@@ -21,6 +21,14 @@ travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
 spindle_to_table_mm = [62.484, 431.8]
 
+# HA: the shop's installed lathe (Pedro 2026-10-15), from the deleted inventory
+# (45952b66bc:cad/process/shop/inventory.toml machines.PM-1127VF-LB), its two
+# spindle ranges as archived. MHA-PD-00 turns a stub mandrel in place in its
+# chuck (cad/scripts/ha_assembly_package.py, #2392).
+[machines.pm-1127vf-lb]
+kind = "lathe"
+rpm_ranges = [[70, 380], [380, 2000]]
+
 # HA: fixtures.vise-pm-6 (Precision Matthews VISE-6in-HIGHPREC; make, SKU and
 # source stay in cad/config/shop-equipment.toml), from the deleted inventory
 # (45952b66bc:cad/process/shop/inventory.toml), × 25.4. Measured by Pedro on
@@ -187,3 +195,22 @@ material = "rocker-1018-cold-finished"
 sfm = 65
 chip_load_mm_per_tooth = 0.0254
 flutes = 4
+
+# HA: the MHA-MS-01 stick's engraving bit (cad/config/shop-equipment.toml
+# tools.ms-stick-engraver: make, SKU, 30 deg V, .005 in tip) on its brass,
+# read by test_ms_stick_drawing. Source: 2L "Feeds and Speeds for Engraving
+# with an Engraving Tool" (engraving_tool_speed_and_feed_table.pdf, read live
+# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm (the
+# PM-30MV's top speed), halved for small tip widths as its note says: 3 in/min
+# by handwheel, plunge at half that; passes .005 deep, the last .001-.002 at a
+# slower feed to leave no burr. diameter_mm is the 1/8 in shank (the bit's
+# body); the cutting width is the V at depth, set by the equipment record.
+[tools.ms-stick-engraver]
+description = "MHA-MS-01 engraving bit, see shop-equipment.toml tools.ms-stick-engraver"
+diameter_mm = 3.175
+
+[settings.ms-stick-engrave-brass]
+tool = "ms-stick-engraver"
+material = "ms-stick-brass"
+rpm = 3000
+feed = "3 in/min"

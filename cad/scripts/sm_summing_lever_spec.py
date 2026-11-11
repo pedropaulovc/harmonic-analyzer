@@ -13,7 +13,7 @@ Values MUST match build_sm_summing_lever.py.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths
 stay physical millimetres.  The lever's nominals are kinematic closures
-(knife ridge, spring stations and pitch), spring/nut seats or values other
+(knife ridge, spring stations and pitch), spring seats or values other
 subsystems read, so they keep their values and print at the places that
 hold them; every check below takes the printed limits.  Only the R MAX
 limits (knife-ridge round, rib blends) and the knife-edge side band move to
@@ -41,13 +41,13 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
-# --- Nominal geometry (SummingLever.cs, inches -> mm; DIMENSIONS.md ch. 18). ---
+# --- Nominal geometry (mm); plate/web centring per owner issue #2129. ---
 PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
 PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
-COUNTER_WEB_T = 0.2 * MM_PER_IN  # 5.08 negative-X web, centered on Y0
-COEFFICIENT_T = 7.0  # uniform positive-X plate; thickened downward only (.276)
-COEFFICIENT_TOP_Y = 0.1 * MM_PER_IN  # fixed +2.54 seat, independent of web depth
-COEFFICIENT_BOTTOM_Y = COEFFICIENT_TOP_Y - COEFFICIENT_T  # -4.46 nut seats
+COEFFICIENT_T = 7.0  # uniform plate centred on the pivot/trunnion axis
+COUNTER_WEB_T = COEFFICIENT_T  # negative-X web shares the plate's two faces
+COEFFICIENT_TOP_Y = COEFFICIENT_T / 2.0  # +3.50 spring-anchor seats
+COEFFICIENT_BOTTOM_Y = -COEFFICIENT_T / 2.0  # -3.50 plate underside
 CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
@@ -165,8 +165,8 @@ SURFACE_FINISHES = (
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``ch-vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the supplied nut is discarded
-# and each is locked by an MHA-CH-14 jam nut on the plate underside -- so
-# each station is a through tap, not a bore:
+# and each stays bare, nothing torquing it (#2326) -- so each station is a
+# through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
 # supplier change can never leave the lever tapped for the wrong screw.
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
@@ -182,13 +182,13 @@ CHANNEL_PITCH = 7.62  # machine channels.station_pitch_mm, .300
 # test_station_pitch_lockstep pin it (-CHANNEL_PITCH / 2).
 HOLE_Z_OFFSET = -3.81
 # The whole coefficient plate now supplies the spring tap's 1.5D engagement
-# at its printed .XX band. Its top and underside remain the
-# existing spring-eye and jam-nut seats; there is no separate pad or step.
+# at its printed .XX band. Its top remains the existing spring-eye seat;
+# there is no separate pad or step.
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
 RIB_T = 5.08  # every edge/middle rib extrusion, .20 on the ordinary .XX band
 RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
-# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst nut
-# footprint at X36.449.
+# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst
+# protruding anchor-shank footprint at X37.970 (no jam nut, #2326).
 RIB_REACH = 35.814  # 1.41 in
 # Modeled at the title block's inside-corner ceiling, R.040 MAX.
 RIB_BLEND_R = inside_corner_radius_mm(unit=UNIT)
@@ -204,6 +204,8 @@ COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
+# Preserve the nominal tangent apex exactly; rounding is drawing-only.
+COUNTER_FLANK_ANGLE_DEG = math.degrees(math.asin(RIB_WRAP_R / abs(TIP_X)))
 HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
 HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
@@ -233,6 +235,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationPlate": {"WebThickness": 2},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 2, "RibReach": 2},
     "EdgeRibFront": {"EdgeRibThickness": 2},
+    "MiddleRibProfile": {"MiddleRibCounterAngle": 1},
     "KnifeStubReference": {"KnifeStubLength": 2},
     "KnifeRidgeFillet": {"KnifeRidgeRadius": KNIFE_RIDGE_R_PLACES},
     "KnifeEnvelopeReference": {
@@ -269,11 +272,12 @@ RIB_REACH_DEVIATIONS = _deviations(RIB_REACH, "EdgeRibFrontProfile", "RibReach")
 # Manufacturing GD&T limits consumed by the part's drawing projection.  The
 # inch zones are the source; the drawing prints them, the mm table is derived.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    # Ø.006 (#290; Ø0.15 before), tightened from Ø0.30 (owner ruling on code
-    # review C06): two neighbouring MHA-CH-14 jam nuts stand on adjacent taps,
-    # and at Ø0.30 their worst approach leaves no O.D. both the wall floor and
-    # the 0.25 neighbour clearance admit (ch_anchor_jam_nut_spec).
-    "spring-hole pattern position": ".006",
+    # Ø.010: a THRU tap with no REAM, dowel or register word carries no
+    # position tighter (drawing-guidelines.md "Necessity, then the shop
+    # table"). The hooks thread straight in with no jam nut (#2326), so no
+    # neighbour clearance tightens it; half the zone, ±.005 normal to the knife
+    # line, is error_budget.yaml's summing_hook_arm allowance.
+    "spring-hole pattern position": ".010",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()

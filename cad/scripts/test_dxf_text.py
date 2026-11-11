@@ -185,7 +185,7 @@ def _offset_area(ring, t):
 
 def test_first_layer_volume_is_the_closed_form_v():
     # Disjoint drafted convex outlines: each is a prismatoid, D/6 (A0 + A1 + 4 Am).
-    slope = math.tan(math.radians(part.NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
+    slope = math.tan(math.radians(part.ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0))
     depth = part.NUMERAL_DEPTH
     exact = sum(
         depth / 6.0 * (_offset_area(ring, 0.0) + _offset_area(ring, depth * slope)

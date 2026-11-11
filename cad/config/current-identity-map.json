@@ -436,16 +436,6 @@
       ]
     },
     {
-      "old_stem": "ch-anchor-jam-nut",
-      "old_number": "MHA-CH-014",
-      "new_identities": [
-        {
-          "stem": "ch-anchor-jam-nut",
-          "number": "MHA-CH-14"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-platen-clip",
       "old_number": "MHA-PD-003",
       "new_identities": [
@@ -1827,17 +1817,6 @@
       ]
     },
     {
-      "old_stem": "vn-boss-hook-jam-nut",
-      "old_number": "MHA-VN-072",
-      "new_identities": [
-        {
-          "parent": "sm-summing",
-          "stem": "sm-vn-boss-hook-jam-nut",
-          "number": "MHA-SM-VN-55"
-        }
-      ]
-    },
-    {
       "old_stem": "sm-knife-mount",
       "old_number": "MHA-SM-002",
       "new_identities": [
@@ -2862,6 +2841,29 @@
           "parent": "dt-drive-train",
           "stem": "dt-vn-cone-tip-adjuster",
           "number": "MHA-DT-VN-55"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-anchor-jam-nut",
+      "old_number": "MHA-CH-014",
+      "new_identities": [
+        {
+          "stem": "ch-anchor-jam-nut",
+          "number": "MHA-CH-14"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-boss-hook-jam-nut",
+      "old_number": "MHA-VN-072",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-boss-hook-jam-nut",
+          "number": "MHA-SM-VN-55"
         }
       ],
       "status": "retired"

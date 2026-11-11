@@ -24,7 +24,6 @@ from sm_knife_mount_spec import (
 )
 from sm_summing_assembly_spec import (
     BOSS_HOOK,
-    BOSS_JAM_NUT,
     BOSS_ROCK_TRAVEL,
     COUNTER_DIMENSION,
     COUNTER_FEATURE,
@@ -81,7 +80,6 @@ BOM_DESCRIPTIONS = {
     DOWEL: f"{inch_fraction(knife_dowel.DIA, what='knife-mount dowel')} DOWEL PIN",
     LEVER: "SUMMING LEVER",
     BOSS_HOOK: "#10-24 OPEN EYEBOLT, TRIMMED",
-    BOSS_JAM_NUT: "#10-24 THIN HEX JAM NUT",
     COUNTER_SPRING: "COUNTER SPRING",
     GOOSENECK: "COUNTER-SPRING GOOSENECK, BENT TUBE",
     END_PLUG: "GOOSENECK END PLUG",
@@ -163,12 +161,15 @@ ASSEMBLED_NOTES = (
 # cut on the part, so the former knife-mount transfer (sm Q3: hang it
 # soft, spot, drill, tap, harden) is gone. Owner ruling 2026-11-08 (Pedro),
 # #2144 item 11.3 (scheme S1): one dowel per mount; with both bolts
-# finger-tight a gauge bar through both bores sets the mounts' yaw, the
-# bolts are tightened and the bar must slide out (step 5). The lever's
+# finger-tight a gauge bar through both bores sets the front mount's yaw,
+# its bolt is tightened and the bar must slide out (step 5). The lever's
 # rigid outward stubs cannot enter two fixed bores, so the rear mount comes
 # off to take its stub and is
 # re-hung and swung until the rock gauge passes (step 6;
-# build_sm_summing_assembly's rock and rear-yaw budgets). Owner ruling
+# build_sm_summing_assembly's rock and rear-yaw budgets): 6G, not the bar,
+# sets the rear mount, so its bolt stays finger-tight through step 5
+# (Delegated ruling 2026-11-11 (SmGauge2400), no precedent; owner review
+# #2144; #2400: tightening it there was undone at step 6). Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
 # shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
 # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end
@@ -183,13 +184,9 @@ ASSEMBLY_STEPS = (
     f"1B. IF ONE DOES, OR ONE SLID IN BY HAND, BOND IT IN WITH {BOND_GRADE} "
     "PER SHEET 1 NOTE 4.",
     "1C. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
-    "2. SPIN THE MHA-SM-VN-55 JAM NUT ONTO MHA-SM-VN-50 FROM ITS CUT END UP TO "
-    "THE EYE.",
-    "2A. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
+    "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
-    "2B. HOLDING THE EYE CLOCKED, RUN THE JAM NUT DOWN TO THE BOSS TOP FACE "
-    "AND TIGHTEN IT.",
     f"3. CLAMP THE {BRACKET_NUMBER} FLANGE AGAINST THE COEFFICIENT-PLATE END "
     "OF MHA-SM-03, ITS TWO HOLES ON THE REF STATIONS OF THE MHA-SM-03 BRACKET "
     "TAPS WITHIN ±.005 (CALIPERS).",
@@ -208,9 +205,9 @@ ASSEMBLY_STEPS = (
     "5A. TURN EACH CUT MHA-SM-VN-52 DOWN THROUGH ITS WASHER AND HOLE INTO ITS "
     "MOUNT BY HAND UNTIL ITS HEAD MEETS THE WASHER (FINGER-TIGHT).",
     f"5B. SLIDE A {KNIFE_GAUGE_BAR}, THROUGH BOTH MOUNTS.",
-    "5C. TIGHTEN BOTH BOLTS UNTIL EACH TOP SEAT IS DRAWN UP FLAT TO THE "
-    "CROSSBAR UNDERSIDE.",
-    "5D. WITHDRAW THE BAR (CHECK 6).",
+    "5C. TIGHTEN THE FRONT MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT "
+    "TO THE CROSSBAR UNDERSIDE (THE REAR MOUNT IS SET AT 6G).",
+    "5D. WITHDRAW THE BAR (CHECK 5).",
     "6. REMOVE THE REAR MOUNT'S BOLT.",
     "6A. LIFT THE REAR MOUNT OFF ITS DOWEL.",
     "6B. SLIDE THE REAR MOUNT ONTO THE REAR HEX TRUNNION OF MHA-SM-03 FROM ITS "
@@ -257,7 +254,5 @@ ASSEMBLY_CHECKS = (
     "OF MHA-SM-VN-56, UNDER ITS HEAD.",
     f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
     "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
-    "5. THE EYE OF MHA-SM-VN-50 CANNOT BE TURNED BY HAND: MHA-SM-VN-55 IS TIGHT ON "
-    "THE BOSS TOP FACE.",
-    "6. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
+    "5. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
 )

@@ -63,7 +63,6 @@ from dt_crank_pinion_spec import (
 from dt_crankshaft_spec import (
     COLLAR_LENGTH,
     COLLAR_REAR,
-    COLLAR_STATION_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -1069,13 +1068,10 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND), display_unit=UNIT
     )
-    # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the two
-    # far-end stations, the seat spigot's diameter, and the drive-pin holes'
-    # location, press size and depth.
-    for name in ("CollarSeatStation", "CollarRearStation"):
-        set_dimension_symmetric_tolerance(
-            adapter, "StationReference", name, COLLAR_STATION_TOL, display_unit=UNIT
-        )
+    # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the seat
+    # spigot's diameter, and the drive-pin holes' location, press size and
+    # depth.  The two far-end collar stations print at three places under
+    # the title block's .XXX band (#2314).
     set_dimension_bilateral_tolerance(
         adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND), display_unit=UNIT
     )
