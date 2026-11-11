@@ -116,9 +116,14 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "SetPrecision3" not in source
     assert "assert_imported_precision(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
-    # The diameter is the as-bought drill rod: no model band (its stock
-    # fraction prints as a REFERENCE; the supplier's grind governs).
-    assert model_toleranced_dimensions(part) == {}
+    # The diameter is the press size (#2339): a model band, .0782 +/-.0001
+    # at four places, selected from the drill rod.
+    assert model_toleranced_dimensions(part) == {
+        ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE"
+    }
+    assert spec.PIN_DIA_TOLERANCE == pytest.approx(0.0001 * 25.4)
+    assert notes.DRAWING_PRECISION["PinProfile"]["PinDia"] == 4
+    assert spec.BUDGET["interference_min"] >= spec.PRESS_INTERFERENCE_MIN - 1e-9
 
 
 def test_print_carries_no_gdt_or_roughness() -> None:
@@ -145,18 +150,22 @@ def test_no_note_and_the_mates_at_the_diameter() -> None:
     instruction (the channel assembly's step dresses the pin flush)."""
     lines = notes.DIAMETER_CALLOUT.splitlines()
     assert lines == [
-        f"PRESS FIT IN {notes.BAR_NUMBER}",
+        f"SELECTED STOCK, PRESS FIT IN {notes.BAR_NUMBER}",
         f"RUNS IN {notes.LEVER_NUMBER} #47 HOLE",
     ]
-    # #2136 review: the bought rod's REF prints no band and no material (the
-    # supplier's catalogue grind and the title-block MATERIAL own those).
+    # #2136 review: no material in the callout (the title-block MATERIAL owns
+    # the drill rod); the band is the model's, never callout text.
     for row in lines:
         assert "\u00b1" not in row and "DRILL ROD" not in row
     assert not hasattr(notes, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in _build_source()
     source = _source()
     assert "add_property_linked_note" not in source
-    assert "set_dimension_callouts" not in source
+    assert "supplier_reference_dimension" not in source
+    assert (
+        'set_dimension_callouts(adapter, front_annotations, {"PinDia": DIAMETER_CALLOUT})'
+        in source
+    )
     # r1: SOLIDWORKS printed nothing of a multi-line callout above a value.
     assert 'location="above"' not in source
     # The diameter's two-line callout hangs clear of the pin's outline.

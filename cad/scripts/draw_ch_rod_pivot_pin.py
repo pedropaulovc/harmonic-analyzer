@@ -4,18 +4,19 @@ Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the connecting rod's reamed fork pin hole and
 dressed flush with both tines (user ruling 2026-10-09, PR #1292 review F1) --
 on three native model dimensions, all on the side view where a turned part's
-diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø as the 5/64
-stock fraction's REFERENCE (the drill rod's grind governs), its two fits
-named below it (rules 4 and 7: the mates are flagged where they apply), the
+diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø as the
+press size, .0782 +/-.0001 selected from the drill rod (#2339), with that
+route and its two fits named below it (rules 4 and 7: the mates are flagged
+where they apply), the
 installed length as the size set at assembly, flush with the MHA-CH-03 fork
 faces at MHA-CH-00, under the title block's .XX band (rule 19), and the blank's cut length
 as a single MIN limit from the part's blanked ``BlankReference`` sketch. An
 axis centerline, a bare end view with its center mark and the isometric. No
 note: pressing and dressing the pin are MHA-CH-00's step (rule 7). No
 datums, no frames, no roughness symbol.
-The decimal places are the PART's (``ch_rod_pivot_pin_notes.DRAWING_PRECISION``,
-applied natively by ``build_ch_rod_pivot_pin``); this script reads them back
-off the sheet and dresses the journal as its stock fraction. Decimal-inch
+The decimal places and bands are the PART's (``ch_rod_pivot_pin_notes.DRAWING_PRECISION``,
+applied natively by ``build_ch_rod_pivot_pin``); this script reads the places
+back off the sheet and adds the callout words. Decimal-inch
 sheet (#290); the model keeps its millimetre nominals.
 
 Drawn 10:1 -- a 5/64 x .240 pin is a speck on a B sheet at anything less.
@@ -29,12 +30,10 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
 from _check import check
-from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -52,12 +51,10 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from _supplier_dimensions import supplier_reference_dimension
 from ch_rod_pivot_pin_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA_CALLOUT,
-    PIN_DIA_FRACTION_DENOMINATOR,
     PIN_LENGTH_CALLOUT,
 )
 from ch_rod_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
@@ -90,7 +87,7 @@ HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0304
 
 # Side view: the diameter above the view, its text left of centre so the
 # axis-centerline pick at the view's middle lands on bare face, high enough
-# that its two fit lines below stay clear of the pin's top edge; the
+# that its two callout lines below stay clear of the pin's top edge; the
 # installed length below (value and band over its two setting lines), and
 # the blank's cut length below that (value over word), spaced to stay apart.
 RIGHT_KEEP = {
@@ -161,34 +158,19 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
-    # Descriptive text only; the values, places and the blank's MIN limit
-    # are the model's. The installed length states how it
+    # Descriptive text only; the values, bands, places and the blank's MIN
+    # limit are the model's. The journal's press size names the route that
+    # reaches its band and its two fits (drawing-guidelines.md rules 4 and 7:
+    # name the mate where it applies); the installed length states how it
     # is set and accepted (rule 19); the blank says what it is.
     set_dimension_callouts(
         adapter,
         right_annotations,
-        {"PinLen": PIN_LENGTH_CALLOUT, "BlankLen": "BLANK"},
-    )
-    # The journal is the as-bought drill rod: its native value prints as the
-    # 5/64 stock fraction's REFERENCE (#290: supplier tolerance governs), the
-    # stock and its two fits below it (drawing-guidelines.md rules 4 and 7:
-    # name the mate where it applies).
-    journals = [a for a in right_annotations if dimension_name(adapter, a) == "PinDia"]
-    if len(journals) != 1:
-        raise RuntimeError("expected one pin PinDia dimension")
-    supplier_reference_dimension(
-        adapter,
-        _early_bound(
-            _early_bound(journals[0], "IAnnotation").GetSpecificAnnotation(),
-            "IDisplayDimension",
-        ),
-        label="pin PinDia",
-        units="in",
-        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
-        expected_mm=PIN_DIA,
-        presentation="diameter",
-        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
-        callout=PIN_DIA_CALLOUT,
+        {
+            "PinDia": PIN_DIA_CALLOUT,
+            "PinLen": PIN_LENGTH_CALLOUT,
+            "BlankLen": "BLANK",
+        },
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")

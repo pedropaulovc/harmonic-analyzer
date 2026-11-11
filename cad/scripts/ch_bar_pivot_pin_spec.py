@@ -50,10 +50,13 @@ _BAR_UNIT = _bar.UNIT
 # drill cuts on-size to oversize. ---
 DRILLED_PLUS = drilled_oversize_mm(unit=_lever.UNIT)
 
-# --- The pin: 5/64 drill rod (AISI O1/W1, used annealed as supplied; ground
-# to +/-0.0002 in). ---
-PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
-PIN_DIA_TOLERANCE = 0.00508  # +/-.0002 in, drill-rod grind
+# --- The pin: cut from 5/64 drill rod (AISI O1/W1, used annealed as
+# supplied), SELECTED to .0782 +/-.0001 in by micrometer, as the MHA-CH-10 rod
+# pin (#2339): the rod's own grind (+/-.0002 on .0781) against the bar's
+# .0775-.0779 hole left the least interference at zero; rod that mikes
+# .0781-.0783 makes the printed limits alone give FN2's .0002-.0008. ---
+PIN_DIA = 0.0782 * MM_PER_IN  # 1.98628
+PIN_DIA_TOLERANCE = 0.0001 * MM_PER_IN  # +/-.0001 in, selected drill rod
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # Cut length of the blank: the bar plus dressing stock at each end. Its one
 # function is to stand proud of both faces before dressing (machinist round 1,
@@ -90,11 +93,13 @@ BAR_STOCK_UNDERSIZE = _bar.BAR_STOCK_UNDERSIZE  # 0.051
 HOLE_LOCATION_TOLERANCE = printed_band_mm(3, unit=_BAR_UNIT)
 
 # --- The joint's limits (the budget test_ch_bar_pivot_fit holds). ---
-# The tightest press the cheeks take: ANSI B4.1-1967 (R1987) FN2 "medium
-# drive fit, suitable for ordinary steel parts", nominal size 0-0.12 in:
-# interference 0.2-0.85 thousandths of an inch. Its 0.85 thou maximum caps the
-# press; the minimum only has to stay positive (the pin carries no axial load:
-# the lever bears on it radially and the bar cheeks hold it square).
+# ANSI B4.1-1967 (R1987) FN2 "medium drive fit, suitable for ordinary steel
+# parts", nominal size 0-0.12 in: interference 0.2-0.85 thousandths of an
+# inch. Its 0.85 thou maximum caps the press; its 0.2 thou minimum is the
+# least the printed limits leave (the pin carries no axial load: the lever
+# bears on it radially and the bar cheeks hold it square, but a reamed bore's
+# crests flatten on pressing, so a bare positive limit can still slide).
+PRESS_INTERFERENCE_MIN = 0.0002 * MM_PER_IN  # 0.00508
 PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
 # The amplitude bar's walls (its hole-to-face wall and cheeks), judged on the
 # bar's own inch sheet: the .080 target and the .060 floor.
@@ -120,7 +125,7 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
-    drill rod +/-.0002 in, the reamed cheek hole (the bar's TOP_PIN_HOLE_BAND),
+    selected pin .0782 +/-.0001 in, the reamed cheek hole (the bar's TOP_PIN_HOLE_BAND),
     the lever's #47 hole at the lever sheet's DRILLED HOLES row, the lever
     thickness and plate offset at their bands, the top notch and its ledge, the
     bar stock +0/-0.051, the hole's offset from the back face at the bar
@@ -195,8 +200,10 @@ def joint_budget() -> dict[str, float]:
 
 
 BUDGET = joint_budget()
-if BUDGET["interference_min"] <= 0.0:
-    raise AssertionError("the loosest pin can slide out of the largest reamed hole")
+if BUDGET["interference_min"] < PRESS_INTERFERENCE_MIN - 1e-9:
+    raise AssertionError(
+        "the loosest pin presses under ANSI FN2 into the largest reamed hole"
+    )
 if BUDGET["interference_max"] > PRESS_INTERFERENCE_MAX + 1e-9:
     raise AssertionError("the tightest press exceeds ANSI FN2 for the bar cheeks")
 if BUDGET["running_clearance_min"] <= 0.0:

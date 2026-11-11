@@ -55,6 +55,7 @@ from _sketch import (
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -66,6 +67,7 @@ from ch_bar_pivot_pin_spec import (
     INSTALLED_CONFIG,
     PIN_BLANK_LENGTH,
     PIN_DIA,
+    PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
 )
 
@@ -179,15 +181,22 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
-    # Every model edit -- the marked set, the model-owned decimal places, the
-    # material and the appearance -- precedes the INSTALLED split, so INSTALLED
-    # is copied from a finished default (build_dt_pinion_lever_pin: an edit
-    # made after the split touches only the active configuration and left the
-    # other stale in the saved part). The diameter is the as-bought 5/64 drill
-    # rod: untoleranced, the sheet prints it as the stock fraction's REFERENCE
-    # (the supplier's grind governs); the cut length takes the title block's
-    # .XX band (the dressing stock, ch_bar_pivot_pin_spec.joint_budget
+    # Every model edit -- the diameter's band, the marked set, the
+    # model-owned decimal places, the material and the appearance -- precedes
+    # the INSTALLED split, so INSTALLED is copied from a finished default
+    # (build_dt_pinion_lever_pin: an edit made after the split touches only
+    # the active configuration and left the other stale in the saved part).
+    # The diameter is the press size, .0782 +/-.0001 selected from 5/64 drill
+    # rod (ch_bar_pivot_pin_spec, #2339); the cut length takes the title
+    # block's .XX band (the dressing stock, ch_bar_pivot_pin_spec.joint_budget
     # blank_excess_min/max).
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "PinProfile",
+        "PinDia",
+        PIN_DIA_TOLERANCE,
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

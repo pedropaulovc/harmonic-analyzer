@@ -51,8 +51,10 @@ def test_restated_floors_are_their_sources() -> None:
     )
     # The hubs set the pitch the neighbour stack is judged at.
     assert arm.HUB_LENGTH == bank.PITCH and arm.HUB_LENGTH_BAND[1] == 0.0
-    # FN2's 0.85 thou cap, as the bar pin's press.
+    # FN2's 0.2-0.85 thou window, as the bar pin's press.
+    assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-9)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.0215900, abs=1e-9)
+    assert pin.PRESS_INTERFERENCE_MIN == bar_pin.PRESS_INTERFERENCE_MIN
     assert pin.PRESS_INTERFERENCE_MAX == bar_pin.PRESS_INTERFERENCE_MAX
 
 
@@ -66,7 +68,7 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
 
 
 def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
-    """The bar pin's joint: the same drill rod pressed into the same Ø1.9558
+    """The bar pin's joint: the same selected drill rod pressed into the same Ø1.9558
     +0.02286/+0.0127 ream, running in a drilled #47 in the moving member."""
     assert pin.PIN_DIA == bar_pin.PIN_DIA
     assert pin.PIN_DIA_TOLERANCE == bar_pin.PIN_DIA_TOLERANCE
@@ -84,14 +86,16 @@ def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # The press, at the pin's +/-0.00508 against the ream's +0.02286/+0.0127.
-    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
-    assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
-    assert 0.0 < b["interference_min"] <= b["interference_max"]
+    # The press, at the selected pin's .0782 +/-.0001 against the ream's
+    # .0775-.0779: .0002-.0008, FN2 by the printed limits alone (#2339).
+    assert b["interference_min"] == pytest.approx(0.00508, abs=1e-6)
+    assert b["interference_max"] == pytest.approx(0.02032, abs=1e-6)
+    assert pin.PRESS_INTERFERENCE_MIN - 1e-9 <= b["interference_min"]
+    assert b["interference_min"] <= b["interference_max"]
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # The run, in the arm's #47 (.0785 +.004/0).
-    assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
+    assert b["running_clearance_min"] == pytest.approx(0.00518, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.11186, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.127, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.2794, abs=1e-6)
     assert b["neighbour_clearance_min"] == pytest.approx(0.4271, abs=1e-6)

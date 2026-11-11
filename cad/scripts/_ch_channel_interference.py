@@ -17,22 +17,23 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _interference_common import numbered_pairs, smooth_annulus_limit_mm3
 from sh_vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 
-# The MHA-CH-11 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.984375 drill rod
-# pressed into each MHA-CH-01 bar's Ø1.9558 (.077 in) top-pin ream through both
-# top-notch cheeks: 6.35 bar less the .124 (3.1496) notch (inch #290).
+# The MHA-CH-11 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.98628 (.0782 in,
+# selected 5/64 drill rod, #2339) pressed into each MHA-CH-01 bar's Ø1.9558
+# (.077 in) top-pin ream through both top-notch cheeks: 6.35 bar less the
+# .124 (3.1496) notch (inch #290).
 # Channel j's pin and bar are both its (j + 1)th instance (build_ch_channel_assembly
 # inserts one pin per channel in channel order; _copied_chain_instances pins the
 # bar's number).
 # Literals, so this table does not re-key on the pin spec;
 # test_ch_bar_pivot_fit pins them to it.
-BAR_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.35 - 3.1496)
-# The MHA-CH-10 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
+BAR_PIVOT_PIN_PRESS = (1.98628, 1.9558, 6.35 - 3.1496)
+# The MHA-CH-10 rod pivot pins (ch_rod_pivot_pin_spec), the same selected rod
 # pressed into each MHA-CH-03 rod's Ø1.9558 fork ream through both tines:
 # .240 (6.096) fork less the .106 (2.6924) slot (user ruling 2026-10-09, PR
 # #1292 review F1; slot widened #982; inch #290).
 # Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
 # are; test_ch_rod_pivot_fit pins the literals to the pin spec.
-ROD_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.096 - 2.6924)
+ROD_PIVOT_PIN_PRESS = (1.98628, 1.9558, 6.096 - 2.6924)
 # The MHA-CH-VN-53 #4-40 apex set screws (user, 2026-10-10), one down through
 # each MHA-CH-08 ear's arch (apex .388 (9.852) over the bore since #1371,
 # #290) into its Ø.256 bore, the tap cut at its drill. The thread's major envelope crosses no

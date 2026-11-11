@@ -30,7 +30,8 @@ def test_restated_floors_are_their_sources() -> None:
     assert lever.HUB_LENGTH == bank.PITCH
     assert pin.BAR_HOLE_DIA is bar.TOP_PIN_HOLE_DIA
     assert pin.BAR_HOLE_BAND is bar.TOP_PIN_HOLE_BAND
-    # ANSI B4.1 FN2, 0-0.12 in: 0.85 thousandths of an inch at most.
+    # ANSI B4.1 FN2, 0-0.12 in: 0.2-0.85 thousandths of an inch.
+    assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-6)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.02159, abs=1e-6)
     # The hole's offset prints at three places on the bar's inch sheet: .XXX.
     from _printed_tolerance import printed_band_mm
@@ -54,26 +55,31 @@ def test_restated_floors_are_their_sources() -> None:
 def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
     assert pin.PIN_INSTALLED_LENGTH == bar.BAR_WIDTH
     assert pin.PIN_END_PROUD_MAX == 0.0
-    assert pin.PIN_DIA == pytest.approx(5.0 / 64.0 * 25.4)
+    # Selected from 5/64 drill rod to .0782 +/-.0001 (#2339).
+    assert pin.PIN_DIA == pytest.approx(0.0782 * 25.4)
+    assert pin.PIN_DIA_TOLERANCE == pytest.approx(0.0001 * 25.4)
     assert lever.BAR_PIN_HOLE_SPEC.size == "#47"
     assert NUMBER_DRILL_MM["#47"] == 1.994
 
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # Press in the reamed cheeks: real at both band extremes, inside FN2.
-    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
-    assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
-    assert 0.0 < b["interference_min"] < b["interference_max"]
+    # Press in the reamed cheeks: FN2's least interference at the loosest
+    # printed limits, its cap at the tightest.
+    assert b["interference_min"] == pytest.approx(0.00508, abs=1e-6)
+    assert b["interference_max"] == pytest.approx(0.02032, abs=1e-6)
+    assert pin.PRESS_INTERFERENCE_MIN - 1e-9 <= b["interference_min"]
+    assert b["interference_min"] < b["interference_max"]
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # Running fit in the lever's #47 hole.
-    assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
+    assert b["running_clearance_min"] == pytest.approx(0.00518, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.11186, abs=1e-6)
     # Flush ends leave the #1038 top-notch gap untouched.
     assert b["neighbour_clearance_min"] == pytest.approx(0.1223, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
-    # The .55 roof under the .43 lever turned the full relative swing.
-    assert b["notch_roof_clearance_min"] == pytest.approx(0.9882, abs=1e-4)
+    # The .55 roof under the .43 lever turned the full relative swing (the
+    # selected pin's smaller drop in the #47 hole raises it .0022 mm, #2339).
+    assert b["notch_roof_clearance_min"] == pytest.approx(0.9904, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
     # The far face, the offset at its long limit on the narrowest stock: .079,
     # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).

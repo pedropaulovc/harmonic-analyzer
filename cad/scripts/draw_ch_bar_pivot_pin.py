@@ -6,14 +6,15 @@ channel assembly places its INSTALLED configuration, pressed in and dressed
 flush, and its step says so) -- on two native model dimensions, both on the
 side view where a turned part's diameter sits beside its length
 (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø as
-the 5/64 stock fraction's REFERENCE (the drill rod's grind governs), its
-callout naming both mates, and the cut length under the title block's band.
+the press size, .0782 +/-.0001 selected from the drill rod (#2339), its
+callout naming that route and both mates, and the cut length under the title
+block's band.
 An axis centerline, a bare end view with its one center mark and the
 isometric. No notes, no datums, no frames, no roughness symbol.
-The decimal places are the PART's
+The decimal places and bands are the PART's
 (``ch_bar_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
-``build_ch_bar_pivot_pin``); this script reads them back off the sheet and
-dresses the diameter as its stock fraction. Decimal-inch sheet (#290).
+``build_ch_bar_pivot_pin``); this script reads the places back off the sheet
+and adds the callout words. Decimal-inch sheet (#290).
 
 Drawn 10:1 -- a 5/64 x .30 pin is a speck on a B sheet at anything less.
 
@@ -30,7 +31,6 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -45,7 +45,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -53,12 +53,10 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from _supplier_dimensions import supplier_reference_dimension
 from ch_bar_pivot_pin_notes import (
     DIAMETER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PIN_DIA_FRACTION_DENOMINATOR,
 )
 from ch_bar_pivot_pin_spec import PIN_BLANK_LENGTH, PIN_DIA
 
@@ -165,26 +163,9 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
-    # The diameter is the as-bought drill rod: its native value prints as the
-    # 5/64 stock fraction's REFERENCE (#290: supplier tolerance governs), both
-    # mates below it (rule 4).
-    diameters = [a for a in front_annotations if dimension_name(adapter, a) == "PinDia"]
-    if len(diameters) != 1:
-        raise RuntimeError("expected one pin PinDia dimension")
-    supplier_reference_dimension(
-        adapter,
-        _early_bound(
-            _early_bound(diameters[0], "IAnnotation").GetSpecificAnnotation(),
-            "IDisplayDimension",
-        ),
-        label="pin PinDia",
-        units="in",
-        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
-        expected_mm=PIN_DIA,
-        presentation="diameter",
-        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
-        callout=DIAMETER_CALLOUT,
-    )
+    # The diameter is the press size: its value and band are the model's; the
+    # route that reaches the band and both mates print below it (rule 4).
+    set_dimension_callouts(adapter, front_annotations, {"PinDia": DIAMETER_CALLOUT})
     # The template may centre-mark the circle as the view is placed: farm run
     # 20261023T185703445Z's layout audit found two identical marks on it
     # (duplicate-annotation, fleet issue #913) after the explicit call.  Mark

@@ -57,6 +57,7 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _com import _early_bound
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -68,6 +69,7 @@ from ch_rod_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
     PIN_BLANK_LENGTH_TOL_TYPE,
     PIN_DIA,
+    PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
 )
 
@@ -226,12 +228,18 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
 
-    # The journal is the as-bought 5/64 drill rod: untoleranced, the sheet
-    # prints it as the stock fraction's REFERENCE (the supplier's grind
-    # governs); the installed length is set at assembly and prints at two
-    # places under the title block's .XX band; the blank's cut length is a
-    # single MIN limit (it only has to leave dressing stock,
-    # ch_rod_pivot_pin_spec.joint_budget blank_excess_min).
+    # The journal is the press size, .0782 +/-.0001 selected from 5/64 drill
+    # rod (ch_rod_pivot_pin_spec, #2339); the installed length is set at
+    # assembly and prints at two places under the title block's .XX band; the
+    # blank's cut length is a single MIN limit (it only has to leave dressing
+    # stock, ch_rod_pivot_pin_spec.joint_budget blank_excess_min).
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "PinProfile",
+        "PinDia",
+        PIN_DIA_TOLERANCE,
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     _blank_min_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

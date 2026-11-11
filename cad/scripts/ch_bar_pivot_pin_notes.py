@@ -29,16 +29,18 @@ LEVER_NUMBER = "MHA-CH-02"  # runs in its #47 bar-pin hole
 # The diameter and the length live on the revolve's half-profile
 # (``PinProfile``), so both import into the side view beside each other
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The
-# diameter is the as-bought 5/64 drill rod: the sheet prints it as the stock
-# fraction, a REFERENCE whose supplier grind (+/-.0002) governs (#290 ruling:
-# fractions only on as-bought stock, shown as REF). The length is the cut
+# diameter is the press size, .0782 +/-.0001 at four places
+# (ch_bar_pivot_pin_spec.PIN_DIA_TOLERANCE, #2339): narrower than the turned
+# row, it is reached by the shop table's precision-stock route, the
+# title-block drill rod selected by micrometer, named at the callout without
+# restating the stock (#2136 review). The length is the cut
 # blank's, at the spec's places under the title block's band (the dressing
 # stock in ch_bar_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 3, "PinLen": pin.PIN_BLANK_LENGTH_PLACES},
+    "PinProfile": {"PinDia": 4, "PinLen": pin.PIN_BLANK_LENGTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -50,17 +52,16 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked pin dimension needs authored places")
 
-# Descriptive text only; every value is the model's. The diameter names both
-# mates (rule 4), two lines of words under the size (rule 7: a callout is
-# short). The stock fraction in parentheses already says the rod is bought
-# (guidelines `What the shop holds`: fractions are as-bought stock, REF), and
-# the title-block MATERIAL names the drill rod. The callout hangs under its
-# value: SOLIDWORKS drops a multi-line callout stacked above a value from the
-# print (r1: the diameter's never reached the PDF).
-PIN_DIA_FRACTION_DENOMINATOR = 64  # 5/64 drill rod
+# Descriptive text only; every value is the model's. Under the size, the
+# route that reaches its band, then both mates (rule 4), each in a few words
+# (rule 7: a callout is short); the title-block MATERIAL names the drill rod.
+# The band against the bar hole's printed limits gives FN2's .0002-.0008 (the
+# spec's budget). The callout hangs under its value: SOLIDWORKS drops a
+# multi-line callout stacked above a value from the print (r1: the
+# diameter's never reached the PDF).
 DIAMETER_CALLOUT = "\n".join(
     (
-        f"PRESS FIT IN {BAR_NUMBER}",
+        f"SELECTED STOCK, PRESS FIT IN {BAR_NUMBER}",
         f"RUNS IN {LEVER_NUMBER} #47 HOLE",
     )
 )

@@ -943,7 +943,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # more, so a thinner stretch of the taper sits in both receivers.
     assert 111.5 < crank_allowed[hub_pair] < 112.3
     assert 54.8 < crank_allowed[shaft_pair] < 55.3
-    # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.9558 ream
+    # MHA-CH-11: each .0782 bar pivot pin (selected 5/64 rod) pressed into its bar's Ø1.9558 ream
     # through both top-notch cheeks (6.35 bar less the .124 notch), and
     # MHA-CH-10: the same pin pressed into its rod's Ø1.9558 fork ream through
     # both tines (.240 fork less the .106 slot); channel j's pin with
@@ -960,13 +960,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
-                ): _annulus_limit(1.984375, 1.9558, 6.35 - 3.1496)
+                ): _annulus_limit(1.98628, 1.9558, 6.35 - 3.1496)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
                     (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
-                ): _annulus_limit(1.984375, 1.9558, 6.096 - 2.6924)
+                ): _annulus_limit(1.98628, 1.9558, 6.096 - 2.6924)
                 for n in range(1, 21)
             },
             **{
