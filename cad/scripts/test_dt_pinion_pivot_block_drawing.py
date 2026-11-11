@@ -335,8 +335,9 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     proud = rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.254
     # Both are budgeted on the worst fitted stack (their own tests); at
-    # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.29 * 25.4, 7.73 * 25.4))
+    # nominal each stands that allowance proud of the front block.  #1038
+    # re-pitch: both grow by the 6.06 drum's .42 in.
+    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.71 * 25.4, 8.15 * 25.4))
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -417,8 +418,8 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
 
 
 def test_front_block_feeler_setting_is_the_ruled_band() -> None:
-    # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and
-    # so the 185.1 shaft and 197.0 rod) true is ruling (c)'s 0.25 +/- 0.10
+    # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and so the
+    # torque shaft and lift rod lengths) true is ruling (c)'s 0.25 +/- 0.10
     # feeler between the front strap and the front block.  The band is a
     # named fit-up value so the MHA-DT-00 step and every worst-case gate read
     # one source; it never closes the gap or doubles it.  The layout owns it

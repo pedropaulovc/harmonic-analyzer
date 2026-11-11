@@ -111,7 +111,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # Three part-specific facts a machinist cannot read off the views (policy
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The O.D. IS a catalog stock size, so the .0008 in running band is a
-# stock buy rather than a grind between centres, and a 6.5:.375 slender bar is
+# stock buy rather than a grind between centres, and a 7:.375 slender bar is
 # turned between centres -- saying the centre holes may stay saves a phone
 # call (each dome is turned on its centre, which may stay).
 # The length is cut at assembly, so the shop supplies the bar long (7-1/2 in

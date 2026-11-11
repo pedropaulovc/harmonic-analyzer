@@ -154,9 +154,9 @@ FLAT_EDGE_FROM_RIM = {key: _flat_edge_from_rim(key) for key in FLAT_LEN}
 FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
 FRONT_FLAT_LEN = FLAT_LEN["front"]  # 5.588 (.22)
 BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.318 (.17)
-FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 166.370 (6.55), printed
+FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 177.038 (6.97), printed
 BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.986 (.59), printed
-FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 169.164 (6.660), centre
+FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 179.832 (7.080), centre
 BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.145 (.675), centre
 
 SCREW_POINT_ON_FLAT_MARGIN_MM = min(

@@ -457,9 +457,9 @@ sections:
         - stated
         - high
       - - Axial pitch (z)
-        - 7.0565 mm
-        - '0.278'
-        - 'Current frame-locked channels.station_pitch_mm and cylinder_bank_layout.BANK_PITCH; the earlier 7.0568 mm photo-derived Z-projection is historical rounding, not the configured station pitch'
+        - 7.62 mm
+        - '0.300'
+        - 'Current frame-locked channels.station_pitch_mm (.300 in, owner ruling 2026-11-11, #1038 re-pitch) and cylinder_bank_layout.BANK_PITCH; the former 7.0565 mm channel grid and the earlier 7.0568 mm photo-derived Z-projection are historical, not the configured station pitch'
         - derived
         - med
       - - Gear face width
@@ -481,9 +481,9 @@ sections:
         - scaled + derived current spec
         - med
       - - Cam thickness
-        - 4.0593 mm
-        - '0.160'
-        - 'Current dt_cylinder_gear_spec.CAM_THICKNESS = OVERALL_THICKNESS 7.0565 − FACE_WIDTH 2.9972 (.118 in): the solid sandwich owns the channel spacing. Historical M6 photo budget used 3.5 mm and refuted the legacy 10.2 mm cam, which alone exceeds the pitch; neither historical estimate is the current stack thickness.'
+        - 4.6228 mm
+        - '0.182'
+        - 'Current dt_cylinder_gear_spec.CAM_THICKNESS = OVERALL_THICKNESS 7.62 (.300 in) − FACE_WIDTH 2.9972 (.118 in): the solid sandwich owns the channel spacing, and the #1038 re-pitch puts its 0.5635 mm into the cam (owner default 2026-11-11; the former cam was 4.0593 at the 7.0565 grid). Historical M6 photo budget used 3.5 mm and refuted the legacy 10.2 mm cam, which alone exceeds the pitch; neither historical estimate is the current stack thickness.'
         - derived from current spec
         - med
       - - Cam eccentricity
@@ -499,9 +499,9 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 165.194 mm cylindrical strap-to-strap span; 168.242 mm including two domes
+        - 176.464 mm cylindrical strap-to-strap span; 179.512 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.95 mm north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88 and 164.874 / 167.922 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.95 mm north spring gap, with full depth of both 10.16 mm (.40 in) pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The #1038 re-pitch adds 20 × 0.5635 mm; the 7-1/2 in supply still covers it. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88, 164.874 / 167.922 and 165.194 / 168.242 mm lengths are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
       - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
@@ -653,11 +653,11 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, making the drum-side generator parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −82.524312220..+82.669687780 (165.19 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −88.159312220..+88.304687780 (176.46 mm), domes 1.524 mm (.06 in) proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j
-        - 'toothed slab centred at z_j = −64.012412219573 + 7.0565j; installed Ry180 about its phased local Y diameter; cam/rod-ring centre is z_j − 3.52825 from the current 4.0593 mm cam thickness'
+        - 'toothed slab centred at z_j = −69.083912219573 + 7.62j; installed Ry180 about its phased local Y diameter; cam/rod-ring centre is z_j − 3.81 from the current 4.6228 mm cam thickness'
         - mesh plane alignment
         - high
       - - Crankshaft
@@ -2055,9 +2055,9 @@ sections:
         - derived from selected finite stock form
         - med current nominal geometry; qualification separate
       - - Drum length
-        - 143.256 mm
-        - '5.64'
-        - 'Current pinion_rig_layout locates the 143.256 mm (5.64 in) drum from its back end: pushed-back bank j19 back face +1.25 mm setup leaf, preserving the full 3.0 mm face at printed worst stack. The historical p.67 photo motivates a long drum spanning all 20 gears, not a frozen 0.274 mm short-back placement.'
+        - 153.924 mm
+        - '6.06'
+        - 'Current pinion_rig_layout locates the 153.924 mm (6.06 in) drum from its back end: pushed-back bank j19 back face +1.25 mm setup leaf, preserving the full 3.0 mm face at printed worst stack. The #1038 re-pitch grew it from 5.64 in by 19 × 0.5635 mm rounded to the .01 in grid, keeping the j = 0 slack (3.367 mm; 5.93 in is the shortest that covers gear 0). The historical p.67 photo motivates a long drum spanning all 20 gears, not a frozen 0.274 mm short-back placement.'
         - derived
         - med
       - - Material
@@ -2123,9 +2123,9 @@ sections:
       dimensions.yaml / the pure rig readers has axis (−17.130, 95.25), from
       X_DRUM plus drum radius 32.207, pinion radius 8.814 and parked gap 2.2425;
       former axis (−16.876, 90.518) / radii 32.279 and 8.996 were ideal-tooth
-      lower-rig references. Drum z −70.446..+72.810 (143.256 face, all 20
-      stations), integral steel arbor/head root z −130.746..+95.416,
-      head/crossrod axis z −137.248, and separate MHA-DT-15 crossrod at +65°.
+      lower-rig references. Drum z −75.479..+78.445 (153.924 face, all 20
+      stations), integral steel arbor/head root z −135.779..+101.051,
+      head/crossrod axis z −142.281, and separate MHA-DT-15 crossrod at +65°.
       Straps: 15 wide × 9.144 thick with R7.5 ends, plain (no cam relief), pivot
       (−13.166, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
       former pivot (−12.912, 62.8) belonged to the lower ideal-tooth rig. The swing

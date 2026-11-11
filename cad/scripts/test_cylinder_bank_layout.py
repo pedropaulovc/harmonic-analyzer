@@ -152,8 +152,8 @@ def test_a_closed_slot_always_holds_the_whole_ring() -> None:
     assert ring_max == pytest.approx(2.2352)
     assert bank.RING_MAX == pytest.approx(ring_max)
     assert bank.SHANK_MAX == pytest.approx(ring_max)
-    # d': the thinnest in-band gear, 7.0565 - .0010 in, less FW + .002 in.
-    assert bank.SLOT_MIN == pytest.approx(3.9831)
+    # d': the thinnest in-band gear, .3000 - .0010 in, less FW + .002 in.
+    assert bank.SLOT_MIN == pytest.approx(4.5466)
     assert bank.RING_SLOT_MARGIN == pytest.approx(bank.SLOT_MIN - ring_max)
     assert bank.RING_SLOT_MARGIN >= bank.MARGIN_SPARE
 

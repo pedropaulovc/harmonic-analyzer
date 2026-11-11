@@ -30,9 +30,9 @@ DRAWING_DIMENSIONS = {feature: {name} for feature, name, _south, _north in LEGS}
 # band, floored to ±.003 (±.004 would admit 0.0016 past the bank layout's
 # budget).  The nominals stay the model's (the stack is the gears' sum, the
 # gap a metric gauge blade), so they print at four places with the band as
-# ±.0030 (5.5563, .0374): at three places their rounding would move the
-# printed limits off the native ones (Codjiflo, #2194; drawing-guidelines
-# rule 3).
+# ±.0030 (6.0000, .0374): the stack is on the inch grid since the #1038
+# re-pitch, but the spring gap at three places would round its printed limits
+# off the native ones (Codjiflo, #2194; drawing-guidelines rule 3).
 BAND_PLACES = 3
 PLACES = 4
 DRAWING_PRECISION = {feature: {name: PLACES} for feature, name, _south, _north in LEGS}
