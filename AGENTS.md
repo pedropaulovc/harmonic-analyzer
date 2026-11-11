@@ -91,7 +91,7 @@ being measured:
 | campaign assets, costs and copy maturity | the relevant file under `kickstarter/` |
 | website implementation coverage | `web/src/` + `web/DESIGN.md` |
 | AI-story structure, post maturity and evidence | `ai-story/outline.md` + `ai-story/posts/` + `ai-story/evidence/` |
-| installed shop equipment | `cad/process/shop/inventory.toml` |
+| installed shop equipment | `cad/process/shop.toml` (prechips records) + `cad/config/shop-equipment.toml` (facts prechips has no field for); one fact in one file, never a field in both |
 
 When work changes a domain fact, update its repository source first. Then update
 the issue or project item and link the commit, entry or source file. A project
@@ -445,7 +445,7 @@ such build:
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
-| `prechips:<stem>` (enrolled process travelers) | **no** (FreeCAD 1.1) | no (parallel; needs scoped manifest + STEP) | no (submitter-only) |
+| `prechips:<stem>` (enrolled process travelers) | **no** (stdlib-only prechips CLI) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -484,20 +484,46 @@ STEP bytes into its separate neutral inventory; it consumes bundle outputs,
 not draw closures directly. The release-only `check:features_bound` validates
 scoped recorded face refs, requires two rocker pivot-bore patches and identical
 scoped/full STEP bytes, and reports both digests. Release staging copies the
-verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
-depends only on its own `package:features:<stem>` leaf, not `package:features`, and uses
-the exactly pinned PyPI `prechips==0.3.0` consumer and `cad/process/` with a strict
-**exit 0 only** policy: bad input, machining blockers and required unknowns all
-fail without a stamp. The 0.3.0 release adds bounded contract admission,
-not full-route qualification; the revision guard still refuses v48 plans against
-v47 exports before consumer/kernel execution.
-Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
-Traveler enrollment is currently empty. Migrated plans may track revisions while
-held from enrollment; neither a plan's presence nor its current revision is
-machining approval. A part enrolls only after a migrated plan reaches exit 0 on
-real exported geometry. Releases ship verified travelers under `travelers/<stem>/`
-and list them in the notes. See [feature exports and
-travelers](cad/docs/pipeline/features-travelers.md).
+verified scoped bundles under `features/`. `check:features_bound` is HA-owned:
+it checks part identity, the adjacent STEP name and sha256, a non-empty features
+table and each feature's face set against that STEP; neither it nor
+`export_features` validates against a prechips schema.
+
+Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and
+end bracket) has a `prechips:<stem>` task. It runs
+`cad/scripts/prechips_traveler.py <stem>`, which runs
+`python -m prechips traveler cad/process/<stem>/plan.toml` twice from the same
+plan: `--profile pro` writes `cad/out/travelers/<stem>/traveler.html` and
+`--profile hobby` writes `traveler-hobby.html` with the plan's setup pictures
+(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). prechips is a
+stdlib-only PyPI dependency (`prechips>=0.9`; the lock resolves the latest
+release, bump it with `uv lock --upgrade-package prechips`): no FreeCAD, no
+geometry kernel, no report or hash certificate. The plan reads its CAD values
+from the part's `features.toml` and its machines, tools, settings and gauges
+from `cad/process/shop.toml`. Owner rulings (Pedro): the prechips cutover is a
+clean cutover that deleted the legacy machinery, including the #1413
+placeholder release refusal and the PROVISIONAL sheet stamp; and for prechips
+shop data, "no pedantism of not measured value inferred; if it is in the
+inputs they will be considered" (2026-11-10). `shop.toml` values are used as
+written, with no measured/placeholder provenance, and they are HA's own
+recorded values (the deleted inventory's, where it had one; tool diameters stay
+nominal), not prechips example values. Only exit 0 from both profiles passes; exit 2 from
+either is a refusal (bad input or a failed enforced check) and leaves neither
+file nor a stamp. Each task depends only on its own
+`package:features:<stem>` leaf, is not cache-keyed, and `build` and `release`
+require every enrolled stem. A stem without a plan fails only its own task.
+Under prechips 0.9 the base bar and end bracket pass both profiles on the v48
+manifests. The feed lever's
+plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
+`cad/process/README.md`). prechips adapters are tied to the manifest's
+contents, so a drawing change that alters a part's manifest requirements needs
+a prechips adapter release before that part's traveler passes again.
+A generated traveler is not machining approval. Release staging refuses a
+traveler whose sheet header does not print the drawing number and revision of
+the manifest staged beside it.
+Releases ship each part's `travelers/<stem>/traveler.html` and
+`traveler-hobby.html` and list them in the notes.
+See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -517,15 +543,12 @@ travelers](cad/docs/pipeline/features-travelers.md).
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
   publisher run on the submitter, precompute README images before the tag, and
-  install them with the `next_revision` and migrated/enrolled plan revision bumps only
-  after publication succeeds.
+  install them with the `next_revision` bump only after publication succeeds.
 - The release follow-up PR is exempt from the ordinary PR requirements ONLY if its
-  entire diff is the `cad/config/release.yaml` `next_revision` bump, the matching
-  `[drawing].revision` literal lines in migrated or enrolled
-  `cad/process/<stem>/plan.toml` files, and generated README image files. It may
-  merge immediately. Other plan
-  or shop changes, code, prose, docs, README markup/layout or any other change
-  stays in an ordinary PR and MUST satisfy the ordinary PR requirements.
+  entire diff is the `cad/config/release.yaml` `next_revision` bump and generated
+  README image files. It may merge immediately. Plan or shop changes, code,
+  prose, docs, README markup/layout or any other change stays in an ordinary PR
+  and MUST satisfy the ordinary PR requirements.
 - For a supervised farm release, launch only
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
@@ -536,14 +559,12 @@ travelers](cad/docs/pipeline/features-travelers.md).
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Every migrated or enrolled
-  process plan in `_process_plans.revision_stems()` must keep its tracked
-  `[drawing].revision` literal equal to it. This revision-only scope does not
-  enroll held plans or qualify them for machining: build/release traveler
-  participation remains `TRAVELER_STEMS`. The publisher stages all revision
-  updates before publishing and advances them together afterward; the release
-  agent MUST merge that generated-only follow-up before the next release.
-  `--no-publish` leaves all tracked revisions and images byte-identical.
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Process plans carry no
+  revision literal: they bind it from the exported manifest. The publisher
+  stages the `next_revision` update before publishing and advances it
+  afterward; the release agent MUST merge that generated-only follow-up before
+  the next release. `--no-publish` leaves the tracked revision and images
+  byte-identical.
 
 ### Release notes
 

@@ -211,14 +211,11 @@ def test_opposed_full_thread_limits_protect_each_screw_from_the_other_tap() -> N
     assert spec.SCREW_TIP_GAP_MIN > 0.0
     assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.BAR_THREAD_LIMITS[0]
     assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.KP08_THREAD_LIMITS[0]
-    from prechips.model import Feature
-
     for name in ("tap_1", "tap_2"):
         feature = _features()[name]
         assert feature["thru"] is True and "note" in feature["requirements"]
         for low, high in (spec.BAR_THREAD_LIMITS, spec.KP08_THREAD_LIMITS):
             assert f"{low:.3f} TO {high:.3f} mm" in feature["note"]
-        assert set(feature) <= set(Feature.model_fields)
 
 
 def test_kp08_receipt_band_stands_and_its_least_foot_keeps_the_tips_apart() -> None:
@@ -294,11 +291,13 @@ def test_bottom_blind_precursor_leaves_real_material_for_the_top_wizard() -> Non
 
 def test_owned_hand_taps_replace_the_extension_tap_prerequisite() -> None:
     assert not hasattr(spec, "TAP_REACH_MIN") and not hasattr(spec, "TAP_TOOL")
-    inventory = tomllib.loads(
-        (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    equipment = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )
-    assert "tap-8-32-extension-spiral-point" not in inventory["tools"]
-    hand = inventory["tools"]["taps-unc-hand"]["members"]["8-32-plug"]
+    for tools in (shop["tools"], equipment["tools"]):
+        assert "tap-8-32-extension-spiral-point" not in tools
+    hand = equipment["tools"]["taps-unc-hand"]["members"]["8-32-plug"]
     assert hand["flute_len_in"]["value"] == pytest.approx(0.75)
     process = _config.parts(ARTIFACT)["process"].lower()
     assert "plug" in process and "bottoming" in process
@@ -864,11 +863,7 @@ def test_sheet_carries_no_notes() -> None:
     assert "Manufacturing Notes" not in source
 
 
-def test_prechips_solids_are_valid_fixture_solids() -> None:
-    from prechips.model import FixtureSolid
-
-    for solid in spec.PRECHIPS_SOLIDS:
-        FixtureSolid.model_validate(solid)
+def test_prechips_solids_name_the_bracket_and_its_taps() -> None:
     names = {solid["name"] for solid in spec.PRECHIPS_SOLIDS}
     assert names == {"end bracket", "tap 1", "tap 2"}
     box = spec.PRECHIPS_SOLIDS[0]

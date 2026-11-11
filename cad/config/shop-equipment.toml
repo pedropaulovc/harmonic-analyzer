@@ -1,0 +1,206 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML read directly by its consumers, deliberately not YAML: a *.yaml file in
+# cad/config joins _buildgraph.all_config_files() and would re-key every
+# whole-config consumer.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- gauges ---------------------------------------------------------------
+
+# Kind only; its range and resolution are cad/process/shop.toml gauges.dti.
+[gauges.dti]
+kind = "dial_test_indicator"
+make = "LittleMachineShop"
+
+# Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
+[gauges.pin-gauges]
+note = "illustrative example item: class ZZ minus pin gauges (three boxes)"
+
+# Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
+# block set, for setting DRO stations and indicator zeros against a wrung stack.
+# Standard 81-piece inch composition: .1001-.1009 by .0001 (9); .101-.149 by .001 (49);
+# .050-.950 by .050 (19); 1, 2, 3, 4 (4). Model number not yet recorded.
+[gauges.gauge-blocks-mitutoyo]
+name = "Mitutoyo 81-piece inch gauge block set, shop grade"
+kind = "gauge_block_set"
+make = "Mitutoyo"
+present = true
+note = "owner-confirmed 2026-11-08: 81-piece inch set, shop grade; largest block 4 in; model number to be recorded"
+
+# The gauge geometry the rocker's profile check reads (edge, pivot pin and rod-slot
+# registration) is owned by cad/scripts/ch_rocker_arm_profile_check.py, and the solids
+# below are the plate's outline envelope with the pivot hole and the rod slot's pin seat
+# as voids, in that module's frame (origin on the pivot-hole axis in the face laid on the
+# arm, +Y toward the arcs' centre, +X toward the rod end, plate Z0..3.175). Physical
+# features: 1/8 in O1 ground flat (3.175 as supplied); pivot hole reamed H7 6.500-6.515
+# for the 0.2558 in Class X minus pin (gauges.vermont-class-x-2558-minus); rod slot 1.983
+# +0.010/0 wide (0.001-0.017 diametral clearance on the 0.0780 in Class ZZ minus pin),
+# radial to the pivot at the arm's rod-pin hole station (133.067, 8.456 BASIC), 0.75 run.
+# Accepted on PROFILE (Pedro 2026-10-11): DTI stations within +/-0.03 of the nominal arcs
+# about the pivot; the trammel setting is the proof of R. The same acceptance is taken
+# with pins in both the pivot hole and the rod slot (#1545): the slot's 0.0780 in pin is
+# one of gauges.pin-gauges and clocks the template on the arm. verify = false is an
+# ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11).
+[gauges.arm-outline-template]
+name = "arm outline template (MHA-CH-06), shop-made"
+kind = "profile_gauge"
+# The plate's x envelope follows the tip stations re-aimed at the arm's mid-zone nominal
+# (owner ruling 2026-11-08, #2144 item 10.3). at_mm/axis are design coordinates, not
+# surveyed measurements.
+solids = [
+  { name = "plate", supply = "made", shape = "box", at_mm = [-145.978, -7.746, 0.0], size_mm = [291.956, 29.240, 3.175], note = "outline envelope; the arcs, tip lands and tapered ends are inside it", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  { name = "pivot-hole", shape = "cylinder", void = true, at_mm = [0.0, 0.0, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 6.5024, length_mm = 3.175, locates = "pin gauge in the rocker's pivot bore", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  { name = "rod-slot", shape = "cylinder", void = true, at_mm = [133.067, 8.456, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 1.9812, length_mm = 3.175, locates = "pin gauge in the rocker's rod-pin hole (datum C); the radial slot's run is not modelled", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+]
+range_mm = [8.0, 817.0]
+resolution_mm = { value = 0.05, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "gauge dial or digital display, smallest marked increment" } }
+shop_made = true
+verify = false
+note = "Shop-made template (retired TL CAD part MHA-CH-06-TL-13; inspection geometry in ch_rocker_arm_profile_check; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot and rod slot (pins in both; the slot's pin is the 0.0780 in from gauges.pin-gauges) at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
+
+# Bought gauge pin that locates the arm outline template (gauges.arm-outline-template) in the
+# rocker's pivot bore (ch_rocker_arm_profile_check PIN_GAUGE_*): the 0.2550 Class
+# ZZ pin from gauges.pin-gauges left 0.0505 of registration play across both bores.
+# Auto-selected 2026-10-15 after review timeout (Codex 4280365386); Pedro may revisit.
+[gauges.vermont-class-x-2558-minus]
+name = "Class X gauge pin 0.2558 in minus (Vermont Gage)"
+kind = "pin_gauge"
+make = "Vermont Gage"
+sku = "141225580"
+source = "https://www.mscdirect.com/product/details/85912335"
+purchase = "Vermont Gage 141225580 Class X minus plug gage 0.2558 in x 2 in, MSC 85912335, $20.30 (MSC listing read live 2026-10-15; auto-selected 2026-10-15 after review timeout, Pedro may revisit)"
+note = "illustrative example item: one Vermont Gage Class X minus pin, 0.2558 in, tolerance -0.000040 in (0.25576-0.25580 in = 6.4963-6.4973 mm), tool steel, 2 in long, with certificate. Locates the arm outline template's reamed 6.500-6.515 hole in the rocker's 6.500-6.530 pivot bore: worst-case registration 0.0262 (0.0094 template + 0.0169 rocker)."
+pieces = 1
+dia_in = { value = 0.2558, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "calipers" } }
+
+# --- measuring equipment on the mill -------------------------------------
+
+# The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop.toml
+# machines.pm-30mv, and its scale resolution is shop.toml gauges.mill-x-dro.
+[dro.pm-30mv]
+make = "MagXact MX-100M"
+cite = [
+  "DRO accuracy, vendor-stated: MagXact MX-100M product page (https://www.precisionmatthews.com/products/dro-mag-m-3ax-18x36x20), read 2026-10-27: \"Magnetic Scales and encoders, .0002” Accuracy\"; the X, Y and Z scales are each listed at .0002 in. Installed DRO and 0.0002 in precision confirmed by the owner 2026-10-27.",
+]
+
+# --- tools ----------------------------------------------------------------
+
+# Existing set confirmed live 2026-10-16, SKU 6784: each size includes 2 and 4 flutes;
+# 3/8 in cutter has 3/8 in shank; 9/16 in cutter has 1/2 in shank.
+# https://littlemachineshop.com/products/end-mill-set-20-pieces-2-4-flute-tin-coated-hss-premium
+[tools.endmills-lms-6784]
+kind = "endmill_set"
+material = "HSS"
+coating = "TiN"
+center_cutting = true
+pieces = 20
+flutes = [2, 4]
+
+[tools.endmills-lms-6784.sizes_in]
+2_and_4_flute = ["3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4"]
+
+# Thread length only; the tap's description and tap drill are cad/process/shop.toml
+# tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
+[tools.taps-unc-hand.members.8-32-plug]
+flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+
+# Shop-made trammel that scribes the rocker template's R800/R816 arcs.
+[tools.rocker-trammel]
+name = "Trial shop-made rocker template trammel, 1018 quarter-inch square bar"
+kind = "trammel"
+shop_made = true
+
+[tools.rocker-trammel.members."R800"]
+# Exact authored nominal centre-to-scriber radius; authorized finished-tool trial
+# estimate, not surveyed shop geometry.
+length_mm = { value = 800, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
+
+[tools.rocker-trammel.members."R816"]
+length_mm = { value = 816, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
+
+# --- workholding ------------------------------------------------------------
+
+[fixtures.vise-pm-6]
+kind = "vise"
+make = "Precision Matthews"
+sku = "VISE-6in-HIGHPREC"
+source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
+# Largest workpiece the stock hard jaws clamp. Vendor page: 6 in; vendor drawing
+# L1 = 150 mm; the bare jaw-to-jaw caliper reading was 6.135 in (2026-10-05), but
+# the owner reports (2026-10-30) only 5 3/4 in pieces fit with the stock hard jaws.
+opening_in = { value = 5.75, measured = { status = "measured", by = "Pedro Paulo Vezza Campos", date = "2026-10-30", instrument = "owner-reported fit with stock hard jaws" } }
+
+# Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
+# setups name (plan text and diagrams; prechips has no parallel or jack record).
+# Source and status: Pedro's 2026-11-05 hand traveler
+# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-11-05.html, tool list (open
+# PR #2218, branch process/basebar-traveler-logbook-advice). Status is as that
+# sheet states it on 2026-11-05; no dimension beyond the sheet's is recorded.
+[fixtures.parallels-1-3-8in]
+name = "1-3/8 in parallels, matched pair"
+present = false
+status = "not owned: your set stops at 1 in"
+use = "Op 30 and Setup A: lift the bar above the jaw tops"
+
+[fixtures.jack-hhip-3901-0079]
+name = "HHIP 3901-0079 screw jack"
+make = "HHIP"
+sku = "3901-0079"
+range = "about 3.9–5.5 in"
+present = false
+status = "not owned"
+use = "Op 30 and A4: under the overhanging end"
+
+# --- stock ------------------------------------------------------------------
+
+# Rocker route v3 stock purchase: catalogue nominals, not receipt measurements.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03 (OnlineMetals order 1021751700): 1/8 x 1-1/2 in 1018 CF flat, 4 pieces x 72 in (standard length). Allocation: ch-rocker-strap (MHA-CH-13) and the oblique-trammel jig strap blank (BLANK_WIDTH 38.1)."
+# OnlineMetals 4807 catalogue nominal .125 x 1.5 in = [38.1, 3.175] mm and 72 x 25.4 = 1828.8 mm; not metrology.
+section_mm = [38.1, 3.175]
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
+
+# Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
+section_mm = [152.4, 12.7]
+length_mm = 1371.6
+on_hand = true
+cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "Acetal (Delrin)"
+note = "Black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner and ordered 2026-11-03). Originally allocated to MHA-CH-06-TL-24; the 2026-11-06 R3 design uses a 6061 riser instead. Retain this order as unallocated stock, not as the current riser material."
+# Catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance. Not metrology.
+section_mm = [44.45, 6.35]
+length_mm = 609.6
+on_hand = false
+cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+
+# Not ordered: stock still to buy.
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3/8 x 1/2 in 1018 CF flat, 2 pieces x 12 in (standard length). Allocation: pd-platen-guide (MHA-PD-11), one rail per piece (10.62 long, both rails of the platen). The rail is .29 ±.01 tall (3/8 stock) by .40/.39 deep (1/2 stock): skim .042 off each of the top and bottom faces and .052 off each of the front and back faces, so opposite faces lose equal metal and the long thin rail does not bow from one-sided stress relief. The bottom face (the Ra 63 µin slide on MHA-PD-07) is cut in that skim. The nearer 5/16 x 1/2 section is not in OnlineMetals' 1018 CF rectangle-bar range (listing read 2026-11-10); the 1/4 x 2-1/2 bar cannot yield the section (#2408). Not owned."
+section_mm = [12.7, 9.525]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]

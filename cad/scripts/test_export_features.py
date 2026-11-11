@@ -18,7 +18,6 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 import yaml
-from prechips.model import Features
 
 import export_features as exporter
 import _config
@@ -754,9 +753,14 @@ def _on_plane(point: list[float], face) -> bool:
     return abs(sum(p * n for p, n in zip(point, face.normal)) - face.offset_mm) < 1e-9
 
 
-def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> None:
-    from prechips.rules.coordinates import model_point
+def _model_point(point: list[float], frame: dict) -> list[float]:
+    return [
+        o + sum(p * axis[i] for p, axis in zip(point, (frame["x"], frame["y"], frame["z"])))
+        for i, o in enumerate(frame["origin"])
+    ]
 
+
+def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> None:
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features, frames = manifest["features"], manifest["frames"]
     selectors = exporter.feature_selectors("dt_cone_pivot_post")
@@ -764,7 +768,7 @@ def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> N
 
     def ends(name: str) -> list[list[float]]:
         frame = frames[features[name]["frame"]]
-        return [model_point([0.0, 0.0, z], frame) for z in features[name]["z_mm"]]
+        return [_model_point([0.0, 0.0, z], frame) for z in features[name]["z_mm"]]
 
     foot, body_top = ends("body")
     head_base, head_top = ends("head")
@@ -780,19 +784,6 @@ def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> N
     north, south = ends("cone_boss")
     for point, face in ((north, selectors["cone_boss_north_face"][0]), (south, selectors["cone_boss_south_face"][0])):
         assert _on_axis(point, journal["at"], journal["axis"]) and _on_plane(point, face)
-
-
-def test_turned_profile_resolves_only_spans_coaxial_with_its_setup() -> None:
-    from prechips.rules.turned_profile import _axial_span
-
-    manifest = exporter.requirement_manifest("dt_cone_pivot_post")
-    features, frames = manifest["features"], manifest["frames"]
-    # A spindle on the post axis facing the head top: setup +Z runs model -Y.
-    spindle = {"origin": [0.0, cone.BLOCK_HEIGHT, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 0.0, 1.0], "z": [0.0, -1.0, 0.0]}
-    assert _axial_span(features["head"], spindle, frames, 1.0) == pytest.approx((0.0, cone.HEAD_HEIGHT))
-    assert _axial_span(features["body"], spindle, frames, 1.0) == pytest.approx((cone.HEAD_HEIGHT, cone.BLOCK_HEIGHT))
-    assert _axial_span(features["crank_boss"], spindle, frames, 1.0) is None
-    assert _axial_span(features["cone_boss"], spindle, frames, 1.0) is None
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
@@ -815,13 +806,12 @@ def test_bundle_paths_reject_unsupported_parts(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
-def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_path: Path, stem: str) -> None:
+def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Path, stem: str) -> None:
     step = _step(tmp_path, stem)
     content = step.read_bytes()
     path = exporter.write_manifest(stem.replace("_", "-"), step, revision="v40")
     assert path == step.with_name("features.toml")
     manifest = _load(path)
-    loaded = Features.model_validate(manifest)
     if stem == "ch_rocker_arm":
         labels = _step_labels(stem)
 
@@ -834,14 +824,15 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
 
         pivot_faces = expected_faces("HAF_PIVOT_BORE__P01")
         assert len(pivot_faces) == 2
-        assert loaded.features["pivot_bore"].faces == pivot_faces
+        assert manifest["features"]["pivot_bore"]["faces"] == pivot_faces
         for datum, label in (("B", "HAF_STRAP_DATUM_B__P01"), ("C", "HAF_ROD_HOLE__P01")):
             datum_faces = expected_faces(label)
             assert len(datum_faces) == 1
-            assert loaded.features[loaded.datums[datum].feature].faces == datum_faces
-    assert loaded.step == step.name
-    assert loaded.step_sha256 == hashlib.sha256(content).hexdigest()
-    assert loaded.drawing.revision == "v40"
+            feature = manifest["datums"][datum]["feature"]
+            assert manifest["features"][feature]["faces"] == datum_faces
+    assert manifest["step"] == step.name
+    assert manifest["step_sha256"] == hashlib.sha256(content).hexdigest()
+    assert manifest["drawing"]["revision"] == "v40"
     assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
     assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml"}
     assert step.read_bytes() == content

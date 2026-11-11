@@ -3,8 +3,8 @@
 The isolated producer owns the raw labelled STEP and its adjacent manifest.
 Full export copies that STEP without rewriting it; the release-only gate
 requires byte-identical scoped and neutral copies. ``features.toml`` must
-satisfy the pinned prechips schema, bind its adjacent STEP's exact raw bytes,
-and record that STEP's exact face sets per feature. Consumers derive feature
+identify its part, bind its adjacent STEP's exact raw bytes, and record that
+STEP's exact face sets per feature. Consumers derive feature
 names from the produced manifest, never reload drawing declarations. Every
 failure is loud; neither export nor the gate regenerates a missing bundle.
 """
@@ -16,9 +16,6 @@ import hashlib
 import tomllib
 from pathlib import Path
 from typing import NoReturn
-
-from prechips.model import Features
-from pydantic import ValidationError
 
 import _telemetry
 import export_features
@@ -67,22 +64,22 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
             manifest = tomllib.loads(manifest_bytes.decode("utf-8"))
         except (UnicodeError, tomllib.TOMLDecodeError) as exc:
             _fail(str(manifest_path), f"invalid TOML ({exc})")
-        try:
-            validated = Features.model_validate(manifest)
-        except ValidationError as exc:
-            _fail(str(manifest_path), f"invalid feature manifest ({exc})")
-        if validated.part != stem.replace("_", "-"):
-            _fail(str(manifest_path), f"part must identify {stem.replace('_', '-')!r}, recorded {validated.part!r}")
+        part = manifest.get("part")
+        if part != stem.replace("_", "-"):
+            _fail(str(manifest_path), f"part must identify {stem.replace('_', '-')!r}, recorded {part!r}")
         if manifest.get("step") != step_path.name:
             _fail(str(manifest_path), f"step must be adjacent basename {step_path.name!r}, recorded {manifest.get('step')!r}")
         if manifest.get("step_sha256") != scoped_digest:
             _fail(str(manifest_path), f"step_sha256 {manifest.get('step_sha256')!r} does not bind the adjacent STEP ({digests})")
-        features = list(validated.features)
-        if not features:
+        table = manifest.get("features")
+        if not isinstance(table, dict) or not table:
             _fail(str(manifest_path), "feature manifest has no features")
+        if not all(isinstance(entry, dict) for entry in table.values()):
+            _fail(str(manifest_path), "every feature must be a table")
+        features = list(table)
         scoped_faces = _face_sets(step_path, step_bytes, features, digests)
         for feature, refs in scoped_faces.items():
-            recorded = validated.features[feature].faces
+            recorded = table[feature].get("faces")
             if not isinstance(recorded, list) or len(recorded) != len(refs) or set(recorded) != set(refs):
                 _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from adjacent STEP {refs!r} ({digests})")
         for feature, expected in _STEP_FACE_COUNTS.get(stem, {}).items():

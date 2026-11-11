@@ -302,25 +302,24 @@ completed
 | order by timestamp desc
 ```
 
-## Process traveler prerequisites
+## Process travelers
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
-run on the farm. They need **FreeCAD 1.1** there; the pinned `prechips==0.3.0`
-Python dependency does not install the FreeCAD executable. This release
-admits new bounded contracts, not qualified held routes or traveler
-enrollment. prechips discovers the Windows FreeCAD 1.1 installation or a command
-on `PATH`; set `FREECAD_CMD` when it lives elsewhere:
+run on the farm. They need nothing beyond the locked Python environment:
+prechips is a stdlib-only PyPI dependency (`prechips>=0.9`), with no
+FreeCAD, geometry kernel or network access. The lock resolves the latest
+release; bump it with `uv lock --upgrade-package prechips`. To render a part's
+two travelers (`traveler.html` under `--profile pro`, `traveler-hobby.html`
+under `--profile hobby` with setup pictures) outside doit, after its scoped
+feature bundle exists:
 
-```powershell
-$env:FREECAD_CMD = "$env:LOCALAPPDATA\Programs\FreeCAD 1.1\bin\freecadcmd.exe"
-uv run --frozen python -c "import prechips.kernel as k; print(k.discover_kernel())"
+```text
+uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 ```
 
-An unavailable kernel is a failure, not a geometry pass: required-unknown
-findings exit 4 and the strict task accepts only exit 0. Enrollment is currently
-empty, so ordinary builds do not run the stale tracked plans. Before enrolling
-a migrated part, follow the binding and validation loop in
-[`cad/process/README.md`](cad/process/README.md).
+Only exit 0 from both profiles is success. Exit 2 from either is a refusal (bad
+input or a failed enforced check) and leaves neither file. Plan authoring and
+the shop files are described in [`cad/process/README.md`](cad/process/README.md).
 
 ## Local pytest timing
 
@@ -1123,7 +1122,7 @@ executors, cache contracts or release checks.
 
 Never launch the `release` target through `farm-run.ps1`: it runs in a
 disposable snapshot, and cleanup would discard the publisher's post-release
-tracked image, `release.yaml` and migrated/enrolled process-plan revision updates. Launch
+tracked image and `release.yaml` updates. Launch
 with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing,
 check and enrolled traveler gates). Once successful, restore the complete `cad/out` from the
 recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into

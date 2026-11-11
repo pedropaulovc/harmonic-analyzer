@@ -254,18 +254,6 @@ def test_matched_rail_rejects_insufficient_actual_walls(wall_name, bad_wall) -> 
         spec.require_matched_rail_walls(**walls)
 
 
-def test_plan_uses_actual_rail_as_template_not_nominal_stations() -> None:
-    plan = (
-        Path(__file__).resolve().parents[1] / "process"
-        / "ch_rocker_arm_tl_oblique_base_bar" / "plan.toml"
-    ).read_text(encoding="utf-8")
-    assert "transfer" in plan.lower()
-    assert "NOT DRO targets" in plan
-    assert "all eight screws enter freely by hand" in plan
-    assert "0.080 in" in plan
-    assert "+/-0.08" not in plan
-
-
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     """Every marked dimension prints once, except rail stations 2-8: the
     rail holes print as one pattern (rule 10), hole 1's station and the

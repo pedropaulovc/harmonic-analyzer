@@ -9,8 +9,8 @@ part without editing a central exporter list. `package:features` is a seat-free
 aggregator depending on every `package:features:<stem>` leaf, not a COM export action.
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
-artefacts. The three machine parts have legacy committed process plans; they
-are not enrolled travelers yet. Fixture bundles expose drawing requirements too.
+artefacts. Parts in `_process_plans.TRAVELER_STEMS` feed their manifest to a
+prechips traveler (below). Fixture bundles expose drawing requirements too.
 Each leaf writes only its own self-contained bundle:
 
 ```text
@@ -123,12 +123,12 @@ The rocker's `land_angle_deg` is the two-place BASIC mirror-plane clock angle
 from `_ALPHA_TOP`, printed in Manufacturing Note 1, not the retired zero-place
 land-perpendicularity band. BASIC radii and height remain nominal scalars;
 arc lengths remain geometry-only metadata, not separate acceptance bands.
-The consumer schema does not expose unequally disposed surface-profile fields:
-the sourced profile control is retained in each arc feature's `note` and its
-acceptance identity remains explicitly `unknown`, never silently omitted or
-replaced with a size band.
+The manifest has no unequally disposed surface-profile fields: the sourced
+profile control is retained in each arc feature's `note` and its acceptance
+identity remains explicitly `unknown`, never silently omitted or replaced with
+a size band.
 
-Pivot-cap fitted-head acceptance uses the consumer's required, cited `note`
+Pivot-cap fitted-head acceptance uses the manifest's required, cited `note`
 field, not private schema keys. The unchanged printed counterbore callouts
 retain the actual seated highest-head recess of 0.50–0.60 normal to the actual
 cap top and the 2.00 minimum whole-floor thickness, including full-width edge
@@ -139,9 +139,8 @@ whole-groove-floor applicability alongside the numeric width/depth bands. Each
 register note carries the boss root-radius maximum, cited to
 `REGISTER_ROOT_RADIUS_MAX`, the value charged to the register assembly and
 engagement proof; the native root stays sharp.
-Authored note requirements are represented by the consumer but are not selected
-for automated tolerance inspection or its traveler tolerance table. Schema
-validation therefore proves representation and
+Authored note requirements are recorded as cited notes, not as numeric
+tolerance bands. The manifest therefore records representation and
 provenance, not fitted-head or every-point floor acceptance; the part's
 native/spec geometry and actual-fit guards remain separate and unchanged.
 
@@ -190,10 +189,12 @@ one surviving half is a failure even if the full inventory copies that mistake.
 ## Release binding gate
 
 `check:features_bound` is SolidWorks-free and required by `release`, not `build`.
-It waits for scoped bundles and the full neutral inventory, validates the
-manifest with the pinned prechips `Features` schema, verifies its adjacent
-scoped STEP digest, and requires every feature's recorded face set to equal
-the references parsed from that STEP. A mismatch fails with the feature name
+It waits for scoped bundles and the full neutral inventory. Its checks are
+HA-owned; no prechips schema is involved. It requires the manifest's `part` to
+identify the bundle's part, its `step` to name the adjacent STEP and its
+`step_sha256` to match that STEP's raw bytes, a non-empty `features` table of
+tables, and every feature's recorded face set to equal the references parsed
+from that STEP. A mismatch fails with the feature name
 before any bundle is staged. The gate requires byte-identical scoped and full
 STEPs, reports both raw digests, and retains the split rocker pivot-bore patch
 check. Full export now copies the scoped STEP bytes: this checks authoritative
@@ -229,161 +230,104 @@ remain valid without forcing a rebuild for shifted lines. There is no raw-YAML
 feature-task override; conservative dependency fallbacks may over-rebuild,
 including after an edit irrelevant to a requirement.
 
-## Plan and fixture binding
+## Process plans
 
-`cad/process/` holds HA-authored process plans and shared shop inputs. Tracked
-plans use stable bare face labels (`HAF_<FEATURE>__P<nn>`), never STEP entity
-numbers or exact `#…/ADVANCED_FACE[…]` refs. Before prechips runs,
-`_process_plans.bind_plan(stem, out)` writes
-`cad/out/travelers/<stem>/plan.toml`, replacing whole quoted label tokens with the
-fresh manifest's exact refs and pointing `features` at that manifest. A label
-with several patches expands inside a list; a multi-face scalar, unknown label
-or label owned by another part fails with its source line. Prose containing a
-label is not rewritten, and other bytes stay unchanged. Plans carry no
-`[paths]`: the wrapper supplies the shop paths as CLI flags.
-Binding requires the plan's drawing revision to equal the scoped manifest's
-revision; release preflight also compares it with the configured next revision.
+`cad/process/<stem>/plan.toml` is a plan in the restarted prechips format
+(see the [prechips README](https://github.com/pedropaulovc/prechips)). Its
+`[cad]` table names the part's scoped manifest,
+`file = "../../out/features/<stem>/features.toml"`, and the prechips adapter
+that reads it; root `shop = "../shop.toml"` names the shared shop file. Text
+and numeric fields bind CAD values as `{{cad.<name>}}` and the plan's own
+`[parameters]` as `{{process.<name>}}`; prechips refuses unknown names. A plan
+directory may also hold `diagrams/*.svg` files that the plan names. HA does not
+rewrite, bind or stamp plans: prechips reads the tracked plan and the exported
+manifest directly, with no STEP reader, geometry kernel or hash check.
 
-A shop-made fixture's inventory entry uses `cad = "<fixture-stem>"` and no
-hand-authored `solids`. Its TL spec exports `PRECHIPS_SOLIDS`, derived from the
-same constants as the SolidWorks fixture in the fixture frame.
-`_process_plans.bind_shop(out)` writes the bound inventory under
-`cad/out/travelers/_shop/`, inserting those primitives and removing the HA-only
-`cad` key. Tracked shop files and plans are never rewritten by binding.
-Binding refuses a spec solid without an explicit `measured.status` (#1462),
-since prechips would otherwise trust it as installed nominal geometry.
+`cad/process/shop.toml` is the prechips shop file (machines, workholding,
+gauges, limits, tools and settings) and holds every fact its schema can
+express. Facts prechips has no field for, read directly by CAD specs and tests,
+live in `cad/config/shop-equipment.toml`. An object may appear in both with
+disjoint fields; no field is duplicated. See
+[`cad/process/README.md`](../../process/README.md).
 
-Task-graph loading validates that every inventory CAD fixture's
-`<fixture-stem>_spec.py` exists as a file. Malformed inventory and missing fixture
-specs are captured as bad-input diagnostics on the enrolled `prechips:<stem>`
-tasks, rather than aborting graph construction; build, gallery, check and part
-tasks remain available. Selecting an affected traveler fails with its task label,
-inventory path and captured diagnostic (including the missing spec path), without
-bundle dependencies, geometry export, kernel launch or a success stamp. Add the
-missing spec file or correct the inventory's `cad` stem before retrying.
+## Travelers
 
-## Strict local travelers and enrollment
-
-`_process_plans.TRAVELER_STEMS` is the enrollment authority for the
-`prechips:<stem>` task family. It is currently **empty**. The rocker, base bar,
-shaft and cone plans are held source proposals, not qualified travelers. The
-rocker's source-authored preform is analytically referenced by HA but is not
-PC-modeled or consumable: its `bandsaw_preform` table is deliberately retained,
-and a deburr note does not model seven saw cuts. A stem enrolls only after its
-migrated plan reaches exit 0 on real exported geometry. See
-[`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
-
-For an enrolled stem:
+`_process_plans.TRAVELER_STEMS` lists the parts with a `prechips:<stem>` task:
+`ch_rocker_arm_tl_oblique_base_bar` and `ch_rocker_arm_tl_oblique_end_bracket`.
+`build` and `release` require every one. The feed lever's plan is held,
+unenrolled (see [`cad/process/README.md`](../../process/README.md)).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
 ```
 
-Every enrolled traveler is required by both `build` and `release`. Its task
-depends only on its own `package:features:<stem>` leaf, its scoped bundle and tracked plan, the shop
-files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
-closure. It runs locally on the submitter without a SolidWorks seat, including
-under the farm executor, and needs FreeCAD 1.1 (see
-[`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer is pinned to PyPI `prechips==0.3.0`. No upstream examples are run by
-this task family. The release adds bounded contracts for qualified
-tailstock tool mounting, relative-coordinate inspection readings and shared-axis
-native placement, not complete route consumption or machining qualification.
-The shaft/cone proposals remain **HELD / UNENROLLED**, as do the rocker and base
-bar. The strict revision guard still refuses authored v48 plans against v47
-exports before invoking the consumer or kernel. Do not rewrite those exports
-or enroll a plan merely because its new fields parse.
+The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
+previous `traveler.html` and `traveler-hobby.html` under
+`cad/out/travelers/<stem>/` and then renders both from the same plan:
 
-Full consumer migration, general traveler rendering and native retained-stock/
-motion replay remain deferred. The rocker preform is still unconsumable; the
-shaft's support and pickups remain unqualified. The cone's rotary, manual-root,
-honing, inspection and finish holds remain unresolved. Relative-reading
-qualification does not yet produce printed physical reading bands or an
-executable inspection procedure. Native shared-axis placement proof is a
-bounded geometry result, not proof of these operations or of a measured part.
+```text
+python -m prechips traveler cad/process/<stem>/plan.toml --profile pro --out cad/out/travelers/<stem>/traveler.html
+python -m prechips traveler cad/process/<stem>/plan.toml --profile hobby --out cad/out/travelers/<stem>/traveler-hobby.html
+```
 
-| prechips exit | build/release gate | interpretation |
+If either run exits nonzero, the wrapper removes both files and returns that
+exit code; the hobby run starts only after the pro run passes. The task is
+SolidWorks-free, submitter-only (including under the farm executor) and not
+remote-cache-keyed. Its only task dependency is its own
+`package:features:<stem>` leaf. Its file dependencies are every file in the
+plan directory (including the `diagrams/*.svg` setup pictures the hobby sheet
+embeds), `cad/process/shop.toml`, the scoped `features.toml`, `pyproject.toml`,
+`uv.lock` and the wrapper's script closure. Its targets are the stamp
+`cad/out/reports/prechips-<stem>.ok`, `traveler.html` and
+`traveler-hobby.html`; the stamp is removed before each run so a refusal never
+leaves an old stamp. If `cad/process/<stem>/plan.toml` is missing, the graph
+still loads and only that task fails, naming the missing plan.
+
+| prechips exit (either profile) | build/release gate | meaning |
 |---|---|---|
-| 0 | pass only after output verification | no blocking/required-unknown findings |
-| 2 | fail, no stamp | machining blockers |
-| 3 | fail, no stamp | bad input or broken binding |
-| 4 | fail, no stamp | required unknowns, including unavailable geometry kernel |
-| other nonzero | fail, no stamp | consumer failure |
+| 0 from both | pass | `traveler.html` and `traveler-hobby.html` written |
+| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `machine_capacity`); neither file kept |
+| other nonzero | fail, no stamp | consumer failure; neither file kept |
 
-Outputs live under `cad/out/travelers/<stem>/`: the bound plan, `report.json`,
-printable `traveler.html`, setup PNGs and operation inspection PNGs. The full
-wrapper deletes the old report and HTML before binding so a binding error or
-consumer failure cannot retain a previous traveler generation.
-Completeness is derived from the plan: one `setup-S<ordinal>.png` per setup plus
-every name from `prechips.report.inspection_sketch_names(plan)`. The report must
-record matching SHA-256 hashes for every render under `inputs["render:…"]`,
-declare `expected_exit == 0`, and match the manifest's `step_sha256`.
-Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
-metadata without regenerating its canonical content hash also invalidates it.
-The consumer does not record an HTML digest itself. After a successful default
-run, the wrapper adds `inputs["traveler:html"]` with the exact HTML path,
-SHA-256 and original `source_report_hash`, then recomputes the report's canonical
-hash. The HTML's `prechips-report` meta tag keeps that original upstream hash,
-avoiding a circular HTML/report hash. Verification requires the recorded HTML
-bytes and recomputes the original report hash without this HA-added record;
-both identities must match. An existing HTML certificate cannot be resealed.
-This is hashed report material, not a free-standing sidecar, and verification
-does not regenerate HTML or invoke FreeCAD. Native artifact binding is tracked
-in [prechips issue #183](https://github.com/pedropaulovc/prechips/issues/183).
-Its input digests must also match the bound plan, scoped feature manifest and
-STEP, inventory, shop policy and cutting data. Verification regenerates the
-tracked plan and shop bindings in memory and requires byte equality with the
-bound files; a report cannot certify a different tracked source generation.
-`verify_traveler` is used after execution, by the task's `uptodate` check and
-during release staging. Changed inputs or renders force a rerun rather than
-allowing a stale `cad/out/reports/prechips-<stem>.ok` stamp to pass.
-
-The authoring wrapper's `--check` mode writes a separate bound plan,
-`.check/_shop/` inputs and consumer outputs under
-`cad/out/travelers/<stem>/.check/`. It references the current scoped feature
-bundle without modifying it. All check-mode output rewrites and render cleanup
-stay in scratch: the full bound plan, shared shop and traveler outputs remain
-untouched even after source edits. Check mode does not verify full completeness.
+The `pro` profile enforces every check listed above and prints a concise sheet.
+The `hobby` profile prints the plan's setup pictures and requires one for every
+setup. A refusal names the check; a pass prints no checker text on the sheet.
+Each traveler is one standalone HTML file. It carries no report, hash or
+certificate, and a pass is not permission to machine: shop measurements,
+physical setup verification and machining approval remain human
+responsibilities.
 
 The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
-`prechips-traveler`; the wrapper continues the task trace with
-`pipeline.prechips_traveler`, `prechips.bind` and `prechips.verify` spans and
-captures prechips telemetry unchanged. The pipeline helper accounts for process
-startup. Binding, completeness and nonzero consumer failures mark the pipeline
-span as failed. A strict pass is not permission to machine: shop measurements,
-physical setup verification and machining approval remain human responsibilities.
+`prechips-traveler`; the wrapper continues the task trace with a
+`pipeline.prechips_traveler` span and one `prechips.traveler` span per profile
+around the CLI.
+A missing plan or nonzero exit marks the pipeline span as failed.
 
-## Release travelers and revisions
+Current state: prechips 0.9 or later is required. The base bar and end bracket
+pass both profiles on the v48 manifests. The feed lever's plan
+refuses on `tool_sizing` (its
+11/32 drill is below the drawing's hole band) and is held out of
+`TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the
+manifest's contents: a drawing change that alters a part's manifest
+requirements needs a prechips adapter release before its traveler passes again.
+
+## Release travelers
 
 After staging the verified `features/` bundles, `cut_release.py` calls
 `_process_plans.stage_travelers(out, stage)` under `release.travelers_stage`.
-Each enrolled traveler is verified against the **staged** feature manifest,
-then only the validated byte snapshots of its bound plan and required outputs
-are written to `travelers/<stem>/` in the release ZIP. The validated shared shop
-inputs are staged under `travelers/_shop/` too. Check scratch, lock files and
-stray temporary files are excluded; staging does not re-read an entire directory
-after verification. `facts["travelers"]` records the staged paths, release notes
-list them, and the final provenance manifest hashes their files. Any incomplete
-report, changed render/input, source binding drift or mismatched STEP digest
-fails before the ZIP is sealed. Empty enrollment stages and lists no travelers.
+It copies each enrolled part's `traveler.html` and `traveler-hobby.html` from
+`cad/out/travelers/<stem>/` to `travelers/<stem>/` in the release ZIP, and
+fails naming every traveler file that was not generated. Before copying, it
+also refuses every traveler whose text lacks the `<number>; <revision>` header
+line built from the `[drawing]` table of the manifest already staged under
+`features/<stem>/`, so a traveler rendered from an older export cannot ship
+beside a newer bundle. `facts["travelers"]` records the staged directories and
+the release notes list them.
 
-Each migrated or enrolled plan's tracked `[drawing].revision` literal equals
-`cad/config/release.yaml:next_revision`. `_process_plans.revision_stems()` owns
-this deduplicated union, independently of traveler enrollment. Publisher
-preflight checks held migrated plans' authored freshness without requiring
-an exported manifest; enrolled plans retain strict authored/configured/manifest
-agreement, even if also migrated. Revision participation does not enroll a held
-plan or imply machining qualification. Historical unmigrated plans stay unchanged.
-The publisher prepares source/temporary pairs for `release.yaml` and every
-revision participant before publication. It changes only the single revision
-line in each plan's `[drawing]` section, preserving
-other bytes. After publication, replacements install in order; a failed
-replacement reports which sources were already installed and names manual
-recovery for the remaining revisions. All temporary files are discarded.
-`--no-publish` and failed publication leave the tracked images and revisions
-byte-identical. The generated-only follow-up exemption covers only generated
-README images, `next_revision`, and matching migrated/enrolled-plan revision lines;
-other plan edits require the [ordinary PR requirements](../../../AGENTS.md#minimum-merge-gate-every-pr),
+The publisher's only tracked-source update is `cad/config/release.yaml`
+`next_revision`; it does not edit process plans. The generated-only follow-up
+exemption covers that bump and generated README images; plan and shop edits
+require the [ordinary PR requirements](../../../AGENTS.md#minimum-merge-gate-every-pr),
 including focused source checks, appropriate native proof and applicable reviews.
 An individual PR or stack does not require a full build before merge; the
 release manager runs the full build on main and releases only green main.

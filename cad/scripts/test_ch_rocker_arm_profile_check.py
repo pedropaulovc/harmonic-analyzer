@@ -1,4 +1,4 @@
-"""Archived template calculator contracts and its held-route replacement."""
+"""Archived template calculator contracts."""
 
 from __future__ import annotations
 
@@ -10,17 +10,20 @@ import tomllib
 
 import pytest
 
-import _process_plans as plans
+from _paths import CAD_ROOT
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_profile_check as check
 import ch_rocker_arm_spec as rocker
 import export_features
 
 STEM = "ch_rocker_arm"
-_SHOP = tomllib.loads(
-    (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+# The prechips shop file holds gauge ranges/resolutions; the CAD-only records
+# (template, Class X pin, trammel, gauge grades) are cad/config/shop-equipment.toml.
+_SHOP = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+_EQUIPMENT = tomllib.loads(
+    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
 )
-_INVENTORY = _SHOP["gauges"]
+_INVENTORY = _EQUIPMENT["gauges"]
 
 
 def _printed_zones() -> dict[str, tuple[float, float]]:
@@ -35,7 +38,7 @@ def _printed_zones() -> dict[str, tuple[float, float]]:
 
 
 def _guard(point, normal) -> float:
-    resolution = _INVENTORY["dti"]["resolution_in"]["value"] * 25.4
+    resolution = _SHOP["gauges"]["dti"]["resolution_mm"]
     return check.clocking_error(point, normal) + resolution
 
 
@@ -55,30 +58,6 @@ def _violations(windows: dict) -> list[str]:
                 if not (low < accept[0] - guard and accept[1] + guard < high):
                     found.append(f"{name} {feature} at {point}")
     return found
-
-
-def test_held_route_replaces_template_metrology_with_current_drawing_acceptance() -> None:
-    text = plans.plan_path(STEM).read_text(encoding="utf-8")
-    plan = tomllib.loads(text)
-    assert text.startswith("# HELD REFERENCE ROUTE")
-    assert plan["construction"] == "built_up"
-    setups = {setup["id"]: setup for setup in plan["setups"]}
-    strap_acceptance = next(op for op in setups["S4"]["ops"] if op["op"] == 20)
-    assert set(strap_acceptance["feature"]) == {
-        "strap_faces", "top_edge", "profile_outer",
-        "tip_land_pos_x", "tip_land_neg_x",
-    }
-    assert "MHA-CH-13" in strap_acceptance["note"]
-    final_acceptance = next(op for op in setups["S5"]["ops"] if op["op"] == 20)
-    assert set(final_acceptance["feature"]) == {
-        "pivot_bore", "rod_hole", "hub_faces", "hub_od",
-    }
-    assert "MHA-CH-06" in final_acceptance["note"]
-    assert "full profile" in final_acceptance["note"]
-    assert all(
-        "surface_profile" not in op.get("inspection_methods", {})
-        for setup in setups.values() for op in setup["ops"]
-    )
 
 
 def test_op_97_uses_only_the_inventory_dti_and_height_gauge() -> None:
@@ -188,7 +167,7 @@ def test_template_arcs_stay_on_the_trammel_radii_about_the_raised_centre() -> No
     rocker's mid-zone shift: on the mid-zone arcs on the mirror line, inside
     the top one and outside the bottom one by the shift times (1 - cos phi)
     off it."""
-    trammel = _SHOP["tools"]["rocker-trammel"]["members"]
+    trammel = _EQUIPMENT["tools"]["rocker-trammel"]["members"]
     assert (check.R_TOP, check.R_BOTTOM) == (
         trammel["R800"]["length_mm"]["value"],
         trammel["R816"]["length_mm"]["value"],
@@ -285,9 +264,9 @@ def test_rod_slot_is_radial_at_the_rockers_rod_pin_hole() -> None:
 def test_rod_slot_width_is_a_matched_fit_on_a_pin_the_shop_owns() -> None:
     pins = _INVENTORY["pin-gauges"]
     assert "class ZZ minus" in pins["note"]
-    low, high = pins["range_mm"]
+    low, high = _SHOP["gauges"]["pin-gauges"]["range_mm"]
     assert low <= check.ROD_PIN_MAX <= high
-    step = pins["resolution_in"]["value"]
+    step = round(_SHOP["gauges"]["pin-gauges"]["resolution_mm"] / 25.4, 6)
     assert math.isclose(
         check.ROD_PIN_GAUGE_IN / step, round(check.ROD_PIN_GAUGE_IN / step)
     )

@@ -2,4 +2,4 @@
 
 Interim shop sheets for the oblique-trammel jig parts. They were written by hand and are not generated or checked by prechips. Print one from a browser at 100% scale. Each sheet names its drawing revision and sources at the bottom. The base bar has its 2026-10-27 and 2026-10-30 versions. The feed lever (TL-26) and end bracket (TL-28) follow the decimal-inch drawings from PR #2112.
 
-Prechips travelers generated from `cad/process/<stem>/plan.toml` will replace these. Delete each sheet when its replacement exists.
+The `prechips:<stem>` travelers (pro and hobby) rendered from `cad/process/<stem>/plan.toml` replace these. Under prechips 0.9 the base bar and end bracket have their setup diagrams and pass both profiles; the feed lever's plan is held (see `cad/process/README.md`). Every hand sheet is kept until Pedro has compared the generated travelers with it and approved them (owner decision 2026-11-10); delete a sheet only after that approval.

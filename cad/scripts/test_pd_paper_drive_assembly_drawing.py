@@ -629,18 +629,19 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     import tomllib
 
     import paper_drive_arm_registration as registration
-    from _process_plans import PROCESS_ROOT
+    from _paths import CAD_ROOT
 
     low, high = disc.CENTRE_DISTANCE_WINDOW
     ux, uy = registration.S_TO_K_UNIT
-    inventory = tomllib.loads(
-        (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    equipment = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )
-    mill = inventory["machines"]["PM-30MV"]
-    # The installed DRO's vendor-stated accuracy, per axis (inventory cite).
+    dro_record = equipment["dro"]["pm-30mv"]
+    # The installed DRO's vendor-stated accuracy, per axis (its cite).
     (stated,) = [
         float(match.group(1))
-        for cite in mill["cite"]
+        for cite in dro_record["cite"]
         if cite.startswith("DRO accuracy")
         for match in [re.search(r"(\.\d+)” Accuracy", cite)]
         if match
@@ -652,9 +653,9 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     # #2144 item 5.3). The indicator's unknown accuracy over its range scales
     # that reading only; the bound holds while the indicator repeats to its
     # stated sweep at null.
-    division_in = inventory["gauges"]["dti"]["resolution_in"]["value"]
+    division_in = shop["gauges"]["dti"]["resolution_mm"] / 25.4
     # The printed sweep is a value on the shop's own test indicator.
-    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == division_in
+    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == pytest.approx(division_in)
     division = division_in * 25.4
     centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
@@ -670,7 +671,7 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
-    count = round(mill["resolution_mm"]["value"] / 25.4, 4) * 25.4
+    count = round(shop["gauges"]["mill-x-dro"]["resolution_mm"] / 25.4, 4) * 25.4
     assert knob_setting.DRO_COUNT_MM == pytest.approx(count)
     x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
     for value in (x, y):

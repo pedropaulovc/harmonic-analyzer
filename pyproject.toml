@@ -68,8 +68,10 @@ dependencies = [
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
     # Drawing-bound manufacturing travelers (SolidWorks-free prechips:<stem> tasks).
-    # Exact pin: each prechips fix ships as a PyPI release and a deliberate bump.
-    "prechips==0.3.0",
+    # 0.9 adds the adapters for the enrolled parts' current manifests; no upper
+    # bound. The lock resolves the latest release; bump it deliberately with
+    # `uv lock --upgrade-package prechips`.
+    "prechips>=0.9",
 ]
 
 [dependency-groups]

@@ -232,7 +232,8 @@ its dimension provider and diagnostic recipe have also been removed.
   contact over the finished plate bands; normal fit-up checks that the strap
   seats flat, locates and slips on/off without the tip standing above it.
   It also supplied `fixtures.trammel-cl-dowel`; length tolerance unstated.
-  Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
+  Both purchases were unconfirmed in the retired shop inventory (last at
+  `45952b66bc:cad/process/shop/inventory.toml`).
 - [91251A197](https://www.mcmaster.com/91251A197/)
   (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 19 in the oblique
   trammel jig's final A″ stack: 16 rail screws + 3 CL/CR/HUB clamp screws, the fastener

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="saw" viewBox="0 0 720 {{view.height}}" width="720" height="{{view.height}}" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#111"/>
+    </marker>
+  </defs>
+  <rect width="720" height="{{view.height}}" fill="#fff"/>
+
+  <!-- Top view: authored blanks marked on the bar -->
+  <text x="40" y="20" fill="#555" font-style="italic">Top view</text>
+  <g id="blanks" data-cad-group="blanks" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
+  <g id="stock-rest" data-cad-group="stock-rest" fill="#f2f2f2" stroke="#111" stroke-width="1.5"/>
+  <g id="cutlines" data-cad-group="cutlines" stroke="#a33" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <g id="blank-labels" data-cad-group="blank-labels"/>
+  <text x="{{view.rest_label_x}}" y="{{view.label_y}}" text-anchor="middle">{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} bar</text>
+
+  <!-- length dimensions -->
+  <g id="length-dims" data-cad-group="length-dims" stroke="#111" stroke-width="1"/>
+
+  <!-- width dimension -->
+  <g stroke="#111" stroke-width="1">
+    <line x1="{{view.width_ext_x}}" y1="{{view.top}}" x2="20" y2="{{view.top}}"/>
+    <line x1="{{view.width_ext_x}}" y1="{{view.bottom}}" x2="20" y2="{{view.bottom}}"/>
+    <line x1="26" y1="{{view.width_dim_top}}" x2="26" y2="{{view.width_dim_bottom}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  </g>
+  <text transform="translate(17 {{view.mid}}) rotate(-90)" text-anchor="middle">{{process.blank_width_in:fraction}} in</text>
+
+  <!-- cutline label -->
+  <g id="cut-leaders" data-cad-group="cut-leaders" stroke="#111" stroke-width="1" fill="none"/>
+
+  <!-- Side view: bar on saw bed with supports (thickness drawn 2x) -->
+  <text x="40" y="196" fill="#555" font-style="italic">Side view</text>
+  <g id="side-bar" data-cad-group="side-bar" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
+  <line x1="{{view.cut}}" y1="212" x2="{{view.cut}}" y2="{{view.side_cut_bottom}}" stroke="#a33" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <rect x="{{view.blade_x}}" y="176" width="6" height="42" fill="#555"/>
+  <line x1="{{view.push_x}}" y1="198" x2="{{view.push_x}}" y2="216" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="{{view.blade_text_x}}" y="190">saw blade</text>
+  <line x1="{{view.blade_leader_x1}}" y1="185" x2="{{view.blade_leader_x2}}" y2="185" stroke="#111" stroke-width="1"/>
+
+  <rect x="{{view.bed_x}}" y="{{view.side_bottom}}" width="120" height="50" fill="#b5b9bf" stroke="#111" stroke-width="1.5"/>
+  <path d="M{{view.notch_x1}} {{view.notch_top}}V{{view.notch_bottom}}H{{view.notch_x2}}V{{view.notch_top}}" fill="#fff" stroke="#111" stroke-width="1.2"/>
+  <text x="{{view.bed_label_x}}" y="{{view.bed_label_y}}" text-anchor="middle">saw bed</text>
+
+  <g fill="#8a9099" stroke="#111" stroke-width="1">
+    <g transform="translate({{view.support_left}} {{view.side_bottom}})">
+      <rect x="-20" y="0" width="40" height="4"/>
+      <rect x="-3" y="4" width="6" height="44"/>
+      <rect x="-16" y="48" width="32" height="4"/>
+    </g>
+    <g transform="translate({{view.support_right}} {{view.side_bottom}})">
+      <rect x="-20" y="0" width="40" height="4"/>
+      <rect x="-3" y="4" width="6" height="44"/>
+      <rect x="-16" y="48" width="32" height="4"/>
+    </g>
+  </g>
+  <text x="{{view.support_label_left}}" y="{{view.bed_label_y}}">support</text>
+  <text x="{{view.support_label_right}}" y="{{view.bed_label_y}}">support</text>
+  <line x1="30" y1="{{view.floor_y}}" x2="640" y2="{{view.floor_y}}" stroke="#555" stroke-width="1.5"/>
+  <text x="335" y="{{view.caption_y}}" text-anchor="middle">bar level across saw bed and both supports</text>
+</svg>

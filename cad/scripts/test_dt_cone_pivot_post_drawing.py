@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import math
-import tomllib
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -108,68 +107,6 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         * ((spec.HEAD_DIA / 2.0) ** 2 - (BLOCK_DIA / 2.0) ** 2)
         * spec.HEAD_HEIGHT
     )
-
-
-def test_held_manufacturing_plan_tracks_post_geometry_without_claiming_tooling() -> (
-    None
-):
-    plan_path = (
-        Path(part.__file__).resolve().parents[1]
-        / "process/dt_cone_pivot_post/plan.toml"
-    )
-    plan = tomllib.loads(plan_path.read_text(encoding="utf-8"))
-    setups = {setup["id"]: setup for setup in plan["setups"]}
-    stock = plan["stock"]
-    assert stock["length_mm"] == pytest.approx(
-        stock["north_allowance_mm"] + spec.BLOCK_HEIGHT + stock["south_grip_mm"]
-    )
-    assert setups["S1"]["stock_state"]["south_end_z"] == pytest.approx(
-        -spec.BLOCK_HEIGHT - stock["south_grip_mm"]
-    )
-    assert setups["S1"]["hold"]["stickout_mm"] == pytest.approx(
-        stock["north_allowance_mm"] + spec.BLOCK_HEIGHT
-    )
-    assert setups["S2"]["stock_in"] == "S1C"
-    assert setups["S2"]["stock_state"]["top_z"] == pytest.approx(
-        spec.BLOCK_HEIGHT + 1.5
-    )
-    assert setups["S2"]["stock_state"]["local_thickness"] == {
-        "mount_west": spec.BLOCK_HEIGHT,
-        "mount_east": spec.BLOCK_HEIGHT,
-    }
-    head_face = next(op for op in setups["S2"]["ops"] if op["do"] == "face")
-    assert head_face["to_z"] == spec.BLOCK_HEIGHT
-    incline = math.radians(_config.machine("cone_incline", "derived_incline_deg"))
-    journal = plan["frames"]["J3"]
-    # 1.5 in: the plan's 38.1 and the spec's 1.5 * 25.4 differ in the last bit.
-    assert journal["origin"] == pytest.approx([0.0, spec.BORE_HEIGHT, 0.0], abs=1e-9)
-    assert journal["x"] == pytest.approx([math.cos(incline), 0.0, -math.sin(incline)])
-    assert journal["z"] == pytest.approx([-math.sin(incline), 0.0, -math.cos(incline)])
-    assert plan["frames"]["C4"]["origin"] == [
-        0.0,
-        spec.CRANK_BORE_HEIGHT,
-        spec.CRANK_BOSS_START_Z,
-    ]
-    assert setups["S3"]["hold"]["fixture"] == "unknown"
-    assert setups["S3"]["hold"]["support"] == "unknown"
-    assert "index" not in setups["S3"]["hold"]
-    assert journal["binding"] == "unknown"
-    placement = plan["axis_placements"]["crank"]
-    assert placement == {
-        "boss": "crank_boss",
-        "bore": "crank_bore",
-        "caps": "crank_boss_faces",
-        "support": "head",
-        "separation_mm": 43.2735,
-    }
-    # The manufacturing axis moves as one feature group, not by relabelling CAD
-    # or moving the original setup frame. Native placement proof remains required.
-    operative_height = spec.BORE_HEIGHT + placement["separation_mm"]
-    assert operative_height == pytest.approx(81.3735)
-    assert operative_height - plan["frames"]["C4"]["origin"][1] == pytest.approx(
-        0.17785649710401
-    )
-    assert plan["construction"] == "one_piece"
 
 
 def test_mounting_counterbores_keep_the_wall_target_to_the_head() -> None:

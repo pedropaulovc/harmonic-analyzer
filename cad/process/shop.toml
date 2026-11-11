@@ -1,0 +1,159 @@
+# Harmonic-analyzer shop file for prechips travelers: tooling, cutting settings,
+# machines, gauges and limits, in the prechips shop schema. It holds only
+# records an HA plan (cad/process/<stem>/plan.toml) or an HA spec/test reads.
+# Checks use these values as written, with no measured/placeholder provenance
+# (owner ruling 2026-11-10, cad/process/README.md). Part-specific tool keys do
+# not assert tool equivalence. Material identities preserve each source's
+# stated stock condition; they are not inferred from the printed material text
+# or treated as interchangeable. Facts the prechips schema cannot hold that CAD
+# specs read live in cad/config/shop-equipment.toml; no field is in both files.
+
+# Source: prechips v0.9.0 examples/shop.toml (archive/pre-v0.10-2026-11-08
+# examples/inventory/pedro-shop.toml and examples/shop-policy.toml, converted to
+# millimetres), plus the HA records marked below. Where HA's own records
+# (45952b66bc:cad/process/shop/{inventory,shop-policy}.toml) gave a different
+# value, HA's value is used and marked "HA:".
+[machines.pm-30mv]
+kind = "mill"
+rpm_ranges = [[50, 3000]]
+travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
+# HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
+spindle_to_table_mm = [62.484, 431.8]
+
+[gauges.calipers]
+range_mm = [0.0, 152.4]
+resolution_mm = 0.0127
+
+# Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
+# cad/config/shop-equipment.toml gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
+[gauges.pin-gauges]
+range_mm = [0.2794, 12.7]
+resolution_mm = 0.0254
+
+[gauges.height-gauge]
+range_mm = [0.0, 304.8]
+resolution_mm = 0.0254
+
+# HA: dial test indicator, 0.03 in travel read from zero, 0.0005 in divisions;
+# its kind and make are cad/config/shop-equipment.toml gauges.dti. Both values
+# are #1413 placeholders, still to be remeasured.
+[gauges.dti]
+range_mm = [0.0, 0.762]
+resolution_mm = 0.0127
+
+# PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
+# TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
+# installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
+[gauges.mill-x-dro]
+range_mm = [0.0, 584.2]
+resolution_mm = 0.005
+
+[limits]
+# HA: shop-policy numbers.stickout_ld_max 3.0.
+stickout_ld_max = 3.0
+tool_change_clearance_mm = 25.0
+
+# Source: base-bar.toml; source hand traveler dated 2026-11-05 and
+# table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
+# diameter_mm: standard nominal size stated in each description, × 25.4 (HA's
+# per-tool diameter readings are not used; cad/process/README.md).
+# The 8-32 tap records the plan's authored #29 (.136 in) tap drill. The v48
+# drawing calls the #12 bracket drill (notes.process).
+[tools.basebar-saw]
+description = "Aluminium saw"
+[tools.basebar-em-half]
+description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
+diameter_mm = 12.7
+[tools.basebar-em-face]
+description = "3/4 in 4-flute end mill"
+diameter_mm = 19.05
+[tools.basebar-spot]
+description = "#2 centre drill"
+[tools.basebar-rail-drill]
+description = "#29 (.136 in) drill"
+diameter_mm = 3.4544
+[tools.basebar-bracket-drill]
+description = "#12 (.189 in) drill"
+diameter_mm = 4.8006
+[tools.basebar-slot-drill]
+description = "3/8 in drill"
+diameter_mm = 9.525
+[tools.basebar-tap]
+description = "8-32 plug tap"
+tap_drill_mm = 3.4544
+[tools.basebar-counterbore]
+description = "5/16 in centre-cutting 2-flute end mill"
+diameter_mm = 7.9375
+# Diameter remains a plan-owned parameter and local description override.
+[tools.basebar-slot-finish]
+description = "Centre-cutting 2-flute HSS end mill; flutes ≥5/8 in"
+
+[settings.basebar-edge-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "6 in/min"
+[settings.basebar-slot-rough-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "5 in/min"
+# Source guide's 165 ft/min HSS milling speed and .002 in (0.0508 mm)/tooth.
+[settings.basebar-slot-finish-6061-t6511]
+tool = "basebar-slot-finish"
+material = "6061-t6511"
+sfm = 165
+chip_load_mm_per_tooth = 0.0508
+flutes = 2
+feed_unit = "in/min"
+
+# Source: end-bracket.toml and feed-lever.toml; hand travelers dated
+# 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# drill, plug-start then bottoming-finish taps) and the archived
+# taps-unc-hand 8-32 plug/bottoming records. Speeds are the hand sheets'
+# LittleMachineShop 6061-T6 row: 165 ft/min milling -> 1250 rpm.
+[tools.jig-saw]
+description = "Miter saw or bandsaw"
+[tools.jig-em-half]
+description = "1/2 in centre-cutting 2-flute end mill"
+diameter_mm = 12.7
+[tools.jig-spot]
+description = "#2 centre drill"
+[tools.jig-drill-29]
+description = "#29 (.136 in) drill"
+diameter_mm = 3.4544
+[tools.jig-tap-8-32-plug]
+description = "8-32 UNC plug tap; T-handle wrench"
+tap_drill_mm = 3.4544
+[tools.jig-tap-8-32-bottoming]
+description = "8-32 UNC bottoming tap (1–2 chamfered threads); T-handle wrench"
+tap_drill_mm = 3.4544
+[tools.jig-drill-11-32]
+description = "11/32 (.3438 in) drill, 115-piece index"
+diameter_mm = 8.73125
+[tools.jig-files]
+description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
+
+[settings.jig-em-half-6061-t6511]
+tool = "jig-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "3 in/min"
+
+# HA: the rocker arm's strap profile cutter on its low-carbon steel (the oblique
+# trammel jig's normal cutting force reads this chip load:
+# ch_rocker_arm_tl_oblique_jig_assembly_spec.NORMAL_FEED_CHIP_LOAD_MM). Source:
+# HA cutting-data row low_carbon_steel / HSS / profile, 3-12.7 mm cutters:
+# LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min, low end used;
+# UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth, stated
+# for 1/2 to 1-1/2 in cutters; AUTHOR'S CHOICE below 1/2 in, half the UF low
+# end, 0.001 in = 0.0254 mm/tooth.
+[tools.rocker-profile-cutter]
+description = "HSS 4-flute end mill from the LMS 6784 set (ch_rocker_arm_tl_oblique_trammel_spec PART_CUTTER)"
+
+[settings.rocker-profile-hss-low-carbon-steel]
+tool = "rocker-profile-cutter"
+material = "rocker-1018-cold-finished"
+sfm = 65
+chip_load_mm_per_tooth = 0.0254
+flutes = 4

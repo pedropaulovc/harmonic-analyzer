@@ -4580,96 +4580,56 @@ def synthetic_prechips_task(tmp_path, monkeypatch):
     source = root / stem / "plan.toml"
     source.parent.mkdir(parents=True)
     source.write_text('features = "unused"\n')
-    shop = root / "shop"
-    shop.mkdir()
-    for name in _process_plans.SHOP_FILES:
-        (shop / name).write_text("version = 1\n")
-    (shop / "inventory.toml").write_text(
-        '[fixtures.test]\ncad = "ch_rocker_arm_tl_oblique_carrier"\n'
-    )
+    # Setup diagrams the plan embeds live beside it and are task inputs too.
+    diagram = root / stem / "diagrams" / "setup.svg"
+    diagram.parent.mkdir()
+    diagram.write_text("<svg/>\n")
+    shop = root / "shop.toml"
+    shop.write_text("version = 1\n")
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
+    monkeypatch.setattr(_process_plans, "SHOP_PATH", shop)
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
-    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_oblique_carrier_spec.py"
-    helper = dodo.SCRIPTS_DIR / "_synthetic_fixture_dimensions.py"
-    original = dodo._executed_closure
-
-    def closure(command):
-        if command == [str(spec)]:
-            return [str(spec), str(helper)]
-        return original(command)
-
-    monkeypatch.setattr(dodo, "_executed_closure", closure)
-    return dodo, _process_plans, export_features, stem, source, spec, helper
-
-
-@pytest.fixture
-def synthetic_prechips_kernel(tmp_path, monkeypatch):
-    """Model discovery and --version without importing or launching FreeCAD."""
-    import subprocess
-
-    state = {
-        "path": tmp_path / "FreeCAD 1.1" / "freecadcmd.exe",
-        "version": "FreeCAD 1.1.0\n",
-        "error": None,
-        "discoveries": 0,
-        "queries": [],
-    }
-    kernel = ModuleType("prechips.kernel")
-
-    def discover_kernel():
-        state["discoveries"] += 1
-        return state["path"]
-
-    original = subprocess.check_output
-
-    def version(command, **kwargs):
-        if command[-1] != "--version":
-            return original(command, **kwargs)
-        assert command == [str(Path(state["path"]).resolve()), "--version"]
-        assert kwargs["text"] is True
-        state["queries"].append(command)
-        if state["error"] is not None:
-            raise state["error"]
-        return state["version"]
-
-    kernel.discover_kernel = discover_kernel
-    monkeypatch.setitem(sys.modules, "prechips.kernel", kernel)
-    monkeypatch.setattr(subprocess, "check_output", version)
-    return state
+    return dodo, _process_plans, export_features, stem, source, diagram, shop
 
 
 def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_task):
-    dodo, plans, exporter, stem, source, spec, helper = synthetic_prechips_task
+    dodo, plans, exporter, stem, source, diagram, shop = synthetic_prechips_task
+    unrelated = plans.plan_path("synthetic_other_part")
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_text('features = "other"\n')
     task = next(dodo.task_prechips())
     assert task["name"] == stem
     assert task["task_dep"] == [f"package:features:{stem}"]
-    deps = {str(path) for path in task["file_dep"]}
+    deps = set(task["file_dep"])
+    manifest, step = exporter.bundle_paths(stem, dodo.CAD_OUT)
     expected = {
-        str(source), *(str(path) for path in plans.shop_paths()),
-        str(spec), str(helper), str(dodo.REPO_ROOT / "pyproject.toml"),
-        str(dodo.REPO_ROOT / "uv.lock"), str(dodo.REPO_ROOT / "dodo.py"),
-        str(dodo.SCRIPTS_DIR / "_telemetry.py"),
-        *(str(path) for path in exporter.bundle_paths(stem)),
+        str(path.resolve()) for path in (
+            source, diagram, shop, manifest,
+            dodo.REPO_ROOT / "pyproject.toml", dodo.REPO_ROOT / "uv.lock",
+            dodo.SCRIPTS_DIR / "prechips_traveler.py",
+            dodo.SCRIPTS_DIR / "_process_plans.py",
+        )
     }
     assert expected <= deps
-    assert str(dodo.SCRIPTS_DIR / "prechips_traveler.py") in deps
-    assert str(dodo.SCRIPTS_DIR / "_process_plans.py") in deps
-    directory = plans.traveler_dir(stem, dodo.CAD_OUT)
-    targets = {str(path) for path in task["targets"]}
-    assert {
-        str(directory / "plan.toml"), str(directory / "report.json"),
-        str(directory / "traveler.html"),
-        str(dodo.CAD_OUT / "reports" / f"prechips-{stem}.ok"),
-    } <= targets
-    assert (plans.traveler_complete, [stem, dodo.CAD_OUT]) in task["uptodate"]
-    assert any(
-        isinstance(check, dodo._PrechipsKernelTracker) for check in task["uptodate"]
-    )
-    action, args = task["actions"][0]
+    assert str(unrelated.resolve()) not in deps
+    assert str(step.resolve()) not in deps
+    stamp = str(dodo.REPORTS / f"prechips-{stem}.ok")
+    assert task["targets"] == [
+        stamp, *(str(path) for path in plans.traveler_paths(stem, dodo.CAD_OUT)),
+    ]
+    assert [Path(target).name for target in task["targets"][1:]] == [
+        "traveler.html", "traveler-hobby.html",
+    ]
+    assert task["targets"] == dodo._canonical_targets(f"prechips:{stem}")
+    assert "uptodate" not in task
+    clear, (action, args) = task["actions"]
+    assert clear == (Path.unlink, [Path(stamp)], {"missing_ok": True})
     assert action is dodo._run_stamped
-    assert args[3] == f"prechips:{stem}"
-    assert "prechips_traveler.py" in " ".join(map(str, args[0]))
-    assert stem in args[0]
+    assert args[1:] == [f"prechips:{stem}", stamp, f"prechips:{stem}"]
+    assert args[0] == [
+        dodo.sys.executable, str(dodo.SCRIPTS_DIR / "prechips_traveler.py"),
+        stem, "--out", str(dodo.CAD_OUT),
+    ]
 
 
 def test_prechips_build_release_edges_and_stage(synthetic_prechips_task):
@@ -4723,186 +4683,43 @@ def test_feature_failure_blocks_full_export_but_not_another_traveler(
         assert scheduled[selected] == "failure"
 
 
-def test_prechips_kernel_discovery_is_lazy_at_task_load(
-    synthetic_prechips_task, synthetic_prechips_kernel,
-):
-    from doit.loader import load_tasks
-
-    dodo, _, _, stem, _, _, _ = synthetic_prechips_task
-    loaded = load_tasks(dict(vars(dodo)), allow_delayed=True)
-    assert f"prechips:{stem}" in {task.name for task in loaded}
-    assert synthetic_prechips_kernel["discoveries"] == 0
-    assert synthetic_prechips_kernel["queries"] == []
-
-
-@pytest.mark.parametrize("changed", ["path", "version"])
-def test_prechips_kernel_change_invalidates_last_success(
-    synthetic_prechips_task, synthetic_prechips_kernel, changed,
-):
-    dodo, _, _, _, _, _, _ = synthetic_prechips_task
-    state = synthetic_prechips_kernel
-
-    def evaluate(values):
-        definition = next(dodo.task_prechips())
-        tracker = next(
-            check for check in definition["uptodate"]
-            if isinstance(check, dodo._PrechipsKernelTracker)
-        )
-        task = _FakeTask()
-        return tracker(task, values), task.saved()
-
-    up, saved = evaluate({})
-    assert up is False
-    assert saved == {
-        "_prechips_kernel": {
-            "path": str(Path(state["path"]).resolve()),
-            "version": state["version"].strip(),
-        },
-    }
-    assert evaluate(saved)[0] is True
-    if changed == "path":
-        state["path"] = str(Path(state["path"]).parent / "other-freecadcmd.exe")
-    else:
-        state["version"] = "FreeCAD 1.1.1\n"
-    up, changed_saved = evaluate(saved)
-    assert up is False
-    assert changed_saved != saved
-    # A failed action never runs the saver; the previous success stays stale.
-    assert evaluate(saved)[0] is False
-    assert evaluate(changed_saved)[0] is True
-    assert state["discoveries"] == len(state["queries"]) == 5
-
-
-@pytest.mark.parametrize(
-    "unavailable", ["missing", "empty_version", "launch_error", "query_failure", "timeout"],
-)
-def test_prechips_unavailable_kernel_is_never_current(
-    synthetic_prechips_task, synthetic_prechips_kernel, unavailable,
-):
-    dodo, _, _, _, _, _, _ = synthetic_prechips_task
-    state = synthetic_prechips_kernel
-    tracker = dodo._PrechipsKernelTracker()
-    task = _FakeTask()
-    assert tracker(task, {}) is False
-    saved = task.saved()
-    if unavailable == "missing":
-        state["path"] = None
-    elif unavailable == "empty_version":
-        state["version"] = " \n"
-    elif unavailable == "launch_error":
-        state["error"] = OSError("kernel unavailable")
-    elif unavailable == "query_failure":
-        state["error"] = dodo.subprocess.CalledProcessError(1, "freecadcmd")
-    else:
-        state["error"] = dodo.subprocess.TimeoutExpired("freecadcmd", 10)
-
-    for previous in (saved, {"_prechips_kernel": None}):
-        task = _FakeTask()
-        assert dodo._PrechipsKernelTracker()(task, previous) is False
-        assert task.saved() == {"_prechips_kernel": None}
-
-
-@pytest.mark.parametrize(
-    ("inventory", "diagnostic"),
-    [
-        ("fixtures = [\n", "cannot read inventory"),
-        ('[fixtures.test]\ncad = "not-a-fixture"\n', "invalid fixture TL stem"),
-    ],
-)
-def test_prechips_malformed_inventory_fails_only_its_recorded_action(
-    synthetic_prechips_task, synthetic_prechips_kernel, tmp_path, monkeypatch,
-    inventory, diagnostic,
+def test_prechips_missing_plan_fails_only_its_recorded_action(
+    synthetic_prechips_task, tmp_path, monkeypatch,
 ):
     from doit.loader import load_tasks
 
     dodo, plans, exporter, stem, _, _, _ = synthetic_prechips_task
     monkeypatch.setattr(dodo, "REPORTS", tmp_path / "reports")
-    source = plans.shop_paths()[0]
-    source.write_text(inventory, encoding="utf-8")
-    loaded = load_tasks(dict(vars(dodo)), allow_delayed=True)
-    names = {task.name for task in loaded}
-    assert {f"prechips:{stem}", "build", "gallery", "check:math"} <= names
-    assert any(task.name.startswith("part:") for task in loaded)
-    definition = next(dodo.task_prechips())
-    assert str(source.resolve()) in definition["file_dep"]
-    assert not {
-        str(path.resolve()) for path in exporter.bundle_paths(stem, dodo.CAD_OUT)
-    } & set(definition["file_dep"])
-    assert definition["task_dep"] == []
-    assert definition["uptodate"] == [False]
-    action, args = definition["actions"][0]
-    assert action is dodo._fail_prechips_inventory
-    assert diagnostic in args[2]
-    assert "line " in args[2]
-
-    # The action reports the captured failure, even if inventory is repaired later.
-    source.write_text("version = 1\n", encoding="utf-8")
-
-    def refuse_reload():
-        pytest.fail("the recorded inventory failure must not parse again")
-
-    monkeypatch.setattr(plans, "shop_spec_modules", refuse_reload)
-    with pytest.raises(RuntimeError, match=re.escape(diagnostic)) as raised:
-        action(*args)
-    assert str(source.resolve()) in str(raised.value)
-    assert f"prechips:{stem}" in str(raised.value)
-    assert not (dodo.REPORTS / f"prechips-{stem}.ok").exists()
-    assert synthetic_prechips_kernel["discoveries"] == 0
-    assert synthetic_prechips_kernel["queries"] == []
-
-
-def test_prechips_missing_fixture_spec_fails_only_its_recorded_action(
-    synthetic_prechips_task, synthetic_prechips_kernel, tmp_path, monkeypatch,
-):
-    from doit.loader import load_tasks
-
-    dodo, plans, exporter, stem, _, _, _ = synthetic_prechips_task
-    monkeypatch.setattr(dodo, "REPORTS", tmp_path / "reports")
-    source = plans.shop_paths()[0]
-    missing_stem = "ch_rocker_arm_tl_nonexistent_inventory_fixture"
-    missing_spec = dodo.SCRIPTS_DIR / f"{missing_stem}_spec.py"
-    assert not missing_spec.exists()
-    source.write_text(
-        f'[fixtures.test]\ncad = "{missing_stem}"\n', encoding="utf-8",
-    )
+    missing = next(part for part in exporter.SUPPORTED_PARTS if part != stem)
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", (stem, missing))
+    plan = plans.plan_path(missing)
+    assert not plan.exists()
 
     def refuse_launch(*args, **kwargs):
-        pytest.fail("bad inventory must not launch geometry or traveler work")
+        pytest.fail("a missing plan must not launch geometry or traveler work")
 
     monkeypatch.setattr(dodo, "_run", refuse_launch)
     loaded = load_tasks(dict(vars(dodo)), allow_delayed=True)
     names = {task.name for task in loaded}
-    assert {f"prechips:{stem}", "build", "gallery", "check:math"} <= names
+    assert {
+        f"prechips:{stem}", f"prechips:{missing}", "build", "gallery", "check:math",
+    } <= names
     assert any(task.name.startswith("part:") for task in loaded)
-    definition = next(dodo.task_prechips())
-    assert str(source.resolve()) in definition["file_dep"]
-    assert not {
-        str(path.resolve()) for path in exporter.bundle_paths(stem, dodo.CAD_OUT)
-    } & set(definition["file_dep"])
-    assert definition["task_dep"] == []
+    definition = dodo._prechips_task(missing)
+    assert "file_dep" not in definition
+    assert "task_dep" not in definition
     assert definition["uptodate"] == [False]
-    action, args = definition["actions"][0]
-    assert action is dodo._fail_prechips_inventory
-    assert "missing CAD fixture spec" in args[2]
-    assert str(missing_spec.resolve()) in args[2]
-    assert "correct the inventory cad stem" in args[2]
-
-    # Repairing the inventory cannot erase the action's captured diagnostic.
-    source.write_text("version = 1\n", encoding="utf-8")
-
-    def refuse_reload():
-        pytest.fail("the recorded inventory failure must not parse again")
-
-    monkeypatch.setattr(plans, "shop_spec_modules", refuse_reload)
-    with pytest.raises(RuntimeError, match="missing CAD fixture spec") as raised:
+    assert definition["targets"] == dodo._canonical_targets(f"prechips:{missing}")
+    [(action, args)] = definition["actions"]
+    assert action is dodo._fail_prechips_plan
+    assert args == [f"prechips:{missing}", str(plan)]
+    with pytest.raises(RuntimeError, match="no process plan") as raised:
         action(*args)
-    message = str(raised.value)
-    assert f"prechips:{stem}" in message
-    assert str(source.resolve()) in message
-    assert str(missing_spec.resolve()) in message
-    assert not (dodo.REPORTS / f"prechips-{stem}.ok").exists()
-    assert synthetic_prechips_kernel["discoveries"] == 0
-    assert synthetic_prechips_kernel["queries"] == []
+    assert f"prechips:{missing}" in str(raised.value)
+    assert str(plan) in str(raised.value)
+    assert not (dodo.REPORTS / f"prechips-{missing}.ok").exists()
+    # The enrolled sibling with a plan keeps its normal traveler task.
+    assert dodo._prechips_task(stem)["task_dep"] == [f"package:features:{stem}"]
 
 
 def test_prechips_failed_action_never_writes_stamp(tmp_path, monkeypatch):
@@ -4920,42 +4737,17 @@ def test_recipe_enrolls_strict_traveler_tests():
     dodo = _load_dodo()
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
     deps = {Path(path).name for path in recipe["file_dep"]}
-    assert {"test_process_plans.py", "test_prechips_traveler.py"} <= deps
+    assert "test_prechips_traveler.py" in deps
+    assert not {"test_process_plans.py", "test_process_shop.py"} & deps
     command = " ".join(str(arg) for _, args in recipe["actions"] for arg in args[0])
-    assert "test_process_plans.py" in command
     assert "test_prechips_traveler.py" in command
-
-
-def test_recipe_gate_tracks_migrated_and_enrolled_plans(
-    synthetic_prechips_task, monkeypatch
-):
-    dodo, plans, _, stem, source, _, _ = synthetic_prechips_task
-    other = "synthetic_second_part"
-    held = "synthetic_held_part"
-    monkeypatch.setattr(plans, "MIGRATED_PLANS", (held, stem))
-    monkeypatch.setattr(plans, "TRAVELER_STEMS", (stem, other))
-    second = plans.plan_path(other)
-    second.parent.mkdir(parents=True)
-    second.write_text('features = "unused"\n', encoding="utf-8")
-    held_plan = plans.plan_path(held)
-    held_plan.parent.mkdir(parents=True)
-    held_plan.write_text('features = "held"\n', encoding="utf-8")
-    historical = plans.plan_path("synthetic_historical_part")
-    historical.parent.mkdir(parents=True)
-    historical.write_text('features = "historical"\n', encoding="utf-8")
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    deps = recipe["file_dep"]
-    for member in (source, held_plan, second):
-        assert deps.count(str(member.resolve())) == 1
-    assert str(historical.resolve()) not in deps
-    before = dodo._digest_files(deps)
-    historical.write_text('features = "still historical"\n', encoding="utf-8")
-    assert dodo._digest_files(deps) == before
-    for member in (source, held_plan, second):
-        before = dodo._digest_files(recipe["file_dep"])
-        with member.open("a", encoding="utf-8") as stream:
-            stream.write('[drawing]\nrevision = "v2"\n')
-        assert dodo._digest_files(recipe["file_dep"]) != before, member
+    assert "test_process_plans.py" not in command
+    assert "test_process_shop.py" not in command
+    for path in (
+        dodo.REPO_ROOT / "cad" / "process" / "shop.toml",
+        dodo.REPO_ROOT / "cad" / "config" / "shop-equipment.toml",
+    ):
+        assert str(path.resolve()) in recipe["file_dep"], path
 
 
 @pytest.fixture
@@ -5092,14 +4884,11 @@ def test_prechips_rejects_unexported_enrollment(monkeypatch):
         list(dodo.task_prechips())
 
 
-def test_prechips_empty_enrollment_has_no_tasks(monkeypatch, synthetic_prechips_kernel):
+def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):
     import _process_plans
     dodo = _load_dodo()
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ())
-    monkeypatch.setattr(_process_plans, "MIGRATED_PLANS", ("synthetic_held_part",))
     assert list(dodo.task_prechips()) == []
-    assert synthetic_prechips_kernel["discoveries"] == 0
-    assert synthetic_prechips_kernel["queries"] == []
 
 
 @pytest.mark.parametrize("kind", ["part", "assembly", "explode_assembly", "gate"])

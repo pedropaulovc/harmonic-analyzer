@@ -78,9 +78,12 @@ establish that it applies.
 
 ## Machines
 
-The authoritative list of installed shop equipment, from the mill, lathe and dividing
-head down to the bench tools and the stock on the rack, is
-[`cad/process/shop/inventory.toml`](../cad/process/shop/inventory.toml).
+The shop's machines, workholding, gauges and traveler tooling are in
+[`cad/process/shop.toml`](../cad/process/shop.toml); the few equipment and stock
+facts CAD reads beyond that are in
+[`cad/config/shop-equipment.toml`](../cad/config/shop-equipment.toml). The former
+full inventory (bench tools, stock rack) is history, last at
+`git show 45952b66bc:cad/process/shop/inventory.toml`.
 
 ## The honest note
 

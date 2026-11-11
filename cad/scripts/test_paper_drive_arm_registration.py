@@ -246,17 +246,20 @@ def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
     K stays inside its setting circle."""
     import tomllib
 
-    from _process_plans import PROCESS_ROOT
+    from _paths import CAD_ROOT
     import pd_paper_drive_knob_setting_spec as knob_setting
     import pd_rack_pinion_spec as disc
 
-    inventory = tomllib.loads((PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8"))
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    equipment = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+    )
     dro_accuracy = 0.0002 * 25.4
     assert any(
         cite.startswith("DRO accuracy") and ".0002” Accuracy" in cite
-        for cite in inventory["machines"]["PM-30MV"]["cite"]
+        for cite in equipment["dro"]["pm-30mv"]["cite"]
     )
-    division = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    division = shop["gauges"]["dti"]["resolution_mm"]
     centring = division / 2.0
     ux, uy = registration.S_TO_K_UNIT
     dro = dro_accuracy * (abs(ux) + abs(uy))

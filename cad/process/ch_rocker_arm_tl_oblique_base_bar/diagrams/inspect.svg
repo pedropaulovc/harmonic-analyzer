@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="inspect" data-rail-width-mm="15" data-rail-height-mm="15" data-screw-dia-mm="4.17" data-screw-length-mm="15.875" data-screw-head-dia-mm="6.86" data-screw-head-height-mm="4.17" viewBox="0 0 720 280" width="720" height="280" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <!-- Authored hardware on the root: HGR15 rail section; #8-32 × 5/8 socket screw. -->
+  <defs>
+    <pattern id="sec" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#dfe6ee"/>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#555" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="720" height="280" fill="#fff"/>
+
+  <!-- Plan: CAD finished bar seen from C'BORE SIDE -->
+  <rect id="bar" x="{{view.x0}}" y="{{view.top}}" width="{{view.plan_w}}" height="{{view.plan_h}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
+  <!-- rail on the opposite face: hidden under bar, trimmed flush with both ends -->
+  <g id="rail-hidden" data-cad-group="rail-hidden" fill="none" stroke="#333" stroke-width="1.2" stroke-dasharray="5 3"/>
+
+  <g id="rail-holes" data-cad-group="rail-holes" fill="#fff" stroke="#111" stroke-width="1.1"/>
+  <g id="bracket-holes" data-cad-group="bracket-holes" fill="#fff" stroke="#111" stroke-width="1.1"/>
+  <g id="slots" data-cad-group="slots" fill="#fff" stroke="#111" stroke-width="1.1"/>
+
+  <!-- section line A-A through the last bracket column -->
+  <line x1="{{view.section_x}}" y1="{{view.section_top}}" x2="{{view.section_x}}" y2="{{view.section_bottom}}" stroke="#111" stroke-width="1" stroke-dasharray="10 3 2 3"/>
+
+  <text x="4" y="46">ZERO END</text>
+  <line x1="40" y1="50" x2="31" y2="60" stroke="#111" stroke-width="1"/>
+  <text x="170" y="46">ZERO EDGE</text>
+  <line x1="205" y1="50" x2="210" y2="60" stroke="#111" stroke-width="1"/>
+  <text x="130" y="{{view.cbore_label_y}}">C'BORE SIDE up</text>
+  <text x="120" y="{{view.rail_label_y}}">{{cad.rail_range}} 8-32 (rail screws)</text>
+  <text x="30" y="{{view.rail_note_y}}">HGR15 rail (under): trimmed flush both ends</text>
+  <line x1="{{view.rail_leader_x1}}" y1="{{view.rail_leader_y1}}" x2="{{view.rail_leader_x2}}" y2="{{view.rail_leader_y2}}" stroke="#111" stroke-width="1"/>
+
+  <!-- Section A-A across CAD width and thickness, ZERO EDGE right -->
+  <g id="labels" data-cad-group="labels"/>
+  <rect x="{{view.sxl}}" y="{{view.stop}}" width="{{view.sw}}" height="{{view.st}}" fill="url(#sec)" stroke="#111" stroke-width="1.5"/>
+  <g id="section-cuts" data-cad-group="section-cuts" fill="#fff"/>
+  <g id="section-outlines" data-cad-group="section-outlines" fill="none" stroke="#111" stroke-width="1.2"/>
+  <!-- socket screw recessed in counterbore -->
+  <g id="screw" data-cad-group="screw" stroke="#111"/>
+  <!-- rail on the opposite face -->
+  <g id="rail-section" data-cad-group="rail-section" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
+
+  <text x="430" y="108">C'BORE SIDE</text>
+  <line x1="490" y1="111" x2="{{view.cbore_leader_x}}" y2="{{view.stop}}" stroke="#111" stroke-width="1"/>
+  <text x="716" y="108" text-anchor="end">#8-32 head below top</text>
+  <line x1="598" y1="112" x2="{{view.head_leader_x}}" y2="{{view.head_leader_y}}" stroke="#111" stroke-width="1"/>
+  <text x="430" y="{{view.rail_sec_label_y}}">HGR15 rail, opposite face</text>
+  <line x1="480" y1="{{view.rail_sec_leader_y1}}" x2="{{view.rail_sec_leader_x}}" y2="{{view.rail_sec_leader_y}}" stroke="#111" stroke-width="1"/>
+  <text x="716" y="{{view.edge_label_y}}" text-anchor="end">ZERO EDGE</text>
+  <line x1="680" y1="{{view.edge_leader_y}}" x2="{{view.sxr}}" y2="{{view.sbottom}}" stroke="#111" stroke-width="1"/>
+
+  <text x="430" y="{{view.stud_label_y}}">1/2-13 stud slides in both slots</text>
+  <line x1="428" y1="{{view.stud_leader_y}}" x2="{{view.stud_x}}" y2="{{view.stud_y}}" stroke="#111" stroke-width="1"/>
+</svg>

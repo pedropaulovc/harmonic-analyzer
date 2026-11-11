@@ -68,7 +68,7 @@ The user hands over a session as bullet points or loosely organized notes.
    carries the story, including false starts. Leave a template section out
    or mark a value `not recorded` rather than padding it.
 3. **Cross-check** part names, stock and equipment against the CAD registry
-   and `cad/process/shop/inventory.toml`. Link the module, the part when the
+   and `cad/process/shop.toml` (with `cad/config/shop-equipment.toml`). Link the module, the part when the
    session made one (not for `practice`), and any PR or issue the session
    produced. Link the user's raw photos, video and voice notes by their
    OneDrive paths; that never needs asking. Where the notes and the

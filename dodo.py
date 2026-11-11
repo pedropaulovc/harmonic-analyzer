@@ -22,7 +22,7 @@ Task groups (the prefix says whether SolidWorks is required):
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
-  prechips:<stem>    strict manufacturing traveler (NO SolidWorks; FreeCAD)
+  prechips:<stem>    pro + hobby HTML manufacturing travelers (NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -3606,8 +3606,6 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 
 
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
-    import _process_plans
-
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_selected_factories.py",
@@ -3645,8 +3643,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_features_bound.py",
         # Shared native gear-gap authoring/status contracts use bounded fakes.
         SCRIPTS_DIR / "test_gear.py",
-        SCRIPTS_DIR / "test_process_plans.py",
-        SCRIPTS_DIR / "test_process_shop.py",
         SCRIPTS_DIR / "test_prechips_traveler.py",
         # The rocker's S7 op 97 profile windows: computed from the printed
         # zones and recorded gauge geometry, pinned into the plan's text.
@@ -4015,13 +4011,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Supplier native regressions read captured paint and shelf facts.
             str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
             str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
-            # Migrated/enrolled revision and label contracts read plans at runtime.
-            *(
-                str(_process_plans.plan_path(stem).resolve())
-                for stem in _process_plans.revision_stems()
-            ),
-            # The shop-data contract reads the tracked shop inputs at runtime.
-            *(str(path.resolve()) for path in _process_plans.shop_paths()),
+            # Shop-equipment contracts read the tracked shop records at runtime.
+            str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
+            str((REPO_ROOT / "cad" / "config" / "shop-equipment.toml").resolve()),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -4593,42 +4585,10 @@ def task_check():
     yield from _machinist_review_tasks()
 
 
-class _PrechipsKernelTracker:
-    """Compare the lazy FreeCAD identity with the last successful traveler run."""
-
-    def __init__(self):
-        self.identity: dict[str, str] | None = None
-
-    def _calc(self) -> dict[str, str] | None:
-        from prechips.kernel import discover_kernel
-
-        try:
-            command = discover_kernel()
-            if command is None:
-                return None
-            path = str(Path(command).resolve())
-            with _telemetry.span("prechips.kernel_identity", path=path):
-                version = subprocess.check_output(
-                    [path, "--version"],
-                    text=True,
-                    stderr=subprocess.STDOUT,
-                    timeout=10,
-                    env=_telemetry.inject_env(),
-                ).strip()
-        except (OSError, UnicodeError, subprocess.SubprocessError):
-            return None
-        return {"path": path, "version": version} if version else None
-
-    def __call__(self, task, values) -> bool:
-        self.identity = self._calc()
-        task.value_savers.append(lambda: {"_prechips_kernel": self.identity})
-        return self.identity is not None and values.get("_prechips_kernel") == self.identity
-
-
-def _fail_prechips_inventory(label: str, inventory: str, diagnostic: str) -> None:
-    """Fail only the selected traveler, using the diagnostic captured at task load."""
+def _fail_prechips_plan(label: str, plan: str) -> None:
+    """Fail only the selected traveler whose authored plan is missing."""
     with _telemetry.span("task", label=label, service=_stage_name(label)):
-        raise RuntimeError(f"{label}: {inventory}: {diagnostic}")
+        raise RuntimeError(f"{label}: no process plan at {plan}; author it before enrolling")
 
 
 def _prechips_task(stem: str) -> dict[str, Any]:
@@ -4637,63 +4597,49 @@ def _prechips_task(stem: str) -> dict[str, Any]:
 
     assert stem in SUPPORTED_PARTS, f"traveler stem is not exported: {stem}"
     label = f"prechips:{stem}"
-    stamp = str(REPORTS / f"prechips-{stem}.ok")
+    plan = _process_plans.plan_path(stem)
+    targets = _canonical_targets(label)
+    if not plan.is_file():
+        # A missing plan fails this traveler alone, before exporting its geometry.
+        return {
+            "name": stem,
+            "actions": [(_fail_prechips_plan, [label, str(plan)])],
+            "targets": targets,
+            "uptodate": [False],
+            "verbosity": 2,
+        }
     cmd = [
         sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
         stem, "--out", str(CAD_OUT),
     ]
-    diagnostic = None
-    try:
-        specs = [
-            SCRIPTS_DIR / f"{module}.py"
-            for module in _process_plans.shop_spec_modules()
-        ]
-        for spec in specs:
-            if not spec.is_file():
-                raise _process_plans.PlanBindError(
-                    f"missing CAD fixture spec: {spec.resolve()}; "
-                    "add the spec file or correct the inventory cad stem"
-                )
-    except _process_plans.PlanBindError as exc:
-        specs = []
-        diagnostic = str(exc)
-    actions = [(_run_stamped, [cmd, label, stamp, label])]
-    uptodate = [
-        (_process_plans.traveler_complete, [stem, CAD_OUT]),
-        _PrechipsKernelTracker(),
-    ]
-    if diagnostic is not None:
-        actions = [(
-            _fail_prechips_inventory,
-            [label, str(_process_plans.shop_paths()[0].resolve()), diagnostic],
-        )]
-        uptodate = [False]
-    # A captured shop error must fail without first exporting scoped geometry.
-    bundles = bundle_paths(stem, CAD_OUT) if diagnostic is None else ()
+    manifest, _step = bundle_paths(stem, CAD_OUT)
     return {
         "name": stem,
         "file_dep": sorted({
-            str(_process_plans.plan_path(stem).resolve()),
-            *(str(path.resolve()) for path in _process_plans.shop_paths()),
-            *(str(path.resolve()) for path in bundles),
-            *(path for spec in specs for path in _executed_closure([str(spec)])),
+            # The plan directory also holds the diagrams/*.svg setup pictures
+            # the hobby traveler embeds.
+            *(str(path.resolve()) for path in plan.parent.rglob("*") if path.is_file()),
+            str(_process_plans.SHOP_PATH.resolve()),
+            str(manifest.resolve()),
             str((REPO_ROOT / "pyproject.toml").resolve()),
             str((REPO_ROOT / "uv.lock").resolve()),
-            str((REPO_ROOT / "dodo.py").resolve()),
-            str((SCRIPTS_DIR / "_telemetry.py").resolve()),
             *_executed_closure(cmd),
         }),
-        "task_dep": [f"package:features:{stem}"] if diagnostic is None else [],
-        "targets": _canonical_targets(f"prechips:{stem}"),
-        "uptodate": uptodate,
-        "actions": actions,
+        "task_dep": [f"package:features:{stem}"],
+        "targets": targets,
+        # A refusal must not leave a previous success's stamp beside no HTML;
+        # the wrapper removes both HTML files itself.
+        "actions": [
+            (Path.unlink, [Path(targets[0])], {"missing_ok": True}),
+            (_run_stamped, [cmd, label, targets[0], label]),
+        ],
         "clean": True,
         "verbosity": 2,
     }
 
 
 def task_prechips():
-    """Strict, SolidWorks-free travelers for enrolled parts (requires FreeCAD)."""
+    """SolidWorks-free prechips travelers for enrolled parts (pro and hobby HTML each)."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
@@ -5081,10 +5027,9 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "prechips":
         import _process_plans
 
-        directory = _process_plans.traveler_dir(subname, CAD_OUT)
         return [
-            str(REPORTS / f"prechips-{subname}.ok"), str(directory / "plan.toml"),
-            str(directory / "report.json"), str(directory / "traveler.html"),
+            str(REPORTS / f"prechips-{subname}.ok"),
+            *(str(path) for path in _process_plans.traveler_paths(subname, CAD_OUT)),
         ]
     if family == "package":
         if subname.startswith("features:"):
@@ -5307,8 +5252,9 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
     if (
         queried_namespace(traveler_root)
         or traveler_stamp
+        # Every traveler target is an .html file directly under its stem.
         or _ownership_namespace_has_aliases(
-            traveler_root, filenames=frozenset({"plan.toml", "report.json", "traveler.html"}),
+            traveler_root, filenames=frozenset(), suffixes=frozenset({".html"}),
         )
         or any(path.is_symlink() for path in REPORTS.glob("prechips-*.ok"))
     ):

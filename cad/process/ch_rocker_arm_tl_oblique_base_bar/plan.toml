@@ -1,1484 +1,287 @@
-# HELD PREVIEW ROUTE: not enrolled in _process_plans.TRAVELER_STEMS and not qualified
-# machining instructions. Shared shop values include unmeasured #1413 placeholders, so any
-# traveler from this plan is PROVISIONAL and is not approval to machine.
-#
-# ch_rocker_arm_tl_oblique_base_bar (MHA-CH-06-TL-20 v47): two bars from one route, the second
-# turned over in the jig. Bar 1 (the Bar1 configuration) carries the four TL-28 end-bracket
-# holes; bar 2 (Bar2, same Number) has none and skips their ops (A 90-120, 260-290, 430-460;
-# B 50-60). Process intent from the owner's hand-written 2026-10-30 traveler
-# (not prechips output) and the v47 drawing (farm run 20261030T220540504Z, machinist SHIP).
-# Stock follows the owner ruling in harmonic-analyzer issue #2083: the owned OnlineMetals
-# 1173 1/2 x 6 bar is milled to width on edge in the vise, not ripped. The #290 inch drawing
-# prints the width as a machined 5.50 (139.7) at the title block's .XX band (+/-0.25).
-# Model frame (features.toml): X0 the spindle-end face, Y0 the rail axis (low side -88.9,
-# high side +50.8), Z0 the underside seat, Z11.938 the top seat (.47). Face references are bare HAF
-# labels; _process_plans.bind_plan binds them to the exported STEP.
-part = "ch-rocker-arm-tl-oblique-base-bar"
-features = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
-construction = "one_piece"
-quantity = 2
-quantity_cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:configuration_quantities", "AUTHOR'S CHOICE: both bars follow this same route, bar 2 without the bracket-hole ops; do not mirror the second"]
-
-[drawing]
-number = "MHA-CH-06-TL-20"
-revision = "v49"
-cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
-
-[dro]
-controller = "el400"
-manual = "Electronica EL400 Operation Manual"
-manual_url = "https://www.dropros.com/documents/EL400%20OpManual.pdf"
-mode = "abs"
-
-[dro.direction]
-x = "right"
-y = "away"
-z = "up"
-
-# One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): about 1.5 over the 439.928 length at
-# each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
-# face. These placements are the author's route choice, not measurements of a sawn blank.
-# Retain existing 439.928 mm nominal bars. Trim each actual rail flush with
-# its actual bar, retaining safe hole end walls; transfer that rail's holes.
-# Drawing stations are nominal REF, NOT DRO targets or supplier pitch limits.
-[stock]
-form = "flat_bar"
-form_verify = false
+# Source: Pedro's 2026-11-05 hand traveler
+# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-11-05.html (open PR #2218,
+# branch process/basebar-traveler-logbook-advice; drawing v47), including its
+# vise workholding: 1-3/8 in parallels and the HHIP 3901-0079 jack, recorded in
+# cad/config/shop-equipment.toml with that sheet's ownership status.
+# Table-clamped squaring sequence: 2026-11-07 session
+# 2026-11-07T00-02-29-727Z_01a1b350-58df-72b7-a9e3-7735a77b13fc.
+# v48 drawing: bar 1 alone carries the four #12 bracket holes; rail stations
+# are REF, transferred from each bar's own trimmed rail (flush both ends).
+title = "Oblique trammel base bar — bar 1 and bar 2"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
-drawing_material = "ALUMINUM FLAT BAR 1/2 x 6 in"
-material_verify = false
-material_cite = [
-  "harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.material_specification",
-  "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083 (owner decision 2026-10-30: mill the owned OnlineMetals 1173 1/2 x 6 x 72 in 6061-T6511 bar to width; no bandsaw rip)",
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar; {{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks."
+note = "Inches unless mm. Finished {{cad.size_summary}}. Bar 2: no bracket holes; turned over in assembly."
+shop = "../shop.toml"
+material_key = "6061-t6511"
+
+[cad]
+file = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
+adapter = "harmonic_base_bar"
+
+[parameters]
+blank_length_in = 17.4375
+blank_width_in = 6.0
+blank_thickness_in = 0.5
+quantity = 2
+width_rough_allowance_in = 0.015
+slot_breakthrough_in = 0.02
+slot_step_in = 0.12
+slot_finish_diameter_in = 0.53125
+# Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
+# run from spindle nose to tip (holder gauge + projection). The archived
+# inventory is archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
+edge_x_travel_mm = 469.9         # Edge setup datum: required X travel ~18.5 in.
+block_height_mm = 25.4           # 1-2-3 blocks lying flat, 1 in face up.
+parallel_height_mm = 34.925      # 1-3/8 in parallels (vise setups).
+vise_bed_height_mm = 73.3044     # Archive fixtures.vise-pm-6.bed_height_in 2.886.
+edge_cut_tip_z_mm = -2.032       # Edge cutter .04–.08 in below the underside.
+end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
+drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
+half_cutter_dia_mm = 12.7        # 1/2 in end mill.
+face_cutter_dia_mm = 19.05       # 3/4 in end mill.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# Archive LMS 6784 set projections from the R8 collet grow with size: 3/16 and
+# 1/4 in 25, 3/8 in 38, 7/16 in 41, 11/16 in 50, 3/4 in 57. The 1/2 and 5/16 in
+# cutters have no member record, so they are bounded by their neighbours.
+half_mill_projection_min_mm = 41.0
+half_mill_projection_max_mm = 50.0
+face_mill_projection_mm = 57.0
+small_mill_projection_min_mm = 25.0
+# Archive drill-index-115 13/32 in member, 112.8 out of drill-chuck-r8: the next
+# recorded jobber above the 3/8 in drill, so it bounds the longest drill.
+drill_projection_max_mm = 112.8
+
+[[tools]]
+id = "saw"
+name = "Saw"
+ref = "basebar-saw"
+[[tools]]
+id = "em-half"
+name = "1/2 in end mill"
+ref = "basebar-em-half"
+[[tools]]
+id = "em-face"
+name = "3/4 in end mill"
+ref = "basebar-em-face"
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "basebar-spot"
+[[tools]]
+id = "rail-drill"
+name = "#29 drill"
+ref = "basebar-rail-drill"
+[[tools]]
+id = "bracket-drill"
+name = "#12 drill"
+ref = "basebar-bracket-drill"
+[[tools]]
+id = "slot-drill"
+name = "3/8 in drill"
+ref = "basebar-slot-drill"
+[[tools]]
+id = "tap"
+name = "8-32 tap"
+ref = "basebar-tap"
+[[tools]]
+id = "counterbore"
+name = "5/16 in end mill"
+ref = "basebar-counterbore"
+[[tools]]
+id = "slot-finish"
+name = "{{process.slot_finish_diameter_in:fraction}} in end mill"
+ref = "basebar-slot-finish"
+diameter_mm = "{{cad.slot_finish_diameter_mm}}"
+description = "{{process.slot_finish_diameter_in:fraction}} in centre-cutting 2-flute HSS end mill; flutes ≥5/8 in"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw blanks"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "{{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks marked on the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar; bar supported level on saw bed and stands at the cutline." }
+envelope = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+sizing = "other"
+instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks from {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Mill both long edges"
+machine = "PM-30MV; inch DRO"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Vise off; 1-2-3 blocks inboard, supporting middle ~4 in; both long edges overhang .75–1 in. Strap across mid-width of each end, clear of both long-edge cuts."
+datum = "Front machined edge becomes ZERO EDGE. X along length; +X cutter right, +Y away. Required X travel ~18.5 in."
+diagram = { file = "diagrams/width.svg", alt = "Blank on inboard 1-2-3 blocks with straps at mid-width of each end; both long edges exposed. Front edge cut in +X makes ZERO EDGE; opposite edge cut in −X finishes width without moving the bar." }
+envelope = { x_span_mm = "{{process.edge_x_travel_mm}}", y_span_mm = ["{{cad.blank_width_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.edge_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Cutter .04–.08 below underside. Mill front edge in +X, conventional; rough .050–.080 radial, finish .005–.010. Mark ZERO EDGE both faces. Keep this clamping for opposite edge."
+settings = "basebar-edge-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Mill opposite long edge in −X, conventional; rough .050–.080 radial to {{cad.width_rough_in:.3f}} width, finish to {{cad.width_in:.3f}} from ZERO EDGE."
+settings = "basebar-edge-6061-t6511"
+inspection = "Width at ends/middle."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Square both ends on table"
+machine = "PM-30MV; inch DRO"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Keep bar fixed on inboard supports; supports clear of both end cuts."
+datum = "First squared end becomes ZERO END / X0. Retain ZERO EDGE."
+diagram = { file = "diagrams/ends.svg", alt = "Bar stays fixed on table supports. Add straps over finished long edges near mid-length before removing end straps; end mill squares the left end in −Y and finishes the right end in +Y to {{cad.length_in:.2f}} from ZERO END." }
+# Cutter centre runs past both ends (final X = length + D/2) and across the width.
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+
+[[setups.operations]]
+instruction = "Add two straps over finished long edges near mid-length and tighten before removing end straps. Do not move bar."
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Cutter .04 below bar. Square left end in −Y, .020 passes; mark ZERO END both faces and set X0 there. Measure cutter D; cut right end in +Y, .010 passes, final X = {{cad.length_in:.4f}} + D/2."
+settings = "basebar-edge-6061-t6511"
+
+[[setups]]
+machine_kind = "other"
+title = "Face both sides in vise"
+machine = "PM-30MV / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flat on 1-3/8 in parallels, ZERO EDGE at fixed jaw; screw jack (3.9–5.5 in range) under each overhanging end."
+datum = "Jaw indicated <.001 along X; Z0 underside from measured thickness. Preserve marked ZERO END."
+diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, jacks under both overhangs; 3/4 in end mill faces left and right halves. After both faces, orient ZERO END left and ZERO EDGE back before marking upper face C'BORE SIDE." }
+# Arrives at blank thickness; the deepest pass leaves the finished top.
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "Face left and right halves of each face. Rough .010 per pass, +X, +Y stepover .60; remove half allowance on side 1. Flip end-for-end, ZERO EDGE still at fixed jaw; finish side 2 to {{cad.thickness_in:.4f}}. Reorient ZERO END left, ZERO EDGE back; mark upper face C'BORE SIDE."
+rpm = 840
+feed = "3.3 in/min rough; 2.4 finish"
+
+[[setups]]
+machine_kind = "other"
+title = "Drill / tap / counterbore / slots"
+machine = "PM-30MV; inch DRO"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "ZERO EDGE at back jaw, ZERO END left, C'BORE SIDE up; 1-3/8 in parallels. Support both overhangs with jacks clear of hole/slot paths."
+datum = "Drawing lower edge = ZERO EDGE; left end = ZERO END; far face = C'BORE SIDE. Back-left X0/Y0; +X right, drawing Y dimensions become −Y."
+diagram = { file = "diagrams/holes.svg", alt = "Finished {{cad.length_in:.2f}} in bar in vise: C'BORE SIDE up, ZERO EDGE at back fixed jaw, ZERO END left, X0 Y0 back-left; rail holes {{cad.rail_range}}, counterbored {{cad.bracket_range}} (bar 1 only), slots {{cad.slot_range}} and jacks under both overhangs." }
+# Hole and slot centres lie inside the finished bar. Longest: a drill in the
+# drill chuck; shortest: the 5/16 in counterbore cutter in an R8 collet.
+envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.width_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
+
+[[setups.operations]]
+instruction = "Before drilling: on this bar's own trimmed rail, flush at ZERO END, measure the {{cad.rail_count:d}} hole centres (REF {{cad.rail_first_mm:.3f}} mm, {{cad.rail_pitch_mm:.3f}} mm pitch). Drill {{cad.rail_range}} at measured X."
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+sizing = "other"
+instruction = "Spot to Ø.125 ({{cad.bracket_range}} bar 1 only). All drills: .125 pecks, drill tip .125 past underside. Inches; IDs follow coordinate order. Rail X as measured; bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}; rail row ±{{cad.rail_row_tol_in:.2f}}; slot positions ±{{cad.slot_position_tol_in:.2f}}."
+rpm = 3000
+feed = "hand"
+
+[setups.operations.table]
+columns = ["Holes", "X", "Y"]
+rows = "{{cad.hole_rows}}"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "rail-drill"
+sizing = { kind = "tap_drill", tap = "tap" }
+instruction = "{{cad.rail_range}} through."
+rpm = 3000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "bracket-drill"
+sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
+instruction = "Bar 1 only: {{cad.bracket_range}} through."
+rpm = 3000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "slot-drill"
+sizing = "other"
+instruction = "{{cad.slot_range}} through."
+rpm = 2000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap"
+sizing = "other"
+instruction = "Tap {{cad.rail_range}} through."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "counterbore"
+sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
+instruction = "Bar 1 only: counterbore {{cad.bracket_range}}, {{cad.counterbore_depth_in:.3f}} deep from top."
+rpm = 2000
+feed = "slow hand plunge"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Rough slots with .500 cutter, depths {{cad.slot_depths_in}} below top. Traverse between arc centres: {{cad.slot_paths}}."
+settings = "basebar-slot-rough-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "slot-finish"
+sizing = { kind = "band", band_mm = "{{cad.slot_width_band_mm}}" }
+instruction = "Finish {{cad.slot_range}} at {{cad.slot_depth_in:.2f}} below top, same X and arc-centre Y ranges as roughing. Drawing target: {{cad.slot_width_in:.3f}} wide with {{cad.slot_spacing_in:.3f}} arc-centre spacing."
+settings = "basebar-slot-finish-6061-t6511"
+cut_diameter_mm = "{{cad.slot_finish_diameter_mm}}"
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr / inspect both"
+machine = "Bench / clean mill table"
+indexing = "none"
+datum = "Marked end/edge; rail on face opposite C'BORE SIDE."
+diagram = { file = "diagrams/inspect.svg", alt = "Finished bar 1 from C'BORE SIDE with section through bracket holes {{cad.bracket_range}}: socket heads recessed in counterbores; HGR15 rail on the opposite face, trimmed flush with both ends; slot stud fit." }
+envelope = "other"
+
+[[setups.operations]]
+instruction = "Edges R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; clear threads; fit rail/screws and slot stud."
+feed = "hand"
+
+[setups.operations.table]
+columns = ["Inspect", "Requirement"]
+rows = [
+  ["Overall size", "{{cad.size_summary}}; length both edges;\nwidth ends/mid; thickness corners/mid; ends square to ZERO EDGE"],
+  ["Seats", "No rock on mill table; no chatter marks; Ra {{cad.finish_ra_um:.1f}} µm both faces"],
+  ["Bracket holes / counterbores", "Bar 1: holes Ø{{cad.bracket_dia_min_in:.3f}}–{{cad.bracket_dia_max_in:.3f}}; counterbores Ø{{cad.counterbore_dia_min_in:.3f}}–{{cad.counterbore_dia_max_in:.3f}} × {{cad.counterbore_depth_min_in:.3f}}–{{cad.counterbore_depth_max_in:.3f}} deep;\ncheck #8-32 × 5/8 socket screw head sits recessed"],
+  ["Rail fit", "Own HGR15 rail trimmed flush both ends; {{cad.rail_count:d}}× #8-32 × 3/4 socket screws\nenter free, no forcing"],
+  ["Slots", "Width {{cad.slot_width_min_in:.2f}}–{{cad.slot_width_max_in:.2f}}; overall length minus width {{cad.slot_spacing_min_in:.2f}}–{{cad.slot_spacing_max_in:.2f}};\n1/2-13 slot-fit stud slides end-to-end"],
 ]
-on_hand = true
-prerequisite = "Saw two 443 mm blanks from the owned 1/2 x 6 bar (miter saw or bandsaw), supporting the long end so it does not drop as the cut finishes; file off the saw burrs. Bar 1 was sawn on 2026-10-29 without a recorded length: measure it. This route's coordinates need a blank at least 443 long; a shorter blank is on HOLD until the route is adjusted for it."
-# Catalogue nominal section of OnlineMetals 1173, 6 x 1/2 in = [152.4, 12.7] mm; not a receipt measurement.
-section_mm = [152.4, 12.7]
-length_mm = 443.0
-origin_mm = [-1.5, -89.9, -0.35]
-axis = [1.0, 0.0, 0.0]
-section_axis = [0.0, 1.0, 0.0]
-as_is_faces = []
-cite = [
-  "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083",
-  "Desktop traveler 2026-10-30 Op 10 (hand-written, not prechips): two 443 mm blanks, 1.5 mm to clean up at each end",
-  "AUTHOR'S CHOICE: zero edge 1.0 proud (Op 20 'take as little as you can, usually about 1 mm'); 0.35 a face (about 0.35 per side)",
-]
-
-[frames.edge-low-up]
-origin = [0.0, -88.9, 0.0]
-x = [1.0, 0.0, 0.0]
-y = [0.0, 0.0, 1.0]
-z = [0.0, -1.0, 0.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: bar on edge in the vise, zero edge (the -Y side) up; Z0 on the finished zero edge"
-cite = ["AUTHOR'S CHOICE", "features.toml bar_low_side.plane y -88.9"]
-
-[frames.edge-high-up]
-origin = [0.0, -88.9, 0.0]
-x = [1.0, 0.0, 0.0]
-y = [0.0, 0.0, -1.0]
-z = [0.0, 1.0, 0.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: bar on edge, zero edge down on the vise floor; Z0 on the zero edge, so Z reads the width"
-cite = ["AUTHOR'S CHOICE", "features.toml bar_low_side.plane y -88.9"]
-
-[frames.table-first]
-origin = [0.0, -88.9, 12.35]
-x = [1.0, 0.0, 0.0]
-y = [0.0, -1.0, 0.0]
-z = [0.0, 0.0, -1.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: flat on the mill table, the underside seat up, zero edge toward the column; Z0 on the table"
-cite = ["AUTHOR'S CHOICE", "plan stock origin_mm z -0.35 + 12.7"]
-
-[frames.table-second]
-origin = [439.928, -88.9, 0.0]
-x = [-1.0, 0.0, 0.0]
-y = [0.0, -1.0, 0.0]
-z = [0.0, 0.0, 1.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: turned end for end onto the faced underside, zero edge still toward the column; Z0 on the table, so Z reads the thickness"
-cite = ["AUTHOR'S CHOICE", "features.toml underside_seat.plane z 0"]
-
-[frames.vise-cbore-up]
-origin = [0.0, -88.9, 0.0]
-x = [1.0, 0.0, 0.0]
-y = [0.0, -1.0, 0.0]
-z = [0.0, 0.0, -1.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: underside seat (the counterbore side) up in the vise, zero edge on the fixed jaw, zero end on the left; X0 Y0 the back-left corner, Z0 on top. Y reads negative toward you."
-cite = ["AUTHOR'S CHOICE", "features.toml bar_spindle_end.plane x 0, bar_low_side.plane y -88.9, underside_seat.plane z 0"]
-
-[frames.bench]
-origin = [0.0, -88.9, 0.0]
-x = [1.0, 0.0, 0.0]
-y = [0.0, 1.0, 0.0]
-z = [0.0, 0.0, 1.0]
-binding = "nominal"
-note = "AUTHOR'S CHOICE: bench frame, top seat up"
-cite = ["AUTHOR'S CHOICE"]
-
-# ---------------------------------------------------------------------------------------
-# E1: 6 in vise, bar on edge gripped across its 12.7 thickness on the vise floor (the setup
-# the owner used on 2026-10-29). Mill the first long edge clean: this is the ZERO EDGE.
-[[setups]]
-id = "E1"
-machine = "PM-30MV"
-frame = "edge-low-up"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "stock"
-note = "Provisional: shared shop values include unmeasured #1413 placeholders; not approval to machine. Bar on edge, about 140 mm out each side of the vise. The edge you mill here is the ZERO EDGE: every Y on later sheets is measured from it. Write ZERO EDGE on both faces next to it as soon as it is cut. If it sings, take lighter passes."
-
-[setups.stock_state]
-top_z = 1.0
-bottom_z = -151.4
-
-[setups.hold]
-fixture = "vise-pm-6"
-jaws_along = "x"
-fixed_jaw = "rear"
-parallels = "none"
-jaw_center_along_mm = 220.0
-grip_mm = 44.945
-jaw_above_parallels_mm = 44.945
-stop = "none; bar centred along X by eye"
-clamp = "grip across the 12.7 thickness, the long raw edge down on the vise floor; tap down with the dead-blow hammer, re-tighten"
-align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30: indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
-
-[setups.zero.x]
-edge = "left sawn blank end"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "fixed jaw"
-edge_mm = 12.35
-from = "+y"
-method = "Pick the exposed fixed-jaw face beside the bar before loading."
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-edge = "raw top edge over the vise, mid-thickness, at X+220.0 Y+6.0"
-method = "paper"
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "face"
-feature = "bar_low_side"
-faces = ["HAF_BAR_LOW_SIDE__P01"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = 0.0
-doc_mm = 0.5
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 441.5], y = [-0.35, 12.35], z = [0.0, 1.0] }
-contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [-89.9, -88.9], z = [-0.35, 12.35] } }
-note = "Face with the bottom of the cutter until the whole edge is clean; take as little as you can. Feed 75 mm/min."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 2"]
-
-# ---------------------------------------------------------------------------------------
-# E2: same vise, bar flipped: zero edge down on the wiped vise floor. Mill the other long
-# edge down to 139.7 wide (about 11.7 off).
-[[setups]]
-id = "E2"
-machine = "PM-30MV"
-frame = "edge-high-up"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "E1"
-note = "Width 139.7 (5.50, 139.45 to 139.95) follows the owner's #2083 ruling to mill the owned 1/2 x 6 bar to width on edge, no bandsaw rip. Do both bars before you go on."
-
-[setups.stock_state]
-top_z = 151.4
-bottom_z = 0.0
-bottom_feature = "bar_low_side"
-
-[setups.hold]
-fixture = "vise-pm-6"
-jaws_along = "x"
-fixed_jaw = "rear"
-parallels = "none"
-jaw_center_along_mm = 220.0
-grip_mm = 44.945
-jaw_above_parallels_mm = 44.945
-stop = "none; bar centred along X by eye"
-clamp = "grip across the 12.7 thickness, the zero edge down on the wiped vise floor; tap down with the dead-blow hammer, re-tighten"
-
-[setups.zero.x]
-edge = "left sawn blank end"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "fixed jaw"
-edge_mm = 0.35
-from = "+y"
-method = "Pick the exposed fixed-jaw face beside the bar before loading."
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-method = "measure_then_set"
-gauge = "calipers-18in"
-measure = "bar width, zero edge to the raw top edge"
-measure_before_hold = true
-offset_mm = 0.0
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "face"
-feature = "bar_high_side"
-faces = ["HAF_BAR_HIGH_SIDE__P01"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = 139.7
-doc_mm = 1.0
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 441.5], y = [-12.35, 0.35], z = [139.7, 151.4] }
-contour = { method = "linear_table", step_mm = 6.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 441.5], y = [50.8, 62.5], z = [-0.35, 12.35] } }
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 20 step 4"]
-
-[[setups.ops]]
-op = 20
-do = "inspect"
-feature = "bar_high_side"
-checks = { width = "calipers-18in" }
-inspection_methods.width = "Calipers across the two long edges at both ends and in the middle; 139.45 to 139.95 (5.50 +/-.01)."
-
-# ---------------------------------------------------------------------------------------
-# T1a/T1b: PM-30MV table, vise off (in the vise the bar top would sit below the jaw tops and
-# a facing cutter would hit them). T1a: one strap on each bar end, face the middle. T1b: two
-# straps on the faced middle from the front T-slot, end straps off, face both ends.
-[[setups]]
-id = "T1a"
-machine = "PM-30MV"
-frame = "table-first"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "E2"
-note = "Take the vise off and wipe the table; stone burrs off the table and the bar. One chip under the bar ruins the face. If the bar rocks, slip paper under the low corner; never clamp it flat over a gap: it springs back after the cut. Optional: the same zig-zag can run as a CNCjs facing program with the same depths and feeds."
-
-[setups.stock_state]
-top_feature = "underside_seat"
-top_z = 12.7
-bottom_z = 0.0
-
-[setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.7], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.7], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, set like C1" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-# Desktop traveler 2026-10-30 Op 30: a strap toe on each bar end.
-clamp = "AUTHOR'S CHOICE: the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
-
-[setups.zero.x]
-edge = "left sawn blank end"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge (column side)"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "bar thickness at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
-edge = "the marked spot, flat on the table (not over any paper), at X+220.0 Y-15.0"
-measure_before_hold = true
-offset_mm = 0.0
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "rough_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.45
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
-note = "Stay between the listed X ends: the end straps reach in to X 13.7 and from X 426.3. The ends are faced in the next setup."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
-
-[[setups.ops]]
-op = 20
-do = "finish_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.35
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [-0.35, 0.0] } }
-note = "Finish pass 0.10 over the clamped middle at 60 mm/min. Stop if you see chatter marks."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-[[setups]]
-id = "T1b"
-machine = "PM-30MV"
-frame = "table-first"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "T1a"
-note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
-
-[setups.stock_state]
-top_feature = "underside_seat"
-top_z = 12.7
-bottom_z = 0.0
-
-[setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [150.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 150, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 12.35], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "the same as C1, at X 290" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "AUTHOR'S CHOICE: two straps from the front T-slot on the faced middle; the end passes keep clear of them (72 mm keep-out circles round each strap toe and nut)"
-
-[setups.zero.x]
-edge = "left sawn blank end"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge (column side)"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "underside_seat"
-edge_mm = 12.35
-edge = "the faced middle (bar not moved since the last setup), at X+220.0 Y-15.0"
-method = "paper"
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "rough_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.45
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end; the last pass overlaps the faced middle at the same Z. Both end passes stay over 85 mm from the front straps."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
-
-[[setups.ops]]
-op = 20
-do = "rough_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.45
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.35, 12.7] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end; the first pass overlaps the faced middle at the same Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
-
-[[setups.ops]]
-op = 30
-do = "finish_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.35
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end finish pass at the middle's Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-[[setups.ops]]
-op = 40
-do = "finish_face"
-feature = "underside_seat"
-faces = ["HAF_UNDERSIDE_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.35
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [12.35, 12.45] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [-0.35, 0.0] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end finish pass at the middle's Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-# ---------------------------------------------------------------------------------------
-# T2a/T2b: PM-30MV table, vise off (in the vise the bar top would sit below the jaw tops and
-# a facing cutter would hit them). T2a: one strap on each bar end, face the middle. T2b: two
-# straps on the faced middle from the front T-slot, end straps off, face both ends.
-[[setups]]
-id = "T2a"
-machine = "PM-30MV"
-frame = "table-second"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "T1b"
-note = "Flip the bar end for end, faced side down; wipe the table and the faced side. Snug the straps; do not crush the bar."
-
-[setups.stock_state]
-top_feature = "top_seat"
-top_z = 12.35
-bottom_z = 0.0
-bottom_feature = "underside_seat"
-
-[setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [1.0, -88.2, 12.35], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "left bar end, toe about 15 mm in; stud in the centre T-slot beyond the end, step block a little higher than the bar" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [439.0, -88.2, 12.35], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "right bar end, set like C1" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-# Desktop traveler 2026-10-30 Op 30: a strap toe on each bar end.
-clamp = "AUTHOR'S CHOICE: the bar flat on the table along X, zero edge toward the column, a strap toe on each bar end"
-
-[setups.zero.x]
-edge = "left sawn end (the far end, turned round)"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge (column side)"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "bar thickness at the marked spot: the middle of the bar, X 220, 15 mm in from the zero edge"
-edge = "the marked spot, flat on the table (not over any paper), at X+220.0 Y-15.0"
-measure_before_hold = true
-offset_mm = 0.0
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "rough_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.038
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [11.938, 12.35] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [11.938, 12.35] } }
-note = "Stay between the listed X ends: the end straps reach in to X 13.7 and from X 426.3. The ends are faced in the next setup."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 6 (feeds are the author's choice, not chart values)"]
-
-[[setups.ops]]
-op = 20
-do = "finish_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 11.938
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [15.5, 424.5], y = [-139.7, 0.0], z = [11.938, 12.038] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [34.53, 405.47], y = [-88.9, 50.8], z = [11.938, 12.35] } }
-note = "Finish pass 0.10 down to Z 11.94 over the clamped middle (drawing .47 +/-.01: 11.68 to 12.19 thick). Stop if you see chatter marks."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-[[setups]]
-id = "T2b"
-machine = "PM-30MV"
-frame = "table-second"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "T2a"
-note = "Do not move the bar, the knee or the quill lock. Put the two front straps on the faced middle, then take the end straps off. Check Z on the faced middle (it must read its faced height) and face both ends to the same Z."
-
-[setups.stock_state]
-top_feature = "top_seat"
-top_z = 12.35
-bottom_z = 0.0
-bottom_feature = "underside_seat"
-
-[setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [220.0, -88.2, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [150.0, -113.6, 11.938], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "toe on the faced middle at X 150, Y -113.6 (26 mm in from the front edge), paper under the toe; stud in the front T-slot at Y -151.7" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-table", restraint = "press", pose = { origin_mm = [290.0, -113.6, 11.938], x = [0.0, -1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "the same as C1, at X 290" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "AUTHOR'S CHOICE: two straps from the front T-slot on the faced middle; the end passes keep clear of them (72 mm keep-out circles round each strap toe and nut)"
-
-[setups.zero.x]
-edge = "left sawn end (the far end, turned round)"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge (column side)"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top_seat"
-edge_mm = 11.938
-edge = "the faced middle (bar not moved since the last setup), at X+220.0 Y-15.0"
-method = "paper"
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "rough_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.038
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [11.938, 12.35] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [11.938, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end; the last pass overlaps the faced middle at the same Z. Both end passes stay over 85 mm from the front straps."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
-
-[[setups.ops]]
-op = 20
-do = "rough_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 12.038
-rough_allowance_mm = 0.1
-doc_mm = 0.25
-rpm = 840.0
-feed_mm_min = 85.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [11.938, 12.35] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [11.938, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end; the first pass overlaps the faced middle at the same Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 7"]
-
-[[setups.ops]]
-op = 30
-do = "finish_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 11.938
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 39.5], y = [-139.7, 0.0], z = [11.938, 12.038] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [400.5, 441.5], y = [-88.9, 50.8], z = [11.938, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Left end finish pass at the middle's Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-[[setups.ops]]
-op = 40
-do = "finish_face"
-feature = "top_seat"
-faces = ["HAF_TOP_SEAT__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "conventional"
-to_z = 11.938
-doc_mm = 0.1
-rpm = 840.0
-feed_mm_min = 60.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [400.5, 441.5], y = [-139.7, 0.0], z = [11.938, 12.038] }
-contour = { method = "linear_table", step_mm = 15.0, sweep_frame = "model", sweep_bounds = { x = [-1.5, 39.5], y = [-88.9, 50.8], z = [11.938, 12.35] }, keep_out = [{ at = [150.0, 44.1], dia_mm = 72.0 }, { at = [290.0, 44.1], dia_mm = 72.0 }] }
-note = "Right end finish pass at the middle's Z."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 Op 30 step 8"]
-
-# ---------------------------------------------------------------------------------------
-# A0/A: 6 in vise back on the table and indicated. The counterbore side up (it is the
-# underside of bar 1), zero edge on the fixed jaw, zero end on the left: every hole, both
-# slots and the length are cut in this one clamping. A0 cleans up the zero end; A picks up
-# X on it without unclamping.
-[[setups]]
-id = "A0"
-machine = "PM-30MV"
-frame = "vise-cbore-up"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "T2b"
-note = "Before loading, write ZERO END on one end and C'BORE SIDE - UP IN VISE on one big face (both faces are the same; pick either). The face on top becomes the bottom of bar 1: the counterbores go in it, so every hole is made in one setup. Bar 2 has no bracket holes or counterbores: mark it BAR 2 and skip ops 90-120, 260-290 and 430-460. Check the DRO: X counts up to the right, Y counts down toward you (every Y on this sheet is negative). Don't lean on the overhanging ends."
-
-[setups.stock_state]
-top_feature = "underside_seat"
-bottom_feature = "top_seat"
-top_z = 0.0
-bottom_z = -11.938
-
-[setups.stock_state.entry_z]
-rail_hole_1 = 0.0
-rail_hole_2 = 0.0
-rail_hole_3 = 0.0
-rail_hole_4 = 0.0
-rail_hole_5 = 0.0
-rail_hole_6 = 0.0
-rail_hole_7 = 0.0
-rail_hole_8 = 0.0
-bracket_hole_1 = 0.0
-bracket_hole_2 = 0.0
-bracket_hole_3 = 0.0
-bracket_hole_4 = 0.0
-near_slot = 0.0
-far_slot = 0.0
-
-[setups.stock_state.local_thickness]
-rail_hole_1 = 11.938
-rail_hole_2 = 11.938
-rail_hole_3 = 11.938
-rail_hole_4 = 11.938
-rail_hole_5 = 11.938
-rail_hole_6 = 11.938
-rail_hole_7 = 11.938
-rail_hole_8 = 11.938
-bracket_hole_1 = 11.938
-bracket_hole_2 = 11.938
-bracket_hole_3 = 11.938
-bracket_hole_4 = 11.938
-near_slot = 11.938
-far_slot = 11.938
-
-[setups.hold]
-fixture = "vise-pm-6"
-jaws_along = "x"
-fixed_jaw = "rear"
-parallels = "parallels-lms-6745/1in"
-parallels_along = "x"
-parallels_centres_mm = [[220.0, -1.5875], [220.0, -138.1125]]
-jaw_center_along_mm = 220.0
-grip_mm = 11.938
-jaw_above_parallels_mm = 19.545
-stop = "none; bar centred along X by eye, about 140 mm out each side"
-clamp = "on the two 1 in parallels, one against each jaw; zero edge on the fixed jaw; tighten, tap down with the dead-blow hammer, re-tighten until neither parallel slides"
-align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30 Op 30 step 11: put the vise back and indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
-
-[setups.zero.x]
-edge = "left sawn end"
-edge_mm = -1.5
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge, from behind in the left overhang at about X 100"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = -10.0
-
-[setups.zero.z]
-face = "top"
-edge = "top face over the vise, midway between the jaws, at X+220.0 Y-69.85"
-method = "paper"
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "finish_profile"
-feature = "bar_spindle_end"
-faces = ["HAF_BAR_SPINDLE_END__P01"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = -13.0
-doc_mm = 13.0
-ae_mm = 0.5
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-1.5, 0.0], y = [-139.7, 0.0], z = [-13.0, 0.0] }
-contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [-1.5, 0.0], y = [-88.9, 50.8], z = [0.0, 11.938] }, open_side = "-x" }
-note = "Spindle off: lower the cutter beside the left end to 1 mm below the bar and lock the head. Feed toward you across the end, stepping in 0.5 in X, until the whole end is clean."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A3"]
-
-[[setups]]
-id = "A"
-machine = "PM-30MV"
-frame = "vise-cbore-up"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "A0"
-note = "Same clamping as A0: do not unclamp the bar. For BRACKET holes use their printed positions; rail stations are REF, NOT DRO targets. Before rail work, transfer all carriages onto kit false rails; protect bearings/raceways from grit. Centre the purchased rail's hole span over its actual finished bar, mark both end trims (5.036 mm each nominal only), abrasive-cut with allowance and finish both ends flush to the bar without touching running surfaces. Keep all eight holes and fully enclosed counterbores. Before transfer, inspect actual end ligaments: at least 0.080 in from each counterbore to its trimmed end and each planned tap major to a bar end, hold-down slot or bracket hole/counterbore, with measurement uncertainty deducted. Stop if insufficient; do not move a rail hole or enlarge a slot to rescue it. Align the rail on the ordinary rail-row line, clamp without movement and transfer ALL EIGHT actual hole centres to this bar. Mark the paired bar/rail and near ends. Remove the rail before spotting at the transferred marks, drilling and tapping; support the bar over open air and brush on oil. No transfer-punch accuracy is assumed: after deburring, refit the identified pair flush at both ends and check all eight screws enter freely by hand without shifting or forcing the rail. Do not redrill to the REF positions to rescue a failed fit; stop and report. Clean all grit before reloading carriages. Finally inspect actual tap-to-end, slot and bracket ligaments to the same 0.080 in minimum and run both complete pass sweeps with seals fully supported."
-
-[setups.stock_state]
-top_feature = "underside_seat"
-bottom_feature = "top_seat"
-top_z = 0.0
-bottom_z = -11.938
-
-[setups.stock_state.entry_z]
-rail_hole_1 = 0.0
-rail_hole_2 = 0.0
-rail_hole_3 = 0.0
-rail_hole_4 = 0.0
-rail_hole_5 = 0.0
-rail_hole_6 = 0.0
-rail_hole_7 = 0.0
-rail_hole_8 = 0.0
-bracket_hole_1 = 0.0
-bracket_hole_2 = 0.0
-bracket_hole_3 = 0.0
-bracket_hole_4 = 0.0
-near_slot = 0.0
-far_slot = 0.0
-
-[setups.stock_state.local_thickness]
-rail_hole_1 = 11.938
-rail_hole_2 = 11.938
-rail_hole_3 = 11.938
-rail_hole_4 = 11.938
-rail_hole_5 = 11.938
-rail_hole_6 = 11.938
-rail_hole_7 = 11.938
-rail_hole_8 = 11.938
-bracket_hole_1 = 11.938
-bracket_hole_2 = 11.938
-bracket_hole_3 = 11.938
-bracket_hole_4 = 11.938
-near_slot = 11.938
-far_slot = 11.938
-
-[setups.hold]
-fixture = "vise-pm-6"
-jaws_along = "x"
-fixed_jaw = "rear"
-parallels = "parallels-lms-6745/1in"
-parallels_along = "x"
-parallels_centres_mm = [[220.0, -1.5875], [220.0, -138.1125]]
-jaw_center_along_mm = 220.0
-grip_mm = 11.938
-jaw_above_parallels_mm = 19.545
-stop = "none; as A0"
-clamp = "as A0, not undone: on the two 1 in parallels, zero edge on the fixed jaw"
-align = { indicator = "dti", face = "fixed jaw", over_mm = 100.0, limit_mm = 0.02, cite = "Desktop traveler 2026-10-30 Op 30 step 11: put the vise back and indicate the fixed jaw under 0.02 mm along X, as on 2026-10-29" }
-
-[setups.zero.x]
-edge = "faced zero end (A0), finder at about Y -70"
-edge_mm = 0.0
-from = "-x"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "zero edge, from behind in the left overhang at about X 100"
-edge_mm = 0.0
-from = "+y"
-tool = "edge-finder"
-holder = "r8-collets-lms-4860/3-8in"
-check_jog_mm = -10.0
-
-[setups.zero.z]
-face = "top"
-edge = "top face over the vise, midway between the jaws, at X+220.0 Y-69.85"
-method = "paper"
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "finish_profile"
-feature = "bar_far_end"
-faces = ["HAF_BAR_FAR_END__P01"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = -13.0
-doc_mm = 13.0
-ae_mm = 0.5
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [439.928, 441.5], y = [-139.7, 0.0], z = [-13.0, 0.0] }
-contour = { method = "linear_table", step_mm = 0.5, sweep_frame = "model", sweep_bounds = { x = [439.928, 441.5], y = [-88.9, 50.8], z = [0.0, 11.938] }, open_side = "+x" }
-note = "Measure the end mill across its cutting edges (D, normally 12.70). Last pass at X = 439.93 + D/2 (X 446.28 for D 12.70)."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A5"]
-
-[[setups.ops]]
-op = 20
-do = "spot"
-feature = "rail_hole_1"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 30
-do = "spot"
-feature = "rail_hole_2"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 40
-do = "spot"
-feature = "rail_hole_3"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 50
-do = "spot"
-feature = "rail_hole_4"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 60
-do = "spot"
-feature = "rail_hole_5"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 70
-do = "spot"
-feature = "rail_hole_6"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 80
-do = "spot"
-feature = "rail_hole_7"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 85
-do = "spot"
-feature = "rail_hole_8"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 90
-do = "spot"
-feature = "bracket_hole_1"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 100
-do = "spot"
-feature = "bracket_hole_2"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 110
-do = "spot"
-feature = "bracket_hole_3"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 120
-do = "spot"
-feature = "bracket_hole_4"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 190
-do = "drill"
-feature = "rail_hole_1"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 200
-do = "drill"
-feature = "rail_hole_2"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 210
-do = "drill"
-feature = "rail_hole_3"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 220
-do = "drill"
-feature = "rail_hole_4"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 230
-do = "drill"
-feature = "rail_hole_5"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 240
-do = "drill"
-feature = "rail_hole_6"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 250
-do = "drill"
-feature = "rail_hole_7"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 255
-do = "drill"
-feature = "rail_hole_8"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 260
-do = "drill"
-feature = "bracket_hole_1"
-tool = "drill-index-115/#12"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 270
-do = "drill"
-feature = "bracket_hole_2"
-tool = "drill-index-115/#12"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 280
-do = "drill"
-feature = "bracket_hole_3"
-tool = "drill-index-115/#12"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 290
-do = "drill"
-feature = "bracket_hole_4"
-tool = "drill-index-115/#12"
-holder = "drill-chuck-r8"
-exit_mm = 3.0                     # stop about 3 mm past breakthrough
-rpm = 3000.0
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 360
-do = "hand_tap"
-feature = "rail_hole_1"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 370
-do = "hand_tap"
-feature = "rail_hole_2"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 380
-do = "hand_tap"
-feature = "rail_hole_3"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 390
-do = "hand_tap"
-feature = "rail_hole_4"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 400
-do = "hand_tap"
-feature = "rail_hole_5"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 410
-do = "hand_tap"
-feature = "rail_hole_6"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 420
-do = "hand_tap"
-feature = "rail_hole_7"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 425
-do = "hand_tap"
-feature = "rail_hole_8"
-tool = "taps-unc-hand/8-32-plug"
-holder = "tap-wrench-kit-40-t"
-depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
-approach_mm = 3.0
-note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
-
-[[setups.ops]]
-op = 430
-do = "counterbore"
-feature = "bracket_hole_1_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 5.08
-rpm = 2000.0
-approach_mm = 3.0
-note = "Bar 1 only. Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up. After this one a #8 socket head must sit below the surface: a steel rule laid across it must not rock."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 440
-do = "counterbore"
-feature = "bracket_hole_2_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 5.08
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 450
-do = "counterbore"
-feature = "bracket_hole_3_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 5.08
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-[[setups.ops]]
-op = 460
-do = "counterbore"
-feature = "bracket_hole_4_counterbore"
-tool = "endmills-lms-6784/5-16in-2fl"
-holder = "r8-collets-lms-4860/5-16in"
-depth_mm = 5.08
-rpm = 2000.0
-approach_mm = 3.0
-note = "Quill stop at 5.08 deep (4.953 to 5.207); plunge slowly with oil, then straight up."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A11"]
-
-# Slots: a 1/2 in (12.7) cutter is smaller than the 13.462 (.53) slot, so its R6.35 cannot
-# make the R6.731 ends in one pass, and a single-axis move cannot cut an arc. The 2026-10-30
-# traveler's rectangular lap (corners at end centre +/-0.4 in X and Y together) overcuts
-# about 0.18 outside the R6.731 at 45 degrees. These ops instead keep every cutter-centre
-# point inside the end centres' 0.381 reach along one axis (walls at X +/-0.381, ends at
-# Y +/-0.381 on the slot axis), so no point cuts outside the drawn slot. The ends stay at
-# least R6.614 from their centres (0.117 under R6.731 at 45 degrees); the print dimensions
-# only the .53 +/-.01 (13.46 +/-0.25) width and .16 +/-.01 (4.06 +/-0.25) run, so the end
-# form stays a hold for review, not an acceptance.
-# No prechips generator prints a closed-slot path (linear_table rasters need an open side,
-# a linear profile runs outside its outline), so these ops carry no contour: the sheet leaves
-# the cutter path unresolved and the notes give the manual moves. The rough box is the
-# slot's box; with the 0.381 leave the kernel removes only the 12.7 cutter's R6.35 sweep.
-[[setups.ops]]
-op = 510
-do = "rough_pocket"
-feature = "near_slot"
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = -12.5
-rough_allowance_mm = 0.381
-doc_mm = 3.0
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [15.353, 28.815], y = [-60.071, -42.545], z = [-12.5, 0.0] } # the slot's box; the 0.381 leave keeps the removal to the cutter's R6.35 sweep
-note = "First spot (#2 centre drill) and drill a 9.5 starter hole through at the end centre X 22.08 Y -49.28, then from that hole: go 3 mm deep and move Y from end centre -49.28 to -53.34 and back; repeat at 6, 9, 12 and 12.5 (0.56 below the bar)."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
-
-[[setups.ops]]
-op = 520
-do = "finish_pocket"
-feature = "near_slot"
-faces = ["HAF_NEAR_SLOT__P01", "HAF_NEAR_SLOT__P02", "HAF_NEAR_SLOT__P03", "HAF_NEAR_SLOT__P04"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "climb"
-to_z = -12.5
-doc_mm = 12.5
-ae_mm = 0.381
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-note = "Finishing passes at full depth, one handwheel at a time, cutter centre only: Y from -49.28 to -53.34 at X 21.71 and at X 22.46 (the walls); X from 21.71 to 22.46 at Y -49.28 and at Y -53.34; then at X 22.08, Y out to -48.90 and to -53.72 and back (the end apexes). Never go past these points: a corner move beyond them cuts outside the R6.731 ends. This leaves up to 0.12 on each end at 45 degrees (the ends are R6.61 to R6.73 from their centres, not a true R6.73); the print gives no separate end radius, so the end form is held for review and the width check alone does not accept it. Figures for D 12.70. For another D, let d = (13.46 - D)/2 and REPLACE every listed 0.38 offset from the slot centreline and end centres with d; do not add d to the listed numbers. Width 13.21 to 13.72."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
-
-[[setups.ops]]
-op = 530
-do = "rough_pocket"
-feature = "far_slot"
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "conventional"
-to_z = -12.5
-rough_allowance_mm = 0.381
-doc_mm = 3.0
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [383.159, 396.621], y = [-135.255, -117.729], z = [-12.5, 0.0] } # the slot's box; the 0.381 leave keeps the removal to the cutter's R6.35 sweep
-note = "First spot (#2 centre drill) and drill a 9.5 starter hole through at the end centre X 389.89 Y -124.46, then from that hole: go 3 mm deep and move Y from end centre -124.46 to -128.52 and back; repeat at 6, 9, 12 and 12.5 (0.56 below the bar)."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
-
-[[setups.ops]]
-op = 540
-do = "finish_pocket"
-feature = "far_slot"
-faces = ["HAF_FAR_SLOT__P01", "HAF_FAR_SLOT__P02", "HAF_FAR_SLOT__P03", "HAF_FAR_SLOT__P04"]
-tool = "endmills-tin-10pc/1-2in-2fl"
-holder = "r8-collets-lms-4860/1-2in"
-direction = "climb"
-to_z = -12.5
-doc_mm = 12.5
-ae_mm = 0.381
-rpm = 1250.0
-feed_mm_min = 75.0
-approach_mm = 5.0
-note = "Finishing passes at full depth, one handwheel at a time, cutter centre only: Y from -124.46 to -128.52 at X 389.51 and at X 390.27 (the walls); X from 389.51 to 390.27 at Y -124.46 and at Y -128.52; then at X 389.89, Y out to -124.08 and to -128.90 and back (the end apexes). Never go past these points: a corner move beyond them cuts outside the R6.731 ends. This leaves up to 0.12 on each end at 45 degrees (the ends are R6.61 to R6.73 from their centres, not a true R6.73); the print gives no separate end radius, so the end form is held for review and the width check alone does not accept it. Figures for D 12.70. For another D, let d = (13.46 - D)/2 and REPLACE every listed 0.38 offset from the slot centreline and end centres with d; do not add d to the listed numbers. Width 13.21 to 13.72. The far slot leaves a 4.45 wall to the far edge: do not open it up more than you have to."
-note_cite = ["Desktop traveler 2026-10-30 (hand-written, not prechips): LittleMachineShop cutting-speed chart row Wrought aluminum 6061-T6, https://littlemachineshop.com/pages/cutting-speeds; PM-30MV tops out at 3000 rpm", "Desktop traveler 2026-10-30 A12"]
-
-# ---------------------------------------------------------------------------------------
-# B: bench. Deburr, then check the part and record both bars.
-[[setups]]
-id = "B"
-machine = "finishing-bench"
-frame = "bench"
-coolant = "none"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "A"
-note = "Provisional (#1413 shop placeholders): these checks do not approve the bar for use. Outside a range, don't use the bar until someone has looked at it. Then make bar 2 the same way, without the four bracket holes (skip A ops 90-120, 260-290, 430-460 and B ops 50-60), and mark it BAR 2. Don't mirror it: in the jig bar 2 is simply turned over."
-
-[setups.stock_state]
-top_z = 11.938
-bottom_z = 0.0
-
-[setups.hold]
-fixture = "finishing-rest-plate"
-pose = { origin_mm = [220.0, -69.85, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "none"
-
-[[setups.ops]]
-op = 10
-do = "deburr"
-feature = "top_seat"
-tool = "deburring-tool-noga-ng8150"
-note = "Run the deburring tool lightly round every edge, one or two passes, 0.25 mm max; don't scratch the faced seats. Run an 8-32 screw through each rail hole."
-
-[[setups.ops]]
-op = 20
-do = "inspect"
-feature = ["top_seat", "underside_seat"]
-checks = { height = "micrometers/0-1in", finish_ra = "roughness-comparator" }
-inspection_methods.height = "Micrometer at the four corners and the middle."
-inspection_methods.finish_ra = "Both faces: an even swirl, no chatter or tearing, and a fingernail slides across without catching. On the mill table, press each corner: the bar must not rock."
-
-[[setups.ops]]
-op = 30
-do = "inspect"
-feature = "bar_far_end"
-checks = { length = "calipers-18in" }
-
-[[setups.ops]]
-op = 40
-do = "inspect"
-feature = ["rail_hole_1", "rail_hole_2", "rail_hole_3", "rail_hole_4", "rail_hole_5", "rail_hole_6", "rail_hole_7", "rail_hole_8"]
-checks = { dia = "pin-gauges", thru = "pin-gauges", height = "calipers-18in", thread = "unknown", note = "unknown" }
-inspection_methods.height = "On the top face (no counterbores): put the largest plain pin gauge that enters the hole, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
-inspection_methods.thread = "An 8-32 screw turns in all the way with your fingers."
-inspection_methods.note = "Matched-pair acceptance: both ends flush and all eight screws enter freely by hand without shifting or forcing the rail. Actual minimum rail counterbore/end and bar tap/end, slot and bracket ligaments must be 0.080 in with uncertainty deducted. Both full carriage sweeps retain complete end-seal support. Keep the accepted pair identified."
-
-[[setups.ops]]
-op = 50
-do = "inspect"
-feature = ["bracket_hole_1", "bracket_hole_2", "bracket_hole_3", "bracket_hole_4"]
-checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", note = "unknown" }
-inspection_methods.station = "On the top face, the side without the counterbores (there the hole is its 4.80-4.90 drilled size): largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2."
-inspection_methods.height = "On the top face, the side without the counterbores: largest pin gauge that enters, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
-inspection_methods.note = "Bar 1 only. A #8 socket screw drops through each hole freely and its head sits below the counterbore face. Bar 2: no bracket holes."
-
-[[setups.ops]]
-op = 60
-do = "inspect"
-feature = ["bracket_hole_1_counterbore", "bracket_hole_2_counterbore", "bracket_hole_3_counterbore", "bracket_hole_4_counterbore"]
-checks = { dia = "calipers", depth = "calipers" }
-
-[[setups.ops]]
-op = 70
-do = "inspect"
-feature = ["near_slot", "far_slot"]
-checks = { width = "calipers", separation = "calipers", station = "calipers-18in", height = "calipers", thru = "unknown" }
-inspection_methods.separation = "Slot length minus slot width (about 17.53 - 13.46)."
-inspection_methods.height = "Calipers from the zero edge to the near end of the slot, plus half the slot width W you measured."
-inspection_methods.thru = "A 1/2-13 T-slot stud slides end to end in each slot. Far slot: at least 1.5 of wall to the far edge."

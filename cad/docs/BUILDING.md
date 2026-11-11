@@ -192,18 +192,14 @@ closure. Select affected assemblies and drawings separately when qualifying
 their configuration usage.
 
 `cad/config/release.yaml` reserves the Revision stamped into every native CAD
-file and linked drawing title block. Migrated and enrolled process plans in
-`_process_plans.revision_stems()` keep their tracked `[drawing].revision` equal
-to it. Publisher preflight checks held migrated plans' authored freshness
-without requiring an exported manifest; enrolled plans must also match their
-scoped manifest. Revision participation does not enroll held plans or imply
-machining qualification: traveler build/release scope remains `TRAVELER_STEMS`.
-Before tagging or publishing, the publisher prepares those source revision
-updates and regenerates all README images from the staged, versioned
+file and linked drawing title block. Process plans carry no revision literal;
+they read the revision from the part's exported feature manifest.
+Before tagging or publishing, the publisher prepares the `next_revision` update
+and regenerates all README images from the staged, versioned
 `cad/out/release/harmonic-analyzer-vNN` package without writing tracked files.
 Missing inputs or rendering tools fail before the tag; there is no fallback to
 stale images. Only after successful publication does it install those images
-under `cad/docs/images/` and advance `next_revision` and the participating plans.
+under `cad/docs/images/` and advance `next_revision`.
 
 The bundle's `READOUT.md` is rendered from the error-budget report's canonical
 `closed_form["mg-magnifier"]` section. The project/archive slug remains
@@ -231,9 +227,8 @@ PDF-rendering errors stop publication before tagging. See the
 [drawing comparison details](../../DEVELOPING.md#supervised-farm-releases).
 
 Submit that post-release refresh in a follow-up PR whose only changes are the
-`cad/config/release.yaml` `next_revision` bump, matching `[drawing].revision`
-literal lines in migrated or enrolled `cad/process/<stem>/plan.toml` files,
-and the regenerated README image files. This exact generated-only PR is exempt
+`cad/config/release.yaml` `next_revision` bump and the regenerated README image
+files. This exact generated-only PR is exempt
 from the ordinary PR requirements and may merge immediately. Any other
 plan/shop edit, code, prose, documentation, README markup or layout change
 remains an ordinary PR under [the merge requirements](../../AGENTS.md#minimum-merge-gate-every-pr).

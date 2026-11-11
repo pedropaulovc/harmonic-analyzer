@@ -2,7 +2,7 @@ r"""The rocker arm's surface-profile check (plan ch_rocker_arm S7 op 97).
 
 Both printed profile zones (MHA-CH-06: the top edge's 0.5 and the lower
 outline's 0.5 between J and K, each equal-bilateral to A|B|C) are read against the arm
-outline template (inventory gauges.arm-outline-template), pinned on the arm in
+outline template (shop-equipment gauges.arm-outline-template), pinned on the arm in
 datums A and C. A DTI (gauges.dti) on the height gauge's scriber
 (gauges.height-gauge) is zeroed on the template's edge and read on the arm's
 edge directly above it, so each reading o is how far the arm's edge stands out
@@ -11,7 +11,7 @@ beyond the template's (+ proud, - shy), along the edge's normal.
 The template is a shop-made gauge, not a CAD part: its retired TL CAD part's
 Number stays reserved (cad/docs/subsystem-identities.md). This module owns the
 gauge geometry the check reads (its edge and the two pins that register it on
-the arm); the inventory record carries its physical envelope and acceptance.
+the arm); its shop-equipment record carries its physical envelope and acceptance.
 
 Accept windows, per outline segment (the arithmetic, at any point Q of it at
 least ``INSET_MM`` from a corner):
@@ -41,23 +41,24 @@ import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
 from _printed_tolerance import (
     drilled_oversize_mm,
     drilled_undersize_mm,
     printed_band_mm,
 )
-from _process_plans import PROCESS_ROOT
 
 INCH = 25.4
 INSET_MM = 1.0  # stations stay this far from a corner (AUTHOR'S CHOICE)
 _SAMPLES = 64
 _PLACES = 2
 
-_GAUGES = tomllib.loads(
-    (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
-)["gauges"]
-DTI_RESOLUTION_MM = _GAUGES["dti"]["resolution_in"]["value"] * INCH  # 0.0127
-DTI_TRAVEL_IN = _GAUGES["dti"]["range_in"]
+# The DTI's range and resolution are prechips shop records (cad/process/shop.toml).
+_DTI = tomllib.loads(
+    (CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8")
+)["gauges"]["dti"]
+DTI_RESOLUTION_MM = _DTI["resolution_mm"]  # 0.0127
+DTI_TRAVEL_IN = (_DTI["range_mm"][1] - _DTI["range_mm"][0]) / INCH
 ZONE_MM = float(drawing.ARC_PROFILE_ZONE_MM)
 _CENTRE = (0.0, rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y)
 _XY = tuple[float, float]
@@ -76,7 +77,7 @@ _XY = tuple[float, float]
 # leaving the zone's whole width to the filing that follows. Since the owner
 # ruling of 2026-11-08 (#2144 item 10.3) the rocker's nominal IS that middle,
 # so the aim offsets below are nil and the template is the one made before
-# it. Its arcs stay on the trammel's book radii (inventory tools.rocker-
+# it. Its arcs stay on the trammel's book radii (shop-equipment tools.rocker-
 # trammel) about a centre raised by the arcs' mid-zone shift: each meets its
 # mid-zone arc on the mirror line and falls short by shift x (1 - cos phi)
 # off it. The tip lands and tapered ends are offset along their own normals,
@@ -195,7 +196,7 @@ BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.102
 # Plate: O1 ground flat stock, 1/8 in, thickness as supplied.
 THICK = 3.175
 
-# Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
+# Shop acceptance (shop-equipment gauges.arm-outline-template, Pedro 2026-10-11):
 # DTI stations within +/-0.03 of nominal, taken about the pivot hole and the
 # rod slot with pins in both.
 DTI_ACCEPTANCE = 0.03
@@ -267,14 +268,14 @@ if ROD_SLOT_WIDTH_MIN - ROD_PIN_MAX <= 0.0:
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
 ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0597
 ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0076
-# The slot's 1.00 run (inventory gauges.arm-outline-template; formerly
+# The slot's 1.00 run (shop-equipment gauges.arm-outline-template; formerly
 # ROD_SLOT_FLAT, three places) must admit the pin at the rocker's worst
 # radial position error and play, so the radial slot absorbs that error and
 # only its width sets the clocking below. It grew from 0.75 when the rod-pin
 # hole's zone widened to the drilled-hole row's Ø.014 (delegated ruling
 # 2026-11-07, Q3-A; owner review #2144); the template is not yet made
-# (inventory verify = false), and its inventory note restates the run at
-# the next inventory edit.
+# (its record's verify = false), and its record's note restates the run at
+# the next edit of cad/config/shop-equipment.toml.
 ROD_SLOT_FLAT = 1.00
 if (ROD_SLOT_FLAT - printed_band_mm(_ROD_SLOT_PLACES)) / 2.0 < (
     ROD_HOLE_RADIAL + ROD_HOLE_PLAY + printed_band_mm(_ROD_SLOT_PLACES)

@@ -852,10 +852,9 @@ tolerances. Useful-tail coverage beyond maximum reach is
 9.558867 − 9.0424 = 0.516467 mm.
 See [live vendor evidence](../references/mcmaster/README.md).
 
-This route is shop documentation, not a certified generated traveler.
-Strict traveler generation is **unenrolled and not exercised**; enrollment
-awaits fresh farm feature/STEP geometry and a successful prechips exit-0
-run. No COM, farm, or generated-traveler certification is claimed here.
+This route is shop documentation, not a generated traveler. The part has no
+`cad/process/` plan and is not in `_process_plans.TRAVELER_STEMS`. No COM or
+farm validation of the route is claimed here.
 
 ### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)
 
