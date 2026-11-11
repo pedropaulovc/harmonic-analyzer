@@ -793,7 +793,7 @@ left bosses' tangent: D's station is as cast and prints **9.18 ±.03** from
 the G plane on the CAST-DATUMS sheet (`build_fr_top_frame.D_STATION`), and
 the hole table's origin is the F|G (west, rear) corner. The hanger holes
 left the table; their front and rear Z stations print .XXX from the front
-socket axes (1.104 and 7.959) and remain ordinary toleranced dimensions.
+socket axes (.854 and 7.959) and remain ordinary toleranced dimensions.
 
 The mount's tap is cut on the part at **⌖Ø.005 | A | B | C▷**, datum C the
 reamed bore, which only clocks it about B (owner ruling 2026-11-10 (Pedro),
@@ -810,18 +810,18 @@ the same three block terms, and the turn the gauge bar gives the block
 about its dowel: the bar line runs through both bores, each off its station
 by the #10 hole's ⌖ .010 | D centring (0.127, owner ruling 2026-11-06), the
 ream's station, B's slip and simulator and the bore's ⌖Ø.008 radius (0.414
-in all), at opposite limits over the 174.12 station spacing, a **0.272°**
+in all), at opposite limits over the 180.47 station spacing, a **0.263°**
 turn; each block also turns on the bar by the bar's own .0017 maximum
 diametral clearance over its shortest 13.72 bore, a further **0.180°**
 (owner review of #2334). The tap, clocked to the bore, turns with the
-block through **0.453°**, moving 7.62 from B across by 0.0602:
-**hypot(0.2489, 0.3091) = 0.3969 mm**. Full-crossbar
+block through **0.443°**, moving 7.62 from B across by 0.0590:
+**hypot(0.2489, 0.3079) = 0.3959 mm**. Full-crossbar
 drill drift over the printed grip's thickest **36.63 mm** (36.50 + 0.13) is
-**0.1918 mm**; together they consume 0.5887 of the **0.6604 mm** radial
+**0.1918 mm**; together they consume 0.5877 of the **0.6604 mm** radial
 float (the C drill's Ø6.147 minimum less the bolt's 4.826 major, halved),
-leaving **0.0717 mm** (and a 0.160 washer ring inside the knockouts, up from 0.053 at Ø.008). The rear mount, re-hung on the lever's stub at MHA-SM-00
+leaving **0.0727 mm** (and a 0.162 washer ring inside the knockouts, up from 0.053 at Ø.008). The rear mount, re-hung on the lever's stub at MHA-SM-00
 step 6 and swung about its dowel until the rock gauge passes, may turn
-**1.114°** inside its bolt float, above the 0.453° the bar line and play can ask of
+**1.114°** inside its bolt float, above the 0.443° the bar line and play can ask of
 it (`build_sm_summing_assembly.KNIFE_REAR_YAW_RANGE_DEG`). The block
 carries no dowel-pattern frame: datum B is its round hole.
 
@@ -1024,7 +1024,7 @@ keeps D5's floor and the residual is the owner's
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 8.92 in from that edge) and both keeper feet (8.76 in) lie inside one pass of a facing cutter 2.85 in or wider, which the shop records do not yet list; the front hanger station (8.60) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G and transfer-bore the base from it (#2386) |
+| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the two west bosses' keeper reliefs (the proud .18 milled off inboard of a chord .67 ±.01 from each socket axis, down to the faced top; owner ruling 2026-11-11, #1038, K5), the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 9.17 in from that edge) and both keeper feet (8.98 in) lie inside one pass of a facing cutter 3.35 in or wider, which the shop records do not yet list; the front hanger station (8.85) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G, mill the two west bosses' keeper reliefs .67 from their socket axes down to the faced top, and transfer-bore the base from it (#2386) |
 
 ---
 

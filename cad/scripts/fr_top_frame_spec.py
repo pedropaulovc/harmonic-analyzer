@@ -20,7 +20,9 @@ summing axis, the keeper fit-up) flow through unsnapped.
 Owner ruling 2026-11-10 (#2333, option a): the frame is a one-off gray-iron
 sand casting (ASTM A48 CLASS 25B) poured from a 3D-printed pattern and
 machined on its seats only.  Machined: the faced top and underside planes;
-the four corner-boss tops; the edge breaks bordering those faced planes (cut
+the four corner-boss tops; the two west bosses' keeper reliefs (owner ruling
+2026-11-11, #1038, K5: ``KEEPER_BOSS_RELIEF_FROM_SOCKET``); the edge breaks
+bordering those faced planes (cut
 after facing, the stock covers the edge on the pattern); the tube sockets,
 cap recesses and their mouth chamfers; the gooseneck bore and its mouth
 chamfer; the set-screw tap and its spot face; the cross-screw counterbores,
@@ -132,9 +134,31 @@ HANGER_CROSSBAR_WIDTH_PLACES = 2
 FLANGE_THICKNESS_MM = 8.128  # .32 final top flange, including the faced right rail top
 FLANGE_THICKNESS_PLACES = 2
 BOSS_ABOVE = 4.572  # .18 boss proud of the rail top (corner-crop step)
-BOSS_DIA = (
-    44.958  # 1.77 user ruling: all four upper/lower bosses clear the outward keeper feet
-)
+BOSS_DIA = 44.958  # 1.77 user ruling 2026-10-10: all four upper/lower bosses, as cast
+# Owner ruling 2026-11-11 (#1038, question 3, option K5) amends that Ø1.77
+# ruling on the two WEST (fulcrum-side) bosses only: at the .300 station
+# pitch the MHA-CH-07 keepers stand 5.715 further out per side, and their
+# outward feet (kept, as on the original) would run into the proud barrels.
+# The faced rail top is carried into each of the two barrels by a machined
+# step: an end-mill pass across the rail, square to it, that removes the
+# proud .18 of the barrel inboard of a straight chord and leaves the rail
+# top's own plane as its floor.  The casting pattern is unchanged (all four
+# barrels are still cast Ø1.77): a cast-in flat would carry its own draft,
+# ±.03 band and position zone, which the foot margin cannot pay at this
+# depth, and would change the pattern print.
+# The chord stands .67 from the socket axis toward mid-rail, machined to
+# machined, so the title block's .XX holds it (the east bosses are not cut).
+# ``build_fr_top_frame`` proves the foot, the tap and the wall the step
+# leaves round the cap recess at the printed limits; the MHA-CH-00 keeper
+# plan (``ch_channel_assembly_spec``) draws the stepped barrel from these.
+KEEPER_BOSS_RELIEF_FROM_SOCKET = 17.018  # .67 chord from the socket axis
+KEEPER_BOSS_RELIEF_PLACES = 2
+KEEPER_BOSS_RELIEF_DEPTH = (
+    BOSS_DIA / 2.0 - KEEPER_BOSS_RELIEF_FROM_SOCKET
+)  # 5.461, .215
+KEEPER_BOSS_RELIEF_HALF_CHORD = sqrt(
+    (BOSS_DIA / 2.0) ** 2 - KEEPER_BOSS_RELIEF_FROM_SOCKET**2
+)  # 14.687 across the rail, either side of the socket axis, on the faced top
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
 # MHA-CH-00 draws the west rail's web faces from it).  As cast it prints
@@ -311,9 +335,15 @@ HANGER_PIN_XS = (HANGER_PIN_X,)
 # (build_sm_summing_assembly); each station's ream.  The knife line and the
 # summing stations are the summing subsystem's: they flow through unsnapped.
 HANGER_X = -15.0
-HEX_Z_MID = 87.06
-STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
-STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
+# Owner ruling 2026-11-11 (#1038, question 4, option S-F): the MHA-SM-03
+# plate grows .25 at its FRONT end only (6.00 -> 6.25), so the front knife
+# mount stands 6.35 further out and the rear one stays: each station is its
+# trunnion's mid-length off the summing axis, 82.55 + 10.86 and
+# 76.20 + 10.86.  The crossbar's cast pockets do not move.
+HEX_Z_MID_FRONT = 93.41
+HEX_Z_MID_REAR = 87.06
+STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID_FRONT  # -90.322
+STUD_Z_REAR = SUMMING_Z + HEX_Z_MID_REAR  # +90.148
 PIN_HOLE_X = HANGER_X + HANGER_PIN_X  # -7.38
 HANGER_PIN_X_PLACES = KNIFE_DOWEL.HANGER_OFFSET_PLACES
 # Each ream's station from its #10 axis along the dowel line, and its
@@ -822,6 +852,10 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # over the .080 target to the cap recess at every printed corner
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
+    # The two west bosses' keeper relief step (owner ruling 2026-11-11,
+    # #1038, K5), from its socket axis: the .XX the keeper foot margin is
+    # proved at (build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS).
+    "keeper relief step from socket axis": KEEPER_BOSS_RELIEF_PLACES,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # removed set-screw boss section K-K (spot face, thread run; the boss
     # face prints its as-cast .95 on sheet 6's DETAIL J).
