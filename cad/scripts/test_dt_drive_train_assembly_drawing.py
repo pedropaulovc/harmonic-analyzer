@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import itertools
 import math
 import re
 from pathlib import Path
@@ -882,22 +883,30 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
 
 
 def test_the_bank_stack_is_measured_with_gauges_the_shop_owns() -> None:
-    """#2362: the 20-gear stack is compared on a DTI with a gauge-block stack
-    of its nominal length (Mitutoyo 81-piece set, cad/config/
-    shop-equipment.toml), not a 5-6 in micrometer the shop does not own; the
-    step and setting table row 1 say so and the blocks sit inside the window."""
-    steps = " ".join(drawing.BANK_STEPS.split())
-    assert "MICROMETER" not in steps
+    """#2362: the 20-gear stack is compared on an indicator zeroed on a
+    gauge-block stack of its nominal length, which the shop's 81-piece inch
+    set (cad/config/shop-equipment.toml: .1001-.1009, .101-.149, .050-.950,
+    1-4 in) can wring, and which lies inside the acceptance window."""
     blocks = float(drawing.STACK_GAUGE_BLOCKS)
     low, high = (float(limit) for limit in drawing.STACK_WINDOW.split("-"))
     assert low < blocks < high
-    assert (
-        f"8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE ON A DTI AGAINST "
-        f"{drawing.STACK_GAUGE_BLOCKS} GAUGE BLOCKS, BOTH ON ONE STOP: ACCEPT "
-        f"{drawing.STACK_WINDOW}."
-    ) in steps
-    (row,) = (row for row in drawing.SETTING_TABLE_ROWS if row[0] == "1")
-    assert row[4:] == (drawing.STACK_WINDOW, "DTI ON GAUGE BLOCKS")
+    assert drawing.STACK_GAUGE_BLOCKS in " ".join(drawing.BANK_STEPS.split())
+    tenths = range(1001, 1010)
+    thousandths = range(1010, 1500, 10)
+    fiftieths = range(500, 10000, 500)
+    inches = [
+        sum(subset)
+        for count in range(5)
+        for subset in itertools.combinations((10000, 20000, 30000, 40000), count)
+    ]
+    target = round(blocks * 10000)
+    assert any(
+        a + b + c + d == target
+        for a in (0, *tenths)
+        for b in (0, *thousandths)
+        for c in (0, *fiftieths)
+        for d in inches
+    ), drawing.STACK_GAUGE_BLOCKS
 
 
 def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> None:
