@@ -160,6 +160,7 @@ from build_fr_top_frame import (
     WEB_IN_Z,
     WEB_OUT_X,
 )
+from fr_top_frame_callouts import ADDED_DRAFT_WALL_CALLOUT
 from fr_top_frame_spec import (
     DATUM_TARGET_BARREL_HEIGHT,
     DATUM_TARGET_BOTTOM_RADIUS,
@@ -1531,13 +1532,14 @@ def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
 #
 # The added draft's band is the tighter one (the title block's angle row is
 # ±1°), so its callout states the wall its 2° minimum holds, in rule 3's
-# form: the MHA-CH-07 keeper's 2-56 tap drill in the rail web keeps .0807 in
-# at 2° and .0636 at 1° (machinist review of 518e3d01e1: a tight band whose
-# function prints nowhere is a rule 4 blocker; of 7dfc6b6c5f: a reason in
-# any other form is narration, and a callout carries two lines of words at
-# most, rule 7).  The faces therefore share one row, 149.3 mm of glyphs by
-# farm run 20261111T043554104Z's two (79.5 + 68.5 and a space), its right
-# end 7.6 mm short of the wedge.
+# form and from the build's own proof (fr_top_frame_callouts): the MHA-CH-07
+# keeper's tap drill in the rail web keeps .0807 in at 2° and .0636 at 1°
+# (machinist review of 518e3d01e1: a tight band whose function prints
+# nowhere is a rule 4 blocker; of 7dfc6b6c5f: a reason in any other form is
+# narration, and a callout carries two lines of words at most, rule 7).  The
+# faces therefore share one row, 149.3 mm of glyphs by farm run
+# 20261111T043554104Z's two (79.5 + 68.5 and a space), its right end 7.6 mm
+# short of the wedge.
 DATUM_DRAFT_WEDGES = {
     "WebRingDraft": (WEB_OUT_X, 1.0, 0.012),
     "BossesUpperDraft": (PLAN_HALF_X, -1.0, 0.018),
@@ -1552,7 +1554,7 @@ DATUM_FRONT_KEEP = {
 DATUM_FRONT_CALLOUTS = {
     "WebRingDraft": (
         "DRAFT, WEBS, CROSSBAR, POCKETS, GUSSETS, PADS, SET-BOSS SIDES\n"
-        "HOLDS 2-56 TAP WALL .080 MIN"
+        + ADDED_DRAFT_WALL_CALLOUT
     ),
     "BossesUpperDraft": "DRAFT, FLANGE RIMS, SET-BOSS FACE,\n4X BOSS AND HUB BARRELS",
 }
