@@ -65,6 +65,9 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
 - the PM-30MV DRO's make and cited accuracy (read by the paper-drive tests);
 - the LMS 6784 end-mill set and its sizes, the 8-32 plug hand tap's flute
   length, and the shop-made rocker trammel's R800/R816 lengths;
+- the cylinder gear's alignment-notch saw (TTC 10-215-014, .014 in), not
+  owned, read by `test_dt_cylinder_gear_drawing.py` against the printed
+  .016 MAX (#2364);
 - the PM 6-in vise's make, SKU, source and opening;
 - the base-bar plan's vise workholding (1-3/8 in parallels, HHIP 3901-0079
   screw jack), with the ownership status Pedro's 2026-11-05 hand sheet gives

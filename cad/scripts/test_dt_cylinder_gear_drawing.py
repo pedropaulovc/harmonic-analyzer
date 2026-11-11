@@ -146,6 +146,22 @@ def test_sighted_notch_prints_only_its_flank_clear_maximum() -> None:
     assert _kerf_flank_hits(0.50) > 0
 
 
+def test_the_listed_notch_saw_cuts_inside_the_printed_maximum() -> None:
+    # #2364: the shop's 1/32 saw cuts both flanks past the pitch circle, so
+    # the notch is cut with the not-yet-owned saw recorded for it.
+    import tomllib
+
+    saw = tomllib.loads(
+        (
+            Path(spec.__file__).parent.parent / "config" / "shop-equipment.toml"
+        ).read_text(encoding="utf-8")
+    )["tools"]["cylinder-notch-saw"]
+    kerf = saw["thickness_in"] * 25.4
+    assert kerf <= spec.NOTCH_WIDTH
+    assert _kerf_flank_hits(kerf) == 0
+    assert _kerf_flank_hits(1 / 32 * 25.4) > 0
+
+
 def test_notch_width_limit_is_set_and_read_back_natively(monkeypatch) -> None:
     class Tolerance:
         Type = 0
