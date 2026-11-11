@@ -76,11 +76,11 @@ from ch_amplitude_bar_notes import (
 from ch_amplitude_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
-    BAR_SIDE_FLATNESS_IN,
     BAR_WIDTH,
     BOTTOM_NOTCH_HEIGHT,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
+    GEOMETRIC_TOLERANCES_IN,
     TOP_NOTCH_HEIGHT,
     TOP_PIN_DROP,
 )
@@ -847,7 +847,7 @@ def _add_side_flatness(adapter: Any, front: Any) -> None:
             landing[1] + SIDE_FLATNESS_FRAME_DY,
         ),
         characteristic="flatness",
-        tolerance=BAR_SIDE_FLATNESS_IN,
+        tolerance=GEOMETRIC_TOLERANCES_IN["side face flatness"],
         quantity=SIDE_FLATNESS_CALLOUT,
         label="side face flatness",
     )

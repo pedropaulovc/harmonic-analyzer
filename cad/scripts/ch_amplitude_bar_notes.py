@@ -205,7 +205,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a callout names a dimension the sheet does not print")
 
-# #2341: the side faces' flatness (ch_amplitude_bar_spec.BAR_SIDE_FLATNESS_IN)
+# #2341: the side faces' flatness (ch_amplitude_bar_spec.GEOMETRIC_TOLERANCES_IN)
 # prints as a native frame on the full-length view, on the right side face;
 # under it, which faces it holds, the mate it runs beside (rule 4), and the
 # fit route its band needs (bought CF square can bow about .013 over this

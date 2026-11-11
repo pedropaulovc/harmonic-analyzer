@@ -68,8 +68,12 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # bow about .013 over this length (A108's 3/16 in per 10 ft, #2341 triage),
 # so the stock is straightened or selected to it (parts/ch-amplitude-bar.yaml
 # process); MHA-CH-00 accepts the bank with a feeler leaf between every pair.
-BAR_SIDE_FLATNESS_IN = ".005"
-BAR_SIDE_FLATNESS_MM = float(BAR_SIDE_FLATNESS_IN) * MM_PER_IN  # 0.127
+# The frame prints decimal inch, the source of truth; the mm table restates it.
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {"side face flatness": ".005"}
+GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
+    name: float(zone) * MM_PER_IN for name, zone in GEOMETRIC_TOLERANCES_IN.items()
+}
+BAR_SIDE_FLATNESS_MM = GEOMETRIC_TOLERANCES_MM["side face flatness"]  # 0.127
 # Notch widths: one-sided bands (user ruling 2026-09-27, #1038). The legacy
 # 1/8" (3.175) width left the top notch under the lever's max material. Each
 # width's modelled nominal is its minimum -- the straddled plate at max

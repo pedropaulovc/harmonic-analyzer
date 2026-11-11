@@ -799,7 +799,7 @@ def test_side_face_flatness_closes_the_mid_span_gap() -> None:
     assert top == pytest.approx(0.6858, abs=1e-9)
     mid = (top + foot) / 2.0
     assert mid == pytest.approx(0.4064, abs=1e-9)
-    assert spec.BAR_SIDE_FLATNESS_IN == ".005"
+    assert spec.GEOMETRIC_TOLERANCES_IN == {"side face flatness": ".005"}
     bowed = mid - 2.0 * spec.BAR_SIDE_FLATNESS_MM
     assert bowed >= bank.RUNNING_FLOOR
     assert bowed == pytest.approx(pin.BAR_GAP["mid_span_bowed"])
@@ -820,7 +820,7 @@ def test_side_flatness_frame_stands_east_of_the_bar_clear_of_the_details() -> No
     spec = ch_amplitude_bar_spec
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_add_side_flatness(adapter, front)" in source
-    assert "tolerance=BAR_SIDE_FLATNESS_IN" in source
+    assert 'tolerance=GEOMETRIC_TOLERANCES_IN["side face flatness"]' in source
     assert "quantity=SIDE_FLATNESS_CALLOUT" in source
     lines = ch_amplitude_bar_notes.SIDE_FLATNESS_CALLOUT.splitlines()
     assert len(lines) <= 4
