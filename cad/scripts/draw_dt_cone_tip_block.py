@@ -335,8 +335,11 @@ DIMENSION_CALLOUTS = {
     "DowelHoleDia": DOWEL_HOLE_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {
-    # The width prints .67 at the title block's .XX (#2314): a general size
-    # with no band of its own carries no reason (rule 7), as the depth.
+    # The +X face stands over the platform's narrow west edge
+    # (build_dt_drive_train_assembly's print-worst containment): no fit, so
+    # rule 4's few words of reason name the edge it keeps inside (machinist
+    # review of c4c0e848a: "STAYS ON" named no feature).
+    "Width": "WITHIN MHA-DT-20 EDGE",
     # Screen review (dt-fab-4): a location carries its value only; the
     # shaft-tip function moved to the bore's callout (BORE_FLAG_TEXT).
     # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
@@ -350,12 +353,10 @@ DIMENSION_CALLOUTS_ABOVE = {
 # print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
 # DEPTH).  A value and its rows centre on the dimension's point; a
 # horizontal dimension with a row over its value prints its line 4.5 mm
-# under that point (the 3.97's stacked deviations, 287c), a single-row value
-# 2.8 mm under it (measured with the ink audit below).
+# under that point (the 3.97's stacked deviations, 287c).
 CALLOUT_GLYPH_WIDTH = 0.00253
 TEXT_ROW_HEIGHT = 0.00455
 TWO_ROW_LINE_DROP = 0.0045
-HORIZONTAL_LINE_DROP = 0.0028
 
 
 def _callout_half_width(text: str) -> float:
@@ -368,11 +369,11 @@ def _callout_half_width(text: str) -> float:
 # the sheet border.
 AXIS_HEIGHT_LINE_DX = 0.031
 BLOCK_HEIGHT_LINE_DX = 0.052
-# The width's value stands right of the +X extension line on the extended
-# dimension line, 3.5 mm under the bottom view's south edge, clear of the
-# hold-down tap's callout above it.  Round-1 farm review (dt-fab-4): the
-# width moved off the front view's foot, which now carries the seat's finish
-# symbol; the base sketch's width reads in the view of the foot.
+# The width's value and its function line are wider than its span, so they
+# stand right of the +X extension line on the extended dimension line, 3.5
+# mm under the bottom view's south edge.  Round-1 farm review (dt-fab-4):
+# the width moved off the front view's foot, which now carries the seat's
+# finish symbol; the base sketch's width reads in the view of the foot.
 WIDTH_LINE_DROP = 0.0035
 FRONT_KEEP = {
     "BlockHt": (FRONT_CENTER[0] - BLOCK_HEIGHT_LINE_DX, FRONT_CENTER[1]),
@@ -385,8 +386,9 @@ FRONT_KEEP = {
 }
 # PassageCenter stands above SlitW on the adjuster elevation, its line
 # 21.2 mm over the block's top; the plan's north edge is the ceiling for
-# both.  A single-row value prints its line HORIZONTAL_LINE_DROP under it.
-PASSAGE_CENTER_RISE = 0.0212 + HORIZONTAL_LINE_DROP
+# both.  A single-row value prints its line 2.8 mm under it
+# (HORIZONTAL_LINE_DROP, defined with the ink audit below).
+PASSAGE_CENTER_RISE = 0.0212 + 0.0028
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The 4.875's short
 # span leaves no room for inside arrows (d84a42ca7: the 4.875's line and
@@ -513,8 +515,11 @@ BOTTOM_KEEP = {
         (_bottom_y(Z_NORTH) + FOOT_TAP_CENTER[1]) / 2.0,
     ),
     "Width": (
-        _BOTTOM_RIGHT + TEXT_CLEARANCE + ROUND_OUT + VALUE_TEXT_HALF_WIDTH,
-        _bottom_y(Z_SOUTH) - WIDTH_LINE_DROP + HORIZONTAL_LINE_DROP,
+        _BOTTOM_RIGHT
+        + TEXT_CLEARANCE
+        + ROUND_OUT
+        + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["Width"]),
+        _bottom_y(Z_SOUTH) - WIDTH_LINE_DROP + TWO_ROW_LINE_DROP,
     ),
     "DowelX": (
         DOWEL_X_TEXT_RIGHT - DOWEL_X_EXTENT[2],
@@ -754,7 +759,6 @@ _VALUE_EXTENTS = {
             ("PinchHeight", PINCH_HEIGHT),
             ("PassageCenter", BLOCK_X / 2.0),
             ("Depth", BLOCK_Z),
-            ("Width", BLOCK_X),
             ("FootTapX", FOOT_TAP_X),
             ("FootTapZ", FOOT_TAP_Z),
         )
@@ -763,6 +767,7 @@ _VALUE_EXTENTS = {
         name: _value_and_rows_extent(name, nominal, text)
         for name, nominal, text in (
             ("AxisHeight", ADJUSTER_AXIS_HEIGHT, DIMENSION_CALLOUTS["AxisHeight"]),
+            ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             # "1.20" under its SLOT INTO BORE row.
             ("SlitW", SLIT_W, DIMENSION_CALLOUTS_ABOVE["SlitW"]),
         )
@@ -787,11 +792,11 @@ FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # The locating dowel's ream callout (rule-23 retention, owner ruling
 # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)).  Right of the bottom view
-# the width's value (round-1 farm review, dt-fab-4) stands under the
-# hold-down tap's callout, leaving too little room between them for the
+# the width's value and row (round-1 farm review, dt-fab-4) stand under the
+# hold-down tap's callout, leaving 15 mm between them, too little for the
 # ream's 21 mm block.  So the block stands right of the tap's callout, a text
 # clearance past it, and its leader -- from the underline's left end --
-# runs midway between the width's value and the tap callout's shoulder, under
+# runs midway between the width's row and the tap callout's shoulder, under
 # the view's +X face, to the rim right of the station's dowel witness: it
 # crosses no text and no dimension line.  Placed once the texts it clears
 # are boxed, hence after BOTTOM_KEEP.
@@ -863,6 +868,7 @@ VIEW_B_LEADER_DX = 0.0058
 # about 0.6 mm across.  A vertical dimension with its arrows outside prints
 # no line between them (the 12.0, 8.42, 10.7, 5.56, 3.50, 15.2 on 287c).
 OUTSIDE_ARROW_RUN = 0.0064
+HORIZONTAL_LINE_DROP = 0.0028
 EXTENSION_GAP = 0.0005
 EXTENSION_OVERSHOOT = 0.0013
 LINE_PAST_TEXT = 0.0013

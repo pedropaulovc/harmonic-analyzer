@@ -69,6 +69,8 @@ from dt_cone_tip_block_spec import (
     ADJUSTER_CSK,
     ADJUSTER_AXIS_HEIGHT,
     BLOCK_HEIGHT,
+    BLOCK_WIDTH_BAND,
+    BLOCK_WIDTH_PLACES,
     BLOCK_X,
     BLOCK_Z,
     DOWEL_FROM_TAP,
@@ -621,6 +623,16 @@ async def build(adapter) -> dict[str, str]:
         feature_name="DowelXReference",
         dimension_name="DowelX",
         drive_expression='"FootTapX" + "DowelFromTap"',
+    )
+    # The width may only come in from its nominal (the +X face's containment
+    # over the plate's west edge, dt_cone_tip_block_spec.BLOCK_WIDTH_BAND).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BlockProfile",
+        "Width",
+        *deviations(BLOCK_WIDTH_BAND),
+        places=BLOCK_WIDTH_PLACES,
+        display_unit=UNIT,
     )
     # The dowel's press ream carries its REAM_H7 at four places.
     set_dimension_bilateral_tolerance(

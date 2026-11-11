@@ -71,12 +71,16 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
         )
 
 
-def test_block_width_upper_limit_holds_containment() -> None:
-    """The width prints the title block's .XX, which lands on the +X face:
-    its upper limit keeps the print-worst margin over the plate's narrow west
-    edge, and the check refuses a face standing past that margin."""
+def test_block_width_one_sided_band_holds_containment() -> None:
+    """The width's band may only bring the +X face in (machinist review of
+    83e3370f9, rules 4 and 19): its upper limit, the nominal, keeps the
+    print-worst margin over the plate's narrow west edge, and the check
+    refuses a face standing past that margin."""
     import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
+    assert block.BLOCK_WIDTH_BAND == (0.0, -0.508)
+    assert block.BLOCK_WIDTH_LIMITS[1] == pytest.approx(block.BLOCK_X)
     margin = bdt.tip_block_print_worst_containment_mm(bdt.TIP_WORST_HALF_WIDTHS_MM)
     floor = bdt.PLATFORM_CONTAINMENT_FLOOR_MM + bdt.TIP_PRINT_WORST_MARGIN_MM
     widened = dict(bdt.TIP_WORST_HALF_WIDTHS_MM)
