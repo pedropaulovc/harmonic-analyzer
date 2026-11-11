@@ -1875,7 +1875,7 @@ sections:
         - scaled + derived
         - low/med
       - - Latch hook (MHA-PD-14, round 10, R9-10)
-        - 'one piece of 0.8 (0.032 in) 1095 spring steel, cut and formed annealed, then hardened and tempered blue: an 8-wide base flat on the bar''s back face (x 61.0..77.63, y 299.2..307.2) with two Ø3.2 screw holes; a 90° bend (inside R1.2) up to an ear in the plane x 76.83..77.63 (z −129.9..−113.9); from the ear''s lower edge an arm, 0.8 thick in XY, in the z band −113.9..−123.9 tapering to −125.4 by y 270, hanging plumb to y 282.2, then rolled flatwise R80 through 32.56° toward −X so its straight run lies square to the latch pin; Ø3.3 pin hole match-drilled at assembly at (58.23, 229.09, −120.43); below it a finger tab turned R10 through 35° with a full-round end'
+        - 'one piece of 0.8 (0.032 in) 1095 spring steel, cut and formed annealed, then hardened and tempered: an 8-wide base flat on the bar''s back face (x 61.0..77.63, y 299.2..307.2) with two Ø3.2 screw holes; a 90° bend (inside R1.2) up to an ear in the plane x 76.83..77.63 (z −129.9..−113.9); from the ear''s lower edge an arm, 0.8 thick in XY, in the z band −113.9..−123.9 tapering to −125.4 by y 270, hanging plumb to y 282.2, then rolled flatwise R80 through 32.56° toward −X so its straight run lies square to the latch pin; Ø3.3 pin hole match-drilled at assembly at (58.23, 229.09, −120.43); below it a finger tab turned R10 through 35° with a full-round end'
         - —
         - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`pd_latch_hook_geometry`, PART_ORIGIN_MACHINE at the ear''s outer face, x 77.63)'
         - scaled

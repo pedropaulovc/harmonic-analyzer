@@ -16,7 +16,7 @@ Process (the sheet's notes): the blank is the flat pattern; every form is
 made annealed; fit to the bar, clamp the hanger at full feed mesh, set the
 annealed arm square on the pin with the strip's far face at its drawn
 station, transfer the pin's centre to the strip and drill the pin hole on
-the mark; remove, harden and temper blue, reinstall.  The order of cutting,
+the mark; remove, harden and temper, reinstall.  The order of cutting,
 bending and drilling is the shop's.
 
 The sheet prints decimal inch (the row's ``drawing_unit: in``); every
