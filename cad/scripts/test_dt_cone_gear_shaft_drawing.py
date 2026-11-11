@@ -370,12 +370,12 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
 
 
 def test_the_step_sits_one_setback_inside_t030() -> None:
-    """The step T030|T024 sits 1.0 south of T030's north face, inside T030,
-    and at print-worst the step and its root stay south of T024."""
+    """The step T030|T024 sits one setback south of T030's north face, inside
+    T030, and at print-worst the step and its root stay south of T024."""
     spec = dt_cone_gear_shaft_spec
     station = spec.SECTION_ENDS[1] - spec.FRONT_STUB
     south, north = spec.gear_faces(15)
-    assert station == pytest.approx(north - 1.0)
+    assert station == pytest.approx(north - spec.SEAT_STEP_SETBACK)
     assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
     margin = _setback_margin(
         15,

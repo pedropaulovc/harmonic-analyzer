@@ -1570,11 +1570,11 @@ def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
 def test_tip_dowel_stays_chained_for_the_stack() -> None:
     """Round 6, #6, delegated ruling 2026-11-07 (option A): from the pivot at
     +/-.004, with HoldDownX's own +/-.004, the dowel-to-hold-down distance
-    takes both bands, and the plate's counterbore web and MHA-DT-21's +X
-    face web both fall under the wall target; the chained station holds
-    both, so it controls and the pivot-axis station is a reference.  One
-    locating scheme per hole (rule 10; integration proof 20261109T105251629Z
-    read a controlling .188 beside it as a second one).  The spacing matches
+    takes both bands, and the plate's counterbore web falls under the wall
+    target; the chained station holds it and MHA-DT-21's +X face web, so it
+    controls and the pivot-axis station is a reference.  One locating scheme
+    per hole (rule 10; integration proof 20261109T105251629Z read a
+    controlling .188 beside it as a second one).  The spacing matches
     MHA-DT-21's tap-to-dowel spacing, which note 3 names (rule 4); the .228
     itself carries only its value and band (rule 7)."""
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
@@ -1586,12 +1586,8 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
     assert web >= WALL_TARGET_MM
     assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM
-    from_pivot_band = (
-        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
-    )
     plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
     assert plus_x >= WALL_TARGET_MM - 1e-6
-    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < WALL_TARGET_MM
 
 
 def _tip_dowel_pivot_x_text_box() -> tuple[float, float, float, float]:

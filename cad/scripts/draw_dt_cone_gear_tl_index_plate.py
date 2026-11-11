@@ -103,7 +103,7 @@ FACE_KEEP = {
     # centreline, so its leader drops steeply onto the bore's upper left:
     # from the lower left it crossed datum A's leader, which SolidWorks
     # places on the bore's lower left (round 1, rule 14).  At +0.108 its
-    # stacked +.003 met the top border (round 2 render).
+    # stacked band met the top border (round 2 render).
     "BoreDia": (_FX - 0.030, _FY + 0.100),
     "MountPcd": (_FX - 0.020, _FY - 0.100),
 }

@@ -99,16 +99,11 @@ PINCH_RISE = PINCH_HEIGHT - ADJUSTER_AXIS_HEIGHT
 # the title block's general band for its places (machinist review of
 # d84a42ca7: the former explicit +/-0.10 on the axis height and the tap's
 # stations had no fit the reader could see; the stacks close at .XX and .XXX).
-# The width's band lands on the +X face (PassageCenter and FootTapX locate
-# from the -X face), which stands over the plate's narrow west edge
-# (build_dt_drive_train_assembly's print-worst containment).  Machinist
-# review of 83e3370f9 (rules 4 and 19, gating): a symmetric .XXX band bought
-# that containment with a tight band on a size that only has to stay inside
-# an edge.  The face may only come in, so the width carries a one-sided band
-# under its nominal (rule 3: the band tolerances it, its places only
-# spell it): containment holds at the nominal and the -X-face webs and the
-# pinch screw's tip recess hold at its lower limit.
-BLOCK_WIDTH_BAND = (0.0, -0.508)  # +.000/-.020
+# The width prints the title block's .XX too (#2314).  Its band lands on the
+# +X face (PassageCenter and FootTapX locate from the -X face), which stands
+# over the plate's narrow west edge: build_dt_drive_train_assembly's
+# print-worst containment holds at the width's upper limit, and the -X-face
+# webs and the pinch screw's tip recess hold at its lower limit.
 BLOCK_WIDTH_PLACES = 2
 BLOCK_DEPTH_PLACES = 2
 BLOCK_HEIGHT_PLACES = 2
@@ -198,9 +193,8 @@ def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
     return nominal + lower, nominal + upper
 
 
-# (min, max) of the width, which carries its own band rather than a grade.
-_width_lower, _width_upper = deviations(BLOCK_WIDTH_BAND)
-BLOCK_WIDTH_LIMITS = (BLOCK_X + _width_lower, BLOCK_X + _width_upper)
+# (min, max) of the width at the title block's .XX.
+BLOCK_WIDTH_LIMITS = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
 
 
 def printed_band_mm(places: int) -> float:
@@ -214,7 +208,7 @@ AXIS_HEIGHT_TOL_MM = printed_band_mm(AXIS_HEIGHT_PLACES)
 # r3 (Main, 2026-09-25): PassageCenter prints from the -X face, which the
 # plate frame puts on the east.  The +X (west) face carries only the pinch
 # screw's head, so the width's band lands on that side, where the swing
-# platform's trimmed west edge bounds it (BLOCK_WIDTH_BAND;
+# platform's trimmed west edge bounds it (BLOCK_WIDTH_LIMITS;
 # build_dt_drive_train_assembly asserts the print-worst containment).
 XDatumFace = Literal["-X", "+X"]
 PASSAGE_CENTER_DATUM: XDatumFace = "-X"
@@ -815,9 +809,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "DowelProfile": {"DowelHoleDia": DOWEL_HOLE_PLACES},
     "DowelXReference": {"DowelX": DOWEL_X_PLACES},
 }
-# The stacks above read these grades; the print must carry exactly them.  The
-# width's stacks read its own band (BLOCK_WIDTH_LIMITS), not a grade.
+# The stacks above read these grades; the print must carry exactly them.
 _STACK_GRADES = {
+    ("BlockProfile", "Width"): BLOCK_WIDTH_PLACES,
     ("BlockProfile", "Depth"): BLOCK_DEPTH_PLACES,
     ("Block", "BlockHt"): BLOCK_HEIGHT_PLACES,
     ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_PLACES,

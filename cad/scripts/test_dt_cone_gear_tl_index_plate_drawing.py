@@ -12,6 +12,7 @@ import draw_dt_cone_gear_tl_index_plate as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
+from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
 
@@ -60,7 +61,7 @@ def test_every_guess_cites_the_tracking_issue() -> None:
     assert "issues/2157" in spec.TRACKING_ISSUE
     for name in (
         "PLATE_DIA",
-        "BORE_DIA",
+        "HUB_DIA",
         "THICKNESS",
         "INDEX_HOLE_DIA",
         "MOUNT_PCD",
@@ -87,12 +88,17 @@ def test_registry_row_is_tooling_in_inch() -> None:
     assert entry.source_kind == "part"
 
 
-def test_only_the_bore_and_the_reamed_index_holes_carry_a_model_band() -> None:
+def test_only_the_reamed_index_holes_carry_a_model_band() -> None:
     bands = model_toleranced_dimensions(part)
-    assert set(bands) == {("PlateProfile", "BoreDia"), ("Ring57Profile", "PRINTED_HOLE")}
-    assert spec.BORE_DEVIATIONS == (0.0, 0.003 * INCH)
+    assert set(bands) == {("Ring57Profile", "PRINTED_HOLE")}
     assert spec.INDEX_HOLE_DEVIATIONS == (0.0, 0.0005 * INCH)
     assert spec.DRAWING_PRECISION_BY_NAME[spec.PRINTED_HOLE] == 4
+
+
+def test_the_title_block_bore_always_passes_the_head_hub() -> None:
+    places = spec.DRAWING_PRECISION_BY_NAME["BoreDia"]
+    least = spec.BORE_DIA - printed_band_mm(places, unit=spec.UNIT)
+    assert least >= spec.HUB_DIA - 1e-9
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:

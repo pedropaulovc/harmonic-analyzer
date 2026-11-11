@@ -1605,7 +1605,7 @@ TIP_TAP_LATERAL_BAND_MM = (
 )
 # Each side face's worst distance from the plate centreline: the tap stands
 # at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X
-# face the width on from there (its one-sided band's upper limit).
+# face the width on from there (the upper limit of its title-block .XX).
 _TIP_WIDTH_MAX = TIP_BLOCK_WIDTH_LIMITS[1]
 TIP_WORST_HALF_WIDTHS_MM = {
     "-X": TIP_FOOT_TAP_X - PLAT_HOLDDOWN_LOCAL_X + TIP_TAP_LATERAL_BAND_MM,

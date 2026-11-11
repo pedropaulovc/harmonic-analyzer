@@ -250,8 +250,9 @@ if not (
 # T030's north face (j = 15), inside T030's bore.  T030 then overhangs land 1
 # by the setback; T024 sits wholly on land 2.  The import-time proof below
 # the precision table shows the step and its root fillet stay south of T024
-# at print-worst.
-SEAT_STEP_SETBACK = 1.0
+# at print-worst.  1.1 mm books the cone gears' +/-.002 faces (#2314); T030's
+# 6.9 mm face still carries the step well inside its bore.
+SEAT_STEP_SETBACK = 1.1
 SEAT_STEP_GEAR = 15
 
 
@@ -449,8 +450,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title-block .XXX general grade (+-.005) and no explicit band.  This is a
 # location requirement, not a spelling: the step sits SEAT_STEP_SETBACK
 # behind T024's south face, and the proof below books the step's printed
-# limit with the stack's and the fillet's in that 1.0 mm; the .XX grade
-# (+-.01) alone would take half of it.
+# limit with the stack's and the fillet's in that setback; the .XX grade
+# (+-.01) alone would take a quarter of it.
 #
 # Tip Sec2End (collar's tip-side face to the end): three places, the .XXX
 # grade, booked in the recess proof below (the end stays inside T024's bore

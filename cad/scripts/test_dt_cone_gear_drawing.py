@@ -163,7 +163,8 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     # longer than the pitch; cone_gear_stack owns the stack's band.
     assert spec.FACE_WIDTH == math.floor(spec.SEAT_PITCH * 1e4) / 1e4
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
-    assert spec.FACE_WIDTH_BAND == (0.0254, -0.0254)
+    upper, lower = spec.FACE_WIDTH_BAND
+    assert upper == -lower > 0.0  # centred, as the stack's partial bands need
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 

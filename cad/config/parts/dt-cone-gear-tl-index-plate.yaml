@@ -11,7 +11,7 @@ dt-cone-gear-tl-index-plate:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill and ream the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
+  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.834 to the BS-0 plate hub; drill and ream the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

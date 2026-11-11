@@ -80,9 +80,9 @@ SOCKET_DEPTH_MM = 5.08  # .20
 SPIGOT_SOCKET_ENGAGEMENT_MIN_MM = 1.5 * STEM_DIA_MM
 
 # DT-04's end stands this far inside T024's bore (nominal, .XXX); the shaft
-# spec proves it positive at every limit of T024's feeler-set station and the
-# printed land-2 end.
-TIP_END_RECESS_MM = 0.635  # .025
+# spec proves it positive at every limit of T024's feeler-set station (the
+# cone gears' +/-.002 faces, #2314) and the printed land-2 end.
+TIP_END_RECESS_MM = 0.762  # .030
 
 # T006's pivot length from its leaves' north face, .XX: through the bushing
 # and into the end screw's hole, never bottoming there.

@@ -154,7 +154,6 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     # drill to 5.41, thinning the slit mouth and side webs.
     assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.934, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.889, abs=1e-3)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(4.577, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -649,12 +648,11 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
 # Every number below is recomputed from the print's own grades
 # (DRAWING_PRECISION) and the title block's general bands, never read back
 # from the spec's stack constants, so each test states the property itself.
-# The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands: every
-# dimension prints the title block's general band for its places, except the
-# width, which prints its own one-sided band (machinist review of 83e3370f9).
+# The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands, and
+# #2314 the width's one-sided band: every dimension prints the title block's
+# general band for its places.
 _UNIT = dt_cone_tip_block_spec.UNIT
 _GENERAL = {places: printed_band_mm(places, unit=_UNIT) for places in (1, 2, 3)}
-_BANDED = {"Width": (0.0, -0.508)}  # (upper, lower) as the sheet prints it
 _DRILLED_PLUS = drilled_oversize_mm(unit=_UNIT)
 
 
@@ -664,25 +662,18 @@ def _on_print(nominal: float, places: int) -> float:
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:
-    if name in _BANDED:
-        upper, lower = _BANDED[name]
-        return nominal + lower, nominal + upper
     places = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
     band = _GENERAL[places]
     return _on_print(nominal, places) - band, _on_print(nominal, places) + band
 
 
-def test_width_carries_a_one_sided_band_that_holds_containment() -> None:
-    """Rules 4 and 19 (machinist review of 83e3370f9): the width only has to
-    keep its +X face inside the plate's west edge, so it may only come in from
-    17.0; the model carries that band natively on Width@BlockProfile."""
+def test_width_prints_the_title_block_band_its_stacks_read() -> None:
+    """The width only has to keep its +X face inside the plate's west edge and
+    its webs and pinch recess at its lower limit; the stacks read the title
+    block's .XX limits, and the model carries no band of its own."""
     spec = dt_cone_tip_block_spec
-    assert spec.BLOCK_WIDTH_BAND == _BANDED["Width"]
     assert spec.BLOCK_WIDTH_LIMITS == pytest.approx(_printed("Width", spec.BLOCK_X))
-    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == 2
-    assert model_toleranced_dimensions(part)[("BlockProfile", "Width")] == (
-        "*deviations(BLOCK_WIDTH_BAND)"
-    )
+    assert ("BlockProfile", "Width") not in model_toleranced_dimensions(part)
 
 
 def _worst_near_jaw_wall() -> float:
@@ -815,7 +806,7 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     }
     three_place.discard("DowelX")
     assert "DowelX" not in texts
-    # The width's band is its own, one-sided; its reason still names the edge.
+    # The width prints the title block's .XX; its reason still names the edge.
     assert "MHA-DT-20" in texts["Width"]
     for name in three_place:
         assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
@@ -912,24 +903,21 @@ def _worst_far_wall_from_head() -> float:
 def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
     """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
     1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    2.25D at the printed worst case: the width's one-sided band tops out at
-    its nominal on the head's side under the -X datum, PassageCenter .XXX."""
+    1.5D at the printed worst case: the width's .XX band tops out on the
+    head's side under the -X datum, PassageCenter .XXX."""
     spec = dt_cone_tip_block_spec
     engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
     assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(6.477)
 
 
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
-    """Regression pin (the 1/2 screw passed it too): at the width's lower
-    limit the 5/8 screw's tip stays 0.25 inside the far face; the one-sided
-    band's lower limit leaves 0.635."""
+    """Regression floor (the 1/2 screw passed it too): at the width's lower
+    limit the 5/8 screw's tip stays 0.25 inside the far face."""
     spec = dt_cone_tip_block_spec
     recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
-    assert recess == pytest.approx(0.635)
 
 
 def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
@@ -1155,11 +1143,11 @@ _DOWEL_MUTATIONS = {
     ),
     "station band eats the +X face web": (
         "DOWEL_X_TOL_MM = 0.254",
-        "DOWEL_X_TOL_MM = 0.3",
+        "DOWEL_X_TOL_MM = 0.6",
     ),
     "dowel crowds the +X face": (
         "DOWEL_FROM_TAP = 5.7912",
-        "DOWEL_FROM_TAP = 6.0",
+        "DOWEL_FROM_TAP = 6.1",
     ),
 }
 

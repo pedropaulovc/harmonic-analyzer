@@ -58,7 +58,6 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from dt_cone_gear_tl_index_plate_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
     CSK_DIA,
     CSK_FLANK_ANGLE,
@@ -586,15 +585,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven index plate")
 
-    # The bore pilots on the head's hub: never under the stock plate's bore.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PlateProfile",
-        "BoreDia",
-        *BORE_DEVIATIONS,
-        places=3,
-        display_unit=UNIT,
-    )
     # The reamed index holes: a sliding fit on the head's index pin.
     set_dimension_bilateral_tolerance(
         adapter,
