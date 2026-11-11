@@ -132,7 +132,7 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # (machinist review of farm build 20261110T204245.238203Z: a bare band
 # names no fit route): reference Ø.4720, the bore's smallest printed size,
 # at .0002-.0017 diametral clearance in each bore, so the rock budget keeps
-# the old class ZZ pin's .0017 maximum (inventory gauges.gauge-bar-0472x8).
+# the old class ZZ pin's .0017 maximum (shop-equipment.toml gauges.gauge-bar-0472x8).
 # The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
 # mirror can charge the bar's play without importing the summing spec's
 # config closure (test_dodo_recipe's fine-grained config deps).

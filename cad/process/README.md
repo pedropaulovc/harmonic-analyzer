@@ -69,7 +69,10 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   screw jack), with the ownership status Pedro's 2026-11-05 hand sheet gives
   (PR #2218): neither owned on that date;
 - three `[[stock]]` rows: OnlineMetals 4807 strap and 1173 bar, and McMaster
-  8663K55 acetal.
+  8663K55 acetal;
+- the MHA-SM-02 knife mount's records to make or buy (owner ruling 2026-11-10
+  (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
+  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row.
 
 One fact lives in one file. The same object may appear in both files with
 disjoint fields (the DTI, for example), but no field is duplicated. Together
