@@ -954,6 +954,14 @@ STACK_WINDOW = inch_window(
     ),
     FIT_LIMIT_PLACES,
 )
+# #2362: the shop owns no 5-6 in micrometer (cad/process/shop.toml gauges),
+# but it owns the Mitutoyo 81-piece inch gauge blocks and a test indicator
+# (shop-equipment.toml): the indicator is zeroed on a wrung stack of the
+# bank's nominal length standing on the stop gear 0's cam face sits on, and
+# the stack is the blocks plus its reading at gear 19 (as check 4F adds an
+# indicator reading to a recorded value).  The blocks print at the model leg's own
+# places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo review of #2532).
+STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
 # Step 9D's spring gap is set with one leaf of the rig's STARRETT 66MA gage
 # (v47 machinist review: the blade was never identified); the steps print its
 # inch size and the feeler-stack table its stamped size.
@@ -982,7 +990,7 @@ SETTING_TABLE_ROWS = (
         "GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
         "-",
         STACK_WINDOW,
-        "5-6 IN MICROMETER",
+        "INDICATOR ON BLOCKS",
     ),
     (
         "2",
@@ -1577,12 +1585,12 @@ BANK_STEPS = _note_text(
         f"8B. AS EACH GEAR GOES ON, SET ITS {CONNECTING_ROD} CONNECTING ROD AND {ROCKER_ARM}",
         f"   ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
         "8C. REPEAT 8A-8B FOR GEARS 1 TO 19 IN ORDER, ALL ALIKE.",
-        "8D. CLAMP THE STACK LIGHTLY END TO END.",
-        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN",
-        f"   MICROMETER: ACCEPT {STACK_WINDOW}.",
+        "8D. CLAMP THE STACK LIGHTLY END TO END, GEAR 0 CAM FACE ON A STOP.",
+        f"8E. MEASURE GEAR 19'S BACK FACE ON AN INDICATOR ZEROED ON {STACK_GAUGE_BLOCKS} GAUGE",
+        f"   BLOCKS ON THAT STOP: ACCEPT {STACK_GAUGE_BLOCKS} PLUS THE READING IN {STACK_WINDOW}.",
         "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
         "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
-        "8H. REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
+        f"8H. REPEAT 8D-8E UNTIL {STACK_GAUGE_BLOCKS} PLUS THE READING IS IN ITS WINDOW.",
         "8J. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
         # Rubric sample round 9 (rule 22): the base set-up is two actions.
         "8K. PUT BASE MHA-FR-01 ON THE MILL TABLE OUT OF THE FRAME, WITHOUT ITS",
