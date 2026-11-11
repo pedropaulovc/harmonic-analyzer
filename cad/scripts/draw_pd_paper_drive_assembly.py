@@ -2086,17 +2086,23 @@ def _step_text(
             # confirmation). A mesh that reads outside the window with N true
             # is a part off its drawing: a gear or one of the two running
             # fits the window charges; only when all are inside is the arm
-            # renewed (codjiflo P2 on 176fad0).
+            # renewed (codjiflo P2 on 176fad0). The restart follows the part
+            # (codjiflo P2 on ab2fdaf): a new plate is set to DETAIL K again,
+            # a new disc or sleeve is centred again, a new shaft only re-meshes.
             f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
-            f"FAILED, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth} AND THE "
-            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA, AND THE "
-            f"{n['pd-transgear-knob-shaft']} JOURNAL, THE "
-            f"{n['pd-transgear-arm-plate']} BORE AND THE "
-            f"{n['pd-transgear-feed-pinion']} BORE TO THEIR SHEETS; REPLACE THE "
-            "PART OUTSIDE (A NEW DISC THROUGH STEPS "
+            f"FAILED, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth} AND "
+            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA AND THE "
+            f"{n['pd-transgear-knob-shaft']} JOURNAL AND "
+            f"{n['pd-transgear-arm-plate']} AND {n['pd-transgear-feed-pinion']} "
+            "BORES TO THEIR SHEETS; REPLACE THE PART OUTSIDE AND REPEAT FROM "
+            f"{s('arm-plate-located', 9)} (A NEW PLATE FROM "
+            f"{s('arm-plate-located', 0)}, A NEW DISC AFTER STEPS "
             f"{steps.step_number('disc-cluster-assembled')}-"
-            f"{steps.step_number('disc-taps-transferred')}) AND REPEAT FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{steps.step_number('disc-taps-transferred')}, A NEW "
+            f"{n['pd-transgear-feed-pinion']} AFTER "
+            f"{s('disc-cluster-assembled', 1)}, {s('disc-taps-transferred', 0)}-"
+            f"{s('disc-taps-transferred', 1)} AND {s('disc-taps-transferred', 5)}-"
+            f"{s('disc-taps-transferred', 10)}).",
             "IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-pin']} PIN AND "
@@ -2145,16 +2151,21 @@ def _step_text(
             # costs only the arm's own parts. The uncut plate screws stand
             # under the disc with room to spare
             # (test_the_trial_stack_goes_together_at_the_located_step).
-            "SET THE ARM FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE AND "
+            "CLAMP THE ARM FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE AND "
             f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 10)}.",
             f"CHECK: AS {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)}, "
             "WITH THE TEST INDICATOR ON A MAGNETIC BASE.",
-            "IF A CHECK FAILS, THE DOWELS HAVE NOT HELD THE TRIAL SETTING: REPEAT "
-            f"FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
+            # A chip from the drilling just done reads as a tight spot or an
+            # off reading, so the doweled set is cleaned and read once more
+            # before it is scrapped (codjiflo P2 on ab2fdaf, as 27L/27M).
+            "IF A CHECK FAILS, CLEAN THE TEETH AND SEATS AND REPEAT "
+            f"{s('arm-plate-fitted', 12)}-{s('arm-plate-fitted', 13)}; IF IT STILL "
+            "FAILS, THE DOWELS HAVE NOT HELD: "
+            f"REPEAT FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
             f"{n['pd-transgear-pin']} PIN, {n['pd-vn-transgear-latch-pin']} DOWEL "
             f"AND {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
-            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS, THE SCREWS "
+            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS, SCREWS "
             "REUSED.",
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
         ),

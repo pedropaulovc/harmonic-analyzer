@@ -2468,15 +2468,32 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # A failed trial inspects the gears and the two running fits the window
     # charges before it blames the arm.
     assert (
-        f"THE {_number('pd-transgear-knob-shaft')} JOURNAL, THE "
-        f"{_number('pd-transgear-arm-plate')} BORE AND THE "
-        f"{_number('pd-transgear-feed-pinion')} BORE TO THEIR SHEETS; REPLACE THE PART OUTSIDE"
+        f"THE {_number('pd-transgear-knob-shaft')} JOURNAL AND "
+        f"{_number('pd-transgear-arm-plate')} AND "
+        f"{_number('pd-transgear-feed-pinion')} BORES TO THEIR SHEETS; REPLACE THE PART OUTSIDE"
         in located
     )
+    # The restart follows the part: a new plate is set again from 12A, a new
+    # disc or sleeve is centred again before the trial is repeated.
+    assert (
+        f"REPLACE THE PART OUTSIDE AND REPEAT FROM {drawing.sub_step('arm-plate-located', 9)} "
+        f"(A NEW PLATE FROM {drawing.sub_step('arm-plate-located', 0)}, A NEW DISC AFTER "
+        f"STEPS {steps.step_number('disc-cluster-assembled')}-"
+        f"{steps.step_number('disc-taps-transferred')}, "
+        f"A NEW {_number('pd-transgear-feed-pinion')} AFTER "
+        f"{drawing.sub_step('disc-cluster-assembled', 1)}, "
+        f"{drawing.sub_step('disc-taps-transferred', 0)}-"
+        f"{drawing.sub_step('disc-taps-transferred', 1)} AND "
+        f"{drawing.sub_step('disc-taps-transferred', 5)}-"
+        f"{drawing.sub_step('disc-taps-transferred', 10)})."
+    ) in located
     assert f"IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located
     fitted = _step_body("arm-plate-fitted")
     assert "AS 12M AND 12N" in fitted
-    assert f"NEW {_number('pd-transgear-arm')} ARM" in fitted
+    assert "CLAMP THE ARM FRONT UP ON THE SAME PARALLELS" in fitted
+    # A failed doweled re-read is cleaned and read again before the set is scrapped.
+    assert fitted.index("CLEAN THE TEETH") < fitted.index("IF IT STILL FAILS")
+    assert fitted.index("IF IT STILL FAILS") < fitted.index(f"NEW {_number('pd-transgear-arm')} ARM")
     # The doweled re-read comes before anything irreversible on the arm.
     for key in ("hanger-pivoted", "knob-stack-fitted", "hook-pin-hole-match-drilled"):
         assert steps.step_number("arm-plate-fitted") < steps.step_number(key)
