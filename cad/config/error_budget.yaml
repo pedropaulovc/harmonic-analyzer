@@ -162,11 +162,11 @@ critical_features:
     class: channel
     holds: "spring hole from the fulcrum bore, DRO/CNC"
   summing_hook_arm:
-    tolerance: 0.0762
+    tolerance: 0.127
     nominal: sm_summing_lever_spec.HOLE_X
     quantity: gain
     class: channel
-    holds: "half of the Ø.006 (0.1524 mm) spring-hole pattern position zone (sm_summing_lever_spec.GEOMETRIC_TOLERANCES_IN), normal to the knife line"
+    holds: "half of the Ø.010 (0.254 mm) spring-hole pattern position zone (sm_summing_lever_spec.GEOMETRIC_TOLERANCES_IN), normal to the knife line"
   spring_rate:
     tolerance: 1.25
     unit: pct

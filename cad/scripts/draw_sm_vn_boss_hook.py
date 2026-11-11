@@ -69,8 +69,9 @@ ISO_SCALE = (2.0, 1.0)
 # the Supplier / Supplier SKUs footer row, whose text tops out at y 0.060. The
 # footer notes are sheet-owned and checked against the sheet border instead.
 INK_CELL_YMIN = 0.0651
-# The jam-nut shank (#1189) is 3.8 longer, 15 mm on the sheet: the view sits
-# high enough that the cut-end chamfer dimensions clear the notes below it.
+# The eye's stand-off above the boss (#1189) makes the shank 3.8 longer, 15 mm
+# on the sheet: the view sits high enough that the cut-end chamfer dimensions
+# clear the notes below it.
 FRONT_CENTER = (0.100, 0.175)
 ISO_CENTER = (0.310, 0.213)
 # The cut-end deburr is dimensioned on the 4:1 front view itself (its .04 leg

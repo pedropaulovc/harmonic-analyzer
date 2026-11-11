@@ -15,7 +15,6 @@ import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
-import ch_vn_spring_hook_spec
 import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -229,19 +228,6 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     assert not re.search(r"\b(NORTH|SOUTH|EAST|WEST)\b|O'CLOCK", printed)
 
 
-def test_the_forked_driver_fits_the_jam_nut_and_its_anchor() -> None:
-    """Rule 1: the shop has no jig the package does not tell the builder to
-    make, so the anchor steps size the driver that runs the slotted jam nut."""
-    import ch_anchor_jam_nut_spec as nut
-
-    made = notes.step_lines("channel-anchors-set")[0]
-    assert "MAKE A FORKED DRIVER" in made
-    assert notes.DRIVER_BLADE_THICK_MAX * 25.4 < nut.SLOT_WIDTH
-    assert notes.DRIVER_BLADE_WIDTH * 25.4 <= nut.OD_MIN
-    assert notes.DRIVER_SLOT_WIDTH * 25.4 > nut.THREAD_MAJOR
-    assert notes.DRIVER_SLOT_DEPTH * 25.4 > ch_vn_spring_hook_spec.PROTRUSION_MAX_MM
-
-
 def test_every_adjustable_clamp_step_checks_that_it_holds() -> None:
     """Rule 23: an adjustable clamp counts only with a step that sets it and
     checks it holds."""
@@ -399,11 +385,8 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
 def test_integration_joints_point_at_their_integration_steps() -> None:
     rows = {joint.id: joint for joint in joint_retention.JOINTS}
     anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
-    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
-    step = steps.step_ref("channel-anchors-set")
-    assert anchor.installed_at == anchor.lock_step == nut.installed_at == step
-    assert anchor.lock is joint_retention.Lock.JAM_NUT
-    assert anchor.lock_part == nut.member == "ch_anchor_jam_nut"
+    assert anchor.installed_at == steps.step_ref("channel-anchors-set")
+    assert anchor.lock is joint_retention.Lock.NONE
     bracket = rows["ha-harmonic-analyzer/magnifying-bracket-screws"]
     assert bracket.installed_at == steps.step_ref("magnifier-bracket-screwed")
 

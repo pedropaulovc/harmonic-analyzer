@@ -12,6 +12,8 @@ reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
 shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
+The end profile imports the driving middle-rib counter-flank angle, controlling
+both symmetric flanks under the title block's ordinary angular tolerance.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
@@ -112,6 +114,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_BOTTOM_Y,
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
+    COUNTER_FLANK_ANGLE_DEG,
     COUNTER_HOLE_SPEC,
     COUNTER_WEB_T,
     DRAWING_PRECISION,
@@ -743,6 +746,37 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
+def _assert_counter_flank_angle(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the model's driving angle, one decimal and ordinary angular band."""
+    name = "MiddleRibCounterAngle"
+    found = [raw for raw in annotations if dimension_name(adapter, raw) == name]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one imported {name}, found {len(found)}")
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    full_name = dimension.FullName
+    if (
+        not isinstance(full_name, str)
+        or full_name.split("@")[:2] != [name, "MiddleRibProfile"]
+        or annotation.IsDangling()
+    ):
+        raise RuntimeError(f"{name}: lost native model association")
+    # The model driver reports driven (1) after its equation is bound.
+    if int(display.Type2) != 3 or int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{name}: expected the equation-controlled angular dimension")
+    if not math.isclose(
+        float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+        rel_tol=0.0, abs_tol=1e-8,
+    ):
+        raise RuntimeError(f"{name}: native angle differs from the source control")
+    if int(dimension.GetToleranceType()) != 0:
+        raise RuntimeError(f"{name}: expected the ordinary title-block angular band")
+    if (display.GetText(1), display.GetText(2) or "") != ("2X ", ""):
+        raise RuntimeError(f"{name}: expected two flanks without reference parentheses")
+    assert_imported_precision(adapter, found, DRAWING_PRECISION["MiddleRibProfile"])
+
+
 def _assert_spring_row_locators(adapter: Any, annotations: list[Any]) -> None:
     """Prove the plan's imported spring-row locators print as the part
     authored them: each measures its station, keeps the native BASIC type
@@ -1073,34 +1107,42 @@ def _clear_ridge_witnesses(
             )
 
 
-def _place_flank_text(adapter: Any, annotations: list[Any]) -> None:
+def _place_flank_text(
+    adapter: Any, annotations: list[Any], name: str = "FlankToSide",
+    text_xy: tuple[float, float] | None = None,
+) -> None:
     """Keep the model-owned exterior angle arc; move its whole block off it.
 
     Use the trammel-point recipe's native angular shelf pattern. Merely
     translating the two-row text on the arc leaves its qualifier struck.
     """
-    name = "FlankToSide"
+    text_xy = FLANK_TEXT_XY if text_xy is None else text_xy
     matches = [raw for raw in annotations if dimension_name(adapter, raw) == name]
     if len(matches) != 1:
-        raise RuntimeError("knife detail needs one native FlankToSide")
+        raise RuntimeError(f"knife detail needs one native {name}")
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.OffsetText = False
     if display.OffsetText is not False:
-        raise RuntimeError("FlankToSide: inherited text offset could not be reset")
+        raise RuntimeError(f"{name}: inherited text offset could not be reset")
+    # Set rather than left smart: smart drew the lower corner's arrows
+    # outside with no arc between them (run 20261109T204025899Z).
+    display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    if int(display.ArrowSide) != 0:
+        raise RuntimeError(f"{name}: arrows did not stay inside the exterior arc")
     arc_xy = DETAIL_KEEP[name]
     if annotation.SetPosition2(*arc_xy, 0.0) is not True:
-        raise RuntimeError("FlankToSide: native exterior arc placement was refused")
+        raise RuntimeError(f"{name}: native exterior arc placement was refused")
     position = annotation.GetPosition()
     if not position or math.dist(tuple(position[:2]), arc_xy) > 1e-5:
-        raise RuntimeError("FlankToSide: native exterior arc placement did not persist")
-    offset_dimension_text(adapter, [annotation], {name: FLANK_TEXT_XY})
+        raise RuntimeError(f"{name}: native exterior arc placement did not persist")
+    offset_dimension_text(adapter, [annotation], {name: text_xy})
     position = annotation.GetPosition()
     if (
         display.OffsetText is not True or not position
-        or math.dist(tuple(position[:2]), FLANK_TEXT_XY) > 1e-5
+        or math.dist(tuple(position[:2]), text_xy) > 1e-5
     ):
-        raise RuntimeError("FlankToSide: complete angular text did not stay on its shelf")
+        raise RuntimeError(f"{name}: complete angular text did not stay on its shelf")
 
 
 def _plate_thickness_check(
@@ -1694,13 +1736,14 @@ FRONT_KEEP = {
     "WebThickness": (0.168, 0.258),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),
+    "MiddleRibCounterAngle": (0.216, 0.2378),
 }
-# The native 6.985 mm face span uses the ordinary document .XX precision:
-# its text is above the profile and right of RibReach's complete callout.
+# The native boss-top span is ANCHOR_H/2 - COEFFICIENT_TOP_Y (6.025 mm).
+# Its ordinary .XX text is above the profile and right of RibReach's callout.
 BOSS_FACE_LOCATION_XY = (0.284, 0.250)
 # VIEW F's right-hand column is outside the boss's actual X400.0875 mm end.
-# The short 2.594 span hangs its ordinary 2.59 below the view: predicted native
-# text X403.5..415.1375 / Y125.2219..128.7219 mm, clear of the tap callout.
+# The native knife-vertex span is HEX_H/2 - COEFFICIENT_TOP_Y (1.634 mm).
+# Its ordinary .XX text stays in the right/below lane; native ink needs review.
 KNIFE_HEIGHT_LOCATION_XY = (0.4035, 0.128)
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout
@@ -1722,13 +1765,18 @@ DETAIL_KEEP = {
     # (machinist review 41bbeec): seeded nearer the upper end, it lands on
     # the arc's upper part, below and right of the shelf, outside the arc.
     "FlankToSide": (0.0653, 0.1918),
-    "KnifeRidgeRadius": (0.181, 0.219),
+    # The lower corner's arc and shelf mirror the upper pair's about the
+    # side faces' midpoint (Y150 mm): its one-row text below the height's
+    # Y98.66 witness.
+    "LowerFlankToSide": (0.0653, 0.1082),
+    "KnifeRidgeRadius": (0.186, 0.219),
 }
 # Keep the native arc radius. R3's low shelf routed through the final SEAT T.
-# Above the height's Y201.3401 witness, the whole two-row block clears it by
-# 4.1036 mm and the X74.5999 ridge witness by 4.9138 mm. Any connector from
-# the unchanged arc stays below the text; verify regenerated native/PDF ink.
-FLANK_TEXT_XY = (0.051, 0.211)
+# Above the height's Y201.3401 witness, the two-row block stays left of the
+# X74.5999 ridge witness. Keep the per-stub count and value on one line;
+# verify the unchanged arc's connector and the complete text in the PDF.
+FLANK_TEXT_XY = (0.04365, 0.211)
+LOWER_FLANK_TEXT_XY = (0.04365, 0.089)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native
@@ -2001,6 +2049,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    _assert_counter_flank_angle(adapter, front_annotations)
+    # Retain the acute arc on the counter arm and the boss-side text shelf.
+    offset_dimension_text(
+        adapter, front_annotations, {"MiddleRibCounterAngle": (0.206, 0.249)},
+    )
     # The cylinder's diameter lives in a reference sketch the part saves
     # hidden (its band shows no silhouette to dimension): the hidden-owner
     # curate shows it in the plan, the one view that dimensions it.
@@ -2200,10 +2253,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor boss Z location",
         entities=(end_edge.edge, anchor_rim.edge),
     )
-    # The mid rib shares the boss's station (machinist review r6: its 5.08
-    # thickness had no location along the plate); the plan draws the rib
-    # through the boss, so this one 3.00 locates both and carries no words
-    # (rule 7).
+    # Extend the boss's plan axis through the middle rib: the existing 3.00
+    # now visibly locates their shared Z0 station without another dimension.
+    _owned_centerline(
+        adapter, top,
+        (
+            (TIP_X - ANCHOR_R - RECEIVER_AXIS_OVERRUN_MM, 0.0, 0.0),
+            (RIB_REACH + RECEIVER_AXIS_OVERRUN_MM, 0.0, 0.0),
+        ),
+        label="boss and middle rib centreline",
+    )
     # The row X, start Z and pitch are the part's own BASIC locators
     # (SpringRowCoordinates: X off datum A's -Z ridge axis, start Z off datum
     # B's end, each to a hole centre), imported with the plan's dimensions.
@@ -2283,6 +2342,14 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         detail = _knife_detail(adapter, back)
         _hidden_lines_removed_without_greyed_pass(detail)
+        # End-on, the stub-root blends' seams radiate from the apex and struck
+        # datum A's box (machinist review, run 20261109T194558640Z). They
+        # are tangent edges; Detail D needs none of them.
+        detail_view = _early_bound(detail, "IView")
+        detail_view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+        if int(detail_view.GetDisplayTangentEdges2()) != 0:
+            raise RuntimeError("failed to hide Detail D's tangent edges")
+        detail_view.UpdateViewDisplayGeometry()
         detail_annotations = curate_hidden_dimensions(
             adapter,
             detail,
@@ -2298,6 +2365,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_callouts(adapter, detail_annotations, label="knife detail")
     _clear_ridge_witnesses(adapter, detail, detail_annotations)
     _place_flank_text(adapter, detail_annotations)
+    _place_flank_text(adapter, detail_annotations, "LowerFlankToSide", LOWER_FLANK_TEXT_XY)
     back_edges = scan_view_edges(back, label="bracket receiver face")
     mounting_rims = _mounting_rims(back_edges)
     # Below VIEW F, clear of the receiver stations and the detail's width.
