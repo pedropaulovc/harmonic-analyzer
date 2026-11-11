@@ -471,8 +471,11 @@ def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> Non
         (line_y - old_tip[1]) / (old_knee[1] - old_tip[1])
     )
     assert 0.273311 < crossing_x < 0.279661
-    # Today's 1.30 line stands over the cap with the same 2 mm.
-    assert max(knee[1], centre[1] + radius) < drawing.NOTCH_KEEP["CapECx"][1] - 0.002
+    # Today's 1.30 line, the same 2.78 mm under its text anchor, stands over
+    # the cap and the knee with 2 mm.
+    text_to_line = (0.258 - 0.009) - line_y
+    today_line_y = drawing.NOTCH_KEEP["CapECx"][1] - text_to_line
+    assert max(knee[1], centre[1] + radius) < today_line_y - 0.002
 
 
 def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> None:
