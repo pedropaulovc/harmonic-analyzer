@@ -2494,9 +2494,9 @@ def _step_text(
             f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
             f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
             f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
-            "FOR A FAULT THE SAME ALL ROUND (THE ARM'S SETTING), REMOVE THE CLUSTER "
-            f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
-            f"KEEPING ITS SHIMS, AND THE {n['pd-latch-hook']} HOOK.",
+            f"FOR A FAULT ALL ROUND (THE ARM'S SETTING), REMOVE THE {n['pd-latch-hook']} "
+            f"HOOK AND THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
+            f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
             pivot_unscrewed,
             pivot_tap_chased,
             f"REBUILD FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
@@ -2510,17 +2510,16 @@ def _step_text(
             f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS, "
             f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
             f"{n['pd-vn-transgear-knob-cup-pin']} PIN, {fresh_stake}.",
+            # The cluster, the collar and the bar's hook taps are reused.
             f"SKIP STEPS {steps.step_number('disc-screws-cut')}-"
             f"{steps.step_number('oil-hole-drilled')}, "
             f"{steps.step_number('collar-pins-pressed')}-"
             f"{steps.step_number('pilot-faced-to-fit')} AND "
-            f"{s('latch-hook-fitted', 1)}-{s('latch-hook-fitted', 4)} IN THE REBUILD: "
-            "THE CLUSTER, THE COLLAR AND THE BAR'S HOOK TAPS ARE REUSED.",
+            f"{s('latch-hook-fitted', 1)}-{s('latch-hook-fitted', 4)} IN THE REBUILD.",
         ),
         "collar-rear-faced-to-fit": (
-            f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR AS "
-            f"MADE (LONG) OR AS LAST FACED, ITS REAR FACE ON THE "
-            f"{n['pd-transgear-knob-shaft']} {teeth} FRONT FACE.",
+            f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR, ITS REAR FACE ON "
+            f"THE {n['pd-transgear-knob-shaft']} {teeth} FRONT FACE.",
             f"READ THE {knob_short}'S FRONT FACE AGAINST THE {crank}'S FRONT FACE WITH A "
             "STRAIGHTEDGE ACROSS BOTH AND FEELERS.",
             "REMOVE THE COLLAR.",
@@ -2529,9 +2528,8 @@ def _step_text(
             f"OF THE {crank_short}'S FRONT FACE.",
             f"CHECK: THE FINISHED COLLAR BODY IS WITHIN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
-            f"IF NOT, OR IF {s('collar-rear-faced-to-fit', 1)} READ THE "
-            f"{knob_short}'S FRONT FACE ALREADY BEHIND "
-            f"{s('collar-rear-faced-to-fit', 3)}'S WINDOW, MAKE A NEW "
+            f"IF NOT, OR IF THE {s('collar-rear-faced-to-fit', 1)} READING WAS "
+            f"ALREADY BEHIND {s('collar-rear-faced-to-fit', 3)}'S WINDOW, MAKE A NEW "
             f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT "
             f"FROM STEP {steps.step_number('collar-pins-pressed')}.",
         ),

@@ -173,6 +173,27 @@ def test_an_unknown_step_is_refused() -> None:
         steps.step_number("no-such-step")
 
 
+def test_every_steps_sheet_keeps_most_lines_matchable_by_the_layout_audit() -> None:
+    """The layout audit fails a sheet when under MIN_MATCH_SHARE of its COM
+    strings find their printed text, and an indented continuation line never
+    finds its own (run 20261111T054024870Z: sheet 10 at 34 of 69). Each
+    steps sheet's head lines, plus its reference caption, must stay the
+    larger share."""
+    import _layout_audit
+
+    lines: dict[str, list[str]] = {}
+    for column in drawing.pack_step_columns(
+        drawing._step_text(operating_domain=_unit_operating_domain())
+    ):
+        lines.setdefault(column.sheet, []).extend(
+            line for line in column.text.splitlines() if line.strip()
+        )
+    for sheet, printed in lines.items():
+        continued = sum(line.startswith(" ") for line in printed)
+        matchable = len(printed) + (sheet != drawing.SHEET_NAMES[3])
+        assert matchable - continued >= _layout_audit.MIN_MATCH_SHARE * matchable, sheet
+
+
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     notes = _unit_step_notes()
     heads = STEP_HEAD.findall(notes.fitup_steps)
@@ -2516,7 +2537,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # for a fault that is the same all round, the last branch.
     pose = _step_body("fitup-pose-set")
     assert drawing.reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE") in pose
-    rebuild = pose.index("FOR A FAULT THE SAME ALL ROUND (THE ARM'S SETTING)")
+    rebuild = pose.index("FOR A FAULT ALL ROUND (THE ARM'S SETTING)")
     assert pose.index(f"NEW {_number('pd-transgear-arm')} ARM") > rebuild
     for part, name in (("pd-transgear-arm-plate", "PLATE"), ("pd-latch-hook", "HOOK")):
         assert f"{_number(part)} {name}," in pose[rebuild:]
