@@ -374,7 +374,7 @@ SHAFT_FRONT_STATION = -SHAFT_FRONT_STUB
 # 1.0 mm proud of its south face.
 
 # POST_STATION (cone_line): the corrected 2.8360-in v2 crank boss spans local z
-# -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
+# -21.3868..+50.6476. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
 # unequal; the post station fixes crank X and its configured bore height sets Y.
 
