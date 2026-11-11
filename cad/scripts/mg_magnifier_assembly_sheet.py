@@ -235,17 +235,19 @@ _STACK = (
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
 
-# Rule 23: a specified anaerobic bond equals a press fit. The one bond in this
-# package is the slip-fit drum's fallback (owner ruling 2026-11-07); its
-# degrease, apply, keep-off and cure rules
-# print once, as a general note with the checks on sheet 5, in two lines
-# (the sheet 5 column has under three to spare).
+# Rule 23: a specified anaerobic bond equals a press fit. The package bonds
+# a press that went in slack: the drum on the wheel's spigot (owner ruling
+# 2026-11-07) and the axle in the bar (owner ruling 2026-11-11, #2541 and
+# #2523, amending the 2026-11-07 "a slip axle is remade": a remade axle cut
+# from the same as-supplied rod comes out the same size). Its degrease,
+# apply, keep-off, cure and acceptance rules print once, as a general note
+# with the checks on sheet 5.
 BOND_GRADE = "LOCTITE 638"
 BOND_NOTE_REF = "NOTE 1 (SHEET 5)"
 BOND_NOTE = (
-    f"NOTE 1, {BOND_GRADE} BOND: DEGREASE; APPLY TO THE SPIGOT ONLY, NONE IN THE "
-    "AXLE BORE OR WIRE SEATS; CURE 24 H AT ROOM TEMPERATURE BEFORE LOAD OR OIL. "
-    f"ACCEPT: {_DRUM} DOES NOT TURN BY HAND."
+    f"NOTE 1, {BOND_GRADE} BOND: DEGREASE; COAT THE SPIGOT OR PLAIN AXLE END ONLY, "
+    "NONE IN THE WHEEL BORE OR WIRE SEATS; CURE 24 H BEFORE LOAD OR OIL. ACCEPT: "
+    "THE PART DOES NOT TURN OR SLIDE BY HAND."
 )
 
 # #2399: the axle presses in plain end first, so the press would push on its
@@ -327,7 +329,7 @@ STEP_TEXT = {
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
     # A press that goes on by hand is a slip fit (rule 23). Owner ruling
     # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
-    # the wheel remade (BOND_NOTE); a slip axle is remade.
+    # the wheel remade (BOND_NOTE).
     "drum-pulled-off": f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
     "drum-bonded": (
         f"IF {_DRUM} CAME OFF, BOND IT TO {_WHEEL} WITH {BOND_GRADE}, "
@@ -350,10 +352,20 @@ STEP_TEXT = {
         f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
-    "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
-    "axle-remade": f"IF {_AXLE} CAME OUT, REMAKE IT TO ITS PRESS SIZE.",
-    "axle-repressed": (
-        f"IF {_AXLE} WAS REMADE, RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
+    # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
+    # is bonded, not remade, under NOTE 1 as the drum is: clean, bond, set
+    # before it grabs, then the hold check again once cured. The slip clause
+    # names an unbonded axle, so the bonded one passes back through 2A-2B.
+    "axle-pressed-out": f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS IT OUT.",
+    "axle-cleaned": f"IF {_AXLE} CAME OUT, CLEAN IT AND THE BORE IN {_BAR} TO BARE METAL.",
+    "axle-bonded": f"IF IT WAS CLEANED, BOND IT IN WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
+    "axle-bond-set": (
+        f"IF IT WAS BONDED, SET IT AT ONCE TO THE {_step(_steps.AXLE_PRESSED_KEY)} "
+        "FIRST SETTING."
+    ),
+    "axle-bond-cured": (
+        f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
+        "CURED 24 H."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
     "trial-nuts-jammed": (

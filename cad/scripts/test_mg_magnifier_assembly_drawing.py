@@ -178,7 +178,7 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     each a lettered sub-step of the press (rule 22, the shared step lint)."""
     for pressed, held, taken_out, remedy in (
         (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
-        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-remade"),
+        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-cleaned"),
     ):
         (step,) = (step for step in steps.STEPS if step[0] == pressed)
         assert step[1:4] == (held, taken_out, remedy)
@@ -187,21 +187,44 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         # the next step is the remedy.
         assert "BY HAND" in notes.STEP_TEXT[taken_out]
         assert notes.STEP_TEXT[taken_out].count(",") == 2
-    # The axle, the cheap part, is remade; the drum is bonded rather than the
-    # wheel remade, by the one general bond note that prints with the checks
-    # (owner ruling 2026-11-07).
-    axle = notes.ITEM_NUMBERS["mg-wheel-axle"]
-    assert "REMAKE IT TO ITS PRESS SIZE" in notes.STEP_TEXT["axle-remade"]
-    assert notes.STEP_TEXT["axle-repressed"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_PRESSED_KEY)}."
+    # Both slip fits are bonded under the one general bond note that prints
+    # with the checks: the drum rather than the wheel remade (owner ruling
+    # 2026-11-07), the axle rather than remade from the same as-supplied rod
+    # (owner ruling 2026-11-11, #2541 and #2523, amending 2026-11-07).
+    axle, bar = (notes.ITEM_NUMBERS[stem] for stem in ("mg-wheel-axle", "mg-wheel-bar"))
+    assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
+    # The bonded axle passes back through 2A-2B: only an unbonded slip is
+    # pressed out.
+    assert (
+        f"AN UNBONDED ITEM {axle} SLID IN BY HAND"
+        in notes.STEP_TEXT["axle-pressed-out"]
     )
-    assert f"ITEM {axle}" in notes.STEP_TEXT["axle-repressed"]
+    assert notes.STEP_TEXT["axle-cleaned"] == (
+        f"IF ITEM {axle} CAME OUT, CLEAN IT AND THE BORE IN ITEM {bar} TO BARE METAL."
+    )
+    assert notes.STEP_TEXT["axle-bonded"].endswith(
+        f"BOND IT IN WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
+    )
+    # Set before it grabs, to the press step's own first setting.
+    assert notes.STEP_TEXT["axle-bond-set"].endswith(
+        f"AT ONCE TO THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} FIRST SETTING."
+    )
+    assert notes.STEP_TEXT["axle-bond-cured"] == (
+        f"IF IT WAS BONDED, RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)} "
+        "ONCE IT HAS CURED 24 H."
+    )
     assert notes.STEP_TEXT["drum-bonded"].endswith(
         f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
     )
     assert notes.BOND_NOTE in notes.ASSEMBLY_CHECKS
     assert notes.BOND_NOTE.startswith(f"NOTE 1, {notes.BOND_GRADE} BOND:")
-    for rule in ("DEGREASE", "APPLY TO THE SPIGOT ONLY", "NONE IN THE AXLE BORE", "CURE 24 H", "DOES NOT TURN BY HAND"):
+    for rule in (
+        "DEGREASE",
+        "COAT THE SPIGOT OR PLAIN AXLE END ONLY",
+        "NONE IN THE WHEEL BORE OR WIRE SEATS",
+        "CURE 24 H",
+        "THE PART DOES NOT TURN OR SLIDE BY HAND",
+    ):
         assert rule in notes.BOND_NOTE
 
 
