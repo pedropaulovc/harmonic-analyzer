@@ -93,7 +93,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     assert (lever.KNIFE_LOCAL_X, lever.KNIFE_LOCAL_Y) == (215.0, 5.134)
     assert arm.JOINT == pytest.approx((
         sum(point[0] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
-        KNIFE_Y - 0.71,
+        KNIFE_Y + 0.25,
         joint.SEAT_PLANE_Z,
     ))
     assert arm.JOINT[1] == pytest.approx(
@@ -101,7 +101,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     )
     fx, fy, mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
     centered_row_mz = mz + (arm.NECK[0] - arm.JOINT[0]) * fy
-    assert arm.JOINT_MZ == pytest.approx(centered_row_mz - 0.71 * fx)
+    assert arm.JOINT_MZ == pytest.approx(centered_row_mz + 0.25 * fx)
     assert arm.JOINT_MZ != pytest.approx(centered_row_mz)
 
 
@@ -135,14 +135,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
         joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
     )
     nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
-    assert nominal_edge == pytest.approx(4.79)
-    # The 4.79 mm ordinate prints .189 with the shared mounting band.
-    row_min, row_max = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
+    assert nominal_edge == pytest.approx(5.25)
+    # The 5.75 mm lower-edge ordinate prints .226 with the mounting band.
+    row_min, row_max = (0.226 * IN - joint.BRACKET_POSITION_BAND, 0.226 * IN + joint.BRACKET_POSITION_BAND)
     nearest_edge = min(
         row_min,
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0] - row_max,
     )
-    assert nearest_edge == pytest.approx(row_min)
+    assert nearest_edge == pytest.approx(0.42 * IN - row_max)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)
@@ -168,12 +168,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
 def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
     # The lower-edge ordinate and overall .XX width are independent controls.
     # Width variation is not a symmetric displacement of both nominal edges.
-    rows = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
+    rows = (0.226 * IN - joint.BRACKET_POSITION_BAND, 0.226 * IN + joint.BRACKET_POSITION_BAND)
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
         for width, row_from_lower in itertools.product((0.42 * IN, 0.44 * IN), rows)
     ]
-    assert (min(corner_arms), max(corner_arms)) == pytest.approx(rows)
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx(
+        (0.42 * IN - rows[1], 0.44 * IN - rows[0])
+    )
     corner_tensions = [
         abs(arm.JOINT_MX) / (2.0 * edge_arm)
         + abs(arm.JOINT_MY) / 13.7

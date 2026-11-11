@@ -277,12 +277,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"
     ),
-    ("_mg_wheel_rim_geometry", "GROOVE_R_BAND"): (
-        "equal band indexed into the native symmetric (+/-) tolerance"
-    ),
-    ("_mg_wheel_rim_geometry", "GROOVE_BOTTOM_BAND"): (
-        "equal band indexed into the native symmetric (+/-) tolerance"
-    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),

@@ -20,9 +20,10 @@ from stock_anchor_geom import ANCHOR_9490T1 as anchor
 def test_finished_overall_preserves_factory_thread_datum():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
-    # The full 19.05 boss plus the jam nut's thread above it (#1189).
+    # The full 19.05 boss plus the eye's stand-off above it, the calibrated
+    # counter seat's station (#1189, #2326): nothing moved with the nut.
     assert spec.TRIM.shank_length_mm == pytest.approx(22.886)
-    assert spec.TRIM.shank_length_mm - 19.05 >= spec.JAM_NUT_THREAD_MM - 1e-3
+    assert spec.TRIM.shank_length_mm - 19.05 == pytest.approx(spec.EYE_STANDOFF_MM)
     assert spec.FINISHED_OVERALL_MM == pytest.approx(40.4755)
 
 

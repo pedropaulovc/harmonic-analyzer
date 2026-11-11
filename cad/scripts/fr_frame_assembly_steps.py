@@ -9,10 +9,12 @@ the sheet. Pure data: no SolidWorks, no config reads.
 
 Each step does one thing (drawing-guidelines.md rule 22): a check and its
 remedy are their own steps, each check right after the action it checks.
-The columns are fitted and match-marked in the base, the top frame set to
-the controlling height, the columns match-cut to the cap stack, the tube
-cross holes match-drilled through each casting's clearance hole, and the
-frame screwed together before the deck parts go on.
+The nameplate is spotted through onto the base and its seats tapped on the
+mill before the columns go in. The columns are then fitted and match-marked
+in the base, the top frame set to the controlling height, the columns
+match-cut to the cap stack, the tube cross holes transfer-punched through
+each casting's clearance hole and drilled on the mill, and the frame screwed
+together before the support goes on.
 """
 
 from __future__ import annotations
@@ -20,13 +22,13 @@ from __future__ import annotations
 DRAWING_NUMBER = "MHA-FR-00"
 
 COLUMNS_ROUGH_CUT_KEY = "columns-rough-cut"
-LOWER_HOLES_PILOTED_KEY = "lower-holes-piloted"
-LOWER_HOLES_OPENED_KEY = "lower-holes-opened"
+LOWER_HOLES_MARKED_KEY = "lower-holes-marked"
+LOWER_HOLES_DRILLED_KEY = "lower-holes-drilled"
 LOWER_HOLES_CHECKED_KEY = "lower-holes-checked"
 COLUMNS_RESEATED_KEY = "columns-reseated"
 # The controlling setting: every top socket's cross-hole axis at the sheet-1
 # height above the base underside, before the columns are cut and the upper
-# tube holes match-drilled.
+# tube holes transfer-punched.
 TOP_AXIS_SET_KEY = "top-axis-set"
 TOP_FRAME_CLAMPED_KEY = "top-frame-clamped"
 COLUMNS_CUT_KEY = "columns-cut"
@@ -43,17 +45,30 @@ NAMEPLATE_SCREWED_KEY = "nameplate-screwed"
 GOOSENECK_STARTED_KEY = "gooseneck-set-screw-started"
 
 SEQUENCE: tuple[str, ...] = (
-    # Columns fitted, marked and match-drilled in the base.
+    # The nameplate on the bare base, its seats tapped on the mill before the
+    # base stands under the frame (#2390).
+    NAMEPLATE_SET_KEY,
+    "nameplate-clamped",
+    NAMEPLATE_SPOTTED_KEY,
+    "nameplate-lifted",
+    NAMEPLATE_SEATS_TAPPED_KEY,
+    NAMEPLATE_SCREWED_KEY,
+    "nameplate-flat-checked",
+    "nameplate-heads-checked",
+    # Columns fitted, marked and their lower cross holes transferred, then
+    # checked with the columns back in their sockets, where a tube hole off
+    # the casting's screw line shows (#2388).
     COLUMNS_ROUGH_CUT_KEY,
     "base-sockets-fitted",
     "base-match-marked",
-    LOWER_HOLES_PILOTED_KEY,
+    LOWER_HOLES_MARKED_KEY,
     "lower-columns-lifted",
-    LOWER_HOLES_OPENED_KEY,
+    LOWER_HOLES_DRILLED_KEY,
+    COLUMNS_RESEATED_KEY,
     LOWER_HOLES_CHECKED_KEY,
     "lower-holes-reworked",
+    "lower-tap-chased",
     # The top frame on the columns, at the controlling height.
-    COLUMNS_RESEATED_KEY,
     "top-frame-lowered",
     "top-sockets-fitted",
     "top-match-marked",
@@ -66,14 +81,15 @@ SEQUENCE: tuple[str, ...] = (
     "columns-chamfered",
     FRAME_RESEATED_KEY,
     "top-axis-reset",
-    # The upper tube holes, match-drilled through the top frame.
-    "upper-holes-piloted",
+    # The upper tube holes, transferred from the top frame and checked with
+    # the frame reassembled.
+    "upper-holes-marked",
     "frame-lifted-for-drill",
-    "upper-holes-opened",
+    "upper-holes-drilled",
+    "frame-reassembled",
     UPPER_HOLES_CHECKED_KEY,
     "upper-holes-reworked",
     # The frame screwed together and capped.
-    "frame-reassembled",
     "cross-screws-measured",
     "cross-screws-replaced",
     CROSS_SCREWS_DRIVEN_KEY,
@@ -83,19 +99,11 @@ SEQUENCE: tuple[str, ...] = (
     "caps-pushed-on",
     "caps-checked",
     "column-ends-checked",
-    # The deck parts.
+    # The support on the deck.
     "support-seated",
     SUPPORT_SCREWED_KEY,
     "support-flat-checked",
     "support-heads-checked",
-    NAMEPLATE_SET_KEY,
-    "nameplate-clamped",
-    NAMEPLATE_SPOTTED_KEY,
-    "nameplate-lifted",
-    NAMEPLATE_SEATS_TAPPED_KEY,
-    NAMEPLATE_SCREWED_KEY,
-    "nameplate-flat-checked",
-    "nameplate-heads-checked",
     # The loose set screw and the final checks.
     GOOSENECK_STARTED_KEY,
     "post-bore-checked",

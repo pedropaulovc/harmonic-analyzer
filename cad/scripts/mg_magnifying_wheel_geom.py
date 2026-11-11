@@ -27,7 +27,7 @@ from mg_wheel_drum_geom import (
     DRUM_BORE,
     DRUM_BORE_BAND,
     DRUM_LEN,
-    DRUM_LEN_BAND,
+    DRUM_LEN_DEVIATIONS,
     DRUM_OD,
     DRUM_OD_DEVIATIONS,
     DRUM_WIRE_R,
@@ -72,7 +72,7 @@ HUB_LEN = 19.6  # back face to spigot front face, both faced; prints .772
 # pen-rod line; at 7.09 (hub about centred) that run hit the rim.
 HUB_BACK_Z = 4.09
 SPIGOT_DIA = DRUM_BORE
-SPIGOT_LEN = 9.0  # the drum's .354 face sits .0003 under it; prints .354
+SPIGOT_LEN = 9.0  # prints .354; the drum's .344 face sits .010 under it
 HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -6.51, boss front face
 HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -15.51, spigot front face
 DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, the drum wire lane
@@ -89,17 +89,17 @@ BORE_DIA = 4.7879  # .1885
 HUB_LEN_PLACES = 3
 HUB_LEN_BAND = (0.1016, -0.1016)  # +/-.004, the mm sheet's +/-0.10 restated
 HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES, HUB_LEN_BAND)  # .768-.776
-# Spigot length plus-only against the drum's minus-only length: the drum,
-# pressed to the boss, never stands proud of the spigot face, so the front
-# washer bears on the spigot (the iron), never on the drum.  Both print .354,
-# so the comparison is between printed limits.
+# Spigot length against the drum's length, both on the title block's .XXX
+# row: the drum, pressed to the boss, never stands proud of the spigot face,
+# so the front washer bears on the spigot (the iron), never on the drum: the
+# drum's .344 stands .010 (both parts' .005) under the spigot's .354.  Both
+# print .XXX, so the comparison is between printed limits.
 SPIGOT_LEN_PLACES = 3
-SPIGOT_LEN_BAND = (0.1016, 0.0)  # +.004/.000
-SPIGOT_LEN_LIMITS = printed_limits(SPIGOT_LEN, SPIGOT_LEN_PLACES, SPIGOT_LEN_BAND)
+SPIGOT_LEN_LIMITS = printed_limits(SPIGOT_LEN, SPIGOT_LEN_PLACES)  # .349-.359
 DRUM_RECESS = (
-    SPIGOT_LEN_LIMITS[0] - (DRUM_LEN + DRUM_LEN_BAND[0]),
-    SPIGOT_LEN_LIMITS[1] - (DRUM_LEN + DRUM_LEN_BAND[1]),
-)  # .000 .. .008: the drum face below the spigot face
+    SPIGOT_LEN_LIMITS[0] - (DRUM_LEN + DRUM_LEN_DEVIATIONS[1]),
+    SPIGOT_LEN_LIMITS[1] - (DRUM_LEN + DRUM_LEN_DEVIATIONS[0]),
+)  # .000 .. .020: the drum face below the spigot face
 if DRUM_RECESS[0] < -1e-9:
     raise AssertionError(f"the drum can stand proud of the spigot: {DRUM_RECESS}")
 # Matched fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the drum is reamed first, and the
@@ -157,7 +157,7 @@ TIE1_X = 9.652  # .38
 TIE1_Y = -5.588  # -.22
 TIE1_R = math.hypot(TIE1_X, TIE1_Y)  # 11.153
 TIE1_CLOCK_DEG = 180.0 - math.degrees(math.atan2(TIE1_Y, TIE1_X)) - 360.0  # -149.9
-TIE1_DEPTH_MAX = HUB_LEN_LIMITS[1] - SPIGOT_LEN_LIMITS[0]  # 10.693
+TIE1_DEPTH_MAX = HUB_LEN_LIMITS[1] - SPIGOT_LEN_LIMITS[0]  # 10.846
 # How far TIE 1's axis may stand off its nominal, anywhere along the hole: a
 # disk over both printed coordinates' square, plus the axis's tilt (the
 # title block's angle and drill wander) over the boss.
@@ -168,7 +168,7 @@ _TIE1_COORD = max(
 )
 TIE1_OFFSET_MAX = math.hypot(_TIE1_COORD, _TIE1_COORD) + TIE1_DEPTH_MAX * math.tan(
     math.radians(angular_band_deg(unit=UNIT) + DRILL_WANDER_DEG)
-)  # 0.602
+)  # 0.605
 # The drum's wire-centre radius across its printed O.D. (.XX).
 DRUM_WIRE_R_RANGE = (
     (DRUM_OD + DRUM_OD_DEVIATIONS[0]) / 2.0 + LEVER_WIRE_DIA / 2.0,
@@ -179,7 +179,7 @@ TIE1_DRUM_OPENING = (
     - TIE1_OFFSET_MAX
     + TIE_HOLE_DIA / 2.0
     - (DRUM_WIRE_R_RANGE[1] - LEVER_WIRE_DIA / 2.0)
-)  # 1.534
+)  # 1.531
 if TIE1_DRUM_OPENING < LEVER_WIRE_DIA:
     raise AssertionError(
         f"the drum covers TIE 1: {TIE1_DRUM_OPENING:.3f} open < {LEVER_WIRE_DIA} wire"

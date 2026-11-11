@@ -45,11 +45,10 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    # One symmetric band, plus the separate native radial MAX limit; the body
-    # and pocket depth hold the title block's .XXX band.
-    assert model_toleranced_dimensions(part) == {
-        ("CupProfile", "BodyChamfer"): "BODY_CHAMFER_TOL",
-    }
+    # No model band beside the separate native radial MAX limit: the
+    # chamfer, the body and the pocket depth hold the title block's .XXX band.
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyChamfer"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["BodyDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["PocketDepth"] == 3
 
@@ -270,7 +269,7 @@ def cup_build(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         helpers[name] = AsyncMock()
         monkeypatch.setattr(part, name, helpers[name])
     for name in (
-        "name_last_feature", "set_dimension_symmetric_tolerance",
+        "name_last_feature",
         "apply_package_model_units",
         "clear_dimensions_for_drawing", "mark_dimensions_for_drawing",
         "apply_drawing_precision", "apply_drawing_properties", "_pocket_floor_max_limit",

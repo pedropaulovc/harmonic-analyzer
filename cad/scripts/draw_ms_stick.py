@@ -5,7 +5,7 @@ its dimensions link. GRADUATIONS tables every graduation's station from the
 zero tick and enlarges a decade with its pitches as references; TICK LENGTHS
 gives groove width and each length a local detail without cross-strip
 extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
-detail H at the 10) from the open-edge Top detail for the square-bottom
+detail H at the 10) from the open-edge Top detail for the V graduations'
 groove depth. Each detail's parent on sheets 2-4 is a reduced copy of a
 sheet 1 view, labelled with that view's name and scale. Section G-G cuts the
 whole .315 x .118 bar across both strokes of the zero numeral, so the true V
@@ -90,12 +90,17 @@ DETAIL_PARENT_CENTER = (0.230, 0.245)
 DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
-DEPTH_PARENT_CENTER = (0.330, 0.210)
 # r1-r3 sheet 4: at 6:1 the 0.40 x 0.50 groove could not be read; 15:1 can.
 DEPTH_CENTER = (0.375, 0.120)
 DEPTH_SCALE = (15.0, 1.0)
 DEPTH_RADIUS_MM = 1.6
 NUMERAL_PARENT_CENTER = (0.130, 0.210)
+# Third-angle bottom view of sheet 4's front copy: straight below it (rule
+# 15; run 20261111T180258983Z-3467590b flagged it beside the front copy), its
+# B letter under the front copy's label and its own label above detail F's
+# NUMERAL HEIGHT dimension line. At 0.192 the letter sat 1.33 mm under that
+# label (layout audit needs 1.78; run 20261111T185346013Z-fd4d7b02).
+DEPTH_PARENT_CENTER = (NUMERAL_PARENT_CENTER[0], 0.1895)
 # r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
 # The detail/dimension group sits as far left as its 10X/11X texts allow, so
 # the NUMERALS V callout fits between its circle and G-G.
@@ -189,7 +194,10 @@ NUMERAL_KEEP = {
 }
 # Text centre high enough that the shoulder under its last line clears the
 # top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
-DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
+# The V groove's depth dimension runs its callout block right from this
+# point (run 20261111T180258983Z-3467590b: 0.380 put it 35 mm past the
+# border), so the point sits one block width inside the right border.
+DEPTH_KEEP = {"TickDepth": (0.330, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
 NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.229, 0.138)}
 

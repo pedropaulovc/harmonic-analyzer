@@ -174,6 +174,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     assert "CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND" in north
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-ear-datum")
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-bracket-held")
+    # The fitter leaves this list for the drive train's cylinder stack through
+    # its north-bracket set and comes back at this check (rule 22 hand-off).
+    assert _step_body("north-bracket-held").startswith(
+        f"AFTER {steps.CYLINDER_STACK_REF} THROUGH {steps.NORTH_BRACKET_SET_REF},"
+    )
     # It follows the bank's last sub-step on the bank sheet; positive control:
     # that sub-step is the bank's, not the ear's.
     bank_last = labels[labels.index(north_label) - 1]
@@ -1036,7 +1041,7 @@ def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
-    assert len(drawing.BOM_COMPONENTS) == 19
+    assert len(drawing.BOM_COMPONENTS) == 18
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
     assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(drawing.BOM_COMPONENTS)
     for stem in drawing.BOM_COMPONENTS:
@@ -1047,16 +1052,12 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         )
         assert drawing.BOM_DESCRIPTIONS[stem]
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
-    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 9 * drawing.CHANNELS
-    # The anchor's jam nut (MHA-CH-14, made) is its own row, one per anchor.
-    nut = drawing.explode.ANCHOR_NUT
-    assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.explode.HOOK]
-    assert drawing.BOM_SKUS[nut] == drawing.MADE_PART_SKU
-    # The anchor and its nut are MHA-HA-00's to set: the channel sheet
-    # leaves the spring's bottom loop free and cites that step.
+    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 8 * drawing.CHANNELS
+    # The anchor is MHA-HA-00's to set: the channel sheet leaves the spring's
+    # bottom loop free and cites that step.
     body = _step_body("spring-bottom-loops-left")
     assert steps.HA_ANCHORS_SET_REF in body
-    assert drawing.item(nut) in body and drawing.item(drawing.explode.HOOK) in body
+    assert drawing.item(drawing.explode.HOOK) in body
 
 
 def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
@@ -1146,7 +1147,7 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     (pulled,) = [
         names for step, names in plan if step.label == "north-most channel out"
     ]
-    assert len(pulled) == 9 and set(channel.values()) <= set(pulled)
+    assert len(pulled) == 8 and set(channel.values()) <= set(pulled)
     assert all(name.endswith("-20") for name in pulled)
     assert drawing.exploded_offset(explode.ARM, "north-most") == (0.0, 0.0, 300.0)
     assert drawing.exploded_offset(explode.ROD, "north-most") == (0.0, -50.0, 300.0)
