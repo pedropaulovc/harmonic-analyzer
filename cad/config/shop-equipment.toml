@@ -91,7 +91,7 @@ name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
 kind = "gauge_bar"
 present = false
 purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
-note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set their yaw before the hanger bolts are tightened; check 6 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 6 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
 pieces = 1
 
 # --- measuring equipment on the mill -------------------------------------
