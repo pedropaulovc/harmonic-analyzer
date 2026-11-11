@@ -106,7 +106,9 @@ def test_the_key_still_drives_t030_at_print_worst() -> None:
     band = printed_band_mm(spec.LENGTH_PLACES, unit=spec.UNIT)
     set_low = shaft.printed_length_deviations("Sec1KeyseatEndSet")[0]
     assert set_low < 0.0
-    north_min = shaft.COLLAR_END_STATION + spec.END_SET_MM + set_low + spec.LENGTH - band
+    north_min = (
+        shaft.COLLAR_END_STATION + spec.END_SET_MM + set_low + spec.LENGTH - band
+    )
     t024_south_max = (
         shaft.FRONT_STUB
         + shaft.gear_faces(16)[0]
@@ -132,7 +134,10 @@ def _shaft_spec_refusal(key_length_mm: float) -> str:
     ('' when it imports)."""
     result = subprocess.run(
         [sys.executable, "-c", _SPEC_WITH_KEY_LENGTH, repr(key_length_mm)],
-        cwd=Path(shaft.__file__).parent, capture_output=True, text=True, check=False,
+        cwd=Path(shaft.__file__).parent,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode == 0:
         return ""
