@@ -506,14 +506,15 @@ records on its spans as `prechips.version`. Then
 runs twice from the same plan: `--profile pro` writes
 `cad/out/travelers/<stem>/traveler.html` and `--profile hobby` writes
 `traveler-hobby.html` with the plan's setup pictures
-(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). Without `uv` or
-network access to PyPI the wrapper fails with exit 1 before writing a sheet.
+(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). uv's own failures
+exit 1, never 2: no `uv` or no PyPI before any sheet, or a render whose
+`uv tool run` failed before prechips ran (uv's `error:`/`×` diagnostic).
 prechips itself is stdlib-only: no FreeCAD, no geometry kernel, no report or
 hash certificate. The plan reads its CAD values from the part's
 `features.toml`, which must exist under `cad/out/features/<stem>/` (from a
 build's `package:features:<stem>` leaf, the task's only dependency, or copied
 from a release asset's `features/<stem>/`), and its machines, tools, settings
-and gauges from `cad/process/shop.toml`. Run `uv run doit prechips:<stem>` for
+and gauges from `cad/process/shop.toml`. Run `uv run --frozen python -m doit prechips:<stem>` for
 an enrolled part, or by hand
 `uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>`.
 Owner rulings (Pedro): the prechips cutover is a
@@ -524,7 +525,7 @@ inputs they will be considered" (2026-11-10). `shop.toml` values are used as
 written, with no measured/placeholder provenance, and they are HA's own
 recorded values (the deleted inventory's, where it had one; tool diameters stay
 nominal), not prechips example values. Only exit 0 from both profiles passes; exit 2 from
-either is a refusal (bad input or a failed enforced check) and leaves neither
+either is a prechips refusal (bad input or a failed enforced check) and leaves neither
 file nor a stamp. The task is not cache-keyed and always runs when asked
 (`uptodate: [False]`), because its generator version floats. A stem without a
 plan fails only its own task. Under prechips 0.9 the base bar and end bracket

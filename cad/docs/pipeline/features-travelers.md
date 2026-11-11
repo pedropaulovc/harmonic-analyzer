@@ -267,7 +267,7 @@ they are re-enabled. The plans, the shop file and the setup pictures stay in HA.
 Run it for an enrolled part with:
 
 ```text
-uv run doit prechips:<stem>
+uv run --frozen python -m doit prechips:<stem>
 ```
 
 or render one sheet by hand, without doit:
@@ -283,8 +283,10 @@ prechips release from PyPI, so they need `uv` and network access to PyPI.
 
 The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
 previous `traveler.html` and `traveler-hobby.html` under
-`cad/out/travelers/<stem>/`, resolves the newest prechips release, prints its
-version once, and then renders both sheets from the same plan with that version:
+`cad/out/travelers/<stem>/`, resolves the newest prechips release, logs its
+version once (`_telemetry.info`, shown on the console at
+`HARMONIC_VERBOSITY=info`), and then renders both sheets from the same plan with
+that version:
 
 ```text
 uv tool run --from prechips@latest python -c "<print prechips version>"
@@ -295,12 +297,15 @@ uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan
 `@latest` makes uv revalidate its cached PyPI index and ignore a
 `uv tool install`-ed copy; a bare `--from prechips` may reuse either, so the
 hand command uses `@latest` too. Pinning the two renders to the resolved
-version keeps both sheets on the release that was printed. If `uv` is missing
+version keeps both sheets on the release that was logged. If `uv` is missing
 or the latest release cannot be resolved, the wrapper exits 1 before writing a
 sheet.
 
-If either render exits nonzero, the wrapper removes both files and returns that
-exit code; the hobby run starts only after the pro run passes. The task is
+If either render exits nonzero, the wrapper removes both files. A render whose
+stderr carries uv's own diagnostic (`error:` for fetch, parse or install
+failures, exit 2; `×` for an unresolvable pin, exit 1) is a uv failure and the
+wrapper exits 1; otherwise it returns prechips' exit code, so exit 2 is always a
+prechips refusal. The hobby run starts only after the pro run passes. The task is
 SolidWorks-free, submitter-only (including under the farm executor) and not
 remote-cache-keyed. Because its generator version floats, it always runs when
 requested (`uptodate: [False]`). Its only task dependency is its own
@@ -316,7 +321,7 @@ still loads and only that task fails, naming the missing plan.
 | exit (either profile) | task | meaning |
 |---|---|---|
 | 0 from both | pass | `traveler.html` and `traveler-hobby.html` written |
-| 1 (wrapper) | fail, no stamp | `uv` missing or the latest prechips could not be resolved; nothing rendered |
+| 1 (wrapper) | fail, no stamp | uv itself failed: `uv` missing, the latest prechips could not be resolved, or a render's `uv tool run` failed before prechips ran (stderr carries uv's `error:` or `×` diagnostic, not prechips' `prechips:` prefix); not a refusal, so neither file kept and the plan is not at fault |
 | 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `machine_capacity`); neither file kept |
 | other nonzero | fail, no stamp | consumer failure; neither file kept |
 

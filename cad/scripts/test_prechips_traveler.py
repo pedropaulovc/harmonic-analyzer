@@ -29,7 +29,8 @@ def process(tmp_path, monkeypatch):
 
 def _uv_stub(monkeypatch, *, probe=None, traveler=None):
     """Route stubbed ``uv tool run`` calls: the ``@latest`` version probe, then
-    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused)."""
+    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused).
+    ``traveler(profile)`` returns an exit code or ``(code, stderr)``."""
     calls = []
 
     def run(cmd, **kwargs):
@@ -37,10 +38,11 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None):
         if f"{wrapper.PACKAGE}@latest" in cmd:
             return probe(cmd) if probe else subprocess.CompletedProcess(cmd, 0, f"{_VERSION}\n", "")
         profile = cmd[cmd.index("--profile") + 1]
-        code = traveler(profile) if traveler else 0
+        outcome = traveler(profile) if traveler else 0
+        code, stderr = outcome if isinstance(outcome, tuple) else (outcome, "")
         if code == 0:
             Path(cmd[cmd.index("--out") + 1]).write_text(profile, encoding="utf-8")
-        return subprocess.CompletedProcess(cmd, code)
+        return subprocess.CompletedProcess(cmd, code, None, stderr)
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
     return calls
@@ -80,7 +82,9 @@ def test_refusal_propagates_and_removes_previous_travelers(process, monkeypatch)
     paths[0].parent.mkdir(parents=True)
     for path in paths:
         path.write_text("previous success", encoding="utf-8")
-    calls = _uv_stub(monkeypatch, traveler=lambda profile: 2)
+    calls = _uv_stub(
+        monkeypatch, traveler=lambda profile: (2, "prechips: stock_fit: blank too short\n"),
+    )
     assert wrapper.main(["refused_part", "--out", str(out)]) == 2
     assert not any(path.exists() for path in paths)
     assert len(calls) == 2  # the probe, then the refused pro run only
@@ -92,6 +96,24 @@ def test_hobby_refusal_removes_the_pro_traveler(process, monkeypatch):
     _uv_stub(monkeypatch, traveler=lambda profile: 0 if profile == "pro" else 2)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
     assert not any(path.exists() for path in plans.traveler_paths("smoke_part", out))
+
+
+# uv's own diagnostics, as uv 0.9.8 printed them when provoked on this host:
+# an unreachable index exits 2 with ``error:``; an unresolvable pin exits 1 with ``×``.
+@pytest.mark.parametrize(("code", "stderr"), [
+    (2, "error: Failed to fetch: `https://pypi.org/simple/prechips/`\n"
+        "  Caused by: Request failed after 3 retries\n"),
+    (1, "  × No solution found when resolving tool dependencies:\n"
+        "  ╰─▶ Because there is no version of prechips==9.9.9 and you require\n"),
+])
+def test_uv_failure_during_render_is_not_a_refusal(process, monkeypatch, code, stderr):
+    out, author = process
+    author("smoke_part")
+    _uv_stub(monkeypatch, traveler=lambda profile: 0 if profile == "pro" else (code, stderr))
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
+    assert not any(path.exists() for path in plans.traveler_paths("smoke_part", out))
+    assert wrapper.uv_error(stderr) is not None
+    assert wrapper.uv_error("usage: prechips ...\nprechips: error: bad plan\n") is None
 
 
 def test_missing_plan_fails_without_running_uv(process, monkeypatch):

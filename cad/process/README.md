@@ -123,8 +123,8 @@ plan's 11/32 drill (8.73125 mm) is below the drawing's hole band
 drawing change), not a check to opt out of; enroll the part once its plan passes.
 
 ```text
-uv run doit prechips:<stem>
-uv run python cad/scripts/prechips_traveler.py <stem>
+uv run --frozen python -m doit prechips:<stem>
+uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
@@ -138,12 +138,14 @@ any `uv tool install`-ed copy), so they need `uv` and network access. The doit
 task always runs when requested.
 
 The wrapper removes any previous `traveler.html` and `traveler-hobby.html`
-under `cad/out/travelers/<stem>/`, resolves and prints the latest prechips
+under `cad/out/travelers/<stem>/`, resolves and logs the latest prechips
 version, then runs
 `uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml`
 with `--profile pro` and then `--profile hobby`. Exit 0 from both is the only
-pass. Exit 1 means `uv` or PyPI was unavailable and nothing was rendered. A
-nonzero prechips exit from either is returned and removes both files; exit 2 is
+pass. Exit 1 means uv itself failed: no `uv`, no PyPI, or a render whose
+`uv tool run` failed before prechips ran (uv's `error:` or `×` diagnostic on
+stderr); it is never a finding about the plan. A nonzero prechips exit from
+either is returned and removes both files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`,
 `gauge_capability`, `lathe_holding`, `machine_capacity`, or `hobby`'s missing

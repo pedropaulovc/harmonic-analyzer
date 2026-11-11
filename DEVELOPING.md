@@ -308,7 +308,7 @@ completed
 releases carry no travelers while prechips stabilises (owner ruling 2026-11-11,
 [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)).
 prechips is not in `uv.lock`; the wrapper runs the latest PyPI release with
-`uv tool run` outside the project environment, prints its version once and
+`uv tool run` outside the project environment, logs its version once and
 records it on its spans, so it needs `uv` and network access to PyPI. The
 tasks run on the submitter, including when SolidWorks leaves run on the farm,
 and always run when requested. To render a part's two travelers
@@ -317,15 +317,16 @@ and always run when requested. To render a part's two travelers
 under `cad/out/features/<stem>/` (from a build or a release asset):
 
 ```text
-uv run doit prechips:<stem>
-uv run python cad/scripts/prechips_traveler.py <stem>
+uv run --frozen python -m doit prechips:<stem>
+uv run --frozen python cad/scripts/prechips_traveler.py <stem>
 uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
 The doit task also runs its `package:features:<stem>` leaf first. Only exit 0
-from both profiles is success. Exit 2 from either is a refusal (bad input or a
-failed enforced check) and leaves neither file; exit 1 means `uv` or PyPI was
-unavailable. Plan authoring and the shop files are described in
+from both profiles is success. Exit 2 from either is a prechips refusal (bad
+input or a failed enforced check) and leaves neither file; exit 1 means uv
+itself failed (no `uv`, no PyPI, or a `uv tool run` error before prechips ran).
+Plan authoring and the shop files are described in
 [`cad/process/README.md`](cad/process/README.md).
 
 ## Local pytest timing

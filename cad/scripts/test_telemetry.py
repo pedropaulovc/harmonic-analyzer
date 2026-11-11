@@ -267,7 +267,7 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     def run(cmd, **kwargs):
         calls.append(cmd)
         html.write_text("partial", encoding="utf-8")
-        return types.SimpleNamespace(returncode=code)
+        return types.SimpleNamespace(returncode=code, stderr="")
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
     # Keep the real wrapper and telemetry context managers: existing wrapper
