@@ -390,7 +390,9 @@ def test_rear_mount_bolt_is_first_tightened_after_its_rock_swing() -> None:
     ]
     step_five = [line for line in tightens if drawing._step_group(line) == "5"]
     assert len(step_five) == 1
-    assert "FRONT MOUNT" in step_five[0] and "BOTH" not in step_five[0]
+    action = step_five[0].partition("(")[0]
+    assert "FRONT MOUNT" in action
+    assert "REAR" not in action and "BOTH" not in action and "EACH" not in action
     rear = [line for line in tightens if "TIGHTEN THE REAR" in line]
     assert len(rear) == 1 and drawing._step_group(rear[0]) == "6"
     steps = notes.ASSEMBLY_STEPS

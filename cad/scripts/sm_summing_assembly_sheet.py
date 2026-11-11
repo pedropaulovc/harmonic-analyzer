@@ -169,8 +169,9 @@ ASSEMBLED_NOTES = (
 # off to take its stub and is
 # re-hung and swung until the rock gauge passes (step 6;
 # build_sm_summing_assembly's rock and rear-yaw budgets): 6G, not the bar,
-# sets the rear mount, so its bolt stays finger-tight through step 5 (#2400:
-# tightening it there was undone at step 6). Owner ruling
+# sets the rear mount, so its bolt stays finger-tight through step 5
+# (Delegated ruling 2026-11-11 (SmGauge2400), no precedent; owner review
+# #2144; #2400: tightening it there was undone at step 6). Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
 # shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
 # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end

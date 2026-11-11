@@ -713,8 +713,10 @@ BASIC 7.620 either side of D under 2X ⌖Ø0.10 | A | D, SEP REQT) are
 deleted, so the block fits one way round only, and the MHA-SM-02 slot
 (datum C) is gone too. The block may turn about its one dowel; a Ø.4720
 gauge bar through both mounts' bores sets the front mount's turn at
-MHA-SM-00 step 5, and the rock gauge sets the rear mount's at step 6G (its
-bolt stays finger-tight until then, #2400).
+MHA-SM-00 step 5, and the rock gauge sets the rear mount's at step 6G: its
+bolt stays finger-tight through step 5, comes out at step 6 to re-hang the
+mount on the lever's stub, goes back finger-tight at 6E and is tightened
+only at 6H (#2400).
 The F-F and underside-locator annotations belong to `draw_fr_top_frame`
 and need native inspection (the knockout callout's leader now lands on the
 front ream); the historical slot-text placements and glyph clearances do
