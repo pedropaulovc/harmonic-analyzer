@@ -828,7 +828,7 @@ def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
         for line in text.splitlines()
         if "SEE NOTE" in line
     ]
-    assert len(links) == 5
+    assert len(links) == 6
     assert all(line.endswith(f", SHEET {arm_notes.NOTES_SHEET}") for line in links)
     assert arm_notes.NOTES_SHEET == 2 == len(drawing.SHEET_NAMES)
 

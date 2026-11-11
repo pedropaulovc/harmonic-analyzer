@@ -154,7 +154,10 @@ SIDE_KEEP = {
     "FrontLand": (TIP_X - 0.008, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
     "LandLength": (LAND_MID_X, SIDE_CENTER[1] - 0.024),
-    "LandDia": (LAND_MID_X, SHANK_TOP_Y + 0.025),
+    # Near the land's end, so the R MAX leader rising to the seat corner
+    # passes under its lower arrow (at the land's middle it crossed the
+    # arrow: machinist review, run 20261111T224008804Z).
+    "LandDia": (LAND_END_X + 0.006, SHANK_TOP_Y + 0.025),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
     # At the shank's middle: its dimension line, and the arrow below the
@@ -181,9 +184,10 @@ SIDE_KEEP = {
     # run 20261111T193324863Z printed it crossed by the seat's (text-on-line),
     # and at LAND_END_X - 0.014 its shelf, 2.7 mm past the text, crossed the
     # land end's (shoulder-crosses-line, run 20261111T201934013Z).  Its
-    # leader rises to the lower corner over the land, crossing only the land
-    # end's extension line, and stays above the land's .29 row.
-    "SeatRadius": (LAND_END_X - 0.018, SIDE_CENTER[1] - 0.010),
+    # leader rises steeply to the lower corner over the land, crossing only
+    # the land end's extension line, under the land Ø's lower arrow and above
+    # the land's .29 row.
+    "SeatRadius": (LAND_END_X - 0.018, SIDE_CENTER[1] - 0.016),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
