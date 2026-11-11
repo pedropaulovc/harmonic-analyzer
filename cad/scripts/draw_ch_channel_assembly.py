@@ -134,7 +134,6 @@ from rocker_bank_layout import (
     COUNT,
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_FLAT_STATIONS,
-    ROCKER_SPRING_SET,
     ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
@@ -863,7 +862,7 @@ SPRING_KEEP = {
         asm.PIVOT_CHAIN_Z[0] - 6.5, _PIVOT_Y + 9.5
     )
 }
-# Detail A names the four bodies the gauge is read against (b9ae machinist
+# Detail A names the four bodies the spring set is read against (b9ae machinist
 # review: the caption listed them, nothing in the view said which outline was
 # which): (text, text upper-left as an offset from the detail's centre, pointer
 # tip in the detail's plane as machine (z, y)). The hub to the left of the
@@ -1048,14 +1047,23 @@ def flow_steps(
 
 # The pivot shaft's tip setting prints .XXX (.050 TO .070).
 TIP_SET_PLACES = 3
-# The feeler leaf the right bracket is set on: the spring set's nominal
-# snapped to the .001 grid a feeler set is sold in, proved inside the
-# detail A band (the band, not the leaf, is the acceptance).
+# The lever bank's end-play leaf prints .XXX, the .001 grid a feeler set is
+# sold in.
 FEELER_LEAF_PLACES = 3
-FEELER_LEAF = round(ROCKER_SPRING_SET / LENGTH_UNITS[asm.UNIT], FEELER_LEAF_PLACES)
-if abs(FEELER_LEAF * LENGTH_UNITS[asm.UNIT] - ROCKER_SPRING_SET) > ROCKER_SPRING_SET_BAND:
-    raise AssertionError("the feeler leaf is outside the detail A spring-set band")
-FEELER_LEAF_TEXT = render_number(FEELER_LEAF, asm.UNIT, FEELER_LEAF_PLACES)
+# The right bracket is set by DRO off a test-indicator zero on its own foot
+# end, taken with its ear on the right washer before the wave spring goes on
+# (#2337: the spring covers all but .004 of the washer face, so no feeler leaf
+# can bear on it beside the spring). The washer, the hub stack, the ear and
+# the left ear all cancel: the gap's set error is the two indicator nulls on
+# that one face, half a division each (the shop indicator's placeholder
+# resolution, as MHA-PD-00 step 10 charges it), and the DRO over the move,
+# which must stay inside the detail A band (the band, at the spring-back
+# check, is the acceptance).
+INDICATOR_DIVISION_MM = 0.0127  # .0005: the shop's dial test indicator
+DRO_ACCURACY_MM = 0.00508  # .0002: the PM-30MV DRO, vendor-stated (shop inventory)
+SPRING_SET_ERROR_MM = 2.0 * INDICATOR_DIVISION_MM / 2.0 + DRO_ACCURACY_MM
+if SPRING_SET_ERROR_MM > ROCKER_SPRING_SET_BAND:
+    raise AssertionError("the DRO indicator set misses the detail A spring-set band")
 
 
 def _fitup_text() -> dict[str, str]:
@@ -1186,6 +1194,23 @@ def _fitup_text() -> dict[str, str]:
         "south-washer-fitted": (
             f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT-HAND HUB."
         ),
+        # #2337: the right bracket is zeroed on its foot end with the ear on
+        # the washer before the spring covers it, on the mill the left ear was
+        # set on; it comes off for the spring, goes back on under a light clamp
+        # and is tapped to that zero at the spring set's DRO offset.
+        "south-bracket-on-washer": (
+            f"WITH THE BASE ON THE MILL AS AT {steps.NORTH_BRACKET_SET_REF}, "
+            f"STAND THE RIGHT {bracket} ON {support} WITH {shaft} IN ITS EAR AND "
+            f"THE EAR PUSHING {washer} AND THE BANK LEFT."
+        ),
+        "south-bracket-zeroed": (
+            "WITH A TEST INDICATOR IN THE SPINDLE, READ ZERO ON THE RIGHT "
+            f"{bracket} FOOT END AND ZERO THE DRO ALONG {shaft} THERE."
+        ),
+        "south-bracket-slid-off": (
+            f"MOVE THE INDICATOR CLEAR AND SLIDE THE RIGHT {bracket} OFF {shaft}, "
+            "LEAVING THE BASE UNMOVED ON THE TABLE."
+        ),
         # Machinist review (#2108): the BOM carries one spring, so its run
         # along the shaft is a check, with its own remedy.
         "bank-spring-checked": (
@@ -1196,22 +1221,30 @@ def _fitup_text() -> dict[str, str]:
             f"{n('bank-spring-checked')}."
         ),
         "bank-spring-fitted": f"FIT {spring} ON {shaft} AGAINST THAT {washer}.",
+        # The light clamp holds the bracket against the spring while it is
+        # tapped to the indicator (Codjiflo r1 on #2489: the spring alone
+        # leaves nothing holding it at the target).
+        "south-bracket-refitted": (
+            f"STAND THE RIGHT {bracket} BACK ON {support} WITH {shaft} IN ITS EAR "
+            "AND CLAMP IT LIGHTLY."
+        ),
         # The spring-back check runs while the bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
         # (machinist review, PR #1605).
         "south-bracket-spring-set": (
-            f"WITH THE BANK PUSHED LEFT, STAND THE RIGHT {bracket} ON {support} "
-            f"WITH {shaft} IN ITS EAR AND A {FEELER_LEAF_TEXT} FEELER GAUGE LEAF "
-            f"BETWEEN THE EAR AND {washer}, BESIDE {spring} ({detail})."
+            f"WITH THE DRO AT THE SPRING SET OF {detail}, RIGHT OF THE STEP "
+            f"{n('south-bracket-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
+            "INDICATOR READS ZERO ON IT."
         ),
-        "south-bracket-clamped": f"CLAMP THE RIGHT {bracket} TO {support}.",
-        "feeler-leaf-pulled": "PULL OUT THE FEELER GAUGE LEAF.",
+        "south-bracket-clamped": (
+            f"TIGHTEN THE CLAMP ON THE RIGHT {bracket}, KEEPING THE INDICATOR AT ZERO."
+        ),
         "spring-back-checked": (
             "CHECK THE BANK, PUSHED RIGHT AND RELEASED, SPRINGS BACK AGAINST "
             f"THE LEFT {washer}."
         ),
         "south-bracket-reset": (
-            f"IF IT DOES NOT, UNCLAMP THE RIGHT {bracket} AND RETURN TO STEP "
+            "IF IT DOES NOT, EASE THE CLAMP AND RETURN TO STEP "
             f"{n('south-bracket-spring-set')}."
         ),
         "south-foot-transferred": (
