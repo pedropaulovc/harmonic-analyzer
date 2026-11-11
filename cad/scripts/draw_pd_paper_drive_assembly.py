@@ -1250,17 +1250,33 @@ KNOB_SHAFT_BALLOON_POINT_MM = (
     round(_KNOB_TIP_R * math.sin(KNOB_SHAFT_BALLOON_ANGLE), 4),
     0.0,
 )
-# Sheet 3's balloon 28 walked to the sleeve's rear-face tooth tip (part
+# Sheet 3's balloon 28 walked to the sleeve's rear-face tip arc (part
 # (4.892, 3.024, 0)), drawn hard against the exploded MHA-PD-24 bushing, so
 # its arrow read as the bushing's and balloon 26 seemed to share a part
-# (machinist review of #2551's run 20261111T200045620Z, r1/r3). The same tip
-# corner FEED_SLEEVE_BALLOON_Z forward, on the 12T's tip land, draws about
-# 3 mm down-left of it at the sheet's 2:3, on the teeth seen between the
-# bushing and the disc.
+# (machinist review of #2551's run 20261111T200045620Z, r1/r3). It lands
+# instead on an edge along the teeth: the corner where the 30-degree tooth's
+# tip land meets its flank toward 45 degrees (teeth centre on local +X every
+# 30 degrees; the spaces centre on TOOTH_SPACE_INSPECTION_PHASE_RAD), 6 mm
+# forward of the rear face. The sleeve is placed turned about Y, so the
+# sheet's *Isometric looks along local (1, 1, 1) and that corner faces the
+# eye; at 2:3 it draws about 3 mm down-left of the old point. (A point on
+# the tip land off a corner is on no edge: run 20261111T221813123Z.)
 FEED_SLEEVE_BALLOON_Z = 6.0
 if not 0.0 < FEED_SLEEVE_BALLOON_Z < feed_pinion.FACE_WIDTH:
     raise AssertionError("balloon 28 lands on the feed sleeve's teeth")
-FEED_SLEEVE_BALLOON_POINT_MM = (4.892, 3.024, FEED_SLEEVE_BALLOON_Z)
+if feed_pinion.TOOTH_SPACE_INSPECTION_PHASE_RAD != math.pi / feed_pinion.TEETH:
+    raise AssertionError("balloon 28's corner needs the teeth centred on local +X")
+_FEED_CORNER_ANGLE = (
+    math.radians(30.0)
+    + feed_pinion.STOCK_PROFILE.angular_pitch_rad / 2.0
+    - feed_pinion.STOCK_PROFILE.tip_half_angle_rad
+)
+_FEED_TIP_R = feed_pinion.STOCK_PROFILE.blank_radius_mm
+FEED_SLEEVE_BALLOON_POINT_MM = (
+    round(_FEED_TIP_R * math.cos(_FEED_CORNER_ANGLE), 4),
+    round(_FEED_TIP_R * math.sin(_FEED_CORNER_ANGLE), 4),
+    FEED_SLEEVE_BALLOON_Z,
+)
 _BALLOON_POINTS_MM = {
     "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
     "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
