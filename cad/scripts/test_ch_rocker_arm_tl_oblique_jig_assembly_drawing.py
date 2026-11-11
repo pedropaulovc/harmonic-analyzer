@@ -452,6 +452,21 @@ def test_every_instruction_prints_once_in_order_across_sheets_7_to_10() -> None:
                 assert not line.startswith(" ")
 
 
+def test_station_s_is_defined_in_one_line_before_the_steps_use_it() -> None:
+    key = drawing._wrapped((spec.STATION_KEY,), width=drawing.STEPS_LINE_WIDTH)
+    assert spec.STATION_KEY.startswith("S: ") and "\n" not in key
+    assert spec.STATION_KEY in drawing.STEPS_SHEETS[0].left
+    assert drawing.INSTRUCTION_LINES.index(spec.STATION_KEY) < drawing.INSTRUCTION_LINES.index(
+        spec.ASSEMBLY_STEPS[0]
+    )
+    # The pass table names the axis the key names, on one line.
+    title = drawing._wrapped((spec.PASS_TABLE_TITLE,), width=drawing.STEPS_LINE_WIDTH)
+    assert "SHOULDER-SCREW AXIS" in spec.STATION_KEY and "SHOULDER-SCREW AXIS" in title
+    assert "\n" not in title and "PIN" not in title
+    # S 0 is the spindle origin on both rails.
+    assert spec.trammel.rail_point(1, 0.0) == spec.trammel.rail_point(2, 0.0) == (0.0, 0.0)
+
+
 def _setting_table_boxes() -> list[tuple[float, float, float, float]]:
     """Each setting table's title and native table at the BOM row height,
     stacked down the setting sheet's right column (sheet metres)."""
@@ -475,8 +490,8 @@ def test_setting_table_box_violations_reports_each_overrun() -> None:
 
 
 def test_setting_tables_stand_over_the_setting_sheets_reference_view() -> None:
-    """The rail setting and pass tables hold sheet 10's right column, the
-    reference view's room under them and no steps beside them."""
+    """The rail setting, pass and far limit tables hold sheet 10's right
+    column, the reference view's room under them and no steps beside them."""
     layout = drawing.STEPS_BY_SHEET[drawing.SETTING_SHEET]
     assert layout.tables and not layout.right
     assert drawing.SHEET_NAMES.index(drawing.SETTING_SHEET) + 1 == spec.SETTING_SHEET_NUMBER
@@ -485,7 +500,8 @@ def test_setting_tables_stand_over_the_setting_sheets_reference_view() -> None:
     assert boxes[-1][1] == pytest.approx(drawing.SETTING_TABLES_BOTTOM)
     assert all(box[1] >= room[3] + drawing.REGION_GAP - 1e-9 for box in boxes)
     assert all(_inside_sheet(box) for box in boxes)
-    assert not _overlap(*boxes)
+    assert len(boxes) == 3
+    assert not any(_overlap(a, b) for i, a in enumerate(boxes) for b in boxes[i + 1:])
     assert room[3] - room[1] >= drawing.NOTES_REFERENCE_MIN_HEIGHT
 
 
