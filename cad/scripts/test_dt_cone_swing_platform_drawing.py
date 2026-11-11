@@ -142,10 +142,14 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert part.PLATE_LEN == pytest.approx(
         geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
     )
-    # The 1.65 post body (#290, was the harvested 42.011) keeps the 9.11 plate
-    # (PLATE_LEN rounds up to the .01 in grid), so the platform outline and
-    # the harmonic base's swing-stop seat that follows it stay put.
-    assert (geometry.PLATE_LEN, geometry.PLATE_SOUTH_Z) == pytest.approx((231.394, -224.282))
+    # PLATE_LEN rounds up to the .01 in grid past the 1.65 post body's south
+    # rim plus the 1/8 in margin: 9.54 in at the .300 in station pitch (#1038;
+    # 9.11 at the former 7.0565).
+    grid = 0.254
+    south_margin = geometry.POST_LOCAL_Z - spec.POST_BLOCK_DIA / 2.0 - geometry.PLATE_SOUTH_Z
+    assert geometry.POST_SOUTH_MARGIN <= south_margin + 1e-9 < geometry.POST_SOUTH_MARGIN + grid
+    assert geometry.PLATE_LEN / grid == pytest.approx(round(geometry.PLATE_LEN / grid))
+    assert geometry.PLATE_LEN / 25.4 == pytest.approx(9.54)
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
     assert checks.POST_FOOT_CONTAINMENT >= 0.25
     assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.668)
@@ -206,9 +210,9 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
-        for label, _x, _z, r in part.PLATE_CORNERS
+        for label, _x, _z, r in part.ROUNDED_CORNERS
     }
-    assert overlaps["NE"] == 0.0 and overlaps["SW"] == 0.0 and overlaps["SE"] == 0.0
+    assert overlaps["NE"] == 0.0 and overlaps["SW"] == 0.0
     assert 0.0 < overlaps["NW"] < part._corner_fillet_area("NW", 8.0)
 
 
@@ -221,8 +225,8 @@ def test_corner_arc_count_follows_the_relief_overlap() -> None:
     """
     assert {
         name: drawing.expected_corner_arcs(name)
-        for name in ("CornerNE", "CornerNW", "CornerSW", "CornerSE")
-    } == {"CornerNE": 1, "CornerNW": 2, "CornerSW": 1, "CornerSE": 1}
+        for name in ("CornerNE", "CornerNW", "CornerSW")
+    } == {"CornerNE": 1, "CornerNW": 2, "CornerSW": 1}
     split = [(0.0065, 0.007, 0.008), (0.0065, 0.007, 0.008)]
     drawing.check_corner_arc_plan("CornerNWR", split, 2)
     with pytest.raises(RuntimeError, match="found 3"):
@@ -242,7 +246,10 @@ def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
     that meet at the corner, so moving the plate on the sheet cannot stale it.
     """
     corners = part.PLATE_CORNERS
+    assert [corner[0] for corner in part.ROUNDED_CORNERS] == ["NE", "NW", "SW"]
     for index, (label, x, z, radius) in enumerate(corners):
+        if radius == 0.0:
+            continue
         cx, cz = drawing.corner_fillet_centre_mm(label)
         for _n, nx, nz, _r in (corners[index - 1], corners[(index + 1) % len(corners)]):
             cross = (nx - x) * (cz - z) - (nz - z) * (cx - x)
@@ -291,50 +298,92 @@ def test_corner_attachment_owns_only_the_arc_at_the_model_fillet_centre(monkeypa
         )
 
 
-def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
-    """Run 20261010T072401692Z: CornerSER's fixed shelf put its arrow at
-    183.3 deg about the R12 centre, past the arc's 178 deg end, on the east
-    edge.  The text now derives from the arc's middle; the old station is
-    the positive control."""
+def test_south_east_chamfer_is_two_legs_from_the_sharp_corner() -> None:
+    """#1038: the south-east corner is cut 1.04 x .34 in, stated by its run
+    along the south edge and its rise square to it, both from the sharp
+    corner; the cut's ends lie on the plate's own south and east edges."""
+    corners = {label: (x, z) for label, x, z, _r in geometry.PLATE_CORNERS}
+    se, ne, sw = corners["SE"], corners["NE"], corners["SW"]
+    south, east = geometry.SE_CHAMFER_SOUTH_XZ, geometry.SE_CHAMFER_EAST_XZ
+    assert geometry.SE_CHAMFER_RUN / 25.4 == pytest.approx(1.04)
+    assert geometry.SE_CHAMFER_RISE / 25.4 == pytest.approx(0.34)
+    assert south == pytest.approx((se[0] + geometry.SE_CHAMFER_RUN, se[1]))
+    assert se[0] < south[0] < sw[0]
+    assert east[1] - se[1] == pytest.approx(geometry.SE_CHAMFER_RISE)
+    # On the east taper: collinear with the sharp NE and SE corners.
+    cross = (ne[0] - se[0]) * (east[1] - se[1]) - (ne[1] - se[1]) * (east[0] - se[0])
+    assert abs(cross) / math.dist(ne, se) < 1e-9
+    # The chamfered corner is the one corner that is not rounded.
+    assert {label: radius > 0.0 for label, _x, _z, radius in geometry.PLATE_CORNERS} == {
+        "NE": True, "NW": True, "SW": True, "SE": False,
+    }
+    # The outline the swing sweep reads is the sharp plan with that corner
+    # cut: convex and clockwise in (x, z), like PLATE_CORNERS.
+    outline = [(x, z) for _label, x, z in geometry.PLATE_OUTLINE]
+    assert outline[:3] == [corners[label] for label in ("NE", "NW", "SW")]
+    assert outline[3:] == [south, east]
+    for index, a in enumerate(outline):
+        b, c = outline[(index + 1) % 5], outline[(index + 2) % 5]
+        assert (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < 0.0
+    # The build's cut is the triangle on those three points, and both printed
+    # legs are marked model dimensions at the outline's two places.
+    assert drawing_spec.DRAWING_DIMENSIONS["CornerSEProfile"] == {"CornerSERun", "CornerSERise"}
+    assert drawing_spec.DRAWING_PRECISION["CornerSEProfile"] == {
+        "CornerSERun": 2, "CornerSERise": 2,
+    }
+    assert "CornerSE" not in drawing_spec.DRAWING_DIMENSIONS
+
+
+def test_south_east_chamfer_leaves_the_post_foot_on_the_plate() -> None:
+    """The cut runs past the post's casting foot: the foot keeps the same
+    containment floor against it as against the three straight edges, and
+    the stop fence's certified swing does not move."""
+    south, east = geometry.SE_CHAMFER_SOUTH_XZ, geometry.SE_CHAMFER_EAST_XZ
+    post = (0.0, geometry.POST_LOCAL_Z)
+    normal = abs(
+        (east[0] - south[0]) * (post[1] - south[1]) - (east[1] - south[1]) * (post[0] - south[0])
+    ) / math.dist(south, east)
+    foot_air = normal - spec.POST_BLOCK_DIA / 2.0
+    assert foot_air == pytest.approx(1.334, abs=0.002)
+    assert 0.25 <= checks.POST_FOOT_CONTAINMENT <= foot_air + 1e-9
+    # Both post taps stay inside the foot, so the cut cannot reach them.
+    for tap in (checks.POST_MOUNT_WEST_XZ, checks.POST_MOUNT_EAST_XZ):
+        assert math.dist(tap, post) + spec.POST_MOUNT_THREAD_DIA / 2.0 < spec.POST_BLOCK_DIA / 2.0
+    enclosure = checks.manufactured_p1_stop_enclosure()
+    margins = enclosure["unbroken_fence_margins_mm"]
+    assert margins["corner SE"] > 50.0
+    assert min(margins, key=margins.get) == "edge 3"
+
+
+def test_chamfer_legs_stand_over_the_corner_clear_of_the_corner_station() -> None:
+    """Sheet 1's south-east corner (top left): the run's row stands between
+    the south edge and the corner's own station from the pivot axis, and the
+    rise stands left of the east edge under the cut's lower witness."""
     px, py = drawing.PROFILE_PIVOT_XY
-    corners = {c[0]: c for c in part.PLATE_CORNERS}
-    index = [c[0] for c in part.PLATE_CORNERS].index("SE")
-    _label, vx, vz, radius = corners["SE"]
-    cx, cz = drawing.corner_fillet_centre_mm("SE")
-    centre = (px + cx * 0.0005, py - cz * 0.0005)
-
-    def sheet_angle(x, z):
-        return math.degrees(math.atan2(-(z - cz), x - cx)) % 360.0
-
-    # The arc's ends are the tangent points on the two edges into the vertex.
-    ends = []
-    for _n, nx, nz, _r in (
-        part.PLATE_CORNERS[index - 1], part.PLATE_CORNERS[(index + 1) % 4]
+    per_mm = 0.0005
+    south_y = py - geometry.PLATE_SOUTH_Z * per_mm
+    corner_x = px - geometry.EAST_HALF_S * per_mm
+    run, station, rise = (
+        drawing.PROFILE_KEEP[name] for name in ("CornerSERun", "SouthEastX", "CornerSERise")
+    )
+    half_text = 0.00195
+    assert run[1] - half_text > south_y + 0.002
+    assert station[1] - run[1] >= 0.0055
+    assert run[0] == station[0]
+    assert run[0] + 0.006 < corner_x - 0.002
+    cut_low_y = py - geometry.SE_CHAMFER_EAST_XZ[1] * per_mm
+    assert rise[1] + half_text < cut_low_y - 0.0015
+    assert drawing.PROFILE_KEEP["PlateLenDim"][0] + 0.010 < rise[0] < corner_x - 0.006
+    # The pivot end of both plans stays where its annotations were proven;
+    # the view centres follow the outline.
+    mid_x = (geometry.WEST_HALF_S + geometry.SE_CHAMFER_EAST_XZ[0]) / 2.0
+    mid_z = (geometry.NORTH_OVERHANG + geometry.PLATE_SOUTH_Z) / 2.0
+    for pivot, centre in (
+        (drawing.PROFILE_PIVOT_XY, drawing.PROFILE_CENTER),
+        (drawing.FEATURE_PIVOT_XY, drawing.FEATURE_CENTER),
     ):
-        length = math.hypot(nx - vx, nz - vz)
-        ux, uz = (nx - vx) / length, (nz - vz) / length
-        t = (cx - vx) * ux + (cz - vz) * uz
-        ends.append(sheet_angle(vx + t * ux, vz + t * uz))
-    low, high = sorted(ends)
-    assert high - low < 180.0
-
-    def arrow_angle(text_xy):
-        knee = (
-            text_xy[0] + drawing.RADIUS_KNEE_FROM_TEXT[0],
-            text_xy[1] + drawing.RADIUS_KNEE_FROM_TEXT[1],
-        )
-        return math.degrees(math.atan2(knee[1] - centre[1], knee[0] - centre[0])) % 360.0
-
-    text = drawing.PROFILE_KEEP["CornerSER"]
-    assert arrow_angle(text) == pytest.approx((low + high) / 2.0, abs=1e-6)
-    assert not low <= arrow_angle(drawing._planned(0.040, 0.2435)) <= high
-    # R12.0 is 11.7 x 3.9 mm round its position (run 20261009T172850508Z):
-    # above the 223.4 south witness, below the 24.0 dimension line (2.6 mm
-    # under its text), and left of the 24.0 east extension line.
-    south_witness_y = py - min(c[2] for c in part.PLATE_CORNERS) * 0.0005
-    assert text[1] - 0.00195 > south_witness_y + 0.0015
-    assert text[1] + 0.00195 < drawing.PROFILE_KEEP["SouthEastX"][1] - 0.0026 - 0.0015
-    assert text[0] + 0.00585 < px + vx * 0.0005 - 0.002
+        assert centre == pytest.approx((pivot[0] + mid_x * per_mm, pivot[1] - mid_z * per_mm))
+    assert drawing.PROFILE_PIVOT_XY == pytest.approx((0.0718, 0.1267))
 
 
 def _notch_cap_native_prediction(text_xy):
@@ -370,7 +419,7 @@ def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> Non
     fillet arc.  No saved/fixed tip is used for the new landing.
     """
     text = drawing.NOTCH_KEEP["CapEDia"]
-    assert text == pytest.approx((0.2355 - drawing.NOTCH_SHIFT, 0.200))
+    assert text == pytest.approx((0.2355 - drawing.NOTCH_SHIFT, 0.2055))
     pivot, centre, radius, knee, unit, tip = _notch_cap_native_prediction(text)
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     mouth = (geometry.SLOT_TX, -geometry.SLOT_TZ)
@@ -423,7 +472,8 @@ def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> Non
         (line_y - old_tip[1]) / (old_knee[1] - old_tip[1])
     )
     assert 0.273311 < crossing_x < 0.279661
-    assert max(knee[1], centre[1] + radius) < line_y - 0.002
+    # Today's 1.30 line stands over the cap with the same 2 mm.
+    assert max(knee[1], centre[1] + radius) < drawing.NOTCH_KEEP["CapECx"][1] - 0.002
 
 
 def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> None:

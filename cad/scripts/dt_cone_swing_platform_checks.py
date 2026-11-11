@@ -31,6 +31,9 @@ from dt_cone_swing_platform_geometry import (
     PLATE_T,
     POST_LOCAL_Z,
     POST_MAIN_DIA,
+    SE_CHAMFER_EAST_XZ,
+    SE_CHAMFER_RUN,
+    SE_CHAMFER_SOUTH_XZ,
     SLOT_E_X,
     SLOT_E_Z,
     SLOT_TX,
@@ -92,8 +95,20 @@ _POST_EAST_NORMAL_CLEAR = _POST_EAST_HALF / math.hypot(
 _POST_WEST_NORMAL_CLEAR = _POST_WEST_HALF / math.hypot(
     1.0, (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
 )
+# The south-east chamfer runs past the foot too: its line bounds the plate
+# there like the three straight edges.
+_POST_CHAMFER_NORMAL_CLEAR = abs(
+    (SE_CHAMFER_EAST_XZ[0] - SE_CHAMFER_SOUTH_XZ[0]) * (POST_LOCAL_Z - SE_CHAMFER_SOUTH_XZ[1])
+    - (SE_CHAMFER_EAST_XZ[1] - SE_CHAMFER_SOUTH_XZ[1]) * (0.0 - SE_CHAMFER_SOUTH_XZ[0])
+) / math.dist(SE_CHAMFER_SOUTH_XZ, SE_CHAMFER_EAST_XZ)
 POST_FOOT_CONTAINMENT = (
-    min(_POST_SOUTH_CLEAR, _POST_EAST_NORMAL_CLEAR, _POST_WEST_NORMAL_CLEAR) - _POST_R
+    min(
+        _POST_SOUTH_CLEAR,
+        _POST_EAST_NORMAL_CLEAR,
+        _POST_WEST_NORMAL_CLEAR,
+        _POST_CHAMFER_NORMAL_CLEAR,
+    )
+    - _POST_R
 )
 if POST_FOOT_CONTAINMENT < 0.25:
     raise AssertionError(
@@ -340,7 +355,13 @@ def manufactured_p1_stop_enclosure() -> dict:
             )
             if theta <= 0.0:
                 raise ValueError("manufactured corner can collapse")
-            cut_reach = (radius + _XX_MM) / math.tan(theta / 2.0)
+            # A rounded corner's cut reaches its tangent length; the
+            # chamfered corner's (radius 0.0) reaches its longer leg, the run.
+            cut_reach = (
+                (radius + _XX_MM) / math.tan(theta / 2.0)
+                if radius > 0.0
+                else SE_CHAMFER_RUN + _XX_MM
+            )
             margins[f"corner {label}"] = (
                 math.dist(point, (x, z)) - reach - outline_erosion - cut_reach
             )
