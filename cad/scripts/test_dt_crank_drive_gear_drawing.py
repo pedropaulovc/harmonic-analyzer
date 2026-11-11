@@ -2,10 +2,10 @@
 
 The print is recreated under ``cad/docs/drawing-guidelines.md``: a 64T
 gear with straight inclined teeth slipped onto the cone shaft's land carries
-no datums and no frames, its blank, bore, south-entry and tooth-line sizes are
-native model dimensions whose places and bands the PART owns, and the tooth
-system it cannot dimension -- hand and exact finite stock tangent-span limits
--- lives in the gear-data block.
+no datums and no frames, its blank, bore and south-entry sizes are native
+model dimensions whose places and bands the PART owns, and the tooth system
+it cannot dimension -- the tooth line (inclination, hand, crossing station)
+and exact finite stock tangent-span limits -- lives in the gear-data block.
 """
 
 from __future__ import annotations
