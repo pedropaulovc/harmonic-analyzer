@@ -504,8 +504,9 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # the boss top (owner ruling 2026-11-11, #1038, K5).  The rear one's station
 # from its socket axis reads over the boss top, under the mouth chamfer's
 # parked text; 8.5 mm of paper cannot hold the value and its words, so they
-# park left of the step over the rail.
-KEEPER_RELIEF_CALLOUT = "2X KEEPER\nFOOT RELIEF"
+# park left of the step over the rail.  The words carry the depth: the cut
+# ends on the faced top, the plane the 4X .18 already locates.
+KEEPER_RELIEF_CALLOUT = "2X KEEPER FOOT\nRELIEF TO FACED TOP"
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
@@ -514,7 +515,7 @@ KEEPER_RELIEF_LINE_XY = (
     / 1000.0,
     0.1535,
 )
-KEEPER_RELIEF_TEXT_XY = (0.316, 0.1555)
+KEEPER_RELIEF_TEXT_XY = (0.309, 0.1555)
 
 
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).

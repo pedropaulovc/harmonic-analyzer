@@ -356,7 +356,8 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
     assert "suffix=KEEPER_RELIEF_CALLOUT," in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
-    assert drawing.KEEPER_RELIEF_CALLOUT == "2X KEEPER\nFOOT RELIEF"
+    # The depth is the words: the floor is the faced top the 4X .18 locates.
+    assert drawing.KEEPER_RELIEF_CALLOUT == "2X KEEPER FOOT\nRELIEF TO FACED TOP"
     scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
     axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
     step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
@@ -370,9 +371,9 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert line_y - boss_top_y > 0.005
     assert 0.162 - line_y > 0.005
     text_x, text_y = drawing.KEEPER_RELIEF_TEXT_XY
-    # Three rows of .12 text about the centre: left of the step, over the
-    # rail top, under the chamfer's parked rows.
-    half_w, half_h = 0.012, 0.0075
+    # Three rows of .12 text about the centre (19 characters at 2.2 mm):
+    # left of the step, over the rail top, under the chamfer's parked rows.
+    half_w, half_h = 0.021, 0.0075
     assert text_x + half_w < step_x - 0.005
     rail_top_y = drawing.DETAIL_SECTION_CENTER[1] + part.HALF_H * scale
     assert text_y - half_h > rail_top_y + 0.003
