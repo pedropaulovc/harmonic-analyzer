@@ -83,6 +83,11 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
 - the cylinder gear's alignment-notch saw (TTC 10-215-014, .014 in), not
   owned, read by `test_dt_cylinder_gear_drawing.py` against the printed
   .016 MAX (#2364);
+- the measuring stick's engraving bit (2L P-125x2.0-30-.005-S, 30° V, .005 in
+  tip), not owned, which cuts every MHA-MS-01 graduation and numeral; its
+  brass cutting setting is `shop.toml` `settings.ms-stick-engrave-brass`, and
+  `test_ms_stick_drawing.py` reads both against the printed groove limits
+  (#2433);
 - the PM 6-in vise's make, SKU and source;
 - the base-bar plan's vise workholding (1-3/8 in parallels, HHIP 3901-0079
   screw jack), with the ownership status Pedro's 2026-11-05 hand sheet gives

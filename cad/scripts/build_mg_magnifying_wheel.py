@@ -61,18 +61,12 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from _mg_wheel_rim_geometry import (
-    GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
-    GROOVE_R_BAND,
     RIM_AXIAL,
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
@@ -92,7 +86,6 @@ from mg_magnifying_wheel_geom import (
     RIM_FILLET_R,
     SPIGOT_DIA,
     SPIGOT_LEN,
-    SPIGOT_LEN_BAND,
     SPOKE_AXIAL,
     SPOKE_COUNT,
     SPOKE_OVERLAP,
@@ -1202,38 +1195,15 @@ async def build(adapter) -> dict[str, str]:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the tight bands sit on the model dimensions,
     # the places on every marked one.  The spigot and the bore are matched
     # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.  The
-    # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA).  The
-    # bands are millimetres; UNIT prints them in inches.  Equal deviations
-    # print as one symmetric +/- band.
+    # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA), and so
+    # do the spigot length and the groove's R and bottom Ø at .XXX.  The
+    # bands are millimetres; UNIT prints them in inches.
     set_dimension_symmetric_tolerance(
         adapter,
         "HubProfile",
         "HubLength",
         HUB_LEN_BAND[0],
         places=DRAWING_PRECISION["HubProfile"]["HubLength"],
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "HubProfile",
-        "SpigotLength",
-        *deviations(SPIGOT_LEN_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "GrooveProfile",
-        "GrooveR",
-        GROOVE_R_BAND[0],
-        places=DRAWING_PRECISION["GrooveProfile"]["GrooveR"],
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "GrooveProfile",
-        "GrooveBottomDia",
-        GROOVE_BOTTOM_BAND[0],
-        places=DRAWING_PRECISION["GrooveProfile"]["GrooveBottomDia"],
         display_unit=UNIT,
     )
     # The as-cast sizes carry the casting band (mg_magnifying_wheel_spec).

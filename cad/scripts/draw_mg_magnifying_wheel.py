@@ -571,14 +571,14 @@ _SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # spigot's faced front end (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and all texts right of it except
 # the overall's; each text OUTSIDE its span so no extension line runs
 # through a text.
-# Nearest the part the spigot length (".354 +.004/.000"), whose band keeps the
-# drum from standing proud (DRUM_RECESS); then the web's centre plane
+# Nearest the part the spigot length (".354", the title block's .XXX), whose
+# third place keeps the drum from standing proud (DRUM_RECESS); then the web's centre plane
 # (".61"), which the rim and its groove share, its extension line rising
 # toward the groove (_set_section_witnesses) on the drawn centreline that
 # plane is (WEB_CENTRELINES), left of the spigot step's, so the row above
 # stops short of it; last the overall (".772 ±.004"), which holds the
 # axle's nut stack, left of the back face above the A-A caption.  Each
-# band's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
+# length's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
 # prints its value and band alone (drawing-guidelines.md rule 7).  Each
 # text is centred clear of the face it leaves.  The two right-hand sizes
 # keep their arrows inside their spans, so no tail reaches a neighbouring
@@ -594,14 +594,14 @@ _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
 )
-# The spigot length's +.004/.000 band keeps the drum under the spigot face
+# The spigot length's three places keep the drum under the spigot face
 # (mg_magnifying_wheel_geom.DRUM_RECESS): its callout names the drum.
 SPIGOT_LENGTH_CALLOUT = f"DRUM {DRUM_NUMBER} NOT PROUD"
 # The overall sets the axle's locknut stack (mg_wheel_group): the callout
 # names the stack and the axle by number on one short line, so its dimension
 # line stops short of TIE 1's block.
 HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
-# The groove's two bands seat the pen wire (mg_magnifying_wheel_spec
+# The groove's two three-place sizes seat the pen wire (mg_magnifying_wheel_spec
 # GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): both link the one numbered note that
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
@@ -637,7 +637,7 @@ SECTION_KEEP = {
         1,
         math.ceil(len(SPIGOT_LENGTH_CALLOUT) * _DRUM_CALLOUT_CHAR / _TEXT_CHAR)
         + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[0] + _STACK_UP + _ABOVE_UP,
+        _HUB_ROWS[0] + _ONE_LINE_UP + _ABOVE_UP,
     ),
     "HubFrontZ": _beside(
         _section_x(HUB_FRONT_Z),
@@ -654,7 +654,7 @@ SECTION_KEEP = {
     # The groove's R up right, its leader down-left onto the groove at 35
     # deg, right of the axial rows' line ends; its shoulder over the top of
     # the rim-bore round's R block (ROUND_TEXT_XY), under its note link.
-    # Its one-line ± band leaves the shoulder where the stacked band's block
+    # Its one-line value leaves the shoulder where the stacked band's block
     # put it.
     "GrooveR": (
         SECTION_CENTER[0] + 0.0344,
@@ -715,7 +715,7 @@ ROUND_CALLOUT = "2X RIM BORE EDGES"
 # the standard fit and the mate, the clearance or interference the finished
 # pair makes as REF (mg_magnifying_wheel_spec.DRAWING_NOTES): the bore is
 # reamed to run on the finished axle, and the spigot turned to press into
-# the drum's finished reamed bore.  The groove's two bands link their one
+# the drum's finished reamed bore.  The groove's two three-place sizes link their one
 # note; the tie holes read size, then process, then their plain name
 # (drawing-guidelines.md rule 26).
 DIMENSION_CALLOUTS = {
@@ -730,7 +730,7 @@ DIMENSION_CALLOUTS = {
     "Tie1HoleDia": TIE1_CALLOUT,
     "Tie2HoleDia": TIE2_CALLOUT,
 }
-# Each axial band's need stands over its value.
+# Each axial length's need stands over its value.
 CALLOUTS_ABOVE = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,

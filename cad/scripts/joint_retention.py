@@ -783,7 +783,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
         "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
-        "fr_tube_frame",  # columns: socket slip fit; cross holes opened to Ø.197 so a MHA-FR-VN-53 passes "ITS THREAD NOT CATCHING" (fr_frame_assembly_steps lower-/upper-holes-checked)
+        "fr_tube_frame",  # columns: socket slip fit; cross holes spotted through each casting clearance hole and drilled Ø.197, then a MHA-FR-VN-53 tried through the seated column (fr_frame_assembly_steps lower-/upper-holes-checked)
         "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (fr_frame_assembly_steps caps-pushed-on)
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
@@ -836,7 +836,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure_reason="retains a tube_frame column in its base socket; base and columns never move relative to each other and no operating member bears on or turns about the horizontal screw axis (the screw passes clearance holes in both tube walls)",
         axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; the shank clears the near casting wall (#10 close) and engages only the far casting wall's blind 46 mm bottoming tap",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-piloted, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
+        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-marked, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/cross-screw-in-top-frame",
@@ -850,7 +850,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
         axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; the shank clears the near casting wall (#10 close, SideClearance) and engages only the far casting wall's blind 46 mm #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-piloted, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
+        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-marked, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/support-hold-down-in-base",

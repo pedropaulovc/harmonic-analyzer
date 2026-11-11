@@ -10,7 +10,8 @@ rebuild the complete-machine assembly. No SolidWorks.
 from __future__ import annotations
 
 import _config
-import dt_drive_train_steps
+import fr_frame_assembly_steps as fr_steps
+import ha_build_sequence as build
 import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
 import pd_transgear_removable_spec as removable
@@ -126,8 +127,8 @@ CHANNEL_ANCHORS = 20
 # numbers other sheets cite (MHA-CH-00 cites the anchor step) never move. I
 # and O never letter a sub-step.
 SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-# The title block's angular row is the level acceptance, read with the digital
-# angle gauge the shop owns (as MHA-SM-00 sets its plate).
+# The title block's angular row is the level acceptance, read with a digital
+# angle gauge (as MHA-SM-00 sets its plate).
 LEVEL_TOLERANCE_DEG = angular_band_deg()
 LEVEL_ACCEPTANCE = f"LEVEL WITHIN \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0"
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
@@ -146,21 +147,43 @@ def sub_step(key: str, index: int) -> str:
     return f"{_n(key)}{SUB_STEP_LETTERS[index]}"
 
 
+# Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):
+# the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
+# drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
+_FRAME_REERECTED = (
+    f"FIT THE COLUMNS AND MHA-FR-02 BACK ON MHA-FR-01 PER {build.FRAME_ERECTED.text}."
+)
+_BUILT_APART = (
+    f"DRIVE TRAIN: BUILD {build.DT_BENCH.text} AT THE BENCH.",
+    f"BUILD {build.CH_BENCH.text} AT THE BENCH.",
+    f"BUILD {build.DT_BASE_ON_MILL.text}, MHA-FR-01 ON THE MILL.",
+    f"BUILD {build.CH_BASE_ON_MILL.text}, MHA-FR-01 STILL ON THE MILL.",
+    "SET MHA-FR-01 ON A FLAT BENCH.",
+    f"BUILD {build.CH_KEEPER_PAIR.text}: THE KEEPER PAIR.",
+    f"BUILD {build.CH_TOP_FRAME_ON_MILL.text}, MHA-FR-02 ON THE MILL.",
+    _FRAME_REERECTED,
+    f"CHECK THE FRAME PER {build.FRAME_CHECKED.text}.",
+)
+_REERECTED_HEAD = (
+    f"{_n('drive-train-built')}{SUB_STEP_LETTERS[_BUILT_APART.index(_FRAME_REERECTED)]}"
+)
 _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "frame-built": (
-        "FRAME: BUILD MHA-FR-00 COMPLETE ON A FLAT BENCH, ITS MHA-FR-VN-52 SET "
-        "SCREW BACKED CLEAR IN THE GOOSENECK HUB.",
+        f"FRAME: FIT {build.FRAME_FITTED.text} ON A FLAT BENCH.",
+        "LEAVE THE COLUMNS AND MHA-FR-02 OFF MHA-FR-01 ONCE "
+        f"{fr_steps.step_ref(build.FRAME_LIFTED_KEY)} LIFTS THEM, UNTIL "
+        f"{_REERECTED_HEAD}.",
+        f"FIT {build.LOOSE_CASTINGS.text} NOW, ON THE LOOSE MHA-FR-01 AND "
+        "MHA-FR-02, AHEAD OF ITS "
+        f"{build.FRAME_ERECTED.text.removeprefix(fr_steps.DRAWING_NUMBER + ' ')}.",
     ),
-    "drive-train-built": (
-        f"DRIVE TRAIN: BUILD {dt_drive_train_steps.DRAWING_NUMBER} ON THE BASE, "
-        f"STEPS 1-{len(dt_drive_train_steps.SEQUENCE)} IN ORDER.",
-    ),
+    "drive-train-built": _BUILT_APART,
     "summing-hung": (
         "SUMMING LEVER: BUILD MHA-SM-00 UNDER THE TOP-FRAME CROSSBAR, ITS STEPS "
         "BEFORE FINAL ASSEMBLY IN ORDER, THE MHA-SM-01 POST OUT OF ITS HUB.",
     ),
     "channel-built": (
-        "CHANNEL BANK: BUILD MHA-CH-00 COMPLETE ON THE FRAME PER ITS STEPS, EACH "
+        f"CHANNEL BANK: BUILD {build.CH_ON_FRAME.text} ON THE FRAME, EACH "
         "MHA-CH-VN-50 SPRING HANGING FROM ITS LEVER WITH ITS BOTTOM LOOP FREE.",
     ),
     "channel-anchors-set": (

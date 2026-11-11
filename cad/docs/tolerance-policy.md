@@ -611,7 +611,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
   Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
-  trimmed to **12.192 mm** (**24.892 mm**, .98 in, overall to eye crown) and
+  trimmed to **12.700 mm** (**25.400 mm**, 1.00 in, overall to eye crown, with
+  the .03 title-block deburr of #2314) and
   left bare in the coefficient-plate tap: nothing torques the hooks, so no jam
   nut (owner, #2326). The neck seats on the plate top; one turn maximum
   back-out is retained for preload trim while holding eye clocking. The
@@ -620,8 +621,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   stations are unchanged and the pattern is located **Ø.010 RFS**, the shop
   table's cap for a tap with no fit word (#2326). The shortest in-band
   anchor, backed out its full turn, keeps full thread through the thickest
-  in-band plate (6.858–7.366 mm limits); its cut end hangs **2.017 mm** below the plate
-  underside nominally, **2.413 mm** at most. The counter **9490T1 #10-24**
+  in-band plate (6.858–7.366 mm limits); its cut end hangs **2.525 mm** below the plate
+  underside nominally, **2.921 mm** at most. The counter **9490T1 #10-24**
   keeps its boss-through trim with its eye **3.836 mm** above the boss top,
   no jam nut; neither counter anchor nor boss pose changes. Existing upper
   lever holes are retained, with no upper pins.

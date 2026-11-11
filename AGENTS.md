@@ -1029,10 +1029,12 @@ with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`): `_drawing_precision.py:40`
 and `_supplier_spring_reference.py:376` order COM requests by iterating sets
 of str, and are left unchanged because fixing them re-keys 147 part leaves.
 The soundness alarm is a replay `noop` whose build made another part than the
-base (`outcome=different`: mass properties, request and answer multisets, STL
-triangles), not a request divergence: SolidWorks lists one body's faces in
-another order from run to run, so two builds of the same source can issue
-their requests in another order and still make the same part
+base (`outcome=different`: mass-property measurements in any order, request
+and answer multisets, STL geometry whatever its triangulation), not a request
+divergence: SolidWorks lists one body's faces, and one part's bodies, in
+another order from run to run, and re-triangulates planar faces, so two
+builds of the same source can issue their requests in another order and
+still make the same part
 (`seat_nondeterminism`, counted, never an alarm). The same part from requests
 that diverged with no earlier answer differing is
 `noop_unexplained_divergence` (counted, logged at WARN). See DEVELOPING.md
