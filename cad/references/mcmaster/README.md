@@ -731,7 +731,7 @@ Live catalog verification on October 8, 2026:
   minimum radial float exceeds the **0.1091 mm** station mismatch (both bands plus the lever grid's **0.0075 mm** offset). The moved
   row follows the actual top; current foot-edge and head-envelope budgets
   come from `magnifying_bracket_joint_layout`, not the historical lowered-row
-  values. Native screw-head/knife-mount and rib/nut clearances remain farm
+  values. Native screw-head/knife-mount and rib/anchor-shank clearances remain farm
   acceptance items after the **+0.96 mm** mounting-row shift.
   Receiver depth bands are authored on owned source-model dimensions across
   the Hole Wizard's full subfeature tree, using the same `GetDimension2(0)`

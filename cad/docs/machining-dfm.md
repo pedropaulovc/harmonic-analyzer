@@ -421,12 +421,12 @@ VIEW F's theoretical knife vertex-to-top location is
 **HEX_H/2 − COEFFICIENT_TOP_Y = 1.634 mm**, printed **.06**;
 both locations remain associative native dimensions, not typed values.
 
-The source-neighbour intent is **X reach 35.814 mm (1.41 in) before the worst nut
-footprint at X36.449 mm**, not a claim of axial separation. Charging the
+The source-neighbour intent is **X reach 35.814 mm (1.41 in) before the worst
+protruding anchor-shank footprint at X37.970 mm** (no jam nut, #2326), not a claim of axial separation. Charging the
 printed rib reach (**1.41 ±.01 in**, at most 36.068 mm) gives
-**36.449−36.068 = 0.381 mm** geometric
+**37.970−36.068 = 1.902 mm** geometric
 X clearance. Native full-interference validation must still qualify the
-rib/nut, screw-head/knife-mount and installed-neighbour clearances.
+rib/anchor-shank, screw-head/knife-mount and installed-neighbour clearances.
 
 The middle rib's negative-X contour retains its nominal geometry but is now
 controlled by **MiddleRibCounterAngle@MiddleRibProfile**, driven from the
@@ -503,7 +503,7 @@ pilots, charging the printed pilot radius, drill wander, ordinary free-edge
 variation and actual-axis position bands.
 Their Z envelopes stay inside the rib caps' finite neighbourhoods and away from
 the receiver entry/body-end/knife faces; their X reach stays clear of the spring
-and nut lane and outer plate edge, and neither Y envelope reaches the opposite seat.
+and anchor-shank lane and outer plate edge, and neither Y envelope reaches the opposite seat.
 The analytic section adds material only. Receiver wall proofs therefore take
 **no extra wall credit** for these blends and retain their independent pilot
 and connected-material gates.

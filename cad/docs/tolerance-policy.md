@@ -618,7 +618,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   uniform **7.00 mm** coefficient plate spans local **Y=−3.50..+3.50 mm**.
   The world top is **983.1932 mm** at the level pose; all twenty X/Z
   stations are unchanged and the pattern is located **Ø.010 RFS**, the shop
-  table's floor for a tap with no fit word (#2326). The shortest in-band
+  table's cap for a tap with no fit word (#2326). The shortest in-band
   anchor, backed out its full turn, keeps full thread through the thickest
   in-band plate (6.858–7.366 mm limits); its cut end hangs **2.017 mm** below the plate
   underside nominally, **2.413 mm** at most. The counter **9490T1 #10-24**

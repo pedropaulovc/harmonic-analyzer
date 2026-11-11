@@ -186,8 +186,8 @@ HOLE_Z_OFFSET = -3.52825
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
 RIB_T = 5.08  # every edge/middle rib extrusion, .20 on the ordinary .XX band
 RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
-# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst nut
-# footprint at X36.449.
+# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst
+# protruding anchor-shank footprint at X37.970 (no jam nut, #2326).
 RIB_REACH = 35.814  # 1.41 in
 # Modeled at the title block's inside-corner ceiling, R.040 MAX.
 RIB_BLEND_R = inside_corner_radius_mm(unit=UNIT)
