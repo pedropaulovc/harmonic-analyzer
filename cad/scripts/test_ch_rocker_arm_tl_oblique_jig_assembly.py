@@ -2189,10 +2189,10 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
     """Review jig-asm r2: each sweep limit is witness-marked; every complete
     pass runs mark to mark. #2336: the near limits are pass-table rows set
-    by DRO in X only (step 6N); the far limits, past the table's X travel, are
-    far-limit rows set on each rail by a gauge stack off a bar stop at the
-    carriage with the pin at S 11.00 (step 6P), all marked in step 6Q, which
-    removes the bar stops before any pass runs."""
+    in X only and marked as set (step 6N); the far limits, past the table's X
+    travel, are far-limit rows set on each rail by a gauge stack off a bar
+    stop at the carriage with the pin at S 11.00, each marked as set (step
+    6P), and the stops come off before any carriage moves back (step 6Q)."""
     inch = spec.trammel.INCH
     hundredth = inch / 100.0
     gap = spec.leadscrew.FEED_GAP
@@ -2227,9 +2227,12 @@ def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> N
         assert row[3].startswith("(") and row[5].startswith("(")
         assert row[6] == "X ±.004"
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
-    assert "LIMIT ROW" in steps["6N"] and "X ONLY" in steps["6N"]
-    assert "FAR LIMIT ROWS AS THEIR TABLE'S TITLE STATES" in steps["6P"] and "EACH RAIL" in steps["6P"]
-    assert "WITNESS-MARK" in steps["6Q"] and "REMOVE THE BAR STOPS" in steps["6Q"]
+    near = steps["6N"]
+    assert near.startswith("6N. AT EACH PASS-TABLE LIMIT ROW SET AS IN STEP 6D IN X ONLY, MARK THE BAR")
+    assert "CARRIAGE'S SPINDLE-END FACE WITH THE PASS NAME" in near
+    assert steps["6P"] == "6P. AT EACH FAR LIMIT ROW SET BY ITS TITLE, MARK THE BAR LIKEWISE."
+    assert steps["6Q"] == "6Q. REMOVE THE BAR STOPS."
+    assert list(steps).index("6Q") == list(steps).index("6P") + 1
     title = spec.FAR_LIMIT_TITLE
     assert title.startswith("FAR LIMIT TABLE (STEP 6P), EACH RAIL:")
     assert "RAIL SETTING ROW FROM" in title and "CARRIAGE ONLY" in title

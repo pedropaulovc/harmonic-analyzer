@@ -1624,9 +1624,9 @@ RAIL_SETTING_CHECK = "6H"  # the step that rechecks every row as set
 # cc83acaa8a: the title's 'A STOP' could be read as an origin stop).
 # Three lines: the far limit table's procedure needs the setting sheet's room.
 RAIL_SETTING_TITLE = (
-    "RAIL SETTING TABLE (STEP 6): EACH MOVE FROM FROM TO S, X THEN Y: WRING "
-    "ITS GAUGE-BLOCK STACK ON A SETTING STOP ON THE TABLE, ZERO A "
-    "MACHINE-MOUNTED SETTING INDICATOR ON IT, REMOVE IT, MOVE TO 0."
+    "RAIL SETTING TABLE (STEP 6): EACH ROW'S MOVE TO S, X THEN Y: WRING "
+    "ITS GAUGE-BLOCK STACK ON A SETTING STOP, ZERO A MACHINE-MOUNTED "
+    "SETTING INDICATOR ON IT, REMOVE THE STACK, MOVE TO INDICATOR 0."
 )
 _CHAIN_TEXT = tuple(_length(s, SWEEP_LIMIT_PLACES) for s in CHAIN_STATIONS)
 RAIL_SETTING_HEADER = ("S", "FROM", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE", "CHECK")
@@ -1690,7 +1690,9 @@ PASS_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
 )
 # The pin is put at FROM through the rail-setting rows and centred as in 6D
 # by sliding the carriage only (after 6K the bar is never tapped): the
-# _FAR_LIMIT_ERROR links. Step 6Q removes the bar stop after marking.
+# _FAR_LIMIT_ERROR links. Step 6P marks each row as it is set, the stop
+# staying put between a rail's two rows; step 6Q removes the stops before
+# any carriage moves back toward the spindle.
 FAR_LIMIT_TITLE = (
     "FAR LIMIT TABLE (STEP 6P), EACH RAIL: TABLE AT RAIL SETTING ROW FROM, "
     "HEAD CENTRED AS IN 6D, CARRIAGE ONLY; BAR STOP CLAMPED AT THE "
@@ -2347,10 +2349,10 @@ ASSEMBLY_STEPS = (
     f"6K. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
     f"6L. CHECK EVERY HEAD AGAIN AS IN STEP {RAIL_SETTING_CHECK}.",
     "6M. IF A HEAD FAILS, REDO STEPS 6C-6L WITH THE NUTS LOOSENED.",
-    "6N. SET EACH PASS-TABLE LIMIT ROW BY DRO AS IN STEP 6D, IN X ONLY.",
-    "6P. SET EACH RAIL'S FAR LIMIT ROWS AS THEIR TABLE'S TITLE STATES.",
-    "6Q. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
-    "ROW, WITH THE PASS NAME, THEN REMOVE THE BAR STOPS.",
+    "6N. AT EACH PASS-TABLE LIMIT ROW SET AS IN STEP 6D IN X ONLY, MARK "
+    "THE BAR AT THE CARRIAGE'S SPINDLE-END FACE WITH THE PASS NAME.",
+    "6P. AT EACH FAR LIMIT ROW SET BY ITS TITLE, MARK THE BAR LIKEWISE.",
+    "6Q. REMOVE THE BAR STOPS.",
     # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
     # so the 5/8's tip stays clear of the bar screw's in the shared THRU
     # thread; no thicker, so its full thread holds 1.5 D
