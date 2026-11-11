@@ -2830,8 +2830,8 @@ def test_cast_datum_target_symbols_stand_clear_on_sheet_seven() -> None:
     point (farm run 20261111T023438415Z's natives: radius 7.0).  The six
     stand apart inside the frame, each a full arrow off its point: F1 and F2
     straight under their points in the band between the elevation and the
-    underside, E1 in the west window over datum D's width rows, the other
-    three outside the underside's outline."""
+    underside, either side of datum D's width rows, E1 in the west window,
+    the other three outside the underside's outline."""
     radius, arrow, ink = 0.007, 0.003556, drawing.INK_CLEARANCE
     placed = _cast_datum_symbols()
     assert set(placed) == set(drawing.DATUM_TARGET_SYMBOL_OFFSETS)
@@ -2870,8 +2870,18 @@ def test_cast_datum_target_symbols_stand_clear_on_sheet_seven() -> None:
     )
     assert window[0] + ink <= ex - radius and ex + radius <= window[2] - ink
     assert ey + radius <= window[3] - ink
-    width_rows_top = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][1] + 0.0045 + _ROW_PITCH
-    assert ey - radius - width_rows_top >= ink
+    # Datum D's width rows stand in the band over the underside, between the
+    # two F symbols and under the elevation's rail, not in a window (rule
+    # 14, machinist review of fad41f8525).
+    rows = (*drawing.DATUM_BOTTOM_CALLOUTS_ABOVE["BarWidth"].splitlines(), ".99 ±.03")
+    wx, wy = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"]
+    half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
+    half_h = len(rows) * _ROW_PITCH / 2.0
+    block = (wx - half_w, wy - half_h, wx + half_w, wy + half_h - _ROW_SLACK)
+    assert block[1] - underside[3] >= ink
+    for name in sorted(drawing.DATUM_TARGETS_ON_ELEVATION):
+        assert _box_point_gap(block, placed[name][1]) - radius >= ink, name
+    assert drawing._datum_elevation_xy(0.0, -part.HALF_H)[1] - block[3] >= ink
 
 
 @pytest.mark.parametrize("dashed", (False, True))
@@ -3534,6 +3544,19 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN >= WALL_TARGET_MM > thinner
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN >= part.KEEPER_TAP_DRILL_WALL_MARGIN
     assert thinner / 25.4 == pytest.approx(0.0636, abs=5e-5)
+    # One band covers every added-draft face by owner ruling D4, though the
+    # wall it holds stands in the rail web alone: RV-12 records the ruling
+    # for a reviewer who would loosen the other faces (machinist review of
+    # fad41f8525, r3).
+    (rv12,) = [
+        entry
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_top_frame", "part")
+        if entry.id == "RV-12"
+    ]
+    assert rv12.kind == "accept"
+    assert "owner ruling 2026-11-10 (#2333, D4)" in rv12.reason
+    for row in callouts["WebRingDraft"].splitlines():
+        assert row in rv12.where, row
     # The wedges: the web's outer face opens outward going up (added draft),
     # the upper barrel closes inward (taken out above the faced top).
     wedges = drawing.DATUM_DRAFT_WEDGES
@@ -4220,21 +4243,25 @@ def test_crossbar_datum_ink_refuses_missing_width_text(monkeypatch, invalid) -> 
 # Native IDisplayData of sheet 7's datum D (DetailItem524) and the BarWidth
 # it hangs on, farm run 20261111T023438415Z, sheet metres.  That run asked
 # the tag at x 144.1 on the width's line (y 124.0) against the width's
-# first arrow at x 141.0842, and offset the width's rows to (179.0, 128.0).
-_R7_DATUM_D_ASKED = ((0.1441, 0.124), (0.179, 0.128))
+# first arrow at x 141.0842, and offset the width's rows to (179.0, 128.0):
+# "CROSSBAR AT UNDERSIDE" at (150.5066, 128.0), 56.9868 wide over its 21
+# glyphs, and ".99 ±.03" at (170.6073, 122.4437), 16.7854 wide, each row
+# centred on the offset's x.
+_R7_DATUM_D_ASKED = (0.1441, 0.124)
 _R7_BAR_WIDTH_ARROW_X = 0.1410842
+_R7_ROW_GLYPH = 0.0569868 / 21
+_R7_ROW_PITCH = 0.128 - 0.1224437
 
 
 def _r7_datum_d_display_data():
     """That run's ink where the live constants put it: the tag stands at the
     mirror of its requested x about the width's first arrow and rides the
     width's line (CROSSBAR_MEDIAN_DATUM_XY's three measured runs); the
-    width's two rows ride their offset."""
-    (asked_x, line_y), (text_x, text_y) = _R7_DATUM_D_ASKED
+    width's rows stand about their offset, the value last, the callout's
+    sized at that run's mean glyph."""
+    asked_x, line_y = _R7_DATUM_D_ASKED
     tag_dx = asked_x - drawing.CROSSBAR_MEDIAN_DATUM_XY[0]
     tag_dy = drawing.DATUM_BOTTOM_KEEP["BarWidth"][1] - line_y
-    row_dx = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][0] - text_x
-    row_dy = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][1] - text_y
     arrow_x, y = _R7_BAR_WIDTH_ARROW_X, 0.124 + tag_dy
     x0, x1 = 0.1310683 + tag_dx, 0.1380683 + tag_dx
     datum = {
@@ -4254,16 +4281,26 @@ def _r7_datum_d_display_data():
             "h": 0.0035, "w": 0.0034708, "ang": 0.0, "ref": 1,
         }],
     }
-    width = {"texts": [
-        {
-            "t": "CROSSBAR AT UNDERSIDE", "pos": [0.1505066 + row_dx, 0.128 + row_dy, 0],
-            "h": 0.0035, "w": 0.0569868, "ang": 0.0, "ref": 1,
-        },
-        {
-            "t": ".99 ±.03", "pos": [0.1706073 + row_dx, 0.1224437 + row_dy, 0],
-            "h": 0.0035, "w": 0.0167854, "ang": 0.0, "ref": 1,
-        },
-    ]}
+    text_x, text_y = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"]
+    rows = [
+        (row, len(row) * _R7_ROW_GLYPH)
+        for row in drawing.DATUM_BOTTOM_CALLOUTS_ABOVE["BarWidth"].splitlines()
+    ]
+    rows.append((".99 ±.03", 0.0167854))
+    top = text_y + (len(rows) - 2) * _R7_ROW_PITCH / 2.0
+    width = {
+        "texts": [
+            {
+                "t": row,
+                "pos": [text_x - w / 2.0, top - index * _R7_ROW_PITCH, 0],
+                "h": 0.0035,
+                "w": w,
+                "ang": 0.0,
+                "ref": 1,
+            }
+            for index, (row, w) in enumerate(rows)
+        ]
+    }
     return datum, width
 
 
@@ -4283,7 +4320,7 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     assert "BarWidth" in spec.DRAWING_DIMENSIONS["BarProfile"]
     assert "BarWidth" in spec.AS_CAST_DIMENSIONS["BarProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 2
-    assert drawing.DATUM_BOTTOM_CALLOUTS_ABOVE == {"BarWidth": "CROSSBAR AT UNDERSIDE"}
+    assert drawing.DATUM_BOTTOM_CALLOUTS_ABOVE == {"BarWidth": "CROSSBAR\nAT UNDERSIDE"}
     # The bar's sides reach the underside between each pocket's end and the
     # plan gussets; there the model stands them the nominal .99 apart.
     assert (part.BAR_X1 - part.BAR_X0) / 25.4 == pytest.approx(0.99)
@@ -4294,9 +4331,14 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
             assert part._casting_occupies(x - outward * 1e-6, -part.HALF_H, z), (x, z)
             assert not part._casting_occupies(x + outward * 1e-6, -part.HALF_H, z), (x, z)
     # The tag is asked on the width's line just inside its first arrow, so
-    # it stands mirrored outside the bar, opposite the width's parked rows.
+    # it stands mirrored outside the bar, opposite the width's parked rows;
+    # the line stands over the view, clear of the underside's outline.
     asked = drawing.CROSSBAR_MEDIAN_DATUM_XY
     assert asked[1] == drawing.DATUM_BOTTOM_KEEP["BarWidth"][1]
+    view_top = drawing.DATUM_BOTTOM_CENTER[1] + drawing.PLAN_HALF_Z * (
+        drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    )
+    assert asked[1] - 0.0035 - view_top >= drawing.INK_CLEARANCE
     scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
     arrow_x = _R7_BAR_WIDTH_ARROW_X
     assert arrow_x < asked[0] < arrow_x + (part.BAR_X1 - part.BAR_X0) * scale
@@ -4313,8 +4355,41 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     # The guard still refuses the width's rows parked on the tag.
     for row in rows["texts"]:
         row["pos"][:2] = datum["texts"][0]["pos"][:2]
-    with pytest.raises(RuntimeError, match="datum D ink.*crowds.*CROSSBAR AT UNDERSIDE"):
+    with pytest.raises(RuntimeError, match="datum D ink.*crowds.*CROSSBAR"):
         _check_crossbar_datum_ink(monkeypatch, datum, rows)
+
+
+def test_gusset_run_and_d_station_stand_under_the_underside_view() -> None:
+    """Machinist review of fad41f8525 (rule 14): the gusset run's rows stood
+    in the west window beside half an empty sheet.  Its line now stands
+    under the view with its rows right of it, and D's station under those,
+    over the title block."""
+    ink = drawing.INK_CLEARANCE
+    scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    view_bottom = drawing.DATUM_BOTTOM_CENTER[1] - drawing.PLAN_HALF_Z * scale
+    run_line = drawing.DATUM_BOTTOM_KEEP["GussetRunE"][1]
+    assert view_bottom - run_line >= 0.006
+    gx, gy = drawing.DATUM_BOTTOM_TEXT_OFFSETS["GussetRunE"]
+    rows = (".71 ±.03", drawing.DATUM_BOTTOM_CALLOUTS["GussetRunE"])
+    half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
+    run = (gx - half_w, gy - _ROW_PITCH, gx + half_w, gy + _ROW_PITCH - _ROW_SLACK)
+    assert view_bottom - run[3] >= ink
+    # The run's 6 mm line and its 6.35 mm arrow tail end left of the value,
+    # which stands on the line's height; the callout's row is a row lower.
+    bar_side = (
+        drawing.DATUM_BOTTOM_CENTER[0]
+        + (part.BAR_X1 - (drawing.PLAN_HALF_X + part.SET_BOSS_FACE_X) / 2.0) * scale
+    )
+    value_left = gx - len(rows[0]) * _ROW_CHAR / 2.0
+    assert value_left - (bar_side + part.GUSSET * scale + 0.00635) >= ink
+    assert run_line - (gy - _ROW_PITCH + 0.0035) >= ink
+    # A value alone prints over its line (farm run 20261111T070346684Z: the
+    # station's line 2.8 mm under its text point, its caps 1.7 over it).
+    sx, sy = drawing.DATUM_BOTTOM_KEEP["DStation"]
+    station = (sx - 0.011, sy - 0.0028, sx + 0.011, sy + 0.0017)
+    assert run[1] - station[3] >= ink
+    assert station[1] - TITLE_BLOCK[3] >= ink
+    assert drawing.SHEET_FRAME[1] + ink <= station[1]
 
 
 def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
@@ -4456,13 +4531,13 @@ def test_geometry_front_prints_the_models_rail_height_as_a_reference() -> None:
 
     from _drawing_dimension_import import _features_owning
 
-    # The elevation also carries the web root radius, which no removed
-    # section imported (farm run 20261111T004615500Z).
-    assert set(drawing.GEOMETRY_FRONT_KEEP) == {"RingHeight", "RootR"}
+    # The elevation carries the rail height alone: the web root radius
+    # stands on section H-H's own root (RAIL_SECTION_KEEP).
+    assert set(drawing.GEOMETRY_FRONT_KEEP) == {"RingHeight"}
     assert drawing.GEOMETRY_CALLOUTS["RingHeight"] == "RAIL HEIGHT"
     assert _features_owning(
         spec.DRAWING_DIMENSIONS, drawing.GEOMETRY_FRONT_KEEP, view_label="geometry front"
-    ) == ("TRootFillets", "WebRing")
+    ) == ("WebRing",)
     assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight", "WebRingDraft"}
     assert "WebRingDraft" not in drawing.GEOMETRY_FRONT_KEEP
     assert spec.DRAWING_PRECISION_BY_NAME["RingHeight"] == spec.HANGER_GRIP_PLACES == 3
@@ -4587,34 +4662,83 @@ def test_rail_height_stands_between_its_arrows_right_of_the_front_view() -> None
     assert _box_box_gap(block, TITLE_BLOCK) >= ink
 
 
-def test_web_root_radius_stands_under_the_front_views_west_end() -> None:
+def test_web_root_radius_stands_on_the_rail_sections_left_root() -> None:
     """Owner ruling B2 (#2333): the T's cast root radius is the model's own
-    RootR, R.12 ±.03, imported on the elevation, the one view SolidWorks
-    shows it on (farm run 20261111T004615500Z).  Its rows stand under the
-    view's west end beside the root their leader lands on (farm run
-    20261111T023438415Z: parked at the sheet's lower left, the leader ran
-    150 mm across the view), clear of the boss bottom over them, the title
-    block and the frame."""
+    RootR, R.12 ±.03, the fillet feature's dimension.  SolidWorks hangs it
+    on the feature's first edge and shows it where a view sees that edge
+    end-on (farm run 20261111T004615500Z: with a side rail's root first only
+    the elevation took it, and its leader ended on a corner boss's face,
+    machinist review of fad41f8525).  So the build lists the +Z rail's
+    window root first, picked on H-H's station, and H-H keeps the radius:
+    its rows stand under the T's left, and their leader climbs to the left
+    root clear of the flange width's extension line and the web width's
+    arrow tail."""
     assert spec.DRAWING_DIMENSIONS["TRootFillets"] == {"RootR"}
     assert "RootR" in spec.AS_CAST_DIMENSIONS["TRootFillets"]
     assert spec.DRAWING_PRECISION_BY_NAME["RootR"] == 2
     assert part.ROOT_FILLET_R / 25.4 == pytest.approx(0.12)
+    assert "RootR" not in drawing.GEOMETRY_FRONT_KEEP
+    assert "RootR" not in drawing.GEOMETRY_CALLOUTS
+    assert drawing.RAIL_SECTION_CALLOUTS["RootR"] == "TYP WEB ROOT"
+    build = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    (fillet,) = [
+        call
+        for call in ast.walk(build)
+        if isinstance(call, ast.Call)
+        and getattr(call.func, "attr", "") == "add_fillet"
+        and ast.unparse(call.args[0]) == "ROOT_FILLET_R"
+    ]
+    first_edge = ast.unparse(fillet.args[1].elts[0])
+    assert first_edge == "[RAIL_SECTION_X, FLANGE_BOT_Y, z_shelf_in]"
+    assert part.LAND_X1 < spec.RAIL_SECTION_X < part.COLUMN_X - part.BOSS_DIA / 2.0
+    # H-H stands +Z right (its _orient_cut_section axis), so the window-side
+    # root is the T's left one.  The section's ink as farm run
+    # 20261111T070346684Z printed it: the flange's top at y 211.392, the
+    # widths' extension lines from 1.0 mm over the Top plane's trace, the
+    # web width's 6.35 mm arrow tail; a radius's underline ends 17.933 mm
+    # right of its text point, one row under it.
     ink = drawing.INK_CLEARANCE
-    s = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
-    x, y = drawing.GEOMETRY_FRONT_KEEP["RootR"]
-    rows = ("R.12 ±.03", drawing.GEOMETRY_CALLOUTS["RootR"])
+    s = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    rail_x = drawing.RAIL_SECTION_PROFILE_X
+    top_plane_y = 0.211392 - part.HALF_H * s
+    radius = part.ROOT_FILLET_R
+    centre_y = part.FLANGE_BOT_Y - radius
+    face_z = part.WEB_IN_Z - (centre_y + part.HALF_H) * part.DRAFT_T
+    centre_z = face_z - radius / math.cos(math.atan(part.DRAFT_T))
+    centre = (
+        rail_x + (centre_z - abs(part.FRONT_COLUMN_Z)) * s,
+        top_plane_y + centre_y * s,
+    )
+    flange_left = rail_x - part.RAIL_W_FR / 2.0 * s
+    web_left = rail_x - part.WEB_T / 2.0 * s
+    assert flange_left < centre[0] < web_left
+    x, y = drawing.RAIL_SECTION_KEEP["RootR"]
+    rows = ("R.12 ±.03", drawing.RAIL_SECTION_CALLOUTS["RootR"])
     half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
     block = (x - half_w, y - _ROW_PITCH, x + half_w, y + _ROW_PITCH - _ROW_SLACK)
-    boss_bottom = _FRONT_VIEW_TOP_Y - (part.RING_HEIGHT + part.BOSS_BELOW) * s
-    assert boss_bottom - block[3] >= ink
-    # The west web's root, under the flange: the leader to it stays short.
-    centre_x = drawing.GEOMETRY_FRONT_CENTER[0]
-    root = (centre_x + part.WEB_OUT_X * s, _FRONT_VIEW_TOP_Y - part.FLANGE * s)
-    assert centre_x < block[0]
-    assert _box_point_gap(block, root) <= 0.030
+    assert flange_left - block[2] >= ink
+    assert centre[1] - block[3] >= ink
+    caption_top = drawing.RAIL_SECTION_CAPTION_XY[1] + 0.0035
+    assert block[1] - caption_top >= ink
+    start = (x + 0.017933, y - 0.005556)
+    reach = math.dist(start, centre)
+    along = ((centre[0] - start[0]) / reach, (centre[1] - start[1]) / reach)
+
+    def off_leader(point: tuple[float, float]) -> float:
+        return abs((point[0] - start[0]) * along[1] - (point[1] - start[1]) * along[0])
+
+    extension_foot = (flange_left, top_plane_y + 0.001)
+    assert (
+        extension_foot[1]
+        > start[1] + (extension_foot[0] - start[0]) * along[1] / along[0]
+    )
+    assert off_leader(extension_foot) >= ink
+    web_line_y = drawing.RAIL_SECTION_KEEP["FrWebT"][1] - 0.00833
+    tail_end = (web_left - 0.00635, web_line_y)
+    assert start[1] < tail_end[1] < centre[1]
+    assert off_leader(tail_end) >= ink
     frame = drawing.SHEET_FRAME
     assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink
-    assert frame[1] + ink <= block[1]
     assert _box_box_gap(block, TITLE_BLOCK) >= ink
 
 

@@ -109,3 +109,8 @@ fr-top-frame:
       where: "the 4X corner bosses' position frame (⌖ Ø.06 | A | B, 4X, on the Ø1.77 ±.03 boss at the faced top, sheet 3)"
       finding: "position frame on as-cast bosses over-specified (rule 5)"
       reason: "Delegated ruling 2026-11-11 (Main), following owner precedent 2026-11-10 (#2333 D3, the rail webs' ⌖ .06 | A | B, RV-10, and D6, whose stacks charge a barrel within .03 of its socket); owner review #2144: each cast barrel stays within .03 of its machined socket, which is what leaves the socket wall .247 minimum at the boss bottom (.383 at the faced top, less half the barrel's ±.03, its steepest 3° draft over the 1.69 to the boss bottom, half the socket's .XXX band and that zone's radius) and the MHA-CH-07 keeper feet .009 minimum off the barrels; the sockets' Ø.06 to E | F | G does not hold it, because F and G touch the barrels 1.56 under the faced top"
+    - id: "RV-12"
+      kind: "accept"
+      where: "the added draft's callout (2° +1°/0° DRAFT, WEBS, CROSSBAR, POCKETS, GUSSETS, PADS, SET-BOSS SIDES, HOLDS 2-56 TAP WALL .080 MIN, sheet 7)"
+      finding: "draft band tighter than the title block's ±1° on added-draft faces that hold no 2-56 tap wall (rule 4)"
+      reason: "owner ruling 2026-11-10 (#2333, D4): faces where draft is added print 2° +1°/-0 and faces where it is taken out print 2° ±1°; the one band covers every added-draft face of the pattern, and its 2° minimum is what leaves the keeper 2-56 tap drill its .0807 wall in the rail web (.0636 at 1°, target .080) (owner-accepted)"

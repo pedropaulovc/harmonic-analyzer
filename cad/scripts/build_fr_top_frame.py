@@ -4469,6 +4469,13 @@ async def build(adapter) -> dict[str, str]:
     #     the junction lands split both front/rear window runs; the crossbar
     #     web's two roots run between its pocket ends.  Every added face
     #     stands root_lean out of its underside station there.
+    #     SolidWorks hangs the feature's radius dimension on the FIRST edge,
+    #     in the plane square to it, and a drawing view takes the dimension
+    #     only where it shows that edge end-on (farm run 20261111T004615500Z:
+    #     with the west rail's edge first, the elevation alone took RootR and
+    #     landed it on a corner boss).  So the first edge is the +Z rail's
+    #     window root east of the junction land, picked on the station
+    #     section H-H cuts (RAIL_SECTION_X).
     root_lean = POCKET_H * DRAFT_T  # 0.991
     x_shelf_out = WEB_OUT_X + root_lean
     x_shelf_in = WEB_IN_X - root_lean
@@ -4488,21 +4495,22 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(
             ROOT_FILLET_R,
             [
+                # the +Z rail's window shelf east of the land: RootR's edge
+                [RAIL_SECTION_X, FLANGE_BOT_Y, z_shelf_in],
                 # outer shelf: west rail, east rail (rib-split), front, rear
                 [x_shelf_out, FLANGE_BOT_Y, 0.0],
                 [-x_shelf_out, FLANGE_BOT_Y, east_mid_lo],
                 [-x_shelf_out, FLANGE_BOT_Y, east_mid_hi],
                 [0.0, FLANGE_BOT_Y, -z_shelf_out],
                 [0.0, FLANGE_BOT_Y, z_shelf_out],
-                # window shelf: west rail, east rail (rib-split),
-                # front/rear (land-split)
+                # window shelf: west rail, east rail (rib-split), and the
+                # front/rear (land-split) runs left
                 [x_shelf_in, FLANGE_BOT_Y, 0.0],
                 [-x_shelf_in, FLANGE_BOT_Y, east_mid_lo],
                 [-x_shelf_in, FLANGE_BOT_Y, east_mid_hi],
                 [land_mid_w, FLANGE_BOT_Y, -z_shelf_in],
                 [land_mid_w, FLANGE_BOT_Y, z_shelf_in],
                 [land_mid_e, FLANGE_BOT_Y, -z_shelf_in],
-                [land_mid_e, FLANGE_BOT_Y, z_shelf_in],
                 # crossbar web, both sides
                 [BAR_WEB_X0 - root_lean, FLANGE_BOT_Y, 0.0],
                 [BAR_WEB_X1 + root_lean, FLANGE_BOT_Y, 0.0],

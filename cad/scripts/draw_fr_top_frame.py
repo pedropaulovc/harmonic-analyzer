@@ -420,8 +420,9 @@ HANGER_CENTER_QUALIFIER = "2X"
 # requested 133 against 141.1 at 149.2, its leader then printed along the
 # whole line (farm run 20261111T015941119Z, line-on-dimension-line).  Asking
 # 3 mm right of the arrow (x 141.1) stands it 3 mm left, on the line's
-# extension, clear of the width's text, which parks right in the west window.
-CROSSBAR_MEDIAN_DATUM_XY = (0.1441, 0.124)
+# extension, clear of the width's text, which parks right of the line.  The
+# height is the width's line's (DATUM_BOTTOM_KEEP), over the view.
+CROSSBAR_MEDIAN_DATUM_XY = (0.1441, 0.1945)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -1274,15 +1275,10 @@ GEOMETRY_TOP_KEEP = {
 # The front view carries the rail's web depth -- the web ring's own driving
 # extrude depth, the same finished top-to-underside thickness F-F prints as
 # HangerGrip, so it prints as a reference with no band of its own
-# (_reference_model_rail_height) -- and the web root radius, which
-# SolidWorks shows on an elevation only (farm run 20261111T004615500Z: no
-# removed section took it).  The radius's rows stand under the view's west
-# end, 7.7 mm under the boss bottom and 8 mm left of the title block, on a
-# short leader from the root.  The draft angles print on sheet 7's
+# (_reference_model_rail_height).  The draft angles print on sheet 7's
 # elevation (DATUM_FRONT_KEEP).
 GEOMETRY_FRONT_KEEP = {
     "RingHeight": (0.238, 0.091),
-    "RootR": (0.190, 0.071),
 }
 # A flange rim's draft is taken out (owner ruling D1, #2333), so a flange
 # width holds at the faced top and says so, as a web width says the
@@ -1295,19 +1291,30 @@ GEOMETRY_CALLOUTS = {
     "Depth": "RAIL FLANGE EXTENT",
     "SideFlangeWidth": "2X SIDE FLANGE\nAT FACED TOP",
     "RingHeight": "RAIL HEIGHT",
-    "RootR": "TYP WEB ROOT",
 }
 # The web width's three rows stand right of H-H's rail on its line under
 # the web, 2.6 mm right of the flange thickness's lower arrow tail (x 372).
+# The web root radius is the fillet feature's own dimension, which
+# SolidWorks hangs on the feature's first edge and shows only in a view
+# that sees that edge end-on: the build lists the +Z rail's window root
+# first, the left root of this section (machinist review of fad41f8525: on
+# the elevation the leader ended on a corner boss's face, where no fillet
+# is drawn).  Its two rows stand under the T's left, their underline (y
+# 178.9) ending at x 341.4; from there the leader climbs at 68° to the
+# root (352.6, 206.7), 2.2 mm off the foot of the flange width's left
+# extension line (350.1, 206.3) and 3.2 off the end of the web width's
+# arrow tail (347.9, 186.5).
 RAIL_SECTION_KEEP = {
     "FrWebT": (0.383, 0.1948),
     "FrFlangeWidth": (0.328, 0.23278),
     "FlangeT": (0.372, 0.2117),
+    "RootR": (0.3235, 0.1845),
 }
 RAIL_SECTION_CALLOUTS = {
     "FrWebT": "2X WEB WIDTH\nAT UNDERSIDE",
     "FrFlangeWidth": "2X FLANGE\nAT FACED TOP",
     "FlangeT": "TYP TOP FLANGE",
+    "RootR": "TYP WEB ROOT",
 }
 # The 8.1 flange run is 2.7 mm of paper: its text parks on a leader.
 FLANGE_T_TEXT_OFFSET_XY = (0.389, 0.2245)
@@ -1455,26 +1462,34 @@ _TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 CAST_DATUM_FRAME = ("E", "F", "G")
 DATUM_BOTTOM_CENTER = (0.150, 0.140)
 DATUM_FRONT_CENTER = (0.150, 0.222)
-# The width stands across the bar over the front gussets' heads (y 114.6),
-# D's tag left of it in the east window and its text out right in the west
-# one, over the gusset run's, whose line stands under it; D's station under
-# the view, from the G trace (x 222.7) to the bar's median (x 145.0).
+# No dimension's rows stand inside the part's outline (machinist review of
+# fad41f8525: the width's and the gusset run's stood in the west window with
+# half the sheet empty, rule 14).  The width stands across the bar OVER the
+# view: its extension lines climb from the bar's sides past the rear rail
+# to a line 9.7 mm over the rear bosses (y 184.8), D's tag left of it on the
+# line's extension.  The gusset run stands UNDER the view, 8.2 mm under the
+# front bosses (y 95.2), and D's station under that, from the G trace (x
+# 222.7) to the bar's median (x 145.0), 5 mm over the title block.
 DATUM_BOTTOM_KEEP = {
-    "BarWidth": (0.145, 0.124),
-    "GussetRunE": (0.1522, 0.1185),
-    "DStation": (0.184, 0.086),
+    "BarWidth": (0.145, 0.1945),
+    "GussetRunE": (0.1522, 0.087),
+    "DStation": (0.184, 0.0738),
 }
-# The width's callout row goes above its value, so the leader from the
-# line's right end to the value passes under it.
-DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR AT UNDERSIDE"}
+# The width's callout rows go above its value, so the leader from the
+# line's right end to the value passes under them.  They are two (a
+# callout's two lines of words, rule 7): one row's 57 mm would end 1.4 mm
+# short of F1's symbol.
+DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR\nAT UNDERSIDE"}
 DATUM_BOTTOM_CALLOUTS = {"GussetRunE": "4X 45° GUSSET"}
-# The width's rows stand over its line and the gusset run's two rows under
-# them, 3.4 mm under the width's underline (y 124.4) and 2.9 over the front
-# rail's inner edge (y 109.0): farm run 20261111T023438415Z printed the run
-# on that underline, 20261111T040239292Z on the rail's edge.
+# The width's three rows stand right of its line, 2.7 mm off its right
+# extension line (x 149.5), the value's underline (y 194.9) on the line's
+# own height and the top row's caps (y 209.5) 7 mm under the elevation's
+# rail (y 216.5), between the F targets' symbols.  The gusset run's two
+# rows stand right of its line, their underline (y 78.6) 3.1 mm over the
+# station's value.
 DATUM_BOTTOM_TEXT_OFFSETS = {
-    "BarWidth": (0.179, 0.130),
-    "GussetRunE": (0.180, 0.1165),
+    "BarWidth": (0.1685, 0.20323),
+    "GussetRunE": (0.180, 0.0842),
 }
 # Each target symbol's centre from its point, sheet m: on the underside E1
 # in the west window, G1 and E2 beside the view, E3 under its front-east
@@ -4558,8 +4573,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # their extension lines.  The .32 flange run is 2.7 mm of paper, so it
     # needs a leader.  The front and rear rails are one T, so the two widths
     # carry their count (rule 26), not a prose note under the caption (rule
-    # 9).  All three are the model's own dimensions with their ±.03 (owner
-    # ruling B2, #2333); the root radius is the front view's.
+    # 9).  All four are the model's own dimensions with their ±.03 (owner
+    # ruling B2, #2333); the root radius stands on this section's left root
+    # (RAIL_SECTION_KEEP).
     rail_section_dimensions = curate_view_dimensions(
         adapter,
         rail_section,
@@ -4767,7 +4783,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, crossbar_section, label="crossbar section", cut_surface_only=True, removed=True
     )
     # The plan carries the flange's extents and the side flange's width; the
-    # front view the rail height and the root radius.
+    # front view the rail height.
     geometry_top_dimensions = curate_view_dimensions(
         adapter,
         geometry_top,
