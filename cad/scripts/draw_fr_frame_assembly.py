@@ -555,9 +555,11 @@ STEP_TEXT = {
     # on, which is the side to file. .197 stays because opening the tube hole
     # (fr_frame_attachment_spec) re-keys both castings and every assembly
     # above them; #2561 carries it to the next casting change.
+    # The title block's REMOVE BURRS covers the drilled holes (rule 22: one
+    # action a step).
     steps.LOWER_HOLES_DRILLED_KEY: (
         f"ON THE MILL, DRILL EACH COLUMN Ø{CROSS_HOLE_TEXT} AT ITS SPOT THROUGH BOTH "
-        "WALLS, SQUARE TO AND THROUGH THE TUBE AXIS, AND DEBURR BOTH HOLES."
+        "WALLS, SQUARE TO AND THROUGH THE TUBE AXIS."
     ),
     steps.COLUMNS_RESEATED_KEY: f"RESEAT EACH {_COLUMN} IN {_BASE} ON ITS MATCH MARK.",
     steps.LOWER_HOLES_CHECKED_KEY: (
@@ -565,10 +567,12 @@ STEP_TEXT = {
         "STARTS BY HAND IN THE TAPPED SOCKET WALL."
     ),
     "lower-holes-reworked": (
-        "IF IT DOES NOT START, LIFT THAT COLUMN OUT AND FILE EACH TUBE HOLE WITH A "
-        "ROUND FILE WHERE THE SCREW THREAD MARKED IT, OR, IF NEITHER IS MARKED, "
-        "CHASE THE TAPPED WALL WITH A #10-32 BOTTOMING TAP; REPEAT "
-        f"{_step(steps.COLUMNS_RESEATED_KEY)} AND {_step(steps.LOWER_HOLES_CHECKED_KEY)}."
+        "IF IT DOES NOT START, FILE THE TUBE HOLE ITS THREAD MARKED WITH A ROUND "
+        f"FILE, THAT COLUMN OUT, UNTIL {_step(steps.LOWER_HOLES_CHECKED_KEY)} PASSES."
+    ),
+    "lower-tap-chased": (
+        "IF NEITHER TUBE HOLE IS MARKED, CHASE THE TAPPED SOCKET WALL WITH A "
+        f"#10-32 BOTTOMING TAP UNTIL {_step(steps.LOWER_HOLES_CHECKED_KEY)} PASSES."
     ),
     "top-frame-lowered": (
         f"LOWER {_TOP} OVER THE COLUMNS, TURNED AS SECTION B-B (SHEET 1) SHOWS."
@@ -594,8 +598,7 @@ STEP_TEXT = {
     steps.COLUMNS_CUT_KEY: f"CUT EACH {_COLUMN} AT ITS MARK. DO NOT TRIM THE {_CAP} CAPS.",
     "columns-chamfered": f"CHAMFER THE CUT END OF EACH {_COLUMN}.",
     steps.FRAME_RESEATED_KEY: (
-        f"RESEAT THE COLUMNS IN {_BASE}, THEN {_TOP} ON THEM, ALL ON THEIR MATCH "
-        "MARKS."
+        f"RESEAT THE COLUMNS AND {_TOP} ON {_BASE}, ALL ON THEIR MATCH MARKS."
     ),
     "top-axis-reset": (
         f"REPEAT STEPS {steps.step_number(steps.TOP_AXIS_SET_KEY)} AND "
@@ -617,9 +620,9 @@ STEP_TEXT = {
         "SOCKET."
     ),
     "upper-holes-reworked": (
-        f"IF IT DOES NOT START, {_LIFT_OFF[:-1]}, WORK THE COLUMN AS "
-        f"{_step('lower-holes-reworked')} AND REPEAT FROM "
-        f"{_step('frame-reassembled')}."
+        f"IF IT DOES NOT START, REWORK AS STEPS {steps.step_number('lower-holes-reworked')}"
+        f"-{steps.step_number('lower-tap-chased')} WITH {_TOP} AND THE COLUMNS OFF "
+        f"{_BASE}, UNTIL {_step(steps.UPPER_HOLES_CHECKED_KEY)} PASSES."
     ),
     # The far-wall engagement accepted at the bench, before the screw goes in
     # (CROSS_SCREW_FULL_THREAD_MIN_IN): the installed thread is out of sight.
@@ -634,8 +637,8 @@ STEP_TEXT = {
     ),
     "cross-screw-heads-checked": f"CHECK EVERY {_CROSS} HEAD SEATS.",
     "cross-screw-taps-chased": (
-        "IF ONE DOES NOT, TAKE IT OUT, CHASE ITS TAPPED HOLE WITH A #10-32 "
-        f"BOTTOMING TAP AND REPEAT {_step(steps.CROSS_SCREWS_DRIVEN_KEY)} FOR IT."
+        "IF ONE DOES NOT, CHASE ITS TAPPED HOLE WITH A #10-32 BOTTOMING TAP UNTIL "
+        f"IT SEATS AS {_step(steps.CROSS_SCREWS_DRIVEN_KEY)}."
     ),
     "cap-recesses-checked": (
         f"CHECK EACH CAP RECESS IN {_TOP} CLEARS THE SKIRT OF ITS {_CAP}."

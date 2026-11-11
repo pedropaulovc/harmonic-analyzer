@@ -67,6 +67,7 @@ SEQUENCE: tuple[str, ...] = (
     COLUMNS_RESEATED_KEY,
     LOWER_HOLES_CHECKED_KEY,
     "lower-holes-reworked",
+    "lower-tap-chased",
     # The top frame on the columns, at the controlling height.
     "top-frame-lowered",
     "top-sockets-fitted",
