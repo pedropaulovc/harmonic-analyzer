@@ -192,9 +192,12 @@ _REERECTED_HEAD = (
 _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "frame-built": (
         f"FRAME: FIT {build.FRAME_FITTED.text} ON A FLAT BENCH.",
-        "LEAVE THE COLUMNS AND MHA-FR-02 OFF MHA-FR-01 FROM "
-        f"{fr_steps.step_ref(build.FRAME_LIFTED_KEY)} UNTIL {_REERECTED_HEAD}.",
-        f"FIT {build.LOOSE_CASTINGS.text} ON THE LOOSE MHA-FR-01 AND MHA-FR-02.",
+        "LEAVE THE COLUMNS AND MHA-FR-02 OFF MHA-FR-01 ONCE "
+        f"{fr_steps.step_ref(build.FRAME_LIFTED_KEY)} LIFTS THEM, UNTIL "
+        f"{_REERECTED_HEAD}.",
+        f"FIT {build.LOOSE_CASTINGS.text} NOW, ON THE LOOSE MHA-FR-01 AND "
+        "MHA-FR-02, AHEAD OF ITS "
+        f"{build.FRAME_ERECTED.text.removeprefix(fr_steps.DRAWING_NUMBER + ' ')}.",
     ),
     "drive-train-built": _BUILT_APART,
     "summing-hung": (
