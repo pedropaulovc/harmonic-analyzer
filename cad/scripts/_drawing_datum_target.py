@@ -151,7 +151,9 @@ def add_datum_target(
         "GetDatumReferenceLabel",
     )
     if symbol.SetDatumTargetNotMoveable() is not True:
-        raise RuntimeError(f"datum target {target} did not take a fixed target ({label})")
+        raise RuntimeError(
+            f"datum target {target} did not take a fixed target ({label})"
+        )
     annotation = _sw_type_info.early_bound_or_flag(
         symbol.GetAnnotation(), "IAnnotation", "SetPosition2"
     )
@@ -185,7 +187,10 @@ def add_datum_target(
             f" {read!r}"
         )
     points = read["leader_points"][0]
-    if len(points) < 6 or math.dist(points[-3:-1], target_xy) > _TARGET_LANDING_TOLERANCE_M:
+    if (
+        len(points) < 6
+        or math.dist(points[-3:-1], target_xy) > _TARGET_LANDING_TOLERANCE_M
+    ):
         raise RuntimeError(
             f"datum target {target}'s leader does not end on {target_xy} ({label}):"
             f" {points!r}"

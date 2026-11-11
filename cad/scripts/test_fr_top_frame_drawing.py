@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import functools
 import inspect
 import math
 import re
@@ -156,9 +157,20 @@ def test_cross_screw_head_stays_below_the_counterbore_mouth_at_every_printed_ban
     recess = mouth_low - (floor_offset + part.CROSS_SCREW_HEAD_H)
     assert recess > 0.0
     assert counterbore_radius > part.CROSS_SCREW_HEAD_DIA / 2.0
+    # That is with the barrel on its socket's axis.  The barrel is cast and
+    # the socket machined: the bosses' ⌖Ø.06|A|B (Main's delegated ruling
+    # 2026-11-11, #2333) lets the barrel stand .03 off it, which comes
+    # straight off the recess.  No corner stands prouder than the product's
+    # stated residual (#2516), and nominal sizes keep the head under.
+    offset = spec.BOSS_POSITION_ZONE / 2.0
+    assert offset == pytest.approx(0.03 * 25.4)
+    assert offset - recess <= part.COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX + 1e-9
+    assert part.COUNTERBORE_HEAD_RECESS - offset == pytest.approx(0.2877, abs=5e-4)
     if (boss_direction, seat_direction, floor_direction) == (-1, 1, 1):
         assert recess == pytest.approx(part.COUNTERBORE_PRINTED_HEAD_RECESS)
         assert recess == pytest.approx(0.0219, abs=5e-4)
+        assert offset - recess == pytest.approx(part.COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX)
+        assert offset - recess == pytest.approx(0.7401, abs=5e-4)  # .029
 
 
 def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
@@ -191,6 +203,12 @@ def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
     assert part.COUNTERBORE_PRINTED_NEAR_WALL >= 2.032
     assert part.COUNTERBORE_PRINTED_NEAR_WALL == pytest.approx(2.6797, abs=5e-4)  # .1055
     assert part.COUNTERBORE_PRINTED_HEAD_RECESS > 0.0
+    # The floor may go this much deeper before that ligament reaches .080:
+    # less than the head's worst printed standout with the barrel .03 off its
+    # socket, so no floor closes it (the residual is the owner's, #2516).
+    spare = (floor_offset - recess_radius) - math.sqrt(2.032**2 - (recess_floor - rim) ** 2)
+    assert spare == pytest.approx(0.2769, abs=5e-4)
+    assert spare < part.COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX
 
 
 def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
@@ -207,8 +225,18 @@ def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
     assert part.SIDE_TAP_THREAD_END_Z == pytest.approx(thread_end_z)
     assert part.SIDE_TAP_DRILL_POINT_Z == pytest.approx(drill_point_z)
     assert 0.0 < drill_point_z < thread_end_z < part.WEB_IN_Z
-    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(4.064)
-    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.4577)
+    # Owner rulings B2 and D3 (#2333): the thinnest printed web, .51 -.03,
+    # with its centre plane the half of its ⌖.06|A|B off the socket axes the
+    # tap stands on, still holds the wall target about the thread and drill.
+    web_half = (spec.WEB_T - spec.AS_CAST_BAND) / 2.0 - spec.RAIL_WEB_POSITION_ZONE / 2.0
+    assert web_half == pytest.approx(5.334)  # .210
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(web_half - major_dia / 2.0)
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(
+        web_half - part.SIDE_TAP_DRILL_DIA / 2.0
+    )
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(2.921)  # .115
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(3.3147)  # .1305
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN >= WALL_TARGET_MM
     assert major_dia / 2.0 < part.HALF_H - abs(spec.SCREW_AXIS_Y)
 
 
@@ -284,13 +312,15 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
     overall_length = part._keeper_printed(
         keeper.OVERALL_LENGTH, overall_places, overall_direction
     )
-    # Owner rulings B2, D2 and D6 (#2333): the barrel prints Ø1.77 ±.03 on
-    # the faced top the feet sit on, its axis within the socket pattern's
-    # Ø.06 location of its socket's; the sockets hold Ø.010 to each other, so
-    # the pitch the feet are located across closes by that much.
+    # Owner rulings B2, D2 and D6 (#2333) and Main's delegated ruling
+    # 2026-11-11: the barrel prints Ø1.77 ±.03 on the faced top the feet sit
+    # on, its axis within the bosses' own ⌖Ø.06|A|B of its socket's (the
+    # sockets' Ø.06 to the cast targets does not hold it); the sockets hold
+    # Ø.010 to each other, so the pitch the feet are located across closes
+    # by that much.
     boss_radius = (
         part.BOSS_DIA + boss_direction * spec.AS_CAST_BAND
-    ) / 2.0 + boss_direction * spec.SOCKET_PATTERN_LOCATION_ZONE / 2.0
+    ) / 2.0 + boss_direction * spec.BOSS_POSITION_ZONE / 2.0
     socket_pitch = (
         part.REAR_COLUMN_Z - part.FRONT_COLUMN_Z
     ) + pitch_direction * spec.SOCKET_PATTERN_REFINEMENT_ZONE
@@ -1456,8 +1486,21 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
         for name, value in vars(drawing).items()
         if name.endswith("_KEEP") and isinstance(value, dict)
     }
-    assert len(keeps) >= 16
-    kept = set().union(*keeps.values())
+    # Every view's import names its keep table (the dowel ream's one name is
+    # spelled in place) and every table is imported once, so the scan below
+    # sees each kept name whatever the number of sheets.
+    imports = _named_calls(_drawing_tree(), "curate_view_dimensions")
+    tables = [_keyword(call, "keep") for call in imports]
+    assert sorted(table.id for table in tables if isinstance(table, ast.Name)) == sorted(keeps)
+    inline = [table for table in tables if not isinstance(table, ast.Name)]
+    assert [ast.literal_eval(ast.Tuple(table.keys, ast.Load())) for table in inline] == [
+        ("HangerPinHoleDia",)
+    ]
+    for call in imports:
+        assert ast.unparse(_keyword(call, "dimensions_by_feature")) == "DRAWING_DIMENSIONS"
+    kept = set().union({"HangerPinHoleDia"}, *keeps.values())
+    # A kept name the part never marked for drawing would import nothing.
+    assert not kept - set().union(*spec.DRAWING_DIMENSIONS.values())
     assert kept, "the top-frame sheets import no model dimensions"
     assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)
 
@@ -1966,12 +2009,40 @@ def test_side_rail_and_crossbar_print_as_two_sections_without_a_sheet_scale() ->
     assert drawing.CROSSBAR_SECTION_LETTER not in {"A", "B", "D", "E", "F", "G", "H", "J", "K", "L"}
     assert not hasattr(drawing, "RAIL_SECTION_SCALE_LABEL")
     assert "SCALE 1 : 3" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    # Each section imports the model's own as-cast dimensions (owner ruling
+    # B2, #2333): E-E the side web under its 2X WEB, M-M the crossbar's web
+    # and its pockets' depth, with the rails' flange a reference beside them.
+    tree = _drawing_tree()
+    imported = {
+        ast.unparse(call.args[1]): ast.unparse(_keyword(call, "keep"))
+        for call in _named_calls(tree, "curate_view_dimensions")
+    }
+    assert imported["side_section"] == "SIDE_SECTION_KEEP"
+    assert imported["crossbar_section"] == "CROSSBAR_SECTION_KEEP"
+    callouts = {
+        ast.unparse(call.args[1]): ast.unparse(call.args[2])
+        for call in _named_calls(tree, "set_dimension_callouts")
+    }
+    assert callouts["side_section_dimensions"] == "{'SideWebT': SIDE_WEB_QUALIFIER}"
+    assert callouts["crossbar_section_dimensions"] == "CROSSBAR_SECTION_CALLOUTS"
+    assert set(drawing.SIDE_SECTION_KEEP) == {"SideWebT"}
+    assert drawing.CROSSBAR_SECTION_CALLOUTS == {
+        "CrossbarWebT": "CROSSBAR WEB",
+        "PocketDepth": "2X POCKET",
+    }
+    assert set(drawing.CROSSBAR_SECTION_KEEP) == set(drawing.CROSSBAR_SECTION_CALLOUTS)
+    for name in ("SideWebT", "CrossbarWebT", "PocketDepth"):
+        assert name in set().union(*spec.AS_CAST_DIMENSIONS.values()), name
+    flange = _labelled_call(tree, "_checked_dimension", "crossbar flange thickness")
+    assert ast.unparse(flange.args[1]) == "crossbar_section"
+    assert ast.literal_eval(_keyword(flange, "suffix")) == "CROSSBAR FLANGE"
+    assert ast.literal_eval(_keyword(flange, "reference")) is True
+    assert ast.unparse(_keyword(flange, "expected_mm")) == "FLANGE"
     side = source[source.index('section_label="E"'):source.index("crossbar_cut = [")]
-    assert "suffix=SIDE_WEB_QUALIFIER" in side
-    assert all(q not in side for q in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'))
-    crossbar = source[source.index("section_label=CROSSBAR_SECTION_LETTER"):]
-    for qualifier in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'):
-        assert qualifier in crossbar
+    assert all(
+        q not in side
+        for q in ("CROSSBAR_SECTION_CALLOUTS", "CROSSBAR_SECTION_KEEP", '"CROSSBAR FLANGE"')
+    )
     # Both print at the sheet's 1:3 (no scale row), their one-row captions
     # (44 mm) side by side, each centred under its own section.
     assert drawing.SIDE_SECTION_SCALE == (1, 3)
@@ -2111,12 +2182,26 @@ def test_set_screw_pocket_is_retired_for_the_boss() -> None:
     for retired in ("SET_POCKET", "_hub_pocket_section", "PocketRise", "POCKET_RISE", "POCKET RIM"):
         assert not any(retired in source for source in sources), retired
     assert "hub_section = _hub_boss_section(adapter, hub_top)" in sources[2]
+    # VIEW G also carries the hub gussets' span and the hub boss's drop.
+    # Its width is the boss's on the underside, where the drafted side walls
+    # start, so its last row says so.
     assert drawing.HUB_LEFT_CALLOUTS == {
-        "SetBossWidth": "SET-SCREW BOSS",
+        "SetBossWidth": "SET-SCREW BOSS\nAT UNDERSIDE",
         "SetSpotDia": "",
+        "GussetSpan": "GUSSET SPAN",
+        "HubBossDrop": "",
     }
-    # rule 26: the spot face prints in the symbol form, its depth a reference.
-    assert drawing.SET_SPOT_DEPTH_TEXT == "(.04)"
+    assert set(drawing.HUB_LEFT_CALLOUTS) == set(drawing.HUB_LEFT_KEEP)
+    # rule 26: the spot face prints in the symbol form, its depth a reference
+    # on the tap axis.  The boss face stands .95 from the bore axis on the
+    # faced top only (owner ruling B4, #2333) and its taken-out draft (D1)
+    # has receded .025 by the axis, so the spot is .095 deep there, not the
+    # .12 the two printed stations differ by.
+    lean = part.SCREW_AXIS_BELOW_RAIL_TOP * math.tan(math.radians(spec.DRAFT_DEG))
+    depth = spec.HUB_SET_BOSS_FROM_AXIS - lean - spec.HUB_SET_SPOT_FROM_AXIS
+    assert (lean, depth) == pytest.approx((0.6386, 2.4094), abs=5e-5)
+    assert f"{depth / 25.4:.{spec.HUB_SET_SPOT_PLACES}f}" == "0.09"
+    assert drawing.SET_SPOT_DEPTH_TEXT == "(.09)"
     assert "spot_dia[0], count=\"\", depth=SET_SPOT_DEPTH_TEXT," in sources[2]
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short callouts that state the feature, not the process.
     for text in drawing.HUB_LEFT_CALLOUTS.values():
@@ -2148,12 +2233,10 @@ _HISTORICAL_DD_CAPTION_EXTENT = (0.0227, 0.0147, 0.0226, 0.0)
 _FINISH_INK = (0.0, 0.0, 0.0148, 0.0068)
 # The hub side view's tap centre prints at (146.5, 95.9) mm.  The unchanged
 # tap callout elbows 30.0 left of and 5.6 under its text point, its two rows
-# printing -28.3..+28.0 x -5.0..+4.4 about it; HUB LOCATION printed
-# 107.4..140.8 x 139.9..143.5 (run 6).
+# printing -28.3..+28.0 x -5.0..+4.4 about it (run 6).
 _HUB_LEFT_TAP = (0.1465, 0.0959)
 _TAP_CALLOUT_ELBOW = (-0.0300, -0.0056)
 _TAP_CALLOUT_EXTENT = (0.0283, 0.0050, 0.0280, 0.0044)
-_HUB_LOCATION_NOTE = (0.1074, 0.1399, 0.1408, 0.1435)
 
 
 def _dimension_block(xy, rows):
@@ -2162,6 +2245,19 @@ def _dimension_block(xy, rows):
     half_w = max(map(len, lines)) * _ROW_CHAR / 2.0 + _UNDERLINE_PAST
     half_h = (len(lines) * _ROW_PITCH - _ROW_SLACK) / 2.0
     return (xy[0] - half_w, xy[1] - half_h - _UNDERLINE_DROP, xy[0] + half_w, xy[1] + half_h)
+
+
+def _imported_dimension_block(xy, rows):
+    """An imported model dimension's text block about its text point,
+    underline included, as farm run 20261111T023438415Z's native rows read
+    on every sheet: the rows stand on a 5.56 mm pitch, their middle 2.78 mm
+    under the point (two rows on it and 5.56 under it; three 2.78 over it
+    and 2.78 and 8.33 under), glyphs to 4.5 mm over a row's line and the
+    underline on the last row's."""
+    lines = rows.splitlines()
+    half_w = max(map(len, lines)) * _ROW_CHAR / 2.0 + _UNDERLINE_PAST
+    top_row = xy[1] + (len(lines) - 2) * 0.00278
+    return (xy[0] - half_w, top_row - (len(lines) - 1) * 0.00556, xy[0] + half_w, top_row + 0.0045)
 
 
 def _offset_leader(line_xy, block):
@@ -2184,9 +2280,10 @@ def _dd(x: float, y: float) -> tuple[float, float]:
 def test_hub_boss_section_layout_replays_historical_ink() -> None:
     """Q5 layout with its measured historical D-D caption envelope.
 
-    The current K-K view keeps the thread, spot-face and boss-face geometry
-    and text placement.  Replaying the old caption is baseline evidence
-    only; native inspection must establish the new caption's clearance.
+    The current K-K view keeps the thread and spot-face geometry and text
+    placement; the cast boss face's .95 left it for DETAIL J (owner ruling
+    B4, #2333).  Replaying the old caption is baseline evidence only; native
+    inspection must establish the new caption's clearance.
     """
     from _layout_geometry import Segment, segment_box_distance
 
@@ -2194,32 +2291,26 @@ def test_hub_boss_section_layout_replays_historical_ink() -> None:
     spot_r = spec.HUB_SET_SPOT_DIA / 2.0
     bore_x = part.GOOSENECK_X - part.GOOSENECK_BORE_DIA / 2.0
     spot_x, boss_x, axis_x = part.SET_SPOT_FACE_X, part.SET_BOSS_FACE_X, part.GOOSENECK_X
-    chamfer = part.EDGE_CHAMFER
     thread_y = drawing.HUB_SET_THREAD_LINE_XY[1]
     spot_y = drawing.HUB_SET_SPOT_LINE_XY[1]
-    boss_y = drawing.HUB_SET_BOSS_LINE_XY[1]
     lines = {
         "thread": Segment(_dd(spot_x, 0.0)[0], thread_y, _dd(bore_x, 0.0)[0], thread_y),
         "21.0": Segment(_dd(axis_x, 0.0)[0], spot_y, _dd(spot_x, 0.0)[0], spot_y),
-        "22.0": Segment(_dd(axis_x, 0.0)[0], boss_y, _dd(boss_x, 0.0)[0], boss_y),
     }
     # Each offset leader leaves its own line's midpoint.
     for name, xy in {
         "thread": drawing.HUB_SET_THREAD_LINE_XY,
         "21.0": drawing.HUB_SET_SPOT_LINE_XY,
-        "22.0": drawing.HUB_SET_BOSS_LINE_XY,
     }.items():
         line = lines[name]
         assert xy[0] == pytest.approx((line.x0 + line.x1) / 2.0, abs=1e-4), name
     blocks = {
         "thread": _dimension_block(drawing.HUB_SET_THREAD_OFFSET_XY, "(10.5)\nTHREAD LENGTH"),
         "21.0": _dimension_block(drawing.HUB_SET_SPOT_OFFSET_XY, "21.0\nSPOT FACE\nFROM BORE AXIS"),
-        "22.0": _dimension_block(drawing.HUB_SET_BOSS_OFFSET_XY, "(22.0)\nBOSS FACE\nFROM BORE AXIS"),
     }
     leaders = {
         "thread": _offset_leader(drawing.HUB_SET_THREAD_LINE_XY, blocks["thread"]),
         "21.0": _offset_leader(drawing.HUB_SET_SPOT_LINE_XY, blocks["21.0"]),
-        "22.0": _offset_leader(drawing.HUB_SET_BOSS_LINE_XY, blocks["22.0"]),
     }
     over = _EXTENSION_OVERSHOOT
     extensions = {
@@ -2227,11 +2318,6 @@ def test_hub_boss_section_layout_replays_historical_ink() -> None:
         "spot face": ("thread", "21.0", Segment(*_dd(spot_x, spot_r), _dd(spot_x, 0.0)[0], spot_y + over)),
         "bore wall": ("thread", Segment(*_dd(bore_x, part.HALF_H), _dd(bore_x, 0.0)[0], thread_y + over)),
         "upper axis": ("21.0", Segment(*_dd(axis_x, part.HALF_H + 2.0), _dd(axis_x, 0.0)[0], spot_y + over)),
-        "boss face": ("22.0", Segment(*_dd(boss_x, -part.HALF_H + chamfer), _dd(boss_x, 0.0)[0], boss_y - over)),
-        "lower axis": (
-            "22.0",
-            Segment(*_dd(axis_x, -part.HALF_H - part.HUB_BOSS_DROP - 2.0), _dd(axis_x, 0.0)[0], boss_y - over),
-        ),
     }
     left, bottom = _dd(boss_x, -part.HALF_H - part.HUB_BOSS_DROP)
     right, top = _dd(-part.INNER_X, part.HALF_H)
@@ -2266,10 +2352,16 @@ def test_hub_boss_section_layout_replays_historical_ink() -> None:
             if other != name:
                 assert _segment_gap(leader, line) >= ink, (name, other)
         assert segment_box_distance(leader, _layout_box(caption)) >= ink, name
-    # The 22.0 hangs under the view over the caption: its line, arrowheads
-    # and extension ends all stay an ink clearance above it.
-    assert boss_y - drawing.ARROW_HALF_WIDTH - caption[3] >= ink
-    assert boss_y - over - caption[3] >= ink
+    # K-K dimensions the thread run and the spot face only: a section along
+    # the tap axis does not import the boss face's Top-plane SetBossFace.
+    section = _function(_drawing_tree(), "_hub_boss_section")
+    assert sorted(
+        ast.literal_eval(_keyword(call, "label"))
+        for call in _named_calls(section, "_checked_dimension")
+    ) == ["set-screw spot face from bore axis", "set-screw thread length"]
+    assert not _named_calls(section, "curate_view_dimensions")
+    for name in ("HUB_SET_BOSS_LINE_XY", "HUB_SET_BOSS_OFFSET_XY"):
+        assert not hasattr(drawing, name), name
 
 
 def _layout_box(box):
@@ -2279,11 +2371,13 @@ def _layout_box(box):
 
 
 def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
-    """Q5: the 1:2 side view sees the boss face on.  The 18.0 width's rows
-    stand straight over it; the tap callout's leader leaves under the right
-    extension line's foot and the Ø10.0 spot face's under the left one, each
-    an ink clearance off, and the spot leader's run over the part stays
-    inside the leader-over-part detour gate."""
+    """Q5: the 1:2 side view sees the boss face on.  The width's rows stand
+    straight over it -- the model's own .71 ±.03 with SET-SCREW BOSS and,
+    the side walls being drafted from there, AT UNDERSIDE; the tap callout's
+    leader leaves under the right extension line's foot and the Ø10.0 spot
+    face's under the left one, each an ink clearance off, and the spot
+    leader's run over the part stays inside the leader-over-part detour
+    gate."""
     from _layout_audit import LEADER_DETOUR_PROVISIONAL_M
     from _layout_geometry import Segment, segment_box_distance
 
@@ -2299,9 +2393,19 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
     extensions = {
         side: Segment(x, y, x, line_y + _EXTENSION_OVERSHOOT) for side, (x, y) in feet.items()
     }
-    width = _dimension_block(
-        drawing.SET_BOSS_WIDTH_TEXT_XY, "18.0\n" + drawing.HUB_LEFT_CALLOUTS["SetBossWidth"]
+    width_rows = drawing.HUB_LEFT_CALLOUTS["SetBossWidth"].splitlines()
+    assert width_rows == ["SET-SCREW BOSS", "AT UNDERSIDE"]
+    assert "SetBossWidth" in spec.AS_CAST_DIMENSIONS["SetBossProfile"]
+    assert spec.HUB_SET_BOSS_W / 25.4 == pytest.approx(0.71)
+    width = _imported_dimension_block(
+        drawing.SET_BOSS_WIDTH_TEXT_XY, "\n".join([".71 ±.03", *width_rows])
     )
+    # Three rows stand 2.78 mm over where two stood: over their own line,
+    # under the plan above (its outline starts at y 149.6 on that farm run;
+    # the HUB LOCATION note that once stood between them left the sheet
+    # with the machinist-review answer c852399891).
+    assert width[1] - line_y >= ink
+    assert 0.1496 - width[3] >= ink
     width_line = Segment(tap[0] - half_w, line_y, tap[0] + half_w, line_y)
     # The tap callout: unchanged, its leader dropping from the elbow
     # through the tap centre to the tap circle.
@@ -2336,7 +2440,7 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
         leader = leaders[name]
         t = (x - leader.x0) / (leader.x1 - leader.x0)
         assert leader.y0 + t * (leader.y1 - leader.y0) < boss_top, name
-    texts = {"18.0": width, "Ø10.0": spot, "tap callout": callout, "HUB LOCATION": _HUB_LOCATION_NOTE}
+    texts = {"18.0": width, "Ø10.0": spot, "tap callout": callout}
     for name, box in texts.items():
         for other, other_box in texts.items():
             if other != name:
@@ -2477,67 +2581,1009 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
 
 
 def test_hanger_x_locates_datum_d_not_a_hole() -> None:
-    """The 204.5 (8.050) runs from the left bosses' tangent -- the Y edge of
-    sheet 3's boss-corner origin (owner rulings 2026-11-07), so the view
-    keeps one origin (farm run 20261107T105312645Z: a 7.165 from the
-    upper-left socket axis read as a second origin) -- to D's trace, the
-    native centreline between the crossbar's two side-face edges, an .XXX
-    locator; no competing hole-axis X dimension survives."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    block = source[source.index("# D's own station"):source.index("# #946:")]
-    assert "crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0" in block
-    assert "_insert_crossbar_median(" in block and "_add_view_centerlines(" not in block
-    # Sheet 2's proven flange-width picks: the two side faces' top edges.
-    assert (
-        "((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0))"
-        in block
-    )
-    assert 'label="crossbar median D from left boss tangent"' in block
-    assert "expected_mm=crossbar_median_x - TABLE_ORIGIN_XZ[0]" in block
-    assert "text_xy=D_STATION_TEXT_XY" in block
-    # The tangent by its sketch segment; the median keeps its typed
-    # CENTERLINE pick at the mid-bar point, clear of both holes.
-    assert "tangents = _draw_boss_tangents(adapter, detail_top)" in block
-    assert 'entity_types=("SKETCHSEGMENT", "CENTERLINE")' in block
-    assert 'entities=(tangents["left boss tangent"].segment, None)' in block
-    assert "p1=(crossbar_median_x, HALF_H, 0.0)" in block
+    """Owner rulings B5 and D2 (#2333): the hanger axes stand BASIC zero on
+    D, the median plane of the crossbar's two as-cast sides, held by
+    ⌖.010|D; no hole-axis X dimension competes with it (farm run
+    20261107T105312645Z: a 7.165 from a socket axis read as a second
+    origin).  Sheet 3 keeps D's trace only, the native centreline between
+    the two side faces; D's width, its tag and its 9.18 ±.03 station from
+    datum G -- the model's own DStation -- stand on sheet 7."""
+    tree = _drawing_tree()
+    for owner, view in (("build", "detail_top"), ("_cast_datum_sheet", "bottom")):
+        function = _function(tree, owner)
+        (trace,) = _named_calls(function, "_insert_crossbar_median")
+        assert ast.unparse(trace.args[1]) == view
+        (sides,) = _named_calls(trace, "_exact_linear_entities")
+        (x0, y0, z0), (x1, y1, z1) = _build_value(function, sides.args[1])
+        # Both picks ride the bar's drafted side faces (owner ruling B1) at
+        # one height, between the hanger holes, and D is their median.
+        assert (y0, z0) == (y1, z1) == (pytest.approx(part.HALF_H - drawing.TOP_BREAK_DROP), 0.0)
+        for x, outward in ((x0, -1.0), (x1, 1.0)):
+            assert part._casting_occupies(x - outward * 1e-6, y0, 0.0), (view, x)
+            assert not part._casting_occupies(x + outward * 1e-6, y0, 0.0), (view, x)
+        assert x1 - x0 > part.BAR_X1 - part.BAR_X0
+        assert (x0 + x1) / 2.0 == pytest.approx(part.HANGER_X), view
     assert (
         part.STUD_Z_FRONT + spec.HANGER_WASHER.OD_MAX
         < 0.0
         < part.STUD_Z_REAR - spec.HANGER_WASHER.OD_MAX
     )
-    assert "center=True" not in block
-    assert "reference=" not in block and "set_basic_dimension" not in block
-    # rule 7: a location carries its value and band only.
-    assert "suffix=" not in block[block.index("_checked_dimension("):]
     assert (part.BAR_X0 + part.BAR_X1) / 2.0 == pytest.approx(part.HANGER_X)
-    # D's station equals the hanger holes' table X, both from the corner.
-    d_station = part.HANGER_X - drawing.TABLE_ORIGIN_XZ[0]
-    assert d_station / 25.4 == pytest.approx(8.050, abs=0.0005)
-
-
-def test_boss_tangents_make_the_table_corner_and_d_extension() -> None:
-    """Owner ruling 2026-11-07: the hole-table origin is the virtual corner
-    where the Ø1.77 boss ODs touch -- the lower bosses' tangent (Y 0) and
-    the left bosses' tangent (X 0) -- drawn as thin phantom lines, the left
-    one running up past the upper-left boss to datum D's dimension line."""
-    x0, z0 = drawing.TABLE_ORIGIN_XZ
-    r = part.BOSS_DIA / 2.0
-    assert x0 == pytest.approx(-part.COLUMN_X - r)
-    assert z0 == pytest.approx(part.REAR_COLUMN_Z + r)
-    # The bosses stand .210 / .135 proud of the rail faces.
-    assert (-x0 - part.OUTER_X) / 25.4 == pytest.approx(0.210, abs=0.0005)
-    assert (z0 - part.OUTER_Z) / 25.4 == pytest.approx(0.135, abs=0.0005)
-    assert (drawing.TABLE_TANGENT_LINE_STYLE, drawing.TABLE_TANGENT_LINE_WEIGHT) == (2, 0)
-    assert drawing.TABLE_TANGENT_TOP_Y == drawing.D_STATION_TEXT_XY[1]
-    # The left tangent reaches past the upper-left boss to D's line.
-    assert _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)[1] + r * _S < drawing.TABLE_TANGENT_TOP_Y
+    # The frame is the hanger holes' only X control on the plan.
+    frame = _labelled_call(
+        tree, "add_feature_control_frame", "hanger axes on crossbar median plane"
+    )
+    assert ast.unparse(frame.args[1]) == "detail_top"
+    assert ast.unparse(_keyword(frame, "datums")) == "('D',)"
+    assert _keyword(frame, "diameter") is None
+    assert ast.unparse(_keyword(frame, "tolerance")) == (
+        "GEOMETRIC_TOLERANCES_IN['knife-hanger crossbar centring']"
+    )
+    assert spec.GEOMETRIC_TOLERANCES_IN["knife-hanger crossbar centring"] == ".010"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    helper = source[source.index("def _draw_boss_tangents("):source.index("def _set_table_origin_arrows(")]
-    assert '"lower boss tangent": (tuple(corner[:2]), tuple(lower_right[:2]))' in helper
-    assert '"left boss tangent": (tuple(corner[:2]), (corner[0], TABLE_TANGENT_TOP_Y))' in helper
-    assert "(COLUMN_X, z0, \"lower-right boss tangent point\")" in helper
-    assert "require_placed(" in helper
+    for retired in (
+        "D_STATION_TEXT_XY",
+        "crossbar median D from left boss tangent",
+        "crossbar_median_x",
+    ):
+        assert retired not in source, retired
+    # D's station is the model's own dimension from the G plane, as cast, and
+    # only sheet 7's underside imports it.
+    assert part.D_STATION == pytest.approx(part.CAST_DATUM_ORIGIN_XZ[0] - part.HANGER_X)
+    assert part.D_STATION == pytest.approx(233.0977, abs=5e-5)
+    assert f"{part.D_STATION / 25.4:.2f}" == "9.18"
+    assert "DStation" in spec.DRAWING_DIMENSIONS["BarProfile"]
+    assert "DStation" in spec.AS_CAST_DIMENSIONS["BarProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["DStation"] == 2
+    assert [
+        name
+        for name, keep in vars(drawing).items()
+        if name.endswith("_KEEP") and isinstance(keep, dict) and "DStation" in keep
+    ] == ["DATUM_BOTTOM_KEEP"]
+    assert '"horizontal_distance", D_STATION, "DStation"' in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_datum_plane_traces_make_the_table_corner() -> None:
+    """Owner rulings B6 and D2 (#2333): the hole-table origin is the corner
+    of the cast datum planes F and G -- F through the two rear barrels' rear
+    generators at the datum targets' height, G through the rear-west
+    barrel's west generator -- drawn on the plan as thin phantom traces from
+    that corner: F under both rear bosses to the rear-east one's tangent
+    point, G up the rear-west boss past G1's."""
+    x0, z0 = drawing.TABLE_ORIGIN_XZ
+    assert (x0, z0) == part.CAST_DATUM_ORIGIN_XZ
+    # The barrel's taken-out draft (owner ruling B1) has narrowed it by the
+    # targets' height: the planes stand .8305 off the rear-west socket's
+    # axis, .054 inside the Ø1.77 the faced top holds.
+    drop = part.HALF_H - part.DATUM_TARGET_Y
+    r = part.BOSS_DIA / 2.0 - drop * math.tan(math.radians(spec.DRAFT_DEG))
+    assert (drop, r) == pytest.approx((39.624, 21.0953), abs=5e-5)
+    assert r == pytest.approx(part._boss_radius(part.DATUM_TARGET_Y))
+    assert (x0, z0) == pytest.approx((part.COLUMN_X + r, part.REAR_COLUMN_Z + r))
+    assert (part.BOSS_DIA / 2.0 - r) / 25.4 == pytest.approx(0.0545, abs=5e-5)
+    targets = part.CAST_DATUM_TARGETS
+    assert targets["F1"][2] == targets["F2"][2] == pytest.approx(z0)
+    assert targets["G1"][0] == pytest.approx(x0)
+    assert (drawing.TABLE_TANGENT_LINE_STYLE, drawing.TABLE_TANGENT_LINE_WEIGHT) == (2, 0)
+    helper = _function(_drawing_tree(), "_draw_datum_traces")
+    (ends,) = [node.iter for node in ast.walk(helper) if isinstance(node, ast.comprehension)]
+    assert [ast.unparse(end) for end in ends.elts] == [
+        "(x0, z0, 'hole-table F|G corner')",
+        "(-COLUMN_X, z0, 'rear-east boss F tangent point')",
+        "(x0, TABLE_G_LINE_FRONT_Z, 'G trace front end')",
+    ]
+    (lines,) = _named_calls(helper, "sketch_lines")
+    assert ast.unparse(lines.args[2]) == (
+        "{'F plane': (tuple(corner[:2]), tuple(f_end[:2])),"
+        " 'G plane': (tuple(corner[:2]), tuple(g_end[:2]))}"
+    )
+    assert len(_named_calls(helper, "require_placed")) == 1
+    # G's trace runs forward past G1's tangent point and ends on the boss.
+    assert targets["G1"][2] - part.BOSS_DIA / 2.0 < drawing.TABLE_G_LINE_FRONT_Z < targets["G1"][2]
+    for retired in ("TABLE_TANGENT_TOP_Y", "_draw_boss_tangents"):
+        assert not hasattr(drawing, retired), retired
+
+
+def test_six_cast_datum_targets_stand_on_the_castings_own_skin() -> None:
+    """Owner rulings B6 and D2 (#2333): the casting's first set-up stands on
+    six points of its as-cast surface, 3-2-1 -- E1 to E3 on three corner-boss
+    bottoms, F1 and F2 on the two rear barrels' rear generators, G1 on the
+    rear-west barrel's west generator.  Each is a point of the drafted
+    solid's skin with its face's land about it, the three E points span the
+    frame's centre, and the two locations that place them print BASIC."""
+    from types import SimpleNamespace
+
+    targets = part.CAST_DATUM_TARGETS
+    frame = drawing.CAST_DATUM_FRAME
+    assert frame == ("E", "F", "G")
+    assert sorted(targets) == ["E1", "E2", "E3", "F1", "F2", "G1"]
+    assert [sum(name[0] == letter for name in targets) for letter in frame] == [3, 2, 1]
+    # Outward of the solid at each point: down off a boss bottom, rearward
+    # off F's barrels, westward off G's.
+    outward = {"E": (0.0, -1.0, 0.0), "F": (0.0, 0.0, 1.0), "G": (1.0, 0.0, 0.0)}
+    bosses = {}
+    for name, point in targets.items():
+        normal = outward[name[0]]
+        assert part._casting_occupies(*(at - 1e-3 * n for at, n in zip(point, normal))), name
+        assert not part._casting_occupies(*(at + 1e-3 * n for at, n in zip(point, normal))), name
+        west, rear = point[0] > 0.0, point[2] > 0.0
+        bosses[name] = ("west" if west else "east", "rear" if rear else "front")
+        axis = (math.copysign(part.COLUMN_X, point[0]), math.copysign(part.REAR_COLUMN_Z, point[2]))
+        reach = math.hypot(point[0] - axis[0], point[2] - axis[1])
+        if name[0] == "E":
+            assert point[1] == part.BOSS_BOTTOM_Y == -(part.HALF_H + part.BOSS_BELOW), name
+            assert reach == pytest.approx(spec.DATUM_TARGET_BOTTOM_RADIUS), name
+        else:
+            assert point[1] - part.BOSS_BOTTOM_Y == pytest.approx(
+                spec.DATUM_TARGET_BARREL_HEIGHT
+            ), name
+            assert reach == pytest.approx(part._boss_radius(point[1])), name
+    assert bosses == {
+        "E1": ("west", "rear"), "E2": ("east", "rear"), "E3": ("east", "front"),
+        "F1": ("west", "rear"), "F2": ("east", "rear"), "G1": ("west", "rear"),
+    }
+    # The bottom's ring runs from the socket bore to its edge break; the
+    # barrel's free band from that break's upper edge -- where the 45° break
+    # off the bottom meets the leaning generator -- to the faced underside.
+    lean = math.tan(math.radians(spec.DRAFT_DEG))
+    lands = (
+        spec.DATUM_TARGET_BOTTOM_RADIUS - part.BORE_DIA / 2.0,
+        part._boss_radius(part.BOSS_BOTTOM_Y) - part.EDGE_CHAMFER - spec.DATUM_TARGET_BOTTOM_RADIUS,
+        spec.DATUM_TARGET_BARREL_HEIGHT - part.EDGE_CHAMFER / (1.0 - lean),
+        part.BOSS_BELOW - spec.DATUM_TARGET_BARREL_HEIGHT,
+    )
+    assert lands == pytest.approx((3.2512, 3.4540, 1.7229, 3.1242), abs=5e-5)
+    assert part.DATUM_TARGET_LANDS == pytest.approx(lands)
+    assert min(lands) >= part.DATUM_TARGET_LAND_MIN == 1.5
+    # An edge of its face that moves the whole as-cast band (owner ruling
+    # B2) still leaves each point on the face.
+    assert min(lands) > spec.AS_CAST_BAND
+    # The frame's centre stands inside the E triangle, nearest its E3-E1 side.
+    corners = [(targets[name][0], targets[name][2]) for name in ("E1", "E2", "E3")]
+
+    def area(a, b, c):
+        return abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2.0
+
+    slices = [area((0.0, 0.0), corners[i], corners[(i + 1) % 3]) for i in range(3)]
+    assert sum(slices) == pytest.approx(area(*corners))
+    margins = [
+        2.0 * slices[i] / math.dist(corners[i], corners[(i + 1) % 3]) for i in range(3)
+    ]
+    assert margins.index(min(margins)) == 2
+    assert min(margins) == pytest.approx(part.CAST_DATUM_E_MARGIN)
+    assert min(margins) == pytest.approx(13.91, abs=5e-3)
+    assert part.CAST_DATUM_E_MARGIN >= part.CAST_DATUM_E_MARGIN_MIN == 10.0
+    # Sheet 7 puts every one on its face: a boss bottom's plane, or a
+    # barrel's 2° cone (never a cylinder, never another lean).
+    sheet = _function(_drawing_tree(), "_cast_datum_sheet")
+    (added,) = _named_calls(sheet, "add_datum_target")
+    stated = {keyword.arg: ast.unparse(keyword.value) for keyword in added.keywords}
+    assert (stated["target"], stated["target_xy"]) == ("target", "at")
+    assert stated["entity"] == "faces[distinct[face_specs[target]]]"
+    assert stated["entity_type"] == "'FACE'"
+    (loop,) = [
+        node
+        for node in ast.walk(sheet)
+        if isinstance(node, ast.For) and any(inner is added for inner in ast.walk(node))
+    ]
+    assert ast.unparse(loop.iter) == "CAST_DATUM_TARGETS.items()"
+    assert "view = front if target in DATUM_TARGETS_ON_ELEVATION else bottom" in ast.unparse(loop)
+    assert drawing.DATUM_TARGETS_ON_ELEVATION == {"F1", "F2"}
+    faces = ast.unparse(sheet)
+    assert "PlanarFace((0.0, -1.0, 0.0), -BOSS_BOTTOM_Y, contains_x_mm=column_x" in faces
+    assert "_BarrelFace(column_x, DATUM_TARGET_Y, column_z)" in faces
+    x, z = part.COLUMN_X, part.REAR_COLUMN_Z
+    barrel = drawing._BarrelFace(x, part.DATUM_TARGET_Y, z)
+    cone = {
+        "identity": drawing.SURFACE_CONE,
+        "box": [
+            (x - 23.0) / 1000.0, part.BOSS_BOTTOM_Y / 1000.0, (z - 23.0) / 1000.0,
+            (x + 23.0) / 1000.0, -part.HALF_H / 1000.0, (z + 23.0) / 1000.0,
+        ],
+        "parameters": [0.0] * 7 + [math.radians(spec.DRAFT_DEG)],
+    }
+    assert barrel.matches(SimpleNamespace(**cone))
+    for refused in (
+        {"identity": drawing.SURFACE_CONE + 1},
+        {"parameters": [0.0] * 7 + [math.radians(spec.DRAFT_DEG + 1.0)]},
+        {"box": [value + (0.050 if index % 3 == 0 else 0.0) for index, value in enumerate(cone["box"])]},
+    ):
+        assert not barrel.matches(SimpleNamespace(**{**cone, **refused})), list(refused)
+    # One BASIC radius places the three boss-bottom points and one BASIC
+    # height the three barrel points.
+    assert (
+        spec.DATUM_TARGET_BOTTOM_RADIUS / 25.4, spec.DATUM_TARGET_BARREL_HEIGHT / 25.4
+    ) == pytest.approx((0.63, 0.13))
+    for label in ("boss bottom target from socket axis", "barrel target above boss bottom"):
+        assert spec.DRAWING_REFERENCE_PRECISION[label] == spec.DATUM_TARGET_PLACES == 2
+    assert len(_named_calls(sheet, "_basic_target_location")) == 2
+    basic = _function(_drawing_tree(), "_basic_target_location")
+    assert len(_named_calls(basic, "set_basic_dimension")) == 1
+    assert "{name: DATUM_TARGET_COUNT}" in ast.unparse(basic)
+    assert drawing.DATUM_TARGET_COUNT == "3X"
+
+
+def _cast_datum_symbols():
+    """Sheet 7's six target symbols, {name: (target point, symbol centre)} in
+    sheet m.  The underside (rear up) and the elevation over it both centre
+    on the casting's own extremes, set-screw boss face to west barrels
+    (_datum_elevation_xy); farm run 20261111T023438415Z's native symbols
+    read E1's point at (215.94, 172.00) and F1's at (215.94, 215.43) so."""
+    scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    cx, cy = drawing.DATUM_BOTTOM_CENTER
+    middle = (drawing.PLAN_HALF_X + part.SET_BOSS_FACE_X) / 2.0
+    placed = {}
+    for name, (x, y, z) in part.CAST_DATUM_TARGETS.items():
+        if name in drawing.DATUM_TARGETS_ON_ELEVATION:
+            point = drawing._datum_elevation_xy(x, y)
+        else:
+            point = (cx + (x - middle) * scale, cy + z * scale)
+        dx, dy = drawing.DATUM_TARGET_SYMBOL_OFFSETS[name]
+        placed[name] = (point, (point[0] + dx, point[1] + dy))
+    return placed
+
+
+def test_cast_datum_target_symbols_stand_clear_on_sheet_seven() -> None:
+    """Each native target symbol is a 14 mm circle on a leader from its
+    point (farm run 20261111T023438415Z's natives: radius 7.0).  The six
+    stand apart inside the frame, each a full arrow off its point: F1 and F2
+    straight under their points in the band between the elevation and the
+    underside, E1 in the west window over datum D's width rows, the other
+    three outside the underside's outline."""
+    radius, arrow, ink = 0.007, 0.003556, drawing.INK_CLEARANCE
+    placed = _cast_datum_symbols()
+    assert set(placed) == set(drawing.DATUM_TARGET_SYMBOL_OFFSETS)
+    assert drawing.SHEET_SCALES["CAST-DATUMS"] == drawing.SHEET_SCALE
+    frame = drawing.SHEET_FRAME
+    for name, (point, centre) in placed.items():
+        assert math.dist(point, centre) - radius >= arrow + ink, name
+        box = (centre[0] - radius, centre[1] - radius, centre[0] + radius, centre[1] + radius)
+        assert frame[0] + ink <= box[0] and box[2] <= frame[2] - ink, name
+        assert frame[1] + ink <= box[1] and box[3] <= frame[3] - ink, name
+        assert _box_box_gap(box, TITLE_BLOCK) >= ink, name
+    names = sorted(placed)
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            apart = math.dist(placed[first][1], placed[second][1]) - 2.0 * radius
+            assert apart >= ink, (first, second)
+    scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    cx, cy = drawing.DATUM_BOTTOM_CENTER
+    middle = (drawing.PLAN_HALF_X + part.SET_BOSS_FACE_X) / 2.0
+    half_x = (drawing.PLAN_HALF_X - part.SET_BOSS_FACE_X) / 2.0 * scale
+    half_z = drawing.PLAN_HALF_Z * scale
+    underside = (cx - half_x, cy - half_z, cx + half_x, cy + half_z)
+    for name in sorted(drawing.DATUM_TARGETS_ON_ELEVATION):
+        point, centre = placed[name]
+        assert centre[0] == point[0], name
+        assert point[1] - centre[1] > radius, name
+        assert centre[1] - radius - underside[3] >= ink, name
+    for name in ("E2", "E3", "G1"):
+        assert _box_point_gap(underside, placed[name][1]) - radius >= ink, name
+    _point, (ex, ey) = placed["E1"]
+    window = (
+        cx + (part.BAR_X1 + part.GUSSET - middle) * scale,
+        cy - part.INNER_Z * scale,
+        cx + (part.INNER_X - middle) * scale,
+        cy + part.INNER_Z * scale,
+    )
+    assert window[0] + ink <= ex - radius and ex + radius <= window[2] - ink
+    assert ey + radius <= window[3] - ink
+    width_rows_top = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][1] + 0.0045 + _ROW_PITCH
+    assert ey - radius - width_rows_top >= ink
+
+
+@pytest.mark.parametrize("dashed", (False, True))
+def test_datum_target_leaders_are_solid_for_points_their_view_shows(monkeypatch, dashed) -> None:
+    """Farm run 20261111T023438415Z printed all six target leaders dashed,
+    which Y14.5 reads as targets on the far side.  Every target stands on a
+    face its own view shows (the boss bottoms and G1's generator from below,
+    F's generators from the rear), so the symbol is inserted with a solid
+    leader and a dashed readback fails the build."""
+    from types import SimpleNamespace
+
+    import _drawing_datum_target as datum_target
+    from test_native_bank_retention_contract import _members
+
+    target_xy, symbol_xy = (0.100, 0.050), (0.080, 0.040)
+    inserted = []
+    annotation = SimpleNamespace(
+        SetPosition2=lambda *_xyz: True,
+        GetPosition=lambda: (*symbol_xy, 0.0),
+        GetLeaderCount=lambda: 1,
+        GetLeaderPointsAtIndex=lambda _index: (*symbol_xy, 0.0, *target_xy, 0.0),
+        GetAttachedEntityCount3=lambda: 1,
+        GetAttachedEntityTypes=lambda: (datum_target._ATTACHED_TARGET_POINT,),
+        IsDangling=lambda: False,
+        GetDashedLeader=lambda: dashed,
+    )
+    symbol = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        SetDatumTargetNotMoveable=lambda: True,
+        GetDatumReferenceLabel=lambda _index: "E1",
+        GetTargetShape=lambda: datum_target._SHAPE_POINT,
+        GetDisplaySymbol=lambda: True,
+        GetDisplayTargetArea=lambda: True,
+        GetTextCount=lambda: 0,
+        GetTextAtIndex=lambda _index: "",
+    )
+
+    def insert(*arguments):
+        inserted.append(arguments)
+        return symbol
+
+    model = SimpleNamespace(
+        SelectionManager=SimpleNamespace(SetSelectionPoint2=lambda *_arguments: True),
+        Extension=SimpleNamespace(InsertDatumTargetSymbol3=insert),
+        ClearSelection2=lambda _all: None,
+    )
+    monkeypatch.setattr(datum_target, "_select_annotation_entity", lambda *_a, **_k: None)
+    monkeypatch.setattr(datum_target, "_early_bound", lambda entity, _interface: entity)
+    monkeypatch.setattr(datum_target, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        datum_target._sw_type_info, "early_bound_or_flag", lambda entity, *_members: entity
+    )
+
+    def add():
+        return datum_target.add_datum_target(
+            SimpleNamespace(currentModel=model),
+            object(),
+            target="E1",
+            target_xy=target_xy,
+            symbol_xy=symbol_xy,
+            entity=object(),
+            entity_type="FACE",
+            label="cast datum target E1",
+        )
+
+    if dashed:
+        with pytest.raises(RuntimeError, match="leader is dashed, a far-side target"):
+            add()
+    else:
+        assert add() is symbol
+    # The arguments by the generated type library's own parameter names.
+    methods, _getters, _setters = _members("IModelDocExtension")
+    names = [argument.arg for argument in methods["InsertDatumTargetSymbol3"].args.args[1:]]
+    (arguments,) = inserted
+    sent = dict(zip(names, arguments, strict=True))
+    assert (sent["Datum1"], sent["AreaStyle"], sent["ShowArea"], sent["ShowSymbol"]) == (
+        "E1", 0, True, True,
+    )
+    assert (sent["LeaderLineStyle"], sent["LeaderBent"]) == (0, False)
+    assert "GetDashedLeader" in _members("IAnnotation")[0]
+
+
+def test_sockets_hold_position_to_the_cast_frame_then_to_the_faced_underside() -> None:
+    """Owner rulings D2 and D6 (#2333): the 4X socket pattern stands
+    ⌖Ø.06|E|F|G, the casting's own frame, and ⌖Ø.010|A, square to the faced
+    underside.  A is not one of the upper frame's datums, so the two are
+    stacked single-segment frames and never a Y14.5 composite; datum B (D3),
+    the pattern the rail webs are held to, hangs on them."""
+    import _drawing_gdt
+
+    assert spec.GEOMETRIC_TOLERANCES_IN["tube socket pattern location"] == ".06"
+    assert spec.GEOMETRIC_TOLERANCES_IN["tube socket pattern refinement"] == ".010"
+    assert spec.SOCKET_PATTERN_LOCATION_ZONE == pytest.approx(0.06 * 25.4)
+    assert spec.SOCKET_PATTERN_REFINEMENT_ZONE == pytest.approx(0.010 * 25.4)
+    tree = _drawing_tree()
+    helper = _function(tree, "_socket_position_frame")
+    frame = _labelled_call(helper, "add_feature_control_frame", "tube socket pattern position")
+    stated = {keyword.arg: ast.unparse(keyword.value) for keyword in frame.keywords}
+    assert stated["characteristic"] == "'position'"
+    assert stated["tolerance"] == "GEOMETRIC_TOLERANCES_IN['tube socket pattern location']"
+    assert stated["datums"] == "CAST_DATUM_FRAME"
+    assert stated["diameter"] == "True"
+    assert stated["quantity"] == "SOCKET_POSITION_QUANTITY"
+    assert drawing.SOCKET_POSITION_QUANTITY == "4X"
+    assert stated["lower_frame"] == (
+        "('position', GEOMETRIC_TOLERANCES_IN['tube socket pattern refinement'], ('A',))"
+    )
+    assert "A" not in drawing.CAST_DATUM_FRAME
+    assert "composite" not in stated
+    signature = inspect.signature(_drawing_gdt.add_feature_control_frame)
+    assert signature.parameters["composite"].default is False
+    # Its leader lands on the front-west socket, one of TABLE_HOLES.
+    assert "_socket_bore_circle(edges, COLUMN_X, FRONT_COLUMN_Z" in stated["edge_entity"]
+    assert (part.COLUMN_X, part.FRONT_COLUMN_Z) in {hole[:2] for hole in drawing.TABLE_HOLES}
+    (tag,) = _named_calls(helper, "add_frame_datum_feature")
+    assert ast.unparse(tag.args[2]) == "frame"
+    assert ast.unparse(_keyword(tag, "datum")) == "SOCKET_DATUM"
+    assert drawing.SOCKET_DATUM == "B"
+    (assigned,) = [
+        node for node in ast.walk(helper) if isinstance(node, ast.Assign) and node.value is frame
+    ]
+    assert ast.unparse(assigned.targets[0]) == "frame"
+    (placed,) = _named_calls(_function(tree, "build"), "_socket_position_frame")
+    assert ast.unparse(placed) == "_socket_position_frame(adapter, detail_top, detail_top_edges)"
+
+
+def _run_web_position_frame(monkeypatch, *, leader_status=0, positioned=True, style_after=0):
+    """Run ``_web_position_frame`` against a recording seat; returns the
+    events in order."""
+    from types import SimpleNamespace
+
+    events = []
+
+    class Annotation:
+        def SetLeader3(self, *arguments):
+            events.append(("SetLeader3", arguments))
+            return leader_status
+
+        def SetPosition2(self, *xyz):
+            events.append(("SetPosition2", xyz))
+            return positioned
+
+        def GetLeaderStyle(self):
+            return style_after
+
+    annotation = Annotation()
+
+    def frame(_adapter, _view, **stated):
+        events.append(("frame", stated))
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    monkeypatch.setattr(drawing, "add_feature_control_frame", frame)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda _a, _v, _point, *, label: (0.300, 0.100, 0.0)
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _interface: entity)
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: events.append(("rebuild", label))
+    )
+    edges = SimpleNamespace(
+        exact_line_through=lambda point, *, label: SimpleNamespace(edge=("cut face", point))
+    )
+    drawing._web_position_frame(
+        object(), object(), edges,
+        landing_mm=(1.0, -5.0, 2.0), frame_xy=(0.260, 0.090), label="side rail web position",
+    )
+    return events
+
+
+def test_rail_webs_hold_position_to_the_underside_and_the_socket_pattern(monkeypatch) -> None:
+    """Owner ruling D3 (#2333): a rail web's thickness is as cast (±.03) and
+    its centre plane stands ⌖.06|A|B, B the 4X socket pattern.  A position
+    controls the web's width, a feature of size, so each removed section's
+    frame stands under that width's rows with no leader: it is attached to
+    the web's drafted cut face (SolidWorks would not hang it on the
+    dimension), its leader is then taken off and the frame moved to its
+    place; the width's 2X counts the webs."""
+    from test_native_bank_retention_contract import _members
+
+    assert spec.GEOMETRIC_TOLERANCES_IN["rail web position"] == ".06"
+    assert spec.RAIL_WEB_POSITION_ZONE == pytest.approx(0.06 * 25.4)
+    assert {"SideWebT", "FrWebT"} == set(spec.AS_CAST_DIMENSIONS["WebProfile"])
+    assert not hasattr(drawing, "WEB_POSITION_QUANTITY")
+    events = _run_web_position_frame(monkeypatch)
+    assert [name for name, _detail in events] == ["frame", "SetLeader3", "SetPosition2", "rebuild"]
+    stated = events[0][1]
+    # A centre plane's zone is two parallel planes: no diameter, one segment,
+    # and no count of its own.
+    assert stated == {
+        "edge_entity": ("cut face", (1.0, -5.0, 2.0)),
+        "leader_attach_xy": (0.300, 0.100),
+        "frame_xy": (0.260, 0.090),
+        "characteristic": "position",
+        "tolerance": ".06",
+        "datums": ("A", "B"),
+        "label": "side rail web position",
+    }
+    methods, _getters, _setters = _members("IAnnotation")
+    names = [argument.arg for argument in methods["SetLeader3"].args.args[1:]]
+    leader = dict(zip(names, events[1][1], strict=True))
+    assert leader["LeaderStyle"] == drawing._NO_LEADER == 0
+    assert leader == {
+        "LeaderStyle": 0, "LeaderSide": 0, "SmartArrowHeadStyle": True,
+        "Perpendicular": False, "AllAround": False, "Dashed": False,
+    }
+    assert events[2][1] == (0.260, 0.090, 0.0)
+    # A frame that keeps its leader, or will not move, fails the build.
+    for refusal, message in (
+        ({"leader_status": 1}, "failed to take the leader off"),
+        ({"positioned": False}, "failed to position the leaderless"),
+        ({"style_after": 1}, "frame kept its leader"),
+    ):
+        with pytest.raises(RuntimeError, match=message):
+            _run_web_position_frame(monkeypatch, **refusal)
+    # Each section's frame is attached on its web's drafted inner face, under
+    # the flange's root.
+    tree = _drawing_tree()
+    placed = _named_calls(_function(tree, "build"), "_web_position_frame")
+    assert [ast.unparse(call.args[1]) for call in placed] == ["rail_section", "side_section"]
+    assert [ast.literal_eval(_keyword(call, "label")) for call in placed] == [
+        "front and rear rail web position",
+        "side rail web position",
+    ]
+    assert [ast.unparse(_keyword(call, "frame_xy")) for call in placed] == [
+        "RAIL_WEB_POSITION_FRAME_XY",
+        "SIDE_WEB_POSITION_FRAME_XY",
+    ]
+    scope = {**vars(drawing), "rail_cut_x": drawing.section_cut_ends()["H"][0][0]}
+    rear_rail, east_rail = (
+        eval(compile(ast.Expression(_keyword(call, "landing_mm")), drawing.__file__, "eval"), scope)
+        for call in placed
+    )
+    assert rear_rail[1] == east_rail[1] == drawing.WEB_POSITION_LANDING_Y
+    assert -part.HALF_H < drawing.WEB_POSITION_LANDING_Y < part.FLANGE_BOT_Y - part.ROOT_FILLET_R
+    # On the rear rail's inner web face (the web rearward of it) ...
+    assert part._casting_occupies(rear_rail[0], rear_rail[1], rear_rail[2] + 1e-3)
+    assert not part._casting_occupies(rear_rail[0], rear_rail[1], rear_rail[2] - 1e-3)
+    assert rear_rail[2] < part.WEB_IN_Z
+    # ... and on the east rail's (the web eastward of it), each leaning in
+    # over the underside's nominal by the added draft.
+    assert part._casting_occupies(east_rail[0] - 1e-3, east_rail[1], east_rail[2])
+    assert not part._casting_occupies(east_rail[0] + 1e-3, east_rail[1], east_rail[2])
+    assert east_rail[0] > -part.WEB_IN_X
+
+
+# A native feature-control frame hangs from its position's top-left corner,
+# 7.0 mm tall.  Farm run 20261111T023438415Z's cells: the symbol 7.00, a
+# ".06" tolerance 9.31 (13.53 with its Ø), datum A 6.29 and datum B 5.53; a
+# count row's line stands 12.56 under the top, its glyphs 4.5 over that.
+_FRAME_HEIGHT = 0.007
+_FRAME_CELLS = {"symbol": 0.00700, ".06": 0.00931, "Ø.06": 0.01353, "A": 0.00629, "B": 0.00553}
+_FRAME_COUNT_DROP = 0.01256
+
+
+def test_web_position_frames_stand_under_their_width_rows() -> None:
+    """Each web's width is the model's own .51 ±.03, its three rows saying
+    whose it is and that it holds on the underside (the web is drafted from
+    there): the last row's line is the dimension line, 8.33 mm under the
+    text point (farm run 20261111T023438415Z's three-row blocks), and the
+    leaderless ⌖.06|A|B box hangs directly under it, flush with the rows'
+    left end, over its section's caption.  Widths are that run's native
+    rows: "2X WEB WIDTH" 31.86 mm, "AT UNDERSIDE" 31.40."""
+    ink = drawing.INK_CLEARANCE
+    frame = drawing.SHEET_FRAME
+    width = sum(_FRAME_CELLS[cell] for cell in ("symbol", ".06", "A", "B"))
+    sections = {
+        "H-H": (
+            drawing.RAIL_SECTION_KEEP["FrWebT"],
+            drawing.RAIL_SECTION_CALLOUTS["FrWebT"],
+            0.03186,
+            drawing.RAIL_WEB_POSITION_FRAME_XY,
+            drawing.RAIL_SECTION_CAPTION_XY,
+        ),
+        "E-E": (
+            drawing.SIDE_SECTION_KEEP["SideWebT"],
+            drawing.SIDE_WEB_QUALIFIER,
+            0.03140,
+            drawing.SIDE_WEB_POSITION_FRAME_XY,
+            drawing.SIDE_SECTION_CAPTION_XY,
+        ),
+    }
+    assert sections["H-H"][1].splitlines() == ["2X WEB WIDTH", "AT UNDERSIDE"]
+    assert sections["E-E"][1].splitlines() == ["2X WEB", "AT UNDERSIDE"]
+    for name, ((tx, ty), _callout, widest, (fx, fy), caption) in sections.items():
+        line_y = ty - 0.00833
+        left, right = tx - widest / 2.0, tx + widest / 2.0
+        box = (fx, fy - _FRAME_HEIGHT, fx + width, fy)
+        assert ink <= line_y - box[3] <= _ROW_PITCH, name
+        assert left - 0.001 <= box[0] and box[2] <= right + 0.001, name
+        assert box[1] - caption[1] >= ink, name
+        assert frame[0] + ink <= box[0] and right <= frame[2] - ink, name
+        assert _box_box_gap(box, TITLE_BLOCK) >= ink, name
+    # H-H's rows stand right of the rail, by the flange thickness's lower
+    # arrow tail (6.35 mm down its dimension line from the flange's
+    # underside): the value row (16.79 mm) starts right of that line, the
+    # two wider rows pass under the tail's end.
+    (tx, ty), _callout, _widest, _frame_xy, _caption = sections["H-H"]
+    assert (tx - 0.01679 / 2.0) - drawing.RAIL_SECTION_KEEP["FlangeT"][0] >= ink
+    tail_end = (
+        drawing.RAIL_SECTION_CENTER[1]
+        + part.FLANGE_BOT_Y * drawing.GEOMETRY_VIEW_SCALE / 1000.0
+        - 0.00635
+    )
+    assert tail_end - (ty - 0.00278 + 0.0045) >= ink
+
+
+def _boss_frame_rims(spans):
+    """Scanned faced-top barrel rim arcs of the front-east boss, one per
+    sheet-angle span in degrees, each answering GetClosestPointOn in metres
+    as an arc does: the point's own projection inside the span, else the
+    nearer end."""
+    from types import SimpleNamespace
+
+    centre = (-part.COLUMN_X, part.HALF_H, part.FRONT_COLUMN_Z)
+    radius = part.BOSS_DIA / 2.0
+
+    def on_rim(degrees):
+        angle = math.radians(degrees)
+        return (
+            (centre[0] + radius * math.cos(angle)) / 1000.0,
+            centre[1] / 1000.0,
+            (centre[2] - radius * math.sin(angle)) / 1000.0,
+        )
+
+    def arc(start, end):
+        def closest(x, _y, z):
+            at = math.degrees(math.atan2(-(z * 1000.0 - centre[2]), x * 1000.0 - centre[0])) % 360.0
+            inside = start <= at <= end
+            nearer = start if abs(at - start) <= abs(at - end) else end
+            return (*on_rim(at if inside else nearer), 0.0, 0.0)
+
+        return SimpleNamespace(
+            circle=(*centre, 0.0, 1.0, 0.0, radius),
+            edge=SimpleNamespace(GetClosestPointOn=closest, span=(start, end)),
+        )
+
+    return [arc(start, end) for start, end in spans], on_rim
+
+
+def test_corner_bosses_hold_position_to_the_underside_and_the_socket_pattern(monkeypatch) -> None:
+    """Main's delegated ruling 2026-11-11 (#2333): each cast Ø1.77 barrel
+    holds ⌖Ø.06|A|B on the faced top -- the barrel-to-socket offset the
+    wall, keeper-foot and head-recess stacks charge.  The frame lands on the
+    front-east barrel's rim arc on the faced top, outboard of the rail, and
+    counts the four."""
+    from types import SimpleNamespace
+
+    assert spec.GEOMETRIC_TOLERANCES_IN["corner boss position"] == ".06"
+    assert spec.BOSS_POSITION_ZONE == pytest.approx(0.06 * 25.4)
+    centre = (-part.COLUMN_X, part.HALF_H, part.FRONT_COLUMN_Z)
+    radius = part.BOSS_DIA / 2.0
+    framed = []
+
+    def frame(_adapter, _view, **stated):
+        framed.append(stated)
+
+    monkeypatch.setattr(drawing, "add_feature_control_frame", frame)
+    monkeypatch.setattr(
+        drawing,
+        "model_point_in_view",
+        lambda _a, _v, point, *, label: (point[0] * 0.5, -point[2] * 0.5, 0.0),
+    )
+    # The rails' flanges cut the rim into arcs; the bore, the boss top's rim
+    # and the rear boss share its axis line or its size.
+    rims, on_rim = _boss_frame_rims(((100.0, 260.0), (280.0, 440.0)))
+    decoys = [
+        SimpleNamespace(circle=(*centre, 0.0, 1.0, 0.0, part.BORE_DIA / 2.0), edge="bore"),
+        SimpleNamespace(
+            circle=(centre[0], part.HALF_H + part.BOSS_ABOVE, centre[2], 0.0, 1.0, 0.0, radius),
+            edge="boss top",
+        ),
+        SimpleNamespace(
+            circle=(centre[0], centre[1], part.REAR_COLUMN_Z, 0.0, 1.0, 0.0, radius), edge="rear"
+        ),
+    ]
+    drawing._boss_position_frame(object(), object(), SimpleNamespace(circles=[*decoys, *rims]))
+    (stated,) = framed
+    assert stated["edge_entity"].span == (100.0, 260.0)
+    landing = on_rim(drawing.BOSS_POSITION_LANDING_DEG)
+    assert stated["leader_attach_xy"] == pytest.approx((landing[0] * 0.5, -landing[2] * 0.5))
+    assert {key: stated[key] for key in stated if key not in ("edge_entity", "leader_attach_xy")} == {
+        "frame_xy": drawing.BOSS_POSITION_FRAME_XY,
+        "characteristic": "position",
+        "tolerance": ".06",
+        "datums": ("A", "B"),
+        "diameter": True,
+        "quantity": "4X",
+        "label": "corner boss position",
+    }
+    # A landing no arc passes through, or one two arcs share, fails the build.
+    for spans, count in ((((280.0, 440.0),), 0), (((100.0, 260.0), (150.0, 200.0)), 2)):
+        rims, _on_rim = _boss_frame_rims(spans)
+        with pytest.raises(RuntimeError, match=f"{count} faced-top barrel rims pass through"):
+            drawing._boss_position_frame(object(), object(), SimpleNamespace(circles=rims))
+    # That landing is the barrel's crest on the faced top, outboard of the
+    # east rail's flange, where the taken-out barrel is at its Ø1.77.
+    x, y, z = (value * 1000.0 for value in landing)
+    assert x < -part.OUTER_X and y == pytest.approx(part.HALF_H)
+    inward = ((centre[0] - x) / radius, (centre[2] - z) / radius)
+    assert part._casting_occupies(x + 1e-3 * inward[0], y, z + 1e-3 * inward[1])
+    assert not part._casting_occupies(x - 1e-3 * inward[0], y, z - 1e-3 * inward[1])
+    for off_plane in (-1.0, 1.0):
+        assert part._boss_radius(part.HALF_H + off_plane) < radius
+    # Once, on the plan, after the sockets' frames it refers to (datum B).
+    build = _function(_drawing_tree(), "build")
+    (placed,) = _named_calls(build, "_boss_position_frame")
+    assert ast.unparse(placed) == "_boss_position_frame(adapter, detail_top, detail_top_edges)"
+    (sockets,) = _named_calls(build, "_socket_position_frame")
+    assert sockets.lineno < placed.lineno
+
+
+def test_boss_position_frame_stands_between_the_boss_and_socket_callouts() -> None:
+    """The bosses' frame block -- the ⌖|Ø.06|A|B box and its 4X row -- stands
+    in the left margin under the Ø1.77 callout's rows and over the socket
+    callout's, on a level leader to the front-east barrel's outboard rim,
+    which lands between those two callouts' own leaders.  Farm run
+    20261111T023438415Z's natives: each callout's leader leaves its
+    underline's end (8.36 mm under the text point; 17.74 mm right of the
+    boss callout's, 29.57 of the socket callout's) radially to its circle."""
+    from _layout_geometry import Segment
+
+    ink = drawing.INK_CLEARANCE
+    fx, fy = drawing.BOSS_POSITION_FRAME_XY
+    width = sum(_FRAME_CELLS[cell] for cell in ("symbol", "Ø.06", "A", "B"))
+    block = (fx, fy - _FRAME_COUNT_DROP, fx + width, fy)
+    assert drawing.SHEET_FRAME[0] + ink <= block[0]
+    boss_x, boss_y = drawing.DETAIL_TOP_KEEP["C0Dia"]
+    socket_x, socket_y = drawing.DETAIL_TOP_KEEP["B0Dia"]
+    assert len(drawing.DETAIL_CALLOUTS["C0Dia"].splitlines()) == 2
+    assert len(drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()) == 2
+    assert (boss_y - 0.00836) - block[3] >= ink
+    assert block[1] - (socket_y + 0.0028 + 0.0045) >= ink
+    centre = _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)
+    radius = part.BOSS_DIA / 2.0 * _S
+    angle = math.radians(drawing.BOSS_POSITION_LANDING_DEG)
+    landing = (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
+    # Outboard, a little under the socket's axis, and level with the box.
+    assert 180.0 < drawing.BOSS_POSITION_LANDING_DEG <= 200.0
+    assert block[2] + _BENT_SHOULDER + ink <= landing[0]
+    assert abs(landing[1] - (fy - _FRAME_HEIGHT / 2.0)) <= 0.0015
+    leader = Segment(block[2], landing[1], *landing)
+
+    def callout_leader(shoulder, circle_r):
+        run = math.dist(shoulder, centre)
+        tip = tuple(c + (s - c) * circle_r / run for c, s in zip(centre, shoulder))
+        return tip, Segment(*shoulder, *tip)
+
+    # The boss callout's leader lands higher on that rim, the socket
+    # callout's on the bore rim under it; neither comes near the level one.
+    boss_tip, boss_leader = callout_leader((boss_x + 0.01774, boss_y - 0.00836), radius)
+    socket_tip, socket_leader = callout_leader(
+        (socket_x + 0.02957, socket_y - 0.00836), part.BORE_DIA / 2.0 * _S
+    )
+    assert boss_tip[1] - landing[1] >= ink
+    assert landing[1] - socket_tip[1] >= ink
+    for name, other in {"boss callout": boss_leader, "socket callout": socket_leader}.items():
+        assert _segment_gap(leader, other) >= ink, name
+        assert _box_segment_gap(block, ((other.x0, other.y0), (other.x1, other.y1))) >= ink, name
+
+
+_DRAFT_ADDED = ("WebRing", "HubRib", "Crossbar", "BarPockets", "HubGussetPlate", "SetBoss")
+_DRAFT_TAKEN_OUT = ("TopFlange", "BossesUpper", "BossesLower", "HubBoss")
+
+
+def test_draft_bands_follow_the_sense_each_feature_is_drafted_in(monkeypatch) -> None:
+    """Owner rulings B1, D1 and D4 (#2333): every drag face leans 2°.  The
+    features B1 adds draft to are drafted from the underside up and hold
+    2° +1°/-0; the ones B1 and D1 take it out of narrow away from the plane
+    that holds their nominal and hold 2° ±1°.  The set-screw boss is one
+    extrude: its added side walls set its band, inside its face's ±1°."""
+    from types import SimpleNamespace
+
+    import _drafted_extrude
+
+    table = spec.DRAFT_ANGLE_DIMENSIONS
+    assert (spec.DRAFT_DEG, spec.DRAFT_ANGLE_PLACES) == (2.0, 0)
+    assert (spec.DRAFT_ADDED_DEVIATIONS_DEG, spec.DRAFT_TAKEN_OUT_DEVIATIONS_DEG) == (
+        (1.0, 0.0), (1.0, 1.0),
+    )
+    assert (spec.DRAFT_ADDED_DEG_MIN, spec.DRAFT_DEG_MIN, spec.DRAFT_DEG_MAX) == (2.0, 1.0, 3.0)
+    assert {feature: band for feature, (_name, band) in table.items()} == {
+        **dict.fromkeys(_DRAFT_ADDED, spec.DRAFT_ADDED_DEVIATIONS_DEG),
+        **dict.fromkeys(_DRAFT_TAKEN_OUT, spec.DRAFT_TAKEN_OUT_DEVIATIONS_DEG),
+    }
+    assert all(name == f"{feature}Draft" for feature, (name, _band) in table.items())
+    # The build drafts each feature in its family's sense: added draft from
+    # the underside up, a solid widening and a pocket narrowing (its walls
+    # thicken); taken-out draft narrowing from the faced top, the hub barrel
+    # down from the underside.
+    build = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    drafted = {}
+    for call in _named_calls(build, "drafted"):
+        stated = {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords}
+        sense = (stated["start"], stated["up"], stated["narrowing"], stated.get("cut", "False"))
+        drafted[ast.unparse(call.args[1])] = sense
+    assert drafted.pop("feat") == ("HALF_H", "updown == 'up'", "True", "False")
+    (both_barrels,) = [
+        node.iter
+        for node in ast.walk(build)
+        if isinstance(node, ast.For)
+        and ast.unparse(node.target) == "(updown, depth, depth_name, feat, v_one)"
+    ]
+    assert [
+        (ast.literal_eval(row.elts[0]), ast.literal_eval(row.elts[3]))
+        for row in both_barrels.elts
+    ] == [("up", "BossesUpper"), ("down", "BossesLower")]
+    assert {ast.literal_eval(feature): sense for feature, sense in drafted.items()} == {
+        "WebRing": ("-HALF_H", "True", "False", "False"),
+        "HubRib": ("-HALF_H", "True", "False", "False"),
+        "Crossbar": ("-HALF_H", "True", "False", "False"),
+        "BarPockets": ("-HALF_H", "True", "True", "True"),
+        "HubGussetPlate": ("HUB_GUSSET_BOTTOM_Y", "True", "False", "False"),
+        "SetBoss": ("-HALF_H", "True", "False", "False"),
+        "TopFlange": ("HALF_H", "False", "True", "False"),
+        "HubBoss": ("-HALF_H", "False", "True", "False"),
+    }
+    build_source = ast.unparse(build)
+    assert "angles={f'{feature}Draft': DRAFT_DEG}" in build_source
+    assert "if set(drafted_depths) != set(DRAFT_ANGLE_DIMENSIONS):" in build_source
+    assert (
+        "angle_name, (upper_deg, lower_deg) = DRAFT_ANGLE_DIMENSIONS[feature_name]\n"
+        "        set_draft_angle_tolerance(adapter, feature_name, angle_name, lower_deg, upper_deg)"
+    ) in build_source
+    # That call bands the model's own angle: bilateral +1°/-0 where draft is
+    # added, symmetric ±1° where it is taken out, printed at whole degrees.
+    banded = {}
+
+    class Tolerance:
+        Type = None
+
+        def SetValues(self, lower, upper):
+            self.values = (lower, upper)
+            return True
+
+        def GetMinValue(self):
+            return self.values[0]
+
+        def GetMaxValue(self):
+            return self.values[1]
+
+    def named(_adapter, feature_name, dimension_name):
+        banded[feature_name] = {"name": dimension_name, "tolerance": Tolerance()}
+        dimension = SimpleNamespace(Tolerance=banded[feature_name]["tolerance"])
+        return feature_name, dimension
+
+    def printed(display, deviations, *, display_unit, label):
+        banded[display]["printed"] = (deviations, display_unit)
+
+    monkeypatch.setattr(_drafted_extrude, "_named_dimension", named)
+    monkeypatch.setattr(_drafted_extrude, "_early_bound", lambda entity, _interface: entity)
+    monkeypatch.setattr(_drafted_extrude, "_read_member", getattr)
+    monkeypatch.setattr(_drafted_extrude, "_set_tolerance_precision", printed)
+    for feature_name, (angle_name, (upper_deg, lower_deg)) in table.items():
+        _drafted_extrude.set_draft_angle_tolerance(
+            object(), feature_name, angle_name, lower_deg, upper_deg
+        )
+    one = math.radians(1.0)
+    for feature in _DRAFT_ADDED:
+        tolerance = banded[feature]["tolerance"]
+        assert (tolerance.Type, tolerance.values) == (2, pytest.approx((0.0, one))), feature
+        assert banded[feature]["printed"] == ((0.0, 1.0), "deg"), feature
+    for feature in _DRAFT_TAKEN_OUT:
+        tolerance = banded[feature]["tolerance"]
+        assert (tolerance.Type, tolerance.values) == (4, pytest.approx((-one, one))), feature
+        assert banded[feature]["printed"] == ((-1.0, 1.0), "deg"), feature
+    with pytest.raises(ValueError, match="non-negative deviations and a range"):
+        _drafted_extrude.set_draft_angle_tolerance(object(), "WebRing", "WebRingDraft", 0.0, 0.0)
+
+
+def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> None:
+    """Owner ruling D4 (#2333): the print states each band once, as the
+    model's own angle with the faces it governs -- the web ring's for the
+    added draft, the upper boss barrels' for the taken-out draft -- on the
+    cast-datum elevation's west end.  Each 2° wedge stands on the Top
+    plane's trace, its arc raised over the boss tops, its rows parked on its
+    own side of the view inside the frame."""
+    keep = drawing.DATUM_FRONT_KEEP
+    printed = {
+        name: feature
+        for feature, (name, _band) in spec.DRAFT_ANGLE_DIMENSIONS.items()
+        if name in keep
+    }
+    assert printed == {"WebRingDraft": "WebRing", "BossesUpperDraft": "BossesUpper"}
+    assert set(keep) == set(printed)
+    assert {spec.DRAFT_ANGLE_DIMENSIONS[feature][1] for feature in printed.values()} == {
+        spec.DRAFT_ADDED_DEVIATIONS_DEG,
+        spec.DRAFT_TAKEN_OUT_DEVIATIONS_DEG,
+    }
+    marked = {
+        name
+        for names in spec.DRAWING_DIMENSIONS.values()
+        for name in names
+        if name.endswith("Draft")
+    }
+    assert marked == set(keep)
+    for name, feature in printed.items():
+        assert name in spec.DRAWING_DIMENSIONS[feature], name
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == spec.DRAFT_ANGLE_PLACES, name
+    assert [
+        table
+        for table, kept in vars(drawing).items()
+        if table.endswith("_KEEP")
+        and isinstance(kept, dict)
+        and any(str(name).endswith("Draft") for name in kept)
+    ] == ["DATUM_FRONT_KEEP"]
+    sheet = _function(_drawing_tree(), "_cast_datum_sheet")
+    (imported,) = [
+        call
+        for call in _named_calls(sheet, "curate_view_dimensions")
+        if ast.unparse(_keyword(call, "keep")) == "DATUM_FRONT_KEEP"
+    ]
+    assert ast.unparse(imported.args[1]) == "front"
+    # Each callout names its own band's faces and none of the other's.
+    callouts = drawing.DATUM_FRONT_CALLOUTS
+    assert set(callouts) == set(drawing.DATUM_FRONT_TEXT_OFFSETS) == set(keep)
+    faces = {
+        "WebRingDraft": ("WEBS", "CROSSBAR", "POCKETS", "GUSSETS", "PADS", "SET-BOSS SIDES"),
+        "BossesUpperDraft": ("FLANGE RIMS", "SET-BOSS FACE", "4X BOSS", "HUB BARRELS"),
+    }
+    for name, own in faces.items():
+        rows = callouts[name].splitlines()
+        assert len(rows) == 2 and rows[0].startswith("DRAFT, "), name
+        assert all(face in callouts[name].replace("\n", " ") for face in own), name
+        (other,) = set(faces) - {name}
+        assert not [face for face in faces[other] if face in callouts[name]], name
+    # The wedges: the web's outer face opens outward going up (added draft),
+    # the upper barrel closes inward (taken out above the faced top).
+    wedges = drawing.DATUM_DRAFT_WEDGES
+    assert set(wedges) == set(keep)
+    web_x, web_lean, web_rise = wedges["WebRingDraft"]
+    barrel_x, barrel_lean, barrel_rise = wedges["BossesUpperDraft"]
+    assert (web_x, barrel_x) == (part.WEB_OUT_X, drawing.PLAN_HALF_X)
+    y = part.FLANGE_BOT_Y - part.ROOT_FILLET_R - 1.0
+    z = spec.SIDE_SECTION_Z
+    lean = math.tan(math.radians(spec.DRAFT_DEG))
+    for at_y in (-part.HALF_H + 1.0, y):
+        face = part.WEB_OUT_X + (at_y + part.HALF_H) * lean
+        assert part._casting_occupies(face - 1e-3, at_y, z) and not part._casting_occupies(
+            face + 1e-3, at_y, z
+        )
+    assert web_lean == 1.0
+    top = part.HALF_H + part.BOSS_ABOVE
+    assert part._boss_radius(top) < part._boss_radius(part.HALF_H) == part.BOSS_DIA / 2.0
+    assert barrel_lean == -1.0
+    trace = drawing._datum_elevation_xy(0.0, 0.0)[1]
+    boss_top = drawing._datum_elevation_xy(0.0, top)[1]
+    ink = drawing.INK_CLEARANCE
+    frame = drawing.SHEET_FRAME
+    blocks = {}
+    for name, (x, lean_sign, rise) in wedges.items():
+        vertex = drawing._datum_elevation_xy(x, 0.0)[0]
+        kx, ky = keep[name]
+        # The value's point stands on the arc, inside its 2° wedge.
+        assert ky == pytest.approx(trace + rise, abs=1e-5), name
+        assert 0.0 < (kx - vertex) * lean_sign < rise * lean, name
+        assert ky - boss_top >= ink, name
+        # Its rows as farm run 20261111T023438415Z printed these callouts
+        # (then on sheet 2) about their points: the added band's stacked
+        # +1°/0° stands its upper limit 5.56 mm over the point and its second
+        # callout row 10.08 under it; the taken-out band's ±1° is the plain
+        # three rows, 2.78 over and 8.33 under.  Glyphs stand 4.5 over a
+        # row's line and ran 2.63 mm each at the widest (the rows' wording
+        # has changed since: their widths are that estimate until a farm run
+        # prints them).
+        tx, ty = drawing.DATUM_FRONT_TEXT_OFFSETS[name]
+        half = max(map(len, callouts[name].splitlines())) * 0.00263 / 2.0
+        band = spec.DRAFT_ANGLE_DIMENSIONS[printed[name]][1]
+        stacked = band == spec.DRAFT_ADDED_DEVIATIONS_DEG
+        over, under = (0.00556, 0.01008) if stacked else (0.00278, 0.00833)
+        block = (tx - half, ty - under, tx + half, ty + over + 0.0045)
+        blocks[name] = block
+        assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink, name
+        assert block[3] <= frame[3] - ink, name
+        assert block[1] - boss_top >= ink, name
+    assert abs(web_rise - barrel_rise) >= 0.005
+    assert _box_box_gap(blocks["WebRingDraft"], blocks["BossesUpperDraft"]) >= ink
+    # The added draft's rows stand left over the view, the taken-out
+    # draft's right of it: neither block covers the other's arc point.
+    assert blocks["WebRingDraft"][2] < keep["WebRingDraft"][0] < keep["BossesUpperDraft"][0]
+    assert keep["BossesUpperDraft"][0] < blocks["BossesUpperDraft"][0]
+    for name, block in blocks.items():
+        (other,) = set(blocks) - {name}
+        assert _box_point_gap(block, keep[other]) >= ink, name
+
+
+def test_drawing_script_leaves_the_layout_audits_gate_as_declared() -> None:
+    """The layout audit's enforced kinds are the repository's gate.  A
+    drawing script that rebinds them at import turns its own REPORT run soft,
+    and every later test of the session with it; the script may read the
+    audit module and never assign into it."""
+    import _layout_audit
+
+    tree = _drawing_tree()
+    rebound = [
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Delete))
+        for target in (
+            node.targets if isinstance(node, (ast.Assign, ast.Delete)) else [node.target]
+        )
+        if isinstance(target, ast.Attribute)
+        and isinstance(target.value, ast.Name)
+        and target.value.id == "_layout_audit"
+    ]
+    assert rebound == []
+    assert not [
+        ast.unparse(call)
+        for call in _named_calls(tree, "setattr")
+        if call.args and ast.unparse(call.args[0]) == "_layout_audit"
+    ]
+    assert _layout_audit.ENFORCED_KINDS, "the audit module's gate reads empty"
+    assert _layout_audit.ENFORCED_KINDS <= _layout_audit.GATING_KINDS
 
 
 def test_face_line_takes_the_face_not_the_edge_break() -> None:
@@ -2982,12 +4028,19 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
             drawing._crossbar_median_datum(adapter, view, width)
 
 
-def _r6_crossbar_datum_display_data(*, text_y=None):
+# R6's fix moved the width's two text rows to y 104.6, the then
+# CROSSBAR_FLANGE_TEXT_OFFSET_XY (0.1085, 0.1046).  Owner ruling B5 (#2333)
+# has since moved D to sheet 7's as-cast BarWidth, so that offset is history:
+# the recorded rows below exercise the guard, and
+# test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven replays
+# the live sheet.
+_R6_MOVED_WIDTH_TEXT_Y = 0.1046
+
+
+def _r6_crossbar_datum_display_data(*, text_y=_R6_MOVED_WIDTH_TEXT_Y):
     # Native IDisplayData from R6, 20261014T055244900Z, GEOMETRY sheet RD6
     # and DetailItem389.  Move only the two width-text rows, not D's default
     # drop or attachment.  Coordinates are sheet metres, not PNG estimates.
-    if text_y is None:
-        text_y = drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY[1]
     shift = text_y - 0.108
     datum = {
         "lines": [
@@ -3041,7 +4094,6 @@ def test_crossbar_datum_ink_clears_each_moved_width_row_not_the_block(monkeypatc
     from _drawing_annotation_extent import boxes_clear
     from _layout_audit import display_box
 
-    assert drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY == (0.1085, 0.1046)
     datum, width = _r6_crossbar_datum_display_data()
     tag_box, block_box = display_box(datum), display_box(width)
     assert tag_box is not None and block_box is not None
@@ -3125,6 +4177,106 @@ def test_crossbar_datum_ink_refuses_missing_width_text(monkeypatch, invalid) -> 
         _check_crossbar_datum_ink(monkeypatch, datum, width)
 
 
+# Native IDisplayData of sheet 7's datum D (DetailItem524) and the BarWidth
+# it hangs on, farm run 20261111T023438415Z, sheet metres.  That run asked
+# the tag at x 144.1 on the width's line (y 124.0) against the width's
+# first arrow at x 141.0842, and offset the width's rows to (179.0, 128.0).
+_R7_DATUM_D_ASKED = ((0.1441, 0.124), (0.179, 0.128))
+_R7_BAR_WIDTH_ARROW_X = 0.1410842
+
+
+def _r7_datum_d_display_data():
+    """That run's ink where the live constants put it: the tag stands at the
+    mirror of its requested x about the width's first arrow and rides the
+    width's line (CROSSBAR_MEDIAN_DATUM_XY's three measured runs); the
+    width's two rows ride their offset."""
+    (asked_x, line_y), (text_x, text_y) = _R7_DATUM_D_ASKED
+    tag_dx = asked_x - drawing.CROSSBAR_MEDIAN_DATUM_XY[0]
+    tag_dy = drawing.DATUM_BOTTOM_KEEP["BarWidth"][1] - line_y
+    row_dx = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][0] - text_x
+    row_dy = drawing.DATUM_BOTTOM_TEXT_OFFSETS["BarWidth"][1] - text_y
+    arrow_x, y = _R7_BAR_WIDTH_ARROW_X, 0.124 + tag_dy
+    x0, x1 = 0.1310683 + tag_dx, 0.1380683 + tag_dx
+    datum = {
+        "lines": [
+            [0, 0, 0, 0, arrow_x, y, 0, x1, y, 0],
+            [0, 0, 0, 0, x1, y - 0.0035, 0, x0, y - 0.0035, 0],
+            [0, 0, 0, 0, x0, y - 0.0035, 0, x0, y + 0.0035, 0],
+            [0, 0, 0, 0, x0, y + 0.0035, 0, x1, y + 0.0035, 0],
+            [0, 0, 0, 0, x1, y + 0.0035, 0, x1, y - 0.0035, 0],
+        ],
+        "triangles": [[
+            arrow_x, y - 0.0014, 0, arrow_x, y + 0.0014, 0,
+            arrow_x - 0.00245, y, 0, 1, 0,
+        ]],
+        "texts": [{
+            "t": "D", "pos": [0.1328329 + tag_dx, 0.1212219 + tag_dy, 0],
+            "h": 0.0035, "w": 0.0034708, "ang": 0.0, "ref": 1,
+        }],
+    }
+    width = {"texts": [
+        {
+            "t": "CROSSBAR AT UNDERSIDE", "pos": [0.1505066 + row_dx, 0.128 + row_dy, 0],
+            "h": 0.0035, "w": 0.0569868, "ang": 0.0, "ref": 1,
+        },
+        {
+            "t": ".99 ±.03", "pos": [0.1706073 + row_dx, 0.1224437 + row_dy, 0],
+            "h": 0.0035, "w": 0.0167854, "ang": 0.0, "ref": 1,
+        },
+    ]}
+    return datum, width
+
+
+def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch) -> None:
+    """Owner ruling B5 (#2333): datum D stays the crossbar's width, now as
+    cast: .99 ±.03 on the faced underside, where the added draft leaves the
+    two sides nominal.  The tag hangs on that width's own dimension -- the
+    median plane of both sides, not one of them -- on sheet 7, and its ink
+    reads apart from the width's rows."""
+    tree = _drawing_tree()
+    sheet = _function(tree, "_cast_datum_sheet")
+    (tag,) = _named_calls(tree, "_crossbar_median_datum")
+    assert _named_calls(sheet, "_crossbar_median_datum") == [tag]
+    assert ast.unparse(tag.args[1]) == "bottom"
+    (width,) = _named_calls(_function(sheet, "datum_d"), "_named_dimension")
+    assert ast.unparse(width) == "_named_dimension(adapter, dimensions, 'BarWidth')"
+    assert "BarWidth" in spec.DRAWING_DIMENSIONS["BarProfile"]
+    assert "BarWidth" in spec.AS_CAST_DIMENSIONS["BarProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["BarWidth"] == 2
+    assert drawing.DATUM_BOTTOM_CALLOUTS_ABOVE == {"BarWidth": "CROSSBAR AT UNDERSIDE"}
+    # The bar's sides reach the underside between each pocket's end and the
+    # plan gussets; there the model stands them the nominal .99 apart.
+    assert (part.BAR_X1 - part.BAR_X0) / 25.4 == pytest.approx(0.99)
+    pocket_end, gusset_start = part.BAR_POCKET_Z, part.LAND_FACE_Z0 - part.GUSSET
+    assert gusset_start - pocket_end > 5.0
+    for z in ((pocket_end + gusset_start) / 2.0, -(pocket_end + gusset_start) / 2.0):
+        for x, outward in ((part.BAR_X0, -1.0), (part.BAR_X1, 1.0)):
+            assert part._casting_occupies(x - outward * 1e-6, -part.HALF_H, z), (x, z)
+            assert not part._casting_occupies(x + outward * 1e-6, -part.HALF_H, z), (x, z)
+    # The tag is asked on the width's line just inside its first arrow, so
+    # it stands mirrored outside the bar, opposite the width's parked rows.
+    asked = drawing.CROSSBAR_MEDIAN_DATUM_XY
+    assert asked[1] == drawing.DATUM_BOTTOM_KEEP["BarWidth"][1]
+    scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+    arrow_x = _R7_BAR_WIDTH_ARROW_X
+    assert arrow_x < asked[0] < arrow_x + (part.BAR_X1 - part.BAR_X0) * scale
+    datum, rows = _r7_datum_d_display_data()
+    tag_right = max(x for line in datum["lines"][1:] for x in (line[4], line[7]))
+    assert tag_right == pytest.approx(2.0 * arrow_x - asked[0], abs=1e-6)
+    frame = drawing.SHEET_FRAME
+    for row in rows["texts"]:
+        x, y = row["pos"][:2]
+        assert arrow_x + (part.BAR_X1 - part.BAR_X0) * scale < x
+        assert x + row["w"] <= frame[2] - drawing.INK_CLEARANCE
+        assert frame[1] + drawing.INK_CLEARANCE <= y <= frame[3] - drawing.INK_CLEARANCE
+    _check_crossbar_datum_ink(monkeypatch, datum, rows)
+    # The guard still refuses the width's rows parked on the tag.
+    for row in rows["texts"]:
+        row["pos"][:2] = datum["texts"][0]["pos"][:2]
+    with pytest.raises(RuntimeError, match="datum D ink.*crowds.*CROSSBAR AT UNDERSIDE"):
+        _check_crossbar_datum_ink(monkeypatch, datum, rows)
+
+
 def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
     """User ruling 2026-10-14: the whole top is faced on the plane the model
     carries, so the grip is the crossbar's full-height extrude depth,
@@ -3140,8 +4292,8 @@ def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
     assert spec.DRAWING_DIMENSIONS["Crossbar"] == {"HangerGrip"}
     assert spec.DRAWING_PRECISION_BY_NAME["HangerGrip"] == spec.HANGER_GRIP_PLACES
     # The rail height is that same thickness, the web ring's own driving
-    # depth, marked at the grip's places for its reference in the front view
-    # beside the ring's draft angle.
+    # depth, marked at the grip's places for its reference in the front view;
+    # the ring's draft angle prints on sheet 7's elevation.
     assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight", "WebRingDraft"}
     assert spec.DRAWING_PRECISION_BY_NAME["RingHeight"] == spec.HANGER_GRIP_PLACES
     # The hidden reference sketch and its depth equation are gone, not aliased.
@@ -3264,16 +4416,22 @@ def test_geometry_front_prints_the_models_rail_height_as_a_reference() -> None:
 
     from _drawing_dimension_import import _features_owning
 
-    assert drawing.GEOMETRY_FRONT_KEEP == {"RingHeight": (0.238, 0.091)}
+    # The elevation also carries the web root radius, which no removed
+    # section imported (farm run 20261111T004615500Z).
+    assert set(drawing.GEOMETRY_FRONT_KEEP) == {"RingHeight", "RootR"}
     assert drawing.GEOMETRY_CALLOUTS["RingHeight"] == "RAIL HEIGHT"
     assert _features_owning(
         spec.DRAWING_DIMENSIONS, drawing.GEOMETRY_FRONT_KEEP, view_label="geometry front"
-    ) == ("WebRing",)
-    assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight"}
+    ) == ("TRootFillets", "WebRing")
+    assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight", "WebRingDraft"}
+    assert "WebRingDraft" not in drawing.GEOMETRY_FRONT_KEEP
     assert spec.DRAWING_PRECISION_BY_NAME["RingHeight"] == spec.HANGER_GRIP_PLACES == 3
     assert part.RING_HEIGHT == spec.HANGER_GRIP == pytest.approx(36.4998)
-    # The model drives the depth and authors no band on it: no tolerance call
+    # The model drives the depth and authors no band on it: it is not an
+    # as-cast dimension (owner ruling B2's ±.03 table) and no tolerance call
     # in the build names the web ring or its dimension.
+    assert "WebRing" not in spec.AS_CAST_DIMENSIONS
+    assert "RingHeight" not in set().union(*spec.AS_CAST_DIMENSIONS.values())
     build = Path(part.__file__).read_text(encoding="utf-8")
     for node in ast.walk(ast.parse(build)):
         if not isinstance(node, ast.Call):
@@ -3284,23 +4442,38 @@ def test_geometry_front_prints_the_models_rail_height_as_a_reference() -> None:
             literals = {arg.value for arg in node.args if isinstance(arg, ast.Constant)}
             assert not literals & {"WebRing", "RingHeight"}, called
     compact = "".join(build.split())
-    assert compact.count('ring_height_dim=name_dimensions(adapter,"WebRing",["RingHeight"])') == 1
-    assert compact.count("drive_jobs.append((ring_height_dim[0],'\"RingHeight\"'))") == 1
+    assert compact.count('"WebRing","webring",depth=RING_HEIGHT,depth_name="RingHeight",') == 1
+    assert compact.count("drive_jobs.append((\"RingHeight@WebRing\",'\"RingHeight\"'))") == 1
     # The sheet imports it once, callouts it, marks it after the callout and
     # reads its places back with every other import.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build("):]
-    steps = [
-        "keep=GEOMETRY_FRONT_KEEP,",
-        "geometry_annotations = [*geometry_top_dimensions, *geometry_front_dimensions]",
-        "set_dimension_callouts(adapter, geometry_annotations, geometry_callouts)",
-        "_reference_model_rail_height(adapter, geometry_front_dimensions)",
-        "imported_annotations = [*geometry_annotations]",
+    body = _function(_drawing_tree(), "build")
+    (imported,) = [
+        call
+        for call in _named_calls(body, "curate_view_dimensions")
+        if ast.unparse(_keyword(call, "keep")) == "GEOMETRY_FRONT_KEEP"
     ]
-    assert all(body.count(step) == 1 for step in steps)
-    assert [body.index(step) for step in steps] == sorted(
-        body.index(step) for step in steps
+    (callouts,) = [
+        call
+        for call in _named_calls(body, "set_dimension_callouts")
+        if ast.unparse(call.args[1]) == "geometry_annotations"
+    ]
+    (reference,) = _named_calls(body, "_reference_model_rail_height")
+    assert [ast.unparse(arg) for arg in reference.args] == [
+        "adapter",
+        "geometry_front_dimensions",
+    ]
+    assigned = {
+        ast.unparse(node.targets[0]): node
+        for node in ast.walk(body)
+        if isinstance(node, ast.Assign)
+    }
+    assert assigned["geometry_front_dimensions"].value is imported
+    assert ast.unparse(assigned["geometry_annotations"].value) == (
+        "[*geometry_top_dimensions, *geometry_front_dimensions]"
     )
+    collected = assigned["imported_annotations"]
+    assert "*geometry_annotations" in ast.unparse(collected.value)
+    assert imported.lineno < callouts.lineno < reference.lineno < collected.lineno
     # Never a free-text thickness: no string the print's modules author
     # spells it, so the only 1.437s on paper are the model's dimensions.
     for module in (spec, drawing):
@@ -3371,6 +4544,37 @@ def test_rail_height_stands_between_its_arrows_right_of_the_front_view() -> None
     assert _EE_OUTLINE_XMIN - block[2] >= ink
     frame = drawing.SHEET_FRAME
     assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink
+    assert _box_box_gap(block, TITLE_BLOCK) >= ink
+
+
+def test_web_root_radius_stands_under_the_front_views_west_end() -> None:
+    """Owner ruling B2 (#2333): the T's cast root radius is the model's own
+    RootR, R.12 ±.03, imported on the elevation, the one view SolidWorks
+    shows it on (farm run 20261111T004615500Z).  Its rows stand under the
+    view's west end beside the root their leader lands on (farm run
+    20261111T023438415Z: parked at the sheet's lower left, the leader ran
+    150 mm across the view), clear of the boss bottom over them, the title
+    block and the frame."""
+    assert spec.DRAWING_DIMENSIONS["TRootFillets"] == {"RootR"}
+    assert "RootR" in spec.AS_CAST_DIMENSIONS["TRootFillets"]
+    assert spec.DRAWING_PRECISION_BY_NAME["RootR"] == 2
+    assert part.ROOT_FILLET_R / 25.4 == pytest.approx(0.12)
+    ink = drawing.INK_CLEARANCE
+    s = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    x, y = drawing.GEOMETRY_FRONT_KEEP["RootR"]
+    rows = ("R.12 ±.03", drawing.GEOMETRY_CALLOUTS["RootR"])
+    half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
+    block = (x - half_w, y - _ROW_PITCH, x + half_w, y + _ROW_PITCH - _ROW_SLACK)
+    boss_bottom = _FRONT_VIEW_TOP_Y - (part.RING_HEIGHT + part.BOSS_BELOW) * s
+    assert boss_bottom - block[3] >= ink
+    # The west web's root, under the flange: the leader to it stays short.
+    centre_x = drawing.GEOMETRY_FRONT_CENTER[0]
+    root = (centre_x + part.WEB_OUT_X * s, _FRONT_VIEW_TOP_Y - part.FLANGE * s)
+    assert centre_x < block[0]
+    assert _box_point_gap(block, root) <= 0.030
+    frame = drawing.SHEET_FRAME
+    assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink
+    assert frame[1] + ink <= block[1]
     assert _box_box_gap(block, TITLE_BLOCK) >= ink
 
 
@@ -4130,37 +5334,64 @@ def test_reams_are_no_datums_and_carry_no_position_frame() -> None:
     assert 0.013 < x < TITLE_BLOCK[0] and 0.125 < y < 0.270
 
 
-def test_overall_plan_extremes_pick_the_barrel_circles_as_entities() -> None:
+def test_overall_plan_extremes_pick_the_scanned_edges_as_entities() -> None:
     # Farm a03283b49: a sheet-point pick on the boss barrel's R22.5 plan
     # outline resolved to the top edge break's inner circle (then the C2's
-    # R20.5, width 435 for 439).  Both overall dimensions select the scanned
-    # R22.5 circles, on the upper boss's break's lower circle plane.
-    import ast
+    # R20.5, width 435 for 439).  Both overall dimensions select scanned
+    # edges: the barrels' R.885 circles on the faced top's plane, where the
+    # taken-out draft holds the Ø1.77 (owner ruling B1, #2333), and for the
+    # width's east end the set-screw boss's face, .065 past the east
+    # barrels' tangent (owner ruling B4).
+    tree = _drawing_tree()
+    width = _labelled_call(tree, "_checked_dimension", "overall casting width")
+    depth = _labelled_call(tree, "_checked_dimension", "overall casting depth")
+    for call in (width, depth):
+        assert ast.literal_eval(_keyword(call, "maximum")) is True
+        assert ast.literal_eval(_keyword(call, "reference")) is True
+        assert isinstance(_keyword(call, "entities"), ast.Tuple)
 
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    calls = {
-        ast.literal_eval(keyword.value): call
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call) and _called_name(call) == "_checked_dimension"
-        for keyword in call.keywords
-        if keyword.arg == "label" and isinstance(keyword.value, ast.Constant)
-    }
-    for label in ("overall casting width", "overall casting depth"):
-        keywords = {keyword.arg: keyword.value for keyword in calls[label].keywords}
-        entities = keywords["entities"]
-        assert isinstance(entities, ast.Tuple) and len(entities.elts) == 2
-        assert all(_called_name(item) == "plan_barrel" for item in entities.elts)
-        assert ast.literal_eval(keywords["maximum"]) is True
-    barrel = next(
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == "plan_barrel"
+    def barrels(entities):
+        return [
+            (_called_name(item), [ast.unparse(arg) for arg in item.args[:2]])
+            for item in entities
+        ]
+
+    face, west = _keyword(width, "entities").elts
+    assert ast.unparse(face) == (
+        "geometry_top_edges.exact_line_through((SET_BOSS_FACE_X, HALF_H, GOOSENECK_Z),"
+        " label='overall width, set-screw boss face').edge"
     )
-    text = ast.unparse(barrel)
-    assert "geometry_top_edges.circle_at(" in text
-    assert "HALF_H + BOSS_ABOVE - EDGE_CHAMFER" in text
-    assert "BOSS_DIA / 2" in text
+    assert barrels([west]) == [("plan_barrel", ["COLUMN_X", "FRONT_COLUMN_Z"])]
+    assert ast.unparse(_keyword(width, "expected_mm")) == "PLAN_HALF_X - SET_BOSS_FACE_X"
+    assert barrels(_keyword(depth, "entities").elts) == [
+        ("plan_barrel", ["-COLUMN_X", "FRONT_COLUMN_Z"]),
+        ("plan_barrel", ["-COLUMN_X", "REAR_COLUMN_Z"]),
+    ]
+    assert ast.unparse(_keyword(depth, "expected_mm")) == "2 * PLAN_HALF_Z"
+    (circle,) = [
+        call
+        for call in ast.walk(_function(tree, "plan_barrel"))
+        if isinstance(call, ast.Call) and _called_name(call) == "circle_at"
+    ]
+    assert ast.unparse(circle.func) == "geometry_top_edges.circle_at"
+    assert [ast.unparse(arg) for arg in circle.args] == ["(x, HALF_H, z)", "BOSS_DIA / 2"]
+    # The faced top holds each barrel's largest circle and the boss face's
+    # farthest edge, so those are the plan's extremes.
     assert drawing.PLAN_HALF_X == part.COLUMN_X + part.BOSS_DIA / 2.0
+    assert part._boss_radius(part.HALF_H) == pytest.approx(part.BOSS_DIA / 2.0)
+    for y in (part.HALF_H + part.BOSS_ABOVE, -part.HALF_H - part.BOSS_BELOW):
+        assert part._boss_radius(y) < part.BOSS_DIA / 2.0
+    assert part.SET_BOSS_FACE_X < -drawing.PLAN_HALF_X
+    assert part._casting_occupies(part.SET_BOSS_FACE_X + 1e-6, part.HALF_H, part.GOOSENECK_Z)
+    assert not part._casting_occupies(part.SET_BOSS_FACE_X - 1e-6, part.HALF_H, part.GOOSENECK_Z)
+    below = (part.HALF_H - 5.0, part.GOOSENECK_Z)  # receded 5 x tan 2° = .175 mm
+    assert not part._casting_occupies(part.SET_BOSS_FACE_X + 0.1, *below)
+    assert part._casting_occupies(part.SET_BOSS_FACE_X + 0.25, *below)
+    places = spec.DRAWING_REFERENCE_PRECISION
+    overall_width = (drawing.PLAN_HALF_X - part.SET_BOSS_FACE_X) / 25.4
+    assert f"{overall_width:.{places['overall casting width']}f}" == "17.35"
+    overall_depth = 2.0 * drawing.PLAN_HALF_Z / 25.4
+    assert f"{overall_depth:.{places['overall casting depth']}f}" == "10.59"
 
 
 def test_no_datum_tag_is_attached_to_a_circle_by_edge_object() -> None:
@@ -4278,30 +5509,46 @@ def _locator_circles():
     return circles
 
 
+# The crossbar sketch's two land-end dimensions (build_fr_top_frame's bar
+# polygon), each from a bar side's front-gusset vertex to the front land's
+# end on that side: model x of (crossbar face, land end).
+_LAND_END_DIMENSIONS = {
+    "LandEnd": (part.BAR_X0, part.LAND_X0),
+    "LandEndW": (part.BAR_X1, part.LAND_X1),
+}
+
+
+def _land_end_kept():
+    """The land-end dimension VIEW L imports: its name and its model x pair."""
+    (name,) = set(drawing.UNDERSIDE_KEEP) & set(_LAND_END_DIMENSIONS)
+    return name, _LAND_END_DIMENSIONS[name]
+
+
 def _land_end_ink():
-    """The land-end dimension's ink (sheet m): extension lines from the
-    front crossbar's sharp +X side bottom (its gusset end, |z| 75) and the
-    land end's edge (|z| 105.5), each 1 mm short of its edge as the 73.0's
-    printed (from y 163.83 for an edge ending at 164.83), down to 1 mm past
-    the dimension line at y 145; that line between them, arrows inside; and
-    the text, parked on a jog at LAND_TEXT_OFFSET_XY, as the 73.0's
-    three-row block printed there (farm run 20261027T133857303Z: x 124.18
-    from y 136.67 to 151.0, 2.8 mm a glyph), its widest row now 24 glyphs."""
+    """The imported land-end dimension's ink (sheet m), as farm run
+    20261111T023438415Z printed the model's own: extension lines from the
+    bar side's front-gusset vertex and the front land's end, each starting
+    1 mm short of its vertex (y 173.60 and 167.59), down to 1 mm past the
+    dimension line; that line between them, arrows inside; the value row
+    (16.8 mm wide, its glyphs to 4.5 mm over the point) centred on
+    LAND_TEXT_OFFSET_XY with its count row and its underline 5.56 mm under
+    it; and the jog from the line's middle to the underline's near end."""
     from _layout_geometry import Box, Segment
 
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
-    bar_x = centre[0] + part.BAR_X1 * m_per_mm
-    land_x = centre[0] + part.LAND_X1 * m_per_mm
-    bar_top = centre[1] - (part.INNER_Z - part.GUSSET) * m_per_mm - 0.001
-    land_top = centre[1] - part.WEB_IN_Z * m_per_mm - 0.001
-    line_y = drawing.LAND_END_TEXT_XY[1]
-    rows = drawing.LAND_END_CALLOUT.splitlines()
-    text = Box(0.12418, 0.13667, 0.12418 + 0.0028 * max(map(len, rows)), 0.1510)
+    name, (bar_face, land_end) = _land_end_kept()
+    bar_x = centre[0] + bar_face * m_per_mm
+    land_x = centre[0] + land_end * m_per_mm
+    bar_top = centre[1] - (part.LAND_FACE_Z0 - part.GUSSET) * m_per_mm - 0.001
+    land_top = centre[1] - part.LAND_FACE_Z0 * m_per_mm - 0.001
+    line_y = drawing.UNDERSIDE_KEEP[name][1]
+    tx, ty = drawing.LAND_TEXT_OFFSET_XY
+    text = Box(tx - 0.0084, ty - 0.00556, tx + 0.0084, ty + 0.0045)
     lines = {
         "land-end bar-face extension": Segment(bar_x, line_y - 0.001, bar_x, bar_top),
         "land-end land extension": Segment(land_x, line_y - 0.001, land_x, land_top),
         "land-end line": Segment(bar_x, line_y, land_x, line_y),
-        "land-end jog": Segment(drawing.LAND_END_TEXT_XY[0], line_y, text.xmin, text.ymin),
+        "land-end jog": Segment((bar_x + land_x) / 2.0, line_y, text.xmin, text.ymin),
     }
     return lines, text
 
@@ -4311,8 +5558,11 @@ def test_land_end_dimension_is_crossed_by_no_leader() -> None:
     knockout callout's leader crossed the land's -X extension line.  The
     land is located end by end from the crossbar's +X face instead: .95 =
     (2.884 - .984)/2, four ends, symmetric, so the full
-    land stays defined.  No leader on the sheet crosses its lines, and no
-    text box sits on them."""
+    land stays defined.  Owner ruling B2 (#2333) makes it the model's own
+    as-cast dimension, .95 ±.03 -- the +X end's LandEndW, not the -X end's
+    LandEnd, which farm run 20261111T023438415Z printed under that leader
+    again.  No leader on the sheet crosses its lines, and no text box sits
+    on them."""
     from _layout_geometry import Segment, segment_box_distance
 
     assert part.LAND_X1 - part.BAR_X1 == pytest.approx(24.13)  # .95
@@ -4324,18 +5574,38 @@ def test_land_end_dimension_is_crossed_by_no_leader() -> None:
     assert "crossbar junction land" not in spec.DRAWING_REFERENCE_PRECISION
     # rule 7: a location carries its value, band and count only.
     assert drawing.LAND_END_CALLOUT.splitlines() == ["4X"]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    land = source[source.index("    land = _checked_dimension(") :][:1400]
-    assert "p0=(BAR_X1, -HALF_H, -(BAR_POCKET_Z + INNER_Z - GUSSET)/2)," in land
-    assert "p1=(LAND_X1, -HALF_H+EDGE_CHAMFER, -(INNER_Z+WEB_IN_Z)/2)," in land
-    assert 'label="land end from crossbar face"' in land
-    assert "expected_mm=LAND_X1-BAR_X1," in land
-    assert "suffix=LAND_END_CALLOUT," in land
-    assert "    land.ArrowSide = _DIM_ARROWS_INSIDE\n" in land
-    assert "LAND_X0" not in land
+    name, (bar_face, land_end) = _land_end_kept()
+    assert (name, bar_face, land_end) == ("LandEndW", part.BAR_X1, part.LAND_X1)
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    for row in (
+        '("land end", at[0], at[2], "horizontal_distance", BAR_X0 - LAND_X0, "LandEnd"),',
+        '("west land end", at[7], at[5], "horizontal_distance", LAND_X1 - BAR_X1, "LandEndW"),',
+        "(BAR_X1, -z_land + GUSSET),  # 7 west side, front gusset",
+        "(LAND_X1, -z_land),  # 5 front land, west end",
+    ):
+        assert row in build, row
+    assert name in spec.DRAWING_DIMENSIONS["BarProfile"]
+    assert name in spec.AS_CAST_DIMENSIONS["BarProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
+    assert "LandEnd" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert drawing.UNDERSIDE_KEEP[name] == drawing.LAND_END_TEXT_XY
+    assert drawing.UNDERSIDE_CALLOUTS[name] == drawing.LAND_END_CALLOUT
+    tree = _drawing_tree()
+    (offsets,) = [
+        call.args[2]
+        for call in _named_calls(tree, "offset_dimension_text")
+        if ast.unparse(call.args[1]) == "underside_dimensions"
+    ]
+    assert f"'{name}': LAND_TEXT_OFFSET_XY" in ast.unparse(offsets)
+    # Its arrows stand inside the 8 mm between the extension lines.
+    inside = _function(tree, "land_arrows_inside")
+    (picked,) = _named_calls(inside, "_named_dimension")
+    assert ast.unparse(picked) == f"_named_dimension(adapter, underside_dimensions, '{name}')"
+    assert "land.ArrowSide = _DIM_ARROWS_INSIDE" in ast.unparse(inside)
+    assert len(_named_calls(_function(tree, "build"), "land_arrows_inside")) == 1
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
     assert drawing.LAND_END_TEXT_XY[0] == pytest.approx(
-        centre[0] + (part.BAR_X1 + part.LAND_X1) / 2.0 * m_per_mm, abs=1e-5
+        centre[0] + (bar_face + land_end) / 2.0 * m_per_mm, abs=1e-5
     )
     land_lines, text = _land_end_ink()
     # The arrows (3.556 mm each) fit inside the 8 mm run.
@@ -4702,12 +5972,18 @@ def test_hanger_station_line_ends_inside_short_of_the_station_rows() -> None:
 def test_boss_diameter_reads_apart_from_the_f_f_stacks() -> None:
     """Machinist review at rubric 848e03f (rule 15, 2 of 3 runs): at
     (0.215, 0.100) "CYLINDRICAL BOSS" shared a line with F-F's "1.437" and
-    read as one callout.  The Ø1.18 rows (value 3 mm over, callout 3 mm
-    under the point, ~2.6 mm a glyph) stand a row-and-more over the grip's
-    value row, left of detail J's circle and right of F-F's station block."""
+    read as one callout.  The Ø1.18 rows (value 3 mm over, first callout row
+    3 mm under the point, ~2.6 mm a glyph) stand a row-and-more over the
+    grip's value row, left of detail J's circle and right of F-F's station
+    block.  Owner ruling D1 (#2333) takes the barrel's draft out below the
+    underside, so a second row, one 5.56 mm pitch lower, says where the
+    Ø1.18 holds (farm run 20261111T023438415Z: rows from 126.8, 121.2 and
+    115.6 about y 124.0, the widest 42.6 mm)."""
     x, y = drawing.HUB_BOSS_DIA_TEXT_XY
-    half_w = len(drawing.HUB_BOTTOM_CALLOUTS["HubDia"]) * 0.0026 / 2.0
-    box = (x - half_w, y - 0.006, x + half_w, y + 0.006)
+    rows = drawing.HUB_BOTTOM_CALLOUTS["HubDia"].splitlines()
+    assert rows == ["CYLINDRICAL BOSS", "AT UNDERSIDE"]
+    half_w = max(map(len, rows)) * 0.0026 / 2.0
+    box = (x - half_w, y - 0.006 - (len(rows) - 1) * _ROW_PITCH, x + half_w, y + 0.006)
     grip_value_y = drawing.HANGER_GRIP_OFFSET_XY[1] + 0.00278
     assert box[1] - grip_value_y >= 0.015
     cx, cy = drawing.HUB_DETAIL_CENTER
@@ -4751,15 +6027,83 @@ def test_pad_width_leaves_the_plan_for_detail_j() -> None:
     assert drawing.HUB_BOTTOM_KEEP["RibWidth"] == drawing.RIB_WIDTH_LINE_XY
     assert drawing.HUB_BOTTOM_KEEP["HubDia"] == drawing.HUB_BOSS_DIA_TEXT_XY
     assert set(drawing.HUB_BOTTOM_CALLOUTS) == set(drawing.HUB_BOTTOM_KEEP)
-    assert drawing.HUB_BOTTOM_CALLOUTS["HubDia"] == "CYLINDRICAL BOSS"
+    # Owner ruling D1 (#2333): the hub barrel's draft is taken out from the
+    # faced underside, so its Ø1.18 says where it holds: 1 mm under it the
+    # barrel has narrowed 1 x tan 2° = .035 mm a side.
+    assert drawing.HUB_BOTTOM_CALLOUTS["HubDia"] == "CYLINDRICAL BOSS\nAT UNDERSIDE"
+    assert part.HUB_BOSS_DIA / 25.4 == pytest.approx(1.18, abs=5e-3)
+    rim = (part.GOOSENECK_X + part.HUB_BOSS_DIA / 2.0, -part.HALF_H - 1.0, part.GOOSENECK_Z)
+    assert part._casting_occupies(rim[0] - 0.05, *rim[1:])
+    assert not part._casting_occupies(rim[0] - 0.02, *rim[1:])
+    tree = _drawing_tree()
+    (offsets,) = [
+        call.args[2]
+        for call in _named_calls(tree, "offset_dimension_text")
+        if ast.unparse(call.args[1]) == "bottom_dimensions"
+    ]
+    assert dict(
+        (ast.literal_eval(key), ast.unparse(value))
+        for key, value in zip(offsets.keys, offsets.values)
+    ) == {
+        "RibWidth": "RIB_WIDTH_TEXT_XY",
+        "GussetT": "HUB_GUSSET_T_OFFSET_XY",
+        "SetBossFace": "SET_BOSS_FACE_TEXT_XY",
+    }
     source = inspect.getsource(drawing)
-    assert source.count('"RibWidth": RIB_WIDTH_TEXT_XY') == 1
-    assert (
-        "offset_dimension_text(adapter, bottom_dimensions, "
-        '{"RibWidth": RIB_WIDTH_TEXT_XY})'
-    ) in source
     assert "    rib_width_display.ArrowSide = _DIM_ARROWS_INSIDE\n" in source
-    assert "keep=HUB_BOTTOM_KEEP," in source
+    (imported,) = [
+        call
+        for call in _named_calls(tree, "curate_view_dimensions")
+        if ast.unparse(_keyword(call, "keep")) == "HUB_BOTTOM_KEEP"
+    ]
+    assert ast.unparse(imported.args[1]) == "geometry_bottom"
+
+
+def test_set_screw_boss_face_prints_on_detail_j_where_it_holds() -> None:
+    """Owner rulings B4 and D1 (#2333): the full-height boss's cast face
+    stands .95 ±.03 from the gooseneck bore axis on the faced top's plane and
+    leans in under it, so the print says where the .95 holds.  It is the
+    model's own SetBossFace, a Top-plane sketch dimension a section along
+    the tap axis does not import (farm run 20261111T015941119Z), so DETAIL J
+    carries it: its line from the bore axis to the face's top edge, through
+    the boss, and its rows parked outside the detail's fence (farm run
+    20261111T023438415Z: at x 212 "AT FACED TOP" touched the fence)."""
+    assert spec.HUB_SET_BOSS_FROM_AXIS / 25.4 == pytest.approx(0.95)
+    assert "SetBossFace" in spec.DRAWING_DIMENSIONS["SetBossProfile"]
+    assert "SetBossFace" in spec.AS_CAST_DIMENSIONS["SetBossProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["SetBossFace"] == 2
+    assert [
+        name
+        for name, keep in vars(drawing).items()
+        if name.endswith("_KEEP") and isinstance(keep, dict) and "SetBossFace" in keep
+    ] == ["HUB_BOTTOM_KEEP"]
+    assert drawing.HUB_BOTTOM_KEEP["SetBossFace"] == drawing.SET_BOSS_FACE_LINE_XY
+    assert drawing.HUB_BOTTOM_CALLOUTS["SetBossFace"] == "AT FACED TOP"
+    ink = drawing.INK_CLEARANCE
+    s = drawing.HUB_DETAIL_SCALE[0] / drawing.HUB_DETAIL_SCALE[1] / 1000.0
+    cx, cy = drawing.HUB_DETAIL_CENTER
+    fence = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * s
+    # From below the east face stands left of the bore axis the detail
+    # centres on; that run printed its line's ends at x 251.74 and 300.00.
+    face_x = cx - spec.HUB_SET_BOSS_FROM_AXIS * s
+    assert (face_x, cx) == pytest.approx((0.25174, 0.300))
+    line_x, line_y = drawing.SET_BOSS_FACE_LINE_XY
+    assert face_x < line_x < cx
+    assert abs(line_y - cy) <= spec.HUB_SET_BOSS_W / 2.0 * s - ink
+    assert math.dist((face_x, line_y), (cx, cy)) <= fence - ink
+    # The value row stands on the offset point with the callout row one
+    # 5.56 mm pitch under it, 32.3 mm wide (that run's native rows).
+    tx, ty = drawing.SET_BOSS_FACE_TEXT_XY
+    half_w = 0.0323069 / 2.0
+    block = (tx - half_w, ty - 0.00556, tx + half_w, ty + 0.0045)
+    nearest = (min(max(cx, block[0]), block[2]), min(max(cy, block[1]), block[3]))
+    assert math.dist(nearest, (cx, cy)) - fence >= ink
+    locator_right = drawing.HUB_BOTTOM_CENTER[0] + (
+        drawing.PLAN_HALF_X - part.SET_BOSS_FACE_X
+    ) / 2.0 * drawing._HUB_BOTTOM_M_PER_MM
+    assert block[0] - locator_right >= ink
+    frame = drawing.SHEET_FRAME
+    assert frame[1] + ink <= block[1] and block[3] <= frame[3] - ink
 
 
 def test_pad_width_on_detail_j_names_the_drawn_faces_and_reads_outside_it() -> None:
@@ -5190,86 +6534,171 @@ def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
 
 
 def _table_origin_mark() -> tuple[tuple[float, float], dict[str, tuple[float, float, float, float]]]:
-    """The table origin's sheet point (the plan's lower-left virtual sharp)
-    and its two arrows as boxes padded 2 mm for their "0"/"X"/"Y" labels."""
-    s = drawing.DETAIL_VIEW_SCALE / 1000.0
-    cx, cy = drawing.DETAIL_TOP_CENTER
-    ox = cx + drawing.TABLE_ORIGIN_XZ[0] * s
-    oy = cy - drawing.TABLE_ORIGIN_XZ[1] * s
-    d, length, pad = drawing.TABLE_ORIGIN_ARROW_OFFSET, drawing.TABLE_ORIGIN_ARROW_LENGTH, 0.002
+    """The table origin's sheet point (the F|G corner, the plan's lower
+    right) and its two arrows with their labels as boxes.  The X arrow runs
+    left on a line under the corner and the Y arrow up on a line right of it
+    (TABLE_ORIGIN_*_ARROW's length and offset).  The labels' reach about them
+    is the native mark's on farm run 20261111T023438415Z's sheet: "X" to
+    6.35 mm past the X tip and that arrow's "0" to 5.3 mm right of the
+    corner, both from 2.8 mm under to 1.5 mm over the X line; the Y arrow's
+    "0" from 5.8 mm under the corner and "Y" to 5.1 mm past the Y tip, both
+    within 1.4 mm of the Y line."""
+    ox, oy = _plan(*drawing.TABLE_ORIGIN_XZ)
+    (x_length, x_offset), (y_length, y_offset) = (
+        drawing.TABLE_ORIGIN_X_ARROW,
+        drawing.TABLE_ORIGIN_Y_ARROW,
+    )
+    x_line, y_line = oy - x_offset, ox + y_offset
     return (ox, oy), {
-        "X arrow": (ox - pad, oy - d - pad, ox + length + pad, oy - d + pad),
-        "Y arrow": (ox - d - pad, oy - pad, ox - d + pad, oy + length + pad),
+        "X arrow": (ox - x_length - 0.00635, x_line - 0.0028, ox + 0.0053, x_line + 0.0015),
+        "Y arrow": (y_line - 0.0014, oy - 0.0058, y_line + 0.0014, oy + y_length + 0.0051),
     }
 
 
-def test_sheet_three_locates_its_holes_in_one_table_from_the_lower_left_corner() -> None:
-    """drawing-guidelines.md rule 10: the sockets and the hanger holes each
-    carry a mate, so one tagged table locates them, a MATE column naming each
-    group's mate; the keeper taps are transferred from MHA-CH-07 at assembly,
-    so their callout places them and no station dimension survives on the
-    sheet.  Owner 2026-11-07: the origin is a corner the shop picks up with
-    an edge finder, never a hole centre -- the virtual corner where the
-    Ø1.77 boss ODs touch, the lower and left bosses' tangents, so every hole
-    reads positive and A1 reads (.885, .885)."""
+def test_sheet_three_tabulates_its_sockets_basic_from_the_cast_datum_corner() -> None:
+    """drawing-guidelines.md rule 10: the four sockets carry a mate, so one
+    tagged table locates them, a MATE column naming it; the keeper taps are
+    transferred from MHA-CH-07 at assembly, so their callout places them and
+    no station dimension survives on the sheet.  Owner 2026-11-07: the origin
+    is a corner the shop picks up, never a hole centre.  Owner ruling D2
+    (#2333): on the casting that corner is its own datum frame's F|G corner
+    -- the rear barrels' datum-target tangent and the rear-west barrel's, the
+    plan's lower right -- the coordinates BASIC under the sockets' position
+    frames and every one positive; the hanger holes leave the table for
+    datum D's frame and their .XXX stations from the front sockets' axis."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for retired in (
-        "front hanger z from upper sockets", "rear hanger z from upper sockets",
         "keeper x from left sockets", "front keeper z from upper sockets",
         "rear keeper z from upper sockets", "socket horizontal pitch",
         "socket vertical pitch", "HOLE X, Z ORIGIN",
     ):
         assert retired not in source, retired
-    assert "_socket_hole_table(adapter, detail_top, detail_top_edges)" in source
+    tree = _drawing_tree()
+    build = _function(tree, "build")
+    (placed,) = _named_calls(build, "_socket_hole_table")
+    assert ast.unparse(placed) == "_socket_hole_table(adapter, detail_top, detail_top_edges)"
     x0, z0 = drawing.TABLE_ORIGIN_XZ
-    assert (x0, z0) == (
-        -part.COLUMN_X - part.BOSS_DIA / 2.0, part.REAR_COLUMN_Z + part.BOSS_DIA / 2.0,
-    )
-    locations = {
-        (x, z): (round((x - x0) / 25.4, 3), round((z0 - z) / 25.4, 3))
-        for x, z, _d, _m in drawing.TABLE_HOLES
-    }
-    assert locations[(-part.COLUMN_X, part.REAR_COLUMN_Z)] == (0.885, 0.885)
-    # The other rows shift +.210 in X and +.135 in Y from the rail-face corner.
-    for (x, z), (lx, ly) in locations.items():
-        assert lx == pytest.approx(round((x + part.OUTER_X) / 25.4, 3) + 0.210, abs=0.0011)
-        assert ly == pytest.approx(round((part.OUTER_Z - z) / 25.4, 3) + 0.135, abs=0.0011)
-    assert all(
-        x >= drawing.TABLE_ORIGIN_XZ[0] and z <= drawing.TABLE_ORIGIN_XZ[1]
-        for x, z, _d, _m in drawing.TABLE_HOLES
-    )
-    assert drawing.negative_locations((("A1", ".673", ".750", ""), ("B1", "-1.0", "2.0", ""))) == ["-1.0"]
-    source_table = source[source.index("def _socket_hole_table("):]
-    assert "negative_locations(rows[1:])" in source_table
-    assert "_set_table_origin_arrows(adapter, table, corner_xy)" in source_table
+    assert (x0, z0) == part.CAST_DATUM_ORIGIN_XZ
     holes = {(x, z): (diameter, mate) for x, z, diameter, mate in drawing.TABLE_HOLES}
-    assert len(holes) == 6
+    assert len(holes) == len(drawing.TABLE_HOLES) == 4
     for x in (-part.COLUMN_X, part.COLUMN_X):
         for z in (part.FRONT_COLUMN_Z, part.REAR_COLUMN_Z):
             assert holes[(x, z)] == (part.BORE_DIA, "MHA-FR-03, MHA-FR-01")
-    for z in (part.STUD_Z_FRONT, part.STUD_Z_REAR):
-        assert holes[(part.HANGER_X, z)] == (spec.HANGER_CLEARANCE_DIA, "MHA-SM-VN-52")
-    # The band left of the title block, under the plan's lower bosses and
+    # Counted left and up from the corner, as that farm run's native cells
+    # read A1 to A4: .831 is the barrel's radius at the datum targets' height.
+    printed = {
+        hole: tuple(
+            f"{(origin - at) / 25.4:.3f}".lstrip("0") for origin, at in zip((x0, z0), hole)
+        )
+        for hole in holes
+    }
+    assert printed == {
+        (-part.COLUMN_X, part.REAR_COLUMN_Z): ("16.343", ".831"),
+        (-part.COLUMN_X, part.FRONT_COLUMN_Z): ("16.343", "9.651"),
+        (part.COLUMN_X, part.REAR_COLUMN_Z): (".831", ".831"),
+        (part.COLUMN_X, part.FRONT_COLUMN_Z): (".831", "9.651"),
+    }
+    assert x0 - part.COLUMN_X == pytest.approx(part._boss_radius(part.DATUM_TARGET_Y))
+    assert drawing.negative_locations((("A1", ".673", ".750", ""), ("B1", "-1.0", "2.0", ""))) == ["-1.0"]
+    table_helper = _function(tree, "_socket_hole_table")
+    helper_source = ast.unparse(table_helper)
+    assert "negative_locations(rows[1:])" in helper_source
+    assert "_set_table_origin_arrows(adapter, table, corner_xy)" in helper_source
+    assert "table.SetColumnHidden(_HOLE_TABLE_SIZE_COLUMN, True)" in helper_source
+    corner = _labelled_call(table_helper, "model_point_in_view", "hole-table origin")
+    assert ast.unparse(corner.args[2]) == (
+        "(TABLE_ORIGIN_XZ[0] / 1000.0, HALF_H / 1000.0, TABLE_ORIGIN_XZ[1] / 1000.0)"
+    )
+    (inserted,) = _named_calls(table_helper, "insert_hole_table")
+    assert ast.unparse(_keyword(inserted, "datum_xy")) == "corner_xy"
+    assert ast.unparse(_keyword(inserted, "anchor_xy")) == "HOLE_TABLE_ANCHOR"
+    assert ast.literal_eval(_keyword(inserted, "basic_locations")) is True
+    assert ast.literal_eval(_keyword(inserted, "location_places")) == 3
+    # Each hanger hole's station: its own vertical dimension from the front
+    # sockets' drawn axis to the hole, machined to machined, so it prints at
+    # the title block's .XXX with nothing added.
+    stations = {
+        "front hanger z from upper sockets": part.STUD_Z_FRONT,
+        "rear hanger z from upper sockets": part.STUD_Z_REAR,
+    }
+    assert set(drawing.HANGER_Z_TEXT_XY) == set(stations)
+    assert not {(part.HANGER_X, z) for z in stations.values()} & set(holes)
+    (station,) = [
+        call
+        for call in _named_calls(build, "_checked_dimension")
+        if ast.unparse(_keyword(call, "text_xy")) == "HANGER_Z_TEXT_XY[label]"
+    ]
+    assert {keyword.arg for keyword in station.keywords} == {
+        "p0", "p1", "text_xy", "label", "expected_mm", "orientation", "center",
+        "entity_types", "entities",
+    }
+    assert ast.unparse(_keyword(station, "p0")) == "(HANGER_X, HALF_H, FRONT_COLUMN_Z)"
+    assert ast.unparse(_keyword(station, "p1")) == "(HANGER_X, HALF_H, station_z)"
+    assert ast.unparse(_keyword(station, "expected_mm")) == "station_z - FRONT_COLUMN_Z"
+    assert ast.literal_eval(_keyword(station, "orientation")) == "vertical"
+    entities = ast.unparse(_keyword(station, "entities"))
+    assert entities.startswith("(front_socket_axis, detail_top_edges.circle_at(")
+    assert "(HANGER_X, HALF_H, station_z), HANGER_CLEARANCE_DIA / 2.0" in entities
+    (loop,) = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.For) and any(inner is station for inner in ast.walk(node))
+    ]
+    assert ast.unparse(loop.target) == "(station_z, label)"
+    assert ast.unparse(loop.iter) == (
+        "((STUD_Z_FRONT, 'front hanger z from upper sockets'),"
+        " (STUD_Z_REAR, 'rear hanger z from upper sockets'))"
+    )
+    assert [
+        (f"{(z - part.FRONT_COLUMN_Z) / 25.4:.{spec.DRAWING_REFERENCE_PRECISION[label]}f}")
+        for label, z in stations.items()
+    ] == ["1.104", "7.959"]
+    # The band left of the title block, under the plan's rear bosses and
     # over the edge-break note, holds the table.
     table = _hole_table_box()
     assert table[2] < TITLE_BLOCK[0]
-    plan_bottom = drawing.DETAIL_TOP_CENTER[1] - (
-        part.REAR_COLUMN_Z + part.BOSS_DIA / 2.0
-    ) * drawing.DETAIL_VIEW_SCALE / 1000.0
+    plan_bottom = _plan(0.0, part.REAR_COLUMN_Z + part.BOSS_DIA / 2.0)[1]
     assert table[3] < plan_bottom - 0.001
     assert table[1] > drawing.EDGE_NOTE_XY[1] + 0.001
     # The origin mark's arrows and labels stand clear of the table, the
-    # lower-left boss and the rails' outer edges.
+    # rear-west boss beside the corner, the keeper callout and the title
+    # block: the X arrow under the corner, the Y arrow right of it.
     (ox, oy), arrows = _table_origin_mark()
-    s = drawing.DETAIL_VIEW_SCALE / 1000.0
-    cx, cy = drawing.DETAIL_TOP_CENTER
-    boss = (cx - part.COLUMN_X * s, cy - part.REAR_COLUMN_Z * s)
-    boss_r = part.BOSS_DIA / 2.0 * s
+    boss, boss_r = _plan(part.COLUMN_X, part.REAR_COLUMN_Z), part.BOSS_DIA / 2.0 * _S
+    _callout, callout_box = _keeper_callout_placed()
+    frame = drawing.SHEET_FRAME
     for name, box in arrows.items():
         assert _box_box_gap(box, table) >= drawing.INK_CLEARANCE, name
         assert _box_point_gap(box, boss) - boss_r >= drawing.INK_CLEARANCE, name
-    assert arrows["X arrow"][3] < oy and arrows["Y arrow"][2] < ox
-    assert "table.SetColumnHidden(_HOLE_TABLE_SIZE_COLUMN, True)" in source_table
+        assert _box_box_gap(box, callout_box) >= drawing.INK_CLEARANCE, name
+        assert _box_box_gap(box, TITLE_BLOCK) >= drawing.INK_CLEARANCE, name
+        assert frame[0] < box[0] and box[2] < frame[2] - drawing.INK_CLEARANCE, name
+    assert arrows["X arrow"][3] < oy and arrows["Y arrow"][0] > ox
+
+
+def test_keeper_callout_leader_passes_over_the_table_origin_mark() -> None:
+    """Farm run 20261111T023438415Z: with the table's origin on the F|G
+    corner (owner ruling D2, #2333) the keeper callout's leader, climbing
+    from its shoulder over that corner to the rear tap, ran through the
+    origin mark's "Y", whose arrow then stood 10 mm up the corner's right.
+    The arrow is shorter: the leader passes an ink clearance over its
+    letter, over the G trace's end and clear of the X arrow."""
+    from _layout_geometry import Segment
+
+    hole, hole_r, boss, boss_r = _keeper_geometry()
+    callout, tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
+    leader = (_shoulder_end(callout, tip), tip)
+    (ox, oy), arrows = _table_origin_mark()
+    ink = drawing.INK_CLEARANCE
+    for name, box in arrows.items():
+        assert _box_segment_gap(box, leader) >= ink, name
+    y_arrow = arrows["Y arrow"]
+    that_run = (*y_arrow[:3], y_arrow[3] - drawing.TABLE_ORIGIN_Y_ARROW[0] + 0.010)
+    assert _box_segment_gap(that_run, leader) < ink
+    # The G trace climbs the corner's own x to TABLE_G_LINE_FRONT_Z.
+    g_end = _plan(drawing.TABLE_ORIGIN_XZ[0], drawing.TABLE_G_LINE_FRONT_Z)
+    assert g_end[0] == ox and oy < g_end[1] < leader[1][1]
+    assert _segment_gap(Segment(ox, oy, *g_end), Segment(*leader[0], *leader[1])) >= ink
 
 
 def test_hole_table_locations_drop_the_leading_zero() -> None:
@@ -5294,29 +6723,28 @@ def test_hole_table_locations_drop_the_leading_zero() -> None:
     assert "leading_zero_locations(rows[1:])" in source
 
 
-def test_socket_finish_leader_passes_over_the_table_origin_mark() -> None:
+def test_socket_finish_leader_stays_clear_of_the_table_origin_mark() -> None:
     """Farm run 20261107T084432155Z (leader-crosses-leader): the socket Ra
-    leader, level with the A1 axis, ran through the origin mark's Y arrow at
-    the lower-left corner.  From its tail (the symbol point plus
-    FINISH_LEADER_TAIL) to the upper-left bore rim it now passes over the
-    arrow and its letter."""
-    from _layout_geometry import Segment
-
-    s = drawing.DETAIL_VIEW_SCALE / 1000.0
-    cx, cy = drawing.DETAIL_TOP_CENTER
+    leader, level with the A1 axis, ran through the origin mark's Y arrow,
+    then at the plan's lower-left corner.  The leader still climbs from its
+    tail (the symbol point plus FINISH_LEADER_TAIL) to the rear-east bore's
+    upper-left rim; owner ruling D2 (#2333) moved the origin to the F|G
+    corner at the plan's lower right, so the whole mark stands right of the
+    leader, and the F trace the corner sends under that boss runs below it."""
     angle = math.radians(drawing.SOCKET_FINISH_LANDING_DEG)
-    r = part.BORE_DIA / 2.0 * s
-    rim = (cx - part.COLUMN_X * s + r * math.cos(angle), cy - part.REAR_COLUMN_Z * s + r * math.sin(angle))
+    r = part.BORE_DIA / 2.0 * _S
+    bore = _plan(-part.COLUMN_X, part.REAR_COLUMN_Z)
+    rim = (bore[0] + r * math.cos(angle), bore[1] + r * math.sin(angle))
     sx, sy = drawing.SOCKET_FINISH_SYMBOL_XY
-    leader = Segment(sx + drawing.FINISH_LEADER_TAIL, sy, *rim)
-    _origin, arrows = _table_origin_mark()
+    leader = ((sx + drawing.FINISH_LEADER_TAIL, sy), rim)
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "socket_east_rear")' in Path(
+        drawing.__file__
+    ).read_text(encoding="utf-8")
+    (_ox, oy), arrows = _table_origin_mark()
     for name, box in arrows.items():
-        assert _box_segment_gap(box, ((leader.x0, leader.y0), (leader.x1, leader.y1))) >= drawing.INK_CLEARANCE, name
-    y_arrow = arrows["Y arrow"]
-    # Over the Y arrow's letter (a 3.5 mm capital past its tip).
-    t = (y_arrow[0] + y_arrow[2]) / 2.0
-    at = leader.y0 + (leader.y1 - leader.y0) * (t - leader.x0) / (leader.x1 - leader.x0)
-    assert at - (y_arrow[3] + 0.0035) >= 0.001
+        assert _box_segment_gap(box, leader) >= drawing.INK_CLEARANCE, name
+        assert box[0] - max(leader[0][0], rim[0]) >= drawing.INK_CLEARANCE, name
+    assert min(leader[0][1], rim[1]) - oy >= drawing.INK_CLEARANCE
 
 
 
@@ -5325,8 +6753,9 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     their holes, sat under the hanger and keeper callouts' leaders.  Each
     now stands in the open window next to its hole, an ink clearance inside
     the rails and the crossbar, clear of the D centreline, of the keeper
-    callout and of the table's origin mark at the lower-left corner (farm
-    run 20261106T210746725Z: the mark's X arrow ran through a tag)."""
+    callout and of the table's origin mark (farm run 20261106T210746725Z:
+    the mark's X arrow ran through a tag).  Owner ruling D2 (#2333) leaves
+    the table the four sockets only, each tag diagonally inside its own."""
     s = drawing.DETAIL_VIEW_SCALE / 1000.0
     cx, cy = drawing.DETAIL_TOP_CENTER
     ink = drawing.INK_CLEARANCE
@@ -5338,22 +6767,20 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     _callout, callout_box = _keeper_callout_placed()
     half_w, half_h = drawing._HOLE_TAG_HALF
     _origin, arrows = _table_origin_mark()
+    assert len(drawing.TABLE_HOLES) == 4
     for x, z, diameter, _mate in drawing.TABLE_HOLES:
-        x0, y1 = drawing.hole_tag_position(x, z, diameter)
+        assert diameter == part.BORE_DIA, (x, z)
+        x0, y1 = drawing.hole_tag_position(x, z)
         box = (x0, y1 - 2 * half_h, x0 + 2 * half_w, y1)
         assert _box_box_gap(box, callout_box) >= ink, (x, z)
         for arrow in arrows.values():
             assert _box_box_gap(box, arrow) >= ink, (x, z)
         hx, hy = cx + x * s, cy - z * s
         assert math.dist((x0 + half_w, y1 - half_h), (hx, hy)) < 0.023
+        # Inward of its socket on both sheet axes.
+        assert (x0 + half_w > hx) == (x < 0) and (y1 - half_h > hy) == (z > 0), (x, z)
         d_x = cx + part.HANGER_X * s
-        if diameter == part.HANGER_CLEARANCE_DIA:
-            # B1 in the left window; B2 in the right, off the C DRILL
-            # callout's leader (farm run 20261107T000550920Z).
-            side = "right" if z < 0 else "left"
-            assert (box[0] >= d_x) == (side == "right"), (x, z)
-        else:
-            side = "right" if x > 0 else "left"
+        side = "right" if x > 0 else "left"
         left, right = windows[side]
         assert left + ink <= box[0] and box[2] <= right - ink, (x, z)
         assert bottom + ink <= box[1] and box[3] <= top - ink, (x, z)
@@ -5365,15 +6792,16 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     reviews of farm run 20261107T170344738Z's PDF (above A2 the leader
     crossed datum D's dimension line at its left arrowhead).  The block's
     widest row, 2.58 mm a glyph, stays inside the frame and ends left of the
-    left boss tangent; its radial leader to A2's near rim stays well under
-    D's dimension line and under the boss leader's landing."""
+    left boss tangent; its radial leader to A2's near rim stays under the
+    boss leader's landing.  D's station stands on sheet 7 now (owner ruling
+    D2, #2333), so no dimension line runs over A2 on this sheet."""
     x, y = drawing.DETAIL_TOP_KEEP["B0Dia"]
     rows = drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()
     assert len(rows) <= 2
     half = max(map(len, rows)) * 0.00258 / 2.0
     ink = drawing.INK_CLEARANCE
     assert x - half >= drawing.SHEET_FRAME[0] + ink
-    tangent_x = _plan(drawing.TABLE_ORIGIN_XZ[0], 0.0)[0]
+    tangent_x = _plan(-drawing.PLAN_HALF_X, 0.0)[0]
     assert x + half <= tangent_x - 0.004
     cx, cy = _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)
 
@@ -5385,8 +6813,8 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
         )
 
     rim = landing((x + half, y), part.BORE_DIA / 2.0 * _S)
-    # D's dimension line prints about 2.5 mm under its text point.
-    assert drawing.D_STATION_TEXT_XY[1] - 0.0025 - max(rim[1], y) >= 0.02
+    assert not hasattr(drawing, "D_STATION_TEXT_XY")
+    assert "DStation" not in drawing.DETAIL_TOP_KEEP
     boss_x, boss_y = drawing.DETAIL_TOP_KEEP["C0Dia"]
     boss_landing = landing((boss_x, boss_y), part.BOSS_DIA / 2.0 * _S)
     assert boss_landing[1] - rim[1] >= 0.005
@@ -5398,18 +6826,31 @@ def test_side_rail_web_text_stands_beside_its_own_section() -> None:
     """Local machinist reviews: parked right of E-E the 2X SIDE RAIL WEB
     rows ran out over M-M (farm run 20261107T170344738Z's PDF); centred over
     E-E the web's extension lines ran up through "RAIL" (farm run
-    20261107T204437943Z).  The shorter "2X WEB" stands left of E-E's web,
-    off both extension lines and clear of the plan's 1.35 SIDE FLANGE text
-    (its shoulder ends at x 266.7 mm)."""
+    20261107T204437943Z).  The web is drafted from the underside, so its
+    .51 holds there: the three rows stand left of the rail UNDER the web,
+    off both extension lines, under the plan's 1.35 SIDE FLANGE rows and
+    right of the front view's RAIL HEIGHT.  Farm run 20261111T023438415Z's
+    native rows: a three-row block's value line 2.78 mm over its text
+    point, glyphs 4.5 over a line, the last row's line -- the dimension
+    line -- 8.33 under the point; ".51 ±.03" 16.79 mm wide, "AT UNDERSIDE"
+    31.40, "RAIL HEIGHT" 26.78; a two-row block's line 5.56 under its
+    point."""
     x, y = drawing.SIDE_WEB_TEXT_XY
-    assert drawing.SIDE_WEB_QUALIFIER == "2X WEB"
-    half = len(drawing.SIDE_WEB_QUALIFIER) * 0.00258 / 2.0
+    assert drawing.SIDE_SECTION_KEEP == {"SideWebT": drawing.SIDE_WEB_TEXT_XY}
+    assert drawing.SIDE_WEB_QUALIFIER.splitlines() == ["2X WEB", "AT UNDERSIDE"]
+    half = 0.03140 / 2.0
+    top, line_y = y + 0.00278 + 0.0045, y - 0.00833
     ink = drawing.INK_CLEARANCE
     web_left = drawing._side_section_xy(-part.WEB_OUT_X, 0.0)[0]
     assert x + half <= web_left - ink
-    assert x - half >= 0.2667 + 0.005
-    # The dimension line (5.56 mm under the text point) clears E-E's flange top.
-    assert y - 0.00556 - drawing._side_section_xy(0.0, part.HALF_H)[1] >= ink
+    # The value row is level with the flange, whose outer face stands left
+    # of the web's.
+    assert x + 0.01679 / 2.0 <= drawing._side_section_xy(-part.OUTER_X, 0.0)[0] - ink
+    # The dimension line stands under the underside the width is taken on.
+    assert drawing._side_section_xy(0.0, -part.HALF_H)[1] - line_y >= ink
+    assert drawing.GEOMETRY_TOP_KEEP["SideFlangeWidth"][1] - 0.00556 - top >= ink
+    rail_height_right = drawing.GEOMETRY_FRONT_KEEP["RingHeight"][0] + 0.02678 / 2.0
+    assert (x - half) - rail_height_right >= ink
 
 
 def test_cross_tap_callout_counts_all_four_taps_then_names_its_mate() -> None:
@@ -5497,13 +6938,14 @@ def test_transfer_rows_rederive_the_keeper_envelope_and_plan_clearance() -> None
 def _hole_table_box():
     """Sheet 3's hole table (x0, y0, x1, y1), hung from its top-left anchor:
     the drawn TAG, X/Y LOC and MATE widths (the native SIZE column hidden),
-    46.4 mm tall as farm run 20261106T204855971Z measured it."""
+    32.9 mm tall as farm run 20261111T023438415Z's native table read with
+    its header and four socket rows (y 48.59 to 81.50)."""
     x, y = drawing.HOLE_TABLE_ANCHOR
     width = (
         drawing.HOLE_TABLE_TAG_WIDTH + 2 * drawing.HOLE_TABLE_LOC_WIDTH
         + drawing.HOLE_TABLE_MATE_WIDTH
     )
-    return (x, y - 0.0464, x + width, y)
+    return (x, y - 0.0329, x + width, y)
 
 
 def _keeper_callout_placed():
@@ -5557,18 +6999,38 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
 def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
     # The underside's 138.0 names the pockets; M-M, the crossbar's own
     # section, prints their depth, flange underside to the T's underside, arrows
-    # inside.  Its two rows print 24.4 x 9.2 mm (2X POCKET by the 40d9d030e
-    # render's glyphs), the underline 1.0 under the block and 0.1 past each
-    # side; extension lines overshoot their line 1.03 mm (the 8.0's there).
+    # inside.  Its two rows print 24.6 x 9.2 mm (farm run
+    # 20261111T023438415Z's native "1.117 ±.030" over "2X POCKET"), the
+    # underline 1.0 under the block; extension lines overshoot their line
+    # 1.0 mm.
     from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY' in source
+    # Owner ruling B2 (#2333): the depth, the length and the front end's
+    # station are the model's own as-cast dimensions, each with its ±.03.
+    assert drawing.CROSSBAR_SECTION_KEEP["PocketDepth"] == drawing.CROSSBAR_POCKET_DEPTH_LINE_XY
+    assert drawing.CROSSBAR_SECTION_CALLOUTS["PocketDepth"] == "2X POCKET"
+    assert drawing.UNDERSIDE_KEEP["PocketLength"] == drawing.POCKET_LENGTH_TEXT_XY
+    assert drawing.UNDERSIDE_CALLOUTS["PocketLength"] == "2X POCKET"
+    assert drawing.UNDERSIDE_KEEP["PocketFromSocket"] == drawing.POCKET_FROM_SOCKET_LINE_XY
+    assert drawing.UNDERSIDE_CALLOUTS["PocketFromSocket"] == ""
+    for feature, name in (
+        ("BarPockets", "PocketDepth"),
+        ("BarPocketProfile", "PocketLength"),
+        ("BarPocketProfile", "PocketFromSocket"),
+    ):
+        assert name in spec.DRAWING_DIMENSIONS[feature], name
+        assert name in spec.AS_CAST_DIMENSIONS[feature], name
+    tree = _drawing_tree()
+    offsets = {
+        ast.unparse(call.args[1]): ast.unparse(call.args[2])
+        for call in _named_calls(tree, "offset_dimension_text")
+    }
+    assert "'PocketDepth': CROSSBAR_POCKET_DEPTH_TEXT_XY" in offsets["crossbar_section_dimensions"]
+    assert "'PocketLength': POCKET_LENGTH_OFFSET_XY" in offsets["underside_dimensions"]
     # Machinist review r1: the 138.0 no longer claims a mid-air "CENTRED ON
     # T"; its front end is located from the front-left socket axis.
-    assert 'suffix="2X POCKET", offset_text=POCKET_LENGTH_OFFSET_XY' in source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '\\nCENTRED ON T"' not in source
-    assert 'label="crossbar pocket from front socket"' in source
     assert drawing.BAR_POCKET_FROM_SOCKET == pytest.approx(
         abs(part.FRONT_COLUMN_Z) - part.BAR_POCKET_Z
     )
@@ -5576,17 +7038,29 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
     # the sheet frame, after a rebuild later than its placement readback; a
     # settled check reads its line back onto the 138.0's x after the
     # finalizer's settling rebuild and proves it inside the zone frame.
-    assert (
-        "_pin_vertical_dimension_line(\n"
-        "            adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],"
-    ) in source
-    assert source.count("_pin_vertical_dimension_line(") == 2  # def + the one call
+    (pinned,) = _named_calls(tree, "_pin_vertical_dimension_line")
+    assert pinned in list(ast.walk(_function(tree, "_pocket_from_socket_settled")))
+    assert ast.unparse(pinned.args[1]) == (
+        "_named_dimension(adapter, underside_dimensions, 'PocketFromSocket')"
+        ".GetSpecificAnnotation()"
+    )
+    assert ast.unparse(pinned.args[2]) == "POCKET_FROM_SOCKET_LINE_XY[0]"
+    assert ast.literal_eval(_keyword(pinned, "label")) == "crossbar pocket from front socket"
     assert "settled_checks=(_pocket_from_socket_settled,)," in source
     assert drawing.POCKET_FROM_SOCKET_LINE_XY[0] == drawing.POCKET_LENGTH_TEXT_XY[0]
     assert drawing.SHEET_FRAME[0] < drawing.POCKET_FROM_SOCKET_LINE_XY[0]
-    assert 'label="crossbar pocket depth"' in source
-    assert "pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE" in source
-    assert "crossbar pocket depth" in spec.DRAWING_REFERENCE_PRECISION
+    inside = _function(tree, "pocket_arrows_inside")
+    (picked,) = _named_calls(inside, "_named_dimension")
+    assert ast.unparse(picked) == (
+        "_named_dimension(adapter, crossbar_section_dimensions, 'PocketDepth')"
+    )
+    assert "pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE" in ast.unparse(inside)
+    assert len(_named_calls(_function(tree, "build"), "pocket_arrows_inside")) == 1
+    # The pocket is the .XXX grip less the flange, so its as-cast band prints
+    # at the grip's places; no sheet-derived reference states it any more.
+    assert spec.DRAWING_PRECISION["BarPockets"] == {"PocketDepth": spec.HANGER_GRIP_PLACES}
+    assert "crossbar pocket depth" not in spec.DRAWING_REFERENCE_PRECISION
+    assert part.POCKET_H == pytest.approx(part.RING_HEIGHT - part.FLANGE)
     ink = drawing.INK_CLEARANCE
     xy = drawing._side_section_xy
     line_x = drawing.CROSSBAR_POCKET_DEPTH_LINE_XY[0]
@@ -5609,10 +7083,17 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
         assert _segment_gap(leader, segment) >= ink, name
         assert segment_box_distance(segment, text) >= ink, name
     assert segment_box_overlap_length(leader, text) == 0.0
-    # Between the side rail's inner face and the T, under the side web's line
-    # (printed 5.56 mm under its text point) and over the 1:4 captions.
+    # Between the side rail's inner face and the T, clear of E-E's web
+    # dimension line (its three rows' last line, 8.33 mm under the text
+    # point, out to its right arrow's tail 6.35 mm past the web's inner face)
+    # and over the sections' captions.
     assert text.xmin - xy(-part.INNER_X, 0.0)[0] >= ink
-    assert drawing.SIDE_WEB_TEXT_XY[1] - 0.00556 - text.ymax >= ink
+    web_line_y = drawing.SIDE_WEB_TEXT_XY[1] - 0.00833
+    web_line = Segment(
+        drawing.SIDE_WEB_TEXT_XY[0], web_line_y, xy(-part.WEB_IN_X, 0.0)[0] + 0.00635, web_line_y
+    )
+    assert segment_box_distance(web_line, text) >= ink
+    assert _segment_gap(leader, web_line) >= ink
     assert leader.y1 - drawing.SIDE_SECTION_CAPTION_XY[1] >= ink
 
 
@@ -5624,11 +7105,23 @@ def test_keeper_facing_note_is_the_part_property_and_the_seats_carry_no_frame() 
 
     # Rule 5 names flatness on a clamp face over-specification and no user
     # ruling accepts a keeper-seat frame (codex review of 06d0bbc59): the
-    # faced top carries the seats, with no flatness value of its own.
+    # faced top carries the seats, with no flatness value of its own.  The
+    # casting's own controls are positions only: the sockets' two frames,
+    # the rail webs' and the corner bosses' (owner rulings D2, D3 and D6,
+    # and Main's delegated ruling 2026-11-11, #2333).
     assert set(spec.GEOMETRIC_TOLERANCES_MM) == {
+        "corner boss position",
         "knife-hanger crossbar centring",
         "knife-hanger press ream perpendicularity",
+        "rail web position",
+        "tube socket pattern location",
+        "tube socket pattern refinement",
     }
+    assert not [key for key in spec.GEOMETRIC_TOLERANCES_MM if "keeper" in key or "flat" in key]
+    assert {
+        ast.literal_eval(_keyword(frame, "characteristic"))
+        for frame in _named_calls(_drawing_tree(), "add_feature_control_frame")
+    } == {"position", "perpendicularity"}
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     # One facing requirement on the whole top except the four corner bosses
     # (user ruling 2026-10-14).  No region size, no edge margin, no setup
@@ -5768,7 +7261,9 @@ def test_keeper_tap_drill_wall_holds_the_target_without_an_exception() -> None:
     assert "RV-08" not in entries
 
 
-def test_top_frame_drawing_is_six_sheets() -> None:
+def test_top_frame_drawing_is_seven_sheets() -> None:
+    # Owner rulings B6 and D2 (#2333): the casting's own datum frame takes a
+    # seventh sheet, its two views at the title block's scale.
     assert drawing.SHEET_NAMES == (
         "PICTORIAL",
         "GEOMETRY",
@@ -5776,8 +7271,17 @@ def test_top_frame_drawing_is_six_sheets() -> None:
         "CROSS-TAPS",
         "HUB-SET-SCREW",
         "UNDERSIDE",
+        "CAST-DATUMS",
     )
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
+    datum_sheet = _function(_drawing_tree(), "_cast_datum_sheet")
+    assert 'ddoc.ActivateSheet("CAST-DATUMS")' in ast.get_source_segment(
+        Path(drawing.__file__).read_text(encoding="utf-8"), datum_sheet
+    )
+    placed = _named_calls(datum_sheet, "place_view")
+    assert [ast.literal_eval(view.args[2]) for view in placed] == ["*Front", "*Bottom"]
+    assert {ast.unparse(_keyword(view, "scale")) for view in placed} == {"SHEET_SCALE"}
+    assert drawing.SHEET_SCALES["CAST-DATUMS"] == drawing.SHEET_SCALE
     # No split-line seat regions remain to dimension, qualify or section.
     assert not [key for key in spec.DRAWING_REFERENCE_PRECISION if "keeper seat" in key]
     for module in (spec, part, drawing):
@@ -6010,6 +7514,59 @@ def _named_calls(node, name):
 
 def _keyword(call, name):
     return next((item.value for item in call.keywords if item.arg == name), None)
+
+
+@functools.cache
+def _drawing_tree():
+    """The drawing script's syntax tree (read-only: one parse a session)."""
+    return ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+
+
+def _labelled_call(node, name, label):
+    """The one ``name(...)`` call under ``node`` whose ``label=`` is ``label``."""
+    (call,) = [
+        call
+        for call in _named_calls(node, name)
+        if isinstance(_keyword(call, "label"), ast.Constant)
+        and _keyword(call, "label").value == label
+    ]
+    return call
+
+
+def _function(node, name):
+    """The one function ``name`` defined anywhere under ``node``."""
+    (function,) = [
+        item
+        for item in ast.walk(node)
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == name
+    ]
+    return function
+
+
+def _build_value(function, expression):
+    """``expression``, a syntax node inside ``function``, evaluated against
+    the drawing module and the function's own plain ``name = ...`` locals it
+    reads (each assigned once from module names)."""
+    import builtins
+
+    scope = dict(vars(drawing))
+    local = {
+        node.id for node in ast.walk(expression) if isinstance(node, ast.Name)
+    } - set(scope) - set(vars(builtins))
+    assigned = [
+        statement
+        for statement in ast.walk(function)
+        if isinstance(statement, ast.Assign)
+        and len(statement.targets) == 1
+        and isinstance(statement.targets[0], ast.Name)
+        and statement.targets[0].id in local
+    ]
+    assert sorted(statement.targets[0].id for statement in assigned) == sorted(local)
+    for statement in assigned:
+        scope[statement.targets[0].id] = eval(
+            compile(ast.Expression(statement.value), drawing.__file__, "eval"), scope
+        )
+    return eval(compile(ast.Expression(expression), drawing.__file__, "eval"), scope)
 
 
 # --- Drawing-local curve tessellation (offline, not exported-ink proof) ------

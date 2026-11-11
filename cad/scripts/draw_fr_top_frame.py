@@ -92,7 +92,6 @@ from _gtol_face import SURFACE_CONE
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
 from _layout_audit import display_box, estimated_text_runs
-import _layout_audit
 from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -1252,7 +1251,7 @@ SECTION_CUT_BASELINE_TEXT_GAP = (
 # rows (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
 # The width is the boss's on the underside, where its drafted side walls
 # start (they stand .10 wider on the faced top), so its last row says so:
-# three rows, the underline where the two rows' stood.
+# three rows, the underline (y 123.7) 2.8 mm over where the two rows' stood.
 SET_BOSS_WIDTH_LINE_XY = (0.1465, 0.1150)
 SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1320)
 SET_SPOT_DIA_TEXT_XY = (0.0958, 0.1177)
@@ -3970,12 +3969,6 @@ def _set_precise_curve_quality(adapter: Any) -> None:
     )
 
 
-# TEMPORARY (#2333): the casting sheets' layout iterations report every
-# layout finding without failing, so each PDF and audit report publish.
-# Removed before the strict run.
-_layout_audit.ENFORCED_KINDS = frozenset()
-
-
 @dataclass(frozen=True)
 class _BarrelFace:
     """One corner boss's drafted lower barrel: the DRAFT_DEG cone whose box
@@ -4068,7 +4061,8 @@ def _boss_position_frame(adapter: Any, view: Any, edges: ViewEdges) -> None:
         and abs(item.circle[2] - FRONT_COLUMN_Z) < 1e-4
         and abs(item.circle[6] - radius) < 1e-4
         and abs(abs(item.circle[4]) - 1.0) < 1e-6
-        and math.dist(tuple(item.edge.GetClosestPointOn(*point) or ())[:3], point) < 1e-7
+        and math.dist(tuple(item.edge.GetClosestPointOn(*point) or ())[:3], point)
+        < 1e-7
     ]
     if len(rims) != 1:
         raise RuntimeError(
@@ -4076,7 +4070,8 @@ def _boss_position_frame(adapter: Any, view: Any, edges: ViewEdges) -> None:
         )
     landing = model_point_in_view(adapter, view, point, label=label)
     add_feature_control_frame(
-        adapter, view,
+        adapter,
+        view,
         edge_entity=rims[0],
         leader_attach_xy=(float(landing[0]), float(landing[1])),
         frame_xy=BOSS_POSITION_FRAME_XY,

@@ -101,7 +101,10 @@ def test_base_cross_screws_engage_the_far_wall() -> None:
 
 
 def test_top_cross_screws_engage_the_far_wall() -> None:
-    # Every MHA-FR-02 floor is located .XX from its own socket axis.
+    # Every MHA-FR-02 floor is located .XX from its own socket axis: .62
+    # (owner ruling D5, #2333, moved it .03 deeper from .65), so the far wall
+    # starts at most .62 + .01 + 13.0 mm of match-bored socket + .010 mouth
+    # = 29.256 from the floor.
     floor_places = top_frame_spec.DRAWING_REFERENCE_PRECISION[
         "counterbore floor from socket axis"
     ]
@@ -113,15 +116,18 @@ def test_top_cross_screws_engage_the_far_wall() -> None:
     assert start == pytest.approx(top_frame.TOP_CROSS_SCREW_FAR_WALL_START_MAX)
     engagement = top_frame.TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
     assert engagement == pytest.approx(joint.far_wall_full_thread_min_mm(start))
-    assert math.isclose(engagement, 12.352, abs_tol=0.005)  # 2.56D
+    # The shortest screw's nominal 0.7-pitch tip: 44.45 - 1.524 - 0.556 = 42.370.
+    assert max_floor_offset == pytest.approx(16.002)
+    assert start == pytest.approx(29.256)
+    assert math.isclose(engagement, 13.114, abs_tol=0.005)  # 2.72D
     assert engagement >= joint.FAR_WALL_ENGAGEMENT_FLOOR_MM
     assert math.isclose(
         joint.far_wall_full_thread_min_mm(
             start, tip_loss_mm=1.5 * joint.CROSS_SCREW_PITCH
         ),
-        11.717,
+        12.479,
         abs_tol=0.005,
-    )  # 2.43D
+    )  # 2.59D
     # The screw still seats before the tip meets the far tap's end: the
     # thread depth prints .XX (1.81), .050 of reserve past the shank tip.
     full_thread = frame.TOP_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]

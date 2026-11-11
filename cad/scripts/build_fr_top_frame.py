@@ -1296,9 +1296,9 @@ if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.
 # stand .03 off its socket, which comes straight off the recess, so at
 # every printed limit at once the head may stand
 # COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX (0.740, .029) proud of the as-cast
-# mouth, 1.050 under it at nominal.  The cap ligament below leaves 0.20 to
-# go deeper, so the print keeps D5's floor and that residual is the owner's
-# (#2516).
+# mouth, 1.050 under it at nominal.  The cap ligament below lets the floor
+# go 0.277 deeper at most, so the print keeps D5's floor and that residual
+# is the owner's (#2516).
 _SOCKET_BARREL_OFFSET = BOSS_POSITION_ZONE / 2.0
 
 
@@ -1458,9 +1458,7 @@ SIDE_TAP_DRILL_POINT_Z = (
 # .03 off the socket axes, and the added draft only thickens it above.
 # Lateral ligaments at those limits: thread major 5.334-2.413=2.921; drill
 # 5.334-2.0193=3.315 (4.064 and 4.458 at nominal).
-_SIDE_TAP_WEB_HALF_MIN = (
-    _cast_limit(WEB_T, -1.0) / 2.0 - RAIL_WEB_POSITION_ZONE / 2.0
-)
+_SIDE_TAP_WEB_HALF_MIN = _cast_limit(WEB_T, -1.0) / 2.0 - RAIL_WEB_POSITION_ZONE / 2.0
 SIDE_TAP_THREAD_WALL_MARGIN = _SIDE_TAP_WEB_HALF_MIN - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
 SIDE_TAP_DRILL_WALL_MARGIN = _SIDE_TAP_WEB_HALF_MIN - SIDE_TAP_DRILL_DIA / 2.0
 if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < WALL_TARGET_MM:
