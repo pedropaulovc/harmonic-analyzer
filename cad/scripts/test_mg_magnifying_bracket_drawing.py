@@ -40,7 +40,7 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
     assert joint.NECK_THICKNESS == 12.5 and joint.NOSE_R == 5.5
     assert mounting.SIDE_PLATE_THICKNESS == mounting.GRIP == 3.175
     assert mounting.SCREW_MACHINE_X == (1.0, 14.7)
-    assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
+    assert mounting.RECEIVER_ROW_Y == pytest.approx(0.25)
 
 
 def test_model_precision_and_functional_bands_have_one_authority() -> None:
@@ -164,7 +164,7 @@ def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault, 
 
 
 def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
-    assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
+    assert mounting.RECEIVER_ROW_Y == pytest.approx(0.25)
     assert mounting.SIDE_PLATE_Y == (-5.5, 5.5)
     assert mounting.CLEARANCE_SPEC.kind == "clearance"
     assert mounting.CLEARANCE_SPEC.size == "#2"

@@ -214,7 +214,6 @@ from _cwm import (
     resolve_entity,
 )
 from _transforms import (
-    ROT_X_POS90,
     ROT_Y_180,
     ROT_Y_POS90,
     compose_rows,
@@ -606,7 +605,6 @@ import ch_channel_lever_spec  # noqa: E402
 import ch_vn_channel_spring_stock_geom as spring_stock  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import ch_vn_spring_hook_spec  # noqa: E402
-import ch_anchor_jam_nut_spec  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 
@@ -624,16 +622,6 @@ IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
-
-
-# MHA-CH-14 on each anchor axis, its z = 0 bearing face on the coefficient
-# plate underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine
-# -Y, so the round nut hangs below the plate around the anchor's protruding shank.
-CHANNEL_ANCHOR_NUT_XY = (
-    spring_mounts.CHANNEL_ANCHOR_XY[0],
-    spring_mounts.PLATE_BOTTOM_Y,
-)
-CHANNEL_ANCHOR_NUT_ROWS = ROT_X_POS90
 
 
 def z_station(j: int) -> float:
@@ -959,10 +947,10 @@ def _assert_spring_mount(
             f"channel anchor engages {engagement:.4f} mm of plate, expected "
             f"{ch_vn_spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
         )
-    # The cut end crosses the plate and carries the MHA-CH-14 jam nut on the
-    # underside; at the worst case (shortest in-band part under the thickest
-    # nut, through the thickest in-band plate, backed out the whole calibration
-    # budget) full threads must still show below the nut.
+    # The cut end crosses the plate with no nut on it (#2326); at the worst
+    # case (shortest in-band part, through the thickest in-band plate, backed
+    # out the whole calibration budget) its full-form thread still spans the
+    # plate.
     protrusion = bottom - thread_bottom
     nominal_protrusion = ch_vn_spring_hook_spec.PROTRUSION_MM
     if abs(protrusion - nominal_protrusion) > 1e-6:
@@ -971,29 +959,13 @@ def _assert_spring_mount(
             f"underside, expected {nominal_protrusion:.4f}"
         )
     budget = ch_vn_spring_hook_spec.ADJUSTMENT_TRAVEL_MM
-    past_nut = ch_vn_spring_hook_spec.full_threads_past_nut_mm(
+    below_plate = ch_vn_spring_hook_spec.full_thread_below_plate_mm(
         budget, -ch_vn_spring_hook_spec.LENGTH_BAND_WORST_MM
     )
-    floor = ch_vn_spring_hook_spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
-    if past_nut < floor - 1e-9:
+    if below_plate < -1e-9:
         raise RuntimeError(
-            f"channel anchor shows {past_nut:.4f} mm of full thread past its jam "
-            f"nut at the worst case, under the {floor:.4f} mm floor"
-        )
-    # Neighbouring round nuts on the one-row tap pattern, both at their
-    # largest printed O.D., their taps displaced toward each other across the
-    # lever's spring-hole position zone (a zone radius each; code review C06).
-    nut_gap = (
-        sm_summing_lever_spec.CHANNEL_PITCH
-        - float(
-            sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
-        )
-        - ch_anchor_jam_nut_spec.OD_MAX
-    )
-    if nut_gap < ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE:
-        raise RuntimeError(
-            f"neighbouring channel anchor jam nuts clear by {nut_gap:.4f} mm, "
-            f"under {ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE} mm"
+            f"channel anchor's full thread ends {-below_plate:.4f} mm inside the "
+            "plate at the worst case"
         )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
@@ -1005,10 +977,9 @@ def _assert_spring_mount(
         f"stock spring mount: inside length {pose.length_mm:.4f} mm, "
         f"thread engagement {engagement:.3f} mm, "
         f"cut end {protrusion:.3f} mm below the plate underside, "
-        f"{past_nut:.3f} mm full thread past the jam nut after the "
+        f"full thread {below_plate:.3f} mm past the plate underside after the "
         f"{budget:.3f} mm back-out budget "
-        f"({ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} turn), "
-        f"{nut_gap:.3f} mm between neighbouring jam nuts"
+        f"({ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} turn)"
     )
 
 
@@ -2440,15 +2411,6 @@ async def build(adapter) -> dict[str, str]:
                 "rotation": [0.0, 0.0, 0.0],
                 "rows": IDENTITY,
                 "label": f"spring-hook ch{j:02d} direct threaded seat",
-            }
-        )
-        grounded_specs.append(
-            {
-                "part": "ch-anchor-jam-nut",
-                "position": [*CHANNEL_ANCHOR_NUT_XY, z_mid],
-                "rotation": euler_from_rows(CHANNEL_ANCHOR_NUT_ROWS),
-                "rows": CHANNEL_ANCHOR_NUT_ROWS,
-                "label": f"spring-hook jam nut ch{j:02d} on the plate underside",
             }
         )
 
