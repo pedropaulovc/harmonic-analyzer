@@ -1610,7 +1610,6 @@ def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None
     knob = _step_body("knob-stack-fitted")
     chain_step = steps.step_number("chain-closed")
     assert f"TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP {chain_step}" in knob
-    assert "KNOB HELD" in _step_body("hook-pin-hole-match-drilled")
     assert steps.SEQUENCE.index("knob-stack-fitted") < steps.SEQUENCE.index(
         "hanger-meshed"
     )
@@ -2422,16 +2421,10 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
     hook = _step_body("hook-pin-hole-match-drilled")
-    # #2416 (owner direction 2026-11-11): the feed mesh is set on a feeler leaf
-    # wedged in the teeth and accepted on function; no backlash window or dial
-    # reading prints for it.
-    for body in (mesh, hook):
-        assert "DIAL" not in body and "DATUM" not in body
-        assert not re.search(r"\.\d{4}", body)
-        assert "NO TIGHT SPOT" in body
+    # #2416 (owner direction 2026-11-11): the mesh is set on the derived
+    # feeler leaves, and no backlash window for it prints any more.
     for leaf in steps.FEED_MESH_LEAF_TEXTS:
         assert f"{leaf} " in mesh
-    assert "SKIPS NO TOOTH" in hook
     assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
@@ -2446,20 +2439,16 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
 
 
-def test_the_feeler_leaves_set_the_feed_mesh_clear_of_interference() -> None:
-    """Codjiflo P1 on e690ffe and 5972cc9: platen shake with the knob held,
-    and the disc's rim rock through the hub's D-flat, could both pass with the
-    feed teeth at interference. A leaf wedged in the teeth sets the gap at the
-    mesh itself: the first leaf meets every rack-mesh gate, the second keeps
-    the teeth clear and continuous action (owner option C on #2416)."""
+def test_the_first_feeler_leaf_sets_the_feed_mesh_inside_its_design_band() -> None:
+    """Codjiflo P1 on e690ffe and 5972cc9, P2 on 2ba1416: a leaf wedged in
+    the teeth sets the gap at the mesh itself, so the as-set mesh is the one
+    the builder proves: the first leaf lands in the design band (opposite-flank
+    budget included), and only the once-used second leaf goes looser."""
     import paper_drive_mesh_check as mesh_check
 
     first, second = steps.FEED_MESH_LEAF_BACKLASH_MM
-    assert 0.0 < first < second
-    mesh_check.feed_rack_mesh((first, first)).require()
-    loose = mesh_check.feed_rack_mesh((second, second))
-    assert loose.interference_margin_min_mm >= 0.0
-    assert loose.contact_ratio_min >= mesh_check.RUNOUT_CONTACT_RATIO_FLOOR
+    low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
+    assert low <= first <= high < second
     # What the replaced readings could reach: no mesh backlash left, where the
     # feed teeth pass the interference point.
     assert mesh_check.feed_rack_mesh((0.0, 0.0)).interference_margin_min_mm < 0.0

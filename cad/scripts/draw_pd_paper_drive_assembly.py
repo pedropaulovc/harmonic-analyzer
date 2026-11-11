@@ -2449,6 +2449,7 @@ def _step_text(
             f"{steps.FEED_MESH_LEAF_TEXTS[1]} LEAF.",
             f"IF IT STILL HAS A TIGHT SPOT, INSPECT THE {n['pd-transgear-feed-pinion']} "
             f"TEETH AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
+            f"REPLACE THE PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2472,7 +2473,8 @@ def _step_text(
             "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
-            f"{s('hanger-meshed', 0)}-{s('hook-pin-hole-match-drilled', 9)}.",
+            f"{s('hanger-meshed', 0)}-{s('hook-pin-hole-match-drilled', 9)} ON THE LEAF "
+            f"STEP {steps.step_number('hanger-meshed')} ENDED ON.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",

@@ -27,6 +27,7 @@ import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
 import pd_transgear_feed_pinion_spec as feed_pinion
+import _gear_quality as gear_quality
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
@@ -221,24 +222,35 @@ RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
 # along the rack, whatever play lies behind the pinion (codjiflo P1 on
 # e690ffe and 5972cc9: platen shake with the knob held, and the disc's rim
 # rock through the hub's D-flat, could both pass with the teeth at
-# interference). The first leaf meets every rack-mesh gate. The second, used
-# once if the first leaves a tight spot, keeps the teeth clear of interference
-# and the contact ratio at the continuous-action floor: the owner's option C
-# on #2416 (2026-11-11) gives up the 1.2 guarantee at the loose end.
-FEED_MESH_LEAVES_MM = (0.002 * 25.4, 0.003 * 25.4)
+# interference). The first leaf, .0025 (a standard leaf in 26- and 32-leaf
+# inch sets), lands inside the builder's design band: every rack-mesh gate
+# and the opposite-flank budget (rack index and face lead plus the feed's
+# lateral terms, codjiflo P2 on 2ba1416: .002 fell 0.012 mm short of it). The
+# second, used once if the first leaves a tight spot, keeps the teeth clear
+# of interference and the contact ratio at the continuous-action floor
+# below: the owner's option C on #2416 (2026-11-11) gives up the 1.2
+# guarantee at the loose end. It is this mesh's own floor; the same 1.1 is
+# the reducer's runout floor only by the same AGMA reasoning.
+FEED_FALLBACK_CONTACT_RATIO_FLOOR = 1.1
+FEED_MESH_LEAVES_MM = (0.0025 * 25.4, 0.003 * 25.4)
 FEED_MESH_LEAF_BACKLASH_MM = tuple(
     2.0 * leaf / math.cos(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
     for leaf in FEED_MESH_LEAVES_MM
 )
 mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[0],) * 2).require()
+if not (
+    gear_quality.rack_pitch_index_deviation_mm() + paper_geometry.feed_lateral_deviation_mm()
+    <= FEED_MESH_LEAF_BACKLASH_MM[0]
+):
+    raise AssertionError("the first feeler leaf leaves the feed mesh's opposite-flank budget")
 _LOOSE_LEAF_MESH = mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[1],) * 2)
 if [
     problem
     for problem in _LOOSE_LEAF_MESH.failures()
     if not problem.startswith("contact ratio ")
-] or not _LOOSE_LEAF_MESH.contact_ratio_min >= mesh_check.RUNOUT_CONTACT_RATIO_FLOOR:
+] or not _LOOSE_LEAF_MESH.contact_ratio_min >= FEED_FALLBACK_CONTACT_RATIO_FLOOR:
     raise AssertionError(f"the second feeler leaf leaves the feed mesh: {_LOOSE_LEAF_MESH.summary}")
-FEED_MESH_LEAF_TEXTS = tuple(inch_text(leaf, 3) for leaf in FEED_MESH_LEAVES_MM)
+FEED_MESH_LEAF_TEXTS = tuple(inch_text(leaf, 4).rstrip("0") for leaf in FEED_MESH_LEAVES_MM)
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
