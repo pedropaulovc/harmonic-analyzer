@@ -637,7 +637,8 @@ def test_full_export_rejects_a_missing_bundle_before_any_native_or_neutral_write
 @pytest.mark.parametrize(("defect", "diagnostic"), [
     ("dropped-names", "pivot_bore: no named STEP face"),
     ("half-labelled-bore", "pivot_bore must be exactly 2 STEP faces, found 1"),
-    ("invalid-schema", "invalid feature manifest"),
+    ("no-features", "feature manifest has no features"),
+    ("scalar-feature", "every feature must be a table"),
     ("invalid-toml", "invalid TOML"),
     ("unbound-digest", "does not bind the adjacent STEP"),
     ("wrong-face-refs", "faces .* differ from adjacent STEP"),
@@ -660,8 +661,10 @@ def test_full_export_rejects_malformed_bundles_without_regeneration_or_partial_s
         # only the consumer's split-periodic cardinality check can reject it.
         export_features.write_manifest("ch_rocker_arm", step, revision="v41")
         manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-    elif defect == "invalid-schema":
-        manifest["units"] = "inches"
+    elif defect == "no-features":
+        manifest["features"] = {}
+    elif defect == "scalar-feature":
+        manifest["features"]["pivot_bore"] = "not a table"
     elif defect == "unbound-digest":
         step.write_bytes(step.read_bytes() + b"\r\n/* raw header drift */\r\n")
     elif defect == "wrong-face-refs":
