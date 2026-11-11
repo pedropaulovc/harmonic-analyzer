@@ -921,9 +921,10 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
     assert float(position.tolerance) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
     # #2415: the axis follows the bore over the pin's press-land grip only.
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
-        float(square.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
+        float(square.tolerance) * 25.4 * registration.S_AXIS_RUN_ON_MM
         / cluster_pin.PRESS_LAND_GRIP_MIN
     )
+    assert registration.S_AXIS_RUN_ON_MM > registration.S_PROJECTED_HEIGHT_MM
     assert cluster_pin.PRESS_LAND_GRIP_MIN < geometry.THICKNESS - geometry.THICKNESS_BAND
     # The datums the frames name are the part's: A the front face, B the
     # pivot bore, C the pin bore.

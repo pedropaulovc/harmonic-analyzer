@@ -86,8 +86,8 @@ PART_DATUMS = (
 # precedent; owner review #2144): no projected zone anywhere on MHA-PD-18
 # (rule 26 bars the modifier). The pin bore S (datum C) takes ⌖ Ø.004 to
 # A|B and a plain ⊥ Ø.001 to A over the bore, the reamed-hole row (owner
-# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, run on
-# from the thinnest stock to the chain plane in front of face A, is
+# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, gripped by
+# the pin's press land and run on to the chain plane in front of face A, is
 # paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM: the meshes and the
 # platen air charge it, and MHA-PD-00's collar feeler accepts the collar air
 # it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).

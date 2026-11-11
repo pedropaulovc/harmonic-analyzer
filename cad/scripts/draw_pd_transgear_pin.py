@@ -185,7 +185,10 @@ SIDE_KEEP = {
 # proves they arrived.
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
 # The shank's upper silhouette ahead of the press land, between the shank Ø's
-# tolerance stack and the land's reference Ø.
+# tolerance stack and the land's reference Ø.  The leader lands there by
+# selection point (the wheel-axle journal's pattern): inserted without it,
+# the rebuilt symbol re-attached to another face's silhouette (run
+# 20261111T181535941Z, same_entity=False).
 FINISH_PICK = (LAND_END_X - 0.013, SHANK_TOP_Y)
 FINISH_SYMBOL = (LAND_END_X - 0.013, SHANK_TOP_Y + 0.008)
 # A point on the shank face, clear of the Ø dimension line.
@@ -372,6 +375,7 @@ async def build(adapter: Any) -> dict[str, str]:
         side,
         edge_xy=FINISH_PICK,
         symbol_xy=FINISH_SYMBOL,
+        leader_attach_xy=FINISH_PICK,
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
         label="MHA-PD-23 shank finish",
         entity_type="SILHOUETTE",

@@ -1,8 +1,9 @@
 r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 
-The plain steel pin the disc cluster runs on.  It is pressed through the
-MHA-PD-18 arm's reamed hole at S from the rear until its domed head seats on
-the arm's rear face; forward of the arm it carries, rear to front, the
+The plain steel pin the disc cluster runs on.  Its short press land under
+the head is pressed into the MHA-PD-18 arm's reamed hole at S from the rear
+until the domed head seats on the arm's rear face; the shank passes the
+ream clear and, forward of the arm, carries, rear to front, the
 MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub and screws on
 it), the MHA-PD-25 front bushing and, in the groove near its front end, the
 MHA-PD-VN-61 retaining ring (McMaster 97431A240).  Nothing on it is threaded.
@@ -14,7 +15,8 @@ owner ruling of 2026-10-30 took the shank from 3.9 mm to 1/8 in.
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
 (the face that seats on the arm's rear face, machine z -116.4625) and local
 +Z runs toward the machine front, so machine z = ``HEAD_SEAT_MACHINE_Z`` -
-local z.  The head runs z -HEAD_HEIGHT..0, the shank z 0..LENGTH.
+local z.  The head runs z -HEAD_HEIGHT..0, the press land z
+0..PRESS_LAND_LENGTH and the shank on from there to LENGTH.
 
 PURE DATA: the build and the drawing both import it; neither imports the
 other.  ``transgear_cluster_fit`` holds the chain the groove station sets.

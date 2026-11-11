@@ -30,8 +30,9 @@ from pd_transgear_pin_spec import (
 # the fit (rule 23).  Numbered note 1, linked from the press land's reference
 # Ø and from the shank Ø by SEE NOTE 1, names both fits: the land is turned
 # to the measured arm ream (rule 4: standard fit names, the interference as
-# REF; #2415), and the shank runs in its three mates and passes the ream
-# clear.  The note prints the arm's ream limits, so the route and the land's
+# REF; #2415), and the shank, turned to its three mates' measured reams for
+# the running clearance, passes the arm's ream clear.  The note prints the
+# arm's ream limits, so the route and the land's
 # reference agree on the sheet.  The ring groove's Ø and width name their
 # ring once, in note 2 (rule 4).  Kept here, not in the widely imported
 # spec, so the wording re-keys only this part.
@@ -45,8 +46,9 @@ DRAWING_NOTES = "\n".join((
     f"{inch_text(ARM.PIN_BORE_DIA_MAX, 4)} REAM OF {ARM_NUMBER}, TURNED TO",
     "    THE MEASURED REAM (INTERFERENCE "
     f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)}).",
-    f"    SHANK: RUNNING FIT IN {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}",
-    f"    (CLEARANCE {inch_text(RUNNING_CLEARANCE[0], 4)}-{inch_text(RUNNING_CLEARANCE[1], 4)}).",
+    f"    SHANK: RUNNING FIT, TURNED TO THE MEASURED REAMS OF {RUNNING_MATES[0]},",
+    f"    {' AND '.join(RUNNING_MATES[1:])} (CLEARANCE "
+    f"{inch_text(RUNNING_CLEARANCE[0], 4)}-{inch_text(RUNNING_CLEARANCE[1], 4)}).",
     f"{RING_GROOVE_NOTE}. RING GROOVE Ø AND WIDTH: FOR RING {RING_NUMBER}",
     f"    (McMASTER {RING.SKU}).",
     "1/4 IN BAR STOCK OK.",

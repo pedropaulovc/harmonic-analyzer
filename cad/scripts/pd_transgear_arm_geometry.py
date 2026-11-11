@@ -171,6 +171,8 @@ PIVOT_FIT_CLEARANCE_PLACES = 4
 # The least clearance the shoulder needs to run free: the shared
 # close-running minimum plus the sweep of a bore at the general angular row
 # on the seated spacer, both spacer face grades paid.
+if not 3.0 < PIVOT.SHOULDER_DIA <= 6.0:
+    raise ValueError("the pivot running minimum requires the shared ISO 3-through-6 mm clearance class")
 PIVOT_RUNNING_CLEARANCE_MIN = measured_close_running_clearance_mm()[0] + PIVOT_AXIS_BINDING_SWEEP_MAX
 PIVOT_BORE_DIA = 4.9276  # .1940, the reamer's size
 PIVOT_BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.0010/0

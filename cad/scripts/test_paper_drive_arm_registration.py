@@ -14,6 +14,7 @@ import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
 import _transgear_arm_plate_locating_interface as pin
+import pd_transgear_pin_spec as cluster_pin
 from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
 
 
@@ -154,9 +155,18 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
     assert arm_control.projected_zone_height_mm is None
     assert arm_control.characteristic == "perpendicularity"
     assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
+    # #2415: the axis follows the bore over the press land's grip only, and
+    # runs on from the land's front end, behind face A, to the chain plane.
+    assert registration.S_PIN_LAND_GRIP_MIN_MM == pytest.approx(cluster_pin.PRESS_LAND_GRIP_MIN)
+    assert registration.S_PIN_LAND_LENGTH_MIN_MM == pytest.approx(
+        2.0 * cluster_pin.PRESS_LAND_LENGTH - cluster_pin.PRESS_LAND_LENGTH_MAX
+    )
+    land_end_behind_face_a = arm.THICKNESS + arm.THICKNESS_BAND - registration.S_PIN_LAND_LENGTH_MIN_MM
+    assert land_end_behind_face_a > 0.0
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
-        float(arm_control.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
-        / registration.PIN.PRESS_LAND_GRIP_MIN
+        float(arm_control.tolerance) * 25.4
+        * (registration.S_PROJECTED_HEIGHT_MM + land_end_behind_face_a)
+        / cluster_pin.PRESS_LAND_GRIP_MIN
     )
     assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     # K prints a plain ⊥ Ø.002 to A over its bore (fan-out Q2-A, rule 26);
