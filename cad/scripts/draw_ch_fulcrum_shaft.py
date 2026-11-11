@@ -58,19 +58,22 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# One side view at 2:1: the .012 flats and their stations read at that size
-# and it spans most of the sheet width. No end view: from the end the dome
-# hides the flats, so it showed a bare circle (machinist review r1).
-SHEET_SCALE = (2.0, 1.0)
+# One side view at 3:2: the .012 flats and their stations read at that size.
+# At the .300 pitch (#1038) the 7.01 shaft no longer fits at 2:1 with the
+# .24 left of its left tip and the ~45 mm across-flat block right of its
+# right tip (356 + 10 + 51 mm against the 406 mm drawable width). No end
+# view: from the end the dome hides the flats, so it showed a bare circle
+# (machinist review r1).
+SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 AXIS_Y = 0.212
 # Left of the sheet centre: the across-flat callout block starts at its
-# dimension line right of the right tip and runs ~35 mm right (r2 crossed
+# dimension line right of the right tip and runs ~45 mm right (r2 crossed
 # the border at 0.216); the left tip's .24 still clears the zone margin.
 RIGHT_CENTER = (0.198, AXIS_Y)
-# The isometric fills the free band over the title block at 1:1 (half the
+# The isometric fills the free band over the title block at 1:1 (under the
 # sheet scale, hence its note): the shaft runs lower-left to upper-right
-# about 114 x 66 mm, so x 0.261-0.375, y 0.089-0.155.
+# about 122 x 70 mm, so x 0.257-0.379, y 0.087-0.157.
 ISO_CENTER = (0.318, 0.122)
 ISO_SCALE = (1, 1)
 
@@ -207,7 +210,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(3, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (right, iso):
         set_hidden_lines_removed(adapter, view)

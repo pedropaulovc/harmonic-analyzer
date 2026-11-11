@@ -781,7 +781,7 @@ sections:
       - - Ring / shank / fork thickness
         - 2.175 / 2.175 / 6.075 (REF) mm; ring faces 1.950 / 4.125 ±0.05, tines 1.700 ±0.05, slot 2.675 ±0.05, all from one fork face; one mid-plane (the cam plane = the arm plane)
         - —
-        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.175, both faces located ±0.05 from the fork''s datum face (#982; was 2.200 at three places symmetric to the slot within 0.10, #948 ruling R, PR #1292): the thinnest cam slot then floats the ring ±0.85, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Tines 1.700 ±0.05 either side of a 2.675 ±0.05 slot, so the fork over the tines is 6.075 REF (Main ruling 2026-10, option b; #982): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.65 MIN (rule-20 shortfall against the 2.0 wall target; the ch14 fan photo shows cheeks thinner than the 2.5 arm), 0.48 MIN to the neighbouring fork with both straps off their hubs and both pin ends flush (0.35 floor; `ch_rod_pivot_pin_spec.BUDGET`)'
+        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.175, both faces located ±0.05 from the fork''s datum face (#982; was 2.200 at three places symmetric to the slot within 0.10, #948 ruling R, PR #1292): the thinnest cam slot then floats the ring ±0.85, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Tines 1.700 ±0.05 either side of a 2.675 ±0.05 slot, so the fork over the tines is 6.075 REF (Main ruling 2026-10, option b; #982): each inter-arm gap (pitch 7.62 − arm 2.500) holds one tine of each neighbouring rod, tine 1.65 MIN (rule-20 shortfall against the 2.0 wall target; the ch14 fan photo shows cheeks thinner than the 2.5 arm), 0.99 MIN to the neighbouring fork with both straps off their hubs and both pin ends flush (0.35 floor; `ch_rod_pivot_pin_spec.BUDGET`)'
         - derived
         - med
       - - Shank width
@@ -899,7 +899,7 @@ sections:
         - scaled
         - med
       - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)
-        - 'Ø10 boss × 7.0565 long on each arm''s pivot bore, proud 2.278 of each face; neighbouring hubs touch and set the station pitch (ch14 p.28 page002_img02 + ch17 p.40: no loose bushings anywhere in the stack). Lever fulcrum hubs likewise Ø12 × 7.0565, proud 2.028'
+        - 'Ø10 boss × 7.62 long on each arm''s pivot bore, proud 2.565 of each face; neighbouring hubs touch and set the station pitch (ch14 p.28 page002_img02 + ch17 p.40: no loose bushings anywhere in the stack). Lever fulcrum hubs likewise Ø12 × 7.62, proud 2.311'
         - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 5.63 above the shaft axis (contact 261.81 − notch 2.381 − axis 253.8; level rest pose), so OD < ~11.25 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 0.63 clearance'
         - derived
         - med (OD low)
@@ -1138,7 +1138,7 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 166.4 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 1.025 proud of each keeper lug, one 0.3-deep × 4.4 set-screw flat per end on +Y at ±75.0) along Z at (x, y, centre-z) = (+199.9, 1061.3932, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-07) seated at 1036.1932 on the rail top face 1036.193 (the 0.0002 float Main accepted on #2127): 8.0-thick lugs (owner ruling Q11-B 2026-10-16) reamed through in one pass at their installed spacing, Ø6.35 +0.050/+0.038 running fit (0.010 running clearance kept over the 0.04 flatness zone of the MHA-FR-02 faced keeper-rail top), mid-planes z −0.504 ± 75.0 = −75.504/+74.496 (inner faces unchanged, 0.435 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-CH-VN-55) down through each crown onto its flat; 8.5-long outboard feet (owner ruling Q11-B'' 2026-10-16) screwed by #2-56 × 7/16 frame-side screws (MHA-CH-VN-52, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 83.0 = −83.504/+82.496'
+        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 178.05 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 1.016 proud of each keeper lug, one 0.3-deep × 4.4 set-screw flat per end on +Y at ±80.772) along Z at (x, y, centre-z) = (+199.9, 1061.3932, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-07) seated at 1036.1932 on the rail top face 1036.193 (the 0.0002 float Main accepted on #2127): 8.0-thick lugs (owner ruling Q11-B 2026-10-16) reamed through in one pass at their installed spacing, Ø6.35 +0.050/+0.038 running fit (0.010 running clearance kept over the 0.04 flatness zone of the MHA-FR-02 faced keeper-rail top), mid-planes z −0.504 ± 80.772 = −81.276/+80.268 (0.508 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-CH-VN-55) down through each crown onto its flat; 8.5-long outboard feet (owner ruling Q11-B'' 2026-10-16) screwed by #2-56 × 7/16 frame-side screws (MHA-CH-VN-52, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 88.646 = −89.150/+88.142'
         - —
         - 'p.40 bottom-left clevis = the shaft END mount; fulcrum = keeper seat 1036.1932 (top_frame_plane: MHA-FR-02 rail top 1036.193 + 0.0002) + 25.2 = 1061.3932 (#290 plane snap moves the whole chain −0.0068 with the underside; was 1061.4 over 1036.2); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); keeper/shaft/set-screw geometry from `cad/scripts/ch_fulcrum_keeper_spec.py` and `cad/scripts/ch_fulcrum_shaft_spec.py` (2026-10-10 outward-foot rederive); tap from ch_fulcrum_keeper_spec KEEPER_TAP_SPEC'
         - measured
@@ -1249,7 +1249,7 @@ sections:
         - source geometry + authorized joint relocation
         - med
       - - Spring holes
-        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø.006RFS pattern. Purchased9489T111 anchors seat at unchanged coefficienttop and lock withMHA-CH-14 jamnuts atY−4.46.'
+        - '20×#6-32through taps at leverlocalX39.85, Z=−75.9815+j×7.62 (j0..19), Ø.006RFS pattern. Purchased9489T111 anchors seat at unchanged coefficienttop and lock withMHA-CH-14 jamnuts atY−4.46.'
         - —
         - 'cad/scripts/sm_summing_lever_spec.py and ch_anchor_jam_nut_spec.py'
         - source geometry + retained spring interface

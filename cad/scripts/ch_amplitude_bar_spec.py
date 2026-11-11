@@ -60,6 +60,16 @@ BAR_DEPTH = 0.25 * MM_PER_IN  # 6.35
 # The section is the stock (printed as reference), so the stock band, not the
 # title block's .XX, bounds the bar's width and depth.
 BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
+# Flatness of each side face the bar presents to its neighbour (#2341): the
+# bars hang free between their end joints with a running gap to each
+# neighbour, so a bow (or twist) toward one closes it at mid-span.
+# ch_bar_pivot_pin_spec.bar_gap_budget closes the mid-span gap on two
+# neighbours each bowed the full zone toward the other. Bought CF square can
+# bow about .013 over this length (A108's 3/16 in per 10 ft, #2341 triage),
+# so the stock is straightened or selected to it (parts/ch-amplitude-bar.yaml
+# process); MHA-CH-00 accepts the bank with a feeler leaf between every pair.
+BAR_SIDE_FLATNESS_IN = ".005"
+BAR_SIDE_FLATNESS_MM = float(BAR_SIDE_FLATNESS_IN) * MM_PER_IN  # 0.127
 # Notch widths: one-sided bands (user ruling 2026-09-27, #1038). The legacy
 # 1/8" (3.175) width left the top notch under the lever's max material. Each
 # width's modelled nominal is its minimum -- the straddled plate at max
@@ -67,12 +77,13 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # so a notch is never narrower than its plate. The 0.25 novice spare
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
-# prints .118 +/-.002, so the notch is .124 +.007/.000, and the bar-to-bar
-# side gap (pitch 7.0565 - bar 6.35 = 0.7065) holds the running floor with
-# this float, both ledges' and both plate offsets' bands in it
-# (ch_bar_pivot_pin_spec.joint_budget). The foot notch keeps an interim
-# +.010/.000 (the metric +0.30 narrowed so its widest notch and thinnest
-# cheek are no worse than before); its stack is still #1038.
+# prints .118 +/-.002, so the notch is .124 +.007/.000. The foot notch is
+# .124 +.010/.000 (the metric +0.30 narrowed so its widest notch and thinnest
+# cheek are no worse than before). At the .300 pitch (owner ruling
+# 2026-11-11) both floats, with both ledges' and both plate offsets' bands,
+# leave the bar-to-bar side gap (pitch 7.62 - bar 6.35 = 1.27) over its
+# running floor at both ends (ch_bar_pivot_pin_spec.joint_budget and
+# bar_gap_budget).
 BOTTOM_NOTCH_WIDTH = _straddle_minimum(
     STRAP_THICKNESS, STRAP_THICKNESS_TOLERANCE
 )  # 3.1496 (.124)

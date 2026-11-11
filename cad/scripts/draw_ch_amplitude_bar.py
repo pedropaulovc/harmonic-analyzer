@@ -45,6 +45,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_gdt import add_feature_control_frame
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -70,10 +71,12 @@ from ch_amplitude_bar_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
+    SIDE_FLATNESS_CALLOUT,
 )
 from ch_amplitude_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
+    BAR_SIDE_FLATNESS_IN,
     BAR_WIDTH,
     BOTTOM_NOTCH_HEIGHT,
     BOTTOM_NOTCH_OFFSET,
@@ -400,6 +403,11 @@ FINISH_CHAR_HEIGHT = 0.0025
 # The bent leader's shoulder runs this far from the symbol's vertex toward the
 # attach point before it turns (measured on the pivot-shaft sheet, r743-5).
 FINISH_SHOULDER = 0.0063
+# #2341: the side faces' flatness frame stands this far east of and above its
+# leader's landing at the right side face's mid-length, west of the detail
+# views' crop circles (x 0.116 on); its four-line callout hangs under it.
+SIDE_FLATNESS_FRAME_DX = 0.008
+SIDE_FLATNESS_FRAME_DY = 0.014
 
 
 # The cropped-view helpers below are copied from draw_pinion_spring's pc-r15
@@ -795,6 +803,56 @@ def _notch_floor_edge(view: Any) -> Any:
     return max(matches, key=lambda item: item[0])[1]
 
 
+def _side_face_edge(view: Any) -> Any:
+    """The right side face's near long edge in the 1:4 front view: the face
+    at x = BarWidth runs the bar's full length, edge-on in this view."""
+    matches = []
+    for raw in visible_view_entities(view, 1, label="right side face"):
+        edge = _early_bound(raw, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        points = [
+            tuple(float(v) * 1000.0 for v in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in (start, end)
+        ]
+        if any(abs(p[0] - BAR_WIDTH) > 0.01 for p in points):
+            continue
+        if abs(abs(points[0][1] - points[1][1]) - BAR_LENGTH) > 0.01:
+            continue
+        matches.append((points[0][2], edge))
+    depths = sorted(round(z, 2) for z, _edge in matches)
+    if depths not in ([0.0], [round(BAR_DEPTH, 2)], [0.0, round(BAR_DEPTH, 2)]):
+        raise RuntimeError(f"unexpected right side face edges at z={depths} mm")
+    return max(matches, key=lambda item: item[0])[1]
+
+
+def _add_side_flatness(adapter: Any, front: Any) -> None:
+    """#2341: the side faces' flatness frame on the full-length view, its
+    leader landing on the right side face's edge at mid-length, the frame
+    east of the bar between DETAIL A's and DETAIL B's crop circles."""
+    landing = model_point_in_view(
+        adapter,
+        front,
+        (BAR_WIDTH / 1000.0, BAR_LENGTH / 2000.0, BAR_DEPTH / 1000.0),
+        label="side flatness landing",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_entity=_side_face_edge(front),
+        leader_attach_xy=landing,
+        frame_xy=(
+            landing[0] + SIDE_FLATNESS_FRAME_DX,
+            landing[1] + SIDE_FLATNESS_FRAME_DY,
+        ),
+        characteristic="flatness",
+        tolerance=BAR_SIDE_FLATNESS_IN,
+        quantity=SIDE_FLATNESS_CALLOUT,
+        label="side face flatness",
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -919,6 +977,7 @@ async def build(adapter: Any) -> dict[str, str]:
             mark = _mark_detail_on_front(adapter, front, spec)
             _letter_detail(adapter, front, spec, mark)
     _add_view_arrow(adapter, views[DETAIL_B.name])
+    _add_side_flatness(adapter, front)
 
     add_surface_finish(
         adapter,

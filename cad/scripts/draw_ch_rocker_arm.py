@@ -2023,22 +2023,22 @@ STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
 HUB_LENGTH_TEXT = rocker_notes.HUB_LENGTH_CALLOUT
 # Two rows under the value: one row lower than the four-row block's seat keeps
 # its line (~0.142) where it was, under the strap's bottom edge.
-HUB_LENGTH_TEXT_XY = (0.040, 0.1519)
+HUB_LENGTH_TEXT_XY = (0.0396, 0.1519)
 # The value plus two rows (#2136 r3: with three rows its top met the strap's
 # position frame), centred under that frame and left of the hub end.
-HUB_ROOT_TEXT_XY = (0.041, 0.199)
+HUB_ROOT_TEXT_XY = (0.0405, 0.199)
 # Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face
 # each arm registers on in the 20X stack, one a shop can set up on, where the
 # hub-width centre plane it replaces could only be derived. The strap frame's
 # ⌖0.10|G holds the strap's centre plane at a BASIC from that face to view
 # F's centreline. Both stand in the view's one free column, right of the -Z
-# face (x ~0.0856) and short of the front view's 132.8 left witness
+# face (x ~0.0864) and short of the front view's 132.8 left witness
 # (FRONT_LEFT_WITNESS_X): G's triangle on the face's lower half, its box
 # straight out right; the BASIC's line above the hub (top ~0.190), its boxed
 # text out right of the face.
 HUB_FACE_DATUM_LANDING_Y_MM = rocker_interface.PIVOT_MID_Y - rocker.HUB_DIA / 4.0
 HUB_FACE_DATUM_STANDOFF_M = 0.0075
-HUB_FACE_BASIC_TEXT_XY = (0.0945, 0.199)
+HUB_FACE_BASIC_TEXT_XY = (0.0955, 0.199)
 FRONT_LEFT_WITNESS_X = 0.105
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "HubLength": HUB_LENGTH_TEXT_XY,
@@ -2841,7 +2841,7 @@ def _strap_centre_plane(adapter: Any, view: Any) -> Any:
 
 
 # G's BASIC: the -Z hub face to the strap's centre plane, both off the face
-# requirements (the half hub length, 3.52825, printed at its places).
+# requirements (the half hub length, 3.81, printed at its places: .1500).
 HUB_FACE_BASIC_MM = (
     STRAP_FACES.fields["upper_z"][0] + STRAP_FACES.fields["lower_z"][0]
 ) / 2.0 - HUB_FACES.fields["lower_z"][0]

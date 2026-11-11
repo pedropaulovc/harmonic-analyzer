@@ -90,8 +90,8 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
 
 def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     stations = drawing.STATIONS
-    # The pitch prints .278 (7.0612) +.001/.000: each hub may come out the
-    # printed maximum, past the 7.0565 model.
+    # The pitch prints .300 (7.62) +.001/.000: each hub may come out the
+    # printed maximum, .001 past the model.
     lower, upper = printed_deviations(
         spec.HUB_LENGTH,
         notes.DRAWING_PRECISION["Hub"]["HubLength"],

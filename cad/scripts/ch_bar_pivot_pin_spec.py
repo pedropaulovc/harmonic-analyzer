@@ -4,7 +4,9 @@ closes.
 PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the
 pattern). The part build (``build_ch_bar_pivot_pin.py``), its drawing, the
 channel assembly and ``test_ch_bar_pivot_fit`` import it; it reads only the
-two parts it joins, so the pin never re-keys on bank layout or config.
+two parts it joins, so the pin never re-keys on bank layout or config. Its
+``bar_gap_budget`` carries the same bar-to-bar gap down the bank to the foot,
+where the bars straddle the MHA-CH-06 strap (#1038, #2341).
 
 The joint: each amplitude bar's top notch (``ch_amplitude_bar_spec``)
 straddles its channel lever (``ch_channel_lever_spec``) at the lever's
@@ -67,9 +69,9 @@ PIN_BLANK_LENGTH_BAND = (
     printed_band_mm(PIN_BLANK_LENGTH_PLACES, unit=UNIT),
     -printed_band_mm(PIN_BLANK_LENGTH_PLACES, unit=UNIT),
 )  # (upper, lower) deviations: .XX
-# Dressed ends stand nothing proud of the bar faces: the top-notch stack
-# below leaves 0.1065 against the 0.10 running floor (#1038, owner ruling
-# 2026-10-15 option 2).
+# Dressed ends stand nothing proud of the bar faces: at the .300 pitch the
+# top-notch stack below leaves 0.6858 against the 0.10 running floor (#1038;
+# owner rulings 2026-10-15 option 2 and 2026-11-11).
 PIN_END_PROUD_MAX = 0.0
 
 # The configuration the channel assembly places: the pin dressed flush with
@@ -203,6 +205,64 @@ if BUDGET["running_clearance_min"] <= 0.0:
     raise AssertionError("pin can seize in the lever's bar-pin hole")
 if BUDGET["neighbour_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("a pin end can close the bar-to-bar running gap")
+
+
+def bar_gap_budget() -> dict[str, float]:
+    """Least bar-to-bar gaps along the bank at the printed worst case (mm;
+    #1038, #2341).
+
+    ``top``: the top joint's ``neighbour_clearance_min``. ``foot``: the same
+    form on the foot notch and the real MHA-CH-06 strap (.098 +/-.001): the
+    pitch the rocker hubs set (never short), the widest stock, the foot
+    notch's float on the thinnest strap, both ledges' bands, and the strap's
+    position zone to its hub (each strap half the zone off its hub's
+    mid-plane, two neighbours toward each other). ``mid_span``: two straight
+    bars between those end gaps, so at least their mean. ``mid_span_bowed``:
+    that, less two neighbours each bowed the full side-face flatness zone
+    (MHA-CH-01) toward the other. ``leaf``: the feeler leaf MHA-CH-00 passes
+    between every adjacent pair, the least of those gaps floored to the
+    .001 in a feeler set is sold in, so a bank inside its bands always
+    passes it.
+    """
+    import ch_rocker_arm_spec as _arm
+
+    pitch_min = _arm.HUB_LENGTH  # the arms stack hub on hub at the pitch
+    w_max = _bar.BAR_WIDTH
+    notch_max = _bar.BOTTOM_NOTCH_WIDTH + _bar.BOTTOM_NOTCH_WIDTH_BAND[0]
+    strap_min = _arm.ARM_THICKNESS + _arm.ARM_THICKNESS_BAND[1]
+    top = joint_budget()["neighbour_clearance_min"]
+    foot = (
+        pitch_min
+        - w_max
+        - (notch_max - strap_min)
+        - 2.0 * _bar.NOTCH_OFFSET_TOLERANCE_MM
+        - _arm.STRAP_HUB_SYMMETRY
+    )
+    mid_span = (top + foot) / 2.0
+    mid_span_bowed = mid_span - 2.0 * _bar.BAR_SIDE_FLATNESS_MM
+    least = min(top, foot, mid_span_bowed)
+    leaf = math.floor(round(least / MM_PER_IN * 1000.0, 9)) / 1000.0 * MM_PER_IN
+    return {
+        "top": top,
+        "foot": foot,
+        "mid_span": mid_span,
+        "mid_span_bowed": mid_span_bowed,
+        "leaf": leaf,
+    }
+
+
+BAR_GAP = bar_gap_budget()
+if BAR_GAP["foot"] < RUNNING_FLOOR - 1e-9:
+    raise AssertionError(
+        "a bar's foot-notch float can close the bar-to-bar running gap"
+    )
+if BAR_GAP["mid_span_bowed"] < RUNNING_FLOOR - 1e-9:
+    raise AssertionError(
+        "two neighbouring bars bowed their side-face flatness toward each other "
+        "close the mid-span running gap"
+    )
+if BAR_GAP["leaf"] < RUNNING_FLOOR - 1e-9:
+    raise AssertionError("the bank's feeler leaf does not prove the running floor")
 if BUDGET["notch_roof_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("the lever's lower edge can reach the top notch's roof")
 # The hole's far-face wall is .079 on the narrowest stock: under the .080

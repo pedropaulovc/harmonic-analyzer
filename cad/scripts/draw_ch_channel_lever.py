@@ -262,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The integral Ø.47 x .278 fulcrum hub hides the whole plate section
+    # The integral Ø.47 x .300 fulcrum hub hides the whole plate section
     # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)

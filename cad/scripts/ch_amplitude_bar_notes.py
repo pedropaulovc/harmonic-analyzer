@@ -205,6 +205,15 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a callout names a dimension the sheet does not print")
 
+# #2341: the side faces' flatness (ch_amplitude_bar_spec.BAR_SIDE_FLATNESS_IN)
+# prints as a native frame on the full-length view, on the right side face;
+# under it, which faces it holds, the mate it runs beside (rule 4), and the
+# fit route its band needs (bought CF square can bow about .013 over this
+# length: the stock is straightened or selected to it). Each line
+# stays within 15 characters: the block stands between the bar and the
+# detail views' crop circles.
+SIDE_FLATNESS_CALLOUT = "BOTH SIDE FACES\nBESIDE NEXT BAR\nSTRAIGHTEN OR\nSELECT STOCK"
+
 # The one sheet note is the pin hole's matched fit. The title-block QTY owns
 # the count, the FINISH field the plating, and the views both notches' depth
 # and common plane (machinist round 2, #1293: "BOTH END NOTCHES THRU THE FULL

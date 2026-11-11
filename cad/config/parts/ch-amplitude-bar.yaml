@@ -8,7 +8,7 @@ ch-amplitude-bar:
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
-  process: "machined (steel)"
+  process: "machined (steel); the 1/4 sq stock straightened or selected to the .005 side-face flatness"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

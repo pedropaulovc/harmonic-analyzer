@@ -126,6 +126,7 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     "fulcrum-shaft-withdrawn",
     LEVER_BANK_THREADED_KEY,
     "bar-feet-seated",
+    "bars-gapped",
     "levers-swing",
     "lever-bank-slides",
     "fulcrum-flats-aligned",

@@ -101,6 +101,7 @@ import ch_channel_assembly_spec as asm
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 import ch_channel_explode_spec as explode
 import ch_channel_assembly_steps as steps
+from ch_bar_pivot_pin_spec import BAR_GAP
 from ch_channel_lever_spec import (
     HUB_LENGTH as LEVER_HUB_LENGTH,
     HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
@@ -1163,6 +1164,12 @@ def _fitup_text() -> dict[str, str]:
             "leave no gaugeable play in the shortest lug span"
         )
     end_play_text = render_number(end_play_leaf, asm.UNIT, FEELER_LEAF_PLACES)
+    # #2341: the bars' least running gap, at the foot at the worst case of
+    # every band with each side face at its flatness, floored to .001 (the
+    # pin spec's bar-gap budget): a bank inside its bands always passes.
+    bar_gap_text = render_number(
+        BAR_GAP["leaf"] / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
+    )
     return {
         # The hub stack is proved on the shaft first, while the arms are
         # loose; each rod + arm pair is then pinned at the bench, before the
@@ -1368,6 +1375,10 @@ def _fitup_text() -> dict[str, str]:
         "bar-feet-seated": (
             f"SEAT THE FOOT NOTCH OF EACH {bar} ASTRIDE THE ARM OF THE {arm} "
             "BELOW IT."
+        ),
+        "bars-gapped": (
+            f"CHECK A {bar_gap_text} FEELER GAUGE LEAF PASSES BETWEEN EVERY "
+            f"ADJACENT PAIR OF {bar} BARS, TOP TO BOTTOM."
         ),
         "levers-swing": f"CHECK EVERY {lever} SWINGS FREE ON {fulcrum_shaft}.",
         "lever-bank-slides": (

@@ -64,7 +64,7 @@ def test_supply_sizes_derive_from_the_finished_rocker() -> None:
     assert spec.SUPPLY_BORE_DIA + spec.DRILLED_PLUS < rocker.PIVOT_HOLE_DIA
     # The length leaves FACE_STOCK at each end over the finished top limit.
     finished_max = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(0.32 * 25.4)
+    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(0.35 * 25.4)
     assert spec.SUPPLY_LENGTH_MIN >= finished_max + 2.0 * spec.FACE_STOCK
     assert spec.SUPPLY_LENGTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert spec.SUPPLY_WALL_MIN >= WALL_FLOOR_MM

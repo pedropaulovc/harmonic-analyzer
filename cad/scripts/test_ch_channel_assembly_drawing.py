@@ -1251,20 +1251,20 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert [z - asm.KEEPER_SOCKET_XZ[1] for z in asm.LUG_INNER_FACE_Z] == pytest.approx(
         [front, rear]
     )
-    # The bands' functions (Main's ruling, 2026-10-16): the right face's band
-    # keeps its foot off the front socket boss at the printed worst case
-    # (build_fr_top_frame), and the lug centre's band is charged in the
-    # transferred foot tap's wall to the rail web (#1660 r6).  The cast
-    # boss's own ⌖ Ø.06 | A | B (#2333, MHA-FR-02 RV-11) leaves the south
-    # foot .009, which is what the title block's band would spend in the
-    # location band's place: that band is what holds the foot off the boss.
+    # The bands' functions (Main's ruling, 2026-10-16): the lug centre's band
+    # is charged in the transferred foot tap's wall to the rail web (#1660
+    # r6), and the inner faces' band is the shaft flats' (ch_fulcrum_shaft_spec).
+    # At the .300 pitch the south foot stands over the K5 relief machined on
+    # the front socket boss (#1038, fr_top_frame_spec KEEPER_BOSS_RELIEF_*),
+    # so it clears the relief step at the printed worst case even at the
+    # title block's band: the boss no longer sets the location band.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
     band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
     title_block_band = top.PRINTED_LINEAR_BAND_MM[keeper.KEEPER_FITUP_PLACES]
-    assert south_margin == pytest.approx(0.2286)
-    assert south_margin + band - title_block_band == pytest.approx(0.0, abs=1e-9)
+    assert south_margin == pytest.approx(0.737, abs=5e-4)
+    assert south_margin + band - title_block_band > 0.0
     assert north_margin > 10 * band
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
 
@@ -1423,3 +1423,21 @@ def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() ->
     seeds = assembly_contract("ch-channel").flip_invert
     assert {f"sh vn arbor set screw datum {axis}" for axis in "xyz"} <= seeds
     assert not any(seed.startswith("ch vn arbor set screw datum ") for seed in seeds)
+
+def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
+    """#2341: once every foot is seated the bars hang side by side at the
+    .300 pitch; the bank is accepted on the least worst-case gap (the foot,
+    each side face at its flatness), floored to the .001 leaf a bank inside
+    its bands always passes, checked before the levers are proved free."""
+    import ch_bar_pivot_pin_spec as pin
+
+    order = ["bar-feet-seated", "bars-gapped", "levers-swing"]
+    numbers = [steps.step_number(key) for key in order]
+    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    leaf = pin.BAR_GAP["leaf"]
+    least = min(v for k, v in pin.BAR_GAP.items() if k not in ("leaf", "mid_span"))
+    assert pin.RUNNING_FLOOR <= leaf <= least
+    assert leaf == pytest.approx(0.005 * 25.4)
+    body = _step_body("bars-gapped")
+    assert "A .005 FEELER GAUGE LEAF" in body
+    assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body

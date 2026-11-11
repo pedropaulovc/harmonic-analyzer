@@ -32,7 +32,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md),
 # in inches: two on the milled bar height and the turned hub (the walls read
 # them), three on the plate, the plate offset, the hub length (the station
-# pitch's .278) and both lever arms, four on the reamed fulcrum bore.
+# pitch's .300) and both lever arms, four on the reamed fulcrum bore.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeverOutline": {"BarHeight": 2},
     "LeverBody": {"LeverThick": 3},
