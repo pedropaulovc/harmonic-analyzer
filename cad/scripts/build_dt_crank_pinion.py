@@ -61,6 +61,7 @@ from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi
+from _part_shaded_quality import set_precise_shaded_quality
 from _visibility import blank_reference_geometry
 from dt_crank_pinion_notes import DRAWING_NOTES, GEAR_DATA
 from dt_crank_pinion_spec import (
@@ -720,6 +721,9 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
+    # The sheet's 3:1 isometric shades the flanks from this part's own
+    # tessellation (rule 8: no faceted pictorial).
+    set_precise_shaded_quality(adapter, label="crank pinion")
     await assert_boss_present(adapter, "crank pinion before save")
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 

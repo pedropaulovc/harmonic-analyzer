@@ -127,6 +127,8 @@ GEAR_DATA = mate_notes.gear_data_note(
         # The title block's edge break would erase these fine teeth; the
         # requirement is a tooth fact, so it reads with them, as on the 64T.
         ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
-        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07 64T INCLINED RIGHT HAND"),
+        # The 64T's tooth line prints on its own sheet; it changes nothing
+        # this spur is cut to (machinist review on #2482, rule 26).
+        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T"),
     ]
 )

@@ -947,7 +947,9 @@ def test_both_shop_gears_state_the_source_owned_tooth_runout_not_a_form_class() 
     assert "MHA-DT-10" in runout_row
     assert any(line.startswith("TRANSVERSE BACKLASH WITH MHA-DT-10") for line in lines)
     # The 64T's block keeps main's 19 lines (the tooth line and its crossing
-    # station replaced the helix and lead rows) and its widest row: an extra
-    # line or a wider row runs its last rows into the tooth tips.
+    # station replaced the helix and lead rows). The tooth-line row, 81
+    # characters, is now its widest; farm r7 printed it clear of the tooth
+    # tips. An extra line or a wider row runs its last rows into the tips.
     assert len(lines) == 19
+    assert max(len(line) for line in lines) <= 81
     assert len(runout_row) <= max(len(line) for line in lines if line is not runout_row)
