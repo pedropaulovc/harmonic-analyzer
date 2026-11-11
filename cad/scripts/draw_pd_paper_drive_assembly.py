@@ -2426,19 +2426,26 @@ def _step_text(
         ),
         # Owner direction 2026-11-11 (#2416): the feed mesh only has to run
         # without binding, keep its teeth engaged and feed the paper steadily;
-        # its backlash is not a function. So the arm is set by feel and
-        # accepted on those three, not on a datum shake window read on a dial
-        # (the band stays the builder's design proof, paper_drive_rack_setup).
+        # its backlash is not a function. So the arm is set on a coarse rock
+        # of the disc's rim, which magnifies the mesh about 8x and leaves the
+        # reducer and most of the sleeve's play out (codjiflo P1 on e690ffe:
+        # platen shake with the knob held could pass with the teeth at the
+        # interference point), and accepted on function, not on a datum shake
+        # window read on a dial (the band stays the builder's design proof,
+        # paper_drive_rack_setup; the rock window's own gates are
+        # steps.FEED_DISC_ROCK_BACKLASH_MM's).
         "hanger-meshed": (
             f"SWING THE ARM UP UNTIL THE {n['pd-transgear-feed-pinion']} TEETH "
             f"ENTER THE {n['pd-platen-rack']} RACK.",
-            "KNOB HELD, RAISE THE ARM UNTIL THE PLATEN ONLY JUST SHAKES ALONG THE "
-            "RACK.",
+            f"PLATEN HELD, SET THE ARM SO THE {n['pd-rack-pinion']} DISC, ROCKED BY "
+            f"HAND, MOVES {steps.FEED_DISC_ROCK_TEXT} AT ITS RIM, READ WITH A STEEL "
+            "RULE.",
             "CLAMP THE ARM TO THE BAR.",
             "RUN THE PLATEN THROUGH THE ENGAGED FEED, "
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
             "CHECK: NO TIGHT SPOT.",
-            "CHECK: SHAKE AT EVERY TOOTH.",
+            "CHECK: PLATEN HELD AT EACH END AND THE MIDDLE OF THE ENGAGED FEED, THE "
+            f"DISC ROCKS {steps.FEED_DISC_ROCK_MIN_TEXT} AT ITS RIM.",
             "IF EITHER CHECK FAILS, UNCLAMP AND LOWER THE ARM A LITTLE.",
             f"REPEAT {s('hanger-meshed', 2)}-{s('hanger-meshed', 5)}.",
         ),
@@ -2460,11 +2467,12 @@ def _step_text(
             f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT.",
+            f"CHECK: AS {s('hanger-meshed', 5)}.",
             "CHECK: KNOB HELD, PUSHED FIRMLY BY HAND EACH WAY AT BOTH ENDS AND THE "
             "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
-            f"{s('hanger-meshed', 1)}-{s('hook-pin-hole-match-drilled', 9)}.",
+            f"{s('hanger-meshed', 1)}-{s('hook-pin-hole-match-drilled', 10)}.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
