@@ -175,13 +175,15 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's one-line R MAX under the shank, its right end short of
-    # the land end's extension line: the 23 mm text does not fit between
+    # The seat root's one-line R MAX under the shank, its shelf ending short
+    # of the land end's extension line: the 23 mm text does not fit between
     # that line and the seat's (the 1.8600's, 2.02's, .09's and .29's), where
-    # run 20261111T193324863Z printed it crossed by the seat's (text-on-line).
-    # Its leader rises to the lower corner over the land, crossing only the
-    # land end's extension line, and stays above the land's .29 row.
-    "SeatRadius": (LAND_END_X - 0.014, SIDE_CENTER[1] - 0.010),
+    # run 20261111T193324863Z printed it crossed by the seat's (text-on-line),
+    # and at LAND_END_X - 0.014 its shelf, 2.7 mm past the text, crossed the
+    # land end's (shoulder-crosses-line, run 20261111T201934013Z).  Its
+    # leader rises to the lower corner over the land, crossing only the land
+    # end's extension line, and stays above the land's .29 row.
+    "SeatRadius": (LAND_END_X - 0.018, SIDE_CENTER[1] - 0.010),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only

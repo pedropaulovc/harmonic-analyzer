@@ -79,9 +79,13 @@ NOTES = (
 NOTES_TEXT = "\n".join(NOTES)
 
 PIVOT_BORE_CALLOUT = f"REAM, {see_note(PIVOT_NOTE)}"
+# The arm is reamed first; the pin's land is turned to the measured ream
+# (MHA-PD-23 note 1), so the interference band is the matched fit's, not
+# the two parts' printed limits (machinist review, run 20261111T201934013Z).
 PIN_BORE_CALLOUT = "\n".join((
     "REAM THRU",
-    f"PRESS FIT ON PIN {PIN.PIN_NUMBER}",
+    f"PRESS FIT ON PIN {PIN.PIN_NUMBER},",
+    "LAND TURNED TO MEASURED REAM",
     f"(INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)})",
 ))
 # Note 2 names the dowel and its press; the callout links it (round 2: the
