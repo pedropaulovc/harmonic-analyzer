@@ -280,8 +280,9 @@ DRUM_STATION_CALLOUT = (
 # The drum joint's one step covers MHA-DT-01 too (dt_alignment_pinion_spec).
 # The journals' bore moved onto their callouts (JOURNAL_CALLOUT), so the one
 # note is the inside-corner ceiling at the Ø5/16-Ø.41 and Ø.41/Ø.59 shoulders
-# (machinist review r1 of #1685; the dt-crankshaft precedent: the title
-# block's edge-break radius, until #1625 puts the default in the title block).
+# and, since #2360, the bond relief's two Ø5/16-Ø.28 shoulders (machinist
+# review r1 of #1685; the dt-crankshaft precedent: the title block's
+# edge-break radius, until #1625 puts the default in the title block).
 INSIDE_CORNER_R_MAX = edge_break_radius_mm(unit=UNIT)  # R.010
 DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX.".replace(
     "R0.", "R."

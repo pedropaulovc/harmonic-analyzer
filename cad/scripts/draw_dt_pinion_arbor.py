@@ -129,7 +129,9 @@ COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
-BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+# Three short rows (#2360): the widest is the diameter's own, so the block
+# ends ~0.168 and leaves the relief diameter room before its shoulder.
+BOND_ZONE_CALLOUT = f"BONDED FIT IN\n{DRUM_NUMBER},\n{RETAINING_COMPOUND}"
 SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
@@ -320,9 +322,12 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # head end and the front land's.  Above the shaft (r1 of #1685) the callout
 # no longer fit under detail A.  Its arrows sit inside the flanks
 # (ARROWS_INSIDE): an outside tail would rise into the back Ra symbol over
-# the shaft.  Two callout rows now (r3 had three): one pitch up keeps the
-# block's top, so its witnesses stay short.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
+# the shaft.  Three callout rows again (#2360, as at r3 of #1685; two since
+# then): the block's top stays put, so its witnesses stay short.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474)
+# The diameter's own row ends here on the r2 sheet of #2360 (755e192b: the
+# "-.0038" ran to x 0.1677); the shorter word rows end left of it.
+BOND_ZONE_BLOCK_RIGHT_X = 0.1677
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
 # dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
@@ -434,18 +439,17 @@ ARROWS_INSIDE = (
 # in the open run under the front land's diameter block.  The relief's
 # length stands above the shaft, under detail A's label, as the journals'
 # lengths do.  Its plain .XX diameter hangs below the shaft, over the
-# station row: measured from the axis to the station witness's shoulder
-# point, its line stands 6 mm aft of that shoulder and its text hangs away
-# from the shoulder (as the front land's does), so the station's shoulder
-# witness stays clear of it.  At 7454ba6d (r1) the text ran 14.2 mm.
-# Measured to the relief floor line instead (850d2ba9, r3), SolidWorks
-# spread the text over 25 mm across that witness.
+# station row, measured from the axis to the station witness's shoulder
+# point, its line in the run between the bond-zone block and that shoulder
+# witness.  SolidWorks has set its text 14.3 mm right of the line (r2,
+# 755e192b) and spread over 25.3 mm about it (r5, b6a90da7: x-13.1..+12.2
+# mm); the line stands where either extent clears both neighbours.
 RELIEF_LEN_Y = 0.178
 RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
-RELIEF_DIA_TEXT_WIDTH = 0.0142
-RELIEF_DIA_LINE_OFFSET = 0.006
+RELIEF_DIA_TEXT_EXTENT = (-0.0131, 0.0143)
+RELIEF_DIA_LINE_OFFSET = 0.016
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),

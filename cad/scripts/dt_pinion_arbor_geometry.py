@@ -360,20 +360,20 @@ if (
 # owned tools (it would need a boring bar reaching 2.9 in through a .3135
 # land), so the clearance is turned on the arbor instead: a plain relief
 # between two bond lands.  The drum then bears and bonds only on those lands,
-# each wholly inside one reamed half, and the long shaft no longer has to
-# follow the bore's straightness over its whole length.  The arbor's back
-# end still slides through the meeting point on assembly, so the halves must
-# meet within the back journal's .0014 in worst-case diametral clearance;
-# the drum sheet's SLIDES ON BY HAND is that check, made before bonding.
+# and the long shaft no longer has to follow the bore's straightness over its
+# whole length.  The arbor's back end still slides through the meeting point
+# on assembly, so the halves must meet within the back journal's .0014 in
+# worst-case diametral clearance; the drum sheet's SLIDES ON BY HAND is that
+# check, made before bonding.  So a step under a land is harmless: it is at
+# most that .0014, under the land's .0014-.0053 bond clearance.
 #
 # The relief's front shoulder is located from the head rear face, the sheet's
 # datum for every station (drawing-guidelines rules 10/11; machinist review
 # of 7454ba6d gated a chain off the front land), and its length is its own
 # size, as each journal's is.  Both at .XX.  The front land is the longer:
 # the operator's torque enters at the head and reaches the drum through it.
-# The relief's front shoulder stands clear of the front land's diameter
-# block on the sheet, its back shoulder 15 mm ahead of the bond-zone
-# diameter's witness (BOND_ZONE_DIA_FROM_HEAD_REAR).
+# The back shoulder stands 15 mm ahead of the bond-zone diameter's witness
+# (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the back land.
 BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
 BOND_RELIEF_LEN = 66.04  # 2.60
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
@@ -398,8 +398,11 @@ FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
 BACK_BOND_OVERLAP_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
 ) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
-# Each land lies wholly inside one reamed half (the halves meet at the drum's
-# mid-length, give or take the reamer's reach), so no land straddles the step.
+# The relief spans the drum's mid-length, where halves reamed to about half
+# depth from each end meet.  This is not a requirement: a deeper pass (the
+# reamer's reach, about 4.25 in, puts the step anywhere from 3.79 to 6.65 in
+# from the head rear face) may leave the step under the front land, where
+# the slide check above already bounds it.
 _DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
 if not (
     BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND

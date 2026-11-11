@@ -495,14 +495,18 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     assert shaft_top + 0.003 <= len_y <= label_bottom - 0.004
     assert drawing.RELIEF_BACK_X < len_x < drawing.RELIEF_FRONT_X
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
-    # The relief's dimension line stands aft of the station's shoulder
-    # witness and its text hangs away from it, inside the relief's span.
-    assert drawing.RELIEF_FRONT_X - dia_x >= 0.004
-    assert drawing.RELIEF_BACK_X + 0.010 <= dia_x - drawing.RELIEF_DIA_TEXT_WIDTH
-    journal_width, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
-    bond_width, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
-    bond_x, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
-    front_x, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
+    text_left, text_right = (dia_x + d for d in drawing.RELIEF_DIA_TEXT_EXTENT)
+    # Either way SolidWorks sets the relief diameter's text, it stands between
+    # the bond-zone block's right end and the station's shoulder witness.
+    assert drawing.BOND_ZONE_BLOCK_RIGHT_X + 0.002 <= text_left
+    assert text_right <= drawing.RELIEF_FRONT_X - 0.001
+    bond_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    rows = drawing.BOND_ZONE_CALLOUT.split("\n")
+    assert bond_x + drawing.CALLOUT_CHAR_ADVANCE * max(map(len, rows)) <= text_left
+    _, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
+    _, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
+    _, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    _, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
     # Its text sits under both blocks, over the station row's line.
     assert dia_y + 0.004 <= min(bond_y - bond_height / 2.0, front_y - journal_height / 2.0)
     assert dia_y - 0.004 >= y
@@ -759,7 +763,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_ZONE_CALLOUT
     # Round 3 (fan-out dt-fab-3): the bonded fit and its reason print once,
     # at the drum span's callout; no note repeats where the drum bonds.
-    assert drawing.BOND_ZONE_CALLOUT == "BONDED FIT IN MHA-DT-01,\nLOCTITE 638"
+    assert drawing.BOND_ZONE_CALLOUT.split() == ["BONDED", "FIT", "IN", "MHA-DT-01,", "LOCTITE", "638"]
     assert "MHA-DT-01" not in drawing.SHEET_NOTES
     import _config
 
