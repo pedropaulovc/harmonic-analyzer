@@ -139,8 +139,8 @@ PHASES: tuple[Phase, ...] = (
 # sheet and key: the master table names them so the shop sees which belong on
 # the mill. Printed numbers follow the keys.
 MATCH_LOCATED: tuple[tuple[ModuleType, str], ...] = (
-    (fr_steps, fr_steps.LOWER_HOLES_PILOTED_KEY),
-    (fr_steps, "upper-holes-piloted"),
+    (fr_steps, fr_steps.LOWER_HOLES_MARKED_KEY),
+    (fr_steps, "upper-holes-marked"),
     (fr_steps, fr_steps.NAMEPLATE_SPOTTED_KEY),
     (dt_steps, "post-and-tip-block"),
     (dt_steps, "crank-hub-fitted"),
