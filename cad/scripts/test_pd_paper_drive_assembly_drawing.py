@@ -1831,14 +1831,20 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     assert f"{tir} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
         assert method not in transferred
+    # Codjiflo P3 on 353fd41a36: the sleeve, held between the stub's
+    # shoulder and the tailstock, takes the truing taps, and the stub stays
+    # chucked while the work is off it.
     ordered_actions = (
+        "SHOULDER",
+        "TAILSTOCK CENTRE",
         "TAP THE DISC CENTRAL",
         "CLAMP THE DISC TO THE HUB FLANGE",
         "OFF THE MANDREL",
+        "IN THE CHUCK",
         "SPOT-DRILL THE DISC",
         "SCREWS.",
         "REMOVE THE CLAMPS",
-        "ON THE MANDREL.",
+        "REFIT THE SLEEVE",
         f"ALL {disc.TEETH} SPACES",
         "MATCH-MARK DISC AND HUB",
     )

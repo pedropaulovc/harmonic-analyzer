@@ -2257,10 +2257,16 @@ def _step_text(
             # its own whose ends are no bigger than the smallest centre drill's
             # body. A stub turned in the chuck to the bore runs true to the
             # spindle by construction, is fitted to the actual bore and needs
-            # no drawing; it stays chucked until the re-check.
-            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON IT "
+            # no drawing. The sleeve, not the slender stub, takes the truing
+            # taps: its rear face sits on the stub's faced shoulder and the
+            # tailstock centre holds its front bore mouth. The stub stays
+            # chucked until the re-check, or a re-chucked stub's own runout
+            # enters the reading.
+            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC "
             "ON A STUB MANDREL TURNED IN PLACE IN THE LATHE CHUCK TO A SLIDING FIT "
-            f"IN THE {n['pd-transgear-feed-pinion']} BORE.",
+            f"IN THE {n['pd-transgear-feed-pinion']} BORE, THE SLEEVE'S REAR FACE "
+            "ON THE MANDREL'S FACED SHOULDER, THE TAILSTOCK CENTRE IN ITS FRONT "
+            "BORE MOUTH.",
             "WITH A DIAL INDICATOR ON A "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
             f"IN EACH {n['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC "
@@ -2271,7 +2277,8 @@ def _step_text(
             # (#2418).
             "CLAMP THE DISC TO THE HUB FLANGE WITH 2 TOOLMAKER'S CLAMPS BETWEEN "
             "ITS HOLES.",
-            "SLIDE THE SLEEVE, HUB AND DISC OFF THE MANDREL.",
+            "BACK OFF THE TAILSTOCK AND SLIDE THE SLEEVE, HUB AND DISC OFF THE "
+            "MANDREL, LEAVING THE MANDREL IN THE CHUCK.",
             f"SPOT-DRILL THE DISC THROUGH THE {hub_geometry.SCREW_COUNT} HUB FLANGE "
             "HOLES.",
             f"DRILL EACH SPOT {TAP_0_80_DRILL_TEXT} THRU THE DISC.",
@@ -2279,7 +2286,8 @@ def _step_text(
             f"FIX THE DISC WITH {hub_geometry.SCREW_COUNT} "
             f"{n['pd-vn-transgear-disc-screw']} SCREWS.",
             "REMOVE THE CLAMPS.",
-            "REFIT THE SLEEVE, HUB AND DISC ON THE MANDREL.",
+            "REFIT THE SLEEVE, HUB AND DISC ON THE MANDREL AND TAILSTOCK AS "
+            f"{s('disc-taps-transferred', 0)}.",
             f"CHECK: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
             f"IF NOT, SLACKEN THE {n['pd-vn-transgear-disc-screw']} SCREWS AND REPEAT "
             f"{s('disc-taps-transferred', 1)}, {s('disc-taps-transferred', 7)} AND "
