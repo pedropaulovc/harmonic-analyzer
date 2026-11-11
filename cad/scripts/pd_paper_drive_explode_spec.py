@@ -105,7 +105,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "knob cup rearward",
         ("pd-transgear-knob-cup", "pd-vn-transgear-knob-cup-pin"),
         "z",
-        46.0,
+        64.0,
     ),
     ExplodeStep(
         "cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", -22.0
@@ -120,22 +120,28 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     # locating dowels drawn out of the arm between them.  At 16 mm the
     # isometric drew the plate on the arm's top edge with the dowels hidden
     # under it (2026-10-27 ENFORCE review, r1, r2: balloon 20 landed on a
-    # barely visible tip).  The 6 mm dowels, 1.7 proud, now stand about
-    # 16 mm clear of the arm and 18 mm short of the plate.
+    # barely visible tip).  At 20 mm the dowels stood behind the arm's hub
+    # (ENFORCE reviews of 30dde0c577 and b1161da53b, two runs each: balloon
+    # 19 ended on a sliver at the hub's edge, 1.2 mm under its top), so they
+    # come 20 mm further out, which lifts them about 5 mm on the 2:3 sheet,
+    # and the plate and the knob cup (behind the plate's hub) with them.  The
+    # screws follow the plate at 18 mm, not 24: at 70/24/50 (cup 76) the
+    # view's balloon ring stood 199.1 mm in its 197.0 mm room (run
+    # 20261111T093403871Z).
     ExplodeStep(
         "arm plate rearward",
         ("pd-transgear-arm-plate", "pd-vn-transgear-arm-plate-screw"),
         "z",
-        40.0,
+        58.0,
     ),
     ExplodeStep(
-        "plate screws rearward", ("pd-vn-transgear-arm-plate-screw",), "z", 24.0
+        "plate screws rearward", ("pd-vn-transgear-arm-plate-screw",), "z", 18.0
     ),
     ExplodeStep(
         "plate dowels rearward",
         ("pd-vn-transgear-arm-plate-locating-pin",),
         "z",
-        20.0,
+        40.0,
     ),
     # The disc cluster along its pin, in the order it goes on, each part a
     # clear gap from the next (round 11 review: the pin, shims, rear bushing
