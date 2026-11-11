@@ -2,11 +2,11 @@ r"""Create the MHA-DT-32 crank handle pivot screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
-native size band and one bearing-surface finish, the shoulder and thread
-lengths keep their native bands, and every other size is an ordinary model
-dimension at its part-authored places.  The thread relief's 45-degree lead
-prints its native band in DETAIL A, a 10:1 native detail of the seat corner
-(#2172).
+native size band and one bearing-surface finish, the tip chamfer its single
+MAX limit, and every other size is an ordinary model dimension at its
+part-authored places under the title block's bands (#2314).  The thread
+relief's 45-degree lead prints in DETAIL A, a 10:1 native detail of the seat
+corner (#2172).
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -226,7 +226,7 @@ THREAD_NOTE_XY = (THREAD_START_X + 0.0021, SIDE_CENTER[1] - 0.015)
 # DETAIL A (#2172): the 45-degree relief lead is 0.9 mm of sheet at 3:1, and
 # the groove already carries the relief width above it and the Ø below it
 # (the #2102 review found it too crowded for a third dimension), so a 10:1
-# native detail carries the lead's model dimension, its band and its words,
+# native detail carries the lead's model dimension and its words,
 # as MHA-DT-08's detail B carries its tenon-root relief.  A detail imports
 # only a dimension whose references it shows, so the fence takes in both ends
 # of the lead and the seat-face corner.  It stays above the axis (no ink of

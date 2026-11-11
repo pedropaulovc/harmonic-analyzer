@@ -976,7 +976,7 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
     import math as _math
 
     assert spec.NUMERAL_DEPTH == 0.4064  # .016 MIN
-    assert spec.NUMERAL_V_INCLUDED_ANGLE_DEG == 30.0
+    assert spec.ENGRAVING_V_INCLUDED_ANGLE_DEG == 30.0
     assert spec.NUMERAL_STROKE_WIDTH_MM == 0.24
     # A true V: the 15-degree walls leave under 0.03 mm of root at .016 deep.
     assert spec.NUMERAL_TIP_FLAT_MM == pytest.approx(
@@ -1127,6 +1127,88 @@ def test_no_form_that_removes_the_v_fails_with_discriminating_probes(monkeypatch
     assert "probe undrafted default direction: FeatureCut3 returned None" in message
     # Every cut a form or probe made was undone.
     assert seat.volume == 4800.0
+
+
+def _straight_tick_mm3(length_mm: float) -> float:
+    return spec.TICK_WIDTH * length_mm * spec.TICK_DEPTH
+
+
+def test_tick_v_volume_is_the_inward_drafted_groove() -> None:
+    # Midpoint integral of the drafted cross-section, the closed form's own
+    # definition, over a fine depth grid.
+    slope = math.tan(math.radians(spec.ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0))
+    steps = 4000
+    dz = spec.TICK_DEPTH / steps
+    for length in (spec.TICK_LENGTH, spec.MINOR_TICK_LENGTH, spec.HALF_TICK_LENGTH):
+        numeric = sum(
+            (spec.TICK_WIDTH - 2.0 * z * slope) * (length - z * slope) * dz
+            for z in ((i + 0.5) * dz for i in range(steps))
+        )
+        assert spec.tick_v_volume_mm3(length) == pytest.approx(numeric, rel=1e-6)
+    assert spec.TICK_TIP_FLAT_MM == pytest.approx(spec.TICK_WIDTH - 2.0 * spec.TICK_DEPTH * slope)
+    assert spec.TICK_TIP_FLAT_MM > 0.0
+    # 11 full ticks, 90 minor ticks less the one the half tick covers, 1 half.
+    assert spec.TICK_VOLUME_MM3 == pytest.approx(
+        11 * spec.tick_v_volume_mm3(spec.TICK_LENGTH) + 89 * spec.tick_v_volume_mm3(spec.MINOR_TICK_LENGTH)
+        + spec.tick_v_volume_mm3(spec.HALF_TICK_LENGTH)
+    )
+    # The total gate catches one dropped minor tick; the seed gate cannot
+    # mistake a straight-wall cut for the V.
+    with pytest.raises(RuntimeError, match="dropped tick"):
+        builder._check_engraving_volume(
+            "all ticks", spec.TICK_VOLUME_MM3 - spec.tick_v_volume_mm3(spec.MINOR_TICK_LENGTH),
+            spec.TICK_VOLUME_MM3, builder.TICK_VOLUME_ALLOWANCE_MM3, "dropped tick",
+        )
+    seed = spec.tick_v_volume_mm3(spec.TICK_LENGTH)
+    assert _straight_tick_mm3(spec.TICK_LENGTH) - seed > builder.TICK_SEED_ALLOWANCE_MM3
+
+
+def test_seed_tick_keeps_the_form_that_removes_the_v(monkeypatch) -> None:
+    v = spec.tick_v_volume_mm3(spec.TICK_LENGTH)
+    # Ddir1 False flares the walls (twice the V); Ddir1 True is the V.
+    seat = _CutSeat({(True, False, True): 2.0 * v, (True, True, True): v})
+    form = asyncio.run(builder._first_v_cut(
+        seat.adapter, "Tick0Profile", seat.volume, depth_mm=spec.TICK_DEPTH,
+        expected=v, allowance=builder.TICK_SEED_ALLOWANCE_MM3,
+    ))
+    assert form == builder._v_cut_args(True, depth_mm=spec.TICK_DEPTH)
+    assert seat.undone == 1 and seat.selected[0] == ("Tick0Profile", "SKETCH")
+    assert form[5] == pytest.approx(spec.TICK_DEPTH / 1000.0) and form[7] is True
+    assert seat.volume == pytest.approx(4800.0 - v)
+
+
+def test_listed_engraving_bit_cuts_every_graduation_and_numeral() -> None:
+    import tomllib
+
+    root = Path(builder.__file__).resolve().parents[1]
+    bit = tomllib.loads((root / "config" / "shop-equipment.toml").read_text(encoding="utf-8"))[
+        "tools"]["ms-stick-engraver"]
+    shop = tomllib.loads((root / "process" / "shop.toml").read_text(encoding="utf-8"))
+    # One bit cuts both: its V is the model's.
+    assert bit["included_angle_deg"] == spec.ENGRAVING_V_INCLUDED_ANGLE_DEG
+    assert f"{spec.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}°" in callouts.CALLOUTS["TickDepth"]
+    assert f"{spec.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}°" in callouts.CALLOUTS["NumeralDepth"]
+    slope = math.tan(math.radians(bit["included_angle_deg"] / 2.0))
+    tip = bit["tip_width_in"] * 25.4
+    # Plunge depths that cut the printed face-width limits, against the depth
+    # MIN and the deepest cut that leaves the stated stock at the thinnest bar.
+    depth_for_width_min = (spec.TICK_WIDTH - tip) / (2.0 * slope)
+    depth_for_width_max = (spec.GRADUATION_WIDTH_MAX_MM - tip) / (2.0 * slope)
+    deepest = spec.BODY_THICKNESS - spec.BODY_FIT_TOLERANCE_MM - spec.GRADUATION_FLOOR_MIN_MM
+    shallowest = max(spec.TICK_DEPTH, depth_for_width_min)
+    # A window of .010+ for a plunge set on the Z handwheel.
+    assert min(deepest, depth_for_width_max) - shallowest >= 0.254
+    assert spec.NUMERAL_DEPTH < deepest
+    # At the numeral depth MIN the bit's stroke runs wider than the modelled
+    # near-sharp V; the excess a side stays inside the .02 numeral gap's .XX
+    # band (+/-.01), so the printed gap still holds.
+    stroke = tip + 2.0 * spec.NUMERAL_DEPTH * slope
+    assert 0.0 < (stroke - spec.NUMERAL_STROKE_WIDTH_MM) / 2.0 < 0.254
+    setting = shop["settings"]["ms-stick-engrave-brass"]
+    assert setting["tool"] == "ms-stick-engraver" and "ms-stick-engraver" in shop["tools"]
+    low, high = shop["machines"]["pm-30mv"]["rpm_ranges"][0]
+    assert low <= setting["rpm"] <= high
+
 
 
 def test_numeral_readback_requires_one_draft_sense(monkeypatch) -> None:
@@ -1486,10 +1568,14 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.005
     assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020
-    # Detail B's callout block runs left from its keep point over G-G's
-    # columns (rendered 0.292-0.380 m), so its shoulder, about 2.5 line
-    # pitches below the keep height, must pass above the section.
-    _tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
+    # Detail B's callout block runs right from its keep point (run
+    # 20261111T180258983Z-3467590b rendered it 0.378-0.454 m from 0.380), so
+    # it must end inside the B-size inner border at x 0.419 m, and its
+    # shoulder, about 2.5 line pitches below the keep height, passes above
+    # the section.
+    tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
+    block = max(map(len, callouts.CALLOUTS["TickDepth"].splitlines())) * 0.00275
+    assert tick_x + block < 0.419 - 0.005
     assert tick_y - 2.5 * 0.0034 > profile.ymax + 0.008
     # The cutting line misses every graduation by a visible margin and still
     # crosses the zero's straight side strokes, short of its end facets.

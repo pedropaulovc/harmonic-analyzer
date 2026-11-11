@@ -52,10 +52,10 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_size_carries_its_band_on_the_model() -> None:
-    # The O.D. has no fit: it takes the title block's .XX row.
+    # The O.D. and the length have no fit band: they take the title block's
+    # .XX and .XXX rows.
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
-        ("Drum", "DrumLen"): "*deviations(DRUM_LEN_BAND)",
     }
     # drawing-guidelines.md rule 17 (walls and webs) at the worst printed
     # corner: the O.D. printed .74 -.01 over the .4990 +.0005 reamed bore.
@@ -68,14 +68,11 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     assert spec.DRUM_BORE == pytest.approx(0.499 * 25.4)
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
     assert wheel_geom.DRUM_PRESS == pytest.approx((0.0002 * 25.4, 0.0013 * 25.4))
-    # The drum's .354 on the inch grid; the spigot keeps its 9.0 hub station,
-    # each model inside its printed band, and the drum's minus-only length
-    # against the spigot's plus-only length keeps its face under the spigot's.
-    assert spec.DRUM_LEN == pytest.approx(0.354 * 25.4)
-    assert spec.DRUM_LEN <= wheel_geom.SPIGOT_LEN
-    assert spec.DRUM_LEN_BAND == pytest.approx((0.0, -0.004 * 25.4))
-    assert wheel_geom.SPIGOT_LEN_BAND == pytest.approx((0.004 * 25.4, 0.0))
-    assert wheel_geom.DRUM_RECESS == pytest.approx((0.0, 0.008 * 25.4), abs=1e-9)
+    # Both lengths on the title block's .XXX row, each model inside its
+    # printed limits: the longest drum still keeps its face under the
+    # shortest spigot's, so it is never proud.
+    assert spec.DRUM_LEN < wheel_geom.SPIGOT_LEN
+    assert wheel_geom.DRUM_RECESS[0] >= -1e-9
     assert (
         part.V_DRUM
         == math.pi

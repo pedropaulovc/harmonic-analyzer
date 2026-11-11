@@ -301,7 +301,7 @@ def test_moved_screw_row_stays_coaxial_without_moving_the_installed_bodies() -> 
         joint.LEVER_HOLE_POINTS,
         strict=True,
     ):
-        assert screw[1] == pytest.approx(KNIFE_Y - 0.71)
+        assert screw[1] == pytest.approx(KNIFE_Y + 0.25)
         assert screw == pytest.approx(tuple(
             local + origin
             for local, origin in zip(clearance, joint.BRACKET_ORIGIN, strict=True)

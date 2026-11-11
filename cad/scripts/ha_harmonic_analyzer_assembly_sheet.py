@@ -10,12 +10,12 @@ rebuild the complete-machine assembly. No SolidWorks.
 from __future__ import annotations
 
 import _config
-import dt_drive_train_steps
+import fr_frame_assembly_steps as fr_steps
+import ha_build_sequence as build
 import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
-import ch_anchor_jam_nut_spec
 import ch_vn_spring_hook_spec
 import fr_top_frame_spec
 from ha_harmonic_analyzer_assembly_spec import (
@@ -127,34 +127,13 @@ CHANNEL_ANCHORS = 20
 # numbers other sheets cite (MHA-CH-00 cites the anchor step) never move. I
 # and O never letter a sub-step.
 SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-# The title block's angular row is the level acceptance, read with the digital
-# angle gauge the shop owns (as MHA-SM-00 sets its plate).
+# The title block's angular row is the level acceptance, read with a digital
+# angle gauge (as MHA-SM-00 sets its plate).
 LEVEL_TOLERANCE_DEG = angular_band_deg()
 LEVEL_ACCEPTANCE = f"LEVEL WITHIN \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0"
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 _ANCHOR = str(_config.parts("ch-vn-spring-hook")["number"])
-_ANCHOR_NUT = str(_config.parts("ch-anchor-jam-nut")["number"])
 _SUMMING_PLATE = str(_config.parts("sm-summing-lever")["number"])
-
-# The forked driver that runs each round, slotted MHA-CH-14 jam nut up its
-# anchor (ch_anchor_jam_nut_spec: one straight slot across the lower face, the
-# anchor's shank through the nut's centre). A screwdriver blade, its tines in
-# the nut's slot either side of the shank: thinner than the slot, no wider
-# than the nut, its centre slot clearing the shank's major diameter and
-# deeper than the shank stands below the plate. Sizes in the sheet's inch,
-# at the .XX/.XXX grades a tool sketch needs.
-DRIVER_BLADE_WIDTH = 0.25
-DRIVER_BLADE_THICK_MAX = 0.045
-DRIVER_SLOT_WIDTH = 0.16
-DRIVER_SLOT_DEPTH = 0.40
-if not (
-    DRIVER_BLADE_THICK_MAX < ch_anchor_jam_nut_spec.SLOT_WIDTH / 25.4
-    and DRIVER_BLADE_WIDTH <= ch_anchor_jam_nut_spec.OD_MIN / 25.4
-    and ch_anchor_jam_nut_spec.THREAD_MAJOR / 25.4 + 0.01 < DRIVER_SLOT_WIDTH
-    and DRIVER_SLOT_DEPTH > ch_vn_spring_hook_spec.PROTRUSION_MAX_MM / 25.4
-    and (DRIVER_BLADE_WIDTH - DRIVER_SLOT_WIDTH) / 2.0 >= 0.04
-):
-    raise AssertionError("the forked driver must fit the jam nut's slot round the shank")
 
 
 def _n(key: str) -> int:
@@ -168,29 +147,46 @@ def sub_step(key: str, index: int) -> str:
     return f"{_n(key)}{SUB_STEP_LETTERS[index]}"
 
 
+# Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):
+# the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
+# drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
+_FRAME_REERECTED = (
+    f"FIT THE COLUMNS AND MHA-FR-02 BACK ON MHA-FR-01 PER {build.FRAME_ERECTED.text}."
+)
+_BUILT_APART = (
+    f"DRIVE TRAIN: BUILD {build.DT_BENCH.text} AT THE BENCH.",
+    f"BUILD {build.CH_BENCH.text} AT THE BENCH.",
+    f"BUILD {build.DT_BASE_ON_MILL.text}, MHA-FR-01 ON THE MILL.",
+    f"BUILD {build.CH_BASE_ON_MILL.text}, MHA-FR-01 STILL ON THE MILL.",
+    "SET MHA-FR-01 ON A FLAT BENCH.",
+    f"BUILD {build.CH_KEEPER_PAIR.text}: THE KEEPER PAIR.",
+    f"BUILD {build.CH_TOP_FRAME_ON_MILL.text}, MHA-FR-02 ON THE MILL.",
+    _FRAME_REERECTED,
+    f"CHECK THE FRAME PER {build.FRAME_CHECKED.text}.",
+)
+_REERECTED_HEAD = (
+    f"{_n('drive-train-built')}{SUB_STEP_LETTERS[_BUILT_APART.index(_FRAME_REERECTED)]}"
+)
 _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "frame-built": (
-        "FRAME: BUILD MHA-FR-00 COMPLETE ON A FLAT BENCH, ITS MHA-FR-VN-52 SET "
-        "SCREW BACKED CLEAR IN THE GOOSENECK HUB.",
+        f"FRAME: FIT {build.FRAME_FITTED.text} ON A FLAT BENCH.",
+        "LEAVE THE COLUMNS AND MHA-FR-02 OFF MHA-FR-01 ONCE "
+        f"{fr_steps.step_ref(build.FRAME_LIFTED_KEY)} LIFTS THEM, UNTIL "
+        f"{_REERECTED_HEAD}.",
+        f"FIT {build.LOOSE_CASTINGS.text} NOW, ON THE LOOSE MHA-FR-01 AND "
+        "MHA-FR-02, AHEAD OF ITS "
+        f"{build.FRAME_ERECTED.text.removeprefix(fr_steps.DRAWING_NUMBER + ' ')}.",
     ),
-    "drive-train-built": (
-        f"DRIVE TRAIN: BUILD {dt_drive_train_steps.DRAWING_NUMBER} ON THE BASE, "
-        f"STEPS 1-{len(dt_drive_train_steps.SEQUENCE)} IN ORDER.",
-    ),
+    "drive-train-built": _BUILT_APART,
     "summing-hung": (
         "SUMMING LEVER: BUILD MHA-SM-00 UNDER THE TOP-FRAME CROSSBAR, ITS STEPS "
         "BEFORE FINAL ASSEMBLY IN ORDER, THE MHA-SM-01 POST OUT OF ITS HUB.",
     ),
     "channel-built": (
-        "CHANNEL BANK: BUILD MHA-CH-00 COMPLETE ON THE FRAME PER ITS STEPS, EACH "
+        f"CHANNEL BANK: BUILD {build.CH_ON_FRAME.text} ON THE FRAME, EACH "
         "MHA-CH-VN-50 SPRING HANGING FROM ITS LEVER WITH ITS BOTTOM LOOP FREE.",
     ),
     "channel-anchors-set": (
-        f"MAKE A FORKED DRIVER FOR THE {_ANCHOR_NUT} NUTS: GRIND A FLAT "
-        f"SCREWDRIVER BLADE TO {render_number(DRIVER_BLADE_WIDTH, 'in', 2)} WIDE AND "
-        f"{render_number(DRIVER_BLADE_THICK_MAX, 'in', 3)} THICK MAX.",
-        f"SLOT THE BLADE'S MIDDLE {render_number(DRIVER_SLOT_WIDTH, 'in', 2)} WIDE X "
-        f"{render_number(DRIVER_SLOT_DEPTH, 'in', 2)} DEEP.",
         f"DISCARD THE HEX NUT SUPPLIED WITH EACH OF THE {CHANNEL_ANCHORS} {_ANCHOR} "
         "ANCHORS.",
         f"THREAD EACH {_ANCHOR} DOWN INTO ITS {_SUMMING_PLATE} PLATE TAP UNTIL ITS "
@@ -198,13 +194,6 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"TURN EACH {_ANCHOR} BACK, NO MORE THAN "
         f"{ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} TURN, TO BRING ITS EYE OPENING "
         "IN LINE WITH ITS SPRING.",
-        f"HOLDING THE EYE THERE, RUN ONE {_ANCHOR_NUT} UP THE SHANK WITH THE "
-        "FORKED DRIVER, TINES IN THE NUT'S SLOT, TIGHT AGAINST THE PLATE "
-        "UNDERSIDE.",
-        f"CHECK EACH {_ANCHOR}: ITS EYE CANNOT BE TURNED BY HAND.",
-        f"CHECK EACH {_ANCHOR_NUT}: FULL THREAD SHOWS BELOW IT.",
-        "IF AN EYE TURNS OR NO THREAD SHOWS, SLACKEN THAT NUT AND REPEAT "
-        f"{_n('channel-anchors-set')}E-{_n('channel-anchors-set')}F.",
         "HOOK EACH SPRING'S BOTTOM LOOP INTO ITS ANCHOR EYE.",
     ),
     "summing-levelled": (

@@ -3865,6 +3865,10 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Cross-sheet ownership checks whose filenames intentionally do not match
         # the one-file-per-drawing discovery pattern above.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # The master build order across MHA-FR/DT/CH-00 (#2391) and the one
+        # assembly tool list reconciled with the shop files (#2392).
+        SCRIPTS_DIR / "test_ha_build_sequence.py",
+        SCRIPTS_DIR / "test_ha_assembly_package.py",
         # Exact native and rigidly transformed assembly inspection cameras.
         SCRIPTS_DIR / "test_assembly_named_views.py",
         # Intended chain mesh follows the actual mounted instance pose, not
