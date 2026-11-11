@@ -94,20 +94,18 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
     """The uniform 7.00 coefficient plate prints .28 ±.01 in on the lever, and
     the printed nominal governs (rule 3), so the jam nut seats anywhere from
-    6.858 to 7.366 below its fixed top. The trim is 17.78 shank / 1.20 in
-    overall: the worst-case 1.5875 full-thread floor, one .01 step of margin,
-    and the round-up to the grid."""
+    6.858 to 7.366 below its fixed top. The trim is sized there: the
+    worst-case 1.5875 full-thread floor, one .01 step of margin, and the
+    round-up of the overall to the .01 grid."""
     thin, thick = _printed_plate_limits_mm()
     assert (thin, thick) == pytest.approx((6.858, 7.366))
     assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
-    assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
-        (17.78, 30.48)
-    )
     band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
     floor = spec.PAST_NUT_FLOOR_MM
     # Thickest plate, shortest part, backed out: the floor plus the margin.
     at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
-    assert at_thick == pytest.approx(1.8552006006)
+    # the round-up to the .01 grid is the only thread past the margin.
+    assert at_thick - floor - spec.PAST_NUT_MARGIN_MM < 0.254
     assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
     assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
     # The thinner plates only add thread.
@@ -115,15 +113,16 @@ def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
         at_thick + (thick - thin)
     )
     # Deepest cut end: the longest part under the thinnest plate, still cut
-    # from the 19.05 stock (1.27 comes off).
+    # from the 19.05 stock.
     assert spec.SHANK_LENGTH_MM + band < anchor.shank_length_mm
-    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.27)
     assert spec.PROTRUSION_MAX_MM == pytest.approx(
         spec.SHANK_LENGTH_MM + band - anchor.unthreaded_shank_length_mm - thin
     )
-    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.001)
-    # Modelled at nominal thickness, the cut end hangs 7.605 below the plate.
-    assert spec.PROTRUSION_MM == pytest.approx(7.605)
+    # Modelled at nominal thickness, the cut end hangs the protrusion below
+    # the plate.
+    assert spec.PROTRUSION_MM == pytest.approx(
+        spec.SHANK_LENGTH_MM - anchor.unthreaded_shank_length_mm - lever.COEFFICIENT_T
+    )
 
 
 

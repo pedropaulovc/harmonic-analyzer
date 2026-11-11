@@ -66,12 +66,14 @@ FINISHED_OVERALL_TOLERANCE_MM = printed_band_mm(OVERALL_PLACES, unit=UNIT)
 # Owner ruling (C10): one more step of the printed overall's grid (.01) as
 # thread over the floor at that worst corner.
 PAST_NUT_MARGIN_MM = 0.254  # .01
-# The restored factory deburr (0.4557) on the .XXX grid.
-CHAMFER_WIDTH_MM = 0.4572  # .018
-# At the short chamfer limit the cut end's flat (major radius - chamfer) must
-# still pass the #6-32 tap drill it enters, which allows .0022 below the
-# .018 nominal -- so the deburr is a 3-place control, not the title block's.
-CHAMFER_WIDTH_TOLERANCE_MM = 0.0508  # .002
+# The restored factory deburr on the .XXX grid, at the title block's .XXX
+# (#2314): at its short limit (.020) the cut end's flat (major radius -
+# chamfer) still passes the #6-32 tap drill it enters (MIN_CHAMFER_WIDTH_MM,
+# .0158), so the deburr needs no band of its own. The longer leg costs the
+# past-nut budget a little more axial run, which the trim takes.
+CHAMFER_WIDTH_PLACES = 3
+CHAMFER_WIDTH_MM = 0.635  # .025
+CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(CHAMFER_WIDTH_PLACES, unit=UNIT)
 MIN_CHAMFER_WIDTH_MM = (
     ANCHOR_9489T111.thread_major_dia_mm - blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC)
 ) / 2.0
@@ -173,18 +175,18 @@ DRAWING_DIMENSIONS = {
 }
 DIMENSION_PRECISION = {
     "FinishedOverall": OVERALL_PLACES,
-    "ChamferWidth": 3,
+    "ChamferWidth": CHAMFER_WIDTH_PLACES,
     "ChamferAngle": 0,
 }
-# The overall length and the 45 deg leg defer to the title block (swTolGeneral);
-# the deburr width prints its own symmetric band.
+# The overall length, the deburr width and the 45 deg leg defer to the title
+# block (swTolGeneral).
 DIMENSION_TOLERANCE_TYPES = {
     "FinishedOverall": 11,
-    "ChamferWidth": 4,
+    "ChamferWidth": 11,
     "ChamferAngle": 11,
 }
 _NUT_NUMBER = _config.parts("ch-anchor-jam-nut")["number"]
-# Rule 7: the 1.20 overall takes the title block's band, so it carries no
+# Rule 7: the 1.21 overall takes the title block's band, so it carries no
 # reason; the nut's omission is the stock name's, its jam nut the MHA-HA-00
 # step's (ANCHOR_INSTALL_STEP).
 DRAWING_NOTES = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."

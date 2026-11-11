@@ -110,12 +110,12 @@ FRONT_KEEP = {
     "ChamferWidth": (0.168, 0.098),
     "ChamferAngle": (0.1305, 0.1132),
 }
-# The deburr band is tighter than the title block on both sides (review r8
-# read it as a plain lead-in): its minimum leg brings the cut end under the
-# #6-32 tap drill so the cut thread starts in the lever's tap, and its
-# maximum, at the steepest angle, is charged to the full threads the shank
-# keeps past the jam nut.  Rule 7 allows one reason line per feature, so the
-# callout names both mates on one line (RV-01 accepts the band itself).
+# The deburr prints three places under the title block's .XXX (#2314), so it
+# names what it serves (rule 3): its short leg brings the cut end under the
+# #6-32 tap drill so the cut thread starts in the lever's tap, and its long
+# leg, at the steepest angle, is charged to the full threads the shank keeps
+# past the jam nut.  Rule 7 allows one reason line per feature, so the
+# callout names both mates on one line.
 CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; THREAD PAST MHA-CH-14"}
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
