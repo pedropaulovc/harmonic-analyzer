@@ -118,7 +118,7 @@ class Projection:
 def test_checked_heights_print_their_model_values() -> None:
     """The overall reference prints the cap stack's .001 grid exactly. The top
     cross-bore axis (MHA-FR-02's taps, .72 under its rail top) sits on the
-    .001 grid too, so it prints three places, with the tape-read band the
+    .001 grid too, so it prints three places, with the rule-read band the
     setting needs (#2389) rather than the title block's .XXX. The dimension carries
     only its value and band; the setting step names it, from the model."""
     from _title_block_units import render_number

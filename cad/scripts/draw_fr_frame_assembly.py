@@ -551,7 +551,10 @@ STEP_TEXT = {
     # punch's play, the drill's start and the casting's screw line off its
     # socket axis can add up to (codjiflo review of PR #2552): the seated
     # check and a file close that stack at assembly (rule 19), as the screw
-    # is what the hole must pass.
+    # is what the hole must pass. The screw's thread marks the edge it bears
+    # on, which is the side to file. .197 stays because opening the tube hole
+    # (fr_frame_attachment_spec) re-keys both castings and every assembly
+    # above them; #2561 carries it to the next casting change.
     steps.LOWER_HOLES_DRILLED_KEY: (
         f"ON THE MILL, DRILL EACH COLUMN Ø{CROSS_HOLE_TEXT} AT ITS SPOT THROUGH BOTH "
         "WALLS, SQUARE TO AND THROUGH THE TUBE AXIS, AND DEBURR BOTH HOLES."
@@ -562,9 +565,10 @@ STEP_TEXT = {
         "STARTS BY HAND IN THE TAPPED SOCKET WALL."
     ),
     "lower-holes-reworked": (
-        "IF A TUBE HOLE STOPS IT, LIFT THAT COLUMN OUT, EASE THE HOLE TOWARD "
-        f"THE SCREW WITH A ROUND FILE AND REPEAT {_step(steps.COLUMNS_RESEATED_KEY)}"
-        f" AND {_step(steps.LOWER_HOLES_CHECKED_KEY)}."
+        "IF IT DOES NOT START, LIFT THAT COLUMN OUT AND FILE EACH TUBE HOLE WITH A "
+        "ROUND FILE WHERE THE SCREW THREAD MARKED IT, OR, IF NEITHER IS MARKED, "
+        "CHASE THE TAPPED WALL WITH A #10-32 BOTTOMING TAP; REPEAT "
+        f"{_step(steps.COLUMNS_RESEATED_KEY)} AND {_step(steps.LOWER_HOLES_CHECKED_KEY)}."
     ),
     "top-frame-lowered": (
         f"LOWER {_TOP} OVER THE COLUMNS, TURNED AS SECTION B-B (SHEET 1) SHOWS."
@@ -613,7 +617,7 @@ STEP_TEXT = {
         "SOCKET."
     ),
     "upper-holes-reworked": (
-        f"IF A TUBE HOLE STOPS IT, {_LIFT_OFF[:-1]}, EASE THE HOLE AS "
+        f"IF IT DOES NOT START, {_LIFT_OFF[:-1]}, WORK THE COLUMN AS "
         f"{_step('lower-holes-reworked')} AND REPEAT FROM "
         f"{_step('frame-reassembled')}."
     ),
