@@ -11,7 +11,7 @@ part is the bolt body alone.
 Two supplier options this production part takes -- the nut above and LENGTH:
 the vendor's 19.05 mm shank is cut to ``ch_vn_spring_hook_spec.SHANK_LENGTH_MM``
 with the 45 deg deburr restored at the new end (its leg driven to the sheet's
-.018 nominal), so the shank crosses the plate, carries the jam nut and still
+.03 nominal), so the shank crosses the plate, carries the jam nut and still
 shows two full threads below it after the calibration back-out -- and the
 factory thread phase survives.
 
@@ -110,7 +110,7 @@ async def _size_deburr(adapter) -> None:
     """Drive the restored factory deburr's leg to the sheet's inch nominal.
 
     The shared trim recipe restores the vendor's 0.4557 leg; the anchor's own
-    driving ChamferWidth then takes the spec's .018 (the boss hook's pattern).
+    driving ChamferWidth then takes the spec's .03 (the boss hook's pattern).
     """
     _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferWidth")
     # swSetValue_InAllConfigurations (2); only the finished configuration exists yet.
@@ -159,6 +159,7 @@ def _manufacturing_controls(adapter) -> None:
     # swTolGeneral omits the redundant printed band in favour of the title block.
     for feature, name, band in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM / 1000),
         (
             "StockDeburrProfile",
             "ChamferAngle",

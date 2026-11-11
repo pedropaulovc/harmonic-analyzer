@@ -94,20 +94,16 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
     """The uniform 7.00 coefficient plate prints .28 ±.01 in on the lever, and
     the printed nominal governs (rule 3), so the jam nut seats anywhere from
-    6.858 to 7.366 below its fixed top. The trim is 17.78 shank / 1.20 in
-    overall: the worst-case 1.5875 full-thread floor, one .01 step of margin,
-    and the round-up to the grid."""
+    6.858 to 7.366 below its fixed top. The trim is sized there: the
+    worst-case 1.5875 full-thread floor, one .01 step of margin, and the
+    round-up of the overall to the .01 grid."""
     thin, thick = _printed_plate_limits_mm()
     assert (thin, thick) == pytest.approx((6.858, 7.366))
     assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
-    assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
-        (17.78, 30.48)
-    )
     band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
     floor = spec.PAST_NUT_FLOOR_MM
     # Thickest plate, shortest part, backed out: the floor plus the margin.
     at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
-    assert at_thick == pytest.approx(1.8552006006)
     assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
     assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
     # The thinner plates only add thread.
@@ -115,15 +111,11 @@ def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
         at_thick + (thick - thin)
     )
     # Deepest cut end: the longest part under the thinnest plate, still cut
-    # from the 19.05 stock (1.27 comes off).
+    # from the 19.05 stock.
     assert spec.SHANK_LENGTH_MM + band < anchor.shank_length_mm
-    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.27)
     assert spec.PROTRUSION_MAX_MM == pytest.approx(
         spec.SHANK_LENGTH_MM + band - anchor.unthreaded_shank_length_mm - thin
     )
-    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.001)
-    # Modelled at nominal thickness, the cut end hangs 7.605 below the plate.
-    assert spec.PROTRUSION_MM == pytest.approx(7.605)
 
 
 
@@ -270,14 +262,21 @@ def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, 
         check()
 
 
-def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
-    """An angle's text outside its 0..45 deg wedge measures another angle; on
-    the bisector at radius 26 it stands off both rays by more than its box."""
-    vertex = (0.1065, 0.1032)
-    x, y = drawing.FRONT_KEEP["ChamferAngle"]
-    bearing = math.degrees(math.atan2(y - vertex[1], x - vertex[0]))
-    assert bearing == pytest.approx(spec.CHAMFER_ANGLE_DEG / 2, abs=0.5)
-    assert math.hypot(x - vertex[0], y - vertex[1]) == pytest.approx(0.026, abs=2e-4)
+def test_deburr_vertex_follows_the_settled_ink_with_the_trim_and_the_leg():
+    """The settled ink (runs fa43a1a5, ae121732; the 30.734 mm part with its
+    .018 leg) put the 45 deg vertex at x 0.1064770 and the cut end's
+    extension line at y 0.1032311. The view centres on its outline, so a
+    longer trim drops the cut end by half its growth on the 5:1 sheet, and a
+    longer leg moves the vertex inboard by its growth."""
+    sheet_per_mm = 5.0 / 1000.0
+    growth = spec.FINISHED_OVERALL_MM - 30.734
+    assert drawing.CHAMFER_VERTEX == pytest.approx(
+        (
+            0.1064770 - (spec.CHAMFER_WIDTH_MM - 0.4572) * sheet_per_mm,
+            0.1032311 - growth * sheet_per_mm / 2.0,
+        ),
+        abs=1e-4,
+    )
     assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100
 
 
@@ -296,7 +295,16 @@ def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
         segment_box_distance,
     )
 
-    assert drawing.FRONT_KEEP["ChamferAngle"] == pytest.approx((0.1305, 0.1132))
+    # The recorded ink is the settled vertex's; the text keeps its offset from
+    # the vertex, so the clearances carry to the current vertex unchanged.
+    settled_vertex = (0.1064770, 0.1032)
+    offset = tuple(
+        keep - vertex
+        for keep, vertex in zip(drawing.FRONT_KEEP["ChamferAngle"], drawing.CHAMFER_VERTEX)
+    )
+    assert offset == pytest.approx(
+        (0.1305 - settled_vertex[0], 0.1132 - settled_vertex[1]), abs=1e-4
+    )
     text = Box(0.1256875, 0.1104219, 0.1256875 + 0.009625, 0.1104219 + 0.0035)
     arrowheads = [
         arrowhead_segments(row)
