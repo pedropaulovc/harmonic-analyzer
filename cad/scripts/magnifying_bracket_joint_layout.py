@@ -60,8 +60,8 @@ SIDE_PLATE_Z = (
     SEAT_PLANE_Z - BRACKET_ORIGIN[2],
 )
 SCREW_MACHINE_X = (1.0, 14.7)
-# Both mating rows move together; the L body, seat and threaded nose do not.
-# Receiver location is measured from the actual coefficient-plate top face.
+# Centring the lever's 7 mm slab moves both mating rows together by +0.96 mm;
+# the L body, seat and threaded nose stay put. Measure from the actual top.
 RECEIVER_ROW_FROM_TOP = 3.25
 RECEIVER_ROW_Y = lever.COEFFICIENT_TOP_Y - RECEIVER_ROW_FROM_TOP
 SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]

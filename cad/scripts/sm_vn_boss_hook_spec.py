@@ -1,7 +1,6 @@
 """Manufacturing controls for the modified McMaster 9490T1 anchor."""
 
 import _config
-import sm_vn_boss_hook_jam_nut_spec as jam_nut
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm, printed_deviations
 from stock_anchor_geom import ANCHOR_9490T1, trim
@@ -11,13 +10,16 @@ from _supplier_screw_reference_names import FEATURE_BY_PLANE
 # #290: the registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/sm-vn-boss-hook", _config.parts("sm-vn-boss-hook"))
 
-# The MHA-SM-VN-55 jam nut locks the anchor on the boss top face (#1189), so
-# the shank is trimmed longer than the boss by the nut's height plus one
-# pitch: the nut runs on full thread a pitch clear of the thread's start at
-# the eye neck, and the cut end still finishes flush with the boss underside
-# (full ANCHOR_H engagement in the lever's through tap).
-JAM_NUT_THREAD_MM = jam_nut.THICKNESS + ANCHOR_9490T1.thread_pitch_mm
-SHANK_LENGTH_MM = round(ANCHOR_H + JAM_NUT_THREAD_MM, 3)
+# The anchor threads straight into the lever's boss with no jam nut (#2326).
+# Its eye stands EYE_STANDOFF_MM of bare thread above the boss top face: the
+# installed station the calibrated counter seats (springs.yaml) were measured
+# at, held when the jam nut that once ran on that thread (#1189) was retired,
+# so neither the anchor's eye nor the counter spring moves. The shank runs
+# from that eye down to a cut end flush with the boss underside (full
+# ANCHOR_H engagement in the lever's through tap); the 9490T1 is threaded
+# right up to its eye bend, so the stand-off is all full thread.
+EYE_STANDOFF_MM = 3.836
+SHANK_LENGTH_MM = round(ANCHOR_H + EYE_STANDOFF_MM, 3)
 TRIM = trim(ANCHOR_9490T1, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = ANCHOR_9490T1.eye_od_mm / 2 - TRIM.shank_end_y_mm
 # #290: the trim sets the counter anchor's eye station (spring_mount_geom

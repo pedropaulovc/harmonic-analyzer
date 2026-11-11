@@ -56,7 +56,7 @@ from _sketch_rectangle import define_centered_rectangle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _configuration_material import require_material_in_every_configuration
 from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
@@ -75,7 +75,6 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    RELIEF_LEAD_TOL,
     RELIEF_WIDTH,
     SEAT_STATION,
     SHOULDER_DIA,
@@ -85,7 +84,6 @@ from dt_crank_handle_pivot_screw_spec import (
     SLOT_WIDTH,
     SURFACE_FINISHES,
     THREAD_LENGTH,
-    THREAD_LENGTH_BAND,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
     TIP_CHAMFER_BAND,
@@ -391,13 +389,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Model-owned bands (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`): the running-fit shoulder, the relief
-    # diameter that keeps the die's run-out under the thread root and a flat
-    # seat (Codex P1 on #1139), the relief lead whose imported dimension prints
-    # this band in the drawing's detail A (Codex P2; #2172), and the
-    # thread length that must engage the arm.  The tip chamfer prints as the
-    # single limit .015 MAX (#290 review of b28d38a16).  The head and slot
-    # sizes print under the title block's bands.
+    # implements the guidelines`): the running-fit shoulder, and the tip
+    # chamfer's single limit .015 MAX (#290 review of b28d38a16).  The relief
+    # diameter, the relief lead (detail A), the thread length and the head and
+    # slot sizes print under the title block's bands (#2314).
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND),
         display_unit=UNIT,
@@ -409,13 +404,6 @@ async def build(adapter) -> dict[str, str]:
         limit=TIP_CHAMFER,
         band=TIP_CHAMFER_BAND,
         tol_type=TIP_CHAMFER_TOL_TYPE,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND),
-        display_unit=UNIT,
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the

@@ -35,6 +35,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationPlate": {"WebThickness"},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach"},
     "EdgeRibFront": {"EdgeRibThickness"},
+    "MiddleRibProfile": {"MiddleRibCounterAngle"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
     "KnifeEnvelopeReference": {
@@ -43,6 +44,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "RidgeFromLeft",
         "RidgeFromRight",
         "FlankToSide",
+        "LowerFlankToSide",
     },
 }
 
@@ -52,18 +54,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # upper flanks each make the one flank-to-side angle.  A radial prefix
 # replaces the native R, so a radius prefix carries its own; the width's
 # opening parenthesis marks it a reference (its suffix closes it).
+# Keep per-stub prefixes on one line: multiline values disappear when the
+# existing SEE NOTE callout is added. EACH STUB is one feature on each;
+# 2X PER STUB is the two upper flank angles on each hexagon.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("EdgeRibFront", "EdgeRibThickness"): "3X ",
     ("EdgeRibFrontProfile", "RibReach"): "3X ",
     ("EdgeRibFrontProfile", "EdgeRibFrontArcR"): "3X R",
+    ("MiddleRibProfile", "MiddleRibCounterAngle"): "2X ",
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
-    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
-    ("KnifeEnvelopeReference", "HexWidth"): "2X (",
-    ("KnifeEnvelopeReference", "HexHeight"): "2X ",
-    ("KnifeEnvelopeReference", "RidgeFromLeft"): "2X ",
-    ("KnifeEnvelopeReference", "RidgeFromRight"): "2X ",
-    ("KnifeEnvelopeReference", "FlankToSide"): "4X ",
+    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "EACH STUB R",
+    ("KnifeEnvelopeReference", "HexWidth"): "EACH STUB (",
+    ("KnifeEnvelopeReference", "HexHeight"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "RidgeFromLeft"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "RidgeFromRight"): "EACH STUB ",
+    ("KnifeEnvelopeReference", "FlankToSide"): "2X PER STUB ",
+    ("KnifeEnvelopeReference", "LowerFlankToSide"): "2X PER STUB ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
 }
@@ -127,7 +134,7 @@ BRACKET_TAP_CALLOUT_PROCESS = f"SPOT THRU {BRACKET_NUMBER} AT ASSEMBLY\n"
 # (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  They
 # are native model dimensions of the part's hidden SpringRowCoordinates
 # sketch, which owns their BASIC type, places and 19X count.  The drawing's
-# own boss-top (.28) and knife-ridge (.10) locations of the coefficient top
+# own boss-top (.24) and knife-ridge (.06) locations of the coefficient top
 # follow the document's .XX, as do the 3.00 anchor X/Z: their printed limits
 # stay inside every check (sm_summing_lever_profile.PLATE_TOP_Y_ALLOWANCE).
 BASIC_PLACES = 4

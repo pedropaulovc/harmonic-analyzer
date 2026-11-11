@@ -347,6 +347,10 @@ def pack_step_columns(
 
 
 _STEP_GROUPS = tuple(notes.step_lines(key) for key in steps.SEQUENCE)
+# Sheet 4 holds the first two columns, sheet 5 the rest; a fourth column, in
+# sheet 5's right half, keeps a blank line and the checks before running
+# below its last step, which otherwise head that half.
+_CHECKS_RESERVE = _lines(ASSEMBLY_CHECKS) + 1
 STEP_COLUMNS: tuple[str, ...] = tuple(
     _wrapped(
         column,
@@ -354,11 +358,14 @@ STEP_COLUMNS: tuple[str, ...] = tuple(
         heading=STEPS_HEADING if index == 0 else STEPS_CONTINUED_HEADING,
     )
     for index, column in enumerate(
-        pack_step_columns(_STEP_GROUPS, columns=3, capacity=STEPS_COLUMN_LINES, reserve=0)
+        pack_step_columns(
+            _STEP_GROUPS,
+            columns=4,
+            capacity=STEPS_COLUMN_LINES,
+            reserve=_CHECKS_RESERVE,
+        )
     )
 )
-# Sheet 4 holds the first two columns; sheet 5 the third, with the checks
-# before running in its right-hand column.
 STEP_COLUMN_SHEETS = tuple(
     SHEET_NAMES[3] if index < 2 else SHEET_NAMES[4] for index in range(len(STEP_COLUMNS))
 )
@@ -366,11 +373,22 @@ STEP_COLUMN_XY = tuple(
     (STEPS_LEFT_X if index % 2 == 0 else STEPS_RIGHT_X, STEPS_TOP_Y)
     for index in range(len(STEP_COLUMNS))
 )
-if len(STEP_COLUMNS) != 3:
+if len(STEP_COLUMNS) < 3:
     raise AssertionError("the sequence runs on into sheet 5's left column")
-CHECKS_XY = (STEPS_RIGHT_X, STEPS_TOP_Y)
+CHECKS_XY = (
+    STEPS_RIGHT_X,
+    STEPS_TOP_Y
+    - (
+        NOTE_LINE_PITCH * (_lines(STEP_COLUMNS[3]) + 1)
+        if len(STEP_COLUMNS) == 4
+        else 0.0
+    ),
+)
 STEPS_COLUMN_BOTTOM_Y = min(
-    STEPS_TOP_Y - NOTE_LINE_PITCH * _lines(block) for block in (*STEP_COLUMNS, ASSEMBLY_CHECKS)
+    (
+        *(STEPS_TOP_Y - NOTE_LINE_PITCH * _lines(block) for block in STEP_COLUMNS),
+        CHECKS_XY[1] - NOTE_LINE_PITCH * _lines(ASSEMBLY_CHECKS),
+    )
 )
 if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m:
     raise AssertionError("the steps sheets' text leaves its field")

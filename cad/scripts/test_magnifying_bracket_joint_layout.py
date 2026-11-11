@@ -73,14 +73,14 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_MACHINE_X == (1.0, 14.7)
     assert joint.SCREW_PITCH_X == pytest.approx(13.7)
     assert joint.RECEIVER_ROW_FROM_TOP == 3.25
-    assert joint.RECEIVER_ROW_Y == pytest.approx(-0.71)
+    assert joint.RECEIVER_ROW_Y == pytest.approx(0.25)
     # The lever's taps sit at the nearest .001 in (1.120 / .581 from its
     # free edge, .128 below its top); the bracket keeps its mm stations.
     assert joint.LEVER_RECEIVER_FROM_EDGE_IN == (1.120, 0.581)
     assert joint.LEVER_RECEIVER_ROW_FROM_TOP_IN == 0.128
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
     for point in joint.LEVER_HOLE_POINTS:
-        assert point[1:] == pytest.approx((-0.7112, -76.2))
+        assert point[1:] == pytest.approx((0.2488, -76.2))
     assert joint.LEVER_STATION_OFFSET_MAX == pytest.approx(math.hypot(0.0074, 0.0012))
     for bracket_point, lever_point, pose in zip(
         joint.BRACKET_HOLE_POINTS,
@@ -128,7 +128,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
         - row_from_lower - joint.BRACKET_POSITION_BAND - head_radius
     )
-    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.713, 0.42 * 25.4 - 4.79 - 2.077))
+    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((5.75, 3.673, 0.42 * 25.4 - 5.75 - 2.077))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(min(lower_wall, upper_wall))
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.
@@ -152,7 +152,7 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
     lower_head_walls, upper_head_walls = [], []
     lower_hole_walls, upper_hole_walls = [], []
     for width in (0.42 * 25.4, 0.44 * 25.4):
-        for row_from_lower in (4.79 - joint.BRACKET_POSITION_BAND, 4.79 + joint.BRACKET_POSITION_BAND):
+        for row_from_lower in (5.75 - joint.BRACKET_POSITION_BAND, 5.75 + joint.BRACKET_POSITION_BAND):
             # The 3.8 circle plus its .10 allowance is a conservative screen,
             # not an invented catalog head-major maximum.
             lower_head_walls.append(row_from_lower - 3.90 / 2.0)
@@ -160,9 +160,9 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
             # Native 2.591 prints .102 +.004/0: the accepted hole is .106 MAX.
             lower_hole_walls.append(row_from_lower - 0.106 * 25.4 / 2.0)
             upper_hole_walls.append(width - row_from_lower - 0.106 * 25.4 / 2.0)
-    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.713, 0.42 * 25.4 - 6.867))
+    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((3.673, 0.42 * 25.4 - 7.827))
     assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx(
-        (4.663 - 0.053 * 25.4, 0.42 * 25.4 - 4.917 - 0.053 * 25.4),
+        (5.623 - 0.053 * 25.4, 0.42 * 25.4 - 5.877 - 0.053 * 25.4),
     )
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(
         min(*lower_head_walls, *upper_head_walls),
@@ -227,10 +227,10 @@ def _joint_with_values(**values):
 def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> None:
     # Deliberately beyond the printed width's lower limit, but still above the wall
     # floor: make the upper edge active so a lower-only budget cannot pass.
-    narrowed = _joint_with_values(SIDE_PLATE_HEIGHT_DEVIATIONS=(-2.0, 0.8))
-    row_max = 4.79 + joint.BRACKET_POSITION_BAND
-    assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 1.95)
-    assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 0.053 * 25.4)
+    narrowed = _joint_with_values(SIDE_PLATE_HEIGHT_DEVIATIONS=(-1.0, 0.8))
+    row_max = 5.75 + joint.BRACKET_POSITION_BAND
+    assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(10.0 - row_max - 1.95)
+    assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(10.0 - row_max - 0.053 * 25.4)
     for name in (
         "BRACKET_ORIGIN", "SIDE_PLATE_Y", "BRACKET_HOLE_POINTS", "LEVER_HOLE_POINTS",
         "SCREW_POSITIONS", "GRIP", "ENGAGEMENT_MIN", "SCREW_TIP_GAP_MIN",
@@ -271,8 +271,8 @@ def test_row_input_relocates_every_axis_without_changing_screw_grip_or_l_pose() 
         "SEAT_PLANE_Z", "GRIP", "ENGAGEMENT", "ENGAGEMENT_MIN", "SCREW_REACH_MAX",
     ):
         assert moved[name] == getattr(joint, name)
-    # A larger downward relocation consumes the lower head wall, not the upper.
-    assert moved["COUNTERBORE_HEIGHT_WALL_MIN"] < joint.COUNTERBORE_HEIGHT_WALL_MIN
+    # The upper edge governs at the centred slab's row; lowering it gains wall.
+    assert moved["COUNTERBORE_HEIGHT_WALL_MIN"] > joint.COUNTERBORE_HEIGHT_WALL_MIN
 
 
 def _material_wall_oracle(
@@ -514,13 +514,13 @@ def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
         - pilot_radius - spring_radius
     )
     assert spring_web >= 2.0
-    # Both coefficient faces are fixed by the new asymmetric section. Test
-    # the actual circle/line/R1 union, not the obsolete symmetric half-height.
+    # Both coefficient faces follow the centred section. Test the actual
+    # circle/line/R1 union, not a vertical half-height clearance shortcut.
     for x, y, _z in joint.LEVER_HOLE_POINTS:
         lower, upper = lever_profile.rib_bounds(x)
         assert lower < lever.COEFFICIENT_BOTTOM_Y < y
         assert y < lever.COEFFICIENT_TOP_Y < upper
-        assert upper != pytest.approx(-lower)
+        assert upper == pytest.approx(-lower)
         assert x + pilot_radius + joint.POSITION_BAND < (
             lever_profile.PROFILE.reach - joint.LINEAR_BAND
         )
@@ -546,7 +546,7 @@ def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
         assert wall.lower_mm >= 2.0
         assert wall.minimum_mm >= 2.0
         assert wall.minimum_mm == pytest.approx(min(wall.upper_mm, wall.lower_mm))
-    # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
+    # The native spring frame is Ø.010 RFS (#2326), not MMC.
     # Separate X/Z extremes conservatively bound the pilot and its wander.
     spring_position = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     spring_dx_min = (
@@ -567,19 +567,20 @@ def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
     assert spring_web_min >= 2.0
 
 
-def test_real_jam_nut_footprint_stays_clear_of_every_rib_at_ordinary_bands() -> None:
-    import ch_anchor_jam_nut_spec as nut
+def test_protruding_anchor_shank_stays_clear_of_every_rib_at_ordinary_bands() -> None:
+    from stock_anchor_geom import ANCHOR_9489T111
 
     position_radius = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
-    nut_inner_x = lever.HOLE_X - position_radius - nut.OD_MAX / 2.0
+    shank_inner_x = lever.HOLE_X - position_radius - ANCHOR_9489T111.thread_major_dia_mm / 2.0
     reach_max = lever.RIB_REACH + lever.RIB_REACH_DEVIATIONS[1]
-    # The rib stays clear of the nut; a rib grown just past it would intrude.
-    assert nut_inner_x > reach_max
+    # The rib stays clear of the cut shank below the plate; a rib grown just
+    # past it would intrude.
+    assert shank_inner_x > reach_max
     # This is positive geometric separation, not a newly invented clearance floor.
     section = lever_profile.RibProfile(reach=reach_max, blend_radius=0.0)
-    probe = (nut_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
+    probe = (shank_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
     assert section.signed_boundary_distance(*probe) < 0.0
-    intrusion = lever_profile.RibProfile(reach=nut_inner_x + 0.01, blend_radius=0.0)
+    intrusion = lever_profile.RibProfile(reach=shank_inner_x + 0.01, blend_radius=0.0)
     assert intrusion.signed_boundary_distance(*probe) > 0.0
 
 

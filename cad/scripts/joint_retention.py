@@ -270,6 +270,22 @@ RULINGS: dict[str, Ruling] = {
             "declare the same joint-specific departure."
         ),
     ),
+    "U-MHA-CH-VN-51-no-lock": Ruling(
+        joint="ha-harmonic-analyzer/channel-anchor-in-summing-plate",
+        granted=(
+            "owner (Pedro), 2026-11-09, #2326: 'these jam nuts dont actually exist in real device and "
+            "must be removed ; there is no torque load on hooks so theres no need for nuts'. The "
+            "MHA-CH-14 jam nut is retired; each anchor stays bare in its coefficient-plate tap"
+        ),
+    ),
+    "U-MHA-SM-VN-50-no-lock": Ruling(
+        joint="sm-summing/boss-hook-in-lever",
+        granted=(
+            "owner (Pedro), 2026-11-09, #2326: 'these jam nuts dont actually exist in real device and "
+            "must be removed ; there is no torque load on hooks so theres no need for nuts'. The "
+            "MHA-SM-VN-55 jam nut is retired; the anchor stays bare in the boss tap"
+        ),
+    ),
 }
 
 
@@ -624,7 +640,6 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
-        "sm_vn_boss_hook_jam_nut",  # McMaster 90760A140 thin #10-24 hex nut (MHA-SM-VN-55), member: jammed on the summing-lever boss top face, locking the boss hook
         "sm_vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
         "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; a plain reamed dowel slip hole and an open dowel slot
         "fr_vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
@@ -654,8 +669,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_rack_pinion",  # 120T disc (MHA-PD-06): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
         "dt_vn_slotted_screw",  # #8-32 x 1-1/2 fillister (90280A203, MHA-DT-VN-57), member into harmonic_base tapped seat
-        "ch_vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-CH-VN-51); member, x20 into summing_lever tapped plate (top-level row), receiver of its jam nut; no channel-internal joint
-        "ch_anchor_jam_nut",  # MHA-CH-14 made brass round nut, #6-32 tapped through, member: x20 jammed on the summing-lever plate underside, locking each channel anchor (top-level row)
+        "ch_vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-CH-VN-51); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "sh_vn_thumb_screw",  # #4-40 UNC (91882A221), magnifier clamp/output fixture and measuring-stick stop
@@ -769,7 +783,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
         "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
-        "fr_tube_frame",  # columns: socket slip fit; cross holes opened to Ø.197 so a MHA-FR-VN-53 passes "ITS THREAD NOT CATCHING" (fr_frame_assembly_steps lower-/upper-holes-checked)
+        "fr_tube_frame",  # columns: socket slip fit; cross holes spotted through each casting clearance hole and drilled Ø.197, then a MHA-FR-VN-53 tried through the seated column (fr_frame_assembly_steps lower-/upper-holes-checked)
         "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (fr_frame_assembly_steps caps-pushed-on)
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
@@ -822,7 +836,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure_reason="retains a tube_frame column in its base socket; base and columns never move relative to each other and no operating member bears on or turns about the horizontal screw axis (the screw passes clearance holes in both tube walls)",
         axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; the shank clears the near casting wall (#10 close) and engages only the far casting wall's blind 46 mm bottoming tap",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-piloted, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
+        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-marked, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/cross-screw-in-top-frame",
@@ -836,7 +850,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
         axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; the shank clears the near casting wall (#10 close, SideClearance) and engages only the far casting wall's blind 46 mm #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-piloted, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
+        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-marked, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/support-hold-down-in-base",
@@ -1529,48 +1543,21 @@ JOINTS: tuple[Joint, ...] = (
             "about the shank, and the spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "trimmed 9490T1 shank engages the full 19.05 boss height (cut end at the boss underside) and "
-            "stands one jam-nut height plus a pitch of full thread above the boss top face, where the "
-            "MHA-SM-VN-55 thin nut bears; no shoulder or head seats -- the wire bend has the shank diameter"
+            "trimmed 9490T1 shank engages the full 19.05 boss height (cut end flush with the boss underside) "
+            "and stands its eye 3.836 of bare full thread above the boss top face; no shoulder or head "
+            "seats -- the wire bend has the shank diameter"
         ),
-        lock=Lock.JAM_NUT,
-        lock_part="sm_vn_boss_hook_jam_nut",
-        lock_binds=("sm_vn_boss_hook", "sm_summing_lever"),
-        lock_step="MHA-SM-00 STEP 2",
-        evidence=(
-            "coordinator ruling on #1189 (option a): thin #10-24 jam nut under the eye, tightened on the "
-            "boss top face once the eye is clocked. build_sm_summing_assembly.py: "
-            "_assert_counter_spring_hang (full boss engagement, jam-nut thread above the boss), JAM_NUT_POS "
-            "and the 'boss-hook jam nut locked to lever' lock_mate; build_sm_summing_lever.py: "
-            "_counter_anchor_tap; sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; "
-            "sm_vn_boss_hook_spec.py JAM_NUT_THREAD_MM/SHANK_LENGTH_MM; sm_vn_boss_hook_jam_nut_spec.py; "
-            "cad/config/parts/sm-vn-boss-hook.yaml and sm-vn-boss-hook-jam-nut.yaml (90760A140, McMaster 10-24 "
-            "narrow-profile listing read live 2026-10-16: zinc-plated steel, 5/16 wide, 7/64 high) "
-            "installation_notes; sm_summing_assembly_sheet.ASSEMBLY_STEPS 2, ASSEMBLY_CHECKS 5"
-        ),
-    ),
-    Joint(
-        id="sm-summing/boss-hook-jam-nut-on-hook",
-        assembly="sm_summing",
-        member="sm_vn_boss_hook_jam_nut",
-        receiver="sm_vn_boss_hook",
-        thread="#10-24 UNC",
-        quantity=1,
-        installed_at="MHA-SM-00 STEP 2",
-        exposure=Exposure.STATIC_CLAMP,
-        exposure_reason=(
-            "the jam nut is tightened against the boss top face with the eye held clocked; nut, eyebolt "
-            "and lever then ride as one body, and the spring's twist on the eye reaches that body through "
-            "the boss thread and the nut's bearing face -- no operating torque acts on the nut's own faces"
-        ),
-        axial_capture="thin hex nut bearing on the boss top face, jammed against the eyebolt's thread flanks",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
+        exception="U-MHA-SM-VN-50-no-lock",
         evidence=(
-            "build_sm_summing_assembly.py JAM_NUT_POS/JAM_NUT_ROWS and its lock_mate; "
-            "sm_vn_boss_hook_jam_nut_spec.py; sm-vn-boss-hook-jam-nut.yaml (90760A140)"
+            "build_sm_summing_assembly.py: _assert_counter_spring_hang (cut end flush, full boss "
+            "engagement) and the 'boss-hook keyed' lock_mate; build_sm_summing_lever.py: "
+            "_counter_anchor_tap; sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; "
+            "sm_vn_boss_hook_spec.py EYE_STANDOFF_MM/SHANK_LENGTH_MM; cad/config/parts/sm-vn-boss-hook.yaml "
+            "installation_notes; sm_summing_assembly_sheet.ASSEMBLY_STEPS 2"
         ),
     ),
     Joint(
@@ -1824,51 +1811,23 @@ JOINTS: tuple[Joint, ...] = (
             "crank, and that spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "the trimmed 9489T111 shank crosses the full 7.00 uniform coefficient-plate tap and carries the MHA-CH-14 jam "
-            "nut on the plate underside, which bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top "
-            "only when fully seated (calibration backs it off up to 1 counted turn), and at the worst case "
-            "(shortest in-band part, whole budget backed out) two full turns still show below the nut"
+            "the trimmed 9489T111 shank crosses the full 7.00 uniform coefficient-plate tap, whose thread "
+            "bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top only when fully "
+            "seated (calibration backs it off up to 1 counted turn), and at the worst case (shortest "
+            "in-band part, thickest in-band plate, whole budget backed out) full thread still spans the plate"
         ),
-        lock=Lock.JAM_NUT,
-        lock_part="ch_anchor_jam_nut",
-        lock_binds=("ch_vn_spring_hook", "sm_summing_lever"),
-        lock_step=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
-        evidence=(
-            "coordinator rulings 2026-10-16 (period hardware; option A after the hex-pitch collision): a made "
-            "round #6-32 jam nut on the plate underside, driven by a forked driver through its notched face "
-            "while the eye is held at its clocking. "
-            "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
-            "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount and "
-            "CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; ch_vn_spring_hook_spec.py SHANK_LENGTH_MM/"
-            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS; "
-            "ha_harmonic_analyzer_assembly_sheet.py channel-anchors-set steps; "
-            "sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; ch_anchor_jam_nut_spec.py; "
-            "cad/config/parts/ch-vn-spring-hook.yaml installation_notes"
-        ),
-    ),
-    Joint(
-        id="ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor",
-        assembly="ha_harmonic_analyzer",
-        member="ch_anchor_jam_nut",
-        receiver="ch_vn_spring_hook",
-        thread="#6-32 UNC",
-        quantity=1,
-        per_channel=True,  # build_ch_channel_assembly places one per range(CHANNELS)
-        installed_at=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
-        exposure=Exposure.STATIC_CLAMP,
-        exposure_reason=(
-            "the jam nut is tightened against the plate underside with the eye held clocked; nut, anchor and "
-            "lever then ride as one body, and the spring's twist on the eye reaches that body through the "
-            "plate thread and the nut's bearing face -- no operating torque acts on the nut's own faces"
-        ),
-        axial_capture="round nut bearing on the plate underside, jammed against the anchor's thread flanks",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
-        lock_step=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
+        lock_step="",
+        exception="U-MHA-CH-VN-51-no-lock",
         evidence=(
-            "build_ch_channel_assembly.py CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; "
-            "ch_anchor_jam_nut_spec.py; ch-anchor-jam-nut.yaml"
+            "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
+            "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount; "
+            "ch_vn_spring_hook_spec.py SHANK_LENGTH_MM/PROTRUSION_MAX_MM/full_thread_below_plate_mm/"
+            "ADJUSTMENT_TURNS; ha_harmonic_analyzer_assembly_sheet.py channel-anchors-set steps; "
+            "sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; "
+            "cad/config/parts/ch-vn-spring-hook.yaml installation_notes"
         ),
     ),
     # --- measuring stick ---
@@ -2453,9 +2412,6 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "ha-harmonic-analyzer/channel-anchor-in-summing-plate": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "direct threaded seat"
     ),
-    "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor": Occurrence(
-        "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "CHANNEL_ANCHOR_NUT_XY"
-    ),
     "ms-measuring-stick/stop-thumbscrew": Occurrence(
         "ms_measuring_stick",
         "build_ms_measuring_stick_assembly.py",
@@ -2471,9 +2427,6 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "sm-summing/boss-hook-in-lever": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "boss-hook keyed"
-    ),
-    "sm-summing/boss-hook-jam-nut-on-hook": Occurrence(
-        "sm_summing", "build_sm_summing_assembly.py", "JAM_NUT_POS"
     ),
     "sm-summing/gooseneck-shoulder-screw": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "shoulder screw seated on end plug"
