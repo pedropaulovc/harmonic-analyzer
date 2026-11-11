@@ -15,9 +15,10 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import types
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import pytest
@@ -95,6 +96,7 @@ def blob(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "_BACKEND", cache._BlobBackend(service))
     monkeypatch.setattr(shadow, "RECORDINGS", tmp_path / "replay")
     monkeypatch.setattr(shadow, "OUT_ROOT", tmp_path / "out")
+    monkeypatch.setattr(shadow, "SCRATCH", tmp_path / "out" / "rs")
     return service
 
 
@@ -140,7 +142,7 @@ def spans(monkeypatch):
 
 @pytest.fixture
 def logged(monkeypatch):
-    messages: dict[str, list[str]] = {"warn": [], "error": []}
+    messages: dict[str, list[str]] = {"info": [], "warn": [], "error": []}
     for level in messages:
         monkeypatch.setattr(
             _telemetry,
@@ -191,7 +193,9 @@ def _built(
     assert recording is not None
     recording.log.write_bytes(b"log of " + key.encode())
     recording.captures.mkdir()
-    (recording.captures / "0f.SLDPRT.gz").write_bytes(b"capture of " + key.encode())
+    (recording.captures / shadow.CAPTURE_FILE).write_bytes(
+        b"capture of " + key.encode()
+    )
     recording.summary_path.write_text(json.dumps(_summary(**summary)), "utf-8")
     return recording, deps
 
@@ -235,9 +239,16 @@ def test_an_unknown_mode_is_off_and_warns_once(monkeypatch, logged):
     assert len(logged["warn"]) == 1 and "'on'" in logged["warn"][0]
 
 
-def test_the_fault_exit_code_is_the_engines():
+def test_the_restated_engine_facts_are_the_engines(tmp_path):
     assert shadow.EXIT_RECORD_FAULT == conv.EXIT_RECORD_FAULT
     assert shadow.CAPTURE_NAME == conv.capture_dir_of(Path(shadow.LOG_NAME)).name
+    assert {r.value for r in shadow.Recovery} == {r.value for r in conv.Recovery}
+    # The path budget's capture name is every capture name's width.
+    assert shadow.CAPTURE_FILE == conv.capture_name(0)
+    assert len(conv.capture_name(999_999)) == len(shadow.CAPTURE_FILE)
+    # And its work-directory name is mkdtemp's.
+    work = Path(tempfile.mkdtemp(prefix="", dir=tmp_path))
+    assert len(work.name) == shadow.SCRATCH_NAME_CHARS
 
 
 def test_dodos_side_never_imports_the_engine():
@@ -352,22 +363,25 @@ def _exec_com_runs(
     recording: shadow.Recording | None,
     autostart: bool,
     codes: tuple[int, ...],
+    degraded: bool = False,
 ) -> list[str]:
+    """``dodo._exec_com`` with each subprocess answering the next exit code;
+    the driver's summary names a ``rerun`` fault for exit 92 and (with
+    ``degraded``) a ``degraded`` one for any other exit code."""
     runs: list[str] = []
     answers = iter(codes)
 
     def run_subprocess(cmd, label, log_stem=None, *, task=None):
-        runs.append(
-            "driver"
-            if recording is not None and cmd == recording.command
-            else "unrecorded"
-        )
+        driver = recording is not None and cmd == recording.command
+        runs.append("driver" if driver else "unrecorded")
         rc = next(answers)
-        if rc == shadow.EXIT_RECORD_FAULT and recording is not None:
+        rerun = rc == shadow.EXIT_RECORD_FAULT
+        if driver and (rerun or degraded):
             fault = {
-                "where": "Recorder.call",
-                "type": "OSError",
-                "message": "injected: the log volume is full",
+                "where": "Recorder.call" if rerun else "Recorder.capture",
+                "recovery": "rerun" if rerun else "degraded",
+                "type": "OSError" if rerun else "FileNotFoundError",
+                "message": "injected",
                 "traceback": "Traceback ...\nOSError: injected",
             }
             recording.summary_path.write_text(
@@ -401,39 +415,74 @@ def _exec_com_runs(
 
 @pytest.mark.parametrize("autostart", [False, True], ids=["farm-leaf", "autostart"])
 @pytest.mark.parametrize(
-    ("codes", "expected"),
+    ("codes", "degraded", "expected", "recovery"),
     [
-        ((92, 0), ["driver", "unrecorded"]),
-        ((92, 1), ["driver", "unrecorded", "fail 1"]),
-        ((1,), ["driver", "fail 1"]),
-        ((0,), ["driver"]),
+        ((92, 0), False, ["driver", "unrecorded"], "rerun"),
+        ((92, 1), False, ["driver", "unrecorded", "fail 1"], "rerun"),
+        ((0,), True, ["driver"], "degraded"),
+        ((1,), True, ["driver", "fail 1"], "degraded"),
+        ((1,), False, ["driver", "fail 1"], None),
+        ((0,), False, ["driver"], None),
     ],
-    ids=["fault-then-clean", "fault-then-script-failure", "script-failure", "clean"],
+    ids=[
+        "rerun-then-clean",
+        "rerun-then-script-failure",
+        "degraded",
+        "degraded-script-failure",
+        "script-failure",
+        "clean",
+    ],
 )
-def test_only_a_recorder_fault_reruns_the_build_once_unrecorded(
-    blob, tmp_path, monkeypatch, spans, logged, autostart, codes, expected
+def test_only_a_rerun_fault_reruns_the_build_once_unrecorded(
+    blob,
+    tmp_path,
+    monkeypatch,
+    spans,
+    logged,
+    autostart,
+    codes,
+    degraded,
+    expected,
+    recovery,
 ):
     dodo = _load_dodo()
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
     recording = shadow.plan(_STEM, tmp_path / f"build_{_STEM}.py", "k" * 64)
-    assert _exec_com_runs(dodo, monkeypatch, recording, autostart, codes) == expected
-    faulted = codes[0] == shadow.EXIT_RECORD_FAULT
-    assert recording.faulted is faulted
+    runs = _exec_com_runs(dodo, monkeypatch, recording, autostart, codes, degraded)
+    assert runs == expected
+    assert recording.recovery == recovery and recording.faulted is bool(recovery)
     faults = [event for event in spans.events if event["name"] == "replay.record_fault"]
     records = _events(tmp_path, "replay_record_fault")
-    if not faulted:
+    if recovery is None:
         assert faults == [] and records == [] and logged["warn"] == []
         return
-    assert [(f["where"], f["fault_type"], f["exit_code"]) for f in faults] == [
-        ("Recorder.call", "OSError", 92)
+    where = "Recorder.call" if recovery == "rerun" else "Recorder.capture"
+    assert [(f["where"], f["exit_code"], f["recovery"]) for f in faults] == [
+        (where, codes[0], recovery)
     ]
-    assert [(r["label"], r["where"], r["mode"]) for r in records] == [
-        (f"part:{_STEM}", "Recorder.call", "shadow")
+    assert [(r["label"], r["where"], r["mode"], r["recovery"]) for r in records] == [
+        (f"part:{_STEM}", where, "shadow", recovery)
     ]
-    assert any("re-running the build once unrecorded" in m for m in logged["warn"])
-    # A faulted recording is never published or evaluated.
+    [warning] = logged["warn"]
+    if recovery == "rerun":
+        assert "re-running the build once unrecorded" in warning
+    else:
+        assert "nothing of this recording is published" in warning
+    # A faulted recording is never published or evaluated; its one record
+    # and INFO line say why.
     shadow.after_build(recording, [], _digest)
-    assert _events(tmp_path, "replay_shadow") == [] and blob.committed == {}
+    [record] = _events(tmp_path, "replay_shadow")
+    assert (record["outcome"], record["recovery"], record["where"]) == (
+        "record_fault",
+        recovery,
+        where,
+    )
+    assert blob.committed == {}
+    [line] = logged["info"]
+    assert line.startswith(
+        f"[com-replay] part:{_STEM}: record_fault ({recovery} in {where}): "
+        "nothing published | publish=- bytes=-"
+    )
 
 
 def test_exit_92_without_a_recording_is_an_ordinary_failure(blob, monkeypatch):
@@ -448,7 +497,7 @@ def test_exit_92_without_a_recording_is_an_ordinary_failure(blob, monkeypatch):
 # Publication: two create-only sidecars named from the part key
 # --------------------------------------------------------------------------- #
 def test_a_recording_publishes_beside_the_part_archive(
-    blob, tmp_path, monkeypatch, spans
+    blob, tmp_path, monkeypatch, spans, logged
 ):
     monkeypatch.setenv(shadow.MODE_ENV, "record")
     recording, deps = _built(tmp_path, "size: 1\n")
@@ -482,7 +531,7 @@ def test_a_recording_publishes_beside_the_part_archive(
     assert (
         tmp_path / "restored" / shadow.LOG_NAME
     ).read_bytes() == recording.log.read_bytes()
-    capture = Path(shadow.CAPTURE_NAME) / "0f.SLDPRT.gz"
+    capture = Path(shadow.CAPTURE_NAME) / shadow.CAPTURE_FILE
     assert (tmp_path / "restored" / capture).read_bytes() == (
         recording.directory / capture
     ).read_bytes()
@@ -492,9 +541,15 @@ def test_a_recording_publishes_beside_the_part_archive(
         "stored",
         "record",
     )
+    assert record["bundle_bytes"] == len(data)
     assert record["overhead"]["overhead_pct"] == pytest.approx(
         100 * 1.53 / (100 - 1.53), abs=1e-3
     )
+    assert logged["info"] == [
+        f"[com-replay] part:{_STEM}: recorded | publish=stored bytes={len(data)} "
+        "| lookup=- base=- differing=- listed=- read=- - | shadow=- served=-/- - "
+        "| truth=-"
+    ]
     published_spans = spans.named("replay.")
     assert [entry["name"] for entry in published_spans] == [
         f"replay.record_overhead part:{_STEM}",
@@ -584,7 +639,9 @@ def test_inputs_that_moved_during_the_build_publish_nothing(
 # --------------------------------------------------------------------------- #
 # Base selection
 # --------------------------------------------------------------------------- #
-def _manifest(inputs: dict[str, str], recording_id: str, schema: int = 1) -> dict:
+def _manifest(
+    inputs: dict[str, str], recording_id: str, schema: int = shadow.MANIFEST_SCHEMA
+) -> dict:
     return {
         "schema": schema,
         "recording_id": recording_id,
@@ -599,7 +656,9 @@ def test_the_nearest_base_differs_least_then_is_newest():
         (_manifest({"a": "2", "b": "2", "c": "1"}, "newest-two-off"), 40.0),
         (_manifest({"a": "2", "b": "1", "c": "1"}, "old-one-off"), 10.0),
         (_manifest({"a": "1", "b": "2", "c": "1"}, "newer-one-off"), 20.0),
-        (_manifest(now, "same-but-other-schema", schema=2), 50.0),
+        # The exact inputs, but a bundle of the old format (captures mirrored
+        # under their output paths): never a base.
+        (_manifest(now, "same-but-old-format", schema=1), 50.0),
         (_manifest(now, "this-recording"), 60.0),
     ]
     base = shadow.nearest(candidates, now, "this-recording")
@@ -754,6 +813,17 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.soundness_alarm"] is True
     assert span["replay.base_key"] == base.key[:12]
+    # One INFO line per recorded build; the evaluated one carries every step.
+    assert len(logged["info"]) == 2
+    line = logged["info"][-1]
+    assert "\n" not in line
+    assert line.startswith(
+        f"[com-replay] part:{_STEM}: evaluated | publish=stored bytes="
+        f"{record['bundle_bytes']} | lookup=found base={base.key[:12]} differing=1 "
+        "listed=2 read=2 "
+    )
+    assert "| shadow=noop served=10/10 " in line
+    assert line.endswith("| truth=diverged | SOUNDNESS ALARM")
     assert span["service"] == _telemetry.BUILD_INFRA_SERVICE
     assert [entry["name"].split()[0] for entry in spans.named("replay.")] == [
         "replay.record_overhead",
@@ -776,6 +846,28 @@ def test_a_failed_evaluation_is_a_verdict_not_a_failure(
     record = _events(tmp_path, "replay_shadow")[-1]
     assert (record["outcome"], record["verdict"]) == ("evaluated", "error")
     assert "could not start" in record["reason"] and logged["error"] == []
+
+
+def test_a_failed_shadow_step_is_one_record_and_one_line(
+    blob, tmp_path, monkeypatch, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    recording, deps = _built(tmp_path, "size: 1\n")
+
+    def bundle(_recording):
+        raise OSError("injected:\nthe recording vanished")
+
+    monkeypatch.setattr(shadow, "bundle", bundle)
+    shadow.after_build(recording, deps, _digest)  # does not raise
+    [record] = _events(tmp_path, "replay_shadow")
+    assert record["outcome"] == "error" and "vanished" in record["error"]
+    assert blob.committed == {}
+    [line] = logged["info"]
+    assert line.startswith(
+        f"[com-replay] part:{_STEM}: error (OSError('injected:\\nthe recording "
+        "vanished')) | publish=- bytes=-"
+    )
+    assert "\n" not in line
 
 
 # --------------------------------------------------------------------------- #
@@ -810,7 +902,7 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
     config = source / "widget.yaml"
     deps = [str(script), str(config)]
 
-    def build(text: str) -> shadow.Recording:
+    def build(text: str, fault: str = "") -> shadow.Recording:
         config.write_text(text, encoding="utf-8")
         recording = shadow.plan(_STEM, script, cache.key_inputs(deps, _digest)[0])
         assert recording is not None
@@ -825,15 +917,20 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
                 str(shadow.OUT_ROOT),
             ],
             cwd=SCRIPTS,
-            env=dict(os.environ, OTEL_EXPORTER_OTLP_ENDPOINT=""),
+            env=dict(
+                os.environ, OTEL_EXPORTER_OTLP_ENDPOINT="", COM_REPLAY_TEST_FAULT=fault
+            ),
             capture_output=True,
             text=True,
             timeout=120,
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
+        # What dodo._exec_com does with the driver's exit: never a re-run here.
+        assert not recording.exited(proc.returncode)
         built = _outputs(shadow.OUT_ROOT)
         shadow.after_build(recording, deps, _digest)
-        # Observation reads the outputs; it never writes one.
+        # Observation reads the outputs; it never writes one (and its scratch
+        # under the output root is gone).
         assert _outputs(shadow.OUT_ROOT) == built
         return recording
 
@@ -861,8 +958,8 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
     )
     assert second_record["differing"] == [cache._rel(config)]
     # The replay's scratch is gone; its logs and the local verdict remain.
-    assert not (second.directory / "shadow").exists()
-    assert (second.directory / "shadow-replay.log").is_file()
+    assert list(shadow.SCRATCH.iterdir()) == []
+    assert (second.directory / shadow.REPLAY_LOG_NAME).is_file()
     assert (
         json.loads((second.directory / shadow.SHADOW_NAME).read_text("utf-8"))[
             "verdict"
@@ -871,6 +968,18 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
     )
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.ground_truth"] == "same"
+    # A recorder fault once the build had its result (keeping SaveTo's file,
+    # as on the farm on 2026-11-10): the build exits 0 and nothing of its
+    # recording is published or evaluated.
+    published = dict(blob.committed)
+    third = build("size: 3\n", fault="capture")
+    assert third.recovery == shadow.Recovery.DEGRADED
+    assert blob.committed == published
+    third_record = _events(tmp_path, "replay_shadow")[-1]
+    assert (third_record["outcome"], third_record["where"]) == (
+        "record_fault",
+        "Recorder.capture",
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -880,7 +989,7 @@ def test_recordings_are_no_task_input_or_output(monkeypatch):
     monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
     dodo = _load_dodo()
     modules = {"_com_conversation.py", "com_replay.py", "_replay_shadow.py"}
-    recordings = shadow.RECORDINGS.resolve()
+    owned = (shadow.RECORDINGS.resolve(), shadow.SCRATCH.resolve())
     # One real part task (every part task is built by the same _part_task; the
     # closure test covers every recipe's module closure).
     stem = _buildgraph.part_scripts()[0].stem.removeprefix("build_")
@@ -890,5 +999,94 @@ def test_recordings_are_no_task_input_or_output(monkeypatch):
     assert not [
         path
         for path in paths
-        if Path(path).name in modules or Path(path).resolve().is_relative_to(recordings)
+        if Path(path).name in modules
+        or any(Path(path).resolve().is_relative_to(root) for root in owned)
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Windows path budget: no long-path support on the workers (or in SolidWorks)
+# --------------------------------------------------------------------------- #
+# A farm leaf's checkout: C:\harmonic\work\sources\<commit 12 hex>-<16 hex>\
+# workspace (solidworks-pool workers, 2026-11-10).
+_FARM_REPO = (
+    PureWindowsPath("C:/harmonic/work/sources") / f"{'f' * 12}-{'f' * 16}" / "workspace"
+)
+# Characters every path must keep in hand on the farm, for names this model
+# does not know (a temporary file SolidWorks or pywin32 derives from an
+# output, a longer member suffix). The tightest today: 41, a member PNG's
+# SaveBMP intermediate replayed under rs/<8>/o (2026-11-10).
+_FARM_HEADROOM = 32
+
+
+def _part_outputs(dodo: Any, stem: str) -> list[str]:
+    """Every file a part build writes under the output root, relative to it:
+    its cache outputs, member exports, each routine view in its PNG directory,
+    and SaveBMP's intermediate beside every PNG (the adapter's
+    ``<png>.capture.bmp``, captured by the recorder)."""
+    from _part_save import _ROUTINE_PART_VIEWS
+
+    out = Path(dodo.CAD_OUT)
+    png_dir = Path(dodo._png_dir(stem))
+    files: set[Path] = set()
+    for path in map(
+        Path, [*dodo._part_cache_outputs(stem), *dodo._part_configuration_outputs(stem)]
+    ):
+        if path == png_dir:
+            files.update(
+                png_dir / f"{png_dir.name}_{v}.png" for v in _ROUTINE_PART_VIEWS
+            )
+            continue
+        files.add(path)
+    files.update(
+        path.with_name(path.name + ".capture.bmp")
+        for path in list(files)
+        if path.suffix == ".png"
+    )
+    return sorted(path.relative_to(out).as_posix() for path in files)
+
+
+def test_every_part_recording_fits_the_windows_path_limit(monkeypatch):
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    dodo = _load_dodo()
+    checkout = PureWindowsPath(shadow.REPO_ROOT)
+    repo = max(_FARM_REPO, checkout, key=lambda root: len(str(root)))
+
+    def under(path: Path) -> PureWindowsPath:
+        return repo / PureWindowsPath(path.relative_to(shadow.REPO_ROOT))
+
+    tightest: list[tuple[int, str, str]] = []
+    stems = [s.stem.removeprefix("build_") for s in _buildgraph.part_scripts()]
+    assert len(stems) > 100
+    for stem in stems:
+        outputs = _part_outputs(dodo, stem)
+        needs = shadow.path_needs(
+            stem, under(shadow.RECORDINGS), under(shadow.SCRATCH), outputs
+        )
+        # The recording's own files, the work directory and the base bundle,
+        # and every output's replay copy are all budgeted.
+        purposes = {need.purpose for need in needs}
+        assert {
+            shadow.LOG_NAME,
+            shadow.SUMMARY_NAME,
+            shadow.REPLAY_LOG_NAME,
+            "capture",
+            "work tmp",
+            "base capture",
+        } <= purposes
+        assert {f"replay output {output}" for output in outputs} <= purposes
+        need = min(needs, key=lambda n: n.headroom)
+        tightest.append((need.headroom, stem, need.path))
+    headroom, stem, path = min(tightest)
+    assert headroom >= _FARM_HEADROOM, (stem, len(path), path)
+
+
+def test_a_checkout_too_deep_for_the_recording_builds_unrecorded(
+    blob, tmp_path, monkeypatch, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    monkeypatch.setattr(shadow, "RECORDINGS", tmp_path / ("d" * 240))
+    assert shadow.plan(_STEM, tmp_path / f"build_{_STEM}.py", "k" * 64) is None
+    [warning] = logged["warn"]
+    assert "past the Windows limit; building unrecorded" in warning
+    assert not (tmp_path / ("d" * 240)).exists()

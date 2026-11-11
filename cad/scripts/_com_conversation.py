@@ -38,18 +38,26 @@ nearest frames outside this module, pywin32 and the makepy wrappers) a recording
 keeps; a replay names the caller of a divergence regardless.
 
 Files SolidWorks writes during the window are kept gzip-compressed beside the
-log (``<log>.files/<seq>/<rel>.gz``, digest of the uncompressed bytes) and
-restored by the replay at the same point. A replay runs whatever Python source
-the checkout holds now against a log recorded from older source: the log pins
-only the engine, the declared environment and the external files COM arguments
-name, never Python source.
+log, flat under short fixed-width names (``<log>.files/<capture_name>``; the
+trailer maps each to the call's seq, the output path, and the digest and size
+of the uncompressed bytes) and restored by the replay to that path at the same
+point. A replay runs whatever Python source the checkout holds now against a
+log recorded from older source: the log pins only its format, the engine, the
+declared environment and the external files COM arguments name, never Python
+source.
 
-Recording is fail-open. A failure of this module's own code during a recorded
-build (never the script's, never SolidWorks') raises :class:`RecordFault`, a
-``BaseException`` the build's ``except Exception`` handlers cannot mistake for
-a COM or build failure, and is sticky (:func:`record_faults`): the driver exits
-:data:`EXIT_RECORD_FAULT` even if something swallowed it, and dodo re-runs the
-build once unrecorded.
+Recording is fail-open, never at the build's expense; a failure of this
+module's own code during a recorded build (never the script's, never
+SolidWorks') is classed by where it happened (:class:`Recovery`). Where the
+real call has completed and its result is in hand (keeping the files it wrote,
+encoding and logging it, file-access accounting, closing the window) the fault
+is ``DEGRADED``: recording stops, the build gets its real result and finishes
+through the pass-through recorder, and the recording is unusable. Anywhere
+else the script's result cannot be guaranteed (``RERUN``): the fault raises
+:class:`RecordFault`, a ``BaseException`` the build's ``except Exception``
+handlers cannot mistake for a COM or build failure, and is sticky
+(:func:`record_faults`): the driver exits :data:`EXIT_RECORD_FAULT` even if
+something swallowed it, and dodo re-runs the build once unrecorded.
 
 pywin32 recognises its own interface objects by ``isinstance(...,
 PyIDispatchType)``; that C type cannot be subclassed, so :func:`funnel`
@@ -102,13 +110,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-SCHEMA = 1
+# 2: captures stored flat under capture_name, the trailer mapping each output
+# path to its file, digest and size (1 mirrored the output path).
+SCHEMA = 2
 ENGINE_FILE = Path(__file__).resolve()
 REPO_ROOT = ENGINE_FILE.parents[2]
 # Where every build writes (``_paths.OUT_*`` live under it).
 OUT_ROOT = REPO_ROOT / "cad" / "out"
 EXIT_REPLAY_NOT_NOOP = 91
-# A recorded build whose recorder (not script, not SolidWorks) failed: dodo
+# A recorded build whose recorder (not script, not SolidWorks) failed in a way
+# that leaves the build without results it can trust (Recovery.RERUN): dodo
 # re-runs it once unrecorded. Restated as _replay_shadow.EXIT_RECORD_FAULT
 # (dodo never imports this engine) and pinned equal by test_replay_shadow.
 EXIT_RECORD_FAULT = 92
@@ -121,6 +132,16 @@ _HEADER_WIDTH = {"InvokeTypes": 5, "Invoke": 4}
 # gzip level of the kept SolidWorks-written files: _artifact_cache._PACK_LEVEL,
 # so log-plus-captures bytes compare like with like against the output archive.
 _CAPTURE_LEVEL = 6
+# Width of a capture's file name (capture_name). Captures never mirror the
+# output's own relative path: the recording sits deeper than the output root,
+# and a mirrored path passed Windows' MAX_PATH (271 characters on a farm
+# worker, 2026-11-10) where the output itself took 185.
+CAPTURE_NAME_DIGITS = 6
+
+
+def capture_name(index: int) -> str:
+    """The file name of the ``index``-th capture of a recording."""
+    return f"{index:0{CAPTURE_NAME_DIGITS}d}.gz"
 
 
 class Mode(StrEnum):
@@ -360,32 +381,63 @@ class SandboxViolation(BaseException):
 
 
 class RecordFault(BaseException):
-    """This module's own code failed during a recorded build.
+    """This module's own code failed during a recorded build, leaving the
+    build without a result it can trust (:attr:`Recovery.RERUN`).
 
     Never raised for the script's or SolidWorks' failures: those pass through
     the recorder unchanged. A ``BaseException`` so a build's ``except
     Exception`` fallback cannot turn an engine fault into a build outcome."""
 
 
+class Recovery(StrEnum):
+    """What an engine fault costs the build it happened in.
+
+    The class follows the site, not the exception (DEVELOPING.md "COM
+    conversation recording (shadow)" lists them):
+
+    * ``DEGRADED``: the real operation has completed and its result is in
+      hand; only the recorder's own bookkeeping failed (keeping a written file,
+      encoding the response, writing the log, file-access accounting, closing
+      the window). Recording stops, the result is returned, the build carries
+      on through the pass-through recorder; the recording is unusable.
+    * ``RERUN``: the script cannot be given a result it would have had
+      unrecorded (a fault before or while the call is forwarded, building the
+      proxy of a returned object, applying a byref write-back, opening the
+      window). :class:`RecordFault` aborts the build; the driver exits
+      :data:`EXIT_RECORD_FAULT` and dodo re-runs it unrecorded."""
+
+    DEGRADED = "degraded"
+    RERUN = "rerun"
+
+
 # Every engine fault of this process, oldest first. Sticky: the driver exits
-# EXIT_RECORD_FAULT when any was raised, even if the build swallowed it.
+# EXIT_RECORD_FAULT when any RERUN fault was raised, even if the build
+# swallowed it.
 _FAULTS: list[dict[str, str]] = []
 _FAULT_TRACEBACK_CHARS = 4000
 
 
 def record_faults() -> list[dict[str, str]]:
-    """The engine faults raised in this process so far."""
+    """The engine faults of this process so far."""
     return list(_FAULTS)
 
 
-def _fault(where: str, exc: BaseException) -> RecordFault:
+def rerun_required() -> bool:
+    """Whether a fault of this process left the build untrustworthy."""
+    return any(fault["recovery"] == Recovery.RERUN for fault in _FAULTS)
+
+
+def _fault(
+    where: str, exc: BaseException, recovery: Recovery = Recovery.RERUN
+) -> RecordFault:
     """Note ``exc``, raised by engine code at ``where``; return the
-    :class:`RecordFault` to raise in its place."""
+    :class:`RecordFault` to raise in its place (``RERUN`` sites only)."""
     import traceback
 
     _FAULTS.append(
         {
             "where": where,
+            "recovery": recovery.value,
             "type": type(exc).__name__,
             "message": str(exc)[:_CLIP],
             "traceback": "".join(traceback.format_exception(exc))[
@@ -396,9 +448,19 @@ def _fault(where: str, exc: BaseException) -> RecordFault:
     return RecordFault(f"COM recording fault in {where}: {type(exc).__name__}: {exc}")
 
 
+def _degrade(where: str, exc: BaseException) -> None:
+    """A ``DEGRADED`` fault: stop the active recording, never raise."""
+    active = _ACTIVE
+    if isinstance(active, Recorder):
+        active.stop(where, exc)
+        return
+    _fault(where, exc, Recovery.DEGRADED)
+
+
 @contextlib.contextmanager
 def _engine(where: str) -> Iterator[None]:
-    """Engine code: an ordinary exception it raises becomes a RecordFault."""
+    """Engine code at a ``RERUN`` site: an ordinary exception it raises
+    becomes a RecordFault."""
     try:
         yield
     except Exception as exc:
@@ -1504,9 +1566,9 @@ def _capture_differences(
     ) -> dict[tuple[int | None, str], str]:
         index_of = {call.seq: i for i, call in enumerate(stream)}
         return {
-            (index_of.get(int(seq)), rel): digest
+            (index_of.get(int(seq)), rel): kept["sha256"]
             for seq, files in conversation.trailer.get("captured", {}).items()
-            for rel, digest in files.items()
+            for rel, kept in files.items()
         }
 
     left, right = by_index(base, a), by_index(new, b)
@@ -1789,9 +1851,10 @@ class _AuditDispatcher:
                 observer.observe(event, args)
             except Exception as exc:  # noqa: BLE001 - a fault, never the build's I/O
                 # Raising here would fail whatever file operation the build was
-                # doing: drop the accounting and leave the fault sticky instead.
+                # doing: drop the accounting (the recording is then unusable:
+                # its reads are incomplete) and let the build carry on.
                 self.observer = None
-                _fault("audit", exc)
+                _degrade("audit", exc)
 
     def install(self) -> None:
         if not self.installed:
@@ -1958,8 +2021,10 @@ def _raw_write_back(
 
 def _contained(method: Callable[..., Any]) -> Callable[..., Any]:
     """A Recorder entry point the build calls into (through a proxy or the
-    funnel). An ordinary exception from the engine's own code becomes a
-    :class:`RecordFault` and turns the recorder into a pass-through; the real
+    funnel). An ordinary exception from the engine's own code that the entry
+    point did not settle as ``DEGRADED`` (:meth:`Recorder._settle`) happened
+    where the script's result cannot be guaranteed: it becomes a ``RERUN``
+    :class:`RecordFault` and turns the recorder into a pass-through. The real
     object's own exception (``Recorder._through``) passes unchanged."""
     where = f"Recorder.{method.__name__}"
 
@@ -1993,6 +2058,8 @@ class Recorder:
         self.pw = self.codec.pw
         self.capture_dir = capture_dir
         self.callers = callers
+        # Pass-through: set by a fault (or the window closing); every later
+        # operation is forwarded exactly as pywin32 would make it, unlogged.
         self.closed = False
         self.seq = 0
         self._handles = {
@@ -2009,7 +2076,9 @@ class Recorder:
         self.foreign_thread_calls = 0
         self.external: dict[str, str] = {}
         self.internal_paths: set[str] = set()
-        self.captured: dict[str, dict[str, str]] = {}
+        # seq -> output path -> {"file": capture_name, "sha256", "size"}.
+        self.captured: dict[str, dict[str, dict[str, Any]]] = {}
+        self.capture_files = 0
         self.capture_bytes = 0
         self.capture_stored_bytes = 0
         self._digests: dict[str, str | None] = {}
@@ -2031,6 +2100,55 @@ class Recorder:
         except Exception as exc:
             self._through = exc
             raise
+
+    def stop(self, where: str, exc: BaseException) -> None:
+        """A ``DEGRADED`` fault at ``where``: recording stops here and the
+        recording is unusable; the build carries on through the pass-through."""
+        self.closed = True
+        _fault(where, exc, Recovery.DEGRADED)
+
+    def _settle(
+        self, seq: int, watch: dict[str, Any] | None, entry: Callable[[], Call]
+    ) -> None:
+        """The bookkeeping of an operation whose real result is already in
+        hand: keep the files it wrote, encode it, log it. A failure here costs
+        the recording, never the build (``DEGRADED``). Skipped once recording
+        has stopped (an outer call still in progress when an inner one
+        stopped it)."""
+        if self.closed:
+            return
+        try:
+            if watch:
+                self._capture(seq, watch)
+        except Exception as exc:  # noqa: BLE001 - the build keeps its result
+            self.stop("Recorder.capture", exc)
+            return
+        try:
+            self._emit(entry())
+        except Exception as exc:  # noqa: BLE001 - the build keeps its result
+            self.stop("Recorder.log", exc)
+
+    def _forward(self, method: Callable[..., Any], args: tuple[Any, ...]) -> Any:
+        """A call once recording has stopped: forwarded and answered exactly
+        as while recording, nothing logged. Its result and byref write-backs
+        are proxied and applied the same way, so the objects the build got
+        before and after the stop stay one population of proxies (equal and
+        hashing alike, as unrecorded)."""
+        origin = _origin()
+        real_args, variants = self._prepare(args)
+        failure: BaseException | None = None
+        with _raw_write_back(self.pw.variant, variants):
+            try:
+                raw = method(*real_args)
+            except BaseException as exc:  # the real call's own: re-raised
+                failure = exc
+        if failure is not None:
+            self._write_backs(variants, origin)
+            self._through = failure
+            raise failure
+        result = self.wrap(raw, origin)
+        self._write_backs(variants, origin)
+        return result
 
     # -- handles ---------------------------------------------------------------
 
@@ -2065,18 +2183,26 @@ class Recorder:
             self.adopted_inside += 1
             return proxy
         self.adopted_outside += 1
-        seq = self._next_seq()
-        self._emit(
-            Call(
+        try:  # the proxy is the build's already: bookkeeping only from here
+            seq = self._next_seq()
+            site = _site()
+            caller_frames = self._caller()
+        except Exception as exc:  # noqa: BLE001 - the build keeps its proxy
+            self.stop("Recorder.log", exc)
+            return proxy
+        self._settle(
+            seq,
+            None,
+            lambda: Call(
                 seq,
                 proxy._h,
                 "ADOPT",
                 [],
-                _site(),
+                site,
                 self.codec.encode(proxy, result=True),
                 origin=origin,
-                caller=self._caller(),
-            )
+                caller=caller_frames,
+            ),
         )
         return proxy
 
@@ -2143,7 +2269,8 @@ class Recorder:
         """Keep a gzip copy of every named output file the call created or
         changed, so a replay can recreate it at the same point (even an
         intermediate that Python deletes later, such as ``SaveBMP``'s
-        ``.capture.bmp``); the digest is of the uncompressed bytes."""
+        ``.capture.bmp``). Stored flat (:func:`capture_name`), never under the
+        output's own path; the digest and size are of the uncompressed bytes."""
         assert self.capture_dir is not None
         started = time.perf_counter_ns()
         for rel, before in watch.items():
@@ -2151,26 +2278,36 @@ class Recorder:
             after = _signature(source)
             if after is None or after == before:
                 continue
-            target = self.capture_dir / str(seq) / f"{rel}.gz"
+            name = capture_name(self.capture_files)
+            self.capture_files += 1
+            target = self.capture_dir / name
             with _ENGINE_IO:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 data = source.read_bytes()
                 target.write_bytes(
                     gzip.compress(data, compresslevel=_CAPTURE_LEVEL, mtime=0)
                 )
-            digest = hashlib.sha256(data).hexdigest()
-            self.captured.setdefault(str(seq), {})[rel] = digest
+            self.captured.setdefault(str(seq), {})[rel] = {
+                "file": name,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "size": len(data),
+            }
             self.capture_bytes += len(data)
             self.capture_stored_bytes += target.stat().st_size
         self.clock["capture"] += time.perf_counter_ns() - started
 
     # -- operations ------------------------------------------------------------
+    #
+    # Fault classes (Recovery): everything up to and including the forwarded
+    # call, building the proxies of its result and applying its byref
+    # write-backs is RERUN (_contained); keeping its files, encoding its
+    # response and logging it is DEGRADED (_settle).
 
     @_contained
     def call(self, proxy: RecordingProxy, op: str, args: tuple[Any, ...]) -> Any:
         method = self._real(getattr, proxy._real, op)
         if self.closed:
-            return self._real(method, *_unproxied(list(args)))
+            return self._forward(method, args)
         entered = time.perf_counter_ns()
         seq = self._next_seq()
         site = _site()
@@ -2193,33 +2330,34 @@ class Recorder:
         self.clock["com"] += time.perf_counter_ns() - com_started
         self.depth -= 1
         if failure is not None:
-            outs = self._outs(variants, origin)
-            if watch:
-                self._capture(seq, watch)
-            self._emit(
-                Call(
+            applied = self._write_backs(variants, origin)
+            raised = failure
+            self._settle(
+                seq,
+                watch,
+                lambda: Call(
                     seq,
                     proxy._h,
                     op,
                     canonical,
                     site,
                     None,
-                    _encode_exception(self.codec, failure),
-                    outs,
+                    _encode_exception(self.codec, raised),
+                    self._outs(applied),
                     foreign,
                     origin,
                     caller_frames,
-                )
+                ),
             )
             self.clock["calls"] += time.perf_counter_ns() - entered
             self._through = failure
             raise failure
         result = self.wrap(raw, origin)
-        outs = self._outs(variants, origin)
-        if watch:
-            self._capture(seq, watch)
-        self._emit(
-            Call(
+        applied = self._write_backs(variants, origin)
+        self._settle(
+            seq,
+            watch,
+            lambda: Call(
                 seq,
                 proxy._h,
                 op,
@@ -2227,11 +2365,11 @@ class Recorder:
                 site,
                 self.codec.encode(result, result=True),
                 None,
-                outs,
+                self._outs(applied),
                 foreign,
                 origin,
                 caller_frames,
-            )
+            ),
         )
         self.clock["calls"] += time.perf_counter_ns() - entered
         return result
@@ -2253,24 +2391,33 @@ class Recorder:
 
         return [convert(a) for a in args], tracked
 
-    def _outs(self, tracked: list[_WriteBack], origin: Origin) -> list[Any] | None:
-        """Encode each write-back as ``[attribute, raw value]`` and apply it
-        to the caller's VARIANT the way pywin32 would have (``value`` wraps
-        interfaces through ``_get_good_object_``; those wrapping calls are
-        recorded after this call, exactly where a replay issues them)."""
-        if not tracked:
-            return None
-        outs: list[Any] = []
+    def _write_backs(
+        self, tracked: list[_WriteBack], origin: Origin
+    ) -> list[tuple[str, Any] | None]:
+        """Apply each write-back to the caller's VARIANT the way pywin32 would
+        have (``value`` wraps interfaces through ``_get_good_object_``; those
+        wrapping calls are recorded after this call, exactly where a replay
+        issues them): ``(attribute, value)`` per VARIANT, None when unchanged."""
+        applied: list[tuple[str, Any] | None] = []
         for entry in tracked:
             after = entry.passed._value
             if after is entry.before and not entry.via_property:
-                outs.append(None)
+                applied.append(None)
                 continue
             after = self.wrap(after, origin)
             via = "value" if entry.via_property else "_value"
-            outs.append([via, self.codec.encode(after, result=True)])
             setattr(entry.original, via, after)
-        return outs
+            applied.append((via, after))
+        return applied
+
+    def _outs(self, applied: list[tuple[str, Any] | None]) -> list[Any] | None:
+        """The applied write-backs as logged: ``[attribute, raw value]``."""
+        if not applied:
+            return None
+        return [
+            None if out is None else [out[0], self.codec.encode(out[1], result=True)]
+            for out in applied
+        ]
 
     @_contained
     def compare(self, proxy: RecordingProxy, op: str, other: ComProxy) -> bool:
@@ -2280,55 +2427,70 @@ class Recorder:
         )
         if self.closed:
             return outcome
-        origin = _origin()
-        caller_frames = self._caller()
-        seq = self._next_seq()
-        self._emit(
-            Call(
+        try:  # the outcome is the build's already: bookkeeping only from here
+            origin = _origin()
+            caller_frames = self._caller()
+            seq = self._next_seq()
+            site = _site()
+        except Exception as exc:  # noqa: BLE001 - the build keeps its outcome
+            self.stop("Recorder.log", exc)
+            return outcome
+        self._settle(
+            seq,
+            None,
+            lambda: Call(
                 seq,
                 proxy._h,
                 op,
                 [{"h": other._h}],
-                _site(),
+                site,
                 bool(outcome),
                 origin=origin,
                 caller=caller_frames,
-            )
+            ),
         )
         return outcome
 
     @_contained
     def identity(self, proxy: RecordingProxy) -> int:
         """``hash()`` of a proxy: a small identity index, equal for equal COM
-        objects (recorded, so the replay answers the same index)."""
+        objects (recorded, so the replay answers the same index). The same
+        index once recording has stopped, so a dict or set filled before a
+        degraded fault still finds its keys after it."""
+        origin = _origin()
+        identities = self._identities[origin]
         if self.closed:
-            return self._real(hash, proxy._real)
+            real_hash = self._real(hash, proxy._real)
+            return identities.setdefault(real_hash, len(identities))
         seq = self._next_seq()
         site = _site()
-        origin = _origin()
         caller_frames = self._caller()
         try:
             real_hash = hash(proxy._real)
         except Exception as exc:
-            self._emit(
-                Call(
+            failure = exc
+            self._settle(
+                seq,
+                None,
+                lambda: Call(
                     seq,
                     proxy._h,
                     "__hash__",
                     [],
                     site,
                     None,
-                    _encode_exception(self.codec, exc),
+                    _encode_exception(self.codec, failure),
                     origin=origin,
                     caller=caller_frames,
-                )
+                ),
             )
-            self._through = exc
+            self._through = failure
             raise
-        identities = self._identities[origin]
         index = identities.setdefault(real_hash, len(identities))
-        self._emit(
-            Call(
+        self._settle(
+            seq,
+            None,
+            lambda: Call(
                 seq,
                 proxy._h,
                 "__hash__",
@@ -2337,7 +2499,7 @@ class Recorder:
                 index,
                 origin=origin,
                 caller=caller_frames,
-            )
+            ),
         )
         return index
 
@@ -2351,15 +2513,17 @@ class Materialiser:
     """Recreates SolidWorks' file writes during a replay.
 
     The recorder kept every output file a save/export call created or changed
-    as ``<log>.files/<seq>/<rel>.gz``; after serving that call the replay
-    writes the same bytes into the scratch output root, so Python reading or
-    testing the file afterwards (``os.path.exists`` after ``SaveAs3``, Pillow
-    converting the ``SaveBMP`` capture) sees what it saw in the recording."""
+    as ``<log>.files/<capture_name>``, mapped in the trailer's ``captured``
+    from the call's seq and the file's output path; after serving that call
+    the replay writes the same bytes to that path under the scratch output
+    root, so Python reading or testing the file afterwards
+    (``os.path.exists`` after ``SaveAs3``, Pillow converting the ``SaveBMP``
+    capture) sees what it saw in the recording."""
 
     def __init__(
         self, conversation: Conversation, capture_dir: Path, scratch_root: Path
     ):
-        self.captured: dict[str, dict[str, str]] = conversation.trailer.get(
+        self.captured: dict[str, dict[str, dict[str, Any]]] = conversation.trailer.get(
             "captured", {}
         )
         self.capture_dir = capture_dir
@@ -2368,20 +2532,23 @@ class Materialiser:
         self.missing: list[str] = []
 
     def __call__(self, seq: int) -> None:
-        for rel, digest in self.captured.get(str(seq), {}).items():
-            source = self.capture_dir / str(seq) / f"{rel}.gz"
+        for rel, kept in self.captured.get(str(seq), {}).items():
+            source = self.capture_dir / kept["file"]
             if not source.is_file():
                 self.missing.append(f"{seq}/{rel}")
                 continue
             target = self.scratch_root / rel
             with _ENGINE_IO:
                 data = gzip.decompress(source.read_bytes())
-                if hashlib.sha256(data).hexdigest() != digest:
-                    self.missing.append(f"{seq}/{rel} (digest differs)")
+                if (
+                    len(data) != kept["size"]
+                    or hashlib.sha256(data).hexdigest() != kept["sha256"]
+                ):
+                    self.missing.append(f"{seq}/{rel} (bytes differ)")
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
-            self.copied[rel] = digest
+            self.copied[rel] = kept["sha256"]
 
 
 def capture_dir_of(log: Path) -> Path:
@@ -2937,8 +3104,12 @@ def recording(
     the funnel, the recipe-inert entry points and (WARN mode) the file
     observer, and on exit restores the adapter's original objects so teardown
     runs unrecorded on real ones. The build's own exceptions pass through
-    unchanged; one raised by this setup or teardown is a :class:`RecordFault`.
-    The trailer written is also left on ``recorder.trailer``."""
+    unchanged. A fault opening the window is a ``RERUN`` :class:`RecordFault`
+    (nothing of the build has run); one closing it, after the build has
+    finished, is ``DEGRADED``. The trailer written is also left on
+    ``recorder.trailer``; its status is ``complete`` only when no fault
+    happened (``degraded``: recording stopped early; ``faulted``: a ``RERUN``
+    fault)."""
     global _ACTIVE
     window = contextlib.ExitStack()
     swapped: list[tuple[Any, str, Any]] = []
@@ -3002,50 +3173,62 @@ def recording(
     finally:
         _ACTIVE = None
         _AUDIT.observer = None
-        with _engine("recording.close"), window:
-            seconds = time.perf_counter() - started
-            audit_started = time.perf_counter()
-            census_exit = _wrapper_census(recorder.pw) if audit else None
-            audit_seconds = time.perf_counter() - audit_started
-            recorder.closed = True
-            restore()
-            recorder.trailer = {
-                "status": "complete",
-                "outcome": outcome,
-                "faults": [fault["where"] for fault in _FAULTS],
-                "calls": recorder.seq,
-                "handles": recorder.allocated[Origin.RECIPE],
-                "inert_handles": recorder.allocated[Origin.INERT],
-                "inert_calls": recorder.origins[Origin.INERT],
-                "types": recorder.types,
-                "external": recorder.external,
-                "internal_paths": sorted(recorder.internal_paths),
-                "reads": observer.reads,
-                "captured": recorder.captured,
-                "capture_dir": capture.name,
-                "capture_bytes": recorder.capture_bytes,
-                "capture_stored_bytes": recorder.capture_stored_bytes,
-                "callers": recorder.callers.value,
-                "inert_entry_points": len(inert_entries),
-                "clock_seconds": {
-                    "in_calls": recorder.clock["calls"] / 1e9,
-                    "com": recorder.clock["com"] / 1e9,
-                    "engine": (recorder.clock["calls"] - recorder.clock["com"]) / 1e9,
-                    "caller": recorder.clock["caller"] / 1e9,
-                    "capture": recorder.clock["capture"] / 1e9,
-                },
-                "writes_outside_out": observer.outside,
-                "adopted_inside_calls": recorder.adopted_inside,
-                "adopted_outside_calls": recorder.adopted_outside,
-                "foreign_thread_calls": recorder.foreign_thread_calls,
-                "window_seconds": seconds,
-                "escape_audit": {
-                    "at_entry": census_entry,
-                    "at_exit": census_exit,
-                    "seconds": audit_seconds,
-                },
-            }
-            writer.close(recorder.trailer)
+        try:
+            with window:
+                seconds = time.perf_counter() - started
+                audit_started = time.perf_counter()
+                census_exit = _wrapper_census(recorder.pw) if audit else None
+                audit_seconds = time.perf_counter() - audit_started
+                recorder.closed = True
+                restore()
+                recorder.trailer = {
+                    "status": "faulted"
+                    if rerun_required()
+                    else "degraded"
+                    if _FAULTS
+                    else "complete",
+                    "outcome": outcome,
+                    "faults": [
+                        {"where": fault["where"], "recovery": fault["recovery"]}
+                        for fault in _FAULTS
+                    ],
+                    "calls": recorder.seq,
+                    "handles": recorder.allocated[Origin.RECIPE],
+                    "inert_handles": recorder.allocated[Origin.INERT],
+                    "inert_calls": recorder.origins[Origin.INERT],
+                    "types": recorder.types,
+                    "external": recorder.external,
+                    "internal_paths": sorted(recorder.internal_paths),
+                    "reads": observer.reads,
+                    "captured": recorder.captured,
+                    "capture_dir": capture.name,
+                    "capture_files": recorder.capture_files,
+                    "capture_bytes": recorder.capture_bytes,
+                    "capture_stored_bytes": recorder.capture_stored_bytes,
+                    "callers": recorder.callers.value,
+                    "inert_entry_points": len(inert_entries),
+                    "clock_seconds": {
+                        "in_calls": recorder.clock["calls"] / 1e9,
+                        "com": recorder.clock["com"] / 1e9,
+                        "engine": (recorder.clock["calls"] - recorder.clock["com"])
+                        / 1e9,
+                        "caller": recorder.clock["caller"] / 1e9,
+                        "capture": recorder.clock["capture"] / 1e9,
+                    },
+                    "writes_outside_out": observer.outside,
+                    "adopted_inside_calls": recorder.adopted_inside,
+                    "adopted_outside_calls": recorder.adopted_outside,
+                    "foreign_thread_calls": recorder.foreign_thread_calls,
+                    "window_seconds": seconds,
+                    "escape_audit": {
+                        "at_entry": census_entry,
+                        "at_exit": census_exit,
+                        "seconds": audit_seconds,
+                    },
+                }
+                writer.close(recorder.trailer)
+        except Exception as exc:  # noqa: BLE001 - the build has already finished
+            recorder.stop("recording.close", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -3198,16 +3381,18 @@ def run_script(script: Path) -> int:
 def check_inputs(conversation: Conversation) -> list[dict[str, Any]]:
     """The replay's inputs equal the record's, except Python source.
 
-    Pinned: the engine (it decides what a request is and how a response is
-    served), the declared environment keys (process inputs part closures read)
-    and every file outside the output root a COM argument named
-    (templates and the like: SolidWorks reads them, so new content would change
-    its answers behind an unchanged request). Never pinned: the build script and
-    the helper modules. Changed source is what a replay exists to judge, and the
-    request stream itself is the evidence; ``header.script_sha256`` is
-    informational."""
+    Pinned: the log format (:data:`SCHEMA`), the engine (it decides what a
+    request is and how a response is served), the declared environment keys
+    (process inputs part closures read) and every file outside the output root
+    a COM argument named (templates and the like: SolidWorks reads them, so new
+    content would change its answers behind an unchanged request). Never
+    pinned: the build script and the helper modules. Changed source is what a
+    replay exists to judge, and the request stream itself is the evidence;
+    ``header.script_sha256`` is informational."""
     mismatches: list[dict[str, Any]] = []
     header = conversation.header
+    if header.schema != SCHEMA:
+        mismatches.append({"input": "schema", "recorded": header.schema})
     if header.engine != sha256_file(ENGINE_FILE):
         mismatches.append({"input": "engine", "recorded": header.engine})
     for key, value in header.environment.items():

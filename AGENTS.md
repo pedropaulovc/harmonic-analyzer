@@ -985,8 +985,10 @@ through `cad/scripts/com_replay.py` and published beside its archive as
 `com-replay/...` sidecars. Off the seat, it is then replayed against the nearest
 earlier recording, purely as telemetry: nothing is reused, and no output, exit
 code or cache key changes. `HARMONIC_COM_REPLAY=off` is the kill switch; the
-other values are `record` and `shadow` (the default). The recorder's own fault
-exits 92, and the build is then re-run once unrecorded. See DEVELOPING.md
+other values are `record` and `shadow` (the default). A recorder fault after a
+call's result is in hand stops recording and the build finishes as its own
+(nothing published); one that leaves the build's results untrustworthy exits
+92, and the build is then re-run once unrecorded. See DEVELOPING.md
 "COM conversation recording (shadow)".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**

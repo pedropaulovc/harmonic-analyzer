@@ -2329,14 +2329,25 @@ seat lock, trace, log tee and exit codes. The recorder
 | file | content |
 | --- | --- |
 | `conversation.jsonl.gz` | the request/response log |
-| `conversation.jsonl.gz.files/` | gzip captures of the files SolidWorks saved |
-| `summary.json` | exit code, faults, engine SHA-256, request counts, engine and audit clock |
+| `conversation.jsonl.gz.files/` | gzip captures of the files SolidWorks saved, flat as `000000.gz`, `000001.gz`, ...; the log's trailer maps each to its call, output path, SHA-256 and size |
+| `summary.json` | exit code, faults (with `recovery`), engine SHA-256, request counts, engine and audit clock |
 | `shadow.json`, `shadow-replay.log`, `shadow-diff.log` | the last shadow evaluation (`shadow` mode) |
 
+Captures never mirror the output's own path: the recording directory is
+deeper than `cad/out`, and on 2026-11-10 a mirrored capture of a PNG's
+`.capture.bmp` reached 271 characters on a farm worker, past Windows' 260
+(workers and SolidWorks have no long-path support). Every path a recording
+and its shadow replay create is budgeted (`_replay_shadow.path_needs`);
+`test_every_part_recording_fits_the_windows_path_limit` checks every part
+under the farm's checkout root and requires 32 characters of headroom (41 at
+worst today), and a
+checkout too deep for a recording's own paths builds unrecorded with a WARN.
+
 Assemblies, drawings and gates are not recorded. Nothing under
-`cad/out/replay` is a doit target, `file_dep` or cache-key input, and the three
-modules (`_replay_shadow.py`, `_com_conversation.py`, `com_replay.py`) are in no
-recipe closure (`test_recording_modules_stay_out_of_every_recipe_closure`,
+`cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
+input, and the three modules (`_replay_shadow.py`, `_com_conversation.py`,
+`com_replay.py`) are in no recipe closure
+(`test_recording_modules_stay_out_of_every_recipe_closure`,
 `test_recordings_are_no_task_input_or_output`).
 
 ### The switch
@@ -2357,12 +2368,29 @@ the module is in no recipe closure, no cache key moves.
 
 ### Failure handling
 
-- **Recorder fault.** The driver exits `92` (`EXIT_RECORD_FAULT`) only when the
-  recorder itself failed (log write, capture, audit accounting), never for the
-  script's or SolidWorks' failure. `dodo._exec_com` logs a WARN, adds a
-  `replay.record_fault` event to the task span and a `replay_record_fault`
-  record to `cad/out/reports/cache.jsonl`, then re-runs the build **once,
-  unrecorded**, on the same seat. That re-run's exit code is the task's.
+A failure of the recorder's own code (never the script's or SolidWorks') is
+classed by where it happened (`_com_conversation.Recovery`):
+
+| site | recovery |
+| --- | --- |
+| keeping the files a call wrote, encoding its response, writing its log line (calls, adoptions, comparisons, hashes) | `degraded` |
+| file-access accounting (the audit hook) | `degraded` |
+| closing the recording window after the build | `degraded` |
+| anything before or while the call is forwarded (request encoding, path accounting, argument preparation) | `rerun` |
+| building the proxy of a returned object; applying a byref write-back | `rerun` |
+| opening the recording window; reading the seat's revision | `rerun` |
+
+- **`degraded`.** The real call has completed and the build has its result:
+  recording stops there, the result is returned, and the build finishes
+  through the pass-through recorder with its own exit code and outputs.
+  The recording is unusable: `dodo` logs a WARN, adds a `replay.record_fault`
+  event (`recovery=degraded`) to the task span and a `replay_record_fault`
+  record to `cad/out/reports/cache.jsonl`, and publishes nothing. No re-run.
+- **`rerun`.** The script's result cannot be guaranteed: the build aborts
+  (`RecordFault`, which no `except Exception` can swallow) and the driver
+  exits `92` (`EXIT_RECORD_FAULT`). `dodo._exec_com` reports it the same way
+  (`recovery=rerun`), then re-runs the build **once, unrecorded**, on the same
+  seat. That re-run's exit code is the task's.
 - **Script or SolidWorks failure.** Exit codes, including the watchdog's 86–89,
   pass through the driver unchanged and get today's handling. This mechanism
   never retries them.
@@ -2394,7 +2422,12 @@ that budget, the shadow step is skipped (`lookup=budget`).
 
 ### The shadow replay
 
-The base bundle is downloaded and verified into `cad/out/replay/<stem>/shadow/`.
+The base bundle is downloaded and verified into a fresh work directory
+`cad/out/rs/<8 random characters>/` (`b` the bundle, `o` the replay's output
+root, `t` its temporary files), short so that a replayed output's path is the
+build's own plus 15 characters. Old-format bundles (captures mirrored under
+their output paths) are never a base: the manifest schema, the log schema and
+the engine digest in the blob prefix all exclude them.
 Then the CURRENT part script is replayed against the base log in a subprocess
 with SolidWorks absent. The replay serves recorded responses and refuses live
 COM, writes outside its scratch, and non-loopback network. The worker slot gets
@@ -2408,7 +2441,7 @@ A replay `noop` whose ground truth is `diverged` is a **soundness alarm**: if
 recordings had been reused, a wrong artefact would have been reused. It is
 logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence) and never
 fails the build. A non-`noop` replay with `ground_truth=same` is a
-`false_divergence`, meaning a missed reuse that is not unsafe. The scratch
+`false_divergence`, meaning a missed reuse that is not unsafe. The work
 directory is removed afterwards.
 
 ### Where results land
@@ -2425,6 +2458,7 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 Each recorded build also appends one `replay_shadow` record to
 `cad/out/reports/cache.jsonl`, whose `outcome` is one of:
 
+- `record_fault` (with `recovery` and `where`): nothing published
 - `no_recording`
 - `inputs_moved`
 - `recorded`
@@ -2432,8 +2466,14 @@ Each recorded build also appends one `replay_shadow` record to
 - `evaluated`, which also carries the verdict fields
 - `error`
 
-On a farm leaf that file stays on the worker, so use Application Insights for
-fleet-wide results.
+and ends with one INFO line in the task log, for example:
+
+```text
+[com-replay] part:pd_transgear_arm_plate: evaluated | publish=stored bytes=412160 | lookup=found base=f1016ee56b74 differing=1 listed=3 read=3 0.412s | shadow=noop served=1874/1874 9.84s | truth=same
+```
+
+(`-` marks a step the build never reached). On a farm leaf `cache.jsonl` stays
+on the worker, so use Application Insights for fleet-wide results.
 
 Verdict counts, alarms and false divergences per stem (drop `by stem` for the
 fleet total):
@@ -2474,9 +2514,11 @@ Recorder faults and soundness alarms (log records):
 traces
 | where timestamp > ago(7d) and message startswith "[com-replay]"
 | extend label=tostring(customDimensions.label),
+         recovery=tostring(customDimensions.recovery),
          kind=case(message has "SOUNDNESS ALARM", "alarm",
                    message has "recorder fault", "record_fault", "other")
-| summarize count(), last=max(timestamp), example=take_any(message) by kind, label
+| summarize count(), last=max(timestamp), example=take_any(message)
+            by kind, recovery, label
 ```
 
 The same from a local `cache.jsonl` (bash or PowerShell 7.3+):
@@ -2498,7 +2540,7 @@ jq -s '
       overhead_pct_p95: ([.[].overhead.overhead_pct // empty] | pct(0.95))
     })),
     alarms: [$s[] | select(.soundness_alarm == true) | {label, key, base_key, alarm_evidence}],
-    record_faults: [$f[] | {label, key, where, fault_type, message}],
+    record_faults: [$f[] | {label, key, recovery, where, fault_type, message}],
     overhead_pct_p95: ([$s[].overhead.overhead_pct // empty] | pct(0.95))
   }' cad/out/reports/cache.jsonl
 ```

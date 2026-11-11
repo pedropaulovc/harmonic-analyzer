@@ -8,8 +8,12 @@
     diagnostic runs only; dodo's part builds never pass it). ``--callers``
     keeps the Python caller of every call (``full``), none (``divergence``: a
     replay names its own at a divergence) or none at all (``off``). Exits with
-    the build's own exit code, or 92 when the recorder itself failed: the
-    recording is unusable and dodo re-runs the build once unrecorded.
+    the build's own exit code, or 92 when the recorder failed where the build's
+    results cannot be trusted (``Recovery.RERUN``): dodo re-runs the build once
+    unrecorded. A recorder failure after a call's result was in hand
+    (``Recovery.DEGRADED``) stops recording and lets the build finish: the exit
+    code is the build's, and the summary's ``faults`` mark the recording
+    unusable.
 
 ``replay <script> --log P --scratch DIR --result P [--base-outputs DIR] [--capture-dir DIR]``
     Run the script with SolidWorks absent, serving the log: no live COM, no
@@ -131,6 +135,7 @@ def _summary(
         "window_seconds": trailer.get("window_seconds"),
         "escape_audit_seconds": audit.get("seconds"),
         "script_seconds": timing.get("script_seconds"),
+        "capture_files": trailer.get("capture_files"),
         "capture_bytes": trailer.get("capture_bytes"),
         "capture_stored_bytes": trailer.get("capture_stored_bytes"),
     }
@@ -158,16 +163,27 @@ def _record(args: argparse.Namespace, script: Path) -> int:
     import _telemetry
 
     rc = timing["rc"] if timing is not None else 1
-    exit_code = conversation.EXIT_RECORD_FAULT if faults else int(rc)
+    rerun = conversation.rerun_required()
+    exit_code = conversation.EXIT_RECORD_FAULT if rerun else int(rc)
     if faults:
         first = faults[0]
+        recovery = (
+            conversation.Recovery.RERUN if rerun else conversation.Recovery.DEGRADED
+        )
+        consequence = (
+            f"the build is re-run unrecorded (exit {exit_code})"
+            if rerun
+            else "recording stopped there and the build finished on its real "
+            f"results (exit {exit_code}); nothing of it is published"
+        )
         _telemetry.warn(
             f"[com-replay] recording fault in {first['where']} "
             f"({first['type']}: {first['message']}); this recording is unusable "
-            f"and the build is re-run unrecorded (exit {exit_code})",
+            f"and {consequence}",
             where=first["where"],
             fault_type=first["type"],
             fault_count=len(faults),
+            recovery=recovery.value,
         )
     if args.summary is not None:
         try:

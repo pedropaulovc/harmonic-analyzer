@@ -19,10 +19,14 @@ One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
 
 Nothing is restored, reused or published FROM a base recording: every output and
 every cache key is exactly what an unrecorded build produces. A driver exit of
-:data:`EXIT_RECORD_FAULT` (the recorder failed, not the script or SolidWorks)
-re-runs the build once unrecorded on the same seat (``dodo._exec_com``); the
-script's and SolidWorks' own failures stay the build's, never retried here.
-DEVELOPING.md "COM conversation recording (shadow)" has the operator view.
+:data:`EXIT_RECORD_FAULT` (the recorder failed where the build's results cannot
+be trusted, not the script or SolidWorks) re-runs the build once unrecorded on
+the same seat (``dodo._exec_com``); a recorder fault after the build had its
+results only stops the recording (:meth:`Recording.exited`). Either way nothing
+of that recording is published. The script's and SolidWorks' own failures stay
+the build's, never retried here. Each recorded leaf ends with one INFO line
+(:func:`report_line`). DEVELOPING.md "COM conversation recording (shadow)" has
+the operator view.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import uuid
@@ -44,7 +49,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 import _artifact_cache as _cache
@@ -58,13 +63,30 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS_DIR.parents[1]
 OUT_ROOT = REPO_ROOT / "cad" / "out"
 RECORDINGS = OUT_ROOT / "replay"
+# Shadow evaluations' work directories: ``<SCRATCH>/<8 random chars>/`` with
+# the base bundle in ``b``, the replay's output root in ``o`` and its temporary
+# files in ``t``. Short on purpose: a replay writes every output of the build
+# under ``o``, so its paths are the build's own plus SCRATCH_OVERHEAD.
+SCRATCH = OUT_ROOT / "rs"
+SCRATCH_NAME_CHARS = 8  # tempfile.mkdtemp(prefix="")
+WORK_BASE, WORK_OUTPUT, WORK_TMP = "b", "o", "t"
 DRIVER = SCRIPTS_DIR / "com_replay.py"
 BLOB_ROOT = "com-replay"
-MANIFEST_SCHEMA = 1
+# 2: bundles of engine log schema 2 (flat captures).
+MANIFEST_SCHEMA = 2
 LOG_NAME = "conversation.jsonl.gz"
 CAPTURE_NAME = f"{LOG_NAME}.files"  # _com_conversation.capture_dir_of
+# _com_conversation.capture_name(i) for any i < 10**6 (pinned by test).
+CAPTURE_FILE = "000000.gz"
 SUMMARY_NAME = "summary.json"
 SHADOW_NAME = "shadow.json"
+REPLAY_LOG_NAME = "shadow-replay.log"
+DIFF_LOG_NAME = "shadow-diff.log"
+# Windows without long-path support (farm workers, and SolidWorks itself):
+# a file path is at most 259 characters, a directory 247 (CreateDirectory
+# keeps room for an 8.3 name).
+PATH_LIMIT = 259
+DIRECTORY_LIMIT = 247
 # The base lookup: one listing plus at most this many manifest reads (newest
 # first), all inside a hard wall budget; past it the shadow step is skipped.
 LOOKUP_SECONDS = 3.0
@@ -75,6 +97,14 @@ SHADOW_SECONDS = 120.0
 # Bound on any evidence string carried by a span, log or cache.jsonl record.
 EVIDENCE_CHARS = 4000
 DIFFERING_LISTED = 40
+
+
+class Recovery(StrEnum):
+    """_com_conversation.Recovery, restated (pinned equal by test): what a
+    recorder fault cost the build."""
+
+    DEGRADED = "degraded"  # recording stopped; the build finished as its own
+    RERUN = "rerun"  # driver exit EXIT_RECORD_FAULT; re-run unrecorded
 
 
 class ReplayMode(StrEnum):
@@ -151,7 +181,14 @@ class Recording:
     script: Path
     key: str
     directory: Path
-    faulted: bool = False
+    # Set once a recorder fault is known (Recording.exited): the recording is
+    # unusable and nothing of it is published.
+    recovery: Recovery | None = None
+    fault_where: str | None = None
+
+    @property
+    def faulted(self) -> bool:
+        return self.recovery is not None
 
     @property
     def label(self) -> str:
@@ -188,26 +225,44 @@ class Recording:
         """The build's own command, exactly as with recording off."""
         return [sys.executable, str(self.script)]
 
-    def fault(self, exit_code: int) -> None:
-        """The driver exited :data:`EXIT_RECORD_FAULT`: the recorder, not the
-        script or SolidWorks, failed. Say so (WARN, a ``replay.record_fault``
-        event on the task span, a cache.jsonl record); the caller re-runs the
-        build once unrecorded and nothing of this recording is used."""
-        self.faulted = True
+    def exited(self, exit_code: int) -> bool:
+        """Read the driver's exit; True when the caller must re-run the build
+        once unrecorded.
+
+        :data:`EXIT_RECORD_FAULT` is a ``rerun`` fault: the recorder failed
+        where the build's results cannot be trusted. Any other exit code is the
+        build's own; the summary's ``faults`` then name a ``degraded`` fault
+        (recording stopped, the build finished on its real results) or none.
+        A fault of either class is said here (WARN, a ``replay.record_fault``
+        event on the task span, a ``replay_record_fault`` cache.jsonl record,
+        each with its ``recovery``) and nothing of this recording is used."""
         summary = _read_json(self.summary_path) or {}
-        faults = summary.get("faults") or [{}]
-        first = faults[0]
-        where = str(first.get("where", "unknown"))
+        faults = [f for f in summary.get("faults") or [] if isinstance(f, dict)]
+        if exit_code == EXIT_RECORD_FAULT:
+            recovery = Recovery.RERUN
+        elif faults:
+            recovery = Recovery.DEGRADED
+        else:
+            return False
+        first = faults[0] if faults else {}
+        self.recovery = recovery
+        self.fault_where = where = str(first.get("where", "unknown"))
         fault_type = str(first.get("type", "unknown"))
         message = str(first.get("message", ""))[:EVIDENCE_CHARS]
+        consequence = (
+            "re-running the build once unrecorded on the same seat"
+            if recovery is Recovery.RERUN
+            else f"recording stopped there; the build finished on its own results "
+            f"(exit {exit_code}) and nothing of this recording is published"
+        )
         _telemetry.warn(
             f"[com-replay] {self.label}: recorder fault in {where} "
-            f"({fault_type}: {message}); re-running the build once unrecorded on "
-            "the same seat",
+            f"({fault_type}: {message}); {consequence}",
             label=self.label,
             exit_code=exit_code,
             where=where,
             fault_type=fault_type,
+            recovery=recovery.value,
         )
         _telemetry.event(
             "replay.record_fault",
@@ -216,7 +271,8 @@ class Recording:
             where=where,
             fault_type=fault_type,
             message=message,
-            fault_count=len(summary.get("faults") or []),
+            fault_count=len(faults),
+            recovery=recovery.value,
         )
         _cache.record_event(
             "replay_record_fault",
@@ -227,16 +283,91 @@ class Recording:
             where=where,
             fault_type=fault_type,
             message=message,
+            recovery=recovery.value,
             traceback=str(first.get("traceback", ""))[-EVIDENCE_CHARS:],
         )
+        return recovery is Recovery.RERUN
+
+
+@dataclass(frozen=True)
+class PathNeed:
+    """One path a recording or its shadow evaluation creates."""
+
+    purpose: str
+    path: str
+    directory: bool = False
+
+    @property
+    def headroom(self) -> int:
+        """Characters to spare under the Windows limit (negative: too long)."""
+        return (DIRECTORY_LIMIT if self.directory else PATH_LIMIT) - len(self.path)
+
+
+def path_needs(
+    stem: str,
+    recordings: PurePath,
+    scratch: PurePath,
+    outputs: Iterable[str] = (),
+) -> list[PathNeed]:
+    """Every path recording ``stem`` creates, at its longest: the recording's
+    own files under ``recordings`` (:data:`RECORDINGS`), the shadow work
+    directory under ``scratch`` (:data:`SCRATCH`; random names at full width)
+    and, for each output path the build writes (relative to the output root),
+    its copy under the replay's scratch output root."""
+    recording = recordings / stem
+    captures = recording / CAPTURE_NAME
+    work = scratch / ("x" * SCRATCH_NAME_CHARS)
+    base = work / WORK_BASE
+    needs = [
+        PathNeed("recording", str(recording), directory=True),
+        PathNeed("captures", str(captures), directory=True),
+        PathNeed("capture", str(captures / CAPTURE_FILE)),
+        *(
+            PathNeed(name, str(recording / name))
+            for name in (
+                LOG_NAME,
+                SUMMARY_NAME,
+                SHADOW_NAME,
+                REPLAY_LOG_NAME,
+                DIFF_LOG_NAME,
+            )
+        ),
+        PathNeed("work", str(work), directory=True),
+        PathNeed("work tmp", str(work / WORK_TMP), directory=True),
+        PathNeed("work replay.json", str(work / "replay.json")),
+        PathNeed("work diff.json", str(work / "diff.json")),
+        PathNeed("base captures", str(base / CAPTURE_NAME), directory=True),
+        PathNeed("base capture", str(base / CAPTURE_NAME / CAPTURE_FILE)),
+        PathNeed("base log", str(base / LOG_NAME)),
+    ]
+    replay_out = work / WORK_OUTPUT
+    for output in outputs:
+        target = replay_out / output
+        needs.append(PathNeed(f"replay output {output}", str(target)))
+        needs.append(
+            PathNeed(f"replay directory {output}", str(target.parent), directory=True)
+        )
+    return needs
 
 
 def plan(stem: str, script: Path, key: str) -> Recording | None:
     """The recording of this part build, or None: mode ``off`` (the build runs
-    exactly as before) or a recording directory that cannot be prepared (the
-    build runs unrecorded; recording never costs a build)."""
+    exactly as before), a checkout too deep for the recording's own paths, or
+    a recording directory that cannot be prepared (the build runs unrecorded;
+    recording never costs a build)."""
     current = mode()
     if current is ReplayMode.OFF:
+        return None
+    too_long = [
+        need for need in path_needs(stem, RECORDINGS, SCRATCH) if need.headroom < 0
+    ]
+    if too_long:
+        _telemetry.warn(
+            f"[com-replay] part:{stem}: {too_long[0].purpose} path "
+            f"{too_long[0].path} is {len(too_long[0].path)} characters, past the "
+            "Windows limit; building unrecorded",
+            label=f"part:{stem}",
+        )
         return None
     directory = RECORDINGS / stem
     try:
@@ -557,14 +688,15 @@ def evaluate(
     seconds: float = SHADOW_SECONDS,
 ) -> Shadow:
     """Replay the current source against ``base`` and compare this build's
-    recording with it. Everything lives in the recording's ``shadow/``
-    directory, removed afterwards; nothing from the base reaches ``cad/out``."""
+    recording with it. Everything lives in a fresh work directory under
+    :data:`SCRATCH` (the replay's outputs in its ``o``), removed afterwards;
+    nothing from the base reaches the build's outputs."""
     deadline = time.monotonic() + seconds
-    work = recording.directory / "shadow"
-    base_dir = work / "base"
-    tmp = work / "tmp"
-    shutil.rmtree(work, ignore_errors=True)
-    base_dir.mkdir(parents=True)
+    SCRATCH.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="", dir=SCRATCH))
+    base_dir = work / WORK_BASE
+    tmp = work / WORK_TMP
+    base_dir.mkdir()
     tmp.mkdir()
     try:
         described = base.manifest.get("bundle") or {}
@@ -594,7 +726,7 @@ def evaluate(
                 "--capture-dir",
                 str(base_dir / CAPTURE_NAME),
                 "--scratch",
-                str(work / "scratch"),
+                str(work / WORK_OUTPUT),
                 "--result",
                 str(replay_result),
                 "--base-outputs",
@@ -602,7 +734,7 @@ def evaluate(
             ],
             env,
             deadline,
-            recording.directory / "shadow-replay.log",
+            recording.directory / REPLAY_LOG_NAME,
         )
         diff_result = work / "diff.json"
         diff_rc = _run(
@@ -617,7 +749,7 @@ def evaluate(
             ],
             env,
             deadline,
-            recording.directory / "shadow-diff.log",
+            recording.directory / DIFF_LOG_NAME,
         )
         return shadow_of(
             replay_rc, _read_json(replay_result), diff_rc, _read_json(diff_result)
@@ -668,25 +800,68 @@ def after_build(
 ) -> None:
     """Publish this build's recording and (``shadow``) evaluate a replay of
     it. Runs after the seat is released; never raises, never touches an
-    output. ``recording`` None (mode ``off``, or a faulted recording) is a
-    no-op."""
-    if recording is None or recording.faulted:
+    output. ``recording`` None (mode ``off``) is a no-op; a faulted recording
+    (:meth:`Recording.exited`) publishes nothing. Every recorded build ends
+    with one ``replay_shadow`` cache.jsonl record and one INFO line
+    (:func:`report_line`)."""
+    if recording is None:
         return
-    try:
-        _after_build(recording, file_deps, digest)
-    except Exception as exc:  # noqa: BLE001 - observation never costs a build
-        _telemetry.warn(
-            f"[com-replay] {recording.label}: shadow step failed: {exc!r}",
-            label=recording.label,
+    record: dict[str, Any] = {"mode": recording.mode.value}
+    if recording.recovery is not None:
+        record.update(
+            outcome="record_fault",
+            recovery=recording.recovery.value,
+            where=recording.fault_where,
         )
-        _cache.record_event(
-            "replay_shadow",
-            recording.label,
-            recording.key,
-            mode=recording.mode.value,
-            outcome="error",
-            error=repr(exc)[:EVIDENCE_CHARS],
-        )
+    else:
+        try:
+            _after_build(recording, file_deps, digest, record)
+        except Exception as exc:  # noqa: BLE001 - observation never costs a build
+            _telemetry.warn(
+                f"[com-replay] {recording.label}: shadow step failed: {exc!r}",
+                label=recording.label,
+            )
+            record.update(outcome="error", error=repr(exc)[:EVIDENCE_CHARS])
+    _cache.record_event("replay_shadow", recording.label, recording.key, **record)
+    _telemetry.info(
+        report_line(recording.label, record),
+        label=recording.label,
+        outcome=record["outcome"],
+    )
+
+
+def report_line(label: str, record: dict[str, Any]) -> str:
+    """One line (never a newline) of what a recorded build's shadow step did:
+    publication outcome and bundle bytes; the base lookup (base key or none,
+    manifests listed and read, seconds); the shadow replay's verdict, requests
+    served of recorded, seconds; and the ground truth from this build's own
+    requests. ``-`` marks a step the build never reached."""
+
+    def shown(name: str, unit: str = "") -> str:
+        value = record.get(name)
+        return "-" if value is None else f"{value}{unit}"
+
+    outcome = str(record.get("outcome"))
+    head = f"[com-replay] {label}: {outcome}"
+    if outcome == "record_fault":
+        head += f" ({shown('recovery')} in {shown('where')}): nothing published"
+    elif outcome == "error":
+        head += f" ({' '.join(str(record.get('error')).split())[:200]})"
+    base = str(record.get("base_key") or "")[:12]
+    if not base:
+        base = "none" if "lookup" in record else "-"
+    segments = [
+        head,
+        f"publish={shown('publish')} bytes={shown('bundle_bytes')}",
+        f"lookup={shown('lookup')} base={base} differing={shown('differing_count')} "
+        f"listed={shown('listed')} read={shown('read')} {shown('lookup_s', 's')}",
+        f"shadow={shown('verdict')} served={shown('served')}/{shown('recorded')} "
+        f"{shown('wall_s', 's')}",
+        f"truth={shown('ground_truth')}",
+    ]
+    if record.get("soundness_alarm"):
+        segments.append("SOUNDNESS ALARM")
+    return " | ".join(segments)
 
 
 def _overhead(summary: dict[str, Any]) -> dict[str, Any]:
@@ -719,15 +894,17 @@ def _attributes(prefix: str, values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _after_build(
-    recording: Recording, file_deps: list[str], digest: Callable[[str], str]
+    recording: Recording,
+    file_deps: list[str],
+    digest: Callable[[str], str],
+    record: dict[str, Any],
 ) -> None:
+    """Fill ``record`` (``outcome`` last) as far as this build gets."""
     label = recording.label
     infra = _telemetry.BUILD_INFRA_SERVICE
-    record: dict[str, Any] = {"mode": recording.mode.value}
     summary = _read_json(recording.summary_path)
     if summary is None or not summary.get("complete") or summary.get("exit_code") != 0:
         record["outcome"] = "no_recording"
-        _cache.record_event("replay_shadow", label, recording.key, **record)
         return
     overhead = _overhead(summary)
     record["overhead"] = overhead
@@ -743,19 +920,18 @@ def _after_build(
         # An input changed while the part built: the manifest would misstate
         # what the key was built from, so nothing is published or evaluated.
         record["outcome"] = "inputs_moved"
-        _cache.record_event("replay_shadow", label, recording.key, **record)
         return
     inputs = dict(pairs)
     data = bundle(recording)
     bundle_name, _ = blob_names(summary["engine"], recording.stem, recording.key)
     published = manifest(recording, summary, inputs, bundle_name, data)
+    record["bundle_bytes"] = len(data)
     with _telemetry.span(f"replay.publish {label}", service=infra, label=label) as sp:
         record["publish"] = publish(recording, published, data)
         sp.set_attribute("replay.publish", record["publish"])
         sp.set_attribute("replay.bundle_bytes", len(data))
     if recording.mode is not ReplayMode.SHADOW:
         record["outcome"] = "recorded"
-        _cache.record_event("replay_shadow", label, recording.key, **record)
         return
     started = time.monotonic()
     with _telemetry.span(
@@ -777,7 +953,6 @@ def _after_build(
     )
     if found.base is None:
         record["outcome"] = "no_base"
-        _cache.record_event("replay_shadow", label, recording.key, **record)
         return
     base = found.base
     record.update(
@@ -819,7 +994,6 @@ def _after_build(
         for name, value in _attributes("replay", fields).items():
             sp.set_attribute(name, value)
     record.update(
-        outcome="evaluated",
         **{
             k: v
             for k, v in fields.items()
@@ -848,8 +1022,8 @@ def _after_build(
             label=label,
             base_key=str(base.manifest.get("key", "")),
         )
+    record["outcome"] = "evaluated"
     _write_shadow(recording, record)
-    _cache.record_event("replay_shadow", label, recording.key, **record)
 
 
 def _write_shadow(recording: Recording, record: dict[str, Any]) -> None:

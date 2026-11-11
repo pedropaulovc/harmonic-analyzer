@@ -547,15 +547,47 @@ def test_changed_external_input_is_an_input_mismatch(tmp_path, monkeypatch):
     assert any(name.endswith("template.prtdot") for name in mismatched)
 
 
+def test_a_log_of_another_format_is_an_input_mismatch(tmp_path, monkeypatch):
+    # A schema-1 log mirrored each capture under its output path; it must
+    # never be replayed by an engine that reads the flat layout.
+    adapter = FakeAdapter(FakeServer())
+    log = tmp_path / "L.jsonl.gz"
+    with monkeypatch.context() as old:
+        old.setattr(conv, "SCHEMA", conv.SCHEMA - 1)
+        with conv.recording(
+            adapter,
+            script=Path(__file__),
+            log=log,
+            roots=conv.Roots(tmp_path / "out"),
+            audit=False,
+        ):
+            adapter.swApp.Add(1.0, 2.0)
+    assert conv.check_inputs(conv.load(log)) == [
+        {"input": "schema", "recorded": conv.SCHEMA - 1}
+    ]
+
+
 def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkeypatch):
     log, recorded, _, _ = _record(tmp_path, monkeypatch, audit=True)
     trailer = conv.load(log).trailer
-    captured = {
-        rel: sha for files in trailer["captured"].values() for rel, sha in files.items()
+    [[(rel, kept)]] = [list(files.items()) for files in trailer["captured"].values()]
+    written = tmp_path / "run1" / rel
+    assert rel == "sldprt/fake.SLDPRT" and kept == {
+        "file": conv.capture_name(0),
+        "sha256": conv.sha256_file(written),
+        "size": written.stat().st_size,
     }
-    assert list(captured) == ["sldprt/fake.SLDPRT"]
-    kept = sorted(p.name for p in conv.capture_dir_of(log).rglob("*") if p.is_file())
-    assert kept == ["fake.SLDPRT.gz"] and trailer["capture_stored_bytes"] > 0
+    captured = {rel: kept["sha256"]}
+    # Stored flat under a short name, never under the output's own path.
+    capture_dir = conv.capture_dir_of(log)
+    stored = sorted(
+        p.relative_to(capture_dir).as_posix()
+        for p in capture_dir.rglob("*")
+        if p.is_file()
+    )
+    assert stored == ["000000.gz"] and trailer["capture_stored_bytes"] > 0
+    assert trailer["capture_files"] == 1
+    assert len(conv.capture_name(999_999)) == len(conv.capture_name(0))
     audit = trailer["escape_audit"]
     # The adapter's wrapper sat on a real object at entry and on a proxy at
     # exit; no wrapper created inside the window holds a real object.
@@ -994,37 +1026,55 @@ def _failing_emit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(conv.LogWriter, "emit", emit)
 
 
-def test_an_engine_fault_is_a_record_fault_never_the_builds_error(
+def _failing_wrap(monkeypatch: pytest.MonkeyPatch) -> None:
+    wrap = conv.Recorder.wrap
+    failed: list[Any] = []
+
+    def failing_once(self: Any, value: Any, origin: Any) -> Any:
+        if not failed:
+            failed.append(value)
+            raise OSError("injected: the proxy could not be built")
+        return wrap(self, value, origin)
+
+    monkeypatch.setattr(conv.Recorder, "wrap", failing_once)
+
+
+def _classes(faults: list[dict[str, str]]) -> list[tuple[str, str]]:
+    return [(fault["where"], fault["recovery"]) for fault in faults]
+
+
+def test_a_fault_before_the_result_is_in_hand_aborts_the_build_for_a_rerun(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(conv, "_FAULTS", [])
     adapter = FakeAdapter(FakeServer())
     app = adapter.swApp
     with pytest.raises(conv.RecordFault, match="Recorder.call"):
-        with _window(tmp_path, adapter):
+        with _window(tmp_path, adapter) as recorder:
             # The server's own failure is the build's: unchanged, no fault.
             with pytest.raises(pythoncom.com_error):
                 app.Fail()
             assert conv.record_faults() == []
-            _failing_emit(monkeypatch)
+            _failing_wrap(monkeypatch)
             try:
                 app.Add(1.0, 2.0)
             except Exception:  # noqa: BLE001 - a build's own fallback
                 pytest.fail("an engine fault reached the build's except Exception")
     faults = conv.record_faults()
-    assert [fault["where"] for fault in faults] == ["Recorder.call"]
+    assert _classes(faults) == [("Recorder.call", "rerun")]
     assert faults[0]["type"] == "OSError" and "injected" in faults[0]["traceback"]
+    assert conv.rerun_required() and recorder.trailer["status"] == "faulted"
     assert type(adapter.swApp._oleobj_) is FakeDispatch  # teardown is unrecorded
 
 
-def test_a_swallowed_engine_fault_stays_sticky_and_recording_stops(
+def test_a_swallowed_rerun_fault_stays_sticky_and_recording_stops(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(conv, "_FAULTS", [])
     adapter = FakeAdapter(FakeServer())
     app = adapter.swApp
     with _window(tmp_path, adapter) as recorder:
-        _failing_emit(monkeypatch)
+        _failing_wrap(monkeypatch)
         try:
             app.Add(1.0, 2.0)
         except BaseException:  # noqa: BLE001 - a build that swallows everything
@@ -1032,7 +1082,51 @@ def test_a_swallowed_engine_fault_stays_sticky_and_recording_stops(
         # Pass-through from here on: real answers, nothing logged.
         assert recorder.closed
         assert app.Add(2.0, 3.0) == 5.0
-    assert [fault["where"] for fault in conv.record_faults()] == ["Recorder.call"]
+    assert _classes(conv.record_faults()) == [("Recorder.call", "rerun")]
+    assert conv.rerun_required()
+
+
+@pytest.mark.parametrize("site", ["log", "capture"])
+def test_a_fault_once_the_result_is_in_hand_degrades_and_the_build_carries_on(
+    tmp_path, monkeypatch, site
+):
+    monkeypatch.setattr(conv, "_FAULTS", [])
+    adapter = FakeAdapter(FakeServer())
+    app = adapter.swApp
+    saved = tmp_path / "out" / "sldprt" / "x.SLDPRT"
+    with _window(tmp_path, adapter) as recorder:
+        if site == "log":
+            _failing_emit(monkeypatch)
+            assert app.Add(1.0, 2.0) == 3.0  # the real result, never an error
+        else:
+
+            def capture(self: Any, seq: int, watch: Any) -> None:
+                raise FileNotFoundError(2, "injected: No such file or directory")
+
+            monkeypatch.setattr(conv.Recorder, "_capture", capture)
+            assert app.SaveTo(str(saved)) is True and saved.is_file()
+        assert recorder.closed
+        assert app.Add(2.0, 3.0) == 5.0  # pass-through from here on
+    assert _classes(conv.record_faults()) == [(f"Recorder.{site}", "degraded")]
+    assert not conv.rerun_required()
+    assert recorder.trailer["status"] == "degraded"
+    assert recorder.trailer["faults"] == [
+        {"where": f"Recorder.{site}", "recovery": "degraded"}
+    ]
+
+
+def test_a_fault_closing_the_window_degrades_and_never_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(conv, "_FAULTS", [])
+    adapter = FakeAdapter(FakeServer())
+
+    def close(self: Any, trailer: Any) -> None:
+        raise OSError("injected: the trailer could not be written")
+
+    monkeypatch.setattr(conv.LogWriter, "close", close)
+    with _window(tmp_path, adapter):
+        assert adapter.swApp.Add(1.0, 2.0) == 3.0
+    assert _classes(conv.record_faults()) == [("recording.close", "degraded")]
+    assert type(adapter.swApp._oleobj_) is FakeDispatch  # restored all the same
 
 
 def test_an_audit_accounting_fault_never_fails_the_builds_file_io(
@@ -1050,7 +1144,7 @@ def test_an_audit_accounting_fault_never_fails_the_builds_file_io(
     dispatcher.observer = Broken()
     dispatcher.hook("open", (str(tmp_path / "x.txt"), "w", 0))  # does not raise
     assert dispatcher.observer is None
-    assert [fault["where"] for fault in conv.record_faults()] == ["audit"]
+    assert _classes(conv.record_faults()) == [("audit", "degraded")]
 
     class Refusing:
         mode = conv.GuardMode.RAISE
@@ -1076,36 +1170,88 @@ def test_the_replay_sandbox_refuses_the_network_but_not_loopback():
     assert len(sandbox.violations) == 2
 
 
-# A part build's driver run with a fake run_build: the real CLI, recorder and
-# exit-code mapping, the fake application instead of a seat.
-_RECORD_DRIVER = """
-import asyncio, os, sys
-import _session
-import test_com_conversation as fixture
-
-def fake_run_build(build):
-    adapter = fixture.FakeAdapter(fixture.FakeServer())
+# The drivers' fake seat. ``_session.run_build`` with the fake application in
+# place of SolidWorks: connect, build, exit code (a failure is exit 1).
+def fake_run_build(build: Any) -> int:
+    adapter = FakeAdapter(FakeServer())
     try:
         asyncio.run(build(adapter))
-    except Exception:
+    except Exception:  # noqa: BLE001 - run_build's contract
         return 1
     return 0
 
-_session.run_build = fake_run_build
-if os.environ.get("COM_REPLAY_TEST_FAULT"):
-    import _com_conversation as conv
-    real = conv.LogWriter.emit
-    def emit(self, call):
-        if call.seq == 3:
-            raise OSError("injected: the log volume is full")
-        return real(self, call)
-    conv.LogWriter.emit = emit
+
+_PYWIN32_GOOD_SINGLE = win32com.client._get_good_single_object_
+
+
+def pywin32_as_for_a_real_seat() -> None:
+    """Unrecorded runs: pywin32 wraps a FakeDispatch as it wraps a real
+    PyIDispatch (its ``isinstance(PyIDispatchType)`` test cannot see a duck
+    type; a recording's funnel does the same for its proxies)."""
+
+    def good_single(obj: Any, obUserName: Any = None, resultCLSID: Any = None) -> Any:  # noqa: N803
+        if isinstance(obj, FakeDispatch):
+            return Dispatch(obj, obUserName, resultCLSID)
+        return _PYWIN32_GOOD_SINGLE(obj, obUserName, resultCLSID)
+
+    win32com.client._get_good_single_object_ = good_single
+
+
+def inject_record_fault(site: str) -> None:
+    """Driver runs: make the recorder's own code fail at one site."""
+    if site == "log":  # degraded: the fourth call's log line
+        emit = conv.LogWriter.emit
+
+        def failing_emit(self: Any, call: Any) -> None:
+            if call.seq == 3:
+                raise OSError("injected: the log volume is full")
+            emit(self, call)
+
+        conv.LogWriter.emit = failing_emit
+    elif site == "capture":  # degraded: keeping SaveTo's file (MAX_PATH)
+
+        def failing_capture(self: Any, seq: int, watch: Any) -> None:
+            raise FileNotFoundError(2, "injected: No such file or directory")
+
+        conv.Recorder._capture = failing_capture
+    elif site == "wrap":  # rerun: the proxy of a returned interface
+        wrap = conv.Recorder.wrap
+
+        def failing_wrap(self: Any, value: Any, origin: Any) -> Any:
+            if conv.is_interface(value):
+                raise OSError("injected: the proxy could not be built")
+            return wrap(self, value, origin)
+
+        conv.Recorder.wrap = failing_wrap
+
+
+# A part build's driver run on the fake seat: the real CLI, recorder and
+# exit-code mapping. COM_REPLAY_TEST_FAULT names an inject_record_fault site.
+_RECORD_DRIVER = """
+import os, sys
+import _session
+import test_com_conversation as fixture
+_session.run_build = fixture.fake_run_build
+fixture.inject_record_fault(os.environ.get("COM_REPLAY_TEST_FAULT", ""))
 import com_replay
 sys.exit(com_replay.main(sys.argv[1:]))
 """
+# The same build unrecorded (``python <script>`` on the fake seat, outputs
+# redirected like the record driver's --out-root): argv = script, out root.
+_UNRECORDED_DRIVER = """
+import sys
+from pathlib import Path
+import _session
+import _com_conversation as conv
+import test_com_conversation as fixture
+fixture.pywin32_as_for_a_real_seat()
+_session.run_build = fixture.fake_run_build
+conv.redirect_outputs(Path(sys.argv[2]))
+sys.exit(conv.run_script(Path(sys.argv[1])))
+"""
 
 
-def test_cli_record_exits_with_the_build_or_with_the_fault_code(tmp_path):
+def test_cli_record_exits_with_the_build_unless_a_fault_requires_a_rerun(tmp_path):
     script = tmp_path / "build_fake_widget.py"
     script.write_text(
         "import os, sys\n"
@@ -1121,49 +1267,87 @@ def test_cli_record_exits_with_the_build_or_with_the_fault_code(tmp_path):
         encoding="utf-8",
     )
     # A clean recording through this driver: test_replay_shadow's end-to-end
-    # test, which records, publishes and replays it.
-    runs = {}
-    for case, variable in (
-        ("script", "COM_REPLAY_TEST_SCRIPT_FAILS"),
-        ("fault", "COM_REPLAY_TEST_FAULT"),
-    ):
-        env = dict(os.environ, OTEL_EXPORTER_OTLP_ENDPOINT="")
-        env[variable] = "1"
-        summary = tmp_path / case / "summary.json"
-        proc = subprocess.run(
-            [
-                sys.executable,
-                "-c",
+    # test, which records, publishes and replays it. All runs at once.
+    cases = {
+        "script": {"COM_REPLAY_TEST_SCRIPT_FAILS": "1"},
+        "log": {"COM_REPLAY_TEST_FAULT": "log"},
+        "capture": {"COM_REPLAY_TEST_FAULT": "capture"},
+        "wrap": {"COM_REPLAY_TEST_FAULT": "wrap"},
+        "unrecorded": {},
+    }
+    procs = {}
+    for case, variables in cases.items():
+        env = dict(os.environ, OTEL_EXPORTER_OTLP_ENDPOINT="", **variables)
+        (tmp_path / case).mkdir()
+        command = (
+            [_UNRECORDED_DRIVER, str(script), str(tmp_path / case / "out")]
+            if case == "unrecorded"
+            else [
                 _RECORD_DRIVER,
                 "record",
                 str(script),
                 "--log",
                 str(tmp_path / case / "L.jsonl.gz"),
                 "--summary",
-                str(summary),
+                str(tmp_path / case / "summary.json"),
                 "--out-root",
                 str(tmp_path / case / "out"),
-            ],
-            cwd=SCRIPTS,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=120,
+            ]
         )
-        assert summary.is_file(), proc.stdout + proc.stderr
-        runs[case] = (proc.returncode, json.loads(summary.read_text("utf-8")))
+        with (tmp_path / case / "driver.log").open("w", encoding="utf-8") as output:
+            procs[case] = subprocess.Popen(
+                [sys.executable, "-c", *command],
+                cwd=SCRIPTS,
+                env=env,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+            )
+    runs = {}
+    for case, proc in procs.items():
+        rc = proc.wait(timeout=120)
+        output = (tmp_path / case / "driver.log").read_text("utf-8", errors="replace")
+        summary = tmp_path / case / "summary.json"
+        assert case == "unrecorded" or summary.is_file(), output
+        runs[case] = (
+            rc,
+            json.loads(summary.read_text("utf-8")) if summary.is_file() else None,
+            conv._tree_files(tmp_path / case / "out"),
+            output,
+        )
+    rc, _, unrecorded, output = runs["unrecorded"]
+    assert rc == 0 and set(unrecorded) == {"py-output.json", "sldprt/fake.SLDPRT"}, (
+        output
+    )
     # The script's own failure is its exit code, exactly as unrecorded, and
     # the recording of it is complete.
-    rc, script_failed = runs["script"]
+    rc, script_failed, _, _ = runs["script"]
     assert rc == 1 and script_failed["exit_code"] == 1
     assert script_failed["faults"] == [] and script_failed["complete"]
-    # A recorder fault is the dedicated code; the recording is unusable.
-    rc, faulted = runs["fault"]
-    assert rc == conv.EXIT_RECORD_FAULT == faulted["exit_code"]
-    assert not faulted["complete"]
-    [fault] = faulted["faults"]
-    assert fault["where"].startswith("Recorder.") and fault["type"] == "OSError"
-    assert conv.load(tmp_path / "fault" / "L.jsonl.gz").trailer["faults"]
+    # A fault after the call's result was in hand: recording stops, the build
+    # finishes on its real results (outputs byte-identical to the unrecorded
+    # build, exit 0), and the recording is unusable.
+    for site in ("log", "capture"):
+        rc, degraded, outputs, output = runs[site]
+        assert rc == 0 == degraded["exit_code"], output
+        assert outputs == unrecorded, output
+        assert not degraded["complete"]
+        [fault] = degraded["faults"]
+        assert (fault["where"], fault["recovery"]) == (f"Recorder.{site}", "degraded")
+        assert "nothing of it is published" in output
+        trailer = conv.load(tmp_path / site / "L.jsonl.gz").trailer
+        assert trailer["status"] == "degraded"
+    # A fault where the build's result cannot be guaranteed: the dedicated
+    # exit code, for dodo to re-run the build unrecorded.
+    rc, rerun, _, output = runs["wrap"]
+    assert rc == conv.EXIT_RECORD_FAULT == rerun["exit_code"], output
+    assert not rerun["complete"]
+    [fault] = rerun["faults"]
+    assert (fault["where"], fault["recovery"], fault["type"]) == (
+        "Recorder.call",
+        "rerun",
+        "OSError",
+    )
+    assert conv.load(tmp_path / "wrap" / "L.jsonl.gz").trailer["status"] == "faulted"
 
 
 def test_cross_commit_replay_rebinds_the_generator_readback(tmp_path, monkeypatch):

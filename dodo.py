@@ -970,17 +970,18 @@ def _exec_com(
 
     ``recording`` (``cmd`` runs a part build under the COM-recording driver,
     :mod:`_replay_shadow`): the driver's exit ``EXIT_RECORD_FAULT`` -- the
-    recorder failed, not the script or SolidWorks -- re-runs the build at once,
-    unrecorded, on the same seat, and only that re-run's exit code reaches the
-    handling above. Every other exit code is the build's own."""
+    recorder failed where the build's results cannot be trusted, not the script
+    or SolidWorks -- re-runs the build at once, unrecorded, on the same seat,
+    and only that re-run's exit code reaches the handling above. Every other
+    exit code is the build's own (a recorder fault after the build had its
+    results only stops the recording: ``Recording.exited``)."""
 
     def run() -> tuple[int, float]:
         nonlocal cmd, recording
         started = time.time()
         rc = _run_subprocess(cmd, label, log_stem, task=task)
-        if recording is None or rc != _replay_shadow.EXIT_RECORD_FAULT:
+        if recording is None or not recording.exited(rc):
             return rc, started
-        recording.fault(rc)
         cmd, recording = recording.unrecorded, None
         started = time.time()
         return _run_subprocess(cmd, label, log_stem, task=task), started
