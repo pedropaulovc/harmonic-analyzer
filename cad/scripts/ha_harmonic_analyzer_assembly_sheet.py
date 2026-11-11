@@ -128,8 +128,8 @@ CHANNEL_ANCHORS = 20
 # numbers other sheets cite (MHA-CH-00 cites the anchor step) never move. I
 # and O never letter a sub-step.
 SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-# The title block's angular row is the level acceptance, read with the digital
-# angle gauge the shop owns (as MHA-SM-00 sets its plate).
+# The title block's angular row is the level acceptance, read with a digital
+# angle gauge (as MHA-SM-00 sets its plate).
 LEVEL_TOLERANCE_DEG = angular_band_deg()
 LEVEL_ACCEPTANCE = f"LEVEL WITHIN \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0"
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
@@ -173,15 +173,16 @@ def sub_step(key: str, index: int) -> str:
 # the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
 # drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
 _FRAME_REERECTED = (
-    f"FIT THE COLUMNS AND MHA-FR-02 BACK ON IT PER {build.FRAME_ERECTED.text}."
+    f"FIT THE COLUMNS AND MHA-FR-02 BACK ON MHA-FR-01 PER {build.FRAME_ERECTED.text}."
 )
 _BUILT_APART = (
     f"DRIVE TRAIN: BUILD {build.DT_BENCH.text} AT THE BENCH.",
     f"BUILD {build.CH_BENCH.text} AT THE BENCH.",
     f"BUILD {build.DT_BASE_ON_MILL.text}, MHA-FR-01 ON THE MILL.",
     f"BUILD {build.CH_BASE_ON_MILL.text}, MHA-FR-01 STILL ON THE MILL.",
-    f"BUILD {build.CH_TOP_FRAME_ON_MILL.text}, MHA-FR-02 ON THE MILL.",
     "SET MHA-FR-01 ON A FLAT BENCH.",
+    f"BUILD {build.CH_KEEPER_PAIR.text}: THE KEEPER PAIR.",
+    f"BUILD {build.CH_TOP_FRAME_ON_MILL.text}, MHA-FR-02 ON THE MILL.",
     _FRAME_REERECTED,
     f"CHECK THE FRAME PER {build.FRAME_CHECKED.text}.",
 )

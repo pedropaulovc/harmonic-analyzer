@@ -90,6 +90,7 @@ length_in = { value = 2, measured = { status = "measured", by = "placeholder (re
 name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
 kind = "gauge_bar"
 present = false
+shop_made = true
 purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
 note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 6 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
 pieces = 1
@@ -98,13 +99,15 @@ pieces = 1
 
 # Every tool the machine's assembly sheets name has one record, so the release's
 # ASSEMBLY.md tool list (cad/scripts/ha_assembly_package.py TOOLS) marks it
-# OWNED or TO BUY from here. Records marked "archived inventory" are moved from
-# cad/process/shop/inventory.toml at 45952b66bc (identity fields only), owned
-# as it listed them: the gauges with the shop's first inventory, the bench and
-# hand tools Pedro approved as shop kit (2026-10-11 and 2026-10-15, #1550) and
-# the Loctite 638 of his adhesive rulings. Every other record is new: nothing
-# recorded the shop owning it, so it is to buy (or to record, if the shop
-# has one). No vendor or SKU is asserted for a tool to buy.
+# OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
+# identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
+# They are owned only where that inventory recorded possession: the gauges of
+# the shop's first inventory and the bench and hand tools Pedro listed as kept
+# (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
+# recorded only as approved to buy, as a trial assumption or as an
+# illustrative example is present = false, as is every new record: nothing
+# recorded the shop owning it, so it is to buy (or to record, if the shop has
+# one). No vendor or SKU is asserted for a tool to buy.
 
 [gauges.micrometers]
 name = "Outside micrometers, 0-1, 1-2 and 2-3 in (archived inventory)"
@@ -165,13 +168,14 @@ name = "Arbor press"
 kind = "press"
 present = false
 
-# The 6 in rule the archived inventory lists (Starrett C604R-6) cannot read the
+# Long enough for the tallest height an assembly sheet reads with a rule; the 6
+# in rule the archived inventory lists (Starrett C604R-6) cannot read the
 # MHA-HA-00 bar height (ha_harmonic_analyzer_assembly_spec.BAR_HEIGHT_MM).
-[tools.steel-rule-24]
-name = "Steel rule, 24 in"
+[tools.steel-rule-48]
+name = "Steel rule, 48 in"
 kind = "rule"
 present = false
-length_in = 24
+length_in = 48
 
 [tools.tape-measure]
 name = "Tape measure"
@@ -252,20 +256,23 @@ name = "Starrett 18A automatic centre punch (archived inventory)"
 kind = "centre_punch"
 make = "Starrett"
 sku = "18A"
-present = true
+present = false
+note = "Purchase approved by Pedro 2026-10-11 (archived inventory); not recorded as received."
 
 [tools.file-nicholson-10-second-cut]
 name = "Nicholson 10 in mill second-cut file (archived inventory)"
 kind = "file"
 make = "Nicholson"
-present = true
+present = false
+note = "Purchase approved by Pedro 2026-10-11 (archived inventory); not recorded as received."
 
 [tools.india-stone-ib8]
 name = "Norton IB8 India combination stone (archived inventory)"
 kind = "sharpening_stone"
 make = "Norton"
 sku = "IB8"
-present = true
+present = false
+note = "The archived inventory listed it only as an illustrative example item."
 
 [fixtures.parallels-lms-6745]
 name = "Parallel set, 1/2-1 in (archived inventory)"
@@ -275,9 +282,10 @@ sku = "6745"
 present = true
 
 [fixtures.v-blocks]
-name = "Matched V-block pair with clamps (archived inventory)"
+name = "Matched V-block pair with clamps"
 kind = "v_blocks"
-present = true
+present = false
+note = "The archived inventory recorded the pair only as a trial ownership assumption (#1413), not as owned."
 
 [consumables.loctite-638]
 name = "Loctite 638 retaining compound (archived inventory)"

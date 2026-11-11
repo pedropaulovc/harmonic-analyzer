@@ -81,11 +81,13 @@ DT_BENCH = Run(dt_steps, dt_steps.SEQUENCE[0], ch_steps.CYLINDER_STACK_KEY)
 DT_BASE_ON_MILL = Run(dt_steps, ch_steps.CYLINDER_STACK_KEY)
 # MHA-CH-00: the rocker stack and rod pins at the bench (before MHA-DT-00
 # step 8 sets the rods on the cams); the rocker bank on the base, still on the
-# mill; the fulcrum keepers on MHA-FR-02 on the mill; the lever bank once the
-# frame is up (its bars' feet straddle the rocker arms below).
+# mill; the fulcrum keeper pair, bored together once the base is off the mill;
+# the keepers on MHA-FR-02 on the mill; the lever bank once the frame is up
+# (its bars' feet straddle the rocker arms below).
 CH_BENCH = Run(ch_steps, ch_steps.SEQUENCE[0], "north-bracket-held")
 CH_BASE_ON_MILL = Run(ch_steps, "north-bracket-held", "keepers-clamped")
-CH_TOP_FRAME_ON_MILL = Run(ch_steps, "keepers-clamped", "bar-notches-set")
+CH_KEEPER_PAIR = Run(ch_steps, "keepers-clamped", "keepers-on-frame")
+CH_TOP_FRAME_ON_MILL = Run(ch_steps, "keepers-on-frame", "bar-notches-set")
 CH_ON_FRAME = Run(ch_steps, "bar-notches-set")
 # MHA-HA-00 from the summing lever on: everything hangs on the erected frame.
 HA_ON_FRAME = Run(ha_steps, "summing-hung")
@@ -116,7 +118,13 @@ PHASES: tuple[Phase, ...] = (
         "APART",
         (DT_BASE_ON_MILL, CH_BASE_ON_MILL),
     ),
-    Phase("FULCRUM KEEPERS", "MHA-FR-02 ON THE MILL", "APART", (CH_TOP_FRAME_ON_MILL,)),
+    Phase("FULCRUM KEEPER PAIR", "BENCH AND MILL", "APART", (CH_KEEPER_PAIR,)),
+    Phase(
+        "KEEPERS ON MHA-FR-02",
+        "MHA-FR-02 ON THE MILL",
+        "APART",
+        (CH_TOP_FRAME_ON_MILL,),
+    ),
     Phase(
         "FRAME RE-ERECTED",
         "ON MHA-FR-01",

@@ -33,7 +33,7 @@ def test_a_new_tool_word_fails_the_guard(monkeypatch):
 
 
 def test_the_listed_rule_reads_the_bar_height():
-    rule = package.shop_record("shop-equipment.toml:tools.steel-rule-24")
+    rule = package.shop_record("shop-equipment.toml:tools.steel-rule-48")
     assert rule["length_in"] * 25.4 >= BAR_HEIGHT_MM
 
 

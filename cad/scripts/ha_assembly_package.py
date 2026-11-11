@@ -221,8 +221,12 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment.toml:tools.setting-mandrel-375",),
         packages=("dt-drive-train",),
     ),
+    # The verb, wherever it stands; not a fit class ("PRESS FIT", "(PRESS)"),
+    # a part's press size, or a hand pressed lightly.
     Tool(
-        "Arbor press", r"(?:^|\. )PRESS\b", ("shop-equipment.toml:tools.arbor-press",)
+        "Arbor press",
+        r"(?<!\()\bPRESS(?:ED)?\b(?![- ]FIT|\)| SIZE| LIGHTLY)",
+        ("shop-equipment.toml:tools.arbor-press",),
     ),
     # --- measuring --------------------------------------------------------
     Tool(
@@ -274,9 +278,9 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool("Protractor", r"\bPROTRACTOR\b", ("shop-equipment.toml:gauges.protractor",)),
     Tool(
-        "Steel rule, 24 in",
+        "Steel rule, 48 in",
         r"\bRULE\b",
-        ("shop-equipment.toml:tools.steel-rule-24",),
+        ("shop-equipment.toml:tools.steel-rule-48",),
     ),
     Tool("Tape measure", r"TAPE MEASURE", ("shop-equipment.toml:tools.tape-measure",)),
     Tool(
@@ -335,7 +339,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         "File",
-        r"(?:^|\. )FILE\b",
+        r"\b(?:ROUND )?FILE\b",
         ("shop-equipment.toml:tools.file-nicholson-10-second-cut",),
     ),
     Tool(
@@ -499,6 +503,17 @@ def _cell(values: tuple[str, ...]) -> str:
 
 
 def markdown() -> str:
+    ha_steps = build.ha_steps
+    printed_at = sorted(
+        ha_steps.step_number(key)
+        for key in ("frame-built", "drive-train-built", "channel-built")
+    )
+    erected = 1 + next(
+        i for i, phase in enumerate(build.PHASES) if build.FRAME_ERECTED in phase.runs
+    )
+    apart = [
+        i for i, phase in enumerate(build.PHASES, start=1) if phase.frame == "APART"
+    ]
     lines = [
         "# MHA-HA-00 build sequence and assembly tools",
         "",
@@ -509,10 +524,10 @@ def markdown() -> str:
         "## Build sequence",
         "",
         "Step numbers are the sub-assembly sheets' own. MHA-HA-00 integration "
-        "steps 1, 2 and 4 print the same order. The frame comes apart at "
+        f"steps {', '.join(map(str, printed_at[:-1]))} and {printed_at[-1]} print "
+        "the same order. The frame comes apart at "
         f"{build.fr_steps.step_ref(build.FRAME_LIFTED_KEY)} and goes back up on its "
-        "match marks in phase "
-        f"{1 + next(i for i, p in enumerate(build.PHASES) if build.FRAME_ERECTED in p.runs)}.",
+        f"match marks in phase {erected}.",
         "",
         "| # | Phase | Where | Frame | Steps | Match-located steps |",
         "|---|---|---|---|---|---|",
@@ -527,15 +542,16 @@ def markdown() -> str:
         "",
         "Match-located steps drill, ream, tap or spot a hole through or from a "
         "part already located on another; those on MHA-FR-01 and MHA-FR-02 are "
-        "why the frame is apart for phases 2-5.",
+        f"why the frame is apart for phases {apart[0]}-{apart[-1]}.",
         "",
         "## Assembly tools, gauges and consumables",
         "",
         "Every tool the assembly sheets name, reconciled with cad/process/shop.toml "
         "and cad/config/shop-equipment.toml. OWNED: its shop record says so. "
         "TO BUY: its record has `present = false`. TO MAKE: a drawn shop tool, "
-        "or made in the step that names it. Drills, taps and reamers a step "
-        "names only by a part's callout are that part's, not listed here.",
+        "made in the step that names it, or its record says `shop_made`. Drills, "
+        "taps and reamers a step names only by a part's callout are that part's, "
+        "not listed here.",
         "",
         "| Tool | Status | Shop record | Named on | As named |",
         "|---|---|---|---|---|",
