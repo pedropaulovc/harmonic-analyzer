@@ -2463,9 +2463,17 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         in located[lifted:]
     )
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
-    # A failed trial names a part to replace whichever way the gears inspect.
-    assert "REPLACE THE ONE OUTSIDE IT" in located
-    assert f"IF BOTH ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located
+    # The setting is made where the mesh is: S is indicated at the disc's height.
+    assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
+    # A failed trial inspects the gears and the two running fits the window
+    # charges before it blames the arm.
+    assert (
+        f"THE {_number('pd-transgear-knob-shaft')} JOURNAL, THE "
+        f"{_number('pd-transgear-arm-plate')} BORE AND THE "
+        f"{_number('pd-transgear-feed-pinion')} BORE TO THEIR SHEETS; REPLACE THE PART OUTSIDE"
+        in located
+    )
+    assert f"IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located
     fitted = _step_body("arm-plate-fitted")
     assert "AS 12M AND 12N" in fitted
     assert f"NEW {_number('pd-transgear-arm')} ARM" in fitted

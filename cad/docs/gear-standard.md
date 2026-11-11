@@ -151,13 +151,13 @@ the runout extreme at the nominal end, 1.214 and 1.123 at the far end, 43.844
 (owner ruling on #2034 and #2011: 43.794 +0.050/-0, aim mid-band).
 MHA-PD-00's arm-plate-located step jig-bores it on the mill DRO after the
 MHA-PD-23 pin is pressed: the arm trammed front up on its pivot bore and the
-pin's shank in bore S (the cluster's running axis), K set at mid-band
+pin's shank in bore S, at the height the disc runs (the mesh's own plane), K set at mid-band
 coordinates from S, each indicated true to under one division of sweep. With
 the plate still only clamped, the cluster and the knob shaft are slipped on and
 the mesh is tried on an indicator (#2417): the knob shaft and the disc pressed
 lightly together, the disc rocked, the stylus on the disc tooth next to the
-15T. The window, .0005 to .0075 in, is every reading a build inside its
-drawings can give (`draw_pd_paper_drive_assembly.REDUCER_BACKLASH_DIAL_MM`):
+15T. The window, .0005 to .0075 in, covers every reading the band, the gears'
+runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_BACKLASH_DIAL_MM`; #2510):
 the band's backlash at the tightest centre the two running fits allow, read
 at the tip and rounded outward to the indicator's division. The trial only
 reads the setting; it never moves K, so the band stays the limit. The pilots

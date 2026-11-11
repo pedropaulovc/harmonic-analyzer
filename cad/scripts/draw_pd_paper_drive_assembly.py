@@ -10,8 +10,8 @@ Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
 assembly steps; sheet 6 continues them and carries DETAIL K, the plate's
 knob-bore setting from the arm's pin bore as the assembly's own model
-dimensions, beside the step that sets it; sheet 7 prints the chain fit-up
-(CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
+dimensions, beside the step that sets it; sheet 10 prints the chain fit-up
+(CONTRACT-paper-drive.md §13.2). Sheet 11 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
 reference. The BOM identifies the current inch
 reducer, finite stock-form integral pinions and rack/backer; sheet 1 gives the
@@ -1642,18 +1642,26 @@ KNOB_END_FLOAT_RANGE = (
 # flanks let it, so the cluster's shift on the pin and the pin's own bending
 # are not read as shake.
 #
-# The window is every reading a build inside its drawings can give: the
+# The window is every reading the charged terms can give: the
 # circular backlash over the S to N set band at every printed corner
 # (paper_drive_mesh_check.reducer_mesh), at the band's bottom closed by the
 # largest clearances for the floor and at its top closed by the smallest for
 # the ceiling, moved to the tip by the tip radius over the pitch radius and
-# rounded outward onto the shop indicator's division. A reading outside it
-# therefore proves a part or the setting off its drawing, which the steps'
-# remedies then find; no build inside its drawings is refused. The floor is
-# a positive shake at the tightest centre the fits allow, which is the mesh
-# check's own gate (backlash over zero at the tight extreme); the no-tight-
-# spot turn checks the same thing all round. Delegated ruling 2026-11-10
-# (#2417, PR #2494), pending owner confirmation.
+# rounded outward onto the shop indicator's division, so that a build inside
+# those terms is never refused and a reading outside sends the fitter to
+# inspect the parts the remedy names. The pin's lean in its bore (S is held
+# square only within .001 over the arm, which the disc's height multiplies)
+# is not in the window: the located step indicates S on the shank at the
+# height the disc runs, so the setting is made where the mesh is (codjiflo
+# P2 on 176fad0). The smaller tilt terms at the knob
+# (paper_drive_geom.reducer_axis_tilt_maxima_rad) are not charged: #2510.
+# The floor is a positive shake at the tightest centre the fits allow, which
+# is the mesh check's own gate (backlash over zero at the tight extreme);
+# the no-tight-spot turn checks the same thing all round. Outward rounding
+# departs from the package's inward windows (steps.inch_window) because this
+# reading is a cross-check of parts already accepted on their own sheets.
+# Delegated ruling 2026-11-10 (PR #2494 takeover agent), no precedent; owner
+# review #2144; pending owner confirmation.
 _KNOB_JOURNAL_CLEARANCE_MM = (
     min(plate_geometry.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
     max(plate_geometry.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
@@ -1690,8 +1698,10 @@ REDUCER_BACKLASH_DIAL_TEXT = " TO ".join(
     steps.inch_text(bound, 4) for bound in REDUCER_BACKLASH_DIAL_MM
 )
 # The disc is read at stations round one turn: 45 degrees apart sample its
-# once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak, and each
-# move turns the 15T 1.875 turns, so its runout is sampled at other phases.
+# once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak. Each
+# move turns the 15T 1.25 turns, so it is read at four phases 90 degrees
+# apart, within cos 45 (71 %) of its own peak: the unread part of its .001
+# eccentricity moves the backlash under .0003, less than a division.
 REDUCER_DIAL_STATIONS = 8
 
 
@@ -2039,8 +2049,8 @@ def _step_text(
             f"THE PLATE AND ITS CLAMPS CLEAR, WITH ROOM UNDER THE PLATE BORE FOR THE "
             f"{n['pd-transgear-knob-shaft']} SHAFT'S REAR END.",
             "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE THE ARM'S PIVOT BORE "
-            f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, CLOSE "
-            f"TO THE ARM'S FACE, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
+            f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, AT "
+            f"THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
             f"MOVE THE TABLE TO THE {KNOB_SETTING_VIEW_NAME} ALONG AND ACROSS "
             "SETTINGS FROM S.",
@@ -2071,18 +2081,23 @@ def _step_text(
             # the setting's limit (owner ruling on #2034 x #2011; #2144 item
             # 5.3), and the indication's own worst case uses .0008 of its .001
             # either side of the aim, so no move inside it is worth a division
-            # (codjiflo P2 on 27438d7; delegated ruling 2026-11-10, #2417, PR
-            # #2494). A mesh that reads outside the window with N true is a
-            # part off its drawing: a gear, or else the pin's bore, which
-            # carries the disc an inch off the arm's face.
+            # (codjiflo P2 on 27438d7; delegated ruling 2026-11-10 (PR #2494
+            # takeover agent), no precedent; owner review #2144; pending owner
+            # confirmation). A mesh that reads outside the window with N true
+            # is a part off its drawing: a gear or one of the two running
+            # fits the window charges; only when all are inside is the arm
+            # renewed (codjiflo P2 on 176fad0).
             f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
             f"FAILED, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth} AND THE "
-            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA, REPLACE THE ONE "
-            "OUTSIDE IT (A NEW DISC THROUGH STEPS "
+            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA, AND THE "
+            f"{n['pd-transgear-knob-shaft']} JOURNAL, THE "
+            f"{n['pd-transgear-arm-plate']} BORE AND THE "
+            f"{n['pd-transgear-feed-pinion']} BORE TO THEIR SHEETS; REPLACE THE "
+            "PART OUTSIDE (A NEW DISC THROUGH STEPS "
             f"{steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')}) AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
-            "IF BOTH ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
+            "IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-pin']} PIN AND "
             f"{n['pd-vn-transgear-latch-pin']} DOWEL.",
@@ -2403,8 +2418,9 @@ def _step_text(
             # anything irreversible, so what usually fails here is the plate's
             # seat (its screws were refitted at the cut) or a tooth fouled or
             # damaged since: those are tried first and cost a clean, a knob
-            # stack or a disc (delegated ruling 2026-11-10, #2417, PR #2494,
-            # pending owner confirmation). A fault that is the same all round
+            # stack or a disc (delegated ruling 2026-11-10 (PR #2494 takeover
+            # agent), no precedent; owner review #2144; pending owner
+            # confirmation). A fault that is the same all round
             # is in the arm's setting, and still takes the whole-transgear
             # rebuild (delegated ruling 2026-11-07 (Main), no precedent; owner
             # review #2144; pending owner confirmation), now from the latch
