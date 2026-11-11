@@ -318,7 +318,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   are unchanged. Away from the station where the cutter crosses the axis a
   straight tooth is thicker on the pitch circle than the helix was, by up to
   0.017 mm at the north face; `crank_mesh_stack.station_checks` books it per
-  face station (#2481). The ruling is conditional on the straight model
+  face station (#2481). Off the pitch circle its flanks also lean against the
+  helix's, one way at the tip and the other at the root; with drive and coast
+  contact at different radii that takes 0.016 mm more backlash at the south
+  face and 0.040 mm at the north face in the plane model. `station_checks`
+  reports it beside the backlash and does not gate it (#2481). The ruling is
+  conditional on the straight model
   passing the drive-train interference and soundness gates.
 - The meshes are not conjugate. Drawing each gear as its cutter's form removes
   the earlier mismatch between range cutters and ideal profiles, at the price

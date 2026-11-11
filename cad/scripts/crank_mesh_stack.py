@@ -15,14 +15,19 @@ station where the cutter's centre plane crosses its axis. Because the axes
 cross in plan, the centre closes toward the 64T's south face and opens toward
 its north face; because the teeth are straight, each tooth space also shifts
 sideways off its radial line away from the crossing station, which thickens
-the tooth on the pitch circle and raises the root. ``station_checks`` reports
-both per face station, closed form, NOT gated (the margin it shows awaits an
-owner ruling, #2481).
+the tooth on the pitch circle and raises the root. Off the pitch circle the
+same shift leans each flank against the screw form, one flank's way at the
+tip and the other's at the root, so the two flanks' contact radii decide what
+it costs. ``station_checks`` reports all of it per face station, NOT gated
+(the margin it shows awaits an owner ruling, #2481).
 """
 from __future__ import annotations
 
+import functools
 import math
 from dataclasses import dataclass, replace
+
+import numpy as np
 
 import _config
 import dt_cone_pivot_post_spec as post
@@ -196,11 +201,140 @@ def straight_root_rise(station_mm: float) -> float:
     return math.hypot(gear64.ROOT_DIA / 2.0, shift) - gear64.ROOT_DIA / 2.0
 
 
+_LEAN_FLANK_SAMPLES = 400
+_LEAN_MESH_PHASES = 61
+
+
+def _as_cut_flank(shift_mm: float, side: int) -> tuple[np.ndarray, np.ndarray]:
+    """(radius, azimuth) along one flank of the straight tooth space's
+    transverse section ``shift_mm`` off its radial line."""
+    form = gear64.TOOTH_SPACE_FORM
+    points = np.array(
+        [
+            form.flank_point(float(u), side)
+            for u in np.linspace(
+                form.flank_parameter_min, form.flank_parameter_max, 801
+            )
+        ]
+    )
+    tangential = points[:, 1] / math.cos(_BETA) + shift_mm
+    return np.hypot(points[:, 0], tangential), np.arctan2(tangential, points[:, 0])
+
+
+def _flank_turn(shift_mm: float):
+    """turn(side, radius): how far (rad) each flank of the shifted space sits
+    from the crossing-station form at a radius, less the turn of the space's
+    centre on the pitch circle. At R64 the two sides' difference is the
+    thickening; its change with radius is the lean."""
+    shifted = {side: _as_cut_flank(shift_mm, side) for side in (1, -1)}
+    crossing = {side: _as_cut_flank(0.0, side) for side in (1, -1)}
+    low = max(curve[0][0] for curve in (*shifted.values(), *crossing.values()))
+    high = min(curve[0][-1] for curve in (*shifted.values(), *crossing.values()))
+
+    def raw(side: int, radius):
+        radius = np.clip(radius, low, high)
+        return np.interp(radius, *shifted[side]) - np.interp(radius, *crossing[side])
+
+    centre_turn = (raw(1, R64) + raw(-1, R64)) / 2.0
+    return lambda side, radius: raw(side, radius) - centre_turn
+
+
+def _sampled_backlash(pin, gear, centre: float, turn, resolved: bool) -> float:
+    """Smallest free circular backlash (on the 16T's operating pitch circle)
+    through one pitch of mesh: both involute flanks of the engaged 64T spaces,
+    each turned as the straight space is, sampled against the 16T's involute
+    flanks. ``resolved`` takes the turn at each sample's own radius; otherwise
+    every sample takes the pitch-circle turn (the thickening alone)."""
+    alpha = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
+    grow, cos_beta = EQUIVALENT_RADIUS_GROWTH_64, math.cos(_BETA)
+    base_p, base_g = (
+        pin.pitch_radius * math.cos(alpha),
+        gear.pitch_radius * math.cos(alpha),
+    )
+    pitch = 2.0 * math.pi * pin.pitch_radius / pin.teeth
+
+    def involute(angle):
+        return np.tan(angle) - angle
+
+    radius = np.linspace(
+        max(base_g, gear.root_radius_max), gear.tip_radius, _LEAN_FLANK_SAMPLES
+    )
+    space_half = (
+        (pitch - gear.pitch_thickness) / (2.0 * gear.pitch_radius)
+        + involute(np.arccos(base_g / radius))
+        - involute(alpha)
+    )
+    # The normal section shows a transverse arc cos(beta) shorter, on the
+    # virtual radius.
+    flank = {
+        side: side * space_half
+        + (
+            turn(side, radius - grow) * (radius - grow) / radius
+            if resolved
+            else turn(side, R64) * R64 / gear.pitch_radius
+        )
+        * cos_beta
+        for side in (1, -1)
+    }
+    tooth_half = pin.pitch_thickness / (2.0 * pin.pitch_radius) + involute(alpha)
+    least = math.inf
+    for phase in np.linspace(-0.5, 0.5, _LEAN_MESH_PHASES):
+        free = 0.0
+        for side in (1, -1):
+            clear = math.inf
+            for pair in (-2, -1, 0, 1, 2):
+                azimuth = (phase + pair) * pitch / gear.pitch_radius + flank[side]
+                x, y = radius * np.cos(azimuth) - centre, radius * np.sin(azimuth)
+                reach = np.hypot(x, y)
+                met = reach <= pin.tip_radius
+                if not met.any():
+                    continue
+                tooth_centre = math.pi - (phase + pair) * 2.0 * math.pi / pin.teeth
+                off_centre = (np.arctan2(y, x)[met] - tooth_centre + math.pi) % (
+                    2.0 * math.pi
+                ) - math.pi
+                half = tooth_half - involute(
+                    np.arccos(base_p / np.maximum(reach[met], base_p))
+                )
+                clear = min(clear, float(np.min(-side * off_centre - half)))
+            free += clear
+        least = min(least, free)
+    return least * centre * pin.pitch_radius / (pin.pitch_radius + gear.pitch_radius)
+
+
+def sampled_station_backlash(station_mm: float, *, lean: bool) -> float:
+    """Worst printed corner pair's sampled backlash at a face station's closed
+    centre. With ``lean`` off it is the closed form less the thickening (the
+    control); with it on, the straight flanks at their own contact radii."""
+    grow = EQUIVALENT_RADIUS_GROWTH_64
+    height = gear64.FACE_WIDTH / 2.0 + station_mm
+    turn = _flank_turn((height - gear64.TOOTH_SPACE_CROSSING) * math.tan(_BETA))
+    centre = CENTRE_RANGE_MM[0] + grow + centre_at_station(station_mm) - FRAME_C2C
+    return min(
+        _sampled_backlash(
+            plane_gear(a, pinion.MODULE_MM), _normal_section_64(b), centre, turn, lean
+        )
+        for _, a in pinion.STOCK_PROFILE_CORNERS
+        for _, b in gear64.STOCK_PROFILE_CORNERS
+    )
+
+
+@functools.lru_cache(maxsize=None)
+def straight_tooth_lean(station_mm: float) -> float:
+    """Backlash the straight 64T tooth's radial lean takes at a face station,
+    beyond its pitch-circle thickening, with drive and coast contact at their
+    own radii through the mesh cycle (plane model, ideal involutes)."""
+    return sampled_station_backlash(station_mm, lean=False) - sampled_station_backlash(
+        station_mm, lean=True
+    )
+
+
 @dataclass(frozen=True)
 class StationCheck:
     station_mm: float
     centre_shift_mm: float
     tooth_thickening_mm: float  # straight 64T tooth, normal circular, booked below
+    tooth_lean_mm: float  # contact-radius resolved; beside backlash_min_mm, not in it
     backlash_min_mm: float  # every printed corner pair, both centre-range ends
     interference_margin_mm: float  # at the closed end; crossing-station tooth form
     root_clearance_mm: float  # at the closed end
@@ -209,6 +343,7 @@ class StationCheck:
         return (
             f"station {self.station_mm:+.3f} mm: centre {self.centre_shift_mm:+.4f}, "
             f"straight tooth +{self.tooth_thickening_mm:.4f}, "
+            f"lean takes {self.tooth_lean_mm:.4f} more, "
             f"backlash min {self.backlash_min_mm:.4f}, interference margin "
             f"{self.interference_margin_mm:.3f}, root clearance {self.root_clearance_mm:.3f}"
         )
@@ -218,7 +353,9 @@ def station_checks() -> tuple[StationCheck, ...]:
     """The standard check's corners at each face station's centre and straight
     tooth (reported only). Backlash loses the tooth's thickening and root
     clearance the root's rise; the interference margin keeps the
-    crossing-station tooth form."""
+    crossing-station tooth form. The lean is reported beside the backlash and
+    is not taken from it: it is a plane-model figure, and on the real crossed
+    axes it does not simply add to the other terms (#2481)."""
     grow = EQUIVALENT_RADIUS_GROWTH_64
     alpha = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
     pins = [plane_gear(profile, pinion.MODULE_MM) for _, profile in pinion.STOCK_PROFILE_CORNERS]
@@ -232,6 +369,7 @@ def station_checks() -> tuple[StationCheck, ...]:
             station,
             shift,
             thickening,
+            straight_tooth_lean(station),
             min(backlash(a, b, c + grow + shift, alpha)
                 for a in pins for b in gears for c in CENTRE_RANGE_MM) - thickening,
             min(interference_margin(a, b, closed, alpha) for a in pins for b in gears),
