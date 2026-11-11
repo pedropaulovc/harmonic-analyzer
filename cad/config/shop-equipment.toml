@@ -122,6 +122,13 @@ kind = "dial_indicator"
 make = "Mitutoyo"
 present = true
 
+# MHA-DT-00 zeroes an indicator on each pedestal and one more across them at
+# once; the shop records one dial indicator and one test indicator.
+[gauges.dial-indicators-extra]
+name = "Two more dial indicators, each on a magnetic base"
+kind = "dial_indicator"
+present = false
+
 [gauges.mag-base]
 name = "Magnetic indicator base (archived inventory)"
 kind = "magnetic_base"
