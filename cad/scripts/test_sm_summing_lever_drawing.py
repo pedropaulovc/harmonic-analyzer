@@ -272,6 +272,7 @@ def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch,
     case.state.document_precision = places
     if places == 2:
         case.capture()()
+        assert case.state.value * 1000.0 == pytest.approx(6.025)
     else:
         with pytest.raises(RuntimeError):
             case.capture()
@@ -370,7 +371,7 @@ def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatc
     check()
     assert case.state.picks == ["height.end", "plate top"]
     assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
-    assert case.state.value * 1000.0 == pytest.approx(2.594)
+    assert case.state.value * 1000.0 == pytest.approx(1.634)
     case.state.precision = -2
     check()  # ordinary precision may follow the existing document
     case.state.document_precision = 3
@@ -682,15 +683,15 @@ def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
     segment = drawing._receiver_axis_centerline(adapter, back)
     assert activated == ["VIEW F"]
     assert projected_points == [
-        pytest.approx((0.0316926, -0.0007112, -0.0762)),
-        pytest.approx((0.014002, -0.0007112, -0.0762)),
+        pytest.approx((0.0316926, 0.0002488, -0.0762)),
+        pytest.approx((0.014002, 0.0002488, -0.0762)),
     ]
     assert created_lines == [pytest.approx((
         origin[0] - scale * 0.0316926 + 0.03,
-        origin[1] - scale * 0.0007112 - 0.02,
+        origin[1] + scale * 0.0002488 - 0.02,
         0.0,
         origin[0] - scale * 0.014002 + 0.03,
-        origin[1] - scale * 0.0007112 - 0.02,
+        origin[1] + scale * 0.0002488 - 0.02,
         0.0,
     ))]
     assert manager.AddToDB is False
@@ -758,9 +759,9 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
 def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
     spec = sm_summing_lever_spec
     assert lever_build.RIB_T == spec.RIB_T == 5.08
-    assert spec.COUNTER_WEB_T == 5.08
-    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 2.54
-    assert spec.COEFFICIENT_T == 7.0
+    assert spec.COUNTER_WEB_T == spec.COEFFICIENT_T == 7.0
+    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 3.5
+    assert -spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_BOTTOM_Y == -3.5
     assert notes.DRAWING_DIMENSIONS["EdgeRibFront"] == {"EdgeRibThickness"}
     assert notes.DIMENSION_PREFIXES[("EdgeRibFront", "EdgeRibThickness")] == "3X "
     rib_dimensions = {
@@ -820,16 +821,22 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     to its side face, on both stubs; the width is a reference."""
     spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
-    assert knife == {"HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide"}
+    assert knife == {
+        "HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide", "LowerFlankToSide",
+    }
     assert set(knife) <= set(drawing.DETAIL_KEEP)
     assert "KnifeRidgeRadius" in drawing.DETAIL_KEEP
     prefixes = notes.DIMENSION_PREFIXES
-    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X ("
-    assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
-    assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
-    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
+    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "EACH STUB ("
+    for name in ("HexHeight", "RidgeFromLeft", "RidgeFromRight"):
+        assert prefixes[("KnifeEnvelopeReference", name)] == "EACH STUB "
+    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "2X PER STUB "
+    # The lower corners close the hexagon at the title block's angular row.
+    assert prefixes[("KnifeEnvelopeReference", "LowerFlankToSide")] == "2X PER STUB "
+    assert "LowerFlankToSide" not in notes.DIMENSION_CALLOUTS_BELOW
+    assert prefixes[("KnifeRidgeFillet", "KnifeRidgeRadius")] == "EACH STUB R"
     # The knife envelope's bands link one note naming their seat once (rule
-    # 4); the 2X counts say both stubs.
+    # 4); EACH STUB states the multiplicity without a multiline prefix.
     seat_bands = ("RidgeFromLeft", "RidgeFromRight", "FlankToSide", "HexHeight")
     for name in seat_bands:
         assert notes.DIMENSION_CALLOUTS_BELOW[name] == notes.KNIFE_SEAT_NOTE_LINK, name
@@ -895,6 +902,74 @@ def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
         node for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
     )
+
+
+def test_counter_flank_import_contract() -> None:
+    name = "MiddleRibCounterAngle"
+    assert notes.DRAWING_DIMENSIONS["MiddleRibProfile"] == {name}
+    assert notes.DIMENSION_PREFIXES[("MiddleRibProfile", name)] == "2X "
+    assert sm_summing_lever_spec.DRAWING_PRECISION["MiddleRibProfile"] == {name: 1}
+    assert drawing.FRONT_KEEP[name] == (0.216, 0.2378)
+    calls = _calls_in_order(_drawing_function("build"))
+    assert sum(_call_name(call) == "_assert_counter_flank_angle" for call in calls) == 1
+    assert not any(_call_name(call) == "set_reference_dimension" for call in calls)
+    offsets = [
+        call for call in calls if _call_name(call) == "offset_dimension_text"
+        and len(call.args) == 3 and isinstance(call.args[2], ast.Dict)
+        and any(isinstance(key, ast.Constant) and key.value == name for key in call.args[2].keys)
+    ]
+    assert len(offsets) == 1
+    assert ast.literal_eval(offsets[0].args[2]) == {name: (0.206, 0.249)}
+
+
+@pytest.mark.parametrize("case", [
+    "native", "missing", "duplicate", "wrong_feature", "dangling", "unbound",
+    "linear", "wrong_angle", "rounded_angle", "supplement", "nonfinite",
+    "tighter_band", "parentheses", "wrong_count", "precision",
+])
+def test_counter_flank_import_reads_native_driving_control(monkeypatch, case) -> None:
+    import _drawing_dimensions as dimensions
+
+    name = "MiddleRibCounterAngle"
+    expected = math.radians(sm_summing_lever_spec.COUNTER_FLANK_ANGLE_DEG)
+    value = {
+        "wrong_angle": expected + 1e-4,
+        "rounded_angle": math.radians(11.537),
+        "supplement": math.pi - expected,
+        "nonfinite": math.nan,
+    }.get(case, expected)
+    native = SimpleNamespace(
+        FullName=f"{name}@{'OtherProfile' if case == 'wrong_feature' else 'MiddleRibProfile'}@sm-summing-lever",
+        SystemValue=value,
+        DrivenState=2 if case == "unbound" else 1,
+        GetToleranceType=lambda: 2 if case == "tighter_band" else 0,
+    )
+    display = SimpleNamespace(
+        Type2=2 if case == "linear" else 3,
+        GetDimension2=lambda _index: native,
+        GetPrimaryPrecision2=lambda: 2 if case == "precision" else 1,
+        GetText=lambda index: (
+            ("2X (" if case == "parentheses" else "1X " if case == "wrong_count" else "2X ")
+            if index == 1 else ")" if case == "parentheses" else ""
+        ),
+    )
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display,
+        IsDangling=lambda: case == "dangling",
+    )
+    adapter = SimpleNamespace(_attempt=lambda action: action())
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: name)
+    monkeypatch.setattr(dimensions, "dimension_name", lambda *_args: name)
+    monkeypatch.setattr(
+        dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_args: value,
+    )
+    annotations = [] if case == "missing" else [annotation] * (2 if case == "duplicate" else 1)
+    if case == "native":
+        drawing._assert_counter_flank_angle(adapter, annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_counter_flank_angle(adapter, annotations)
 
 
 def test_layout_retains_six_views_on_two_sheets_without_a_section() -> None:
@@ -1001,10 +1076,9 @@ def test_flank_shelf_clears_recorded_angular_route_and_complete_neighbors() -> N
     old_connector = Segment(0.0583221, 0.1667272, 0.0696861, 0.0754438)
     assert segment_box_overlap_length(old_connector, printed_rows[1]) > 0.003
     x, y = drawing.FLANK_TEXT_XY
-    assert x == 0.051, "retain the measured horizontal shelf/neighbor relationship"
-    dy = y - 0.081
-    native = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in native_rows)
-    printed = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in printed_rows)
+    dx, dy = x - 0.051, y - 0.081
+    native = tuple(Box(row.xmin + dx, row.ymin + dy, row.xmax + dx, row.ymax + dy) for row in native_rows)
+    printed = tuple(Box(row.xmin + dx, row.ymin + dy, row.xmax + dx, row.ymax + dy) for row in printed_rows)
     clearance = 0.00357  # one complete recorded printed cap height
     neighbors = (
         # Combined complete native/PDF blocks, not just the closest numbers.
@@ -1242,8 +1316,8 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
-    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "EACH STUB "
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "EACH STUB "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
         _call_name(call) for call in _calls_in_order(_builder_function("build"))
@@ -1264,10 +1338,12 @@ _BORDER_LEFT_M = 0.0127
 
 def _detail_block(name: str, value: str) -> tuple[float, float, float, float, int]:
     """(left, right, bottom, top, lines) of a Detail D dimension's text."""
-    lines = [value, *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
+    lines = [*value.split("\n"), *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
     lines = [line for line in lines if line]
     # The angular arc keeps its native exterior seed; only its text is offset.
-    x, y = drawing.FLANK_TEXT_XY if name == "FlankToSide" else drawing.DETAIL_KEEP[name]
+    x, y = {
+        "FlankToSide": drawing.FLANK_TEXT_XY, "LowerFlankToSide": drawing.LOWER_FLANK_TEXT_XY,
+    }.get(name, drawing.DETAIL_KEEP.get(name))
     half_w = _CHAR_M * max(map(len, lines)) / 2.0
     half_h = _LINE_M * len(lines) / 2.0
     return x - half_w, x + half_w, y - half_h, y + half_h, len(lines)
@@ -1279,7 +1355,7 @@ def _dimension_line_y(name: str, lines: int) -> float:
 
 def _knife_envelope_model_owners():
     """Read the native reference's endpoint owners, not left/right name guesses."""
-    lines, spans, angle_lines = {}, {}, None
+    lines, spans, angle_lines = {}, {}, []
     pending_span = None
 
     def endpoint(reference):
@@ -1318,9 +1394,9 @@ def _knife_envelope_model_owners():
                     assert pending_span is not None
                     spans[mark] = pending_span
             elif name == "add_angular_reference_dimension":
-                angle_lines = tuple(lines[argument.id] for argument in call.args[1:3])
+                angle_lines.append(tuple(lines[argument.id] for argument in call.args[1:3]))
     assert set(spans) == {"RidgeFromLeft", "RidgeFromRight"}
-    assert angle_lines is not None
+    assert len(angle_lines) == 2  # upper, then lower corner
     return spans, angle_lines
 
 
@@ -1332,7 +1408,7 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     cx, cy = drawing.DETAIL_CENTER
     fence = drawing.DETAIL_RADIUS_MM * scale
     hw = spec.HEX_W / 2.0 * scale
-    spans, angle_lines = _knife_envelope_model_owners()
+    spans, (angle_lines, lower_lines) = _knife_envelope_model_owners()
     [model_vertex] = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
     [model_shoulder] = set(angle_lines[0]) & set(angle_lines[1])
     assert model_vertex in angle_lines[0]
@@ -1345,17 +1421,31 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     vertex, shoulder, side_end = map(project, (model_vertex, model_shoulder, model_side_end))
     assert shoulder[0] < vertex[0]  # the model's +X flank, not its opposite
     assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
+    # Budget the actual inch text, not the pre-migration metric values.
+    def inch(value, places=spec.KNIFE_ENVELOPE_PLACES):
+        return f"{value / 25.4:.{places}f}".removeprefix("0")
+
+    ridge_value = f"EACH STUB {inch(spec.RIDGE_FROM_SIDE)} ±{inch(spec.RIDGE_FROM_SIDE_TOL)}"
+    flank_band = f"{spec.KNIFE_FLANK_TO_SIDE_TOL_DEG:.1f}".removeprefix("0")
     blocks = {
-        "HexWidth": _detail_block("HexWidth", "2X (8.080)"),
-        "HexHeight": _detail_block("HexHeight", "2X 10.268"),
-        "RidgeFromLeft": _detail_block("RidgeFromLeft", "2X 4.040 ±0.05"),
-        "RidgeFromRight": _detail_block("RidgeFromRight", "2X 4.040 ±0.05"),
-        "FlankToSide": _detail_block("FlankToSide", "4X 122.4° ±0.5°"),
-        "KnifeRidgeRadius": _detail_block("KnifeRidgeRadius", "2X R0.1 MAX"),
+        "HexWidth": _detail_block("HexWidth", f"EACH STUB ({inch(spec.HEX_W)})"),
+        "HexHeight": _detail_block("HexHeight", f"EACH STUB {inch(spec.HEX_H)}"),
+        "RidgeFromLeft": _detail_block("RidgeFromLeft", ridge_value),
+        "RidgeFromRight": _detail_block("RidgeFromRight", ridge_value),
+        "FlankToSide": _detail_block(
+            "FlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}° ±{flank_band}°",
+        ),
+        "KnifeRidgeRadius": _detail_block(
+            "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} max.",
+        ),
+        "LowerFlankToSide": _detail_block(
+            "LowerFlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}°",
+        ),
     }
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
         assert top < _BORDER_TOP_M - 0.004, name
         assert left > _BORDER_LEFT_M + 0.002, name
+    assert blocks["FlankToSide"][1] < shoulder[0] - 0.002
     pair_lines = {
         name: _dimension_line_y(name, blocks[name][4]) for name in spans
     }
@@ -1394,8 +1484,31 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     # R7's complete R0.1 text must clear the x155.4 width witness, not
     # merely sit to the right of the ridge centre.
     assert blocks["KnifeRidgeRadius"][0] > 0.1554 + 0.002
+    # Native single-line shoulder starts 27.8 mm left of the keep; its
+    # underline overhang, not only the glyph box, must clear the witness.
+    assert drawing.DETAIL_KEEP["KnifeRidgeRadius"][0] - 0.0278 > 0.1554 + 0.002
     assert blocks["KnifeRidgeRadius"][2] > datum_foot + 0.007 + 0.004
     assert blocks["KnifeRidgeRadius"][3] < pair_line - 0.004
+    # The lower corner: the same +X side's shoulder, its arc in the exterior
+    # wedge, its one-row text below the height's bottom witness and left of
+    # the width's witness, the arc clear of the height text and width line.
+    [model_lower] = set(lower_lines[0]) & set(lower_lines[1])
+    [model_bottom] = set(lower_lines[0]) - {model_lower}
+    [model_side_top] = set(lower_lines[1]) - {model_lower}
+    lower, bottom, side_top = map(project, (model_lower, model_bottom, model_side_top))
+    assert lower[0] == pytest.approx(shoulder[0]) and bottom[0] == pytest.approx(vertex[0])
+    lower_x, lower_y = drawing.DETAIL_KEEP["LowerFlankToSide"]
+    direction = math.degrees(math.atan2(lower_y - lower[1], lower_x - lower[0])) % 360.0
+    from_flank = math.degrees(math.atan2(lower[1] - bottom[1], lower[0] - bottom[0])) % 360.0
+    from_side = math.degrees(math.atan2(lower[1] - side_top[1], lower[0] - side_top[0])) % 360.0
+    assert from_flank < direction < from_side
+    lower_radius = math.dist((lower_x, lower_y), lower)
+    assert lower[0] - lower_radius > blocks["HexHeight"][1] + 0.002
+    assert lower[1] - lower_radius > width_line + 0.002
+    left, right, _bottom, top, _ = blocks["LowerFlankToSide"]
+    assert top < bottom[1] - 0.002 and right < lower[0] - 0.002
+    assert left > _BORDER_LEFT_M + 0.002
+    assert _bottom > drawing.DETAIL_LABEL_XY[1]
 
 
 def test_knife_detail_is_cut_from_the_existing_receiver_view(monkeypatch) -> None:
@@ -2266,7 +2379,7 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
 
 
 def _recorded_plate_thickness(monkeypatch):
-    """Replay r6's dimension-display rows and projected free-end coordinates."""
+    """Translate r6's recorded layout to the current plate faces; not native proof."""
     case = _native_plate_thickness(monkeypatch)
     state = case.state
     state.name = "PlateThickness@PlateProfile@sm-summing-lever.Part"
@@ -2315,6 +2428,21 @@ def _recorded_plate_thickness(monkeypatch):
     state.text_position = (
         0.21636249951273206, 0.08022187482984736, -9.999999999949722e-05,
     )
+    # Keep the historical witness/leader shapes, translated with the plate.
+    rise = drawing.COEFFICIENT_TOP_Y / 1000.0 - 0.00254
+    state.lines = [
+        (*row[:5], row[5] + rise, *row[6:8], row[8] + rise, *row[9:])
+        for row in state.lines
+    ]
+    for row in state.arrows:
+        row[1] += rise
+    state.projected = {
+        (x, (drawing.COEFFICIENT_TOP_Y if y > 0.0 else drawing.COEFFICIENT_BOTTOM_Y) / 1000.0, z): (px, py + rise)
+        for (x, y, z), (px, py) in state.projected.items()
+    }
+    for member in ("annotation_position", "text_position"):
+        x, y, z = getattr(state, member)
+        setattr(state, member, (x, y + rise, z))
     monkeypatch.setattr(state.data, "GetLineAtIndex2", lambda index: state.lines[index])
     monkeypatch.setattr(
         state.data, "GetTextPositionAtIndex",

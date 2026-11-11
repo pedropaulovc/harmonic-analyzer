@@ -1194,9 +1194,9 @@ sections:
         - 'ch. 15 notes + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Springs (default)
-        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1061.39 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1058.02), bottom eye on the spring-hook arm at 986.24; installed body 67.78 (+5.8: top eye −4.5 with the fulcrum bank, bottom eye −10.3 with the summing plate — canonical ch-vn-channel-spring-installed re-derived; verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
-        - 'ch. 17/18 + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
-        - measured/med
+        - 'McMaster 9432K31, catalogue inside-hook length (not coil-body length): neutral analytic length 64.319119 mm and force 4.378157 N from spring_mount_geom.channel_pose(0), with lower/upper eye centres approximately (24.850028,998.407800)/(24.850317,1057.697719) mm. Owner issue #2129 centres the 7.00 mm coefficient plate at local Y±3.50: the lower anchor rises 0.96 mm while the channel lever stays fixed. Native fixture recalibration on 2026-11-09 measured the neutral channel inside length at 64.320894940 mm and re-measured all neutral/square channel and counter seats; saved-assembly contact and clearance gates remain required.'
+        - 'cad/scripts/spring_mount_geom.py, ch_vn_channel_spring_stock_geom.py and cad/config/machine/springs.yaml; owner centring decision #2129'
+        - derived analytic geometry + native fixture calibration
       - - Default mechanism state
         - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−60.167, 99.155) = drum (−60.394, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 163.101 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
         - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
@@ -1243,25 +1243,25 @@ sections:
         - measured
         - med
       - - Coefficients plate
-        - 'Lever-local X0..44.45, Z±76.20; uniform7.00 (printed.28±.01in) coefficient slab from Y−4.46 to fixedtopY+2.54 (world982.24), not recentered. Three tangent-profile rib extrusions5.08 (printed.20±.01in); endribs retain outerZ±76.20 and innerZ±71.12, middle centeredZ0. Bracket receivers at(16.002,−0.7112,−76.20)/(29.6926,−0.7112,−76.20) (nearest .001in to the bracket stations), row3.2512 (printed.128±.002in) belowactualtop, conventional2-56blind4.95 (printed.195MIN) fullthread and6.604 (printed.26±.01in) pilot+118degreepoint continuing into connectedplate. Spring seats/stations and installation unchanged.'
+        - 'Lever-local X0..44.45, Z±76.20; uniform7.00 (printed.28±.01in) coefficient slab centeredY0 withfacesY±3.50 (worldtop983.1932, bottom976.1932 fromtop_frame_plane.KNIFE_Y), perowner#2129. Three tangent-profile rib extrusions5.08 (printed.20±.01in); endribs retain outerZ±76.20 and innerZ±71.12, middle centeredZ0. Bracket receivers at(16.002,+0.2488,−76.20)/(29.6926,+0.2488,−76.20) (nearest .001in top-relative offset to the bracket stations), row3.2512 (printed.128±.002in) belowactualtop, conventional2-56blind4.95 (printed.195MIN) fullthread and6.604 (printed.26±.01in) pilot+118degreepoint continuing into connectedplate. Springseats andmatchedmountingrows rise0.96; X/Zstations, knifeaxis andbracketbody installation unchanged.'
         - —
-        - 'cad/scripts/sm_summing_lever_spec.py, sm_summing_lever_profile.py and magnifying_bracket_joint_layout.py; owner-authorized plate-tap relocation/uniformribs2026-10-22'
+        - 'cad/scripts/sm_summing_lever_spec.py, sm_summing_lever_profile.py and magnifying_bracket_joint_layout.py; owner-authorized plate-tap relocation/uniformribs2026-10-22; centered7mmplate/web ownerdecision#2129 supersedes fixed-top slab'
         - source geometry + authorized joint relocation
         - med
       - - Spring holes
-        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø.006RFS pattern. Purchased9489T111 anchors seat at unchanged coefficienttop and lock withMHA-CH-14 jamnuts atY−4.46.'
+        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø.010RFS pattern (#2326). Purchased9489T111 anchors seat at coefficienttopY+3.50 and thread straight in with no jamnut (#2326); 7.00mm nominal engagement.'
         - —
-        - 'cad/scripts/sm_summing_lever_spec.py and ch_anchor_jam_nut_spec.py'
-        - source geometry + retained spring interface
+        - 'cad/scripts/sm_summing_lever_spec.py and ch_vn_spring_hook_spec.py'
+        - source geometry + centred spring interface (#2129)
         - med
       - - Web + boss
-        - 'Separate5.08counterweb centeredY0 (top+2.54flush withcoefficienttop); summationtipX−76.20, bossØ19.05×19.05 centeredY0. Allthree5.00ribextrusions shareR15.24wrap, tangentpositiveflanks andR.040MAXrunouts atX35.75; negativeXmidribcontour unchanged.'
+        - 'Separate7.00counterweb centeredY0, facesY±3.50sharedwithcoefficientplate; summationtipX−76.20, bossØ19.05×19.05 centeredY0. Bossupperface tocoefficienttop=6.025 (printed.24in), theoreticalknifevertex totop=1.634 (printed.06in), bothnativeassociativedimensions. Allthree5.08ribextrusions shareR15.24wrap, tangentpositiveflanks andR.040MAXrunouts atX35.814; negativeXmidribcontour unchanged.'
         - —
-        - 'cad/scripts/sm_summing_lever_spec.py and build_sm_summing_lever.py'
+        - 'cad/scripts/sm_summing_lever_spec.py and build_sm_summing_lever.py; owner#2129 centers coefficientplate andcounterweb at7.00mm'
         - source geometry
         - low
       - - Hook hole
-        - 'Vertical#10-24through tap in the counter-anchor boss at leverlocalX−76.20, Z0; purchased9490T1anchor and its top jamnut retain their installed pose.'
+        - 'Vertical#10-24through tap in the counter-anchor boss at leverlocalX−76.20, Z0; purchased9490T1anchor retains its installed pose, with no jamnut (#2326).'
         - —
         - 'cad/scripts/sm_summing_lever_spec.py COUNTER_HOLE_SPEC'
         - source geometry + retained counter-spring interface
@@ -1434,9 +1434,9 @@ sections:
         - engagement intervals verified separately; nose wall nominal only, no standard-thread all-variation guarantee
         - high (specified dimensional requirements, native verification required)
       - - Bracket flange screws ×2
-        - 'MHA-MG-VN-53, McMaster91794A078#2-56UNC×5/16 18-8stainlessfillisterslottedscrews: headØ3.556×2.1082, shankØ2.1844×7.9375. Axes+Z into the lever, machinex+1.0/+14.7, y978.99 (13.7centres), lowered0.71 withmatchingbracketclearanceholes andlevertaps; bracketbody/seat/threadedleverpose unchanged. Headsbear on3.175±0.13flangefrontZ−76.2874, no counterbore, over2Xnormal#2Ø2.591+0.10/0throughclearanceholes; headsstand2.1082proud. Grip3.045minimum leaves4.7625nominal/3.305minimumfullprofileengagement≥1.5D3.2766, including0.76conservativestocklengthallowance,0.7Ptip and0.25entryedgebreak. Lever2-56UNC-2Bblindfullthread.195MINprinted retains4.95±0.0508native-onlystackmetadata. Receiveraxes((16.002,−0.7112,−76.2),(29.6926,−0.7112,−76.2)), the nearest.001in to the bracket stations (≤0.0075 off), are3.2512 (printed.128±.002in) belowactualcoefficienttop. Allthreeleverribextrusions5.08 (printed.20±.01in); endribinnercapsZ±71.12, outercaps±76.20. The6.604 (printed.26±.01in) pilotplus118degreepointcontinues beyondtherib into continuous7.00 (printed.28±.01in) plate, not anunbackedcavity. PrintedØ.070+.004/0in radius0.9398 and0.038865deepest0.3degreewander leave2.221735/2.577335top/bottompilotwalls; nofinishedthreadcavityenvelope orstrengthcertificate. Screw-tipgap0.0067minimum; bottomingtap2Pleadplus0.442057reserve. Actualbracketloweredgeordinate5.64±0.05 givesØ3.8headclearancecircle(notcounterbore) walls7.00end/3.64lower/4.55upper underprintedbands. Minimumshankradialfloat0.2028 exceeds2×0.0508+0.0075=0.1091positionmismatch. Ribreach35.814 (printed1.41±.01in, MAX36.068) versusworstnutinnerX36.449 leaves0.381geometricXgap; nativehead/knifemount,rib/nut,fullsweptclearance andfinalmass/balanceacceptance remainrequired.'
+        - 'MHA-MG-VN-53, McMaster91794A078#2-56UNC×5/16 18-8stainlessfillisterslottedscrews: headØ3.556×2.1082, shankØ2.1844×7.9375. Axes+Z into the lever, machinex+1.0/+14.7, y979.9432 (13.7centres), raised0.96 withmatchingbracketclearanceholes andlevertaps bycenteredplate#2129; bracketbody/seat/threadedleverpose unchanged. Headsbear on3.175±0.13flangefrontZ−76.2874, no counterbore, over2Xnormal#2Ø2.591+0.10/0throughclearanceholes; headsstand2.1082proud. Grip3.045minimum leaves4.7625nominal/3.305minimumfullprofileengagement≥1.5D3.2766, including0.76conservativestocklengthallowance,0.7Ptip and0.25entryedgebreak. Lever2-56UNC-2Bblindfullthread.195MINprinted retains4.95±0.0508native-onlystackmetadata. Receiveraxes((16.002,+0.2488,−76.2),(29.6926,+0.2488,−76.2)), the nearest.001in top-relative offset to the bracket stations (≤0.0075 off), are3.2512 (printed.128±.002in) belowactualcoefficienttop. Allthreeleverribextrusions5.08 (printed.20±.01in); endribinnercapsZ±71.12, outercaps±76.20. The6.604 (printed.26±.01in) pilotplus118degreepointcontinues beyondtherib into continuous7.00 (printed.28±.01in) plate, not anunbackedcavity. PrintedØ.070+.004/0in radius0.9398 and0.038865deepest0.3degreewander leave2.221735/2.577335top/bottompilotwalls; nofinishedthreadcavityenvelope orstrengthcertificate. Screw-tipgap0.0067minimum; bottomingtap2Pleadplus0.442057reserve. Actualbracketloweredgeordinate5.75nominal givesØ3.8headclearancecircle(notcounterbore) minimumheightwall2.841 andactualclearanceholeminimumheightwall3.4448 underprintedbands; headclearancecircleendwall6.9230minimum. Minimumshankradialfloat0.2028 exceeds2×0.0508+0.0075=0.1091positionmismatch. Ribreach35.814 (printed1.41±.01in, MAX36.068) versusworstnutinnerX36.449 leaves0.381geometricXgap; nativehead/knifemount,rib/nut,fullsweptclearance andfinalmass/balanceacceptance remainrequired.'
         - —
-        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster91794A078verifiedlive2026-10-16 (18-8stainlessfillisterslotted,#2-56,5/16in,headØ0.14×0.083in); ownerruling2026-10-16option(i): heads onflange,no counterbore. Owner-authorized2026-10-22plate-taprelocation/uniform5mmribs; livegeometry andstacksin cad/scripts/magnifying_bracket_joint_layout.py and sm_summing_lever_spec.py. No newnativeverification claimed.'
+        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster91794A078verifiedlive2026-10-16 (18-8stainlessfillisterslotted,#2-56,5/16in,headØ0.14×0.083in); ownerruling2026-10-16option(i): heads onflange,no counterbore. Owner-authorized2026-10-22plate-taprelocation/uniform5mmribs; owner#2129 centersplate/web andraisesmatchedrows0.96. Livegeometry andstacksin cad/scripts/magnifying_bracket_joint_layout.py and sm_summing_lever_spec.py. No newnativeverification claimed.'
         - stock + scaled + derived
         - high (stock dimensions and installed stack); med (photo-scaled stations)
   - prose: |2

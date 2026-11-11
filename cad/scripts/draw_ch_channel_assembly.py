@@ -219,11 +219,12 @@ EXPLODED_ISO_CENTER = (0.100, 0.140)
 # landing moved 15 mm between r8 and r9. The view is tall and narrow, so 8 of
 # the 19 balloons crowd its top. At 14 mm the ring's push-apart swung balloon
 # 14 down over the shaft, and a south-end landing crossed leader 2 (r9 audit).
-# A replay of the ring with the anchor-nut balloon added covers every landing
-# on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
-# and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
-# leader 14 2.1-4.4 mm off the shaft, but the ring's centres ran 5.5 mm inside
-# the border at the top, so balloon 4's 5.6 mm circle touched it (machinist
+# A replay of the ring with the anchor-nut balloon (retired, #2326) added
+# covers every landing on the visible shaft, nut attachments at least 3.5 mm
+# below the anchor's, and balloon radius 5.0-5.6 mm. At 28 mm it crosses
+# nothing and keeps leader 14 2.1-4.4 mm off the shaft, but the ring's
+# centres ran 5.5 mm inside the border at the top, so balloon 4's 5.6 mm
+# circle touched it (machinist
 # review, #1660 r1). At 26 mm the top circle clears the border by about 2 mm;
 # _assert_view_on_sheet now grows the outline by the ring plus the largest
 # balloon radius, so a balloon circle can never reach the border.
@@ -344,7 +345,6 @@ BOM_QUANTITIES = {
     explode.BAR_PIN: CHANNELS,
     SPRING_STEM: CHANNELS,
     explode.HOOK: CHANNELS,
-    explode.ANCHOR_NUT: CHANNELS,
 }
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
@@ -367,7 +367,6 @@ PART_ROWS = {
     "ch-bar-pivot-pin": _config.parts("ch-bar-pivot-pin"),
     SPRING_STEM: _config.parts("ch-vn-channel-spring-installed"),
     "ch-vn-spring-hook": _config.parts("ch-vn-spring-hook"),
-    "ch-anchor-jam-nut": _config.parts("ch-anchor-jam-nut"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -653,7 +652,7 @@ KEEPER_PLAN = BankView(
 
 # --- sheet 6: view G and the rest of the lever-bank steps --------------------
 # The front view of the spring hook-up: the fulcrum shaft, a lever, its
-# spring, anchor and jam nut, the 20 channels in line behind the nearest. The
+# spring and anchor, the 20 channels in line behind the nearest. The
 # summing plate the anchor threads into belongs to MHA-HA-00, not this
 # assembly. The view outline ran from model x 7.4 to 217.1 and y 955.6 to
 # 1078.6 (farm leaf on 06616793e): 210 x 123 mm, so at 1:2 about (0.315,
@@ -675,7 +674,6 @@ HOOKUP = BankView(
             "ch-channel-lever",
             SPRING_STEM,
             explode.HOOK,
-            explode.ANCHOR_NUT,
         }
     ),
     parts="SPRING HOOK-UP\nSUMMING PLATE NOT SHOWN",
@@ -1082,7 +1080,7 @@ def _fitup_text() -> dict[str, str]:
     arm, rod, bar = item("ch-rocker-arm"), item(explode.ROD), item(explode.BAR)
     lever, pin = item("ch-channel-lever"), item("ch-rod-pivot-pin")
     bar_pin, channel_spring = item(explode.BAR_PIN), item(SPRING_STEM)
-    anchor, anchor_nut = item(explode.HOOK), item(explode.ANCHOR_NUT)
+    anchor = item(explode.HOOK)
     rocker_view, lever_view = ROCKER_BANK.title, LEVER_BANK.title
     plan_view, hookup_view = KEEPER_PLAN.title, HOOKUP.title
     detail = f"{SOUTH_END.title}, SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1}"
@@ -1370,13 +1368,11 @@ def _fitup_text() -> dict[str, str]:
             f"HOOK THE TOP LOOP OF EACH {channel_spring} SPRING THROUGH THE "
             f"SPRING HOLE OF ITS {lever} ({hookup_view})."
         ),
-        # The anchors thread into the summing plate and are jammed by their
-        # nuts at MHA-HA-00, which owns that joint, its lock and its setting
-        # (rule 23 at the package boundary: cited by its step).
+        # The anchors thread into the summing plate at MHA-HA-00, which owns
+        # that joint and its setting (cited by its step).
         "spring-bottom-loops-left": (
             f"LEAVE EACH BOTTOM LOOP FREE: {steps.HA_ANCHORS_SET_REF} THREADS "
-            f"EACH {anchor} ANCHOR, JAMS IT WITH ITS {anchor_nut} NUT AND HOOKS "
-            "THE LOOP INTO IT."
+            f"EACH {anchor} ANCHOR AND HOOKS THE LOOP INTO IT."
         ),
     }
 

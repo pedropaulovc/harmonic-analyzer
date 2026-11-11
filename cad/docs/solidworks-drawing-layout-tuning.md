@@ -1701,8 +1701,8 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `IsSame` readback against the named bore.
 
 The summing lever's face-height chain also needs a location from the knife
-ridge to the coefficient top; `19.05`, `5.08` and `6.99` alone do not locate
-that chain from the suspension axis. VIEW F now uses the existing native
+ridge to the coefficient top; boss length, web thickness and boss-to-top
+offset alone do not locate that chain from the suspension axis. VIEW F uses the existing native
 `KnifeEnvelopeReference` **height.end** sketch point at model Y5.134 mm,
 the same endpoint used by Detail D's `RidgeFromLeft` and `RidgeFromRight`.
 Datum A itself stays attached to the physical ridge round; its crest and arc
@@ -1711,7 +1711,8 @@ construction height line, verify its native sketch-to-model transform, then
 map that actual endpoint through `IView.GetCorresponding`. Select it with
 `ISketchPoint.Select4` and the visible −Z coefficient-top edge with
 `IEntity.Select4`; `IModelDoc2.AddVerticalDimension2` supplies the measured
-2.594 mm location, displayed as ordinary **2.59** under the existing title block.
+**HEX_H/2 − COEFFICIENT_TOP_Y = 1.634 mm** location, displayed as ordinary
+**.06 in** after the centered **7.00 mm** plate/web change (#2129).
 No new model point, profile, tolerance, section or view is added. Missing or
 ambiguous source geometry, null correspondence and failed selection refuse;
 there is no coordinate-only, rounded-crest or cylinder-centre fallback.
@@ -2402,7 +2403,7 @@ reads each resulting cylindrical radius, axis and transverse centre, then a
 trimmed diagonal point; successful construction and its actual corner patches
 still require the next native run and enlarged inspection.
 
-The previous5mm free-end extension remains: machineX−8..46.25,
+**Historical foot-cut geometry before #2129:** the previous5mm free-end extension remains: machineX−8..46.25,
 localX−48..+6.25, length54.25 and setbacks9.00/22.70. The matched receiver,
 bracket-clearance and screw axes remain localY−0.71 / machineY978.99 and
 machineX1/14.7, with unchanged seat/threaded-lever pose. The receiver row is
@@ -2415,6 +2416,12 @@ width/location intervals. Do not substitute the receiver's unrelated±0.51.
 The fixed-top7.00±0.51 plate backs the receiver pilot beyond the uniform
 5.00±0.51 ribs; retain one native `3X 5.00` rib dimension. No receiver, grip or
 engagement band changes with the foot cut.
+For current geometry, #2129 centers the coefficient plate and counter web at
+Y=±3.50 mm. The top-referenced mounting rows rise 0.96 mm with the top;
+the foot-cut coordinates and wall figures above are historical, not current
+clearance acceptance. Current dimensions and budgets come from
+`magnifying_bracket_joint_layout` and `sm_summing_lever_spec`.
+
 
 The SM-facing **+Z foot back**, the physical origin of100.40, is a static
 locating seat under rule6. Its part-owned `foot_seat` control is **Ra3.2µm**

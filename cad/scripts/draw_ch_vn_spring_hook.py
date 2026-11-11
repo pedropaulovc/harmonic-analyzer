@@ -1,13 +1,14 @@
 """Create the manufacturing drawing for the modified McMaster 9489T111 anchor.
 
 The anchor is purchased by SKU but is NOT installed as supplied: the captive
-hex nut is discarded (the MHA-CH-14 round jam nut locks it) and the shank is cut to
-cross the summing-lever plate and carry that nut, so the sheet carries the
+hex nut is discarded (nothing torques the hook, #2326) and the shank is cut so
+its full thread crosses the summing-lever plate, so the sheet carries the
 same two cutting controls as the counter anchor (``draw_boss_hook``) -- the
 finished overall length to the eye crown and the restored 45 deg deburr at the
 new end. The sheet prints decimal inch (``drawing_unit: in``). The length band
 is the title block's .XX; ``ch_vn_spring_hook_spec`` shows the shortest
-in-band part still keeps two full threads past the nut.
+in-band part, backed out its full turn, still keeps full thread through the
+plate.
 
 Run with SolidWorks open::
 
@@ -72,8 +73,8 @@ SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 30.7 x 12.7 mm (1.21 in overall) since its shank carries
-# the MHA-CH-14 jam nut under the coefficient plate: 5:1 keeps the front view
+# The finished part is 24.9 x 12.7 mm (.98 in overall), its shank cut to keep
+# full thread through the coefficient plate: 5:1 keeps the front view
 # inside the counter anchor's 4:1 sheet band, raised so the cut end's deburr
 # dimensions clear the notes.  The deburr is dimensioned on the front view
 # itself, as on the counter anchor: machinist review r7 found a 20:1 detail for
@@ -82,12 +83,12 @@ SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
 # The view centres on its outline. The settled 31.3 mm part (run 0c4519c5
 # read y 0.1014..0.2711 at centre 0.18625, a 0.0848 half-height) stood centred
-# at 0.1805 with its cut end at 0.1023; the 30.734 mm inch part is 2.83 mm
-# shorter on the sheet, so the centre drops half that to keep the cut end, and
-# every deburr placement below, where it was. Its outline then spans about
-# 0.0957..0.2625, inside the B sheet's 12.7 mm top zone border (y 0.2667) and
-# clear of the 0.0651 notes band.
-FRONT_CENTER = (0.100, 0.1791)
+# at 0.1805 with its cut end at 0.1023; each shorter part drops the centre by
+# half its on-sheet shortening to keep the cut end, and every deburr placement
+# below, where it was: the 30.480 mm part centred at 0.1791, so the 24.892 mm
+# part, 27.94 mm shorter on the sheet, centres at 0.1651 and spans about
+# 0.1023..0.2280, clear of the 0.0651 notes band.
+FRONT_CENTER = (0.100, 0.1651)
 ISO_CENTER = (0.310, 0.209)
 # The settled isometric outline is 0.0543 half-height about its centre (run
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
@@ -113,10 +114,10 @@ FRONT_KEEP = {
 # The deburr band is tighter than the title block on both sides (review r8
 # read it as a plain lead-in): its minimum leg brings the cut end under the
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its
-# maximum, at the steepest angle, is charged to the full threads the shank
-# keeps past the jam nut.  Rule 7 allows one reason line per feature, so the
-# callout names both mates on one line (RV-01 accepts the band itself).
-CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; THREAD PAST MHA-CH-14"}
+# maximum, at the steepest angle, is charged below the plate underside so
+# full thread stays through the plate.  Rule 7 allows one reason line per
+# feature, so the callout names both on one line (RV-01 accepts the band).
+CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; FULL THREAD THRU MHA-SM-03"}
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
@@ -148,15 +149,16 @@ def _verify_controls(annotations: list[Any]) -> None:
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
     """The one sourcing reference: the #6-32 thread on its nominal-major carrier.
 
-    A replacement anchor must take the lever's tap and the jam nut, so the
-    thread is kept. The eye sizes and the as-supplied lengths are not
+    A replacement anchor must take the lever's tap, so the thread is kept.
+    The eye sizes and the as-supplied lengths are not
     replacement criteria -- the 0.66 spring wire links the 6.35 eye with ~10x
     margin, and the finished overall already fixes the length the stock must
     give -- and the SKU names the catalogue part.
     """
     refs = []
+    # Beside the thread's top (y 0.147 at 5:1), below the neck and the eye.
     annotations = curate_stock_dimensions(
-        adapter, front, keep={"SupplierThreadMajor": (0.166, 0.175)},
+        adapter, front, keep={"SupplierThreadMajor": (0.166, 0.147)},
         view_label="supplier thread nominal major, not helical geometry",
         dimensions_by_feature=SUPPLIER_THREAD_DIMENSIONS,
     )
