@@ -11,12 +11,13 @@ cad/process/
 ```
 
 [prechips](https://github.com/pedropaulovc/prechips) is a stdlib-only PyPI
-dependency, declared as `prechips>=0.9`. The lock resolves the latest
-release; bump it with `uv lock --upgrade-package prechips`. It reads the plan,
-the shop file and the part's exported `features.toml`, and writes standalone
-HTML travelers. It needs no FreeCAD or geometry kernel and checks no hashes. HA
-does not rewrite, bind or stamp the plan; prechips reads the tracked file
-directly.
+package. It is not an HA dependency while it stabilises (owner ruling
+2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)):
+it stays out of `uv.lock`, and every traveler run uses the latest PyPI release
+through uv's tool runner. It reads the plan, the shop file and the part's
+exported `features.toml`, and writes standalone HTML travelers. It needs no
+FreeCAD or geometry kernel and checks no hashes. HA does not rewrite, bind or
+stamp the plan; prechips reads the tracked file directly.
 
 ## Plans
 
@@ -107,12 +108,13 @@ Owner rulings (Pedro), recorded for the cutover:
 
 ## Travelers
 
-`cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
+`cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
 `prechips:<stem>` task: the oblique-trammel base bar and end bracket. `build`
-and `release` require every one. Each part ships two travelers from the same
-plan: `traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with
-the setup pictures in `<stem>/diagrams/`). Under prechips 0.9 the base bar and
-end bracket pass both on the v48 manifests.
+and `release` do not run it, and releases carry no travelers while prechips
+stabilises. Each run renders two travelers from the same plan: `traveler.html`
+(`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
+`<stem>/diagrams/`). Under prechips 0.9 the base bar and end bracket pass both
+on the v48 manifests.
 
 The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
 in the repository but not enrolled. prechips refuses it on `tool_sizing`: the
@@ -123,26 +125,33 @@ drawing change), not a check to opt out of; enroll the part once its plan passes
 ```text
 uv run --frozen python -m doit prechips:<stem>
 uv run --frozen python cad/scripts/prechips_traveler.py <stem>
+uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
-The doit task first runs its `package:features:<stem>` leaf (SolidWorks, via the
-supervised farm). The wrapper alone needs an existing scoped bundle. It removes
-any previous `traveler.html` and `traveler-hobby.html` under
-`cad/out/travelers/<stem>/`, then runs
-`python -m prechips traveler cad/process/<stem>/plan.toml` with `--profile pro`
-and then `--profile hobby`. Exit 0 from both is the only pass. A nonzero exit
-from either is returned and removes both files; exit 2 is a refusal, either bad
-input or a failed enforced check (`stock_fit`, `turning_deflection`,
-`cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`,
-`lathe_holding`, `machine_capacity`, or `hobby`'s missing setup picture). A missing plan
-fails only that part's task. A refusal is a finding about the plan or shop
-data; correct the source, not the check.
+Each form needs the part's feature manifest at
+`cad/out/features/<stem>/features.toml`. The doit task first runs its
+`package:features:<stem>` leaf (SolidWorks, via the supervised farm); the
+wrapper and the by-hand `uvx` command need an existing bundle, from a build or
+copied from a release asset's `features/<stem>/`. All three use the latest
+prechips release from PyPI (`@latest` makes uv revalidate its index and skip
+any `uv tool install`-ed copy), so they need `uv` and network access. The doit
+task always runs when requested.
 
-Releases copy each part's `traveler.html` and `traveler-hobby.html` to
-`travelers/<stem>/` in the bundle and list them in the notes. Staging refuses,
-before copying, any traveler whose sheet header does not print the drawing
-number and revision (`<number>; <revision>`) of the manifest staged under
-`features/<stem>/`, such as a traveler left from an older export. A traveler
-that passes is not permission to machine: shop
-measurements, physical setup verification and machining approval are still
-required. See the [feature/traveler contract](../docs/pipeline/features-travelers.md).
+The wrapper removes any previous `traveler.html` and `traveler-hobby.html`
+under `cad/out/travelers/<stem>/`, resolves and logs the latest prechips
+version, then runs
+`uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml`
+with `--profile pro` and then `--profile hobby`. Exit 0 from both is the only
+pass. Exit 1 means uv itself failed: no `uv`, no PyPI, or a render whose
+`uv tool run` failed before prechips ran (uv's `error:` or `×` diagnostic on
+stderr); it is never a finding about the plan. A nonzero prechips exit from
+either is returned and removes both files; exit 2 is
+a refusal, either bad input or a failed enforced check (`stock_fit`,
+`turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`,
+`gauge_capability`, `lathe_holding`, `machine_capacity`, or `hobby`'s missing
+setup picture). A missing plan fails only that part's task. A refusal is a
+finding about the plan or shop data; correct the source, not the check.
+
+A traveler that passes is not permission to machine: shop measurements,
+physical setup verification and machining approval are still required. See the
+[feature/traveler contract](../docs/pipeline/features-travelers.md).

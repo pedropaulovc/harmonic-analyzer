@@ -177,14 +177,17 @@ Without a seat you can still run the offline gates
 glTF exports plus the drawing PDFs.
 
 Drawing-bound requirement manifests are exported with named STEP face sets.
-`prechips:<stem>` tasks render two standalone HTML
+Opt-in `prechips:<stem>` tasks render two standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
 sheet and a `hobby` sheet with setup pictures) for each part
 in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and end
 bracket) from its `cad/process/<stem>/plan.toml`, which reads that part's
-exported manifest. Only exit 0 passes the build and release gates, and releases
-include the generated travelers. The feed lever's plan is held until prechips'
-drill-size refusal is resolved. See the
+exported manifest. They always use the latest prechips release from PyPI, run
+with `uv tool run` outside the project environment. While prechips stabilises,
+`build` and `release` do not run them and releases carry no travelers (owner
+ruling 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)).
+The feed lever's plan is held until prechips' drill-size refusal is resolved.
+See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References

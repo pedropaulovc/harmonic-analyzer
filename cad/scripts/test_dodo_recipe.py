@@ -4605,12 +4605,13 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     expected = {
         str(path.resolve()) for path in (
             source, diagram, shop, manifest,
-            dodo.REPO_ROOT / "pyproject.toml", dodo.REPO_ROOT / "uv.lock",
             dodo.SCRIPTS_DIR / "prechips_traveler.py",
             dodo.SCRIPTS_DIR / "_process_plans.py",
         )
     }
     assert expected <= deps
+    # prechips is not locked (#2502): the lock is no traveler input.
+    assert str((dodo.REPO_ROOT / "uv.lock").resolve()) not in deps
     assert str(unrelated.resolve()) not in deps
     assert str(step.resolve()) not in deps
     stamp = str(dodo.REPORTS / f"prechips-{stem}.ok")
@@ -4621,7 +4622,8 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
         "traveler.html", "traveler-hobby.html",
     ]
     assert task["targets"] == dodo._canonical_targets(f"prechips:{stem}")
-    assert "uptodate" not in task
+    # The generator is the latest PyPI release, so a request always runs it.
+    assert task["uptodate"] == [False]
     clear, (action, args) = task["actions"]
     assert clear == (Path.unlink, [Path(stamp)], {"missing_ok": True})
     assert action is dodo._run_stamped
@@ -4632,10 +4634,28 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     ]
 
 
-def test_prechips_build_release_edges_and_stage(synthetic_prechips_task):
+def test_build_and_release_never_reach_a_traveler(synthetic_prechips_task):
+    """Travelers are opt-in while prechips stabilises (owner ruling 2026-11-11,
+    #2502): no explicit, setup or file-implied edge of ``build`` or ``release``
+    reaches a ``prechips`` task."""
+    from doit.loader import load_tasks
+
     dodo, _, _, stem, _, _, _ = synthetic_prechips_task
-    for task in (dodo.task_build(), dodo.task_release()):
-        assert f"prechips:{stem}" in task["task_dep"]
+    tasks = {task.name: task for task in load_tasks(dict(vars(dodo)), allow_delayed=True)}
+    assert f"prechips:{stem}" in tasks
+    owners = {target: task.name for task in tasks.values() for target in task.targets}
+    for root in ("build", "release"):
+        seen, todo = set(), [root]
+        while todo:
+            name = todo.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            task = tasks[name]
+            todo.extend(task.task_dep)
+            todo.extend(task.setup_tasks)
+            todo.extend(owners[path] for path in task.file_dep if path in owners)
+        assert not any(name.startswith("prechips") for name in seen), root
     assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
     assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
     assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())

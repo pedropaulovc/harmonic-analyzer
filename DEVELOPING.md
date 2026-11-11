@@ -304,22 +304,30 @@ completed
 
 ## Process travelers
 
-`prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
-run on the farm. They need nothing beyond the locked Python environment:
-prechips is a stdlib-only PyPI dependency (`prechips>=0.9`), with no
-FreeCAD, geometry kernel or network access. The lock resolves the latest
-release; bump it with `uv lock --upgrade-package prechips`. To render a part's
-two travelers (`traveler.html` under `--profile pro`, `traveler-hobby.html`
-under `--profile hobby` with setup pictures) outside doit, after its scoped
-feature bundle exists:
+`prechips:<stem>` tasks are opt-in: `build` and `release` do not run them, and
+releases carry no travelers while prechips stabilises (owner ruling 2026-11-11,
+[#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)).
+prechips is not in `uv.lock`; the wrapper runs the latest PyPI release with
+`uv tool run` outside the project environment, logs its version once and
+records it on its spans, so it needs `uv` and network access to PyPI. The
+tasks run on the submitter, including when SolidWorks leaves run on the farm,
+and always run when requested. To render a part's two travelers
+(`traveler.html` under `--profile pro`, `traveler-hobby.html` under
+`--profile hobby` with setup pictures) after its scoped feature bundle exists
+under `cad/out/features/<stem>/` (from a build or a release asset):
 
 ```text
+uv run --frozen python -m doit prechips:<stem>
 uv run --frozen python cad/scripts/prechips_traveler.py <stem>
+uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>
 ```
 
-Only exit 0 from both profiles is success. Exit 2 from either is a refusal (bad
-input or a failed enforced check) and leaves neither file. Plan authoring and
-the shop files are described in [`cad/process/README.md`](cad/process/README.md).
+The doit task also runs its `package:features:<stem>` leaf first. Only exit 0
+from both profiles is success. Exit 2 from either is a prechips refusal (bad
+input or a failed enforced check) and leaves neither file; exit 1 means uv
+itself failed (no `uv`, no PyPI, or a `uv tool run` error before prechips ran).
+Plan authoring and the shop files are described in
+[`cad/process/README.md`](cad/process/README.md).
 
 ## Local pytest timing
 
@@ -1123,8 +1131,8 @@ executors, cache contracts or release checks.
 Never launch the `release` target through `farm-run.ps1`: it runs in a
 disposable snapshot, and cleanup would discard the publisher's post-release
 tracked image and `release.yaml` updates. Launch
-with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing,
-check and enrolled traveler gates). Once successful, restore the complete `cad/out` from the
+with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing
+and check gates). Once successful, restore the complete `cad/out` from the
 recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
 the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
 followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
@@ -1808,7 +1816,7 @@ feature leaf; shared `_drawing_common`, layout-audit, `_pdf_ink` and drawing-hel
 edits re-key all 18 enrolled feature leaves, not native part/assembly recipes.
 Full `export` waits for scoped bundles, validates them and copies their exact
 STEP bytes; its recipe consumes bundle outputs rather than draw closures
-directly. An enrolled `prechips:<stem>` depends only on its own feature leaf.
+directly. An opt-in `prechips:<stem>` depends only on its own feature leaf.
 Feature leaves retain `uptodate: [False]`, so every invocation reaches the cache
 probe even if local manifest and STEP targets exist. `cache_status` reports
 individual `package:features:<stem>` keys, not an aggregate `package:features` COM key.

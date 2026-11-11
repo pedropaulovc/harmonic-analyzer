@@ -212,35 +212,9 @@ def test_revision_advance_touches_only_release_yaml(
     source.write_bytes(b"next_revision: v22\r\n# unchanged\r\n")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
-    monkeypatch.setattr(
-        cut_release._process_plans, "plan_path",
-        lambda _stem: pytest.fail("revision advance opened a process plan"),
-    )
 
     assert cut_release.advance_configured_revision("v22") == "v23"
     assert source.read_bytes() == b"next_revision: v23\r\n# unchanged\r\n"
-
-
-def test_preflight_never_consults_process_plans(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    native = tmp_path / "sldasm"
-    native.mkdir()
-    (native / f"{cut_release.TOP_ASSEMBLY}.SLDASM").write_bytes(b"synthetic native")
-    scene = tmp_path / "scene.json"
-    scene.write_text('{"unit":"mm"}', encoding="utf-8")
-    monkeypatch.setattr(cut_release, "OUT_SLDASM", native)
-    monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
-    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
-    monkeypatch.setattr(cut_release, "_git", lambda *_a, **_k: "")
-    monkeypatch.setattr(
-        cut_release._process_plans, "plan_path",
-        lambda _stem: pytest.fail("preflight opened a process plan"),
-    )
-
-    cut_release.preflight("v22", allow_dirty=False)
-    with pytest.raises(SystemExit, match="does not match configured CAD Revision"):
-        cut_release.preflight("v23", allow_dirty=False)
 
 
 def test_explicit_compact_version_is_accepted() -> None:
@@ -385,13 +359,7 @@ def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
     cut_release.require_tracked("cad/docs/device-operation.md", "closure")
 
 
-@pytest.mark.parametrize(
-    "travelers",
-    [[], ["travelers/ch_rocker_arm", "travelers/ch_pivot_shaft"]],
-)
-def test_release_notes_report_native_count_and_enrolled_travelers(
-    travelers: list[str],
-) -> None:
+def test_release_notes_report_native_count() -> None:
     """The native Pack-and-Go count and the neutral export inventory are two
     different numbers. They shared the ``documents`` key, so
     ``stage_release_neutral``'s inventory silently overwrote the COM-derived
@@ -408,16 +376,13 @@ def test_release_notes_report_native_count_and_enrolled_travelers(
         "pngs": 107,
         "comparisons": {"pairs": 3, "mean_score": None},
         "size_mb": 42.0,
-        "travelers": travelers,
     }
 
     notes = cut_release.release_notes("v42", facts)
 
     assert "native Pack-and-Go (137 referenced documents" in notes
     assert "99 referenced documents" not in notes
-    assert ("- `travelers/`" in notes) == bool(travelers)
-    for path in travelers:
-        assert f"`{path}`" in notes
+    assert "traveler" not in notes
 
 
 def test_release_notes_count_shared_member_files_not_part_documents() -> None:
@@ -595,8 +560,6 @@ def feature_release(
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", tmp_path / "release.yaml")
     monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_DIR", prepared)
     monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_FILE", prepared / "native-package.json")
-    monkeypatch.setattr(cut_release._process_plans, "PROCESS_ROOT", tmp_path / "process")
-    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", ())
     monkeypatch.setattr(cut_release, "DRAWING_OUTPUTS", {})
     monkeypatch.setattr(cut_release, "drawing_note_texts", set)
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
@@ -736,7 +699,7 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
             "drawing-diff" in line
             for line in archive.read("SHA256SUMS.txt").decode().splitlines()
         )
-    assert facts["travelers"] == []
+    assert "travelers" not in facts
     assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
 
 
@@ -763,93 +726,17 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     assert not stage.with_suffix(".zip").exists()
 
 
-def test_release_stages_enrolled_travelers_after_feature_binding(
-    feature_release: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    plans = cut_release._process_plans
-    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
-    generated = plans.traveler_paths("ch_rocker_arm", feature_release)
-    generated[0].parent.mkdir(parents=True)
-    real_stage = plans.stage_travelers
-    printed = {}
-
-    def stage_travelers(out: Path, stage: Path) -> list[Path]:
-        assert out == feature_release
-        assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
-        # What prechips prints from the manifest bound into this release.
-        header = plans.traveler_header("ch_rocker_arm", stage)
-        assert header.endswith("; v38")
-        for path in generated:
-            printed[path.name] = f"<p>{header}</p> {path.name}".encode()
-            path.write_bytes(printed[path.name])
-        return real_stage(out, stage)
-
-    monkeypatch.setattr(plans, "stage_travelers", stage_travelers)
+def test_release_ships_no_travelers(feature_release: Path) -> None:
+    """Releases carry no travelers while prechips stabilises (owner ruling
+    2026-11-11, #2502), even when ``cad/out/travelers/`` holds generated sheets."""
+    sheets = feature_release / "travelers" / "ch_rocker_arm"
+    sheets.mkdir(parents=True)
+    for name in ("traveler.html", "traveler-hobby.html"):
+        (sheets / name).write_text("<p>MHA-CH-06; v38</p>", encoding="utf-8")
     zip_path, facts = cut_release.bundle("v38")
-
-    assert facts["travelers"] == ["travelers/ch_rocker_arm"]
+    assert "travelers" not in facts
     with zipfile.ZipFile(zip_path) as archive:
-        for name in ("traveler.html", "traveler-hobby.html"):
-            assert archive.read(f"travelers/ch_rocker_arm/{name}") == printed[name]
-
-
-def _staged_manifest(stage: Path, number: str, revision: str) -> None:
-    manifest = stage / "features" / "ch_rocker_arm" / "features.toml"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(
-        f'part = "ch-rocker-arm"\n\n[drawing]\nnumber = "{number}"\nrevision = "{revision}"\n',
-        encoding="utf-8",
-    )
-
-
-def test_staging_refuses_a_traveler_rendered_from_another_revision(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    plans = cut_release._process_plans
-    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
-    stage = tmp_path / "stage"
-    _staged_manifest(stage, "MHA-CH-06", "v39")
-    pro, hobby = plans.traveler_paths("ch_rocker_arm", tmp_path / "out")
-    pro.parent.mkdir(parents=True)
-    pro.write_text("<p>MHA-CH-06; v39</p>", encoding="utf-8")
-    hobby.write_text("<p>MHA-CH-06; v38</p>", encoding="utf-8")
-    with pytest.raises(ValueError, match="traveler-hobby.html") as refused:
-        plans.stage_travelers(tmp_path / "out", stage)
-    assert "traveler.html (" not in str(refused.value)
-    assert not (stage / "travelers").exists()
-    hobby.write_text("<p>MHA-CH-06; v39</p>", encoding="utf-8")
-    assert plans.stage_travelers(tmp_path / "out", stage) == [
-        plans.traveler_dir("ch_rocker_arm", stage),
-    ]
-
-
-def test_staging_refuses_a_part_missing_its_hobby_traveler(tmp_path: Path, monkeypatch) -> None:
-    plans = cut_release._process_plans
-    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
-    pro, hobby = plans.traveler_paths("ch_rocker_arm", tmp_path / "out")
-    pro.parent.mkdir(parents=True)
-    pro.write_text("pro only", encoding="utf-8")
-    with pytest.raises(FileNotFoundError, match="traveler-hobby.html"):
-        plans.stage_travelers(tmp_path / "out", tmp_path / "stage")
-    assert not (tmp_path / "stage" / "travelers").exists()
-
-
-def test_release_never_seals_a_failed_traveler_verification(
-    feature_release: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    failure = RuntimeError("traveler verification refused by fixture")
-
-    def refuse_travelers(out: Path, stage: Path) -> list[Path]:
-        assert out == feature_release
-        assert (stage / "step" / "ch-rocker-arm.STEP").is_file()
-        assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
-        raise failure
-
-    monkeypatch.setattr(cut_release._process_plans, "stage_travelers", refuse_travelers)
-    with pytest.raises(RuntimeError) as caught:
-        cut_release.bundle("v38")
-    assert caught.value is failure
-    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
+        assert not any(name.startswith("travelers/") for name in archive.namelist())
 
 
 @pytest.fixture
