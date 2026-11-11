@@ -80,9 +80,12 @@ SHEET_SCALE = (10.0, 1.0)
 VIEW_SCALE = (10, 1)
 # Third-angle: the end view projects to the RIGHT of the side view and shares
 # its Y station.
-FRONT_CENTER = (0.110, 0.170)  # side view: the pin along its axis
-RIGHT_CENTER = (0.220, FRONT_CENTER[1])  # end view: a bare circle
-ISO_CENTER = (0.330, 0.170)
+# The side view stands .03 m further in from the left than before #2339, so
+# the diameter's widest callout line (SELECTED STOCK, ...) stays inside the
+# border (r1 render: it ran off the left edge).
+FRONT_CENTER = (0.140, 0.170)  # side view: the pin along its axis
+RIGHT_CENTER = (0.245, FRONT_CENTER[1])  # end view: a bare circle
+ISO_CENTER = (0.340, 0.170)
 
 # Printed half-sizes in sheet metres, which every dimension is placed clear of.
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0  # 0.0099
