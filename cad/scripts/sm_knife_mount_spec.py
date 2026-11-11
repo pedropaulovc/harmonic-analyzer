@@ -496,10 +496,10 @@ PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
 PIN_HOLE_Z_WEB = _ROW_Z_MIN - _PIN_R_MAX
 # The tap axis stands PIN_HOLE_X from B, within its position zone's radius.
 _TAP_FROM_B_MIN = PIN_HOLE_X - STUD_TAP_POSITION_TOL / 2.0
-# B to the tap's thread major: 7.518 - 1.634 - 2.413 = 3.47.
+# B to the tap's thread major: 7.557 - 1.634 - 2.413 = 3.51.
 PIN_HOLE_TAP_WEB = _TAP_FROM_B_MIN - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
 # The tap's thread to the front/back face: its zone radius and the line's
-# skew over its BASIC station from B, 6.477 - 0.102 - 0.133 - 2.413 = 3.83.
+# skew over its BASIC station from B, 6.477 - 0.064 - 0.133 - 2.413 = 3.87.
 STUD_TAP_Z_WALL = (
     _ROW_Z_MIN
     - STUD_TAP_POSITION_TOL / 2.0

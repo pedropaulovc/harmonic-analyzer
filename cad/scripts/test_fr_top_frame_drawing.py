@@ -3857,7 +3857,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     )
     assert part.HANGER_DRIFT_AT_TOP == pytest.approx(0.19177922892285743)
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one
-    # dowel hangs each knife mount.  X .005 (the ream's .XXX) + .004 (the
+    # dowel hangs each knife mount.  X .005 (the ream's .XXX) + .0025 (the
     # tap's ⌖Ø.005|A|B|C▷ radius, owner ruling 2026-11-10 (Pedro), #2334)
     # + slip/2 + t/2 (B's datum simulator off its
     # hole's centre at the pin root, ⊥Ø.001|A; codjiflo round 5); Z the same
