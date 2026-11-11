@@ -7,9 +7,12 @@ frame assembly and its sheet, not every part that reads the frame's stations.
 
 from __future__ import annotations
 
-# Step 3's top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*)
-# prints three places on the .001 grid with the .XX-grade band it always had:
-# the title block's .XXX would hold a 40 in setting to +/-.005 that no mate
-# needs, since step 5 transfer-drills the tubes from the set position
-# (machinist review of the PR C proof).
-TOP_AXIS_HEIGHT_BAND_MM = 0.254  # +/-.010
+# The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
+# three places on the .001 grid with a band a tape measure reads (#2389).
+# No mate needs it closer: the tubes are transfer-drilled from the set
+# position, and the only base-to-top-frame links, the 20 MHA-CH-01 bars, are
+# common to every channel, so a height error turns all 20 levers alike (.030
+# over the 5.00 bar pin radius is 0.34 deg) and MHA-HA-00's summing levelling
+# takes it out. The original frame (ch30 eight-views, a cross screw per
+# corner boss) shows no finer height control.
+TOP_AXIS_HEIGHT_BAND_MM = 0.762  # +/-.030

@@ -111,6 +111,7 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X, STACK_HEIGHT
 import fr_frame_explode_spec as explode
 from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
@@ -165,6 +166,17 @@ INSET_PLACES = 2
 # CROSS_SCREW_FULL_THREAD_*), imported above.
 # The tube match holes' finished drill, as the hole steps print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
+# #2388: each tube's cross hole is spotted through its casting's Ø.206 near-wall
+# clearance hole with the largest stock transfer punch that enters it, then
+# drilled straight through both tube walls on the mill: no drill runs near the
+# tapped far wall, which an unguided pilot (.050 of slop in the clearance hole)
+# could cut. The punch's radial play is the spot's error.
+TRANSFER_PUNCH_IN = 13.0 / 64.0
+TRANSFER_PUNCH_TEXT = "13/64"
+if not 0.0 < NEAR_WALL_CLEARANCE_DIAMETER / 25.4 - TRANSFER_PUNCH_IN <= 0.005:
+    raise AssertionError(
+        "the transfer punch must enter the clearance hole with little play"
+    )
 # Machine z stations each inset edge's ray is cast at, in turn: on both
 # edges, clear of the plate's corner screw heads (z +/-42) and the deck's
 # centre line (z 0). The first station whose ray meets an edge chooses it; the
@@ -486,13 +498,35 @@ _POST_BORE = f"THE {GOOSENECK_POST_NUMBER} POST BORE OF {_TOP}"
 _LIFT_OFF = f"TAKE {_TOP} AND THE COLUMNS OFF {_BASE}."
 
 # One entry per step key (fr_frame_assembly_steps.SEQUENCE). Only what exists
-# at assembly: matched socket fits, tube cross holes match-drilled through
-# each casting's clearance hole (only the casting wall opposite is tapped),
-# the columns match-cut to the cap stack, and checks against the actual
-# purchased parts. Each step does one thing; a check and its remedy are their
-# own steps (rule 22). Sides and ends name physical features or a lettered
-# view, never a compass or the machine's front and back (rule 26).
+# at assembly: matched socket fits, tube cross holes spotted through each
+# casting's clearance hole and drilled on the mill (only the casting wall
+# opposite is tapped), the columns match-cut to the cap stack, and checks
+# against the actual purchased parts. Each step does one thing; a check and
+# its remedy are their own steps (rule 22). Sides and ends name physical
+# features or a lettered view, never a compass or the machine's front and
+# back (rule 26).
 STEP_TEXT = {
+    # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468). It comes
+    # first so the bare base goes on the mill for the drilling and tapping
+    # (#2390), not under the erected frame.
+    steps.NAMEPLATE_SET_KEY: (
+        f"SET {_PLATE} ENGRAVED FACE UP ON THE TOP FACE OF {_BASE}, CENTRED ACROSS "
+        "ITS WIDTH, PARALLEL TO THE NEAREST END OF THAT FACE AND INSET FROM IT BY "
+        "THE SECTION B-B DIMENSION (SHEET 1)."
+    ),
+    "nameplate-clamped": f"CLAMP {_PLATE} THERE.",
+    steps.NAMEPLATE_SPOTTED_KEY: f"SPOT {_BASE} THROUGH THE FOUR HOLES OF {_PLATE}.",
+    "nameplate-lifted": f"UNCLAMP AND LIFT OFF {_PLATE}.",
+    steps.NAMEPLATE_SEATS_TAPPED_KEY: (
+        f"WITH {_BASE} ON THE MILL, DRILL AND TAP EACH SPOT PER THE TRANSFER "
+        f"CALLOUT ON DRAWING {BOM_PART_NUMBERS[BASE]}."
+    ),
+    steps.NAMEPLATE_SCREWED_KEY: (
+        f"SCREW {_PLATE} DOWN WITH THE FOUR {_PLATE_SCREW} SCREWS UNTIL EVERY HEAD "
+        "SEATS."
+    ),
+    "nameplate-flat-checked": f"CHECK {_PLATE} LIES FLAT ON {_BASE}.",
+    "nameplate-heads-checked": f"CHECK EVERY {_PLATE_SCREW} HEAD BEARS ON {_PLATE}.",
     # The rough cut is the column's own supply length (fr_tube_frame_spec,
     # printed on its sheet as SUPPLY n.nn MIN): round 1 review, "LONG" gave
     # no length to cut to.
@@ -508,14 +542,14 @@ STEP_TEXT = {
         f"MATCH-MARK EACH {_COLUMN} AND ITS {_BASE} SOCKET ACROSS THE JOINT, SO IT "
         "GOES BACK IN THE SAME CORNER, TURNED THE SAME WAY."
     ),
-    steps.LOWER_HOLES_PILOTED_KEY: (
-        f"WITH THE COLUMNS SEATED, PILOT-DRILL BOTH TUBE WALLS THROUGH EACH {_BASE} "
-        "SOCKET CROSS HOLE, GUIDED BY THE CLEARANCE HOLE IN THE SOCKET WALL, WITH "
-        "A DRILL UNDER THE #10-32 MINOR SO THE TAPPED HOLE OPPOSITE IS NOT CUT."
+    steps.LOWER_HOLES_MARKED_KEY: (
+        f"WITH THE COLUMNS SEATED, SPOT EACH COLUMN THROUGH THE CLEARANCE HOLE "
+        f"OF ITS {_BASE} SOCKET WITH A {TRANSFER_PUNCH_TEXT} TRANSFER PUNCH."
     ),
     "lower-columns-lifted": f"LIFT THE COLUMNS OUT OF {_BASE}.",
-    steps.LOWER_HOLES_OPENED_KEY: (
-        f"OPEN EVERY PILOT HOLE IN THE COLUMNS TO Ø{CROSS_HOLE_TEXT} AND DEBURR IT."
+    steps.LOWER_HOLES_DRILLED_KEY: (
+        f"ON THE MILL, DRILL EACH COLUMN Ø{CROSS_HOLE_TEXT} AT ITS SPOT THROUGH BOTH "
+        "WALLS, SQUARE TO AND THROUGH THE TUBE AXIS, AND DEBURR BOTH HOLES."
     ),
     steps.LOWER_HOLES_CHECKED_KEY: (
         f"CHECK ONE {_CROSS} PASSES FREELY THROUGH BOTH Ø{CROSS_HOLE_TEXT} HOLES OF "
@@ -533,10 +567,13 @@ STEP_TEXT = {
         f"FIT EACH {_TOP} SOCKET TO ITS OWN {_COLUMN}: IT SLIDES ON BY HAND, NO ROCK."
     ),
     "top-match-marked": f"MATCH-MARK EACH {_COLUMN} AND ITS {_TOP} SOCKET THE SAME WAY.",
+    # #2389: no mate needs this height closer than a tape reads
+    # (fr_frame_setting_bands), so the base stands on the bench it is built
+    # on and a tape reads from that bench to the hole centre.
     steps.TOP_AXIS_SET_KEY: (
         f"SET EACH {_TOP} SOCKET CROSS-HOLE AXIS TO THE {TOP_AXIS_HEIGHT_TEXT} HEIGHT "
-        f"ABOVE THE UNDERSIDE OF {_BASE} (SHEET 1): READ AT THE CENTRE OF A GAUGE "
-        f"PIN IN THE HOLE WITH A HEIGHT GAUGE, {_BASE} ON A SURFACE PLATE."
+        f"ABOVE THE UNDERSIDE OF {_BASE} (SHEET 1), {_BASE} ON A FLAT BENCH: READ "
+        "WITH A TAPE MEASURE FROM THE BENCH TO THE CENTRE OF THE HOLE."
     ),
     steps.TOP_FRAME_CLAMPED_KEY: f"CLAMP {_TOP} TO THE COLUMNS AT THAT HEIGHT.",
     "columns-marked": (
@@ -554,13 +591,13 @@ STEP_TEXT = {
         f"REPEAT STEPS {steps.step_number(steps.TOP_AXIS_SET_KEY)} AND "
         f"{steps.step_number(steps.TOP_FRAME_CLAMPED_KEY)}."
     ),
-    "upper-holes-piloted": (
-        f"PILOT-DRILL BOTH TUBE WALLS THROUGH EACH {_TOP} SOCKET CROSS HOLE AS "
-        f"{_step(steps.LOWER_HOLES_PILOTED_KEY)}."
+    "upper-holes-marked": (
+        f"SPOT EACH COLUMN THROUGH THE CLEARANCE HOLE OF ITS {_TOP} SOCKET AS "
+        f"{_step(steps.LOWER_HOLES_MARKED_KEY)}."
     ),
     "frame-lifted-for-drill": _LIFT_OFF,
-    "upper-holes-opened": (
-        f"OPEN THE NEW PILOT HOLES AS {_step(steps.LOWER_HOLES_OPENED_KEY)}."
+    "upper-holes-drilled": (
+        f"DRILL THE NEW SPOTS AS {_step(steps.LOWER_HOLES_DRILLED_KEY)}."
     ),
     steps.UPPER_HOLES_CHECKED_KEY: (
         f"REPEAT THE {_step(steps.LOWER_HOLES_CHECKED_KEY)} CHECK ON THE NEW HOLES."
@@ -580,8 +617,8 @@ STEP_TEXT = {
     ),
     "cross-screws-replaced": f"REPLACE ANY {_CROSS} THAT READS SHORT.",
     steps.CROSS_SCREWS_DRIVEN_KEY: (
-        f"DRIVE THE EIGHT {_CROSS} SCREWS, EACH FROM THE SIDE ITS HOLE WAS "
-        "PILOT-DRILLED FROM, ONLY UNTIL ITS HEAD SEATS."
+        f"DRIVE THE EIGHT {_CROSS} SCREWS, EACH IN THROUGH ITS CLEARANCE HOLE, "
+        "ONLY UNTIL ITS HEAD SEATS."
     ),
     "cross-screw-heads-checked": f"CHECK EVERY {_CROSS} HEAD SEATS.",
     "cross-screw-taps-chased": (
@@ -610,25 +647,6 @@ STEP_TEXT = {
     ),
     "support-flat-checked": f"CHECK {_SUPPORT} LIES FLAT ON {_BASE}.",
     "support-heads-checked": f"CHECK EVERY {_SUPPORT_SCREW} HEAD BEARS ON {_SUPPORT}.",
-    # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
-    steps.NAMEPLATE_SET_KEY: (
-        f"SET {_PLATE} ENGRAVED FACE UP ON THE TOP FACE OF {_BASE}, CENTRED ACROSS "
-        "ITS WIDTH, PARALLEL TO THE NEAREST END OF THAT FACE AND INSET FROM IT BY "
-        "THE SECTION B-B DIMENSION (SHEET 1)."
-    ),
-    "nameplate-clamped": f"CLAMP {_PLATE} THERE.",
-    steps.NAMEPLATE_SPOTTED_KEY: f"SPOT {_BASE} THROUGH THE FOUR HOLES OF {_PLATE}.",
-    "nameplate-lifted": f"UNCLAMP AND LIFT OFF {_PLATE}.",
-    steps.NAMEPLATE_SEATS_TAPPED_KEY: (
-        f"DRILL AND TAP EACH SPOT PER THE TRANSFER CALLOUT ON DRAWING "
-        f"{BOM_PART_NUMBERS[BASE]}."
-    ),
-    steps.NAMEPLATE_SCREWED_KEY: (
-        f"SCREW {_PLATE} DOWN WITH THE FOUR {_PLATE_SCREW} SCREWS UNTIL EVERY HEAD "
-        "SEATS."
-    ),
-    "nameplate-flat-checked": f"CHECK {_PLATE} LIES FLAT ON {_BASE}.",
-    "nameplate-heads-checked": f"CHECK EVERY {_PLATE_SCREW} HEAD BEARS ON {_PLATE}.",
     # Rule 23 at the package boundary: the set screw's only job is to grip the
     # summing post, which MHA-HA-00 slides to level and tightens it on.
     steps.GOOSENECK_STARTED_KEY: (
@@ -647,12 +665,13 @@ if tuple(STEP_TEXT) != steps.SEQUENCE:
     raise AssertionError("STEP_TEXT must follow fr_frame_assembly_steps.SEQUENCE")
 # The sequence prints in titled groups, each opening at its first key.
 STEP_GROUPS = (
+    (f"NAMEPLATE ON {_BASE}", steps.NAMEPLATE_SET_KEY),
     (f"COLUMNS IN {_BASE}", steps.COLUMNS_ROUGH_CUT_KEY),
     (f"{_TOP} ON THE COLUMNS", steps.COLUMNS_RESEATED_KEY),
     ("COLUMNS CUT TO LENGTH", "columns-marked"),
-    (f"TUBE HOLES AT {_TOP}", "upper-holes-piloted"),
+    (f"TUBE HOLES AT {_TOP}", "upper-holes-marked"),
     ("FASTENING AND CAPS", "frame-reassembled"),
-    ("SUPPORT AND NAMEPLATE", "support-seated"),
+    (f"SUPPORT ON {_BASE}", "support-seated"),
     ("SET SCREW AND FINAL CHECKS", steps.GOOSENECK_STARTED_KEY),
 )
 if STEP_GROUPS[0][1] != steps.SEQUENCE[0] or [

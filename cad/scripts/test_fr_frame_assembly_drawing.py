@@ -118,8 +118,8 @@ class Projection:
 def test_checked_heights_print_their_model_values() -> None:
     """The overall reference prints the cap stack's .001 grid exactly. The top
     cross-bore axis (MHA-FR-02's taps, .72 under its rail top) sits on the
-    .001 grid too, so it prints three places, with the .XX-grade band the
-    setting needs rather than the title block's .XXX. The dimension carries
+    .001 grid too, so it prints three places, with the tape-read band the
+    setting needs (#2389) rather than the title block's .XXX. The dimension carries
     only its value and band; the setting step names it, from the model."""
     from _title_block_units import render_number
 
@@ -129,7 +129,7 @@ def test_checked_heights_print_their_model_values() -> None:
     assert drawing.TOP_AXIS_HEIGHT_PLACES == 3
     axis_in = drawing.TOP_SCREW_Y / 25.4
     assert axis_in == pytest.approx(round(axis_in, 3), abs=1e-9)
-    assert drawing.TOP_AXIS_HEIGHT_BAND_MM == pytest.approx(0.010 * 25.4)
+    assert drawing.TOP_AXIS_HEIGHT_BAND_MM == pytest.approx(0.030 * 25.4)
     printed = render_number(axis_in, drawing.UNIT, drawing.TOP_AXIS_HEIGHT_PLACES)
     band = render_number(
         drawing.TOP_AXIS_HEIGHT_BAND_MM / 25.4, drawing.UNIT, drawing.TOP_AXIS_HEIGHT_PLACES
@@ -851,6 +851,32 @@ def test_the_nameplate_is_set_then_its_base_seats_are_spotted_through_it() -> No
     assert "SECTION B-B" in placed
     assert not re.search(r"\d\.\d", placed)
     assert drawing.BOM_PART_NUMBERS[drawing.BASE] in _step(steps.NAMEPLATE_SEATS_TAPPED_KEY)
+
+
+def test_the_nameplate_seats_are_tapped_before_the_columns_go_in() -> None:
+    # #2390: the bare base goes on the mill for its nameplate seats; once the
+    # columns and top frame stand on it, it cannot.
+    steps = drawing.steps
+    tapped = steps.step_number(steps.NAMEPLATE_SEATS_TAPPED_KEY)
+    assert tapped < steps.step_number("base-sockets-fitted")
+    assert drawing.STEP_GROUPS[0][1] == steps.NAMEPLATE_SET_KEY
+
+
+def test_tube_cross_holes_are_spotted_through_the_clearance_hole_not_drilled() -> None:
+    # #2388: nothing is drilled through a casting's clearance hole toward the
+    # tapped far wall; the spot is transferred and the tube drilled off the
+    # frame. The punch enters the clearance hole with little play.
+    from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
+
+    play = NEAR_WALL_CLEARANCE_DIAMETER / 25.4 - drawing.TRANSFER_PUNCH_IN
+    assert 0.0 < play <= 0.005
+    steps = drawing.steps
+    marked = steps.step_number(steps.LOWER_HOLES_MARKED_KEY)
+    lifted = steps.step_number("lower-columns-lifted")
+    drilled = steps.step_number(steps.LOWER_HOLES_DRILLED_KEY)
+    assert marked < lifted < drilled
+    assert drawing.TRANSFER_PUNCH_TEXT in _step(steps.LOWER_HOLES_MARKED_KEY)
+    assert "DRILL" not in _step(steps.LOWER_HOLES_MARKED_KEY)
 
 
 def test_the_set_screw_step_points_to_the_drawing_step_that_tightens_it() -> None:

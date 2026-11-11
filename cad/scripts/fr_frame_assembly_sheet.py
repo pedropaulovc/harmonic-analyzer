@@ -24,7 +24,7 @@ from fr_vn_frame_cross_screw_spec import SHANK_LEN as CROSS_SCREW_SHANK_LEN
 # The fitter sheets print decimal inch (fr-frame.yaml ``drawing_unit``).
 UNIT = assembly_contract("fr-frame").drawing_unit
 # The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
-# three places, 40.075, with its .XX-grade band (+/-.010). TOP_AXIS_SET_KEY
+# three places, 40.075, with its tape-read band (+/-.030). TOP_AXIS_SET_KEY
 # sets all four corners' axes to this one absolute height from the base
 # underside before the upper tube holes are match-drilled, so the frame's own
 # .72 tap station off its rail top cannot carry it. MHA-FR-02's faced
