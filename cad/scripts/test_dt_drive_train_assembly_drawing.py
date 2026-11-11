@@ -591,34 +591,40 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
-    """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set at
-    assembly (cone_set_stack): pedestals snug-loose, shims at T012 and T120,
-    pedestals tightened, then the T120 feeler and MHA-DT-VN-51 -- never the stop."""
-    import cone_set_stack as set_stack
-
+    """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set by
+    feel at assembly (owner direction 2026-11-11, #2365; cone_set_stack):
+    pedestals snug-loose and tapped until both ends mesh without binding,
+    pedestals tightened, then swung in until nothing binds and locked with
+    MHA-DT-VN-51 -- never the stop, and nothing gauged."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-
-    def feeler(value: float) -> str:
-        return drawing.inch_text(value, drawing.FEELER_PLACES)
-
-    t012 = f"{feeler(set_stack.feeler_gap_mm(12))} AT T012"
-    t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
-        check.index(t012),
-        check.index(t120),
+        check.index("TAP EACH MHA-DT-02 UNTIL THE GEARS AT ITS END MESH WITHOUT BINDING"),
         check.index("TIGHTEN MHA-DT-VN-62"),
-        # CodeRabbit on #1272: the shims block the swing, so they come out
-        # before the T120 feeler set.
-        check.index("SWING THE CONE SET OUT. 4L. REMOVE THE LEAVES"),
-        check.index(f"{feeler(set_stack.feeler_gap_mm(120))} FEELER IS SNUG T120 TIP TO ROOT"),
+        check.index("SWING THE CONE SET OUT"),
+        check.index("SWING IN UNTIL THE GEARS MESH WITHOUT BINDING"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-SH-VN-52" not in check
+    assert "FEELER" not in check and "LEAVES" not in check
 
 
+def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
+    """The feel set guarantees no bind only where it was felt, so the
+    acceptance turns the crank until the slowest MHA-DT-12 has made a turn."""
+    import dt_cone_gear_spec as cone
+    import dt_crank_drive_gear_spec as gear64
+    import dt_crank_pinion_spec as pinion
+    import dt_cylinder_gear_spec as drum
+
+    crank_per_cone_turn = gear64.TEETH / pinion.TEETH
+    slowest_drum_turn = drum.TEETH / min(cone.CONE_TEETH)
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    turns = re.search(r"TURN THE CRANK (\d+) TURNS\b[^.]*\bBIND", check)
+    assert turns is not None, check
+    assert int(turns.group(1)) == crank_per_cone_turn * slowest_drum_turn
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
@@ -843,11 +849,12 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     stays left of the cone station table."""
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
     assert "4H, 4J" in rows[".004"]
-    assert "CHECK 4D" in rows[".018"] and "1R" in rows[".018"]
-    assert rows[".020"] == "CHECK 4D, 4M"
+    assert "1R" in rows[".018"]
     assert "4F" in rows[".010"]
+    # The cone swing is set by feel (#2365): no row cites check 4.
+    assert not any("CHECK 4" in cited for cited in rows.values())
     checks = " ".join(drawing.CHECKS.split())
-    assert "RADIAL SHIMS" not in checks and "SWING IN ON FEELER LEAVES" in checks
+    assert "RADIAL SHIMS" not in checks and "FEELER LEAVES" not in checks
     widths = drawing.table_column_widths(drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS)
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
@@ -865,14 +872,12 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     route = [
         f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
         f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
-        f"{number}C. LIFT MHA-DT-20 AND THE LEAVES OFF.",
+        f"{number}C. LIFT MHA-DT-20 OFF.",
         f"{number}D. SPOT-DRILL THE PUNCH MARK.",
         f"{number}E. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
         "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
     ]
-    assert step.startswith(
-        "CONE SET ON THE BASE: SET MHA-DT-20 ON THE CHECK 4D FEELER LEAVES."
-    )
+    assert step.startswith("CONE SET ON THE BASE: SET MHA-DT-20 WHERE NO GEAR BINDS.")
     positions = [step.index(part) for part in route]
     assert positions == sorted(positions)
     assert step.count("CHECK THAT") == 1

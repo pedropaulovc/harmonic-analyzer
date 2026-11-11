@@ -116,19 +116,20 @@ Cone bands are ordinary (user ruling 2026-10-10): OD +0/−0.05, tooth thickness
 own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
 
 - **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
-  centre is set at assembly. Pedestals snug-loose, radial shims at T012 and
-  T120, tighten the pedestals, swing T120 in onto its radial feeler, lock the
-  cone-lock-knob (MHA-DT-VN-51); the pedestals are not loosened after the set
-  (pedestal float booked 0 by that order). Each cone's centre is the set point
-  plus its own RSS half-range. Gated: nominal contact ratio ≥ 1.0 at the mean
-  centre, positive backlash and no interference at the RSS corner. Reported
-  only (REF): the RSS contact ratio. The assembly sheet prints no T012
-  overlap figure (owner ruling 2026-11-08, Pedro): T012 must run free after
-  the set, and if it binds the MHA-DT-12 tip is stoned where it marks; the
-  swing is never backed off, as that would undo the T120 set.
+  centre is set by feel at assembly (owner direction 2026-11-11, #2365,
+  superseding the feeler sets of 2026-10-10 and 2026-11-08). Pedestals
+  snug-loose and tapped until both ends of the set mesh without binding,
+  tightened, then the set swung in until the gears mesh without binding and
+  the cone-lock-knob (MHA-DT-VN-51) locked; the pedestals are not loosened
+  after the set. No setting reading is booked: the feel set guarantees that
+  no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
+  gear, no tip on a root, no tip past the mate's base tangent). Gated:
+  nominal contact ratio ≥ 1.0 at the loosest centre a feel set leaves the
+  cone. Reported only (REF): the printed-corner contact ratio there. A gear
+  that binds is cleared by easing the swing, not by stoning a tip.
 - **T006** (pending exception ruling #971): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
-  every printed drum-tip path over the RSS centre range and keeps ≥ 0.02 mm
-  backlash; its contact ratio (≈ 0.77) is REF.
+  every printed drum-tip path at the loosest set and running centres, so it
+  never holds the swing out; its contact ratio (≈ 0.77) is REF.
 - **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
   nominal centre, positive backlash and no interference at the worst corner;
   the open-corner contact ratio is REF.
@@ -546,7 +547,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 - spring-eye threading margins into the lever hole / under the tab;
 - oblique cone↔drum mesh set point (edge slack, `cone_set_stack`). The engaged cone centre is
-  set at assembly on T120's radial feeler and locked with the cone-lock-knob (MHA-DT-VN-51); the
+  set by feel at assembly and locked with the cone-lock-knob (MHA-DT-VN-51); the
   swing stop screw (the shared MHA-SH-VN-52 in its swing-stop occurrence) only limits the disengaged swing;
 - rack–pinion backlash;
 - bushing clearance under the amplitude-bar foot.

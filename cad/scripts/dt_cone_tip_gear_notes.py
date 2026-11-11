@@ -135,10 +135,10 @@ def gear_data() -> str:
     profile = spec.PROFILE
     mesh = dt_mesh_checks.cone_check(teeth)
     inch = spec.inch_text
-    # Conservative reference reporting: round the backlash range outward.
-    spread = mesh.backlash_nominal_mm - mesh.backlash_rss_mm
-    minimum = family.inch_grid_mm(mesh.backlash_rss_mm, 3, math.floor)
-    maximum = family.inch_grid_mm(mesh.backlash_nominal_mm + spread, 3, math.ceil)
+    # Conservative reference reporting: round the backlash range outward,
+    # from the feel set's floor (no bind) to the loosest running centre.
+    minimum = family.inch_grid_mm(max(0.0, mesh.backlash_floor_mm), 3, math.floor)
+    maximum = family.inch_grid_mm(mesh.backlash_max_mm, 3, math.ceil)
     whole_depth_max = family.inch_grid_mm(
         max(
             corner.blank_radius_mm - corner.root_radius_min_mm

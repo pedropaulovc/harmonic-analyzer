@@ -2,15 +2,19 @@
 
 Every value comes from the part specs and config:
 
-* cone T006..T120 against the 120T drum: the centre is set at assembly on
-  T120 and the other cones follow the swing (cone_set_stack books each
-  cone's running mean and RSS half-range). Gated (test_standard_mesh_checks,
-  user ruling 2026-10-10): nominal contact ratio >= 1.0 at the mean centre,
-  and no binding and no interference at the RSS corner. The RSS contact
-  ratio is reported only;
-* the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief must stay clear of every
-  printed drum-tip corner's path over the RSS centre range
-  (``t006_relief_clearance_mm``).
+* cone T006..T120 against the 120T drum: the swing is set by feel at
+  assembly (owner direction 2026-11-11, #2365; cone_set_stack books the
+  centres it can leave each cone at). The feel set is what keeps the gears
+  from binding: no pair runs tighter than its own first bind, so at the
+  tightest pair backlash >= 0, with no tip on a root and no tip past the
+  mate's base tangent (T012..T120). What the stack gates is that the gears do
+  not come loose: nominal contact ratio >= 1.0 at the loosest centre a feel
+  set leaves a cone (test_standard_mesh_checks). The contact ratio of the
+  printed corners there is reported only;
+* the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief
+  must stay clear of every printed drum-tip corner's path at the loosest set
+  and at the loosest running centre (``t006_relief_clearance_mm``), so the
+  relief never holds the swing out further than the flanks do.
 
 The 32T alignment check lives in alignment_mesh_check, the crossed 16T:64T
 crank check with its stack in crank_mesh_stack.
@@ -37,77 +41,60 @@ from standard_mesh_checks import (
 )
 
 
-@functools.cache
-def _drum_corners():
-    return tuple(plane_gear(p, drum.MODULE_MM) for p in drum.manufacturing_corner_profiles())
-
-
 @dataclass(frozen=True)
 class ConeMeshCheck:
     name: str
     centre: cone_set_stack.ConeCentre
-    contact_ratio_nominal: float
-    contact_ratio_rss: float  # REF
-    backlash_nominal_mm: float
-    backlash_rss_mm: float
-    backlash_corner_min_mm: float  # every printed corner pair at the RSS-closed centre
-    interference_margin_rss_mm: float
-    root_clearance_rss_mm: float
+    contact_ratio_nominal: float  # the nominal profiles at the ceiling centre
+    contact_ratio_corner: float  # REF: every printed corner pair there
+    backlash_floor_mm: float  # every printed corner pair at its own first bind
+    backlash_max_mm: float  # REF: every printed corner pair at the ceiling
+    interference_margin_floor_mm: float
+    root_clearance_floor_mm: float
 
     def text(self) -> str:
-        lo, hi = self.centre.rss_range_mm
+        lo, hi = self.centre.range_mm
         return (
-            f"{self.name}: centre {self.centre.mean_mm:.3f} mean, {lo:.3f}..{hi:.3f} RSS; "
+            f"{self.name}: centre {lo:.3f} first bind .. {hi:.3f} loosest running; "
             f"contact ratio {self.contact_ratio_nominal:.3f} nominal, "
-            f"{self.contact_ratio_rss:.3f} RSS (REF); "
-            f"backlash {self.backlash_nominal_mm:.3f} nominal, {self.backlash_rss_mm:.3f} RSS; "
-            f"interference margin {self.interference_margin_rss_mm:.3f} RSS; "
-            f"root clearance {self.root_clearance_rss_mm:.3f} RSS"
+            f"{self.contact_ratio_corner:.3f} printed corners (REF) at the loosest; "
+            f"backlash {self.backlash_floor_mm:.3f} at the first bind, "
+            f"{self.backlash_max_mm:.3f} loosest (REF); "
+            f"interference margin {self.interference_margin_floor_mm:.3f} and "
+            f"root clearance {self.root_clearance_floor_mm:.3f} at the first bind"
         )
 
 
 @functools.cache
 def cone_check(teeth: int) -> ConeMeshCheck:
-    """The set-at-assembly cone mesh. Nominal: the printed profiles (cone at
-    standard thickness and printed OD, drum at mid thickness) at the mean
-    centre. RSS: each centre term, both tooth-thickness half-bands and both
-    tip bands, by their sensitivity at nominal."""
+    """The feel-set cone mesh. At the floor, every printed corner pair at its
+    own first bind (what the feel set guarantees). At the ceiling, the loosest
+    running centre: the nominal profiles (cone at standard thickness and
+    printed OD, drum at mid thickness) for the contact ratio, every corner
+    pair for the reference contact ratio and backlash."""
     alpha, module = math.radians(cone.PRESSURE_ANGLE_DEG), cone.MODULE_MM
     centre = cone_set_stack.cone_centre(teeth)
-    mean, half = centre.mean_mm, centre.rss_half_range_mm
-    lo = mean - half
+    loosest = centre.ceiling_mm
     gear = plane_gear(cone.stock_form_profile(teeth), module)
-    gear_corners = [plane_gear(p, module) for p in cone.manufacturing_corner_profiles(teeth)]
-    drum_corners = _drum_corners()
+    gear_corners = cone_set_stack.cone_corners(teeth)
+    drum_corners = cone_set_stack.drum_corners()
     drum_thickness = [c.pitch_thickness for c in drum_corners]
     mate = replace(plane_gear(drum.STOCK_FORM, drum.MODULE_MM),
                    pitch_thickness=(max(drum_thickness) + min(drum_thickness)) / 2.0)
-    cr = contact_ratio(gear, mate, mean, alpha, module)
-    cr_terms = (
-        contact_ratio(gear, mate, mean + half, alpha, module) - cr,
-        contact_ratio(replace(gear, tip_radius=min(c.tip_radius for c in gear_corners)),
-                      mate, mean, alpha, module) - cr,
-        contact_ratio(gear, replace(mate, tip_radius=min(c.tip_radius for c in drum_corners)),
-                      mean, alpha, module) - cr,
-    )
-    gear_thickness = [c.pitch_thickness for c in gear_corners]
-    nominal_backlash = backlash(gear, mate, mean, alpha)
-    backlash_terms = (
-        backlash(gear, mate, lo, alpha) - nominal_backlash,
-        (max(gear_thickness) - min(gear_thickness)) / 2.0,
-        (max(drum_thickness) - min(drum_thickness)) / 2.0,
-    )
     pairs = [(a, b) for a in gear_corners for b in drum_corners]
+    binds = [
+        (a, b, cone_set_stack.first_bind_mm(a, b, relieved=teeth == 6))
+        for a, b in pairs
+    ]
     return ConeMeshCheck(
         f"cone T{teeth:03d}/drum",
         centre,
-        cr,
-        cr - math.sqrt(sum(d * d for d in cr_terms)),
-        nominal_backlash,
-        nominal_backlash - math.sqrt(sum(d * d for d in backlash_terms)),
-        min(backlash(a, b, lo, alpha) for a, b in pairs),
-        min(interference_margin(a, b, lo, alpha) for a, b in pairs),
-        min(root_clearance(a, b, lo) for a, b in pairs),
+        contact_ratio(gear, mate, loosest, alpha, module),
+        min(contact_ratio(a, b, loosest, alpha, module) for a, b in pairs),
+        min(backlash(a, b, c, alpha) for a, b, c in binds),
+        max(backlash(a, b, loosest, alpha) for a, b in pairs),
+        min(interference_margin(a, b, c, alpha) for a, b, c in binds),
+        min(root_clearance(a, b, c) for a, b, c in binds),
     )
 
 
@@ -193,17 +180,22 @@ def _t006_material_boundary(profile) -> np.ndarray:
 def t006_relief_clearance_mm() -> float:
     """Least distance from any drum tip-land path to the T006 material.
 
-    Every T006 thickness/OD corner against every printed drum corner at both
-    centre limits. Each path starts outside the T006 blank, so it can enter
-    material only by crossing the boundary; with every step shorter than the
-    least distance found, no sample pair can straddle a crossing.
+    Every T006 thickness/OD corner against every printed drum corner at the
+    loosest set (the tightest phase) and the loosest running centre. Clear
+    there, the relief cannot be what holds the swing out. Each path starts
+    outside the T006 blank, so it can enter material only by crossing the
+    boundary; with every step shorter than the least distance found, no
+    sample pair can straddle a crossing.
     """
     worst, longest_step = math.inf, 0.0
+    six_centre = cone_set_stack.cone_centre(6)
     for profile in cone.manufacturing_corner_profiles(6):
         six = plane_gear(profile, cone.MODULE_MM)
         tree = cKDTree(_t006_material_boundary(profile))
-        for centre in cone_set_stack.cone_centre(6).rss_range_mm:
-            for drum_profile, drum_corner in zip(drum.manufacturing_corner_profiles(), _drum_corners()):
+        for centre in (six_centre.set_max_mm, six_centre.ceiling_mm):
+            for drum_profile, drum_corner in zip(
+                drum.manufacturing_corner_profiles(), cone_set_stack.drum_corners()
+            ):
                 theta = _engagement_rotations(centre, six, drum_corner, drum_profile, profile.blank_radius_mm)
                 paths = _drum_tip_lands_in_six_frame(centre, six, drum_corner, drum_profile, theta)
                 radius = np.hypot(paths[..., 0], paths[..., 1])

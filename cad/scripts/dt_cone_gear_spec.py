@@ -107,9 +107,9 @@ PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
 # (upper, lower), actual pitch arc, about the standard-depth thickness: the
-# ordinary cut-gear band (user ruling 2026-10-10, set-at-assembly cones;
-# dt_mesh_checks.cone_check gates it at the RSS corner of cone_set_stack),
-# +/-.003 in on the inch sheet.
+# ordinary cut-gear band (user ruling 2026-10-10; the cones are set by feel at
+# assembly, owner direction 2026-11-11, and dt_mesh_checks.cone_check gates
+# the mesh at the centres cone_set_stack books), +/-.003 in on the inch sheet.
 TOOTH_THICKNESS_BAND = (0.0762, -0.0762)
 
 # DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is pending
@@ -117,16 +117,18 @@ TOOTH_THICKNESS_BAND = (0.0762, -0.0762)
 # can reach a contact ratio of 1, so its tooth is sized for no binding and
 # the drum-tip path instead.
 # * Thickness 0.872 at the tool pitch, the band's upper limit
-#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND): every corner pair keeps >= 0.02
-#   backlash at the RSS-closed centre (cone_set_stack, ~std + 0.095).
+#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND), chosen for >= 0.02 backlash at the
+#   former feeler set's closed centre (~std + 0.095); the feel set (owner
+#   direction 2026-11-11) keeps every pair at backlash >= 0.
 # * Root R 1.10 sets the plunge; the involute stops where the relief rejoins it.
 # * Relief: the path of one virtual drum-tip point, held at C0 = standard +
-#   CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM (0.09, just inside the RSS-closed
-#   centre) with the thick tooth's flank in contact (TrochoidRelief), at radius
-#   C0 - 1.10 so it grazes the root, led 0.0002 rad into the drum tooth. That
-#   keeps every printed drum-tip corner >= 10 um clear of the T006 form at
-#   both T006 thickness limits over the RSS centre range
-#   (dt_mesh_checks.t006_relief_clearance_mm, gated in test_standard_mesh_checks).
+#   CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM (0.09) with the thick tooth's
+#   flank in contact (TrochoidRelief), at radius C0 - 1.10 so it grazes the
+#   root, led 0.0002 rad into the drum tooth. That keeps every printed
+#   drum-tip corner >= 10 um clear of the T006 form at both T006 thickness
+#   limits at the loosest feel set and running centres, so the relief never
+#   holds the swing out (dt_mesh_checks.t006_relief_clearance_mm, gated in
+#   test_standard_mesh_checks).
 # * Blank OD .1696 in (+0/-.0008, CUSTOM_SIX_BLANK_DIA_BAND), above the AGMA
 #   (N+2)/DP 4.23 mm: the ruled 4.31 mm (the largest OD, floored to 0.01 mm,
 #   whose thin corner keeps the 0.25 m tip land) floored to the printed .0001
