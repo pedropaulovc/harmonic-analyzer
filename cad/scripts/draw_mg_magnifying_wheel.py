@@ -578,7 +578,7 @@ _SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # plane is (WEB_CENTRELINES), left of the spigot step's, so the row above
 # stops short of it; last the overall (".772 ±.004"), which holds the
 # axle's nut stack, left of the back face above the A-A caption.  Each
-# band's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
+# length's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
 # prints its value and band alone (drawing-guidelines.md rule 7).  Each
 # text is centred clear of the face it leaves.  The two right-hand sizes
 # keep their arrows inside their spans, so no tail reaches a neighbouring
@@ -715,7 +715,7 @@ ROUND_CALLOUT = "2X RIM BORE EDGES"
 # the standard fit and the mate, the clearance or interference the finished
 # pair makes as REF (mg_magnifying_wheel_spec.DRAWING_NOTES): the bore is
 # reamed to run on the finished axle, and the spigot turned to press into
-# the drum's finished reamed bore.  The groove's two bands link their one
+# the drum's finished reamed bore.  The groove's two three-place sizes link their one
 # note; the tie holes read size, then process, then their plain name
 # (drawing-guidelines.md rule 26).
 DIMENSION_CALLOUTS = {
@@ -730,7 +730,7 @@ DIMENSION_CALLOUTS = {
     "Tie1HoleDia": TIE1_CALLOUT,
     "Tie2HoleDia": TIE2_CALLOUT,
 }
-# Each axial band's need stands over its value.
+# Each axial length's need stands over its value.
 CALLOUTS_ABOVE = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
