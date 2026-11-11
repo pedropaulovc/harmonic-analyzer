@@ -33,7 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
+from _drawing_dimensions import set_dimension_precision
 from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -127,13 +127,10 @@ FRONT_KEEP = {
         CHAMFER_VERTEX[1] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_BEARING),
     ),
 }
-# The deburr prints under the title block's .XX (#2314) and names what it
-# serves (rule 4): its short leg brings the cut end under the
-# #6-32 tap drill so the cut thread starts in the lever's tap, and its long
-# leg, at the steepest angle, is charged to the full threads the shank keeps
-# past the jam nut.  Rule 7 allows one reason line per feature, so the
-# callout names both mates on one line.
-CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; THREAD PAST MHA-CH-14"}
+# The deburr prints under the title block's .XX (#2314), so like the overall
+# and the counter anchor's deburr it carries no reason (rule 7): its stack
+# (short leg under the #6-32 tap drill, long leg charged to the thread past
+# the jam nut) is ch_vn_spring_hook_spec's.
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
@@ -304,7 +301,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
-    set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
     # Footer notes belong to the sheet. The curates leave the front view

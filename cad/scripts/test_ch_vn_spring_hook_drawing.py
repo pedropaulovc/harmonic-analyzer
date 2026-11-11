@@ -262,19 +262,21 @@ def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, 
         check()
 
 
-def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
-    """An angle's text outside its 0..45 deg wedge measures another angle; on
-    the bisector at radius 26 it stands off both rays by more than its box."""
-    vertex = drawing.CHAMFER_VERTEX
-    # Where the chamfer leaves the cut end, on the 5:1 front view.
-    assert vertex[0] == pytest.approx(
-        drawing.FRONT_CENTER[0]
-        + (spec.SUPPLIER_THREAD_MAJOR_MM / 2 - spec.CHAMFER_WIDTH_MM) * 0.005
+def test_deburr_vertex_follows_the_settled_ink_with_the_trim_and_the_leg():
+    """The settled ink (runs fa43a1a5, ae121732; the 30.734 mm part with its
+    .018 leg) put the 45 deg vertex at x 0.1064770 and the cut end's
+    extension line at y 0.1032311. The view centres on its outline, so a
+    longer trim drops the cut end by half its growth on the 5:1 sheet, and a
+    longer leg moves the vertex inboard by its growth."""
+    sheet_per_mm = 5.0 / 1000.0
+    growth = spec.FINISHED_OVERALL_MM - 30.734
+    assert drawing.CHAMFER_VERTEX == pytest.approx(
+        (
+            0.1064770 - (spec.CHAMFER_WIDTH_MM - 0.4572) * sheet_per_mm,
+            0.1032311 - growth * sheet_per_mm / 2.0,
+        ),
+        abs=1e-4,
     )
-    x, y = drawing.FRONT_KEEP["ChamferAngle"]
-    bearing = math.degrees(math.atan2(y - vertex[1], x - vertex[0]))
-    assert bearing == pytest.approx(spec.CHAMFER_ANGLE_DEG / 2, abs=0.5)
-    assert math.hypot(x - vertex[0], y - vertex[1]) == pytest.approx(0.026, abs=2e-4)
     assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100
 
 
