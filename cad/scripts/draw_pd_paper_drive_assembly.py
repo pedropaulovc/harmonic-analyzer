@@ -2519,8 +2519,8 @@ def _step_text(
         ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR AS "
-            f"MADE (LONG), ITS REAR FACE ON THE {n['pd-transgear-knob-shaft']} "
-            f"{teeth} FRONT FACE.",
+            f"MADE (LONG) OR AS LAST FACED, ITS REAR FACE ON THE "
+            f"{n['pd-transgear-knob-shaft']} {teeth} FRONT FACE.",
             f"READ THE {knob_short}'S FRONT FACE AGAINST THE {crank}'S FRONT FACE WITH A "
             "STRAIGHTEDGE ACROSS BOTH AND FEELERS.",
             "REMOVE THE COLLAR.",
@@ -2529,7 +2529,10 @@ def _step_text(
             f"OF THE {crank_short}'S FRONT FACE.",
             f"CHECK: THE FINISHED COLLAR BODY IS WITHIN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
-            f"IF NOT, MAKE A NEW {n['pd-transgear-drive-collar']} COLLAR AND REPEAT "
+            f"IF NOT, OR IF {s('collar-rear-faced-to-fit', 1)} READ THE "
+            f"{knob_short}'S FRONT FACE ALREADY BEHIND "
+            f"{s('collar-rear-faced-to-fit', 3)}'S WINDOW, MAKE A NEW "
+            f"{n['pd-transgear-drive-collar']} COLLAR AND REPEAT "
             f"FROM STEP {steps.step_number('collar-pins-pressed')}.",
         ),
         "collar-shoulder-seated": (
@@ -2615,8 +2618,12 @@ def _step_text(
             "CHECK: COLLAR TO DISC CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}, AS "
             f"{s('collar-disc-air-inspected', 2)}.",
-            f"IF {s('fitup-accepted', 0)} FAILS, REPEAT FROM STEP "
-            f"{steps.step_number('collar-rear-faced-to-fit')}.",
+            # A collar refaced at step 28 comes off with the thumbnut and the
+            # knob first, and every step it sets is then redone (machinist
+            # review of ab77adcbac).
+            f"IF {s('fitup-accepted', 0)} FAILS, {knob_stack_off}",
+            f"REPEAT STEPS {steps.step_number('collar-rear-faced-to-fit')}-"
+            f"{steps.step_number('fitup-accepted')}.",
             f"IF {s('fitup-accepted', 1)} FAILS, {knob_stack_off}",
             knob_pin_out,
             f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
@@ -2654,8 +2661,11 @@ def _step_text(
             "CHECK: THE CHAIN SEATS ON EVERY TOOTH OF BOTH WHEELS WITHOUT "
             "CLIMBING OR A TIGHT SPOT.",
             "CHECK: THE SLACK RUN TOUCHES NOTHING.",
-            "IF A CHECK FAILS, REPEAT STEP "
-            f"{steps.step_number('collar-rear-faced-to-fit')}.",
+            f"IF A CHECK FAILS, OPEN THE {n['pd-vn-chain-connecting-link']} LINK "
+            "AND LIFT THE CHAIN OFF.",
+            knob_stack_off,
+            f"REPEAT STEPS {steps.step_number('collar-rear-faced-to-fit')}-"
+            f"{steps.step_number('chain-run-accepted')}.",
             # As shipped: latched, the feed in mesh (delegated ruling
             # 2026-11-07 (Main), no precedent; owner review #2144; pending
             # owner confirmation).

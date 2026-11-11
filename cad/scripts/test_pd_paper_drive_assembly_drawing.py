@@ -2223,7 +2223,7 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     assert collar.FIT_UP_OFFSET_SET_TEXT in setting
     assert steps.OFFSET_ACCEPT_TEXT in accepted
     assert collar.FIT_UP_OFFSET_SET_TEXT != steps.OFFSET_ACCEPT_TEXT
-    assert f"STEP {steps.step_number('collar-rear-faced-to-fit')}" in accepted
+    assert f"STEPS {steps.step_number('collar-rear-faced-to-fit')}-" in accepted
     behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
     assert behind > 0.0
 
@@ -2564,7 +2564,7 @@ def test_the_trial_stack_goes_together_at_the_located_step() -> None:
     assert screw_tip + slack < disc_rear
     # The pin's head and the plate's rear end clear the plate and each
     # other; the shaft's rear end, the lowest point, hangs inside the shop's
-    # 1 in parallels (inventory fixtures.parallels-lms-6745).
+    # 1 in parallels (archived parallels-lms-6745; shop-equipment.toml: the set stops at 1 in).
     plate_edges = (
         steps_arm.KNOB_BORE_STATION + plate.EDGE_MINUS_X,
         steps_arm.KNOB_BORE_STATION + plate.EDGE_PLUS_X,
