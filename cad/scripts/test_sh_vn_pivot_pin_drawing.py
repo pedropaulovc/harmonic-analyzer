@@ -6,9 +6,12 @@ supplier sizes and mate callout, and the channel BOM rows it feeds.
 
 from __future__ import annotations
 
+import asyncio
+
 import _config
 import _dowel_dimensions
 import _mcmaster_90145a299 as catalogue
+import _purchased_fastener_drawing as purchased
 import ch_channel_assembly_sheet as channel_sheet
 import ch_channel_assembly_steps as channel_steps
 import ch_channel_explode_spec as explode
@@ -21,6 +24,7 @@ import sh_vn_pivot_pin_rod_spec as rod_pin
 import sh_vn_pivot_pin_spec as pin
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
+from _supplier_spring_drawing import state_captions
 
 ROW = _config.parts(pin.PART_STEM)
 MEMBERS = (rod_pin, bar_pin)
@@ -95,22 +99,55 @@ def test_the_diameter_callout_names_every_mate_by_number() -> None:
     assert callouts == [notes.DIAMETER_CALLOUT]
 
 
-def test_the_notes_name_the_assembly_that_presses_and_dresses() -> None:
-    assert notes.ASSEMBLY_NUMBER == channel_steps.DRAWING_NUMBER
-    assert notes.ASSEMBLY_NUMBER in notes.DRAWING_NOTES
-    assert "FLUSH" in notes.DRAWING_NOTES
-    assert len(notes.DRAWING_NOTES.splitlines()) <= 3
+def _build_call(monkeypatch) -> dict:
+    seen: dict = {}
+
+    async def record(adapter, spec, **kwargs):
+        seen.update(kwargs, spec=spec)
+        return {}
+
+    monkeypatch.setattr(drawing, "build_supplier_spring_drawing", record)
+    asyncio.run(drawing.build(object()))
+    return seen
 
 
-def test_the_installed_captions_and_channel_bom_rows_agree() -> None:
-    quantities = ROW["configuration_quantities"]
-    assert notes.VARIANTS == tuple(
-        (
-            spec.CONFIGURATION,
-            f"{spec.BOM_DESCRIPTION}, QTY {quantities[spec.CONFIGURATION]}",
-        )
-        for spec in MEMBERS
+def test_the_sheet_shows_an_unnamed_front_and_one_isometric(monkeypatch) -> None:
+    """Rule 26 and the BOM own the names and quantities: one standard
+    ISOMETRIC of the default member, no coined member captions, and no prose
+    name on the principal front."""
+    call = _build_call(monkeypatch)
+    assert not call.get("installed_variants")
+    assert not call["include_right"] and not call["include_top"]
+    assert call["installed_configuration"] == ROW["default_configuration"]
+    captions = state_captions(
+        stock_caption=call["stock_caption"],
+        installed_caption=call["installed_caption"],
+        right_caption="",
     )
+    assert captions["free_front"] == ""
+    assert captions["installed_iso"] == "ISOMETRIC"
+    assert not any("QTY" in caption for caption in captions.values())
+
+
+def test_the_title_block_material_is_the_plain_registry_material(monkeypatch) -> None:
+    """The SKU prints once, on the footer's SKU row: the MATERIAL cell reads
+    the registry material, short enough for its cell."""
+    call = _build_call(monkeypatch)
+    assert not call.get("spring_metadata")
+    assert ROW["material"] == "18-8 Stainless Steel"
+    assert catalogue.SKU not in ROW["material"]
+
+
+def test_the_note_block_carries_no_assembly_narration() -> None:
+    """Pressing and dressing the pins is MHA-CH-00's step text: the sheet
+    prints only the purchased-part line and its ITEM/SUPPLIER/SKU rows."""
+    notes_text = str(ROW.get("installation_notes", ""))
+    assert purchased.note_lines(notes_text, label=pin.PART_STEM) == ()
+    assert 1 + len(purchased._FOOTER_ROWS) <= 4
+    assert channel_steps.DRAWING_NUMBER not in notes_text
+
+
+def test_the_channel_bom_rows_are_keyed_by_member() -> None:
     rows = {rod_pin: explode.ROD_PIN, bar_pin: explode.BAR_PIN}
     for spec, key in rows.items():
         assert key == f"{pin.PART_STEM}--{spec.CONFIGURATION}"

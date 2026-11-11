@@ -743,6 +743,32 @@ def _record_supplier_fit_candidates(
         _rebuild(draw, phase="restore failed supplier view scale")
 
 
+def state_captions(
+    *,
+    stock_caption: str,
+    installed_caption: str,
+    right_caption: str,
+    installed_variants: Sequence[tuple[str, str]] = (),
+) -> dict[str, str]:
+    """Each supplier-sheet view's caption; an empty one prints no note.
+
+    An empty ``stock_caption`` leaves the principal supplier views unnamed
+    (rule 26: projected principal views take no prose name).
+    """
+    captions = {
+        "free_front": f"{stock_caption} — FRONT" if stock_caption else "",
+        "free_top": f"{stock_caption} — TOP" if stock_caption else "",
+        "free_right": right_caption,
+        "installed_iso": installed_caption,
+        # A principal Front at the sheet scale takes no label.
+        "installed_front": "",
+        "installed_second_iso": installed_variants[1][1] if installed_variants else "",
+    }
+    if installed_variants:
+        captions["installed_iso"] = installed_variants[0][1]
+    return captions
+
+
 async def build_supplier_spring_drawing(
     adapter: Any,
     spec: DrawingSpec,
@@ -921,7 +947,7 @@ async def build_supplier_spring_drawing(
             3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
             4: "installed front and pictorial; supplier data list"
             if installed_front
-            else f"{stock_caption}; separate installed pictorial",
+            else f"{stock_caption or 'supplier reference front'}; separate installed pictorial",
         },
     )
     orientations = {
@@ -1116,17 +1142,12 @@ async def build_supplier_spring_drawing(
     ddoc.ActivateView("")
     if not ddoc.GetEditSheet() or ddoc.ActiveDrawingView is not None:
         raise RuntimeError("cannot restore supplier sheet context for captions/footer")
-    captions = {
-        "free_front": f"{stock_caption} — FRONT",
-        "free_top": f"{stock_caption} — TOP",
-        "free_right": right_caption,
-        "installed_iso": installed_caption,
-        # A principal Front at the sheet scale takes no label.
-        "installed_front": "",
-        "installed_second_iso": installed_variants[1][1] if installed_variants else "",
-    }
-    if installed_variants:
-        captions["installed_iso"] = installed_variants[0][1]
+    captions = state_captions(
+        stock_caption=stock_caption,
+        installed_caption=installed_caption,
+        right_caption=right_caption,
+        installed_variants=installed_variants,
+    )
     placed = []
     for key, center, cell in cells:
         ratio = scales[key]

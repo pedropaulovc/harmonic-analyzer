@@ -80,7 +80,6 @@ from _supplier_spring_reference import (
     add_supplier_reference_configurations,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
-from sh_vn_pivot_pin_notes import DRAWING_NOTES
 
 PART_NAME = "sh-vn-pivot-pin"
 if PART_NAME != pin.PART_STEM:
@@ -283,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Supplier SKUs": ", ".join(str(sku) for sku in row["supplier_skus"]),
         },
     )
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_member_part(
         adapter,
         PART_NAME,

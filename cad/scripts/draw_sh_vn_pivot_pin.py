@@ -1,13 +1,14 @@
 """Purchase drawing for MHA-SH-VN-58, McMaster 90145A299 pivot pins.
 
 The catalogue 5/64 x 5/16 outline lives in the part's zero-body
-SUPPLIER_REFERENCE configuration, not in either installed member: the sheet
-prints its diameter and length as untoleranced supplier REF (the catalogue's
-tolerance governs), the diameter naming the parts each pin presses into and
-runs in. The two installed members (RodPin, BarPin) show as reference
-pictorials with their quantities; the footer carries the property-linked
-supplier and SKU and the pointer to MHA-CH-00, which presses and dresses
-them.
+SUPPLIER_REFERENCE configuration, not in either installed member: the
+unlabelled principal front prints its diameter and length as untoleranced
+supplier REF (the catalogue's tolerance governs), the diameter naming the
+parts each pin presses into and runs in. One ISOMETRIC shows the default
+(RodPin) member; the BarPin member is the same pin, and both quantities are
+the channel BOM's. The title block's MATERIAL is the registry material; the
+standard purchased footer carries the item and the property-linked supplier
+and SKU.
 """
 
 from __future__ import annotations
@@ -188,10 +189,10 @@ async def build(adapter: Any) -> dict[str, str]:
         prepare_views=prepare_pin_outline,
         include_right=False,
         include_top=False,
-        installed_variants=notes.VARIANTS,
-        installed_configuration=notes.VARIANTS[0][0],
-        stock_caption="SUPPLIER PIN AS PURCHASED",
-        spring_metadata=True,
+        installed_configuration=pin.ROD_PIN_CONFIGURATION,
+        installed_caption="ISOMETRIC",
+        # Rule 26: the principal front takes no prose name.
+        stock_caption="",
         unit=part_drawing_unit(PART_STEM),
     )
 
