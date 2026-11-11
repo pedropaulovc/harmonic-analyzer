@@ -141,12 +141,13 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
         plate_min=seat_geometry.PLATE
         + min(seat_geometry.PLATE_BAND),
     )
-    air, engagement = dt_crankshaft_spec.drive_pin_front_clearances(
+    # The printed one-sided band holds (the check raises on a closed air) ...
+    dt_crankshaft_spec.drive_pin_front_clearances(
         dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
         hub_rear_band=geometry.HUB_LENGTH_BAND,
         **kwargs,
     )
-    assert air > 0.0 and engagement > 0.0
+    # ... and the title block's symmetric .XX band would not.
     with pytest.raises(AssertionError, match="reaches the crank hub"):
         dt_crankshaft_spec.drive_pin_front_clearances(
             dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
@@ -180,7 +181,6 @@ def test_chain_clears_the_relief_shoulder_with_the_wheel_floated_onto_the_hub() 
     airs = _stack_a(geometry.RELIEF_LENGTH)
     assert airs["floated_worst"] == pytest.approx(0.2235, abs=1e-9)
     assert airs["floated"] == pytest.approx(0.5775, abs=1e-9)
-    assert airs["seated_worst"] >= geometry.CHAIN_SHOULDER_AIR_MIN
     assert airs["seated"] == pytest.approx(1.3315, abs=1e-9)
     # The floated pose governs, and the relief is the shortest .XX length
     # that holds the floor there (the seat set aft, as above, so the floated

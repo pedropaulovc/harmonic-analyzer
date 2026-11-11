@@ -120,8 +120,9 @@ FIT_NOTE = "\n".join(
 # The sheet's numbered notes, in one block under the general note.
 SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE))
 
-# The banded far-end stations name their stack on their own row: a callout
-# below would lift the value into the row above.  No AIR (rule 26).
+# The three-place far-end collar stations and the Depth name their stack on
+# their own row: a callout below would lift the value into the row above.
+# No AIR (rule 26).
 COLLAR_REAR_MATE = " BEARS ON MHA-DT-05"
 COLLAR_SEAT_MATE = " MHA-PD-09 SEAT"
 SHAFT_LENGTH_MATE = " SETS CLEARANCE MHA-DT-31 TO MHA-PD-09"
@@ -151,10 +152,10 @@ DRIVE_PIN_CALLOUT = "\n".join(
     )
 )
 
-# The native REAM callout prints the hole depth bare, so it would read under
-# the title block's general band, though the cut's depth carries the part's
-# +/-.004 (crankshaft_spec: pressed to the floor, the depth sets the pin's
-# proud length).  The band is appended to the depth at the end of the
+# The native REAM callout prints the hole depth bare, at the callout's four
+# places, which no title-block row covers, though the cut's depth carries the
+# .XXX row's +/-.005 (crankshaft_spec: pressed to the floor, the depth sets
+# the pin's proud length).  The band is appended to the depth at the end of the
 # callout's own format text, in inches at the callout's places:
 # draw_dt_crankshaft refuses any other sheet.
 DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{inch_text(DRIVE_PIN_DEPTH_TOL, HOLE_CALLOUT_PLACES)}"
