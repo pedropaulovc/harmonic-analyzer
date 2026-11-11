@@ -70,7 +70,8 @@ PLATE_CORNERS = (
     ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 0.0),
 )
 ROUNDED_CORNERS = tuple(corner for corner in PLATE_CORNERS if corner[3] > 0.0)
-# South-east corner chamfer (#1038, Repitch1038 ruling 2026-11-11).  With the
+# South-east corner chamfer (#1038; delegated ruling 2026-11-11, no precedent,
+# owner review #2144).  With the
 # bank centred the post stands 5.07 nearer the front, and the swung plate's
 # south end passes frame column socket 0: the pivot is 247.305 from the
 # socket's centre, so past the column nothing on the plate may reach beyond
