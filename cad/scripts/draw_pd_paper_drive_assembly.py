@@ -1919,7 +1919,7 @@ def _step_text(
     )
     bare_gap = " TO ".join(steps.inch_text(limit * 25.4, 3) for limit in _bare_in)
     # Remedies that run back through joints made permanent by then (15J
-    # stake, 22D/22E cross-pin, 9C-9F tapped disc) release and renew named
+    # stake, 22D/22E cross-pin, 9E-9H tapped disc) release and renew named
     # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
     # owner confirmation (#2144): renew, the bar's staked tap re-chased and
     # re-staked on fresh metal, 31E's cluster re-faced without renewal.
@@ -2042,7 +2042,7 @@ def _step_text(
         ),
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
-            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
+            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO ITS FLOOR, "
             f"{pin_window} PROUD.",
             _press_remedy(
                 "DOWEL", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"
@@ -2073,7 +2073,7 @@ def _step_text(
             f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, AT "
             f"THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
-            f"MOVE THE TABLE TO THE {KNOB_SETTING_VIEW_NAME} ALONG AND ACROSS "
+            f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S ALONG AND ACROSS "
             "SETTINGS FROM S.",
             f"TAP THE PLATE UNTIL ITS KNOB BORE {KNOB_BORE_LETTER} INDICATES TRUE.",
             "TIGHTEN THE CLAMPS.",
@@ -2094,9 +2094,14 @@ def _step_text(
             reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
             # The trial counts only if nothing moved under it: S still at the
-            # DRO's zero and N still true at its settings.
-            f"CHECK: RE-INDICATED, S READS TRUE AT THE DRO'S ZERO AND "
-            f"{KNOB_BORE_LETTER} AT ITS SETTINGS.",
+            # DRO's zero and N still true at its settings.  Named in full and
+            # pointed back like 12H: the step can pack onto a sheet without
+            # the DETAIL K key (machinist review on 0a4408f590).
+            f"CHECK: RE-INDICATED PER {s('arm-plate-located', 2)} "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}), "
+            f"{n['pd-transgear-arm']} PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
+            f"{n['pd-transgear-arm-plate']} KNOB BORE {KNOB_BORE_LETTER} AT ITS "
+            "SETTINGS.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
             # The plate is not moved to chase a reading: the S to N band stays
             # the setting's limit (owner ruling on #2034 x #2011; #2144 item
@@ -2129,8 +2134,8 @@ def _step_text(
             f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE.",
             f"WITH THE {n['pd-vn-transgear-disc-screw']} SCREWS SLACKENED, REPEAT "
             f"{s('disc-cluster-assembled', 1)}, {s('disc-taps-transferred', 0)}-"
-            f"{s('disc-taps-transferred', 1)} AND {s('disc-taps-transferred', 5)}-"
-            f"{s('disc-taps-transferred', 10)} ON A NEW "
+            f"{s('disc-taps-transferred', 1)}, {s('disc-taps-transferred', 7)} AND "
+            f"{s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 14)} ON A NEW "
             f"{n['pd-transgear-feed-pinion']}, THEN FROM {s('arm-plate-located', 9)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
@@ -2253,23 +2258,45 @@ def _step_text(
             f"SPIGOT TO THE {n['pd-transgear-feed-pinion']} STEP FACE.",
         ),
         "disc-taps-transferred": (
-            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON IT, "
-            "ON A MANDREL IN THE "
-            f"{n['pd-transgear-feed-pinion']} BORE, BETWEEN CENTRES.",
+            # #2418: not a Ø1/8 mandrel between centres, a precision tool of
+            # its own whose ends are no bigger than the smallest centre drill's
+            # body. A stub turned in the chuck to the bore runs true to the
+            # spindle by construction, is fitted to the actual bore and needs
+            # no drawing. The sleeve, not the slender stub, takes the truing
+            # taps: its rear face sits on the stub's faced shoulder and the
+            # tailstock centre holds its front bore mouth. The stub stays
+            # chucked until the re-check, or a re-chucked stub's own runout
+            # enters the reading.
+            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC "
+            "ON A STUB MANDREL TURNED IN PLACE IN THE LATHE CHUCK TO A SLIDING FIT "
+            f"IN THE {n['pd-transgear-feed-pinion']} BORE, THE SLEEVE'S REAR FACE "
+            "ON THE MANDREL'S FACED SHOULDER, THE TAILSTOCK CENTRE IN ITS FRONT "
+            "BORE MOUTH.",
             "WITH A DIAL INDICATOR ON A "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
             f"IN EACH {n['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC "
             f"CENTRAL AND SQUARE UNTIL THE READINGS SPAN {tir} TIR MAX.",
+            # The flange holes are off the axis, so the spots are taken off the
+            # lathe; the trued disc is clamped to the flange first, or the
+            # spigot's centring clearance lets it shift before it is spotted
+            # (#2418).
+            "CLAMP THE DISC TO THE HUB FLANGE WITH 2 TOOLMAKER'S CLAMPS BETWEEN "
+            "ITS HOLES.",
+            "BACK OFF THE TAILSTOCK AND SLIDE THE SLEEVE, HUB AND DISC OFF THE "
+            "MANDREL, LEAVING THE MANDREL IN THE CHUCK.",
             f"SPOT-DRILL THE DISC THROUGH THE {hub_geometry.SCREW_COUNT} HUB FLANGE "
             "HOLES.",
             f"DRILL EACH SPOT {TAP_0_80_DRILL_TEXT} THRU THE DISC.",
             f"TAP EACH HOLE {disc_screw.THREAD} THRU.",
             f"FIX THE DISC WITH {hub_geometry.SCREW_COUNT} "
             f"{n['pd-vn-transgear-disc-screw']} SCREWS.",
+            "REMOVE THE CLAMPS.",
+            "REFIT THE SLEEVE, HUB AND DISC ON THE MANDREL AND TAILSTOCK AS "
+            f"{s('disc-taps-transferred', 0)}.",
             f"CHECK: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
             f"IF NOT, SLACKEN THE {n['pd-vn-transgear-disc-screw']} SCREWS AND REPEAT "
-            f"{s('disc-taps-transferred', 1)} AND {s('disc-taps-transferred', 5)}-"
-            f"{s('disc-taps-transferred', 6)}.",
+            f"{s('disc-taps-transferred', 1)}, {s('disc-taps-transferred', 7)} AND "
+            f"{s('disc-taps-transferred', 10)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
             # drive torque as shear on the flange's bolt circle
             # (joint_retention 'pd-paper-drive/disc-screws', STATIC_CLAMP;
@@ -2277,7 +2304,7 @@ def _step_text(
             "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
             "NOT TURN THE DISC ON THE HUB.",
             f"IF IT TURNS, FIT NEW {n['pd-vn-transgear-disc-screw']} SCREWS AND "
-            f"REPEAT {s('disc-taps-transferred', 6)}-{s('disc-taps-transferred', 8)}.",
+            f"REPEAT {s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 12)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
         "disc-screws-cut": (
@@ -2600,15 +2627,22 @@ def _step_text(
             # back recovers the air whichever face or axis closed it; the
             # spigot end is never re-faced, as that would take the disc off
             # its screws.
-            f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE ON A "
-            f"MANDREL BY {steps.COLLAR_DISC_AIR_TEXT.split()[0]} LESS THE "
+            # #2418: the sleeve is driven by its rear face on the stub's
+            # shoulder, pushed there by the tailstock centre in the bore mouth;
+            # a Ø1/8 mandrel's friction alone cannot drive a cut on steel, and
+            # a collet on the Ø.313 boss would face the step toward the collet.
+            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE ON A STUB MANDREL AS "
+            f"{s('disc-taps-transferred', 0)}, ITS REAR FACE HELD ON THE MANDREL'S "
+            "FACED SHOULDER BY THE TAILSTOCK CENTRE IN ITS BORE MOUTH.",
+            f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE BY "
+            f"{steps.COLLAR_DISC_AIR_TEXT.split()[0]} LESS THE "
             f"{s('collar-disc-air-inspected', 3)} READING; "
             f"THE {n['pd-transgear-disc-hub']} SPIGOT END SEATS ON IT, SO HUB AND "
             "DISC SET BACK BY THAT AMOUNT.",
             "REFIT THE HUB'S D-BORE ON THE D-FLAT, SPIGOT TO THE STEP FACE, DISC "
             "AND HUB MATCH MARKS TOGETHER.",
             f"REPEAT {s('disc-taps-transferred', 0)} AND "
-            f"{s('disc-taps-transferred', 6)}-{s('disc-taps-transferred', 9)}.",
+            f"{s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 13)}.",
             f"RE-DRILL THE OIL HOLE THROUGH THE HUB INTO THE SLEEVE'S HOLE, AS STEP "
             f"{steps.step_number('oil-hole-drilled')}.",
             f"REPEAT STEPS {steps.step_number('disc-cluster-hung')}-"

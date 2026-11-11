@@ -1530,9 +1530,17 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     )
     read = drawing.sub_step("collar-disc-air-inspected", 3)
     assert (
-        f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE ON A "
-        f"MANDREL BY {feeler} LESS THE {read} READING;" in flat
+        f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE BY "
+        f"{feeler} LESS THE {read} READING;" in flat
     )
+    # #2418: the cut is driven by the sleeve's rear face on the stub's
+    # shoulder, loaded by the tailstock, not by a Ø1/8 mandrel's friction.
+    setup = [
+        flat.index(word)
+        for word in ("STUB MANDREL", "SHOULDER", "TAILSTOCK CENTRE", "RE-FACE THE ")
+    ]
+    assert setup == sorted(setup)
+    assert "BETWEEN CENTRES" not in flat
     assert "READ SHORT" not in flat
     assert texts[-1].startswith(
         f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
@@ -1808,9 +1816,13 @@ def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
 def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark() -> None:
     """Pilot fit and a free span do not centre the assembled tooth spaces."""
     transferred = _step_body("disc-taps-transferred")
-    assert (
-        f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
-    )
+    # #2418: a stub fitted to the actual bore in the chuck, not a Ø1/8
+    # mandrel between centres; the trued disc is clamped before the
+    # off-axis spots are taken off the lathe and is read back on the stub.
+    for word in ("STUB MANDREL", "LATHE CHUCK", "SLIDING FIT"):
+        assert word in transferred
+    assert f"{drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
+    assert "BETWEEN CENTRES" not in transferred
     assert (
         f"\u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
         f"{drawing._N['pd-rack-pinion']} TOOTH SPACE IN TURN"
@@ -1819,10 +1831,20 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     assert f"{tir} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
         assert method not in transferred
+    # Codjiflo P3 on 353fd41a36: the sleeve, held between the stub's
+    # shoulder and the tailstock, takes the truing taps, and the stub stays
+    # chucked while the work is off it.
     ordered_actions = (
+        "SHOULDER",
+        "TAILSTOCK CENTRE",
         "TAP THE DISC CENTRAL",
+        "CLAMP THE DISC TO THE HUB FLANGE",
+        "OFF THE MANDREL",
+        "IN THE CHUCK",
         "SPOT-DRILL THE DISC",
         "SCREWS.",
+        "REMOVE THE CLAMPS",
+        "REFIT THE SLEEVE",
         f"ALL {disc.TEETH} SPACES",
         "MATCH-MARK DISC AND HUB",
     )
@@ -2237,7 +2259,7 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
 
 
 def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
-    """Codex clarity: 0.05 ±0.05 sets, 0.05 ±0.10 accepts; the knob wheel
+    """Codex clarity: one band sets, a wider one accepts; the knob wheel
     behind the crank wheel within the acceptance passes."""
     setting = _step_body("collar-rear-faced-to-fit")
     accepted = _step_body("fitup-accepted")
@@ -2247,6 +2269,26 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     assert f"STEPS {steps.step_number('collar-rear-faced-to-fit')}-" in accepted
     behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
     assert behind > 0.0
+
+
+def test_the_chain_plane_bands_spend_the_offset_budget_not_the_fitter() -> None:
+    """#2420: a straightedge across both wheels and feelers sets and reads
+    the pair, and a miss costs a facing cut or a collar, so the re-check takes
+    the widest .001 band the ±1 mm offset limit leaves in service and the
+    setting the same band less the refit allowance it always kept."""
+    inch = 0.0254
+    budget = collar.CHAIN_OFFSET_LIMIT
+    low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
+    assert max(abs(low), abs(high)) <= budget
+    # One more thousandth of acceptance breaks the limit at the forward end.
+    assert low - inch < -budget
+    assert steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_SET_TOL == pytest.approx(2 * inch)
+    # Wide enough to read on feelers in .001 steps without a re-face per miss.
+    assert collar.FIT_UP_OFFSET_SET_TOL >= 5 * inch
+    # Whatever the setting passes, the re-check passes too.
+    set_low, set_high = collar.CHAIN_OFFSET_IN_SERVICE
+    assert low < set_low and set_high < high
+    assert collar.CHAIN_OFFSET_MARGIN >= 0.0
 
 
 def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
@@ -2464,6 +2506,27 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     )
 
 
+def test_every_step_naming_s_or_n_defines_them_or_points_to_their_key() -> None:
+    """Machinist review on 0a4408f590 (rule 22): step 12R packed onto a sheet
+    without the DETAIL K key and used S and N bare. Each sheet's step that
+    reads S or N names the bore's part or points to the key's sheet."""
+    key_sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1
+    bare = re.compile(rf"(?<![\w'])(S|{drawing.KNOB_BORE_LETTER})\b(?! TO )")
+    for column in drawing.pack_step_columns(
+        drawing._step_text(operating_domain=_unit_operating_domain())
+    ):
+        if column.sheet == drawing.KNOB_SETTING_SHEET:
+            continue
+        for step in re.split(r"\n(?=\d+[A-Z]?\. )", column.text):
+            flat = " ".join(step.split())
+            if "DRO" not in flat or not bare.search(flat):
+                continue
+            assert f"(SHEET {key_sheet})" in flat or (
+                "PIN BORE S" in flat
+                and f"KNOB BORE {drawing.KNOB_BORE_LETTER}" in flat
+            ), flat
+
+
 def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     """#2417: the mesh is read on its real seats while the plate is clamped,
     again once it is doweled, and only confirmed at the chain fit-up."""
@@ -2486,10 +2549,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # setting before it and never moved to chase a reading, so the S to N
     # band stays the limit; S and N are proven unmoved before the pilots.
     assert located.rindex("TAP THE PLATE") < trial
-    assert (
-        f"S READS TRUE AT THE DRO'S ZERO AND {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS"
-        in located[lifted:]
-    )
+    recheck = located[lifted:]
+    assert "S READS TRUE AT THE DRO'S ZERO" in recheck
+    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS" in recheck
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
     # The setting is made where the mesh is: S is indicated at the disc's height.
     assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
@@ -2515,9 +2577,10 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"WITH THE {_number('pd-vn-transgear-disc-screw')} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 1)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 1)} AND "
-        f"{drawing.sub_step('disc-taps-transferred', 5)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 10)} ON A NEW "
+        f"{drawing.sub_step('disc-taps-transferred', 1)}, "
+        f"{drawing.sub_step('disc-taps-transferred', 7)} AND "
+        f"{drawing.sub_step('disc-taps-transferred', 10)}-"
+        f"{drawing.sub_step('disc-taps-transferred', 14)} ON A NEW "
         f"{_number('pd-transgear-feed-pinion')}, THEN FROM {trial}.",
         f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
     ):
