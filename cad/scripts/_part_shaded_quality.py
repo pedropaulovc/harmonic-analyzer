@@ -36,8 +36,10 @@ def set_precise_shaded_quality(adapter: Any, *, label: str) -> None:
     deviation = _sw_type_info.constant("swImageQualityShadedDeviation")
     edge_length = _sw_type_info.constant("swImageQualityUseHighQualityEdgeSize")
 
+    # The three doubles are [in, out] in the typelib (makepy flag 3), so the
+    # early-bound call needs placeholders; it returns them in the tuple.
     status, current, minimum, maximum = extension.GetUserPreferenceDoubleValueRange(
-        deviation
+        deviation, 0.0, 0.0, 0.0
     )
     if status != 0 or not 0.0 < minimum <= maximum:
         raise RuntimeError(
