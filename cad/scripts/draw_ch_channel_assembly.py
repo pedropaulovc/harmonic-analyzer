@@ -94,6 +94,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
+from _printed_tolerance import printed_deviations
 from _title_block_units import LENGTH_UNITS, render_number
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
@@ -127,7 +128,9 @@ from ch_pivot_shaft_spec import (
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
+from ch_rocker_arm_notes import DRAWING_PRECISION as ARM_DRAWING_PRECISION
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
+from ch_rocker_arm_spec import UNIT as ARM_UNIT
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
@@ -616,10 +619,11 @@ LEVER_BANK = BankView(
 # and its X datum, the web centre, is no face to touch). The frame is not in
 # this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws the frame
 # features the settings run from (5d5245a review rule 10): in phantom, the
-# west front upper socket's bore and boss, the line of the upper socket
-# centres and the web centre line; as visible lines, the web faces the
-# centre line splits, each as far as it shows past the front keeper (r5
-# review: in phantom they read as hidden lines through it). It carries
+# west front upper socket's bore, boss and keeper relief step, the line of
+# the upper socket centres and the web centre line; as a visible line, the
+# inner web face, as far as it shows beside the front keeper (r5 review: in
+# phantom a face reads as a hidden line through it; the outer face lies
+# under the keeper from the boss on). It carries
 # the three settings (owner rulings X1+B1, X-A). Placed under the lever bank:
 # the socket line 0.120 up. The farm-measured outline (c80bb08be) ran 0.1051
 # below the socket line, so its bottom clears the border by 2.2 mm; the boss
@@ -708,7 +712,8 @@ PLAN_KEEP = {
 # The two frame datums the sketch draws, named where they are drawn (owner
 # ruling: the web centre is midway between both web faces), the texts
 # east of the view: the socket line's leader lands past the boss, the web
-# centre's inside the boss annulus, between the bore and the web faces.
+# centre's inside the boss annulus, between the bore and the keeper relief
+# step.
 PLAN_POINTERS = (
     (
         f"{_TOP_FRAME_NUMBER} LINE OF THE\nUPPER SOCKET CENTRES",
@@ -725,7 +730,7 @@ PLAN_POINTERS = (
         KEEPER_PLAN.plan_xy(
             asm.KEEPER_SOCKET_XZ[0],
             asm.KEEPER_SOCKET_XZ[1]
-            + (SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_WEB_FACE_FROM_SOCKET) / 2.0,
+            + (SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_RELIEF_FROM_SOCKET) / 2.0,
         ),
     ),
 )
@@ -1095,11 +1100,27 @@ def _fitup_text() -> dict[str, str]:
     # low limit: the stack can only be long, and the re-face step covers that.
     # It faces the longest hubs on the end away from datum G, the face each
     # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
-    # over its print.
-    if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
+    # over its print. Checked on the PRINTED limits, as a fitter reads both
+    # sheets (#2330): twenty .3000 hubs at their low limit make exactly the
+    # stack's printed 6.000 low limit.
+    hub_low_dev, _ = printed_deviations(
+        HUB_LENGTH,
+        ARM_DRAWING_PRECISION["Hub"]["HubLength"],
+        (HUB_LENGTH_BAND[1], HUB_LENGTH_BAND[0]),
+        unit=ARM_UNIT,
+    )
+    stack_low_dev, _ = printed_deviations(
+        STACK_L20_ACCEPT[0],
+        asm.DRAWING_PRECISION[asm.PIVOT_FEATURE][asm.STACK_LENGTH_DIMENSION],
+        asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION],
+        unit=asm.UNIT,
+    )
+    hub_low = HUB_LENGTH + hub_low_dev
+    stack_low = STACK_L20_ACCEPT[0] + stack_low_dev
+    if COUNT * hub_low < stack_low - 1e-9:
         raise AssertionError(
-            "the re-face step covers only a long stack, but the hub band "
-            "allows a stack under the acceptance's low limit"
+            "the re-face step covers only a long stack, but twenty hubs at "
+            "their printed low limit fall under the stack's printed low limit"
         )
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
