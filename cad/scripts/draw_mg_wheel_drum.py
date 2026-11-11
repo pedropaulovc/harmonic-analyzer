@@ -100,11 +100,12 @@ def _inch(value_mm: float, digits: int) -> str:
     return render_number(abs(value_mm) / MM_PER_INCH, "in", digits)
 
 
-# Each band names its mate once, on its own callout (rules 4 and 7): the
-# reamed bore's standard fit on the wheel spigot, which is turned to it, with
-# the interference as REF; the length's tight band sets the drum's stack on
-# that spigot. Seating against the boss and the front-face recess are the
-# assembly's drum-pressed step, not part-sheet text.
+# Each tight size names its mate once, on its own callout (rules 4 and 7):
+# the reamed bore's standard fit on the wheel spigot, which is turned to it,
+# with the interference as REF; the length's third place (the title block's
+# .XXX) sets the drum's stack on that spigot. Seating against the boss and
+# the front-face recess are the assembly's drum-pressed step, not part-sheet
+# text.
 DIMENSION_CALLOUTS = {
     "DrumBore": (
         "REAM THRU\n"

@@ -9,7 +9,8 @@ The bar is 7.95 x .315 x .118 in (201.93 x 8.001 x 2.9972 mm; issue #290's
 decimal-inch sheet, ``ms_stick_spec`` gives the grid and its exemptions).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
-engraved .020 deep into the back face (z=0), tick 0 at x=2.224 in (the
+engraved .020 deep into the back face (z=0) as 30-degree included V grooves
+(issue #2433: the numerals' V bit cuts them), tick 0 at x=2.224 in (the
 2026-10-10 user Option B ruling shifted the whole scale left on the blank).
 
 Numerals: the 0..10 values are engraved beside their full ticks (page001_img01:
@@ -23,7 +24,7 @@ position (0, 0) (placement is baked into the file: the Makers seat ignores the
 importer's scale/position, see ``build_fr_nameplate``) and cut ``NUMERAL_DEPTH``
 deep with every wall drafted inward at half the V angle, so each stroke is the
 true 30-degree included V the shop engraves (2026-10-23 owner ruling). The
-square-bottom graduations stay separate. The frame/sign conventions (the z=0
+graduations are separate cuts of the same V. The frame/sign conventions (the z=0
 ruled face is SEEN from -Z, so the files carry a y inversion, never applied at
 import) are worked out in the generator's docstring. Edit a ``NUMERAL_*`` knob
 in ``ms_stick_spec``, regenerate the DXFs and update that spec's pinned bbox and
@@ -99,7 +100,7 @@ from ms_stick_spec import (
     NUMERAL_FINAL_MIN_STROKE_MM3,
     NUMERAL_LAYER_MIN_STROKE_MM3,
     NUMERAL_LAYER_VOLUMES_MM3,
-    NUMERAL_V_INCLUDED_ANGLE_DEG,
+    ENGRAVING_V_INCLUDED_ANGLE_DEG,
     NUMERAL_VOLUME_MM3,
     REFERENCE_DIMENSIONS,
     SCALE_END_MARGIN,
@@ -108,6 +109,8 @@ from ms_stick_spec import (
     TICK_LENGTH,
     TICK_DEPTH,
     TICK_OVERHANG,
+    TICK_VOLUME_MM3,
+    tick_v_volume_mm3,
     UNIT,
 )
 from _visibility import blank_sketch_feature
@@ -133,6 +136,12 @@ NUMERAL_VOLUME_ALLOWANCE_MM3 = min(NUMERAL_LAYER_ALLOWANCES_MM3)
 NUMERAL_FINAL_ALLOWANCE_MM3 = 0.5 * NUMERAL_FINAL_MIN_STROKE_MM3
 # Imported sketch vertices land on their DXF's to within this (mm).
 NUMERAL_PLACEMENT_TOL_MM = 1e-3
+# The V ticks' removed-volume gates: the closed form (ms_stick_spec) proves
+# the seed tick's draft inward (straight walls remove 1.5x, outward draft 2x
+# its 0.41 mm^3), and all ticks together to half a minor tick, so a tick the
+# patterns dropped fails.
+TICK_SEED_ALLOWANCE_MM3 = 0.25 * tick_v_volume_mm3(TICK_LENGTH)
+TICK_VOLUME_ALLOWANCE_MM3 = 0.5 * tick_v_volume_mm3(MINOR_TICK_LENGTH)
 
 
 def numeral_feature_names() -> list[str]:
@@ -143,7 +152,7 @@ def numeral_feature_names() -> list[str]:
 def _assert_one_numeral_cut(adapter, name: str) -> bool:
     """Read one native numeral cut's depth and V draft back; returns its
     draft-outward flag (the seat's sense of it is proved by removed volume)."""
-    half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
+    half_angle = ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0
     feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
     definition = feature.GetDefinition()
     if definition is None:
@@ -157,7 +166,7 @@ def _assert_one_numeral_cut(adapter, name: str) -> bool:
     if not drafted or not math.isfinite(angle) or abs(angle - half_angle) > 1e-6:
         raise RuntimeError(
             f"{name}: expected a {half_angle:g} deg draft on every wall (a "
-            f"{NUMERAL_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
+            f"{ENGRAVING_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
             f"drafted={drafted} angle={angle:.6g}"
         )
     return bool(definition.GetDraftOutward(True))
@@ -204,7 +213,7 @@ def _v_cut_args(ddir1: bool, *, reverse: bool = True, drafted: bool = True,
         True, False, reverse,  # Sd single-ended, Flip, Dir (reversed: into the bar)
         0, 0, depth_mm / 1000.0, 0.0,  # T1/T2 blind, D1, D2
         drafted, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
-        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
+        math.radians(ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
         False, True, False, False, False,  # scope, auto-select, assembly flags
         0, 0.0, False,  # T0 sketch plane, StartOffset, FlipStartOffset
@@ -248,21 +257,21 @@ async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     return result
 
 
-async def _first_v_cut(adapter, sketch_name: str, pre: float) -> tuple:
-    """Find the form that removes exactly the first layer's V; undo the rest.
-    ``pre`` is the volume before the cut."""
+async def _first_v_cut(adapter, sketch_name: str, pre: float, *, depth_mm: float,
+                       expected: float, allowance: float) -> tuple:
+    """Find the form whose ``depth_mm`` V removes ``expected`` mm^3 to within
+    ``allowance``; undo the rest. ``pre`` is the volume before the cut."""
     tried = []
     for label, ddir1 in V_CUT_VARIANTS:
-        args = _v_cut_args(ddir1)
+        args = _v_cut_args(ddir1, depth_mm=depth_mm)
         try:
             _feature_cut3(adapter, sketch_name, args)
         except FeatureCutRefused as exc:
             tried.append(f"{label}: {exc}")
             continue
         removed = pre - await _volume_mm3(adapter)
-        expected = NUMERAL_LAYER_VOLUMES_MM3[0]
-        if abs(removed - expected) <= NUMERAL_LAYER_ALLOWANCES_MM3[0]:
-            _telemetry.info(f"V cut form: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
+        if abs(removed - expected) <= allowance:
+            _telemetry.info(f"V cut form on {sketch_name}: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
             return args
         tried.append(f"{label}: removed {removed:.4f} mm^3")
         adapter.currentModel.EditUndo2(1)
@@ -272,14 +281,13 @@ async def _first_v_cut(adapter, sketch_name: str, pre: float) -> tuple:
     # Discriminate the refusal: undrafted single-ended controls in each
     # direction say whether the direction or the draft is refused.
     probes = {
-        "undrafted reversed": _v_cut_args(False, drafted=False),
-        "undrafted default direction": _v_cut_args(False, reverse=False, drafted=False),
+        "undrafted reversed": _v_cut_args(False, drafted=False, depth_mm=depth_mm),
+        "undrafted default direction": _v_cut_args(False, reverse=False, drafted=False, depth_mm=depth_mm),
     }
     for label, args in probes.items():
         tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
     raise RuntimeError(
-        f"no FeatureCut3 form removed the first layer's {NUMERAL_LAYER_VOLUMES_MM3[0]:.4f} mm^3 V: "
-        + "; ".join(tried)
+        f"no FeatureCut3 form removed {sketch_name}'s {expected:.4f} mm^3 V: " + "; ".join(tried)
     )
 
 
@@ -291,24 +299,32 @@ async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, a
     before the cut) and reused after it."""
     sketch = f"{name}Sketch"
     if args is None:
-        args = await _first_v_cut(adapter, sketch, pre)
+        args = await _first_v_cut(
+            adapter, sketch, pre, depth_mm=NUMERAL_DEPTH,
+            expected=NUMERAL_LAYER_VOLUMES_MM3[0], allowance=NUMERAL_LAYER_ALLOWANCES_MM3[0],
+        )
     else:
         try:
             _feature_cut3(adapter, sketch, args)
         except FeatureCutRefused as exc:
             raise RuntimeError(f"{name}: {exc}") from exc
     name_last_feature(adapter, name)
-    # D1 is the direction-1 blind depth (D2 repeats it for the unused second
-    # direction, as on the adapter's cut); the draft adds an angle dimension.
-    rows = dump_dimensions(adapter, name)
-    depth_rows = [row["index"] for row in rows
-                  if str(row["full_name"]).startswith("D1@") and abs(row["value_mm"] - NUMERAL_DEPTH) < 1e-6]
-    if len(depth_rows) != 1:
-        raise RuntimeError(f"{name}: expected D1 reading {NUMERAL_DEPTH} mm, found {rows}")
-    name_dimensions(adapter, name, [None] * depth_rows[0] + ["NumeralDepth"])
+    _name_depth(adapter, name, NUMERAL_DEPTH, "NumeralDepth")
     drive_jobs.append((f"NumeralDepth@{name}", '"NumeralDepth"'))
     _assert_one_numeral_cut(adapter, name)
     return args
+
+
+def _name_depth(adapter, feature: str, depth_mm: float, depth_name: str) -> None:
+    """Name a single-ended V cut's blind depth. D1 is the direction-1 depth
+    (D2 repeats it for the unused second direction, as on the adapter's cut);
+    the draft adds an angle dimension, so D1 is found by name and value."""
+    rows = dump_dimensions(adapter, feature)
+    depth_rows = [row["index"] for row in rows
+                  if str(row["full_name"]).startswith("D1@") and abs(row["value_mm"] - depth_mm) < 1e-6]
+    if len(depth_rows) != 1:
+        raise RuntimeError(f"{feature}: expected D1 reading {depth_mm} mm, found {rows}")
+    name_dimensions(adapter, feature, [None] * depth_rows[0] + [depth_name])
 
 
 def _min_limit(adapter, feature: str, name: str) -> None:
@@ -343,14 +359,22 @@ async def _volume_mm3(adapter) -> float:
     return volume
 
 
-def _check_numeral_volume(label: str, removed: float, expected: float, allowance: float) -> None:
+def _check_engraving_volume(label: str, removed: float, expected: float, allowance: float,
+                            hint: str) -> None:
     _telemetry.info(f"{label}: V cut removed {removed:.4f} mm^3 (pinned {expected:.4f})")
     if not math.isfinite(removed) or abs(removed - expected) > allowance:
         raise RuntimeError(
             f"{label}: V cut removed {removed:.4f} mm^3, expected {expected:.4f} "
-            f"+/-{allowance:.4f} -- check for a dropped stroke, the draft direction, "
-            "the DXF import plane/placement, or re-pin the volumes from the generator"
+            f"+/-{allowance:.4f} -- check for a {hint}"
         )
+
+
+def _check_numeral_volume(label: str, removed: float, expected: float, allowance: float) -> None:
+    _check_engraving_volume(
+        label, removed, expected, allowance,
+        "dropped stroke, the draft direction, the DXF import plane/placement, "
+        "or re-pin the volumes from the generator",
+    )
 
 
 async def _check_volume_unchanged(adapter, label: str, built: float) -> None:
@@ -470,8 +494,14 @@ async def _cut_tick(
     drive_jobs: list[tuple[str, str]],
     drive_xcenter: str,
     drive_length: str,
-) -> str:
-    """Cut one graduation tick; returns the cut feature name.
+    cut_args: tuple | None,
+    seed_pre: float | None = None,
+) -> tuple[str, tuple]:
+    """Cut one graduation tick as the 30-degree V; returns the cut feature
+    name and the FeatureCut3 form. With ``cut_args`` None (the seed tick, the
+    first cut on the bar) the form is the one whose removed volume from
+    ``seed_pre`` (the bar's volume just before this tick) matches the
+    closed-form V; later ticks reuse it.
 
     Self-naming: ``stem`` makes the sketch/feature/dim names unique per tick
     (the equation manager keys dims by ``leaf@feature``). The four sketch dims
@@ -536,11 +566,20 @@ async def _cut_tick(
     # Single-ended into the bar, so the depth dimension spans face to floor;
     # the adapter's double-ended cut put D1 on the air side (detail B, run
     # 20261023T211330900Z-bfdf1b6e: the depth read from a stub above the face).
-    try:
-        _feature_cut3(adapter, f"{stem}Profile", _v_cut_args(False, drafted=False, depth_mm=TICK_DEPTH))
-    except FeatureCutRefused as exc:
-        raise RuntimeError(f"cut {label}: {exc}") from exc
-    return name_last_feature(adapter, f"{stem}Cut")
+    sketch = f"{stem}Profile"
+    if cut_args is None:
+        if seed_pre is None:
+            raise ValueError(f"{label}: the seed tick needs the bar's volume before it")
+        cut_args = await _first_v_cut(
+            adapter, sketch, seed_pre, depth_mm=TICK_DEPTH,
+            expected=tick_v_volume_mm3(length), allowance=TICK_SEED_ALLOWANCE_MM3,
+        )
+    else:
+        try:
+            _feature_cut3(adapter, sketch, cut_args)
+        except FeatureCutRefused as exc:
+            raise RuntimeError(f"cut {label}: {exc}") from exc
+    return name_last_feature(adapter, f"{stem}Cut"), cut_args
 
 
 @_telemetry.traced("sketch.stick_manufacturing_chords")
@@ -727,7 +766,10 @@ async def build(adapter) -> dict[str, str]:
     # ("Tick0Cut"), so the pattern must seed off the NEW name -- a captured
     # auto-name would go stale the moment name_last_feature ran (M: renamed-feature
     # references). _cut_tick returns the assigned name for exactly this reason.
-    seed_name = await _cut_tick(
+    # The seed, the bar's first cut, proves the V's draft form by its removed
+    # volume; every later tick reuses that form.
+    ticks_pre = await _volume_mm3(adapter)
+    seed_name, tick_form = await _cut_tick(
         adapter,
         "tick 0",
         "Tick0",
@@ -736,8 +778,10 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
         drive_xcenter='"ScaleStartX"',
         drive_length='"TickLength"',
+        cut_args=None,
+        seed_pre=ticks_pre,
     )
-    name_dimensions(adapter, "Tick0Cut", ["TickDepth"])
+    _name_depth(adapter, "Tick0Cut", TICK_DEPTH, "TickDepth")
     check(
         "linear pattern ticks 1..10",
         await adapter.linear_pattern_feature(
@@ -770,18 +814,18 @@ async def build(adapter) -> dict[str, str]:
     # leave the patterned tenths at 14.2 after a GUI DivisionSpacing edit).
     minor_names = []
     for k in range(1, MINOR_PER_DIVISION):
-        minor_names.append(
-            await _cut_tick(
-                adapter,
-                f"minor tick 0.{k}",
-                f"Minor{k}",
-                SCALE_START_X + k * MINOR_SPACING,
-                MINOR_TICK_LENGTH,
-                drive_jobs=drive_jobs,
-                drive_xcenter=f'"ScaleStartX" + {k} * "DivisionSpacing" / {MINOR_PER_DIVISION}',
-                drive_length='"MinorTickLength"',
-            )
+        name, _form = await _cut_tick(
+            adapter,
+            f"minor tick 0.{k}",
+            f"Minor{k}",
+            SCALE_START_X + k * MINOR_SPACING,
+            MINOR_TICK_LENGTH,
+            drive_jobs=drive_jobs,
+            drive_xcenter=f'"ScaleStartX" + {k} * "DivisionSpacing" / {MINOR_PER_DIVISION}',
+            drive_length='"MinorTickLength"',
+            cut_args=tick_form,
         )
+        minor_names.append(name)
     check(
         "linear pattern minor ticks across divisions 1..9",
         await adapter.linear_pattern_feature(
@@ -820,6 +864,11 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
         drive_xcenter='"ScaleStartX" + "DivisionSpacing" / 2',
         drive_length='"HalfTickLength"',
+        cut_args=tick_form,
+    )
+    _check_engraving_volume(
+        "all ticks", ticks_pre - await _volume_mm3(adapter), TICK_VOLUME_MM3,
+        TICK_VOLUME_ALLOWANCE_MM3, "dropped tick",
     )
 
     # Numerals 0..10: import each generated stroke layer (closed rectangles at

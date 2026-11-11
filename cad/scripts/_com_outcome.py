@@ -31,11 +31,14 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import itertools
 import json
 import math
 import re
+import struct
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -49,7 +52,7 @@ REL_TOL = 1e-9
 # The counter in a new document's title (Part11, Assem3, Draw2): SolidWorks
 # numbers documents per session, so the same build reads another one each run.
 _TITLE_COUNTER = re.compile(r"\b(Part|Assem|Draw)\d+\b")
-# The members answering mass properties: compared in order and within
+# The members answering mass properties: matched as measurements within
 # tolerance (:func:`_mass_signal`), never as exact multiset members.
 _MASS_SITE = re.compile(r"^IMassProperty\d*\.|\.GetMassProperties\d*$")
 # The array the GetMassProperties family answers (SolidWorks API reference:
@@ -58,15 +61,16 @@ _MASS_SITE = re.compile(r"^IMassProperty\d*\.|\.GetMassProperties\d*$")
 # volume, area, mass (a sheet body: area, circumference, mass; a wire body:
 # length, 0, mass), then MomXX, MomYY, MomZZ, MomXY, MomZX, MomYZ, and in
 # the 13-element forms the accuracy. Mixed units: each quantity gets its own
-# tolerance, the centre of mass the part's length as well.
+# tolerance, the centre of mass the part's length as well. Named for a solid
+# body.
 _MASS_ARRAY = re.compile(r"\.GetMassProperties\d*$")
 _MASS_ARRAY_QUANTITIES = (
-    slice(0, 3),
-    slice(3, 4),
-    slice(4, 5),
-    slice(5, 6),
-    slice(6, 12),
-    slice(12, 13),
+    ("CenterOfMass", slice(0, 3)),
+    ("Volume", slice(3, 4)),
+    ("SurfaceArea", slice(4, 5)),
+    ("Mass", slice(5, 6)),
+    ("MomentOfInertia", slice(6, 12)),
+    ("Accuracy", slice(12, 13)),
 )
 # Members whose answers describe the session, not the part: the clock
 # (SummaryInfo's create and save dates differ on every rebuild) and the seat's
@@ -74,15 +78,24 @@ _MASS_ARRAY_QUANTITIES = (
 # fleet builds on 2026-11-10). Their requests stay in the request multiset.
 _SESSION_SITE = re.compile(r"^IModelDoc2\.SummaryInfo$|^ISldWorks\.GetUserPreference")
 _STL_SUFFIX = ".stl"
+# An STL facet's plane, binned: its unit normal to 1e-4 and its offset from
+# the origin to 1e-3 of the STL's unit (millimetres: the build's STL export
+# preferences). Bins that touch are one plane (:func:`_planes`).
+_NORMAL_STEP = 1e-4
+_OFFSET_STEP = 1e-3
+_TOUCHING = tuple(d for d in itertools.product((-1, 0, 1), repeat=4) if any(d))
 _LISTED = 10
+# Bound on a judge fault's message recorded in the result.
+_ERROR_CHARS = 300
+_SIGNALS = ("mass", "requests", "answers", "stl")
 
 
 class Outcome(StrEnum):
     """Did two builds make the same part?"""
 
-    # Every signal is present in both logs and agrees: same mass properties
-    # snapshot by snapshot, the same requests and answers in any order, the
-    # same STL triangles.
+    # Every signal is present in both logs and agrees: the same mass-property
+    # measurements, the same requests and answers, in any order, the same STL
+    # geometry.
     SAME = "same"
     # At least one signal disagrees beyond noise: a different part, or the
     # part reached through other requests or answers (a property value, an
@@ -113,12 +126,28 @@ def judge(
 ) -> dict[str, Any]:
     """``truth_cause`` and the :func:`outcome` fields of two recordings
     whose request divergence (``compare_conversations``) is ``divergence``;
-    ``*_captures`` hold the files each build had SolidWorks write."""
-    a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
-    return {
-        "truth_cause": truth_cause(a, b, divergence),
-        **outcome(base, new, base_captures, new_captures),
-    }
+    ``*_captures`` hold the files each build had SolidWorks write.
+
+    Never raises. A fault of this judgement costs only what it judges: the
+    cause reads ``error:<type>``, a signal ``absent`` (so the outcome is at
+    best ``unknown``), each with its message in ``outcome_details``. The
+    diff's result, whose request divergence is the ground truth, is kept."""
+    cause, cause_error = _attempt(
+        lambda: truth_cause(
+            conv.recipe_calls(base.calls), conv.recipe_calls(new.calls), divergence
+        )
+    )
+    found, error = _attempt(lambda: outcome(base, new, base_captures, new_captures))
+    if error is not None:
+        found = {
+            "outcome": Outcome.UNKNOWN.value,
+            "outcome_signals": {name: Signal.ABSENT.value for name in _SIGNALS},
+            "outcome_details": {name: {"error": error} for name in _SIGNALS},
+        }
+    if cause_error is not None:
+        cause = "error:" + cause_error.split(":", 1)[0]
+        found["outcome_details"]["truth_cause"] = {"error": cause_error}
+    return {"truth_cause": cause, **found}
 
 
 def truth_cause(
@@ -148,35 +177,41 @@ def outcome(
     :class:`Signal` (``outcome_signals``) and what differed
     (``outcome_details``). Signals, all order-independent:
 
-    * ``mass``: every mass-property answer, matched by order per member,
-      within :data:`REL_TOL`;
+    * ``mass``: every mass-property measurement, matched as a multiset
+      within :data:`REL_TOL` (:func:`_mass_signal`);
     * ``requests``: the multiset of recipe requests;
     * ``answers``: the multiset of (request, answer) pairs, but for mass
       properties and answers about the session (``_SESSION_SITE``);
-    * ``stl``: the triangles of every STL file SolidWorks wrote
-      (:func:`_triangles`; last write per path).
+    * ``stl``: the geometry of every STL file SolidWorks wrote (:func:`_mesh`;
+      last write per path).
 
     Handles are erased (an object's identity number depends on call order),
     strings and floats are normalised as for noise. SLDPRT and BMP captures
     are no signal: a part file's bytes differ on every save, a screenshot's
-    with the seat's window."""
+    with the seat's window. A signal whose judgement raises is ``absent``,
+    its message its detail."""
     a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
-    keyed_a, keyed_b = _keyed_calls(a), _keyed_calls(b)
-    mass, mass_detail = _mass_signal(a, b)
-    requests, request_detail = _multiset_signal(
-        [(site, request) for site, request, _ in keyed_a],
-        [(site, request) for site, request, _ in keyed_b],
-    )
-    answers, answer_detail = _multiset_signal(
-        [item for item in keyed_a if item[2] is not None],
-        [item for item in keyed_b if item[2] is not None],
-    )
-    stl_a = _stl_fingerprints(base, base_captures)
-    stl_b = _stl_fingerprints(new, new_captures)
-    stl = Signal.SAME if stl_a == stl_b else Signal.DIFFERENT
-    if stl_a is None or stl_b is None or (not stl_a and not stl_b):
-        stl = Signal.ABSENT
-    signals = {"mass": mass, "requests": requests, "answers": answers, "stl": stl}
+    keyed, keyed_error = _attempt(lambda: (_keyed_calls(a), _keyed_calls(b)))
+    attempts: dict[str, Callable[[], tuple[Signal, Any]]] = {
+        "mass": lambda: _mass_signal(a, b),
+        "requests": lambda: _multiset_signal(
+            [(site, request) for site, request, _ in keyed[0]],
+            [(site, request) for site, request, _ in keyed[1]],
+        ),
+        "answers": lambda: _multiset_signal(
+            [item for item in keyed[0] if item[2] is not None],
+            [item for item in keyed[1] if item[2] is not None],
+        ),
+        "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
+    }
+    signals: dict[str, Signal] = {}
+    details: dict[str, Any] = {}
+    for name, compute in attempts.items():
+        keyed_only = keyed_error is not None and name in ("requests", "answers")
+        result, error = (None, keyed_error) if keyed_only else _attempt(compute)
+        if error is not None:
+            result = Signal.ABSENT, {"error": error}
+        signals[name], details[name] = result
     found = Outcome.SAME
     if Signal.ABSENT in signals.values():
         found = Outcome.UNKNOWN
@@ -185,13 +220,17 @@ def outcome(
     return {
         "outcome": found.value,
         "outcome_signals": {name: signal.value for name, signal in signals.items()},
-        "outcome_details": {
-            "mass": mass_detail,
-            "requests": request_detail,
-            "answers": answer_detail,
-            "stl": {"a": stl_a, "b": stl_b} if stl is Signal.DIFFERENT else None,
-        },
+        "outcome_details": details,
     }
+
+
+def _attempt(compute: Callable[[], Any]) -> tuple[Any, str | None]:
+    """``compute()`` and ``None``, or ``None`` and the fault it raised as one
+    bounded line."""
+    try:
+        return compute(), None
+    except Exception as exc:  # noqa: BLE001 - a judge fault costs only its signal
+        return None, " ".join(f"{type(exc).__name__}: {exc}".split())[:_ERROR_CHARS]
 
 
 def label_feature(divergence: dict[str, Any] | None) -> None:
@@ -224,31 +263,133 @@ def label_feature(divergence: dict[str, Any] | None) -> None:
 def _mass_signal(
     a: Sequence[conv.Call], b: Sequence[conv.Call]
 ) -> tuple[Signal, dict[str, Any] | None]:
-    """A centre of mass is also judged on the part's length (the cube root of
-    its largest volume): a symmetric part's centre is noise around zero."""
-    left, right = _by_site(a), _by_site(b)
+    """The two builds' mass-property measurements (:func:`_measurements`) as
+    a multiset: per kind, every measurement paired with one of the other
+    build's within tolerance (:func:`_mass_close`; a centre of mass is also
+    judged on the part's length, the cube root of its largest volume, since a
+    symmetric part's centre is noise around zero). Order-free: on 2026-11-11
+    sh_vn_chain_link measured one configuration's four bodies in another
+    order, the same bodies as the base's (``IBody2.GetBodies2`` listed them
+    otherwise)."""
+    left, right = _measurements(a), _measurements(b)
     if not left and not right:
         return Signal.ABSENT, None
     counts = {
-        site: [len(left.get(site, [])), len(right.get(site, []))]
-        for site in left.keys() | right.keys()
+        kind: [len(left.get(kind, [])), len(right.get(kind, []))]
+        for kind in left.keys() | right.keys()
     }
-    unequal = {site: pair for site, pair in counts.items() if pair[0] != pair[1]}
+    unequal = {kind: pair for kind, pair in counts.items() if pair[0] != pair[1]}
     if unequal:
         return Signal.DIFFERENT, {"counts": unequal}
-    calls = [call for group in (*left.values(), *right.values()) for call in group]
-    length = _part_length(calls)
-    for site in sorted(left):
-        for ordinal, (x, y) in enumerate(zip(left[site], right[site], strict=True)):
-            if _mass_close(site, x, y, length):
-                continue
-            return Signal.DIFFERENT, {
-                "member": site,
-                "ordinal": ordinal,
-                "a": conv.clip(x.result),
-                "b": conv.clip(y.result),
-            }
+    length = _part_length(
+        [
+            call
+            for group in (*left.values(), *right.values())
+            for m in group
+            for call in m
+        ]
+    )
+
+    def close(x: tuple[conv.Call, ...], y: tuple[conv.Call, ...]) -> bool:
+        return all(_mass_close(c, d, length) for c, d in zip(x, y, strict=True))
+
+    for kind in sorted(left):
+        unpaired = _unassigned(left[kind], right[kind], close)
+        if unpaired is None:
+            continue
+        stranded, candidates = unpaired
+        x = left[kind][stranded]
+        detail: dict[str, Any] = {
+            "member": kind,
+            "ordinal": stranded,
+            "a": conv.clip([c.result for c in x]),
+        }
+        if not candidates:
+            return Signal.DIFFERENT, detail
+        # The other build's unpaired measurement nearest to it, and the
+        # quantity farthest beyond tolerance against that one.
+        (off, member, quantity), j = min(
+            ((_farthest(x, right[kind][j], length), j) for j in candidates),
+            key=lambda item: item[0][0],
+        )
+        return Signal.DIFFERENT, {
+            **detail,
+            "member": member,
+            "quantity": quantity,
+            "tolerances": f"{off:.3g}",
+            "nearest": j,
+            "b": conv.clip([c.result for c in right[kind][j]]),
+        }
     return Signal.SAME, None
+
+
+def _measurements(calls: Sequence[conv.Call]) -> dict[str, list[tuple[conv.Call, ...]]]:
+    """The mass-property measurements of a build by kind, in call order. One
+    GetMassProperties-family answer is one measurement (one body's quantities
+    in one array). Every answer read from one IMassProperty object is one,
+    in the order read, so a volume stays paired with its own centre and
+    inertia. The kind is the members read, in that order."""
+    objects: dict[int, list[conv.Call]] = {}
+    found: list[list[conv.Call]] = []
+    for call in calls:
+        if not _MASS_SITE.search(call.site):
+            continue
+        if _MASS_ARRAY.search(call.site):
+            found.append([call])
+            continue
+        if call.handle not in objects:
+            objects[call.handle] = []
+            found.append(objects[call.handle])
+        objects[call.handle].append(call)
+    kinds: dict[str, list[tuple[conv.Call, ...]]] = {}
+    for measurement in found:
+        kind = ",".join(call.site for call in measurement)
+        kinds.setdefault(kind, []).append(tuple(measurement))
+    return kinds
+
+
+def _unassigned(
+    left: Sequence[Any], right: Sequence[Any], close: Callable[[Any, Any], bool]
+) -> tuple[int, list[int]] | None:
+    """The first of ``left`` that could not be added to the assignment, with
+    the indices of ``right`` the assignment left unpaired then; ``None`` when
+    every one of ``left`` is paired (equal lengths).
+
+    Closeness within a tolerance is not transitive: one measurement can be
+    close to two of the other build's, so pairing greedily, or in the order of
+    a sort key, can strand one that another assignment pairs. Kuhn's
+    augmenting paths find a pairing of every one whenever one exists. The
+    pairing in call order is tried first, and is the answer whenever the
+    builds measured in the same order."""
+    if all(close(x, y) for x, y in zip(left, right, strict=True)):
+        return None
+    near: dict[int, list[int]] = {}
+    owner = [-1] * len(right)
+    taken = [-1] * len(left)
+    for start in range(len(left)):
+        reached: dict[int, int] = {}
+        stack, free = [start], -1
+        while stack and free < 0:
+            i = stack.pop()
+            if i not in near:
+                near[i] = [j for j, y in enumerate(right) if close(left[i], y)]
+            for j in near[i]:
+                if j in reached:
+                    continue
+                reached[j] = i
+                if owner[j] < 0:
+                    free = j
+                    break
+                stack.append(owner[j])
+        if free < 0:
+            return start, [j for j, i in enumerate(owner) if i < 0]
+        j = free
+        while j >= 0:
+            i = reached[j]
+            previous = taken[i]
+            owner[j], taken[i] = i, j
+            j = previous
+    return None
 
 
 def _part_length(calls: Sequence[conv.Call]) -> float:
@@ -274,25 +415,46 @@ def _mass_array(call: conv.Call) -> list[Any] | None:
     return items if all(_is_float(item) for item in items) else None
 
 
-def _mass_close(site: str, x: conv.Call, y: conv.Call, length: float) -> bool:
+def _mass_close(x: conv.Call, y: conv.Call, length: float) -> bool:
+    """Two answers of one mass member within tolerance, quantity by quantity
+    (:func:`_quantities`)."""
+    return all(_close(p, q, floor) for _, p, q, floor in _quantities(x, y, length))
+
+
+def _farthest(
+    x: tuple[conv.Call, ...], y: tuple[conv.Call, ...], length: float
+) -> tuple[float, str, str]:
+    """How far measurement ``y`` is from ``x``, in tolerances (above 1: beyond
+    it): the farthest quantity's distance, member and name."""
+    found = (0.0, x[0].site, "")
+    for c, d in zip(x, y, strict=True):
+        for name, p, q, floor in _quantities(c, d, length):
+            distance = _distance(p, q, floor)
+            if distance > found[0]:
+                found = (distance, c.site, name)
+    return found
+
+
+def _quantities(
+    x: conv.Call, y: conv.Call, length: float
+) -> Iterator[tuple[str, Any, Any, float]]:
+    """What two answers of one mass member are compared on: name, both
+    values, and the floor of the tolerance. A documented array quantity by
+    quantity, the centre of mass on the part's length too; any other answer
+    whole, a ``CenterOfMass`` on the part's length too."""
     left, right = _mass_array(x), _mass_array(y)
     if left is None or right is None or len(left) != len(right):
-        floor = length if site.endswith(".CenterOfMass") else 0.0
-        return _close([x.result, x.raised, x.outs], [y.result, y.raised, y.outs], floor)
-    if not _close([x.raised, x.outs], [y.raised, y.outs]):
-        return False
-    return all(
-        _close(left[part], right[part], length if part.start == 0 else 0.0)
-        for part in _MASS_ARRAY_QUANTITIES
-    )
-
-
-def _by_site(calls: Sequence[conv.Call]) -> dict[str, list[conv.Call]]:
-    found: dict[str, list[conv.Call]] = {}
-    for call in calls:
-        if _MASS_SITE.search(call.site):
-            found.setdefault(call.site, []).append(call)
-    return found
+        floor = length if x.site.endswith(".CenterOfMass") else 0.0
+        yield (
+            x.site.rpartition(".")[2],
+            [x.result, x.raised, x.outs],
+            [y.result, y.raised, y.outs],
+            floor,
+        )
+        return
+    yield "raised", [x.raised, x.outs], [y.raised, y.outs], 0.0
+    for name, part in _MASS_ARRAY_QUANTITIES:
+        yield name, left[part], right[part], length if part.start == 0 else 0.0
 
 
 def _keyed_calls(calls: Sequence[conv.Call]) -> list[tuple[str, str, str | None]]:
@@ -328,19 +490,58 @@ def _multiset_signal(
     return Signal.DIFFERENT, dict(ranked[:_LISTED])
 
 
-def _stl_fingerprints(
+_Point = tuple[float, float, float]
+_Cell = tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class _Mesh:
+    """A binary STL's geometry (:func:`_mesh`)."""
+
+    vertices: frozenset[_Point]
+    # Per plane, its outline (each edge just one of the plane's triangles
+    # uses, in that triangle's winding): the plane's area.
+    outlines: dict[frozenset[tuple[_Point, _Point]], float]
+    area: float
+
+
+def _stl_signal(
+    base: conv.Conversation,
+    new: conv.Conversation,
+    base_captures: Path,
+    new_captures: Path,
+) -> tuple[Signal, dict[str, str] | None]:
+    """Per STL path either build had SolidWorks write, whether the two last
+    writes are the same geometry (:func:`_mesh_difference`)."""
+    a, b = _stl_meshes(base, base_captures), _stl_meshes(new, new_captures)
+    if a is None or b is None or (not a and not b):
+        return Signal.ABSENT, None
+    differing: dict[str, str] = {}
+    for rel in sorted(a.keys() | b.keys()):
+        if rel not in b or rel not in a:
+            differing[rel] = "base only" if rel in a else "new only"
+            continue
+        found = _mesh_difference(a[rel], b[rel])
+        if found is not None:
+            differing[rel] = found
+    if differing:
+        return Signal.DIFFERENT, differing
+    return Signal.SAME, None
+
+
+def _stl_meshes(
     conversation: conv.Conversation, captures: Path
-) -> dict[str, str] | None:
+) -> dict[str, _Mesh | str] | None:
     """Per STL path the build had SolidWorks write, its last write's
-    :func:`_triangles`; ``None`` when a capture is missing or not the bytes
-    the log describes."""
+    :func:`_mesh`; ``None`` when a capture is missing or not the bytes the log
+    describes."""
     captured = conversation.trailer.get("captured", {})
     final: dict[str, dict[str, Any]] = {}
     for seq in sorted(captured, key=int):
         for rel, kept in captured[seq].items():
             if rel.lower().endswith(_STL_SUFFIX):
                 final[rel] = kept
-    found: dict[str, str] = {}
+    found: dict[str, _Mesh | str] = {}
     for rel, kept in final.items():
         try:
             data = gzip.decompress((captures / kept["file"]).read_bytes())
@@ -348,28 +549,136 @@ def _stl_fingerprints(
             return None
         if hashlib.sha256(data).hexdigest() != kept["sha256"]:
             return None
-        found[rel] = _triangles(data)
+        found[rel] = _mesh(data)
     return found
 
 
-def _triangles(data: bytes) -> str:
-    """A binary STL's triangles as a multiset: each triangle's corners rotated
-    to start at the least (the winding kept), facet normals, attribute bytes
-    and the header dropped. Two request-identical builds of dt_crank_pinion
-    (2026-11-11) wrote the same triangles in another order, corners rotated
-    and normals off in the last bits. Anything else is digested whole."""
+def _mesh(data: bytes) -> _Mesh | str:
+    """A binary STL as geometry that does not depend on how SolidWorks split
+    its faces into triangles: the set of vertices and, per plane, the outline
+    of the plane's triangles and their area. On 2026-11-11 two builds of
+    dt_cone_swing_platform that made the same part wrote 35 of 1226 triangles
+    otherwise: the same 724 vertices, a polygon of the top face and two
+    rectangles of side walls split along other diagonals.
+
+    A plane is every triangle whose binned plane touches the others' bins
+    (:func:`_planes`). Its outline is the edges just one of its triangles
+    uses, each in that triangle's winding: any triangulation of the same
+    polygons over the same vertices keeps it, and a moved hole, a region of
+    another shape or an inside-out patch changes it, whatever the area. A
+    triangle without area is in a plane of its own kind. A curved face has no
+    plane: each flat facet of it is one, so a curved face re-tessellated over
+    the same vertices reads as other geometry. That is the conservative
+    direction: a missed reuse, never an unsound one. Triangle order, corner
+    rotation, facet normals, attribute bytes and the header are no part of
+    it. Anything but a well-formed binary STL of finite corners is its
+    digest."""
     count = int.from_bytes(data[80:84], "little") if len(data) >= 84 else -1
     if len(data) != 84 + 50 * count:
         return "bytes:" + hashlib.sha256(data).hexdigest()
-    triangles = []
-    for offset in range(84, len(data), 50):
-        corners = [data[offset + 12 + 12 * k : offset + 24 + 12 * k] for k in range(3)]
-        first = corners.index(min(corners))
-        triangles.append(b"".join(corners[first:] + corners[:first]))
-    digest = hashlib.sha256()
-    for triangle in sorted(triangles):
-        digest.update(triangle)
-    return "triangles:" + digest.hexdigest()
+    rows = list(struct.iter_unpack("<12x9f2x", data[84:]))
+    # A NaN or an infinity anywhere makes the float64 sum of float32 corners
+    # non-finite; finite ones cannot overflow it.
+    if not math.isfinite(sum(itertools.chain.from_iterable(rows))):
+        return "bytes:" + hashlib.sha256(data).hexdigest()
+    triangles = [
+        ((x0, y0, z0), (x1, y1, z1), (x2, y2, z2))
+        for x0, y0, z0, x1, y1, z1, x2, y2, z2 in rows
+    ]
+    cells: list[_Cell | None] = []
+    areas: list[float] = []
+    for a, b, c in triangles:
+        u = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+        v = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+        n = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        )
+        length = math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+        areas.append(0.5 * length)
+        if length == 0.0:
+            cells.append(None)
+            continue
+        unit = (n[0] / length, n[1] / length, n[2] / length)
+        offset = unit[0] * a[0] + unit[1] * a[1] + unit[2] * a[2]
+        cells.append(
+            (
+                round(unit[0] / _NORMAL_STEP),
+                round(unit[1] / _NORMAL_STEP),
+                round(unit[2] / _NORMAL_STEP),
+                round(offset / _OFFSET_STEP),
+            )
+        )
+    plane_of = _planes({cell for cell in cells if cell is not None})
+    planes: dict[_Cell | None, list[int]] = {}
+    for index, cell in enumerate(cells):
+        planes.setdefault(None if cell is None else plane_of[cell], []).append(index)
+    outlines: dict[frozenset[tuple[_Point, _Point]], float] = {}
+    for members in planes.values():
+        edges = [
+            (p, q)
+            for index in members
+            for p, q in itertools.pairwise((*triangles[index], triangles[index][0]))
+        ]
+        uses = Counter((p, q) if p <= q else (q, p) for p, q in edges)
+        outline = frozenset(
+            (p, q) for p, q in edges if uses[(p, q) if p <= q else (q, p)] == 1
+        )
+        outlines[outline] = outlines.get(outline, 0.0) + sum(areas[i] for i in members)
+    return _Mesh(
+        frozenset(p for triangle in triangles for p in triangle),
+        outlines,
+        sum(areas),
+    )
+
+
+def _planes(cells: set[_Cell]) -> dict[_Cell, _Cell]:
+    """Each occupied plane bin's plane: bins one step apart in any of normal
+    and offset are one, so a plane whose triangles' float32 noise straddles a
+    bin edge stays one plane."""
+    parent = {cell: cell for cell in cells}
+
+    def root(cell: _Cell) -> _Cell:
+        while parent[cell] != cell:
+            parent[cell] = parent[parent[cell]]
+            cell = parent[cell]
+        return cell
+
+    for cell in cells:
+        for step in _TOUCHING:
+            other = (
+                cell[0] + step[0],
+                cell[1] + step[1],
+                cell[2] + step[2],
+                cell[3] + step[3],
+            )
+            if other in parent:
+                parent[root(other)] = root(cell)
+    return {cell: root(cell) for cell in cells}
+
+
+def _mesh_difference(a: _Mesh | str, b: _Mesh | str) -> str | None:
+    """What differs between two STLs' geometry, ``None`` for nothing: the
+    vertex set, a plane's outline, or a plane's area beyond :data:`REL_TOL` of
+    the larger total area."""
+    if isinstance(a, str) or isinstance(b, str):
+        return None if a == b else "bytes"
+    if a.vertices != b.vertices:
+        return (
+            f"vertices: {len(a.vertices - b.vertices)} base only, "
+            f"{len(b.vertices - a.vertices)} new only"
+        )
+    if a.outlines.keys() != b.outlines.keys():
+        return (
+            f"plane outlines: {len(a.outlines.keys() - b.outlines.keys())} base "
+            f"only, {len(b.outlines.keys() - a.outlines.keys())} new only"
+        )
+    tolerance = REL_TOL * max(a.area, b.area)
+    off = sum(
+        1 for k, area in a.outlines.items() if abs(area - b.outlines[k]) > tolerance
+    )
+    return f"plane areas: {off} differ" if off else None
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +724,26 @@ def _close(a: Any, b: Any, floor: float = 0.0) -> bool:
     return all(
         x == y or abs(x - y) <= tolerance for x, y in zip(left, right, strict=True)
     )
+
+
+def _distance(a: Any, b: Any, floor: float = 0.0) -> float:
+    """How far apart two values are in :func:`_close`'s tolerance: the
+    largest float difference over it (at most 1 when close), infinite for
+    another structure or a difference no tolerance measures."""
+    left: list[float] = []
+    right: list[float] = []
+    if not _same_shape(a, b, left, right):
+        return math.inf
+    tolerance = REL_TOL * max(_scale(iter([*left, *right])), floor)
+    farthest = 0.0
+    for x, y in zip(left, right, strict=True):
+        if x == y:
+            continue
+        gap = abs(x - y)
+        if not math.isfinite(gap) or tolerance == 0.0:
+            return math.inf
+        farthest = max(farthest, gap / tolerance)
+    return farthest
 
 
 def _same_shape(a: Any, b: Any, left: list[float], right: list[float]) -> bool:

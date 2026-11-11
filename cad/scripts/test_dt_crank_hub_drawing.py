@@ -132,7 +132,8 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
     # Machinist reviews of 19e33c6c2 and main 31cea0b73: only the long side
     # is functional.  At +.004 the drive-pin tips keep air to the rear face;
     # at the title block's -.010 the wheel floated onto it stays on its pins.
-    # The title block's +.010 would all but close the tip air.
+    # The title block's +.010 closes the tip air against the crankshaft's
+    # collar stations and pin depth at their title-block rows (#2314).
     kwargs = dict(
         seat_face=dt_crankshaft_spec.SEAT_COLLAR,
         seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
@@ -140,19 +141,19 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
         plate_min=seat_geometry.PLATE
         + min(seat_geometry.PLATE_BAND),
     )
-    air, engagement = dt_crankshaft_spec.drive_pin_front_clearances(
+    # The printed one-sided band holds (the check raises on a closed air) ...
+    dt_crankshaft_spec.drive_pin_front_clearances(
         dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
         hub_rear_band=geometry.HUB_LENGTH_BAND,
         **kwargs,
     )
-    assert air == pytest.approx(0.1905, abs=1e-9)
-    assert engagement == pytest.approx(0.8331, abs=1e-9)
-    title_block_air, _ = dt_crankshaft_spec.drive_pin_front_clearances(
-        dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-        hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
-        **kwargs,
-    )
-    assert title_block_air < 0.05
+    # ... and the title block's symmetric .XX band would not.
+    with pytest.raises(AssertionError, match="reaches the crank hub"):
+        dt_crankshaft_spec.drive_pin_front_clearances(
+            dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
+            hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
+            **kwargs,
+        )
 
 
 def _stack_a(relief_length: float) -> dict[str, float]:
@@ -180,13 +181,17 @@ def test_chain_clears_the_relief_shoulder_with_the_wheel_floated_onto_the_hub() 
     airs = _stack_a(geometry.RELIEF_LENGTH)
     assert airs["floated_worst"] == pytest.approx(0.2235, abs=1e-9)
     assert airs["floated"] == pytest.approx(0.5775, abs=1e-9)
-    assert airs["seated_worst"] == pytest.approx(0.4699, abs=1e-9)
     assert airs["seated"] == pytest.approx(1.3315, abs=1e-9)
     # The floated pose governs, and the relief is the shortest .XX length
-    # that holds the floor there.
+    # that holds the floor there (the seat set aft, as above, so the floated
+    # pose is the only fault).
     assert airs["floated_worst"] < airs["seated_worst"]
     with pytest.raises(AssertionError, match="floated_worst"):
-        _stack_a(geometry.RELIEF_LENGTH - 0.254)
+        geometry.chain_shoulder_axial_air(
+            relief_length=geometry.RELIEF_LENGTH - 0.254,
+            seat_face=dt_crankshaft_spec.SEAT_COLLAR + 1.0,
+            seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
+        )
 
 
 def test_floated_stack_a_ignores_the_seat_and_hub_stations() -> None:

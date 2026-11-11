@@ -324,8 +324,8 @@ CALLOUTS_BELOW = {
     "PinionSeatDiaDim": FIT_CALLOUT,
     "SpigotDiaDim": SPIGOT_CALLOUT,
 }
-# The banded far-end stations name their stack on their own row: a callout
-# below would lift the value into the row above.
+# The three-place far-end collar stations and the Depth name their stack on
+# their own row: a callout below would lift the value into the row above.
 SUFFIXES = {
     "CollarRearStation": COLLAR_REAR_MATE,
     "CollarSeatStation": COLLAR_SEAT_MATE,

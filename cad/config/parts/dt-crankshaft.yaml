@@ -33,7 +33,7 @@ dt-crankshaft:
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out ruling F4). The band is the shared _sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL, set by the slip budget of dowels MHA-DT-VN-67 in sprocket MHA-PD-09 (spacing error .0036 against the .0039 minimum clearance); a transfer route would re-key MHA-PD-09 and its drive collar across slices. Accepts this location band only, no other departure."
     - id: "RV-05"
       kind: "accept"
-      where: "end view, 2X REAM Ø.0930 drive-pin holes: the depth ↧ .1555 ±.0040"
+      where: "end view, 2X REAM Ø.0930 drive-pin holes: the depth ↧ .1555 ±.0050"
       finding: "the four-place depth nominal .1555 is off the .001 in grid and reads as a converted millimetre value (rule 3)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 8.1 (fan-out ruling on Q-DT11-2: the depth stays as is). The depth is the press depth shared with drive pin MHA-DT-VN-67 (dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH), which sets the pins' projection into sprocket MHA-PD-09; restating it re-keys the seat geometry across slices and is deferred to its next re-key. Accepts this depth's places only, no other departure."
     - id: "RV-06"
