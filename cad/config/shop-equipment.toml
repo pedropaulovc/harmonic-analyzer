@@ -259,3 +259,11 @@ section_mm = [31.75, 15.875]
 length_mm = 101.6
 on_hand = false
 cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
+
+# MHA-FR-02 top-frame casting (owner rulings 2026-11-10 (Pedro), #2333).
+[[stock]]
+form = "casting"
+material = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms)"
+note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand casting, ASTM A48 class 25B, poured by an outside jobbing foundry (a candidate service: none chosen, contacted or quoted) from a pattern the shop 3D-prints in sections from the finished-part model. The pattern carries the 2 degree draft as the model has it (owner rulings B1 and D1: added on the webs, crossbar, gussets, lands, hub rib and set-screw boss sides; taken out of the corner and hub boss barrels, the flange rims and the set-screw boss face), the machining stock and the foundry's shrink allowance (about 1/8 in per ft for gray iron), and parts on the faced top plane with the four boss tops in the cope. No cores or loose pieces: the sockets, bores and holes are cast solid. As-cast dimensions print +/-.03 (B2), and the first machining setup stands on six cast datum targets (B6: E1-E3 on three boss bottoms, F1-F2 on the two rear boss barrels, G1 on the rear-west boss barrel). The foundry stress relieves the casting and returns it cleaned, risers and gates removed. The shop machines the seats listed in the part's registry row (cad/config/parts/fr-top-frame.yaml). Allocation: fr-top-frame (MHA-FR-02). About 24.2 lb as cast (18.0 lb finished); envelope 17.35 x 10.59 x 1.93 in finished and 17.35 x 10.59 x 2.09 in as cast before the shrink allowance. Both masses are estimated from the finished model at 7.2 g/cm3, the as-cast one with every machined feature cast solid and .16 in stock on the faced top and boss tops, .12 in on the faced underside; neither is a foundry figure. Not quoted or ordered."
+on_hand = false
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]

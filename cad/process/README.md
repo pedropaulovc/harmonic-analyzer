@@ -89,6 +89,9 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   (PR #2218): neither owned on that date;
 - three `[[stock]]` rows: OnlineMetals 4807 strap and 1173 bar, and McMaster
   8663K55 acetal;
+- the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
+  #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
+  with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
 - the MHA-SM-02 knife mount's records to make or buy (owner ruling 2026-11-10
   (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
   12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row.

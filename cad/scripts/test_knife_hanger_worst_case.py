@@ -593,7 +593,9 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     assert (
         build_fr_top_frame.BAR_X1 + build_fr_top_frame.BAR_X0
     ) / 2.0 == pytest.approx(-15.0)
-    assert build_fr_top_frame.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.446)
+    # Owner rulings B2 and B5 (#2333): the crossbar is as cast, .99 ±.03, and
+    # D is its sides' median, so a face stands (25.146 - 0.762) / 2 from D.
+    assert build_fr_top_frame.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.192)
     assert top_frame.HANGER_CROSSBAR_CENTER_TOL == pytest.approx(0.127)
     assert (top_frame.HANGER_PIN_HOLE_DIA, top_frame.HANGER_PIN_HOLE_DIA_BAND) == (
         dowel.PRESS_HOLE_DIA,
@@ -624,17 +626,17 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
         - 2.0 * drift_floor
     )
     walls = {
-        "ream to bar face": (build_fr_top_frame.PIN_HOLE_BAR_WALL, 2.927012),
+        "ream to bar face": (build_fr_top_frame.PIN_HOLE_BAR_WALL, 2.673012),
         "ream to screw hole": (build_fr_top_frame.PIN_HOLE_SCREW_WALL, 2.659975),
-        "knockout to bar face": (build_fr_top_frame.KNOCKOUT_BAR_WALL, 3.348861),
+        "knockout to bar face": (build_fr_top_frame.KNOCKOUT_BAR_WALL, 3.094861),
         "knockout to screw hole": (build_fr_top_frame.KNOCKOUT_SCREW_WALL, 2.953882),
     }
     for label, (wall, expected) in walls.items():
         assert wall == pytest.approx(expected, abs=5e-6), label
         assert wall >= 2.032, label
     lands = {
-        "knockout to top-rim break": (build_fr_top_frame.KNOCKOUT_TOP_BREAK_LAND, 1.570861),
-        "washer to bar top break": (build_fr_top_frame.HANGER_WASHER_BAR_TOP_MARGIN, 2.507576),
+        "knockout to top-rim break": (build_fr_top_frame.KNOCKOUT_TOP_BREAK_LAND, 1.316861),
+        "washer to bar top break": (build_fr_top_frame.HANGER_WASHER_BAR_TOP_MARGIN, 2.253576),
         "washer bearing annulus": (build_fr_top_frame.HANGER_WASHER_BEARING_MIN, 1.669376),
         "washer ring inside knockouts": (
             build_fr_top_frame.HANGER_WASHER_KNOCKOUT_RING_MIN,
@@ -645,12 +647,14 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
         assert land == pytest.approx(expected, abs=5e-6), label
         assert land > 0.0, label
     # Across the line the ream and knockout sit their implied-zero .XXX off
-    # the screw axis's line (SAME Z), so each keeps one pocket-end wall.
+    # the screw axis's line (SAME Z), so each keeps one pocket-end wall.  The
+    # pocket ends are as cast (owner ruling B2, #2333): the rear end, chained
+    # from the front one, stands two ±.03 bands out.
     pocket = build_fr_top_frame.BAR_POCKET_HOLE_WALLS
     assert set(pocket) == {"hanger clearance hole", "dowel ream", "dowel knockout"}
-    assert pocket["dowel ream"] == pytest.approx(12.731424, abs=5e-6)
-    assert pocket["dowel knockout"] == pytest.approx(13.153273, abs=5e-6)
-    assert pocket["hanger clearance hole"] == pytest.approx(11.228662, abs=5e-6)
+    assert pocket["dowel ream"] == pytest.approx(11.715424, abs=5e-6)
+    assert pocket["dowel knockout"] == pytest.approx(12.137273, abs=5e-6)
+    assert pocket["hanger clearance hole"] == pytest.approx(10.210002, abs=5e-6)
     # Owner ruling 2026-10-27, option (c): the knockout prints plain #51
     # DRILL, Ø.067 at three places (MAX .071 with the drilled-hole band),
     # drawn coaxial to its ream, so it may stand the implied .XXX .005 off

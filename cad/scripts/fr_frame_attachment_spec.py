@@ -44,11 +44,19 @@ TOP_AXIS_SETTING_FEATURE = "TopAxisSetting"
 TOP_AXIS_HEIGHT_DIMENSION = "TopCrossBoreAxisHeight"
 TOP_AXIS_HEIGHT_PLACES = 3
 # Top-frame bosses take a flush counterbore, not a spotface: the stock
-# fillister head (HEAD_H 4.572) sits below the Ø.35 mouth's lowest barrel point
-# at every printed corner, and the floor stands far enough outboard to keep
+# fillister head (HEAD_H 4.572) sits .041 below the Ø.35 mouth's lowest barrel
+# point at nominal, and the floor stands far enough outboard to keep
 # drawing-guidelines.md rule 17 (walls and webs)'s .080 to the cap recess at its .XX band (build_fr_top_frame proves
-# both; at 128.1 the ligament was 1.80, codex review of 080fda97).
-TOP_SCREW_SEAT_Z = 128.524  # 5.060 (.65 off the column line once it snaps to 4.410)
+# both; at 128.1 the ligament was 1.80, codex review of 080fda97).  Owner
+# ruling 2026-11-10 (#2333, D5): the floor moved .03 deeper, .65 -> .62.
+# The as-cast barrel's draft is taken out (B1), so it narrows below its top
+# plane by 2° ±1° (D4), and the deeper floor keeps the head .0009 under the
+# mouth at every printed limit with the barrel on its socket's axis
+# (build_fr_top_frame.COUNTERBORE_PRINTED_HEAD_RECESS).  A barrel also
+# standing its ⌖Ø.06|A|B off the socket leaves the head up to .029 proud
+# (COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX); that residual is the owner's
+# (#2516).
+TOP_SCREW_SEAT_Z = 127.762  # 5.030 (.62 off the column line once it snaps to 4.410)
 TOP_SCREW_COUNTERBORE_DIAMETER = 8.89  # .35
 # The base keeps its spotface seat at the same diameter.
 SCREW_SPOTFACE_DIAMETER = 8.89  # .35

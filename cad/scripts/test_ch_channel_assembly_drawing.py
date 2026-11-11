@@ -1254,14 +1254,17 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     # The bands' functions (Main's ruling, 2026-10-16): the right face's band
     # keeps its foot off the front socket boss at the printed worst case
     # (build_fr_top_frame), and the lug centre's band is charged in the
-    # transferred foot tap's wall to the rail web (#1660 r6).
+    # transferred foot tap's wall to the rail web (#1660 r6).  The cast
+    # boss's own ⌖ Ø.06 | A | B (#2333, MHA-FR-02 RV-11) leaves the south
+    # foot .009, which is what the title block's band would spend in the
+    # location band's place: that band is what holds the foot off the boss.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
     band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
     title_block_band = top.PRINTED_LINEAR_BAND_MM[keeper.KEEPER_FITUP_PLACES]
-    assert 0.0 < south_margin
-    assert south_margin + band - title_block_band > 0.0
+    assert south_margin == pytest.approx(0.2286)
+    assert south_margin + band - title_block_band == pytest.approx(0.0, abs=1e-9)
     assert north_margin > 10 * band
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
 
