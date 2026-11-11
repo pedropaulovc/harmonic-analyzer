@@ -495,11 +495,13 @@ async def _cut_tick(
     drive_xcenter: str,
     drive_length: str,
     cut_args: tuple | None,
+    seed_pre: float | None = None,
 ) -> tuple[str, tuple]:
     """Cut one graduation tick as the 30-degree V; returns the cut feature
     name and the FeatureCut3 form. With ``cut_args`` None (the seed tick, the
-    first cut on the bar) the form is the one whose removed volume matches
-    the closed-form V; later ticks reuse it.
+    first cut on the bar) the form is the one whose removed volume from
+    ``seed_pre`` (the bar's volume just before this tick) matches the
+    closed-form V; later ticks reuse it.
 
     Self-naming: ``stem`` makes the sketch/feature/dim names unique per tick
     (the equation manager keys dims by ``leaf@feature``). The four sketch dims
@@ -566,8 +568,10 @@ async def _cut_tick(
     # 20261023T211330900Z-bfdf1b6e: the depth read from a stub above the face).
     sketch = f"{stem}Profile"
     if cut_args is None:
+        if seed_pre is None:
+            raise ValueError(f"{label}: the seed tick needs the bar's volume before it")
         cut_args = await _first_v_cut(
-            adapter, sketch, await _volume_mm3(adapter), depth_mm=TICK_DEPTH,
+            adapter, sketch, seed_pre, depth_mm=TICK_DEPTH,
             expected=tick_v_volume_mm3(length), allowance=TICK_SEED_ALLOWANCE_MM3,
         )
     else:
@@ -775,6 +779,7 @@ async def build(adapter) -> dict[str, str]:
         drive_xcenter='"ScaleStartX"',
         drive_length='"TickLength"',
         cut_args=None,
+        seed_pre=ticks_pre,
     )
     _name_depth(adapter, "Tick0Cut", TICK_DEPTH, "TickDepth")
     check(

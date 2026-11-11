@@ -804,6 +804,9 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     depth_parent = placements[-1]
     assert depth_parent.Orientation == "*Top"
     assert depth_parent.Position == drawing.DEPTH_PARENT_CENTER
+    # Third-angle bottom view: straight below its sheet's front copy.
+    assert drawing.DEPTH_PARENT_CENTER[0] == drawing.NUMERAL_PARENT_CENTER[0]
+    assert drawing.DEPTH_PARENT_CENTER[1] < drawing.NUMERAL_PARENT_CENTER[1]
     assert depth_parent.Angle == 0.0
     assert drawing.DEPTH_RADIUS_MM > math.hypot(spec.TICK_WIDTH / 2.0, spec.BODY_THICKNESS / 2.0)
     assert all(view.Angle == pytest.approx(math.pi) for view in placements
@@ -1199,6 +1202,11 @@ def test_listed_engraving_bit_cuts_every_graduation_and_numeral() -> None:
     # A window of .010+ for a plunge set on the Z handwheel.
     assert min(deepest, depth_for_width_max) - shallowest >= 0.254
     assert spec.NUMERAL_DEPTH < deepest
+    # At the numeral depth MIN the bit's stroke runs wider than the modelled
+    # near-sharp V; the excess a side stays inside the .02 numeral gap's .XX
+    # band (+/-.01), so the printed gap still holds.
+    stroke = tip + 2.0 * spec.NUMERAL_DEPTH * slope
+    assert 0.0 < (stroke - spec.NUMERAL_STROKE_WIDTH_MM) / 2.0 < 0.254
     setting = shop["settings"]["ms-stick-engrave-brass"]
     assert setting["tool"] == "ms-stick-engraver" and "ms-stick-engraver" in shop["tools"]
     low, high = shop["machines"]["pm-30mv"]["rpm_ranges"][0]
@@ -1563,10 +1571,14 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.005
     assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020
-    # Detail B's callout block runs left from its keep point over G-G's
-    # columns (rendered 0.292-0.380 m), so its shoulder, about 2.5 line
-    # pitches below the keep height, must pass above the section.
-    _tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
+    # Detail B's callout block runs right from its keep point (run
+    # 20261111T180258983Z-3467590b rendered it 0.378-0.454 m from 0.380), so
+    # it must end inside the B-size inner border at x 0.419 m, and its
+    # shoulder, about 2.5 line pitches below the keep height, passes above
+    # the section.
+    tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
+    block = max(map(len, callouts.CALLOUTS["TickDepth"].splitlines())) * 0.00275
+    assert tick_x + block < 0.419 - 0.005
     assert tick_y - 2.5 * 0.0034 > profile.ymax + 0.008
     # The cutting line misses every graduation by a visible margin and still
     # crosses the zero's straight side strokes, short of its end facets.

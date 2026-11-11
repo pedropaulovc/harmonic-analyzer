@@ -20,7 +20,11 @@ configured 14.2 / 1.42 mm pitch and the 56.5 mm scale zero print rounded
 (.559, .0559, 2.224) at their own +/-.002; the minor pitch prints four places
 so ten printed minor pitches equal the printed full pitch. The 7.95 length is
 .XX because the last groove's rule-17 land reads it; nothing prints .X. The
-unprinted 0.24 V-bit stroke width at the face is tool geometry and stays.
+unprinted 0.24 stroke width at the face is the modelled near-sharp V and
+stays (owner ruling). The listed .005-tip bit at the .016 MIN numeral depth
+cuts strokes about 0.35 wide: stroke width is unprinted, the extra 0.05 a side
+stays inside the .02 numeral gap's +/-.01 band, and note 3 leaves the font to
+the shop.
 """
 
 from __future__ import annotations

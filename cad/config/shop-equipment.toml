@@ -186,7 +186,7 @@ teeth = 72
 # leaves the numeral font to the shop: a single-stroke font of straight
 # horizontal and vertical strokes cuts each stroke with one handwheel.
 [tools.ms-stick-engraver]
-name = "2L Profiler P-125x2.0-30-.005-S, 30 deg included V, .005 in tip, 1/8 in shank, solid carbide, soft-materials (brass) grade"
+name = "2L Profiler P-125x2.0-30-.005-S, 30 deg included V, .005 in tip, solid carbide, soft-materials (brass) grade"
 kind = "engraving_bit"
 make = "2L Inc."
 sku = "P-125x2.0-30-.005-S"
@@ -197,7 +197,6 @@ status = "not owned: to buy"
 use = "MHA-MS-01 graduations (101 ticks) and numerals 0-10"
 included_angle_deg = 30.0
 tip_width_in = 0.005
-shank_in = 0.125
 
 # --- workholding ------------------------------------------------------------
 
