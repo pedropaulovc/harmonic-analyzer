@@ -1251,6 +1251,204 @@ def test_a_mass_property_array_is_judged_quantity_by_quantity():
     assert _com_outcome._mass_signal([accurate], [coarse])[0].value == "different"
 
 
+def _mass(a: list[conv.Call], b: list[conv.Call]) -> tuple[str, Any]:
+    signal, detail = _com_outcome._mass_signal(a, b)
+    return signal.value, detail
+
+
+def _bodies(*bodies: tuple[float, ...]) -> list[conv.Call]:
+    return [_body_mass(*body, *_INERTIA) for body in bodies]
+
+
+# One configuration's four bodies (centre x/y/z, volume, area, mass), placed
+# like sh_vn_chain_link's (2026-11-11): two plates, two pins.
+_LINKS = (
+    (0.0, 0.0, 0.0, 6.1e-05, 0.0231, 0.48),
+    (0.00635, 0.0, 0.0, 6.1e-05, 0.0231, 0.48),
+    (0.003175, 0.0, -0.00205, 2.4e-07, 0.00041, 0.0019),
+    (0.003175, 0.0, 0.00205, 2.4e-07, 0.00041, 0.0019),
+)
+
+
+def test_mass_measurements_match_in_any_order():
+    base = _bodies(*_LINKS)
+    # The same bodies measured in another order: the same part.
+    assert _mass(base, _bodies(*_LINKS[1:], _LINKS[0]))[0] == "same"
+    assert _mass(base, _bodies(_LINKS[1], _LINKS[0], *_LINKS[2:]))[0] == "same"
+    # One body's volume 1e-6 larger, in any order: another part.
+    grown = (*_LINKS[2][:3], _LINKS[2][3] * (1 + 1e-6), *_LINKS[2][4:])
+    signal, detail = _mass(base, _bodies(_LINKS[1], grown, _LINKS[3], _LINKS[0]))
+    assert (signal, detail["member"]) == ("different", "IBody2.GetMassProperties")
+    # A body more: counted.
+    assert _mass(base, _bodies(*_LINKS, _LINKS[0])) == (
+        "different",
+        {"counts": {"IBody2.GetMassProperties": [4, 5]}},
+    )
+
+
+def test_mass_measurements_match_by_assignment_not_greedily():
+    # Volumes 0.9 of the tolerance apart: mid is close to lo and to hi, lo
+    # and hi are not close. Paired greedily in call order, mid takes lo and
+    # strands the base's lo; the assignment pairs mid with hi.
+    volume = _SOLID[3]
+    step = 0.9 * _com_outcome.REL_TOL * volume
+    lo, mid, hi = volume, volume + step, volume + 2 * step
+
+    def body(value: float) -> conv.Call:
+        return _body_mass(*_SOLID[:3], value, *_SOLID[4:], *_INERTIA)
+
+    assert _mass([body(mid), body(lo)], [body(lo), body(hi)])[0] == "same"
+    assert _mass([body(lo), body(lo)], [body(lo), body(hi)])[0] == "different"
+
+
+def _measured(handle: int, volume: float, centre: tuple[float, ...]) -> list[conv.Call]:
+    """One IMassProperty object read for its volume, then its centre."""
+    return [
+        conv.Call(
+            0,
+            handle,
+            "InvokeTypes",
+            [],
+            "IMassProperty.Volume",
+            result={"f": volume.hex()},
+        ),
+        conv.Call(
+            0,
+            handle,
+            "InvokeTypes",
+            [],
+            "IMassProperty.CenterOfMass",
+            result={"t": [{"f": c.hex()} for c in centre]},
+        ),
+    ]
+
+
+def test_an_imassproperty_object_is_one_measurement():
+    first, second = (1e-5, (0.01, 0.0, 0.0)), (2e-5, (0.0, 0.02, 0.0))
+    base = [*_measured(7, *first), *_measured(8, *second)]
+    # The same objects in another order, or their reads interleaved.
+    assert _mass(base, [*_measured(3, *second), *_measured(4, *first)])[0] == "same"
+    one, two = _measured(5, *first), _measured(6, *second)
+    assert _mass(base, [one[0], two[0], one[1], two[1]])[0] == "same"
+    # Each volume with the other's centre: the same answers per member, but
+    # other bodies.
+    swapped = [*_measured(7, first[0], second[1]), *_measured(8, second[0], first[1])]
+    signal, detail = _mass(base, swapped)
+    assert (signal, detail["member"]) == ("different", "IMassProperty.CenterOfMass")
+
+
+def _stl(*triangles: tuple[tuple[float, ...], ...], normal=(0.0, 0.0, 0.0)) -> bytes:
+    """A binary STL: header, count, per triangle a facet normal (never
+    judged), three corners and two attribute bytes."""
+    body = b"".join(
+        struct.pack("<3f", *normal)
+        + b"".join(struct.pack("<3f", *corner) for corner in triangle)
+        + b"\0\0"
+        for triangle in triangles
+    )
+    return b"fake STL".ljust(80) + struct.pack("<I", len(triangles)) + body
+
+
+def _geometry(a: list[tuple], b: list[tuple]) -> str | None:
+    return _com_outcome._mesh_difference(
+        _com_outcome._mesh(_stl(*a)), _com_outcome._mesh(_stl(*b))
+    )
+
+
+def _tilted(x: float, y: float) -> tuple[float, float, float]:
+    """A point of a plane tilted like the platform's side walls, so its
+    float32 corners carry noise."""
+    return (10.0 + 0.98877 * x, 20.0 + y, -200.0 + 0.14944 * x)
+
+
+def test_stl_geometry_ignores_how_a_planar_face_is_triangulated():
+    p = [_tilted(x, y) for x, y in ((0, 0), (4, 0), (4, 3), (0, 3))]
+    split = [(p[0], p[1], p[2]), (p[0], p[2], p[3])]
+    assert _geometry(split, [(p[1], p[2], p[3]), (p[1], p[3], p[0])]) is None
+    hexagon = [
+        _tilted(5 * math.cos(k * math.pi / 3), 5 * math.sin(k * math.pi / 3))
+        for k in range(6)
+    ]
+    fan = [(hexagon[0], hexagon[k], hexagon[k + 1]) for k in range(1, 5)]
+    refan = [
+        (hexagon[3], hexagon[(3 + k) % 6], hexagon[(4 + k) % 6]) for k in range(1, 5)
+    ]
+    assert _geometry(fan, refan) is None
+    # Triangle order, corner rotation and facet normals are no geometry.
+    shuffled = [(c, a, b) for a, b, c in reversed(fan)]
+    assert _stl(*fan) != _stl(*shuffled, normal=(1.0, 2.0, 3.0))
+    assert (
+        _com_outcome._mesh_difference(
+            _com_outcome._mesh(_stl(*fan)),
+            _com_outcome._mesh(_stl(*shuffled, normal=(1.0, 2.0, 3.0))),
+        )
+        is None
+    )
+    # A moved vertex, or the same face inside out, is other geometry.
+    moved = [*hexagon[:2], _tilted(5.0, 0.001), *hexagon[3:]]
+    assert _geometry(fan, [(moved[0], moved[k], moved[k + 1]) for k in range(1, 5)])
+    assert _geometry(fan, [(a, c, b) for a, b, c in fan]).startswith("plane outlines")
+
+
+def test_stl_geometry_tells_a_moved_hole_at_equal_area_and_vertices():
+    # A 4 x 1 strip of squares with one left open: the same ten vertices and
+    # the same area, the opening moved.
+    def strip(*squares: int) -> list[tuple]:
+        found = []
+        for x in squares:
+            a, b, c, d = (
+                _tilted(x, 0),
+                _tilted(x + 1, 0),
+                _tilted(x + 1, 1),
+                _tilted(x, 1),
+            )
+            found += [(a, b, c), (a, c, d)]
+        return found
+
+    assert _geometry(strip(0, 1, 3), strip(0, 1, 3)) is None
+    assert _geometry(strip(0, 1, 3), strip(0, 2, 3)).startswith("plane outlines")
+
+
+def test_stl_geometry_of_a_curved_face_is_its_facets():
+    # A cylinder strip: each flat facet is a plane of its own.
+    ring = [(10 * math.cos(k / 10), 10 * math.sin(k / 10)) for k in range(4)]
+    low, high = [(x, y, 0.0) for x, y in ring], [(x, y, 5.0) for x, y in ring]
+    facets = [
+        triangle
+        for k in range(3)
+        for triangle in (
+            (low[k], low[k + 1], high[k + 1]),
+            (low[k], high[k + 1], high[k]),
+        )
+    ]
+    assert _geometry(facets, list(reversed(facets))) is None
+    # A triangle removed or added: other geometry.
+    assert _geometry(facets, facets[:3] + facets[4:])
+    assert _geometry(facets, [*facets, (low[0], low[2], high[1])])
+    # A non-planar quad split along its other diagonal reads as other
+    # geometry: the conservative direction (a missed reuse, never unsound).
+    q = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.1), (1.0, 1.0, 0.0), (0.0, 1.0, 0.1)]
+    assert _geometry(
+        [(q[0], q[1], q[2]), (q[0], q[2], q[3])],
+        [(q[1], q[2], q[3]), (q[1], q[3], q[0])],
+    )
+    # Anything but a well-formed binary STL is compared byte for byte.
+    text = b"solid fake\nendsolid fake\n"
+    assert _com_outcome._mesh(text).startswith("bytes:")
+    assert (
+        _com_outcome._mesh_difference(
+            _com_outcome._mesh(text), _com_outcome._mesh(text)
+        )
+        is None
+    )
+    assert (
+        _com_outcome._mesh_difference(
+            _com_outcome._mesh(text), _com_outcome._mesh(text + b" ")
+        )
+        == "bytes"
+    )
+
+
 def test_caller_capture_modes(tmp_path, monkeypatch):
     full = conv.CallerCapture.FULL
     for mode in conv.CallerCapture:

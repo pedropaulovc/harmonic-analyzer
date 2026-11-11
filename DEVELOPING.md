@@ -2509,10 +2509,10 @@ not held. Next, the base log is compared with this build's own fresh recording
 
   | signal | compared |
   | --- | --- |
-  | `mass` | every mass-property answer, matched by order per member. A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
+  | `mass` | every mass-property measurement, as a multiset per kind: one `*.GetMassProperties*` answer (one body), or every answer read from one `IMassProperty` object, in the order read (so a volume stays paired with its own centre and inertia). Each measurement must pair with one of the other build's within tolerance, by an assignment (Kuhn's augmenting paths; closeness is not transitive, so pairing greedily or by a sort key could strand one). A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
   | `requests` | the multiset of recipe requests, handles erased, noise normalised |
   | `answers` | the multiset of (request, answer) pairs, but for mass properties and answers about the session (`IModelDoc2.SummaryInfo` dates, `ISldWorks.GetUserPreference*`) |
-  | `stl` | each exported STL's triangles as a multiset: corners rotated to start at the least (winding kept), facet normals and header dropped |
+  | `stl` | each exported STL's geometry, whatever its triangulation: the same set of float32 vertices and, per plane, the same outline (the edges just one of the plane's triangles uses, in its winding) and the same area within 1e-9 of the total. A plane is the triangles whose unit normal (to 1e-4) and offset (to 1e-3 mm) bins touch. A curved face has no plane: each flat facet is one, so a curved face re-tessellated over the same vertices compares `different` (a missed reuse, never an unsound one). Triangle order, corner rotation, facet normals and the header are no part of it; a file that is not a well-formed binary STL is compared byte for byte |
 
   `same`: all four are present and agree. `different`: one differs, or is in
   one log only. `unknown`: nothing differs, but neither log holds a
@@ -2582,11 +2582,21 @@ earlier request-equality rule: the replay was a `noop` and the fresh build's
 requests diverged at the face search, yet its mass properties, request and
 answer multisets and STL were the base's. Two request-identical
 `dt_crank_pinion` builds wrote the same STL triangles in another order, with
-corners rotated and normals off in the last bits. Over that day's 38
-consecutive same-part recording pairs, all 26 request-identical pairs and both
-reordered `dt_cone_swing_platform` pairs compare `same`; every pair with a
-source or configuration edit compares `different`, including the
-property-only edits.
+corners rotated and normals off in the last bits. Later that day a
+`dt_cone_swing_platform` build listed that face search's faces in a third
+order and wrote 35 of the STL's 1226 triangles otherwise: the same 724
+vertices, a polygon of the top face and two side-wall rectangles split along
+other diagonals, mass properties within the last bit. It raised an alarm
+under a triangle-multiset `stl` signal, now replaced by the geometric one
+above. A `sh_vn_chain_link` build measured one configuration's four
+bodies in another order (`IBody2.GetBodies2` listed them otherwise, each
+body with its own face count), the same bodies as the base's; `mass` matched
+by call order would have read another part. Over that day's 38 consecutive
+same-part recording pairs, all 26 request-identical pairs and both reordered
+`dt_cone_swing_platform` pairs compare `same`; every pair with a source or
+configuration edit compares `different`, including the property-only edits.
+The re-triangulated platform pair and the reordered chain-link pair compare
+`same`.
 
 ### What it costs a task
 
