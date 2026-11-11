@@ -793,7 +793,8 @@ def _north_boss_finish_anchor(
 # datum (r5 machinist review); "View B" stays this script's internal name.
 JOURNAL_VIEW_LETTER = "C"
 VIEW_LETTER_HEIGHT = 0.005
-_VIEW_B_ARROW_LENGTH = 0.008
+# 7.5 mm: the letter keeps the audit's text clearance over the caption.
+_VIEW_B_ARROW_LENGTH = 0.0075
 _VIEW_LETTER_HALF_WIDTH = 0.0018
 # View C's label is its letter alone (rule 26: a standard label, never a
 # prose name; the arrow C on SECTION A-A says what it looks along).  Its
