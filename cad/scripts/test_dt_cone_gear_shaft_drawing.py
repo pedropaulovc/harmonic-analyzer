@@ -260,11 +260,11 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     # number.
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-shaft-key"):
         assert _config.parts(mate)["number"] in notes[0]
-    # Land 2 and the socket are bonded fits: their mates by number; the
-    # compound is the assembly sheet's (rule 23).
+    # Land 2 and the socket are bonded fits: their mates by number, and the
+    # fit named with its compound's grade (drawing-guidelines.md rule 26).
     for mate in ("dt-cone-gear", "dt-cone-tip-gear"):
         assert _config.parts(mate)["number"] in notes[1]
-    assert "BONDED FIT" in notes[1] and "LOCTITE" not in spec.DRAWING_NOTES
+    assert f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}" in notes[1]
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
         assert _config.parts(mate)["number"] in notes[2]
@@ -1372,7 +1372,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert "ShoulderR" not in drawing.DIMENSION_CALLOUTS
     # The notes are numbered flag notes (rule 7): the land note, the bond
     # note and the stack note, each naming mates by drawing number.  No
-    # design rationale, process, joint method or check of its own.
+    # design rationale, process, joint method or check of its own; the bond
+    # note's compound grade is part of the fit's name (rule 26).
     notes = dt_cone_gear_shaft_spec.DRAWING_NOTES
     # The sheet's note text runs ~2.7 mm per character; a line from the
     # note anchor must end before the title block at x = 0.216 m (the
@@ -1392,7 +1393,6 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "GRIND",
         "SOLDER",
         "BRAZE",
-        "LOCTITE",
         "RETAIN",
         "ADHESIVE",
         "TAILSTOCK",

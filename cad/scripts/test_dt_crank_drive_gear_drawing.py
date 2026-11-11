@@ -304,7 +304,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "ROOT DIAMETER (REF)",
         "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
         "TOOTH LINE:  STRAIGHT, 13.0 DEG RIGHT HAND FROM AXIS",
-        "TOOTH SPACES CENTRED ON AXIS AT:  .07 FROM CHAMFERED BORE FACE",
+        "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
@@ -435,7 +435,7 @@ def test_the_data_block_states_the_tooth_line_as_it_stated_the_helix() -> None:
         "AXES CROSSED WITH MHA-DT-10"
     ) in data
     assert (
-        f"TOOTH SPACES CENTRED ON AXIS AT:  "
+        f"FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  "
         f"{spec.inch_text(spec.TOOTH_SPACE_CROSSING, 2)} FROM CHAMFERED BORE FACE"
     ) in data
     for retired in ("HELIX", "LEAD", "SCREW SWEEP", "SECTION A-A"):
@@ -691,7 +691,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # sits right of its dimension line, on the shelf the line turns into
     # (farm proof of #2331 at 7f1dedc: line at the keep x, shelf to the right).
     keyway_t = _text_box(
-        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4045 \N{PLUS-MINUS SIGN}0.0020"
+        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4030 \N{PLUS-MINUS SIGN}0.0035"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
     centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")

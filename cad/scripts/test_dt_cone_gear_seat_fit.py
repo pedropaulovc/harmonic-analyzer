@@ -107,6 +107,38 @@ def test_every_keyed_gear_slides_over_the_key_at_the_print_extremes() -> None:
         spec.keyway_top_offset_mm(24)
 
 
+def _chord_height(dia: float, width: float) -> float:
+    return (dia - math.sqrt(dia * dia - width * width)) / 2.0
+
+
+def test_one_broach_pass_lands_in_t_and_the_keyseat_clears_the_key_under_it() -> None:
+    # A 1/16 A broach in its 3/8 A bushing cuts 0.70 mm deep in one pass
+    # (duMONT 1/16"-A, Rev Broaching Tool's table, read across its 0.01 mm
+    # rounding).  Every reading of that depth lands inside T: from the
+    # bushing's 3/8 circle or the bore, at the keyway's centreline or at its
+    # walls, where the circle stands its chord height below the centreline.
+    t_min, t_max = _limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)
+    widths = _limits(cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND)
+    land = cone_land_key.LAND_DIA_MM
+    bores = _limits(land, seat_bore_band(lands.GEAR_SEAT_BAND))
+    assert cone_land_key.BROACH_DEPTH_MM == pytest.approx((0.695, 0.705))
+    for depth in cone_land_key.BROACH_DEPTH_MM:
+        for reference in (land, *bores):
+            for drop in (0.0, *(_chord_height(reference, w) for w in widths)):
+                assert t_min <= reference + depth - drop <= t_max, reference
+    # ANSI B17.1 for a 1/16 key on Ø.375: T = D - Y + H/2 + .005 (.4087)
+    # would cut past T's largest, where T030's web was ruled; its S =
+    # D - Y - H/2 (.3411) would stand the key's top over T's smallest.  The
+    # printed S at its largest keeps the key's top .0015 under it.
+    key = cone_land_key.KEY_SIZE_MM
+    key_max = _limits(key, cone_land_key.KEY_STOCK_BAND)[1]
+    s_max = _limits(cone_land_key.KEYSEAT_S_MM, cone_land_key.KEYSEAT_S_BAND)[1]
+    y = _chord_height(land, key)
+    assert land - y + key / 2.0 + 0.127 > t_max
+    assert land - y - key / 2.0 + key_max > t_min
+    assert t_min - s_max - key_max == pytest.approx(0.0381)
+
+
 def test_every_keyed_web_is_proved_at_the_keyway_corner() -> None:
     # Rule 17 at the keyway's top corner (T at its most, bore at its least,
     # keyway at its widest), under the printed root envelope MIN: T030 is
