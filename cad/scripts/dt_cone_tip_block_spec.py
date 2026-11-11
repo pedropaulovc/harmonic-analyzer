@@ -789,9 +789,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # note 2), the slit width (the drill-to-slot point reaches past the far jaw's
 # tap drill at .X), the pinch-hole height (the top ligament closes at 1.92 at
 # .X if 46.95 prints 47.0) and the pinch hole's .22 station from the north
-# face.  .XXX, each with its function at its callout: the passage centre
-# .335 (ON MHA-DT-05 AXIS: the post's turn takes up the tip's lateral error
-# only at .XXX) and the tap's stations (SETS MHA-DT-39 REACH): .215 along
+# face.  .XXX, each stating its function: the passage centre .335 over its
+# own value (ON MHA-DT-05 AXIS: the post's turn takes up the tip's lateral
+# error only at .XXX) and the tap's stations at its callout (SETS MHA-DT-39
+# REACH): .215 along
 # the axis, where .XX passes the end screw's reach and drops its engagement
 # under the owner's 1.39 D, and .295 across it, where .XX fails the same
 # lateral take-up.  build_dt_drive_train_assembly proves each looser grade

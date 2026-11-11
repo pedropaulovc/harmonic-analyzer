@@ -787,16 +787,16 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
     function is a tight band, and its dimension names the mate it serves.
     The tap's two stations locate one hole, named on that hole's callout;
-    the bore's location names its mate on the bore's callout (rule 4: a
-    location carries its value only).  The locating dowel's station
+    the bore's location states its function over its own value (#2314
+    machinist review: under the bore callout's flag the .335 read as a bare
+    three-place location).  The locating dowel's station
     (rule-23 retention, owner ruling 2026-11-07) prints as a reference with
     no band (round 6, #9), so it holds nothing and names nothing."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
-    assert "PassageCenter" not in texts
+    assert "PassageCenter" in texts
     for name in ("FootTapX", "FootTapZ"):
         texts[name] = drawing.FOOT_TAP_QUALIFIER
-    texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {
         "PassageCenter",

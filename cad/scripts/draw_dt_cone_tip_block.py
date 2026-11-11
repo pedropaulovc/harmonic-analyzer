@@ -246,13 +246,15 @@ ROUND_OUT = 0.0001
 # and its leader climbed ~28 mm over the front view to the rim, ~16 mm
 # further than the hole's approach from the right face, reading as an edge of
 # the part.  The short way in is from the right face, so the callout stands
-# right of the hole with the shaft-tip flag over it (review: named above
-# the thread callout it describes): the flag's top keeps the height it took
-# an arrow clearance (plus half an arrowhead) under the slit floor's depth
-# witness, which no longer prints (machinist review of e04fd60ab: the floor
-# stands inside the bore, dt_cone_tip_block_spec), so the right-hand views
-# keep their measured places, and the callout a text clearance under the
-# name.  Its leader leaves the shoulder's left end at
+# right of the hole.  Its top keeps the height the shaft-tip flag over it gave
+# it: the flag's top an arrow clearance (plus half an arrowhead) under the
+# slit floor's depth witness, which no longer prints (machinist review of
+# e04fd60ab: the floor stands inside the bore, dt_cone_tip_block_spec), and
+# the callout a text clearance under the flag's 3.6 mm row.  The flag's
+# function now stands on PassageCenter itself (#2314 machinist review: the
+# .335 read as a bare three-place location), and the callout keeps its place
+# so the right-hand views keep their measured air.  Its leader leaves the
+# shoulder's left end at
 # ADJUSTER_LEADER_ANGLE: at 45 deg the run over the part is 4.4 mm longer
 # than the hole's approach, past Main's ~4 mm brief (swing's RD2 fix,
 # 4dda16fd5, left 3.8); at 3:2, 40 deg made it 3.2.  At 2:1 the hole's
@@ -264,18 +266,13 @@ ROUND_OUT = 0.0001
 # render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
-# The flag's ink from its upper-left corner: run 20261110T001845485Z printed
-# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; BORE_FLAG_TEXT has the
-# same 17 glyphs.
-ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0450, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
-ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
+ADJUSTER_CALLOUT_TOP_DROP = 0.0036 + TEXT_CLEARANCE + ROUND_OUT
 ADJUSTER_SHOULDER_Y = (
-    ADJUSTER_ENTRY_Y
-    - ADJUSTER_ENTRY_EXTENT[1]
-    - TEXT_CLEARANCE
-    - ROUND_OUT
+    _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER)
+    - ADJUSTER_FLOOR_GAP
+    - ADJUSTER_CALLOUT_TOP_DROP
     - ADJUSTER_CALLOUT_EXTENT[3]
     - ADJUSTER_CALLOUT_EXTENT[1]
 )
@@ -284,10 +281,6 @@ _ADJUSTER_SHOULDER_DX = (
 ) / math.tan(ADJUSTER_LEADER_ANGLE)
 ADJUSTER_CALLOUT_DX = _ADJUSTER_SHOULDER_DX + ADJUSTER_CALLOUT_EXTENT[0]
 ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]
-# The name stands centred over the callout.
-ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
-    ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
-) / 2.0
 # The right view's north face stands ADJUSTER_VIEW_AIR past the callout's
 # right end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over
 # that face; the right view slid 5 mm then, the removed views with it.  Blind
@@ -334,11 +327,22 @@ DIMENSION_CALLOUTS = {
     # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
     "DowelHoleDia": DOWEL_HOLE_CALLOUT,
 }
+# The passage centre's function, on its own dimension (rule 3: a location
+# whose .XX band breaks a stack prints .XXX and states what it holds, once,
+# on the feature; #2314 machinist review read the .335 under the bore-callout
+# flag that carried this text as a bare three-place location).  Its .XXX
+# location holds the end screw, and with it T006's pivot, on the line
+# MHA-DT-05's journal points the shaft along: the post's turn on its screws
+# takes up the tip's lateral error only with PassageCenter at .XXX
+# (build_dt_drive_train_assembly TIP_LATERAL_ERROR_MM 6.20 against 6.25; at
+# .XX 6.33).  Its height is made to the same axis (note 2).  Machinist review
+# of PR 2's farm proof (rounds 1 and 2) read "LOCATES MHA-DT-37 PIVOT" as a
+# mate with no function.
+PASSAGE_CENTER_FUNCTION = f"ON {POST_NUMBER} AXIS"
 DIMENSION_CALLOUTS_ABOVE = {
     # The width prints .67 at the title block's .XX (#2314): a general size
     # with no band of its own carries no reason (rule 7), as the depth.
-    # Screen review (dt-fab-4): a location carries its value only; the
-    # shaft-tip function moved to the bore's callout (BORE_FLAG_TEXT).
+    "PassageCenter": PASSAGE_CENTER_FUNCTION,
     # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
     # stands inside the Ø4.04 bore, so its lower extension line ended on no
     # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
@@ -385,8 +389,8 @@ FRONT_KEEP = {
 }
 # PassageCenter stands above SlitW on the adjuster elevation, its line
 # 21.2 mm over the block's top; the plan's north edge is the ceiling for
-# both.  A single-row value prints its line HORIZONTAL_LINE_DROP under it.
-PASSAGE_CENTER_RISE = 0.0212 + HORIZONTAL_LINE_DROP
+# both.  A value with a row over it prints its line TWO_ROW_LINE_DROP under it.
+PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The 4.875's short
 # span leaves no room for inside arrows (d84a42ca7: the 4.875's line and
@@ -544,15 +548,6 @@ CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 # A one-line "VIEW B": six glyphs at the 287c captions' 2.6 mm pitch, rounded
 # out.  An estimate until a render measures it.
 VIEW_CAPTION_EXTENT = (0.0, 0.0036, 0.0160, 0.0)
-# The bore's function, named at its callout (screen review dt-fab-4: the
-# location carries its value only, rule 4).  Its .XXX location holds the end
-# screw, and with it T006's pivot, on the line MHA-DT-05's journal points the
-# shaft along: the post's turn on its screws takes up the tip's lateral
-# error only with PassageCenter at .XXX (build_dt_drive_train_assembly
-# TIP_LATERAL_ERROR_MM 6.20 against 6.25; at .XX 6.33).  Its height is made
-# to the same axis (note 2).  Machinist review of PR 2's farm proof (rounds 1
-# and 2) read "LOCATES MHA-DT-37 PIVOT" as a mate with no function.
-BORE_FLAG_TEXT = f"ON {POST_NUMBER} AXIS"
 # Review C1: the left view sits right of the right view, out of third-angle
 # order, so it is a removed view named by a letter arrow on the view that
 # shows the face it looks at.  VIEW B looks at the -X (pinch-thread) face:
@@ -684,8 +679,6 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
     return (
         # The removed view's caption is its letter, centred under it.
         ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
-        # Review: named above the thread callout it describes.
-        (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
         # The ream callout's SEE NOTE 1 (round 6, #2).
         (DOWEL_NOTE, *DOWEL_NOTE_XY),
         (AXIS_MATCH_NOTE, *AXIS_MATCH_NOTE_XY),
@@ -752,7 +745,6 @@ _VALUE_EXTENTS = {
         name: _value_extent(name, nominal)
         for name, nominal in (
             ("PinchHeight", PINCH_HEIGHT),
-            ("PassageCenter", BLOCK_X / 2.0),
             ("Depth", BLOCK_Z),
             ("Width", BLOCK_X),
             ("FootTapX", FOOT_TAP_X),
@@ -763,6 +755,8 @@ _VALUE_EXTENTS = {
         name: _value_and_rows_extent(name, nominal, text)
         for name, nominal, text in (
             ("AxisHeight", ADJUSTER_AXIS_HEIGHT, DIMENSION_CALLOUTS["AxisHeight"]),
+            # ".335" under its ON MHA-DT-05 AXIS row.
+            ("PassageCenter", BLOCK_X / 2.0, PASSAGE_CENTER_FUNCTION),
             # "1.20" under its SLOT INTO BORE row.
             ("SlitW", SLIT_W, DIMENSION_CALLOUTS_ABOVE["SlitW"]),
         )
@@ -838,7 +832,6 @@ AXIS_MATCH_NOTE_EXTENT = (
 )
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
-    BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
     "VIEW B": VIEW_CAPTION_EXTENT,
     DOWEL_NOTE: DOWEL_NOTE_EXTENT,
     AXIS_MATCH_NOTE: AXIS_MATCH_NOTE_EXTENT,
