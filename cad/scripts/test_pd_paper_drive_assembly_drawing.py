@@ -866,10 +866,18 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     axis = (0.7071, 0.4082)
     along = (right * axis[0] + up * axis[1]) / math.hypot(*axis)
     assert math.sqrt(right**2 + up**2 - along**2) > shaft.CORE_DIA / 2.0
+    # The feed sleeve lands on its 12T tip land, forward of the rear face that
+    # draws against the exploded rear bushing (#2551 machinist review).
+    sx, sy, sz = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-feed-pinion"].point_mm
+    assert math.hypot(sx, sy) == pytest.approx(
+        drawing.feed_pinion.OUTSIDE_DIA / 2.0, abs=1e-3
+    )
+    assert 0.0 < sz < drawing.feed_pinion.FACE_WIDTH
     pinned = {
         "pd-transgear-removable",
         "pd-transgear-disc-hub",
         "pd-transgear-knob-shaft",
+        "pd-transgear-feed-pinion",
     }
     assert all(
         anchor == drawing.BalloonAnchor()

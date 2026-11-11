@@ -1250,9 +1250,21 @@ KNOB_SHAFT_BALLOON_POINT_MM = (
     round(_KNOB_TIP_R * math.sin(KNOB_SHAFT_BALLOON_ANGLE), 4),
     0.0,
 )
+# Sheet 3's balloon 28 walked to the sleeve's rear-face tooth tip (part
+# (4.892, 3.024, 0)), drawn hard against the exploded MHA-PD-24 bushing, so
+# its arrow read as the bushing's and balloon 26 seemed to share a part
+# (machinist review of #2551's run 20261111T200045620Z, r1/r3). The same tip
+# corner FEED_SLEEVE_BALLOON_Z forward, on the 12T's tip land, draws about
+# 3 mm down-left of it at the sheet's 2:3, on the teeth seen between the
+# bushing and the disc.
+FEED_SLEEVE_BALLOON_Z = 6.0
+if not 0.0 < FEED_SLEEVE_BALLOON_Z < feed_pinion.FACE_WIDTH:
+    raise AssertionError("balloon 28 lands on the feed sleeve's teeth")
+FEED_SLEEVE_BALLOON_POINT_MM = (4.892, 3.024, FEED_SLEEVE_BALLOON_Z)
 _BALLOON_POINTS_MM = {
     "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
     "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
+    "pd-transgear-feed-pinion": FEED_SLEEVE_BALLOON_POINT_MM,
 }
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
