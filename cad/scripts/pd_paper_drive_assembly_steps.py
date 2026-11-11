@@ -11,10 +11,10 @@ rolling diameter. The collar rear-face fit, wheel/pilot float and stud cut
 come from MHA-PD-22 (its sheet shares the fit phrases, R9-30). Its actual
 loaded overlap inspection precedes final platen installation and does not
 turn the static F-to-disc setting into a clearance certificate.
-The feed rack's datum setup and its closed-form gates live in
-``paper_drive_rack_setup`` (the builder gates on them); this module only
-prints them. Drawing-only: no assembly builder imports it. No SolidWorks or
-live proof.
+The feed rack's datum setup band and its closed-form gates live in
+``paper_drive_rack_setup`` (the builder gates on them) as design proofs; the
+sheet sets and accepts that mesh by function, not on the band (#2416).
+Drawing-only: no assembly builder imports it. No SolidWorks or live proof.
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
-import paper_drive_rack_setup as rack_setup
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
@@ -207,8 +206,10 @@ BAR_TOP_ABOVE_DECK_TEXT = inch_text(BAR_TOP_ABOVE_DECK, 2)
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
 RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.0508  # .002
-# The feed rack's datum setup band and its gates are the builder's too:
-# paper_drive_rack_setup owns them; this module only prints them.
+# The feed rack's datum setup band and its gates are the builder's design
+# proofs (paper_drive_rack_setup). The sheet prints no backlash window for that
+# mesh: the fitter sets the arm by feel and accepts it on function, no tight
+# spot, no skipped tooth, a steady feed (owner direction 2026-11-11, #2416).
 RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
@@ -249,4 +250,3 @@ OFFSET_ACCEPT_TEXT = (
 )
 COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
 RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
-RACK_DATUM_BACKLASH_TEXT = inch_window(rack_setup.RACK_DATUM_BACKLASH_RANGE, 4, " TO ")

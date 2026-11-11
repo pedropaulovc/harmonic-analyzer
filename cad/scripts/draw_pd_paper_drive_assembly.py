@@ -1877,7 +1877,6 @@ def _step_text(
     pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
     drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
     knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
-    shake = steps.RACK_DATUM_BACKLASH_TEXT
     lock_gap = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
     # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
@@ -2425,20 +2424,23 @@ def _step_text(
             "CHECK: THE HOOK BASE SEATS FLAT ON THE BAR.",
             "IF IT ROCKS, DEBURR THE TAP MOUTHS AND THE BASE.",
         ),
+        # Owner direction 2026-11-11 (#2416): the feed mesh only has to run
+        # without binding, keep its teeth engaged and feed the paper steadily;
+        # its backlash is not a function. So the arm is set by feel and
+        # accepted on those three, not on a datum shake window read on a dial
+        # (the band stays the builder's design proof, paper_drive_rack_setup).
         "hanger-meshed": (
             f"SWING THE ARM UP UNTIL THE {n['pd-transgear-feed-pinion']} TEETH "
             f"ENTER THE {n['pd-platen-rack']} RACK.",
-            "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE: THE "
-            "DATUM.",
-            f"KNOB HELD, SET THE ARM SO THE PLATEN SHAKES {shake} ALONG THE RACK "
-            "AT THE DATUM, READ WITH A DIAL INDICATOR ON THE PLATEN END.",
+            "KNOB HELD, RAISE THE ARM UNTIL THE PLATEN ONLY JUST SHAKES ALONG THE "
+            "RACK.",
             "CLAMP THE ARM TO THE BAR.",
             "RUN THE PLATEN THROUGH THE ENGAGED FEED, "
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
             "CHECK: NO TIGHT SPOT.",
             "CHECK: SHAKE AT EVERY TOOTH.",
-            "IF EITHER CHECK FAILS, UNCLAMP AND LOWER THE ARM, FEED DISENGAGED.",
-            f"REPEAT {s('hanger-meshed', 0)}-{s('hanger-meshed', 6)}.",
+            "IF EITHER CHECK FAILS, UNCLAMP AND LOWER THE ARM A LITTLE.",
+            f"REPEAT {s('hanger-meshed', 2)}-{s('hanger-meshed', 5)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2458,16 +2460,16 @@ def _step_text(
             f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT.",
-            f"CHECK: THE PLATEN SHAKES {shake} AT THE DATUM, READ WITH A DIAL "
-            "INDICATOR ON THE PLATEN END.",
+            "CHECK: KNOB HELD, PUSHED FIRMLY BY HAND EACH WAY AT BOTH ENDS AND THE "
+            "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
-            f"{s('hanger-meshed', 2)}-{s('hook-pin-hole-match-drilled', 9)}.",
+            f"{s('hanger-meshed', 1)}-{s('hook-pin-hole-match-drilled', 9)}.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
             "TURN THE KNOB TO RUN THE PLATEN THROUGH THE WHOLE ENGAGED FEED.",
-            "CHECK: NO TIGHT SPOT.",
+            "CHECK: THE PLATEN ADVANCES STEADILY, WITH NO TIGHT SPOT.",
             "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",

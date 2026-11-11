@@ -2421,12 +2421,16 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert meshed == fitted + 1 and drilled == meshed + 1
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
-    # The datum shake is the one constant MHA-PD-10's GEAR DATA also prints.
-    shake = steps.RACK_DATUM_BACKLASH_TEXT
-    low, high = (float(value) * 25.4 for value in shake.split(" TO "))
-    band = rack_setup.RACK_DATUM_BACKLASH_RANGE
-    assert band[0] <= low < high <= band[1]
-    assert shake in mesh and shake in _step_body("hook-pin-hole-match-drilled")
+    hook = _step_body("hook-pin-hole-match-drilled")
+    # #2416 (owner direction 2026-11-11): the feed mesh is set by feel and
+    # accepted on function; no backlash window or dial reading prints for it.
+    for body in (mesh, hook):
+        assert "DIAL" not in body and "DATUM" not in body
+        assert not re.search(r"\.\d{4}", body)
+        assert "NO TIGHT SPOT" in body
+    assert "KNOB HELD" in mesh
+    assert "SKIPS NO TOOTH" in hook
+    assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
     window = drawing.engaged_feed_text(domain)
@@ -2435,7 +2439,6 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
         assert axis_word not in mesh
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
-    hook = _step_body("hook-pin-hole-match-drilled")
     assert "LOWER EDGE ON THE PIN" in hook
     # Rule 24: the heat treatment is the hook drawing's.
     assert f"PER {drawing._N['pd-latch-hook']}" in hook

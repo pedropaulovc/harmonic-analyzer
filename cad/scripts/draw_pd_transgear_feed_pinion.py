@@ -431,10 +431,9 @@ _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 # would re-key the part on every renumbering of that sequence.  What a
 # machinist needs to cut and check the teeth (Main ruling 2026-10-10); the
 # span prints on the end view with its limits, not again here.  The span's
-# .0008 band is matched to the rack at assembly: MHA-PD-00 sets the platen
-# shake at the datum on a dial, which sets the feed mesh depth, and the row
-# prints that window as MHA-PD-00 does (RACK_DATUM_BACKLASH_TEXT, the mesh
-# check's band rounded inward).
+# .0008 band is matched to the rack at assembly: MHA-PD-00 sets the feed mesh
+# depth with the arm by feel and accepts it on function, so the row names
+# that step and prints no backlash window (owner direction 2026-11-11, #2416).
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
 MESH_SET_STEP = assembly_steps.step_ref("hanger-meshed")
@@ -446,12 +445,10 @@ GEAR_DATA_ROWS = (
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
     ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
-    # Three short lines keep the block left of the bore's callout.
+    # Two short lines keep the block left of the bore's callout.
     (
         "SPAN MATCHED FIT",
-        "BACKLASH WITH MATE\n"
-        f"   SET AT ASSY {assembly_steps.RACK_DATUM_BACKLASH_TEXT} (DIAL),\n"
-        f"   PER {MESH_SET_STEP}",
+        f"BACKLASH WITH MATE\n   SET AT ASSY PER {MESH_SET_STEP}",
     ),
 )
 GEAR_DATA_NOTE = "\n".join(
