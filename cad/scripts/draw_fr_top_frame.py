@@ -1053,12 +1053,12 @@ POCKET_FROM_SOCKET_LINE_XY = (
 # VIEW L's as-cast locations are the model's own, each with its ±.03 (owner
 # ruling B2, #2333).
 UNDERSIDE_KEEP = {
-    "LandEnd": LAND_END_TEXT_XY,
+    "LandEndW": LAND_END_TEXT_XY,
     "PocketFromSocket": POCKET_FROM_SOCKET_LINE_XY,
     "PocketLength": POCKET_LENGTH_TEXT_XY,
 }
 UNDERSIDE_CALLOUTS = {
-    "LandEnd": LAND_END_CALLOUT,
+    "LandEndW": LAND_END_CALLOUT,
     "PocketFromSocket": "",
     "PocketLength": "2X POCKET",
 }
@@ -1085,23 +1085,26 @@ SIDE_SECTION_CENTER = (0.2967, 0.106)
 # ruling, 2026-11-07, after the machinist reviews of farm run
 # 20261107T204437943Z's PDF found the 1:4 T-sections cramped): like H-H,
 # their captions then carry no scale row (rule 9).  The captions (one
-# 44 mm "SECTION X-X" row) stand centred under their own sections, 3.5 mm
+# 44 mm "SECTION X-X" row) stand centred under their own sections, 6.5 mm
 # lower than the 1:4 pair so M-M's top stays clear of the crossbar web
-# callout's ink, which drops with the larger T; their bottoms stay 14 mm
-# over the title block's top (y 65.4).
+# callout's ink, which drops with the larger T, and E-E's clear of its web
+# position frame; their bottoms stay 11 mm over the title block's top
+# (y 65.4).
 SIDE_SECTION_SCALE = (1, 3)
-SIDE_SECTION_CAPTION_XY = (0.2967, 0.0845)
-# E-E's web value and its 2X WEB row stand left of E-E's rail, on its
-# dimension line (printed 5.56 mm under the text point, 3.8 mm over the
-# flange).  Parked right of the rail (0.327) the 37.5 mm "2X SIDE RAIL WEB"
+SIDE_SECTION_CAPTION_XY = (0.2967, 0.0815)
+# E-E's web width stands under the web like H-H's, its line 5.4 mm under
+# the underside it is taken on (the web is drafted: .51 is its width there,
+# and the keeper tap's wall is proved from that station), its three rows
+# left of the rail on that line.  Over the flange, as it stood, its
+# extension lines read as a width at the flange (takeover audit of
+# #2480).  Parked right of the rail (0.327) the 37.5 mm "2X SIDE RAIL WEB"
 # row ran out over M-M and read as M-M's (local machinist review of farm
-# run 20261107T170344738Z's PDF, r1, 2 of 3 runs); centred over the rail
-# (0.2967) the web's two extension lines ran up through "RAIL" (farm run
-# 20261107T204437943Z, r1).  E-E cuts the side rail only, so "2X WEB" says
-# it; its 15.5 mm row ends 2 mm left of the web's left extension line and
-# starts 10 mm right of the plan's 1.35 SIDE FLANGE text (x 266.7 mm).
-SIDE_WEB_TEXT_XY = (0.284, 0.120)
-SIDE_WEB_QUALIFIER = "2X WEB"
+# run 20261107T170344738Z's PDF, r1, 2 of 3 runs).  E-E cuts the side rail
+# only, so "2X WEB" says it; the 31.4 mm "AT UNDERSIDE" row ends 2.3 mm left
+# of the web's left extension line (x 294.5) and starts 9.4 mm right of the
+# front view's RAIL HEIGHT text (x 251.4).
+SIDE_WEB_TEXT_XY = (0.2765, 0.10286)
+SIDE_WEB_QUALIFIER = "2X WEB\nAT UNDERSIDE"
 # Each section's web axis centreline runs this far (paper mm, times the
 # section's scale denominator in model mm) past the T's top and underside.
 SECTION_AXIS_OVERRUN_MM = 2.0
@@ -1247,8 +1250,11 @@ SECTION_CUT_BASELINE_TEXT_GAP = (
 # the spot's rim to the view's top).  Its two rows land right, 4.8 over the
 # left barrel's top (107.2) and, estimated, 2.6 left of the width's wider
 # rows (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
+# The width is the boss's on the underside, where its drafted side walls
+# start (they stand .10 wider on the faced top), so its last row says so:
+# three rows, the underline where the two rows' stood.
 SET_BOSS_WIDTH_LINE_XY = (0.1465, 0.1150)
-SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1264)
+SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1320)
 SET_SPOT_DIA_TEXT_XY = (0.0958, 0.1177)
 
 # The first sheet contains only the frame and T-rail definition.  Every
@@ -1284,13 +1290,15 @@ GEOMETRY_CALLOUTS = {
     "RingHeight": "RAIL HEIGHT",
     "RootR": "TYP WEB ROOT",
 }
+# The web width's three rows stand right of H-H's rail on its line under
+# the web, 2.6 mm right of the flange thickness's lower arrow tail (x 372).
 RAIL_SECTION_KEEP = {
-    "FrWebT": (0.380, 0.192),
+    "FrWebT": (0.383, 0.1948),
     "FrFlangeWidth": (0.328, 0.230),
     "FlangeT": (0.372, 0.2117),
 }
 RAIL_SECTION_CALLOUTS = {
-    "FrWebT": "2X WEB WIDTH",
+    "FrWebT": "2X WEB WIDTH\nAT UNDERSIDE",
     "FrFlangeWidth": "2X FLANGE",
     "FlangeT": "TYP TOP FLANGE",
 }
@@ -1305,18 +1313,16 @@ FLANGE_T_TEXT_OFFSET_XY = (0.389, 0.2245)
 PLAN_REFERENCE_DIMENSIONS = ("Width", "Depth")
 
 # Owner ruling D3 (#2333): each rail web's median plane holds ⌖.06|A|B to
-# its socket axes (datum B, the 4X socket pattern).  The frame reads off the
-# web's cut face beside its thickness: SolidWorks refused to move a frame
-# onto the thickness dimension itself (farm run 20261111T004615500Z,
-# IAnnotation.SetAttachedEntities -> False).  Each lands at this height on
-# the face, one frame for the two rails its section stands for.
+# its socket axes (datum B, the 4X socket pattern).  A position controls
+# the web's width, a feature of size, so each frame stands directly under
+# its width's callout rows with no leader (drawing-guidelines.md rule 5).
+# SolidWorks refused to move a frame onto the thickness dimension itself
+# (farm run 20261111T004615500Z, IAnnotation.SetAttachedEntities -> False),
+# so the frame is attached to the web's cut face at this height and its
+# leader is then switched off.  The callout's 2X counts the frame's webs.
 WEB_POSITION_LANDING_Y = -5.0
-WEB_POSITION_QUANTITY = "2X"
-RAIL_WEB_POSITION_FRAME_XY = (0.297, 0.194)
-# E-E's frame stands 8.5 mm under the web's foot, so its "2X" row clears the
-# section's caption under it by 2.5 mm (1.0 at y 97, farm run
-# 20261111T023438415Z).
-SIDE_WEB_POSITION_FRAME_XY = (0.3065, 0.0985)
+RAIL_WEB_POSITION_FRAME_XY = (0.3673, 0.1842)
+SIDE_WEB_POSITION_FRAME_XY = (0.2608, 0.0923)
 
 # The boss/socket diameters leave the socket they qualify in opposite
 # directions so neither leader crosses the other's text.  The hole STATIONS
@@ -1339,7 +1345,7 @@ DETAIL_TOP_KEEP = {
 # the corner of the F and G planes -- the rear barrels' and the rear-west
 # barrel's datum-target tangents (build_fr_top_frame.CAST_DATUM_ORIGIN_XZ),
 # the plan's lower right -- so X counts left from it and Y up, and the
-# composite frame on the sockets (SOCKET_POSITION_*) holds the pattern to
+# two position frames on the sockets (SOCKET_POSITION_*) hold the pattern to
 # E|F|G.  Both planes print as thin phantom lines (TABLE_TANGENT_*): F under
 # the two rear bosses, G up the rear-west boss.  The table's native origin
 # mark is reattached to a view point on that corner, its X arrow under the
@@ -1393,29 +1399,44 @@ TABLE_HOLES: tuple[tuple[float, float, float, str], ...] = tuple(
     for x in (-COLUMN_X, COLUMN_X)
 )
 # Each hanger hole's Z station from the front-left socket's axis, in the
-# left window: the front one's line 36 mm left of the crossbar, the rear
-# one's 12 mm left of that.  The front station is 14 mm of paper with the
+# left window: the front one's line 30 mm left of the crossbar, the rear
+# one's 18 mm left of that.  The front station is 14 mm of paper with the
 # rail's inner edge through it (y 207.7), so its value stands outside the
-# run, in the window 2.3 mm under the hole's extension line (y 202.5).
+# run, in the window 2.3 mm under the hole's extension line (y 202.5), and
+# its 11 mm of text, left of its line, clears the rear station's line
+# (x 138) by 5.7.
 HANGER_Z_TEXT_XY = {
-    "front hanger z from upper sockets": (0.150, 0.1985),
+    "front hanger z from upper sockets": (0.156, 0.1985),
     "rear hanger z from upper sockets": (0.138, 0.166),
 }
-# The sockets' composite position frame (owner rulings D2 and D6): Ø.06 to
+# The sockets' two position frames (owner rulings D2 and D6): Ø.06 to
 # E|F|G over Ø.010 to A, on a leader to the front-right socket's rim from
 # the free margin right of it, its 4X under it and datum B -- the pattern
-# the rail webs are held to (D3) -- hung under that.  A tag on a composite
-# frame hangs from the frame block's foot, 19.6 mm under its top with the
-# 4X row, and takes its y there: farm run 20261111T004615500Z printed "B"
-# 25.84 mm under the frame's top plus the offset set, 17.61 mm right of its
-# left end.  SOCKET_DATUM_SYMBOL_OFFSET asks for the tag 10 mm under the
-# block, where that run's one correction lands it.
+# the rail webs are held to (D3) -- hung under that.  They are two
+# single-segment frames, each with its own symbol: A is not one of the
+# upper tier's datums, so the pair is no Y14.5 composite, and
+# drawing-guidelines.md prints none.  A tag on a two-row frame block hangs
+# from the block's foot, 19.6 mm under its top with the 4X row, and takes
+# its y there: farm run 20261111T004615500Z printed "B" 25.84 mm under the
+# frame's top plus the offset set, 17.61 mm right of its left end.
+# SOCKET_DATUM_SYMBOL_OFFSET asks for the tag 10 mm under the block, where
+# that run's one correction lands it.
 SOCKET_POSITION_FRAME_XY = (0.322, 0.2235)
 SOCKET_POSITION_QUANTITY = "4X"
 SOCKET_DATUM = "B"
 SOCKET_DATUM_SYMBOL_OFFSET = (0.01934, -0.03656)
+# The 4X Ø1.77 bosses' position to the socket pattern (Main's delegated
+# ruling 2026-11-11, #2333): ⌖Ø.06|A|B, the offset the wall and keeper-foot
+# stacks charge between a barrel and its socket.  The frame stands under
+# the boss callout's rows (underline y 227.6), 6 mm over the socket
+# callout's, on a level leader to the front-left barrel's rim on the faced
+# top, 10° under the socket's axis on its outboard side, its 4X under it.
+BOSS_POSITION_FRAME_XY = (0.019, 0.218)
+BOSS_POSITION_QUANTITY = "4X"
+BOSS_POSITION_LANDING_DEG = 190.0
 _TABLE_LOCATION_TOLERANCE_MM = 0.02
 _INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_NO_LEADER = 0  # swLeaderStyle_e.swNO_LEADER
 _TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 
 # Sheet 7 (CAST-DATUMS), owner rulings B6 and D2 (#2333): the casting's own
@@ -1440,11 +1461,13 @@ DATUM_BOTTOM_KEEP = {
 # line's right end to the value passes under it.
 DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR AT UNDERSIDE"}
 DATUM_BOTTOM_CALLOUTS = {"GussetRunE": "4X 45° GUSSET"}
-# The gusset run's rows stand 5.5 mm under the width's, whose underline
-# (y 122.4) the higher offset of farm run 20261111T023438415Z touched.
+# The width's rows stand over its line and the gusset run's two rows under
+# them, 3.4 mm under the width's underline (y 124.4) and 2.9 over the front
+# rail's inner edge (y 109.0): farm run 20261111T023438415Z printed the run
+# on that underline, 20261111T040239292Z on the rail's edge.
 DATUM_BOTTOM_TEXT_OFFSETS = {
-    "BarWidth": (0.179, 0.128),
-    "GussetRunE": (0.180, 0.1130),
+    "BarWidth": (0.179, 0.130),
+    "GussetRunE": (0.180, 0.1165),
 }
 # Each target symbol's centre from its point, sheet m: on the underside E1
 # in the west window, G1 and E2 beside the view, E3 under its front-east
@@ -1494,14 +1517,14 @@ def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
 # SolidWorks stands both wedges on the Top plane's trace (y 222.6): the web
 # ring's on the web's outer face, opening outward, and the upper barrels'
 # on the barrel's crest 5.3 mm of paper west of it, closing inward.  A 2°
-# wedge is 0.5 mm of arc, so each arc stands its own rise over its vertex
-# -- the web's 15 mm, 7 over the boss top, the barrel's 22 -- (model x of
+# wedge is 0.4 mm of arc, so each arc stands its own rise over its vertex
+# -- the web's 12 mm, 4 over the boss top, the barrel's 18 -- (model x of
 # the vertex, lean, rise in sheet m), and each value parks off its arc on a
 # leader with the faces it governs: the added draft's rows left over the
-# view, the taken-out draft's right of it, both inside the border (y 266.7).
+# view, the taken-out draft's right of it, 7 mm inside the border (y 266.7).
 DATUM_DRAFT_WEDGES = {
-    "WebRingDraft": (WEB_OUT_X, 1.0, 0.015),
-    "BossesUpperDraft": (PLAN_HALF_X, -1.0, 0.022),
+    "WebRingDraft": (WEB_OUT_X, 1.0, 0.012),
+    "BossesUpperDraft": (PLAN_HALF_X, -1.0, 0.018),
 }
 DATUM_FRONT_KEEP = {
     name: (
@@ -1515,8 +1538,8 @@ DATUM_FRONT_CALLOUTS = {
     "BossesUpperDraft": "DRAFT, FLANGE RIMS, SET-BOSS FACE,\n4X BOSS AND HUB BARRELS",
 }
 DATUM_FRONT_TEXT_OFFSETS = {
-    "WebRingDraft": (0.1722, 0.2541),
-    "BossesUpperDraft": (0.2731, 0.2568),
+    "WebRingDraft": (0.1722, 0.2506),
+    "BossesUpperDraft": (0.2731, 0.2533),
 }
 
 
@@ -1620,9 +1643,9 @@ HUB_LEFT_KEEP = {
 }
 # The boss width straddles the tap's drawn vertical centreline in VIEW G
 # (implied symmetry), and the boss runs up to the faced top (owner ruling
-# B4, #2333).
+# B4, #2333), its side walls widening from the underside.
 HUB_LEFT_CALLOUTS = {
-    "SetBossWidth": "SET-SCREW BOSS",
+    "SetBossWidth": "SET-SCREW BOSS\nAT UNDERSIDE",
     "SetSpotDia": "",
     "GussetSpan": "GUSSET SPAN",
     "HubBossDrop": "",
@@ -3997,12 +4020,13 @@ def _web_position_frame(
     frame_xy: tuple[float, float],
     label: str,
 ) -> None:
-    """A rail web's ⌖.06|A|B (owner ruling D3) on the cut face through
-    ``landing_mm``, the frame at ``frame_xy``."""
+    """A rail web's ⌖.06|A|B (owner ruling D3), leaderless at ``frame_xy``
+    under the web width's callout, attached to the cut face through
+    ``landing_mm``."""
     landing = model_point_in_view(
         adapter, view, tuple(value / 1000.0 for value in landing_mm), label=label
     )
-    add_feature_control_frame(
+    gtol = add_feature_control_frame(
         adapter, view,
         edge_entity=edges.exact_line_through(landing_mm, label=label).edge,
         leader_attach_xy=(float(landing[0]), float(landing[1])),
@@ -4010,13 +4034,63 @@ def _web_position_frame(
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_IN["rail web position"],
         datums=("A", SOCKET_DATUM),
-        quantity=WEB_POSITION_QUANTITY,
+        label=label,
+    )
+    annotation = _early_bound(gtol.GetAnnotation(), "IAnnotation")
+    if annotation.SetLeader3(_NO_LEADER, 0, True, False, False, False) != 0:
+        raise RuntimeError(f"failed to take the leader off the {label} frame")
+    if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
+        raise RuntimeError(f"failed to position the leaderless {label} frame")
+    rebuild_drawing(adapter, label=label)
+    if int(annotation.GetLeaderStyle()) != _NO_LEADER:
+        raise RuntimeError(f"the {label} frame kept its leader")
+
+
+def _boss_position_frame(adapter: Any, view: Any, edges: ViewEdges) -> None:
+    """The 4X corner bosses' ⌖Ø.06|A|B (BOSS_POSITION_FRAME_XY) on the
+    front-left barrel's rim on the faced top."""
+    label = "corner boss position"
+    angle = math.radians(BOSS_POSITION_LANDING_DEG)
+    radius = BOSS_DIA / 2.0
+    # The plan reads +X right and the front (-Z) up.
+    point = (
+        (-COLUMN_X + radius * math.cos(angle)) / 1000.0,
+        HALF_H / 1000.0,
+        (FRONT_COLUMN_Z - radius * math.sin(angle)) / 1000.0,
+    )
+    # The rim is cut into arcs where the rails' flanges meet the barrel: the
+    # frame takes the one the landing lies on.
+    rims = [
+        item.edge
+        for item in edges.circles
+        if abs(item.circle[0] + COLUMN_X) < 1e-4
+        and abs(item.circle[1] - HALF_H) < 1e-4
+        and abs(item.circle[2] - FRONT_COLUMN_Z) < 1e-4
+        and abs(item.circle[6] - radius) < 1e-4
+        and abs(abs(item.circle[4]) - 1.0) < 1e-6
+        and math.dist(tuple(item.edge.GetClosestPointOn(*point) or ())[:3], point) < 1e-7
+    ]
+    if len(rims) != 1:
+        raise RuntimeError(
+            f"{label}: {len(rims)} faced-top barrel rims pass through {point}"
+        )
+    landing = model_point_in_view(adapter, view, point, label=label)
+    add_feature_control_frame(
+        adapter, view,
+        edge_entity=rims[0],
+        leader_attach_xy=(float(landing[0]), float(landing[1])),
+        frame_xy=BOSS_POSITION_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_IN["corner boss position"],
+        datums=("A", SOCKET_DATUM),
+        diameter=True,
+        quantity=BOSS_POSITION_QUANTITY,
         label=label,
     )
 
 
 def _socket_position_frame(adapter: Any, view: Any, edges: ViewEdges) -> None:
-    """The sockets' composite position frame and datum B on it
+    """The sockets' two stacked position frames and datum B on them
     (SOCKET_POSITION_FRAME_XY)."""
     landing = model_point_in_view(
         adapter, view,
@@ -4044,7 +4118,6 @@ def _socket_position_frame(adapter: Any, view: Any, edges: ViewEdges) -> None:
             GEOMETRIC_TOLERANCES_IN["tube socket pattern refinement"],
             ("A",),
         ),
-        composite=True,
         label="tube socket pattern position",
     )
     add_frame_datum_feature(
@@ -5021,7 +5094,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # (fr_top_frame_spec.GEOMETRIC_TOLERANCES_MM; codex review of 06d0bbc59).
     # The keeper taps are transferred from MHA-CH-07 at assembly, so their
     # callout alone places them; the sockets are located by one tagged table,
-    # BASIC from the F|G corner under their composite frame, and the hanger
+    # BASIC from the F|G corner under their two position frames, and the hanger
     # holes stand on D by their own frame (drawing-guidelines.md rule 10).
     # The gooseneck bore stands on the left sockets' axis (GOOSENECK_X is
     # -COLUMN_X): drawn here as their shared centreline, it gives the bore
@@ -5038,6 +5111,11 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_top_edges,
     )
     _socket_position_frame(
+        adapter,
+        detail_top,
+        detail_top_edges,
+    )
+    _boss_position_frame(
         adapter,
         detail_top,
         detail_top_edges,
@@ -5666,7 +5744,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         underside_dimensions,
-        {"LandEnd": LAND_TEXT_OFFSET_XY, "PocketLength": POCKET_LENGTH_OFFSET_XY},
+        {"LandEndW": LAND_TEXT_OFFSET_XY, "PocketLength": POCKET_LENGTH_OFFSET_XY},
     )
     imported_annotations += underside_dimensions
 
@@ -5675,7 +5753,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # outside arrow's 6.35 mm tail would reach the front ream's rim.
         land = _early_bound(
             _named_dimension(
-                adapter, underside_dimensions, "LandEnd"
+                adapter, underside_dimensions, "LandEndW"
             ).GetSpecificAnnotation(),
             "IDisplayDimension",
         )

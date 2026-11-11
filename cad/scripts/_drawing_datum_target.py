@@ -24,9 +24,11 @@ _INSERT_POINT = 0
 # swDatumTargetAreaShape_e.swDatumTargetAreaPoint, what GetTargetShape reads
 # for it.
 _SHAPE_POINT = 1
-# swLeaderStyle_e.swSTRAIGHT: a datum target's leader runs straight from the
-# symbol to its point.
-_LEADER_STRAIGHT = 1
+# InsertDatumTargetSymbol3's LeaderLineStyle: 0 = solid, the target on the
+# side the view shows; 1 draws the leader dashed, which Y14.5 reads as a
+# target on the far side (farm run 20261111T023438415Z printed all six
+# dashed).  The symbol's leader runs straight (LeaderBent False).
+_LEADER_SOLID = 0
 # swSelectType_e.swSelSKETCHPOINTS: the target's own point.  Farm run
 # 20261111T002327093Z read (11,) for a target on a planar face picked by
 # entity, its leader ending on the requested point to the float.
@@ -57,6 +59,7 @@ def datum_target_readback(symbol: Any) -> dict[str, Any]:
         "GetAttachedEntityCount3",
         "GetAttachedEntityTypes",
         "IsDangling",
+        "GetDashedLeader",
     )
     leaders = int(annotation.GetLeaderCount())
     return {
@@ -79,6 +82,7 @@ def datum_target_readback(symbol: Any) -> dict[str, Any]:
             int(t) for t in (annotation.GetAttachedEntityTypes() or ())
         ),
         "dangling": bool(annotation.IsDangling()),
+        "dashed": bool(annotation.GetDashedLeader()),
     }
 
 
@@ -131,7 +135,7 @@ def add_datum_target(
         "",
         True,  # ArrowsSmart
         0,  # ArrowStyle (smart arrows choose it)
-        _LEADER_STRAIGHT,
+        _LEADER_SOLID,
         False,  # LeaderBent
         True,  # ShowArea: the point's X
         True,  # ShowSymbol
@@ -175,6 +179,11 @@ def add_datum_target(
         or read["leaders"] != 1
     ):
         raise RuntimeError(f"datum target {target} lost its point ({label}): {read!r}")
+    if read["dashed"]:
+        raise RuntimeError(
+            f"datum target {target}'s leader is dashed, a far-side target ({label}):"
+            f" {read!r}"
+        )
     points = read["leader_points"][0]
     if len(points) < 6 or math.dist(points[-3:-1], target_xy) > _TARGET_LANDING_TOLERANCE_M:
         raise RuntimeError(

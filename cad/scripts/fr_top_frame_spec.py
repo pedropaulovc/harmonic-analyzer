@@ -52,14 +52,20 @@ Owner rulings B1-B6 and D1-D6 (#2333, 2026-11-10) make the model the casting:
   F1-F2 (rear lower barrels) and G1.
 * D2: G1 stands on the west rear lower barrel and the hole table's origin
   is the F-G (west, rear) corner.  The socket coordinates are basic under
-  one composite frame; the hanger holes leave the table for the socket axes.
+  a two-tier position, printed as two single-segment frames; the hanger
+  holes leave the table for the socket axes.
 * D3: each rail web's median plane holds ``RAIL_WEB_POSITION_ZONE`` to its
   socket axes (datum B, the four-socket pattern).
 * D4: added draft prints +1°/-0, taken-out draft ±1°
   (``DRAFT_ADDED_DEVIATIONS_DEG``, ``DRAFT_TAKEN_OUT_DEVIATIONS_DEG``).
 * D5: the cross-screw counterbore floors stand .62 from the socket axis
   (``fr_frame_attachment_spec.TOP_SCREW_SEAT_Z``).
-* D6: the composite frame's upper tier is ``SOCKET_PATTERN_LOCATION_ZONE``.
+* D6: the socket position's upper tier is ``SOCKET_PATTERN_LOCATION_ZONE``.
+
+Main's delegated ruling 2026-11-11 (#2333): each corner boss's Ø1.77 barrel
+on the faced top holds ``BOSS_POSITION_ZONE`` to the socket pattern
+(⌖Ø.06|A|B), the barrel-to-socket offset the wall, keeper-foot and
+head-recess stacks charge.
 """
 
 from __future__ import annotations
@@ -346,15 +352,24 @@ HANGER_PIN_HOLE_DEPTH_TOL = KNIFE_DOWEL.PRESS_DEPTH_TOL  # 0.254
 # 06d0bbc59); the faced top (RV-03) carries them.
 # Owner rulings B6, D2, D3 and D6 (#2333): the four tube sockets (datum B, the 4X
 # pattern) are located BASIC from the casting's target frame E|F|G by a
-# composite position, the pattern within Ø.06 of the cast datums and the
+# two-tier position (two single-segment frames: drawing-guidelines.md allows
+# no composite frame), the pattern within Ø.06 of the cast datums and the
 # sockets among themselves within Ø.010 to the faced underside A; each rail
 # web's median plane stands within .06 of its socket-axis line (⌖.06|A|B).
+# Main's delegated ruling 2026-11-11 (#2333): each corner boss's Ø1.77
+# barrel on the faced top stands within Ø.06 of its own socket
+# (⌖Ø.06|A|B).  The cast targets F and G touch the barrels 1.56 under the
+# faced top, where a 2° ±1° barrel's radius runs ±.042, so the sockets'
+# Ø.06 to E|F|G alone does not hold a barrel to its socket; this frame is
+# the offset the wall and keeper-foot stacks charge between the two
+# (build_fr_top_frame._SOCKET_BARREL_OFFSET).
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "knife-hanger crossbar centring": ".010",
     "knife-hanger press ream perpendicularity": ".001",
     "tube socket pattern location": ".06",
     "tube socket pattern refinement": ".010",
     "rail web position": ".06",
+    "corner boss position": ".06",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
@@ -364,6 +379,7 @@ SOCKET_PATTERN_REFINEMENT_ZONE = GEOMETRIC_TOLERANCES_MM[
     "tube socket pattern refinement"
 ]
 RAIL_WEB_POSITION_ZONE = GEOMETRIC_TOLERANCES_MM["rail web position"]
+BOSS_POSITION_ZONE = GEOMETRIC_TOLERANCES_MM["corner boss position"]
 HANGER_CROSSBAR_CENTER_ZONE = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
 )
@@ -608,7 +624,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopFlange": {"FlangeT"},
     "Crossbar": {"HangerGrip"},
     # DStation: datum D's median from the G plane (owner ruling D2).
-    "BarProfile": {"BarWidth", "GussetRunE", "LandEnd", "DStation"},
+    "BarProfile": {"BarWidth", "GussetRunE", "LandEndW", "DStation"},
     "BarPocketProfile": {"PocketLength", "PocketFromSocket", "CrossbarWebT"},
     "BarPockets": {"PocketDepth"},
     "BossUpProfile": {"C0Dia"},
@@ -649,7 +665,7 @@ AS_CAST_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "OuterProfile": ("SideFlangeWidth", "FrFlangeWidth"),
     "WebProfile": ("SideWebT", "FrWebT"),
     "TopFlange": ("FlangeT",),
-    "BarProfile": ("BarWidth", "GussetRunE", "LandEnd", "DStation"),
+    "BarProfile": ("BarWidth", "GussetRunE", "LandEndW", "DStation"),
     "BarPocketProfile": ("PocketLength", "PocketFromSocket", "CrossbarWebT"),
     "BarPockets": ("PocketDepth",),
     "BossUpProfile": ("C0Dia",),
@@ -719,7 +735,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {
         "BarWidth": HANGER_CROSSBAR_WIDTH_PLACES,
         "GussetRunE": 2,
-        "LandEnd": 2,
+        "LandEndW": 2,
         "DStation": 2,
     },
     "BarPocketProfile": {"PocketLength": 2, "PocketFromSocket": 2, "CrossbarWebT": 2},

@@ -27,7 +27,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
   keeper rail flat within the keeper-owned 0.04 zone so both keeper feet
   land on one face wherever fit-up puts them. The nominal rail-top plane
-  stays fixed; the H-H top flange thickness (TYP, .XX, minimum 7.874) is
+  stays fixed; the H-H top flange thickness (TYP, .32 ±.03 as cast, minimum 7.366) is
   the finished flange under it.
 * Integral crossbar 25.146 (.99) wide, centred on the knife line x -15.0,
   spanning the window along Z, flush with BOTH faces at its junctions (the
@@ -97,7 +97,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   1/16 in, printed .06 at .XX) on the top-face rims --
   outer rail rim and both window rims -- then on every other external
   convex edge (flange undersides, web bottoms, lands, crossbar, hub rib,
-  boss rims), and .040 x 45 lead-ins on the bore TOP ends
+  boss rims), and .03 x 45 lead-ins on the bore TOP ends
   only. The R.885 bosses bulge 5.4 beyond the side rails and 3.4 beyond
   the front/rear rails, but do not reach the rectangular flange's plan
   corners (25.60 from their centres), so each corner is cropped back to its
@@ -242,8 +242,8 @@ from fr_top_frame_spec import (
     HUB_SET_SPOT_PLACES,
     RAIL_SECTION_X,
     RAIL_WEB_POSITION_ZONE,
+    BOSS_POSITION_ZONE,
     SIDE_SECTION_Z,
-    SOCKET_PATTERN_LOCATION_ZONE,
     SOCKET_PATTERN_REFINEMENT_ZONE,
     HANGER_WASHER,
     HANGER_WASHER_FLOAT_MAX,
@@ -383,8 +383,8 @@ CAP_RECESS_DIAMETRAL_CLEARANCE = CAP_RECESS_DIAMETER_MIN - CAP_MAX_OUTER_DIAMETE
 if CAP_RECESS_DIAMETRAL_CLEARANCE <= 0.0:
     raise AssertionError("purchased cap does not clear the top-frame recess")
 
-OUTER_X = COLUMN_X + RAIL_W_SIDE / 2.0  # 214.0966
-INNER_X = COLUMN_X - RAIL_W_SIDE / 2.0  # 179.9082
+OUTER_X = COLUMN_X + RAIL_W_SIDE / 2.0  # 214.1474
+INNER_X = COLUMN_X - RAIL_W_SIDE / 2.0  # 179.8574
 OUTER_Z = abs(FRONT_COLUMN_Z) + RAIL_W_FR / 2.0  # 131.064
 INNER_Z = abs(FRONT_COLUMN_Z) - RAIL_W_FR / 2.0  # 92.964
 
@@ -568,7 +568,7 @@ if CAP_RECESS_FLOOR_Y - (SCREW_AXIS_Y + SIDE_TAP_DRILL_DIA / 2.0) <= 0.0:
 # The clearance's model depth runs from the floor to the socket axis: past
 # the near wall it cuts only socket air, and its drill point stops far short
 # of the far wall. The sheet prints DRILL TO SOCKET, not this depth.
-SIDE_CLEARANCE_DEPTH = COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z)  # 16.510
+SIDE_CLEARANCE_DEPTH = COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z)  # 15.748
 SIDE_CLEARANCE_SPEC = HoleSpec(
     "clearance",
     NEAR_WALL_CLEARANCE_SIZE,
@@ -582,8 +582,8 @@ SIDE_CLEARANCE_SPEC = HoleSpec(
 # #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
 # lead at the sheet's general .X depth band. No assembly recipe dependency.
 KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
-KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -83.504
-KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.496
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -83.435
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.427
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
@@ -597,14 +597,14 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.496
 FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced rail top
 RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.668 setback per side-rail face
 RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.573 setback per front/rear-rail face
-FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.2489 (flange underside)
-WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.477
-WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.523
-WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.477
-WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.523
+FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.1219 (flange underside)
+WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.4794
+WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.5254
+WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.491
+WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.537
 LAND_MARGIN = 6.096  # .24 land pad past each gusset leg
-LAND_X0 = BAR_X0 - GUSSET - LAND_MARGIN  # -51.6268; crossbar junction land pads
-LAND_X1 = BAR_X1 + GUSSET + LAND_MARGIN  # +21.6268; front/rear inner faces
+LAND_X0 = BAR_X0 - GUSSET - LAND_MARGIN  # -51.703; crossbar junction land pads
+LAND_X1 = BAR_X1 + GUSSET + LAND_MARGIN  # +21.703; front/rear inner faces
 # Crossbar T-section: over the middle of the bar (|z| <= BAR_POCKET_Z) the
 # crossbar keeps its .99-wide, FLANGE-tall top flange and below it thins to a
 # WEB_T web centred on the knife line, through the underside. Two flanking
@@ -612,8 +612,8 @@ LAND_X1 = BAR_X1 + GUSSET + LAND_MARGIN  # +21.6268; front/rear inner faces
 # gusset legs (z +/-74.93) so the full-depth ends, which carry every hanger
 # hole, keep the whole knife-mount top seat clear of the pocket-end edge
 # breaks.
-BAR_WEB_X0 = HANGER_X - WEB_T / 2.0  # -21.5024
-BAR_WEB_X1 = HANGER_X + WEB_T / 2.0  # -8.4976
+BAR_WEB_X0 = HANGER_X - WEB_T / 2.0  # -21.477
+BAR_WEB_X1 = HANGER_X + WEB_T / 2.0  # -8.523
 BAR_POCKET_Z = 68.834  # 2.71: pocket length 5.42; its end from the socket axis flows through
 
 # --- Draft (owner ruling B1, #2333) -------------------------------------------
@@ -645,7 +645,7 @@ HUB_GUSSET_BOTTOM_Y = -HALF_H - HUB_BOSS_DROP
 HUB_GUSSET_PLATE_HALF = HUB_GUSSET_HALF_OUT + 2.0
 SET_BOSS_FACE_X0 = SET_BOSS_FACE_X + RIM_RECEDE  # the cast face on the underside
 SET_BOSS_INNER_X0 = -RIB_OUT_X0 + 2.0  # its sketch edge, inside the rib
-SET_BOSS_PROUD = -SET_BOSS_FACE_X - OUTER_X  # 7.036 past the rail face, constant
+SET_BOSS_PROUD = -SET_BOSS_FACE_X - OUTER_X  # 6.985 past the rail face, constant
 
 # Flange corner crops (user ruling 2026-10-14): the R22.479 corner bosses stop
 # short of the rectangular flange's plan corners, 25.60 from each boss axis,
@@ -662,8 +662,8 @@ SET_BOSS_PROUD = -SET_BOSS_FACE_X - OUTER_X  # 7.036 past the rail face, constan
 # then restores the barrel segment inside the chord: no flange stays outside
 # a barrel, and the barrels, counterbores and bores are unchanged.
 _BOSS_R = BOSS_DIA / 2.0
-CORNER_SIDE_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.623
-CORNER_FR_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
+CORNER_SIDE_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.538
+CORNER_FR_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_FR / 2.0) ** 2)  # 11.933
 CORNER_CROP_OVERRUN = 1.0
 
 
@@ -938,8 +938,8 @@ if STUD_Z_REAR + HANGER_WASHER.OD_MAX / 2.0 >= INNER_Z + GUSSET:
 # charge both axes toward each other.
 _PIN_HOLE_MAX_R = HANGER_PIN_HOLE_DIA_MAX / 2.0
 _CLEARANCE_MAX_R = HANGER_CLEARANCE_DIA_MAX / 2.0
-_REAM_FLOOR_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + HANGER_PIN_HOLE_DEPTH_TOL  # 12.8
-HANGER_DRIFT_AT_REAM_FLOOR = DRILL_DRIFT_PER_MM * _REAM_FLOOR_DEPTH_MAX  # 0.067
+_REAM_FLOOR_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + HANGER_PIN_HOLE_DEPTH_TOL  # 12.192
+HANGER_DRIFT_AT_REAM_FLOOR = DRILL_DRIFT_PER_MM * _REAM_FLOOR_DEPTH_MAX  # 0.064
 # Datum D is the median plane of BOTH as-cast crossbar side faces (owner
 # ruling B5), so a face stands half the width's least printed size from it,
 # whatever the bar's station; on the underside, where the added draft leaves
@@ -952,10 +952,10 @@ _REAM_BAR_FACE_REACH = (
     - HANGER_CROSSBAR_CENTER_TOL
     - HANGER_PIN_X
     - HANGER_PIN_X_TOL
-)  # 4.572
+)  # 4.318
 PIN_HOLE_BAR_WALL = (
     _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - HANGER_DRIFT_AT_REAM_FLOOR
-)  # 2.927
+)  # 2.673
 PIN_HOLE_SCREW_WALL = (
     HANGER_PIN_X
     - HANGER_PIN_X_TOL
@@ -967,7 +967,7 @@ PIN_HOLE_SCREW_WALL = (
 # side bottom it stands beside takes the title block's break there.
 PIN_HOLE_MOUTH_BAR_WALL = (
     _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - TITLE_BLOCK_EDGE_BREAK_MAX
-)  # 2.737
+)  # 2.483
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_GRIP_TOL - _REAM_FLOOR_DEPTH_MAX
 for _label, _value in (
     ("ream wall to the crossbar side face", PIN_HOLE_BAR_WALL),
@@ -1101,10 +1101,10 @@ for _label, _value, _minimum in (
 # at its .XXX station limit (HANGER_PIN_X_TOL).  Toward the #10 hole, whose
 # underside-entry drift is also greatest at the top, both holes' maxima are
 # charged at once.
-HANGER_KNOCKOUT_DRIFT = DRILL_DRIFT_PER_MM * HANGER_KNOCKOUT_LENGTH_MAX  # 0.135
+HANGER_KNOCKOUT_DRIFT = DRILL_DRIFT_PER_MM * HANGER_KNOCKOUT_LENGTH_MAX  # 0.131
 HANGER_KNOCKOUT_SHIFT_AT_TOP = (
     HANGER_DRIFT_AT_REAM_FLOOR + HANGER_KNOCKOUT_COAXIAL_TOL + HANGER_KNOCKOUT_DRIFT
-)  # 0.332
+)  # 0.321
 _KNOCKOUT_MAX_R = HANGER_KNOCKOUT_DIA_MAX / 2.0
 _KNOCKOUT_NEAR_AXIS_MIN = (
     HANGER_PIN_X - HANGER_PIN_X_TOL - HANGER_KNOCKOUT_SHIFT_AT_TOP
@@ -1180,8 +1180,8 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # Knife-mount top seats (drawing-guidelines.md rule 17 (walls and webs), print-worst): each block's footprint on
 # the faced crossbar underside, (x, z), is the convex hull of its corners over
 # every printed extreme -- its round dowel hole at datum D's x and the
-# hanger's z stations from the sockets (D from the left bosses' tangent,
-# sheet 3's boss-corner origin), the #10 axis off D by its ⌖.010|D
+# hanger's z stations from the sockets (owner ruling D2: D itself stands
+# D_STATION from the G plane, sheet 7), the #10 axis off D by its ⌖.010|D
 # centring, the round-hole pin off that axis by its .XXX station along the
 # line and its implied-zero .XXX "SAME Z" across it, and half the dowel
 # slip (codjiflo round 2); the block's +X face 5.65 (.XX) off its round
@@ -1283,15 +1283,25 @@ if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.
 # Flush counterbore (drawing-guidelines.md rule 17 (walls and webs),
 # print-worst).  The barrel is taken out (owner ruling B1): it narrows below
 # the faced top, so the mouth's lowest point is where the narrowest barrel
-# section meets the counterbore's rim, searched round the rim.  The head top
-# must stay below it.  The barrel prints Ø1.77 ±.03 on the faced top, the
-# counterbore .X, the floor offset from the socket axis and the axis below
-# the boss top .XX (machined to machined, B3): the shallowest recess takes
-# the smallest barrel at the steepest draft, the largest counterbore, the
-# lowest axis and the most-outboard floor; the head clearance takes the
-# smallest counterbore.  The offset is from the same socket axis, so socket
-# position does not enter this local stack.  Owner ruling (#2333): the floor
-# moved .03 deeper, .65 -> .62, to hold this at 3°.
+# section meets the counterbore's rim, searched round the rim.  The barrel
+# prints Ø1.77 ±.03 on the faced top, the counterbore .X, the floor offset
+# from the socket axis and the axis below the boss top .XX (machined to
+# machined, B3): the shallowest recess takes the smallest barrel at the
+# steepest draft, the largest counterbore, the lowest axis and the
+# most-outboard floor; the head clearance takes the smallest counterbore.
+# Owner ruling D5 (#2333): the floor moved .03 deeper, .65 -> .62, on this
+# recess at 3° with the barrel coaxial with its socket
+# (COUNTERBORE_PRINTED_HEAD_RECESS, 0.022).  The barrel is cast and the
+# socket machined: the bosses' position (BOSS_POSITION_ZONE) lets a barrel
+# stand .03 off its socket, which comes straight off the recess, so at
+# every printed limit at once the head may stand
+# COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX (0.740, .029) proud of the as-cast
+# mouth, 1.050 under it at nominal.  The cap ligament below leaves 0.20 to
+# go deeper, so the print keeps D5's floor and that residual is the owner's
+# (#2516).
+_SOCKET_BARREL_OFFSET = BOSS_POSITION_ZONE / 2.0
+
+
 def _counterbore_mouth_low_z(
     boss_r_top: float, draft_t: float, counterbore_r: float, axis_y: float
 ) -> float:
@@ -1337,6 +1347,9 @@ COUNTERBORE_PRINTED_HEAD_RECESS = _counterbore_mouth_low_z(
 COUNTERBORE_PRINTED_HEAD_CLEARANCE = (
     COUNTERBORE_MIN_RADIUS - CROSS_SCREW_HEAD_DIA / 2.0
 )  # 0.343 radial
+COUNTERBORE_PRINTED_HEAD_STANDOUT_MAX = (
+    _SOCKET_BARREL_OFFSET - COUNTERBORE_PRINTED_HEAD_RECESS
+)  # 0.740, .029
 if (
     min(COUNTERBORE_HEAD_RECESS, COUNTERBORE_PRINTED_HEAD_RECESS) <= 0.0
     or COUNTERBORE_PRINTED_HEAD_CLEARANCE <= 0.0
@@ -1344,6 +1357,7 @@ if (
 ):
     raise AssertionError(
         "top cross-screw head stands proud of its counterbore at the printed bands"
+        " with the barrel on its socket's axis"
     )
 # The near casting wall between the counterbore floor and the socket bore,
 # which the #10 clearance crosses: the most-inboard printed floor against
@@ -1373,11 +1387,11 @@ if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < WALL_T
         "top cross-screw counterbore leaves under .080 to the bore or cap recess"
     )
 # The machined socket and cap recess inside the as-cast barrel (owner rulings
-# B1/B2, D6): the smallest barrel at its narrowest -- the lower barrel's
+# B1/B2): the smallest barrel at its narrowest -- the lower barrel's
 # bottom, the cap recess's mouth on the upper barrel's top, each at the
 # steepest taken-out draft -- against the largest printed bore, its axis off
-# the barrel's by the socket pattern's Ø.06 location to the cast datums.
-_SOCKET_BARREL_OFFSET = SOCKET_PATTERN_LOCATION_ZONE / 2.0
+# the barrel's by the bosses' position to the socket pattern
+# (_SOCKET_BARREL_OFFSET above).
 SOCKET_BOSS_WALL = (
     COUNTERBORE_MIN_BOSS_RADIUS
     - (RING_HEIGHT + BOSS_BELOW) * DRAFT_T_MAX
@@ -1421,7 +1435,7 @@ if TOP_CROSS_SCREW_FAR_WALL_START_MAX != far_wall_start_max_mm(
     raise AssertionError("the spec's far-wall start is not this counterbore floor's")
 TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = far_wall_full_thread_min_mm(
     TOP_CROSS_SCREW_FAR_WALL_START_MAX
-)  # 12.35 (2.56D); 11.72 (2.43D) at a 1.5-pitch tip
+)  # 13.11 (2.72D); 12.48 (2.59D) at a 1.5-pitch tip
 if TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < FAR_WALL_ENGAGEMENT_FLOOR_MM:
     raise AssertionError(
         "top far casting wall engages MHA-FR-VN-53 "
@@ -1439,10 +1453,16 @@ SIDE_TAP_DRILL_POINT_Z = (
 # |x - ColumnX| <= radius < WebT/2 and |y - axis| <= radius < HalfH - |axis|,
 # so boss ∪ web supplies uninterrupted metal beyond both ends. The actual
 # limiting walls are the web's x faces (and its y faces), not z=112-R22.5.
-# Nominal lateral ligaments: thread major 6.477-2.413=4.064; drill
-# 6.477-2.0193=4.458.
-SIDE_TAP_THREAD_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
-SIDE_TAP_DRILL_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_DRILL_DIA / 2.0
+# The web is cast (owner rulings B2 and D3, #2333): its thinnest printed
+# half on the underside, .51 - .03, with its median the rail web position's
+# .03 off the socket axes, and the added draft only thickens it above.
+# Lateral ligaments at those limits: thread major 5.334-2.413=2.921; drill
+# 5.334-2.0193=3.315 (4.064 and 4.458 at nominal).
+_SIDE_TAP_WEB_HALF_MIN = (
+    _cast_limit(WEB_T, -1.0) / 2.0 - RAIL_WEB_POSITION_ZONE / 2.0
+)
+SIDE_TAP_THREAD_WALL_MARGIN = _SIDE_TAP_WEB_HALF_MIN - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
+SIDE_TAP_DRILL_WALL_MARGIN = _SIDE_TAP_WEB_HALF_MIN - SIDE_TAP_DRILL_DIA / 2.0
 if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < WALL_TARGET_MM:
     raise AssertionError("top cross-tap leaves less than .080 of side-rail web")
 if not (
@@ -1498,9 +1518,12 @@ KEEPER_PRINTED_MAX_OUTBOARD_REACH = _keeper_printed(
 # The upper barrel is taken out: its largest Ø1.77 stands on the faced top
 # the feet sit on and narrows above it.  The feet are DRO-located from the
 # front socket, and the barrel's axis may stand off its socket's by the
-# socket pattern's Ø.06 location to the cast datums (owner rulings D2, D6).
+# bosses' position to the socket pattern, ⌖Ø.06|A|B (BOSS_POSITION_ZONE):
+# the sockets' Ø.06 to the cast targets does not hold it, F and G touching
+# the barrels 1.56 under the faced top, where a 2° ±1° barrel's radius runs
+# ±1.07 (-0.08 front / -0.34 rear without the frame).
 KEEPER_PRINTED_MAX_BOSS_RADIUS = (
-    _cast_limit(BOSS_DIA, 1.0) / 2.0 + SOCKET_PATTERN_LOCATION_ZONE / 2.0
+    _cast_limit(BOSS_DIA, 1.0) / 2.0 + BOSS_POSITION_ZONE / 2.0
 )
 KEEPER_PRINTED_MIN_SOCKET_PITCH = (
     REAR_COLUMN_Z - FRONT_COLUMN_Z
@@ -1740,7 +1763,7 @@ KEEPER_CROSS_TAP_WALL = (
     - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
     - _CROSS_TAP_WANDER_MM
     - KEEPER_TAP_AXIS_WANDER_MM
-)  # 3.31: over the .080 target
+)  # 3.068: over the .080 target
 if KEEPER_CROSS_TAP_WALL < WALL_FLOOR_MM:
     raise AssertionError("top cross-tap thread leaves under .060 to a keeper drill")
 
@@ -4070,9 +4093,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "set spot face", volume - _set_spot_removal(), 5.0
     )
 
-    # 9. Side-screw counterbores: O9 x 6.55 from the 134.9 cut plane to the
-    #    |z|=128.35 floor (6.15 below the boss crown), deep enough that the
-    #    stock fillister head sits below the mouth on the curved boss.
+    # 9. Side-screw counterbores: Ø8.89 (.35) from the 134.893 cut plane to
+    #    the |z|=127.762 floor (.62 from the socket axis, owner ruling D5),
+    #    for the stock fillister head on the drafted boss.
     v_cbore = _counterbore_removal()
     for side, sign, reverse in SIDE_SCREW_FACES:
         cb_plane = check(
