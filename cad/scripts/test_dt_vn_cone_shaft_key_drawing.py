@@ -6,13 +6,19 @@ MHA-DT-04's land-1 keyseat drives the 64T and T030..T120.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 import _config
 import build_dt_vn_cone_shaft_key as part
 import cone_land_key
+import cone_tip_cluster
 import draw_dt_vn_cone_shaft_key as drawing
 import dt_cone_gear_shaft_spec as shaft
+import dt_cone_gear_stack
 import dt_vn_cone_shaft_key_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
@@ -21,7 +27,7 @@ from _mcmaster_98830a511 import LENGTH as STOCK_LENGTH, LENGTH_BAND, SIZE, SIZE_
 from _printed_tolerance import printed_band_mm
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98830A511 as recipe
-from dt_cone_gear_spec import FACE_WIDTH
+from dt_cone_gear_spec import FACE_WIDTH, FACE_WIDTH_BAND
 
 _STEM = "dt-vn-cone-shaft-key"
 _IN = 25.4
@@ -90,6 +96,58 @@ def test_key_lies_on_land_1_driving_the_64t_through_t030_short_of_t024() -> None
     assert north <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
     assert north + set_band + band < t024_south
     assert north - set_band - band > t030_south + FACE_WIDTH / 2.0
+
+
+def test_the_key_still_drives_t030_at_print_worst() -> None:
+    """The reach the shaft spec proves at import (#1038): keyseat end set and
+    key length at their low limits, T030 floated north against T024 with
+    T024's south face at the top of its stack-and-feeler band and T030 at its
+    thinnest.  The key keeps at least half T030's face."""
+    band = printed_band_mm(spec.LENGTH_PLACES, unit=spec.UNIT)
+    set_low = shaft.printed_length_deviations("Sec1KeyseatEndSet")[0]
+    assert set_low < 0.0
+    north_min = shaft.COLLAR_END_STATION + spec.END_SET_MM + set_low + spec.LENGTH - band
+    t024_south_max = (
+        shaft.FRONT_STUB
+        + shaft.gear_faces(16)[0]
+        + cone_tip_cluster.TIP_SET_SHIFT_MM
+        + dt_cone_gear_stack.face_band(16, "south")[0]
+    )
+    t030_south_max = t024_south_max - (FACE_WIDTH + FACE_WIDTH_BAND[1])
+    assert shaft.KEY_T030_ENGAGEMENT_MIN_MM == pytest.approx(north_min - t030_south_max)
+    assert shaft.KEY_T030_ENGAGEMENT_FLOOR_MM == FACE_WIDTH / 2.0
+    assert shaft.KEY_T030_ENGAGEMENT_MIN_MM >= shaft.KEY_T030_ENGAGEMENT_FLOOR_MM
+    assert shaft.KEY_NORTH_END_STATION <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
+
+
+_SPEC_WITH_KEY_LENGTH = (
+    "import sys; import cone_land_key; "
+    "cone_land_key.KEY_LENGTH_MM = float(sys.argv[1]); "
+    "import dt_cone_gear_shaft_spec"
+)
+
+
+def _shaft_spec_refusal(key_length_mm: float) -> str:
+    """What a fresh import of the shaft spec raises with the key that long
+    ('' when it imports)."""
+    result = subprocess.run(
+        [sys.executable, "-c", _SPEC_WITH_KEY_LENGTH, repr(key_length_mm)],
+        cwd=Path(shaft.__file__).parent, capture_output=True, text=True, check=False,
+    )
+    if result.returncode == 0:
+        return ""
+    return result.stderr.strip().splitlines()[-1]
+
+
+def test_a_key_that_loses_t030_or_leaves_land_1_cannot_import() -> None:
+    """Mutation proof of the reach guard: the pre-#1038 4.52 in key passed the
+    old T024 margin at the .300 pitch while ending a face short of T030."""
+    assert _shaft_spec_refusal(spec.LENGTH) == ""
+    assert "the key drives T030 over -" in _shaft_spec_refusal(4.52 * _IN)
+    # One cone face short: the key ends about T030's south face.
+    assert "the key drives T030 over" in _shaft_spec_refusal(spec.LENGTH - FACE_WIDTH)
+    # The next .XX length up leaves land 1.
+    assert "overhangs land 1's end" in _shaft_spec_refusal(spec.LENGTH + 0.01 * _IN)
 
 
 def test_the_cut_clears_the_bar_by_a_key_size_off_its_cut_face() -> None:

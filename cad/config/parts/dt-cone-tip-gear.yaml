@@ -11,7 +11,7 @@ dt-cone-tip-gear:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "turned between centres from bar, steady support for the Ø.0625 x .71 spigot (L/D 12); integral Ø.0625 pivot; gear cutting: six leaves, 48DP PA20, with the DT6-FORM1 custom fly cutter at standard depth"
+  process: "turned between centres from bar, steady support for the Ø.0625 x .76 spigot (L/D 12); integral Ø.0625 pivot; gear cutting: six leaves, 48DP PA20, with the DT6-FORM1 custom fly cutter at standard depth"
   drawing_unit: in
   # T006 left the MHA-DT-03 family for its own part (owner decision C1 keyed,
   # 2026-11-09, PR #1992, https://github.com/pedropaulovc/harmonic-analyzer/pull/1992):

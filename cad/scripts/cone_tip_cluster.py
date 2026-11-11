@@ -73,8 +73,10 @@ STEM_PLACES = 4
 # T006's spigot length from its leaves' south face, and the socket's reamed
 # depth from DT-04's end; .XX.  Research: spigot .73, socket .19.  At the
 # limits (.XX lengths, two face widths, the end recess's range) the spigot
-# must keep air at the socket floor and at least 1.5 D in the socket: .71
-# and .20 do (the shaft spec proves both).
+# must keep air at the socket floor and at least 1.5 D in the socket.  At the
+# .300 in pitch (#1038) the two 7.4528 faces it crosses leave one .XX
+# length that does both with the .20 socket: .76 (the shaft spec proves it;
+# .75 is short of 1.5 D and .77 bottoms once the faces print +/-.002, #2314).
 SPIGOT_LENGTH_MM = 19.304  # .76
 SOCKET_DEPTH_MM = 5.08  # .20
 SPIGOT_SOCKET_ENGAGEMENT_MIN_MM = 1.5 * STEM_DIA_MM

@@ -128,7 +128,7 @@ PNG = OUTPUTS.png
 
 GEAR_SHEET = SHEET_NAMES[0]
 # 6:1 keeps the T006 tooth, its thickness witness and root envelope legible
-# (the family's T012 sheet's ratio) and the 1.23 in part inside the border.
+# (the family's T012 sheet's ratio) and the 1.30 in part inside the border.
 VIEW_SCALE = (6.0, 1.0)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 SHEET_SCALES = {GEAR_SHEET: VIEW_SCALE, CUTTER_DETAIL_SHEET: (1.0, 1.0)}

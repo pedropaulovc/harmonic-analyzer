@@ -264,7 +264,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   and 17.99 mm) so that the whole cutter-form flank stays inside the stock
   cutter's ground profile at every tolerance corner.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
-  7.0565 mm channel pitch is unchanged.
+  7.0565 mm channel pitch was unchanged by the pitch change. The #1038
+  re-pitch (owner ruling 2026-11-11) then moved the channel pitch to 7.62 mm
+  (.300 in): sin i = 1.5875/7.62 gives a cone incline of 12.025°, a seat
+  pitch of 7.4528 mm (the cone face width, .2934 in) and a 149.056 mm
+  twenty-gear cone stack. Tooth counts, DP, PA, bores and keyways did not
+  move.
 - Cone outside diameters follow the AGMA standard blank: 7.26 mm at 12T up to
   64.35 mm at 120T, where the #2 cutter's form caps it just under the ideal
   64.56 mm. T006 is 4.31 mm, above its AGMA 4.23 mm, so that its tip keeps a

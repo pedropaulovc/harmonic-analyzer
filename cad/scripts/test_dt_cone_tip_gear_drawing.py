@@ -352,7 +352,7 @@ def test_tooth_space_plot_stands_beside_the_table() -> None:
 
 
 # The lengths and the overall print at the title block's places with no
-# band of their own (``.25``, ``(1.23)``); every other value carries a
+# band of their own (``.25``, ``(1.30)``); every other value carries a
 # stacked band (``.0625 +.0000/-.0010``).
 _UNBANDED = {"PivotLength", "SpigotLength", "overall"}
 

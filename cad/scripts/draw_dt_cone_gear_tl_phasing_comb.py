@@ -61,7 +61,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 1.31 x .51 plate whose thinnest blade is .022: 5:1 keeps the blades and
+# A 1.42 x .53 plate whose thinnest blade is .022: 5:1 keeps the blades and
 # the .022 T030 blade tip legible.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
