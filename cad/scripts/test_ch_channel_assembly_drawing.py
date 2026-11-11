@@ -1428,17 +1428,37 @@ def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() ->
 def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     """#2341: once every foot is seated the bars hang side by side at the
     .300 pitch; the bank is accepted on the least worst-case gap (the foot,
-    each side face at its flatness), floored to the .001 leaf a bank inside
-    its bands always passes, checked before the levers are proved free."""
+    each bar at the bow the surface-plate check allows), floored to the .001
+    leaf a bank inside its bands always passes, checked before the levers
+    are proved free."""
     import ch_bar_pivot_pin_spec as pin
 
     order = ["bar-feet-seated", "bars-gapped", "levers-swing"]
     numbers = [steps.step_number(key) for key in order]
     assert numbers == list(range(numbers[0], numbers[0] + 3))
-    leaf = pin.BAR_GAP["leaf"]
-    least = min(v for k, v in pin.BAR_GAP.items() if k not in ("leaf", "mid_span"))
+    gaps = drawing.asm.BAR_GAP
+    leaf = gaps["leaf"]
+    least = min(v for k, v in gaps.items() if k not in ("leaf", "mid_span"))
     assert pin.RUNNING_FLOOR <= leaf <= least
     assert leaf == pytest.approx(0.005 * 25.4)
     body = _step_body("bars-gapped")
     assert "A .005 FEELER GAUGE LEAF" in body
     assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body
+
+
+def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
+    """#2341 (Repitch1038 2026-11-11): the bow is controlled by acceptance,
+    not a frame on MHA-CH-01. Before the bars are pinned, each lies on the
+    surface plate on each side face in turn and the allowed bow's leaf must
+    not enter; a bar it enters is straightened by hand or exchanged. Two
+    neighbours each at that bow keep the mid-span running floor."""
+    asm = drawing.asm
+    straight = steps.step_number("bars-straight")
+    assert straight == steps.step_number("bar-notches-set") - 1
+    assert straight < steps.step_number(steps.BARS_PINNED_KEY)
+    assert asm.BAR_BOW_MAX_MM == pytest.approx(0.005 * 25.4)
+    assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
+    body = _step_body("bars-straight")
+    assert "SURFACE PLATE ON EACH SIDE FACE" in body
+    assert "A .005 FEELER GAUGE LEAF MUST NOT ENTER" in body
+    assert "STRAIGHTEN BY HAND, OR EXCHANGE" in body

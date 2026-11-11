@@ -30,6 +30,12 @@ from __future__ import annotations
 
 import math
 
+import ch_amplitude_bar_spec as _bar
+import ch_rocker_arm_spec as _arm
+from ch_bar_pivot_pin_spec import BUDGET as _PIN_BUDGET
+from ch_bar_pivot_pin_spec import MM_PER_IN as _MM_PER_IN
+from ch_bar_pivot_pin_spec import RUNNING_FLOOR as _BAR_RUNNING_FLOOR
+
 from _assembly_contract import assembly_contract
 
 from ch_fulcrum_keeper_spec import (
@@ -221,3 +227,76 @@ DIMENSION_TOLERANCES = {
         for name in (KEEPER_FRONT_Z_DIMENSION, KEEPER_REAR_Z_DIMENSION)
     },
 }
+
+# The bar-to-bar running gap down the bank (#1038, #2341): a channel-assembly
+# stack (rocker hubs, strap, bar bow), kept here so the pin part's recipe
+# closure stays the two parts it joins (Codjiflo r1 on PR #2601).
+#
+# The bars hang free between their end joints with a running gap to each
+# neighbour, so a bow toward one closes it at mid-span. MHA-CH-00 controls
+# the bow by acceptance, not by a frame on MHA-CH-01 (Repitch1038 2026-11-11,
+# the owner's function-over-tight-numbers preference): before the bars are
+# pinned, a BAR_BOW_MAX leaf must not enter under either side face of a bar
+# laid on the surface plate, and after hook-up the BAR_GAP leaf passes
+# between every adjacent pair. Bought CF square can bow about .013 over the
+# bar's length (A108's 3/16 in per 10 ft, #2341 triage), so the stock is
+# straightened or selected to the check (parts/ch-amplitude-bar.yaml process).
+BAR_BOW_MAX_IN = 0.005
+BAR_BOW_MAX_MM = BAR_BOW_MAX_IN * _MM_PER_IN  # 0.127
+
+
+def bar_gap_budget() -> dict[str, float]:
+    """Least bar-to-bar gaps along the bank at the printed worst case (mm;
+    #1038, #2341).
+
+    ``top``: the bar pivot pin joint's ``neighbour_clearance_min``
+    (``ch_bar_pivot_pin_spec``). ``foot``: the same
+    form on the foot notch and the real MHA-CH-06 strap (.098 +/-.001): the
+    pitch the rocker hubs set (never short), the widest stock, the foot
+    notch's float on the thinnest strap, both ledges' bands, and the strap's
+    position zone to its hub (each strap half the zone off its hub's
+    mid-plane, two neighbours toward each other). ``mid_span``: two straight
+    bars between those end gaps, so at least their mean. ``mid_span_bowed``:
+    that, less two neighbours each bowed the full ``BAR_BOW_MAX_MM`` toward
+    the other. ``leaf``: the feeler leaf MHA-CH-00 passes
+    between every adjacent pair, the least of those gaps floored to the
+    .001 in a feeler set is sold in, so a bank inside its bands always
+    passes it.
+    """
+    pitch_min = _arm.HUB_LENGTH  # the arms stack hub on hub at the pitch
+    w_max = _bar.BAR_WIDTH
+    notch_max = _bar.BOTTOM_NOTCH_WIDTH + _bar.BOTTOM_NOTCH_WIDTH_BAND[0]
+    strap_min = _arm.ARM_THICKNESS + _arm.ARM_THICKNESS_BAND[1]
+    top = _PIN_BUDGET["neighbour_clearance_min"]
+    foot = (
+        pitch_min
+        - w_max
+        - (notch_max - strap_min)
+        - 2.0 * _bar.NOTCH_OFFSET_TOLERANCE_MM
+        - _arm.STRAP_HUB_SYMMETRY
+    )
+    mid_span = (top + foot) / 2.0
+    mid_span_bowed = mid_span - 2.0 * BAR_BOW_MAX_MM
+    least = min(top, foot, mid_span_bowed)
+    leaf = math.floor(round(least / _MM_PER_IN * 1000.0, 9)) / 1000.0 * _MM_PER_IN
+    return {
+        "top": top,
+        "foot": foot,
+        "mid_span": mid_span,
+        "mid_span_bowed": mid_span_bowed,
+        "leaf": leaf,
+    }
+
+
+BAR_GAP = bar_gap_budget()
+if BAR_GAP["foot"] < _BAR_RUNNING_FLOOR - 1e-9:
+    raise AssertionError(
+        "a bar's foot-notch float can close the bar-to-bar running gap"
+    )
+if BAR_GAP["mid_span_bowed"] < _BAR_RUNNING_FLOOR - 1e-9:
+    raise AssertionError(
+        "two neighbouring bars each bowed BAR_BOW_MAX toward the other "
+        "close the mid-span running gap"
+    )
+if BAR_GAP["leaf"] < _BAR_RUNNING_FLOOR - 1e-9:
+    raise AssertionError("the bank's feeler leaf does not prove the running floor")

@@ -101,7 +101,6 @@ import ch_channel_assembly_spec as asm
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 import ch_channel_explode_spec as explode
 import ch_channel_assembly_steps as steps
-from ch_bar_pivot_pin_spec import BAR_GAP
 from ch_channel_lever_spec import (
     HUB_LENGTH as LEVER_HUB_LENGTH,
     HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
@@ -1162,11 +1161,16 @@ def _fitup_text() -> dict[str, str]:
             "leave no gaugeable play in the shortest lug span"
         )
     end_play_text = render_number(end_play_leaf, asm.UNIT, FEELER_LEAF_PLACES)
-    # #2341: the bars' least running gap, at the foot at the worst case of
-    # every band with each side face at its flatness, floored to .001 (the
-    # pin spec's bar-gap budget): a bank inside its bands always passes.
+    # #2341: each bar's bow is accepted at the surface plate before it is
+    # pinned (no leaf of the allowed bow enters under either side face); the
+    # bank is then accepted on the bars' least running gap, at the worst case
+    # of every band with each bar at that bow, floored to .001 (the assembly
+    # spec's bar-gap budget): a bank inside its bands always passes.
+    bow_text = render_number(
+        asm.BAR_BOW_MAX_MM / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
+    )
     bar_gap_text = render_number(
-        BAR_GAP["leaf"] / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
+        asm.BAR_GAP["leaf"] / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
     )
     return {
         # The hub stack is proved on the shaft first, while the arms are
@@ -1348,6 +1352,11 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-unclamped": "REMOVE THE CLAMPS.",
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
+        "bars-straight": (
+            f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
+            f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT. STRAIGHTEN "
+            "BY HAND, OR EXCHANGE, ANY BAR IT ENTERS."
+        ),
         "bar-notches-set": (
             f"AT THE BENCH, SET THE TOP NOTCH OF EACH {bar} BAR ASTRIDE ONE "
             f"{lever} LEVER."
