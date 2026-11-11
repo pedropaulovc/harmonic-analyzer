@@ -25,10 +25,8 @@ from _printed_tolerance import angular_band_deg, drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _title_block_units import MM_PER_INCH, render_number
 from _mg_wheel_rim_geometry import (
-    GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
-    GROOVE_R_BAND,
     PEN_WIRE_DIA,
     RIM_AXIAL,
     RIM_INNER_DIA,
@@ -142,8 +140,9 @@ HUB_FILLET_PRINTED = (2, 1)
 RIM_FILLET_PRINTED = (1, 1)
 # Decimal places per marked dimension (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), in inches:
 # every size a wall, the groove seat or the lever-wire run reads prints at
-# .XX or finer (the inch .X row, +/-.1, would swallow the walls), the banded
-# hub lengths and groove at three, the #60 ties at their drill's three.  The
+# .XX or finer (the inch .X row, +/-.1, would swallow the walls), the hub
+# lengths and the groove at three (the spigot and the groove on the title
+# block's .XXX row), the #60 ties at their drill's three.  The
 # rim's OD at .XX keeps the groove deeper than the pen wire
 # (GROOVE_DEPTH_MIN), so its callout says what the band holds.  The web's
 # plane at .XX: the lever wire clears the rim and spokes with the web moved
@@ -211,8 +210,9 @@ ROUND_TEXT_SUFFIX = " MAX"
 # the spigot's press fit are matched-fit statements (rule 4: the standard
 # fit name, the mate, and the resulting clearance or interference as REF),
 # each a numbered note its own callout links by "SEE NOTE n", so neither
-# callout runs past two lines of words.  The groove's two tight bands (its
-# bottom Ø and its R) serve one mate, named once in a numbered note both
+# callout runs past two lines of words.  The groove's two three-place sizes
+# (its bottom Ø and its R, drawing-guidelines.md rule 3: a third place with
+# a stated function) serve one mate, named once in a numbered note both
 # callouts link (rule 4: a mate serving several features).  The spokes'
 # count, pitch and clocking print on their own angle (SPOKE_REFERENCE) and
 # A-A's cutting plane.  The tie holes are named plainly at their own
@@ -276,10 +276,9 @@ _RIM_FILLET = _printed(RIM_FILLET_R, "RimFilletR")
 _RIM_AXIAL_MIN = printed_limits(
     RIM_AXIAL, DRAWING_REFERENCE_PRECISION["rim axial width"]
 )[0]
-_GROOVE_BOTTOM = printed_limits(
-    GROOVE_BOTTOM_DIA, _PLACES["GrooveBottomDia"], GROOVE_BOTTOM_BAND
-)
-_GROOVE_R = printed_limits(GROOVE_R, _PLACES["GrooveR"], GROOVE_R_BAND)
+# The groove's two sizes print .XXX on the title block's row (#2314).
+_GROOVE_BOTTOM = printed_limits(GROOVE_BOTTOM_DIA, _PLACES["GrooveBottomDia"])
+_GROOVE_R = printed_limits(GROOVE_R, _PLACES["GrooveR"])
 # R.03 MAX: the R's single limit is its nominal.
 _CAST_ROUND_MAX = CAST_ROUND_R
 _HUB_DIA = _printed(HUB_DIA, "HubDia")
@@ -295,7 +294,7 @@ if clock_to_local_deg(0.0) % _SPOKE_PITCH:
     raise AssertionError("the spokes no longer lie on the horizontal centerline")
 
 # TIE 1 to the boss OD, every size at the title block's .XX (+/-.01), its
-# axis anywhere in TIE1_OFFSET_MAX: 14.859 - (11.153 + 0.602) - 0.559 = 2.545.
+# axis anywhere in TIE1_OFFSET_MAX: 14.859 - (11.153 + 0.605) - 0.559 = 2.542.
 TIE1_HUB_WALL = _HUB_DIA[0] / 2.0 - (TIE1_R + TIE1_OFFSET_MAX) - _TIE_R_MAX
 # TIE 1 to the hub-fillet feet of the two spokes either side: its angle off
 # the lower one, and off the upper one mirrored onto the seed spoke's +Y side.
@@ -379,8 +378,8 @@ if LEVER_WIRE_WEB_GAP < _lever.CLEARANCE:
 # The pen wire seats in the groove at every printed corner: the narrowest
 # groove is wider than the wire, the shallowest buries it below the rim OD,
 # and the round bottom is never deeper than the groove.
-GROOVE_WIDTH_MIN = 2.0 * _GROOVE_R[0]  # 1.016
-GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 1.054
+GROOVE_WIDTH_MIN = 2.0 * _GROOVE_R[0]  # 0.965 (.038)
+GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 1.041 (.041)
 if not GROOVE_WIDTH_MIN > PEN_WIRE_DIA:
     raise AssertionError(f"groove {GROOVE_WIDTH_MIN:.3f} wide pinches the wire")
 if not GROOVE_DEPTH_MIN >= PEN_WIRE_DIA:

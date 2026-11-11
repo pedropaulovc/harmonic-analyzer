@@ -47,7 +47,6 @@ from mg_wheel_drum_spec import (
     DRUM_BORE,
     DRUM_BORE_BAND,
     DRUM_LEN,
-    DRUM_LEN_BAND,
     DRUM_OD,
     SURFACE_FINISHES,
     UNIT,
@@ -129,17 +128,15 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The O.D. takes the title block's .XX row (DRAWING_PRECISION); the bore
-    # and the length carry their bands (millimetres, printed in UNIT).
+    # The O.D. and the length take the title block's .XX and .XXX rows
+    # (DRAWING_PRECISION); the reamed bore carries its band (millimetres,
+    # printed in UNIT).
     set_dimension_bilateral_tolerance(
         adapter,
         "RingProfile",
         "DrumBore",
         *deviations(DRUM_BORE_BAND),
         display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "Drum", "DrumLen", *deviations(DRUM_LEN_BAND), display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

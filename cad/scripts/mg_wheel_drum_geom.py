@@ -27,20 +27,20 @@ UNIT = drawing_unit("parts/mg-wheel-drum", _config.parts("mg-wheel-drum"))
 DRUM_OD = 18.9
 # #290 owner ruling: the bore is reamed on the owned .4990 reamer.
 DRUM_BORE = 12.6746  # .4990
-# On the inch grid, so the model sits inside its minus-only band; the wheel's
-# spigot keeps its 9.0 (a hub station), so the drum's face sits .0003 under it.
-DRUM_LEN = 8.9916  # .354
+# On the inch grid, .010 short of the wheel spigot's .354 (a 9.0 hub
+# station): both lengths print on the title block's .XXX row, and the gap
+# takes both bands, so the drum's face never stands proud of the spigot's
+# (DRUM_RECESS in mg_magnifying_wheel_geom).
+DRUM_LEN = 8.7376  # .344
 # Printed bands, (upper, lower) deviations. The bore is reamed first: the
 # wheel's spigot is turned to the stated interference in it (DRUM_PRESS in
-# mg_magnifying_wheel_geom). The length is minus-only against the spigot's
-# plus-only length (DRUM_RECESS there). The O.D. carries no band of its own:
-# the wire wraps it, so it takes the title block's .XX row, which moves the
+# mg_magnifying_wheel_geom). The O.D. carries no band of its own: the wire
+# wraps it, so it takes the title block's .XX row, which moves the
 # wire-centre radius by at most .005 + its print rounding.
 DRUM_OD_PLACES = 2
 DRUM_BORE_PLACES = 4
 DRUM_LEN_PLACES = 3
 DRUM_BORE_BAND = (0.0127, 0.0)  # +.0005/.0000
-DRUM_LEN_BAND = (0.0, -0.1016)  # +.000/-.004
 
 LEVER_WIRE_DIA = 0.8  # the lever wire the drum carries (sh_vn_music_wire_lever_geom)
 DRUM_WIRE_R = DRUM_OD / 2.0 + LEVER_WIRE_DIA / 2.0  # 9.85, wire-centre radius
@@ -51,6 +51,8 @@ if not DRUM_OD_DEVIATIONS[0] <= 0.0 <= DRUM_OD_DEVIATIONS[1]:
     raise AssertionError(
         f"drum O.D. model outside its printed limits: {DRUM_OD_DEVIATIONS}"
     )
+# (lower, upper) deviations of the printed length from the model: .XXX.
+DRUM_LEN_DEVIATIONS = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES, unit=UNIT)
 
 MIN_WALL = WALL_TARGET_MM  # drawing-guidelines.md rule 17 (walls and webs) target, at the worst printed band
 WALL_WORST = (
