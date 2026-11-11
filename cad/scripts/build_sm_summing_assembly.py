@@ -208,26 +208,30 @@ KNIFE_DOWEL_X_OFFSETS = (knife_mount.PIN_HOLE_X,)
 # way round only; the block may turn about its dowel, and the MHA-SM-00
 # gauge bar sets that turn.
 # Along the dowel line (X): the ream's .XXX station from the screw axis
-# (0.127), the spotted tap's residual (the former Ø.005 zone's radius,
-# 0.064), B's round hole across its loosest slip on its pin (0.046) and B's
-# datum simulator off the pin root (⊥Ø.001|A, t/2 = 0.013; codjiflo round
-# 5, wyUmn: the worst case is the pin leaning parallel to the hole's tilt,
-# which stays within the ream's ⊥, so the pin's own lean adds nothing past
-# the slip): 0.249.  The block cannot slide off its pin, so the bar moves
-# nothing along the line.
+# (0.127), the tap's ⌖Ø.005|A|B|C zone radius (0.064; owner ruling
+# 2026-11-10 (Pedro), #2334 option B1, S1: the tap is cut on the part, not
+# spotted through the frame), B's round hole across its loosest slip on its
+# pin (0.046) and B's datum simulator off the pin root (⊥Ø.001|A, t/2 =
+# 0.013; codjiflo round 5, wyUmn: the worst case is the pin leaning
+# parallel to the hole's tilt, which stays within the ream's ⊥, so the pin's
+# own lean adds nothing past the slip): 0.249.  The block cannot slide off
+# its pin, so the bar moves nothing along the line.
 # Across it (Z): the ream's implied-zero .XXX "SAME Z" (0.127), the same
 # three block terms, and the turn the bar gives the block about its dowel:
 # the tap, PIN_HOLE_X from B, moves across by that turn times its reach
-# (KNIFE_BAR_YAW_SHIFT).  The bar line runs through both bores, each off
-# its station across the line by its #10 hole's centring to datum D
-# (⌖.010|D, owner ruling 2026-11-06: 0.127), the ream's .XXX station, B's
-# slip and simulator and the bore's ⌖Ø.008|A|B zone radius (0.102), 0.414,
-# at opposite limits over the stations' spacing (174.12): a 0.27 deg turn
-# moving the tap 0.036.  The
+# (KNIFE_BAR_YAW_SHIFT).  The tap's frame is clocked by the bore (datum C),
+# so the bar, which aligns the block to its bore, turns the tap with it: the
+# bore's own yaw inside its zone moves nothing across.  The bar line runs
+# through both bores, each off its station across the line by its #10
+# hole's centring to datum D (⌖.010|D, owner ruling 2026-11-06: 0.127), the
+# ream's .XXX station, B's slip and simulator and the bore's ⌖Ø.008|A|B
+# zone radius (0.102), 0.414, at opposite limits over the stations'
+# spacing (174.12): a 0.27 deg turn, plus the bar's play in the bore below
+# (0.18 deg), moving the tap 0.060.  The
 # rear mount, re-hung on the lever's stub at MHA-SM-00 and swung about its
 # dowel until the rock gauge passes, needs that same turn (the lever's
 # ridge lies along the bar-set front bore); KNIFE_REAR_YAW_RANGE_DEG is the
-# turn its bolt float allows.  hypot(0.249, 0.285) = 0.379.
+# turn its bolt float allows.  hypot(0.249, 0.309) = 0.397.
 _KNIFE_DOWEL_SLIP_MAX = knife_dowel.SLIP_CLEARANCE_MAX
 KNIFE_BLOCK_SHIFT = (
     top_frame.HANGER_PIN_X_TOL
@@ -246,7 +250,19 @@ _KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 174.1
 KNIFE_BAR_YAW_DEG = math.degrees(
     math.atan(2.0 * KNIFE_BORE_LINE_OFFSET / _KNIFE_STATION_SPACING)
 )  # 0.272
-KNIFE_BAR_YAW_SHIFT = knife_mount.PIN_HOLE_X * math.tan(math.radians(KNIFE_BAR_YAW_DEG))
+# The bar's own diametral clearance in each bore (sheet 5B's matched fit,
+# .0017 max) lets each block turn on the bar by that clearance over its
+# shortest bore: atan(0.0432 / 13.716) = 0.180 deg (owner review of #2334
+# asked that the hanger stack count it; it was left out before).  The tap,
+# clocked to the bore, turns with the block by the bar line's yaw plus this
+# play, and the re-hung rear mount must swing as far to follow the front.
+KNIFE_BAR_CLEARANCE = 2.0 * knife_mount.BORE_R_MAX - knife_mount.KNIFE_GAUGE_BAR_DIA_MIN
+_KNIFE_BLOCK_DEPTH_MIN = knife_mount.SUPPORT_Z_THICK - knife_mount.BLOCK_SIZE_TOL
+KNIFE_BAR_PLAY_YAW_DEG = math.degrees(
+    math.atan(KNIFE_BAR_CLEARANCE / _KNIFE_BLOCK_DEPTH_MIN)
+)  # 0.180
+KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.453
+KNIFE_BAR_YAW_SHIFT = knife_mount.PIN_HOLE_X * math.tan(math.radians(KNIFE_TAP_YAW_DEG))
 HANGER_SCREW_MISMATCH_X = KNIFE_BLOCK_SHIFT
 HANGER_SCREW_MISMATCH_Z = KNIFE_BLOCK_SHIFT + KNIFE_BAR_YAW_SHIFT
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
@@ -254,7 +270,7 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # crossbar body to the hole's top end at the faced top, at the longest
 # printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 C drill
 # hole's 0.6604 radial float covers this plus the station mismatch,
-# 0.3785, with 0.0901 spare (HANGER_SCREW_FLOAT_SPARE).
+# 0.3969, with 0.0717 spare (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -265,7 +281,7 @@ HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
 # bolt's shank meets its clearance hole with every other term at its limit
 # -- the across-line room left inside the float circle, less the drift and
 # the along-line mismatch, over the tap's reach from B.  It must cover the
-# turn the rock gauge can ask for (KNIFE_BAR_YAW_DEG).
+# turn the rock gauge can ask for (KNIFE_TAP_YAW_DEG).
 _KNIFE_FLOAT_LEFT = top_frame.HANGER_SCREW_FLOAT - HANGER_SCREW_DRIFT
 KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
     math.atan(
@@ -296,9 +312,12 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # flank at its flattest (code review C09:
 # ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
 # ``KNIFE_SHOULDER_DROP_MIN``).
-KNIFE_BAR_CLEARANCE = 2.0 * knife_mount.BORE_R_MAX - spec.KNIFE_GAUGE_BAR_DIA_MIN
 _KNIFE_BLOCK_DEPTH_MAX = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
 KNIFE_RIDGE_MOUTH_SPAN_MIN = _KNIFE_STATION_SPACING - _KNIFE_BLOCK_DEPTH_MAX  # 159.90
+# Owner ruling 2026-11-10 (Pedro), #2334, S2: the gauge bar spans both
+# mounts' outer faces (7.41 in at the thickest .XX blocks) with its 8.0 in.
+KNIFE_MOUNT_OUTER_SPAN_MAX = _KNIFE_STATION_SPACING + _KNIFE_BLOCK_DEPTH_MAX  # 188.34
+KNIFE_GAUGE_BAR_LENGTH = knife_mount.KNIFE_GAUGE_BAR_LENGTH_IN * 25.4  # 203.2
 KNIFE_RIDGE_YAW_OFFSET = (
     _KNIFE_BLOCK_DEPTH_MAX * KNIFE_BAR_CLEARANCE / KNIFE_RIDGE_MOUTH_SPAN_MIN
 )
@@ -482,16 +501,27 @@ def _assert_knife_hanger_stack() -> None:
             f"cover the dowel and tap mismatch {HANGER_SCREW_MISMATCH:.4f} plus the "
             f"clearance hole's drill drift {HANGER_SCREW_DRIFT:.4f}"
         )
-    if KNIFE_REAR_YAW_RANGE_DEG < KNIFE_BAR_YAW_DEG:
+    if KNIFE_REAR_YAW_RANGE_DEG < KNIFE_TAP_YAW_DEG:
         raise RuntimeError(
             f"rear knife mount turns at most {KNIFE_REAR_YAW_RANGE_DEG:.3f} deg about "
-            f"its dowel inside the bolt float, under the {KNIFE_BAR_YAW_DEG:.3f} deg "
-            "the gauge bar's line can ask of it"
+            f"its dowel inside the bolt float, under the {KNIFE_TAP_YAW_DEG:.3f} deg "
+            "the gauge bar's line and play can ask of it"
         )
-    if spec.KNIFE_GAUGE_BAR_DIA > 2.0 * knife_mount.BORE_R_MIN + 1e-9:
+    if knife_mount.KNIFE_GAUGE_BAR_DIA > 2.0 * knife_mount.BORE_R_MIN + 1e-9:
         raise RuntimeError(
-            f"the Ø{spec.KNIFE_GAUGE_BAR_DIA:.4f} gauge bar does not enter the smallest "
+            f"the Ø{knife_mount.KNIFE_GAUGE_BAR_DIA:.4f} gauge bar does not enter the smallest "
             f"knife bore Ø{2.0 * knife_mount.BORE_R_MIN:.4f}"
+        )
+    if KNIFE_GAUGE_BAR_LENGTH <= KNIFE_MOUNT_OUTER_SPAN_MAX:
+        raise RuntimeError(
+            f"the {KNIFE_GAUGE_BAR_LENGTH:.1f} gauge bar does not span both knife "
+            f"mounts' outer faces ({KNIFE_MOUNT_OUTER_SPAN_MAX:.2f})"
+        )
+    # The printed matched fit is the clearance the rock budget charges.
+    if abs(max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 - KNIFE_BAR_CLEARANCE) > 1e-9:
+        raise RuntimeError(
+            f"the gauge bar's printed {max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN):.4f} max "
+            f"clearance is not the {KNIFE_BAR_CLEARANCE:.4f} the rock budget charges"
         )
     if KNIFE_FREE_ROCK_WORST_DEG < KNIFE_FREE_ROCK_FLOOR_DEG:
         raise RuntimeError(
@@ -552,7 +582,7 @@ def _assert_knife_hanger_stack() -> None:
         f"(spare {HANGER_SCREW_FLOAT_SPARE:.4f}); dowel {KNIFE_DOWEL_END_Y:.4f}.."
         f"{KNIFE_DOWEL_Y:.4f} over the slip floor {slip_floor_y:.4f} mm; rock "
         f"{KNIFE_FREE_ROCK_WORST_DEG:.3f} deg (bar t {KNIFE_BORE_FAR_END_OFFSET:.4f}); "
-        f"bar yaw {KNIFE_BAR_YAW_DEG:.3f} <= rear range {KNIFE_REAR_YAW_RANGE_DEG:.3f} deg"
+        f"tap yaw {KNIFE_TAP_YAW_DEG:.3f} <= rear range {KNIFE_REAR_YAW_RANGE_DEG:.3f} deg"
     )
 
 

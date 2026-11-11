@@ -83,6 +83,17 @@ pieces = 1
 dia_in = { value = 0.2558, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
 length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "calipers" } }
 
+# MHA-SM-00 step 5B / check 6 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
+# #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
+# stand 7.41 in apart at worst. To make: not owned, no receipt metrology.
+[gauges.gauge-bar-0472x8]
+name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
+kind = "gauge_bar"
+present = false
+purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set their yaw before the hanger bolts are tightened; check 6 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+pieces = 1
+
 # --- measuring equipment on the mill -------------------------------------
 
 # The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop.toml
@@ -127,6 +138,16 @@ length_mm = { value = 800, measured = { status = "measured", by = "placeholder (
 
 [tools.rocker-trammel.members."R816"]
 length_mm = { value = 816, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
+
+# MHA-SM-02 knife-mount bore reamer (owner ruling 2026-11-10 (Pedro), #2334 option
+# B1): the Ø.4720 +.0015/0 trunnion bore is reamed once in 4140/4142 HT as
+# supplied (28-32 HRC). To purchase: not owned, no receipt or cutting size asserted.
+[tools.reamer-12mm-h7]
+name = "12 mm H7 HSS straight-flute chucking reamer"
+kind = "reamer"
+present = false
+purchase = "One 12 mm H7 HSS (or HSS-Co) straight-flute chucking reamer, DIN 212 proportions; catalogue cutting band 12.004-12.015 mm (.4726-.4730 in), inside the bore's .4720-.4735 band. Order with the knife-mount 4140 HT bar."
+note = "Cuts the MHA-SM-02 knife mount's Ø.4720 +.0015/0 REAM THRU bore in pre-hardened 4140/4142 HT at 28-32 HRC (slow speed, cutting oil). Trial-cut a scrap of the same bar and pin-check before the parts. The bore is the knife-edge bearing seat for the MHA-SM-03 trunnion."
 
 # --- workholding ------------------------------------------------------------
 
@@ -204,3 +225,13 @@ section_mm = [12.7, 9.525]
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
+
+# MHA-SM-02 knife mounts (owner ruling 2026-11-10 (Pedro), #2334 option B1).
+[[stock]]
+form = "flat_bar"
+material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied"
+note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 4 in. Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+section_mm = [31.75, 15.875]
+length_mm = 101.6
+on_hand = false
+cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]

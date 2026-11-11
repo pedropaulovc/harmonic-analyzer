@@ -17,6 +17,11 @@ import sm_vn_knife_mount_dowel_spec as knife_dowel
 from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
+from sm_knife_mount_spec import (
+    KNIFE_GAUGE_BAR_CLEARANCE_IN,
+    KNIFE_GAUGE_BAR_DIA,
+    KNIFE_GAUGE_BAR_LENGTH_IN,
+)
 from sm_summing_assembly_spec import (
     BOSS_HOOK,
     BOSS_JAM_NUT,
@@ -32,7 +37,6 @@ from sm_summing_assembly_spec import (
     HANGER_FIT_REACH_PLACES,
     HANGER_WASHER,
     KNIFE_FREE_ROCK_FLOOR_DEG,
-    KNIFE_GAUGE_BAR_DIA,
     KNIFE_MOUNT,
     LEVER,
     QUANTITIES,
@@ -98,8 +102,19 @@ HUB_SET_SCREW_TORQUE = (
     f"SNUG, {top_frame.SET_SCREW_TORQUE_MAX_IN_LB:g} IN-LB MAX"
 )
 # The knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item
-# 11.3): a tool named in the steps, not a BOM part.
-KNIFE_GAUGE_BAR = f"Ø{_length(KNIFE_GAUGE_BAR_DIA, 4)} CLASS ZZ MINUS GAUGE PIN"
+# 11.3): a tool named in the steps, not a BOM part.  Owner ruling 2026-11-10
+# (Pedro), #2334, S2: an 8.0 in bar, long enough to pass both mounts (outer
+# faces 7.41 apart), not a 2 in class ZZ pin.  No gauge class comes that
+# long, so its fit route is a matched fit to the mounts it gauges: the
+# reference Ø and the diametral clearance in each bore (rule 4).
+_KNIFE_GAUGE_BAR_CLEARANCE = "-".join(
+    f"{value:.4f}".lstrip("0") for value in KNIFE_GAUGE_BAR_CLEARANCE_IN
+)
+KNIFE_GAUGE_BAR = (
+    f"(Ø{_length(KNIFE_GAUGE_BAR_DIA, 4)}) X "
+    f"{_length(KNIFE_GAUGE_BAR_LENGTH_IN * 25.4, 1)} LONG GAUGE BAR, "
+    f"{_KNIFE_GAUGE_BAR_CLEARANCE} DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
+)
 # The 1:1 knife-edge view is DETAIL A, circled on the sheet 1 front view
 # (rule 9: a view named only in prose is unlabelled).
 DETAIL_LETTER = "A"
@@ -126,7 +141,7 @@ ASSEMBLED_NOTES = (
     f"3. LEVEL SETTING: {LEVEL_CRITERION}, SHEET 4 STEP 10.",
     f"4. {BOND_GRADE} BOND (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
     "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
-    "BEFORE STEP 1C. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND.",
+    "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND.",
     "5. LOCTITE 638 BOND (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
     "MHA-SM-01 BORE; COAT THE SPIGOT; PUSH IT IN UNTIL THE HEAD SEATS SQUARE "
     "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H BEFORE STEP 8A. ACCEPT: IT "
@@ -139,13 +154,19 @@ ASSEMBLED_NOTES = (
 # shoulder screw at 8B, level at 10) stay put. Steps 1-8 are done on the top
 # frame, steps 9-10 at final assembly (MHA-HA-00). Owner ruling 2026-10-24
 # (T+H3): the dowels press into the crossbar before the mounts go on. Steps
-# 1C-1G (sm Q3) and 1H-1K (sm Q7) transfer the knife-mount and bracket taps
-# through their mates: Delegated ruling 2026-11-07 (Main), no precedent;
-# owner review #2144. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3
-# (scheme S1): one dowel per mount; with both bolts finger-tight a gauge pin
-# through both bores sets the mounts' yaw, the bolts are tightened and the
-# pin must slide out (step 5). The lever's rigid outward stubs cannot enter
-# two fixed bores, so the rear mount comes off to take its stub and is
+# 3-3C (sm Q7) transfer the bracket taps through their mate: Delegated
+# ruling 2026-11-07 (Main), no precedent; owner review #2144. They are
+# their own step and the washers seat under step 1 with the dowels (both
+# hanger-hole preparation): machinist review of farm build
+# 20261110T204245.238203Z found the bracket work buried under step 1. Owner ruling
+# 2026-11-10 (Pedro), #2334, S1: each MHA-SM-02 arrives finished, its tap
+# cut on the part, so the former knife-mount transfer (sm Q3: hang it
+# soft, spot, drill, tap, harden) is gone. Owner ruling 2026-11-08 (Pedro),
+# #2144 item 11.3 (scheme S1): one dowel per mount; with both bolts
+# finger-tight a gauge bar through both bores sets the mounts' yaw, the
+# bolts are tightened and the bar must slide out (step 5). The lever's
+# rigid outward stubs cannot enter two fixed bores, so the rear mount comes
+# off to take its stub and is
 # re-hung and swung until the rock gauge passes (step 6;
 # build_sm_summing_assembly's rock and rear-yaw budgets). Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
@@ -161,22 +182,7 @@ ASSEMBLY_STEPS = (
     "1A. CHECK THAT NO DOWEL TURNS OR SLIDES BY HAND.",
     f"1B. IF ONE DOES, OR ONE SLID IN BY HAND, BOND IT IN WITH {BOND_GRADE} "
     "PER SHEET 1 NOTE 4.",
-    "1C. HANG EACH MHA-SM-02, BEFORE IT IS HARDENED, TOP SEAT UP WITH ITS "
-    "ROUND HOLE ON THE DOWEL AT ITS HANGER HOLE.",
-    "1D. SPOT ITS #10-24 TAP THROUGH THE MHA-FR-02 #10 HOLE ABOVE IT.",
-    "1E. MARK EACH MHA-SM-02 AND ITS HANGER HOLE SO IT GOES BACK THERE THE "
-    "SAME WAY ROUND.",
-    "1F. OFF THE FRAME, DRILL AND TAP EACH SPOT PER THE MHA-SM-02 TAP CALLOUT.",
-    "1G. HARDEN EACH MHA-SM-02 PER ITS DRAWING.",
-    f"1H. CLAMP THE {BRACKET_NUMBER} FLANGE AGAINST THE COEFFICIENT-PLATE END "
-    "OF MHA-SM-03, ITS TWO HOLES ON THE REF STATIONS OF THE MHA-SM-03 BRACKET "
-    "TAPS WITHIN ±.005 (CALIPERS).",
-    f"1J. SPOT THROUGH EACH {BRACKET_NUMBER} HOLE WITH A DRILL THAT JUST FITS "
-    "THE HOLE.",
-    f"1K. WITH {BRACKET_NUMBER} OFF, DRILL AND TAP BOTH SPOTS PER THE MHA-SM-03 "
-    "BRACKET TAP CALLOUT.",
-    f"1L. SET {BRACKET_NUMBER} ASIDE; ITS TWO MHA-MG-VN-53 SCREWS FIX IT AT "
-    f"{ha_steps.step_ref('magnifier-bracket-screwed')}.",
+    "1C. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. SPIN THE MHA-SM-VN-55 JAM NUT ONTO MHA-SM-VN-50 FROM ITS CUT END UP TO "
     "THE EYE.",
     "2A. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
@@ -184,19 +190,27 @@ ASSEMBLY_STEPS = (
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
     "2B. HOLDING THE EYE CLOCKED, RUN THE JAM NUT DOWN TO THE BOSS TOP FACE "
     "AND TIGHTEN IT.",
-    "3. ON THE TOP FRAME, AT EACH HANGER HOLE, SEAT AN MHA-SM-VN-54 WASHER ON "
-    "THE FACED TOP.",
-    "4. AT EACH HANGER HOLE MEASURE CROSSBAR UNDERSIDE TO WASHER TOP AND CUT AN "
-    f"MHA-SM-VN-52 TO THAT PLUS {HANGER_FIT_CUT} UNDER THE HEAD (REACH INTO "
-    "MHA-SM-02 TAP: FULL THREAD, TIP CLEAR OF TAP BOTTOM); CHAMFER CUT END PER "
-    "MHA-SM-VN-52.",
-    "5. WITHOUT THE LEVER, HANG EACH MHA-SM-02 BACK AS IN STEP 1C.",
+    f"3. CLAMP THE {BRACKET_NUMBER} FLANGE AGAINST THE COEFFICIENT-PLATE END "
+    "OF MHA-SM-03, ITS TWO HOLES ON THE REF STATIONS OF THE MHA-SM-03 BRACKET "
+    "TAPS WITHIN ±.005 (CALIPERS).",
+    f"3A. SPOT THROUGH EACH {BRACKET_NUMBER} HOLE WITH A DRILL THAT JUST FITS "
+    "THE HOLE.",
+    f"3B. WITH {BRACKET_NUMBER} OFF, DRILL AND TAP BOTH SPOTS PER THE MHA-SM-03 "
+    "BRACKET TAP CALLOUT.",
+    f"3C. SET {BRACKET_NUMBER} ASIDE; ITS TWO MHA-MG-VN-53 SCREWS FIX IT AT "
+    f"{ha_steps.step_ref('magnifier-bracket-screwed')}.",
+    "4. AT EACH HANGER HOLE MEASURE CROSSBAR UNDERSIDE TO WASHER TOP.",
+    f"4A. CUT AN MHA-SM-VN-52 TO THAT PLUS {HANGER_FIT_CUT} UNDER THE HEAD "
+    "(REACH INTO MHA-SM-02 TAP: FULL THREAD, TIP CLEAR OF TAP BOTTOM).",
+    "4B. CHAMFER EACH CUT END PER MHA-SM-VN-52.",
+    "5. WITHOUT THE LEVER, HANG EACH MHA-SM-02 TOP SEAT UP WITH ITS ROUND HOLE "
+    "ON THE DOWEL AT ITS HANGER HOLE.",
     "5A. TURN EACH CUT MHA-SM-VN-52 DOWN THROUGH ITS WASHER AND HOLE INTO ITS "
     "MOUNT BY HAND UNTIL ITS HEAD MEETS THE WASHER (FINGER-TIGHT).",
-    f"5B. SLIDE A {KNIFE_GAUGE_BAR} THROUGH BOTH MOUNTS' BORES.",
+    f"5B. SLIDE A {KNIFE_GAUGE_BAR}, THROUGH BOTH MOUNTS.",
     "5C. TIGHTEN BOTH BOLTS UNTIL EACH TOP SEAT IS DRAWN UP FLAT TO THE "
     "CROSSBAR UNDERSIDE.",
-    "5D. WITHDRAW THE PIN (CHECK 6).",
+    "5D. WITHDRAW THE BAR (CHECK 6).",
     "6. REMOVE THE REAR MOUNT'S BOLT.",
     "6A. LIFT THE REAR MOUNT OFF ITS DOWEL.",
     "6B. SLIDE THE REAR MOUNT ONTO THE REAR HEX TRUNNION OF MHA-SM-03 FROM ITS "
@@ -233,7 +247,8 @@ ASSEMBLY_STEPS = (
 ASSEMBLY_CHECKS = (
     "CHECKS:",
     "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A "
-    f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE ROUND IT.",
+    f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE ROUND IT; THE MOUNT "
+    "DOES NOT TURN ABOUT ITS DOWEL BY HAND.",
     "2. COUNTER SPRING OFF, THE LEVER ROCKS FREELY ON ITS KNIFE EDGE: THE "
     f"OUTER EDGE OF THE BOSS TOP FACE MOVES {ROCK_TRAVEL_MIN} "
     f"(DETAIL {DETAIL_LETTER}) UP AND DOWN FROM LEVEL BEFORE A HEX FLANK "
@@ -244,6 +259,5 @@ ASSEMBLY_CHECKS = (
     "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
     "5. THE EYE OF MHA-SM-VN-50 CANNOT BE TURNED BY HAND: MHA-SM-VN-55 IS TIGHT ON "
     "THE BOSS TOP FACE.",
-    f"6. AFTER STEP 5 THE {KNIFE_GAUGE_BAR} SLIDES OUT OF BOTH MOUNTS' BORES BY "
-    "HAND.",
+    "6. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
 )

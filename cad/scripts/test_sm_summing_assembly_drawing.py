@@ -343,27 +343,53 @@ def test_steps_five_and_six_do_one_thing_a_sub_step() -> None:
             assert line.count(". ") == 1, line
 
 
-def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_pin() -> None:
+def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() -> None:
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
     # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
-    # #2144 item 11.3: with both bolts finger-tight the gauge pin through
+    # #2144 item 11.3: with both bolts finger-tight the gauge bar through
     # both bores sets the mounts' yaw before they are tightened, and it must
-    # slide back out (check 6).
+    # slide back out (check 6).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
+    # the tool is an 8.0 in bar that spans both mounts, not a class ZZ pin,
+    # with a fit route (rule 4): a matched fit to the bores it gauges, whose
+    # maximum is the clearance the rock budget charges.
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
-    assert step.index("TIGHTEN") < step.index("WITHDRAW THE PIN")
-    assert notes.KNIFE_GAUGE_BAR == "Ø.4720 CLASS ZZ MINUS GAUGE PIN"
-    assert spec.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert step.index("TIGHTEN") < step.index("WITHDRAW THE BAR")
+    assert notes.KNIFE_GAUGE_BAR == (
+        "(Ø.4720) X 8.0 LONG GAUGE BAR, "
+        ".0002-.0017 DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
+    )
+    assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
+    assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
+        builder.KNIFE_BAR_CLEARANCE
+    )
+    assert min(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) > 0.0
+    assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
+    assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.415, abs=1e-3)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
+    # The bar is defined once, at 5B; check 6 names it.
+    assert sum(notes.KNIFE_GAUGE_BAR in line for line in notes.ASSEMBLY_STEPS) == 1
     assert any(
-        check.startswith("6. AFTER STEP 5") and notes.KNIFE_GAUGE_BAR in check
+        check.startswith("6. AFTER STEP 5 THE GAUGE BAR SLIDES OUT")
         for check in notes.ASSEMBLY_CHECKS
     )
+
+
+def test_bracket_transfer_is_its_own_step_and_check_one_holds_the_mounts() -> None:
+    # Machinist review of farm build 20261110T204245.238203Z: the MHA-MG-01
+    # tap transfer was buried under step 1, and nothing accepted that a
+    # mount clamped by one bolt does not turn about its dowel.
+    assert all("MHA-MG-01" not in line for line in _step_group("1"))
+    assert all("MHA-MG-01" in line for line in _step_group("3"))
+    assert any("WASHER" in line for line in _step_group("1"))
+    check = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("1. "))
+    assert "DOES NOT TURN ABOUT ITS DOWEL BY HAND" in check
 
 
 def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None:
@@ -382,8 +408,8 @@ def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None
     )
     # The cut stays at step 4 and the hanger joint completes at step 6, the
     # steps the purchased-part sheets and joint_retention cite.
-    cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4. "))
-    assert "CUT AN" in cut
+    cut = " ".join(_step_group("4"))
+    assert cut.startswith("4. ") and "CUT AN" in cut
     assert builder.KNIFE_REAR_YAW_RANGE_DEG > builder.KNIFE_BAR_YAW_DEG
 
 
