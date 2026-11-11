@@ -524,6 +524,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _isometric_clears_boss_dia(iso)
+    # The stock form's flank segments meet on tangent seams that the 3:1
+    # isometric inked as long lines along every tooth; r8's machinist review
+    # read them as facet edges (rule 8). The silhouettes and the tip corners
+    # still draw the teeth.
+    iso.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(iso.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide isometric tangent edges")
+    iso.UpdateViewDisplayGeometry()
 
     front_annotations = curate_view_dimensions(
         adapter,
