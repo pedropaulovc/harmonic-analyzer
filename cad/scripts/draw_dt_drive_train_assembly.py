@@ -954,6 +954,11 @@ STACK_WINDOW = inch_window(
     ),
     FIT_LIMIT_PLACES,
 )
+# #2362: the shop owns no 5-6 in micrometer (cad/process/shop.toml gauges),
+# but it owns the Mitutoyo 81-piece inch gauge blocks and a DTI
+# (shop-equipment.toml): the stack is compared on the DTI with a wrung stack
+# of its nominal length, each against one stop, the reading added to it.
+STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, 4)
 # Step 9D's spring gap is set with one leaf of the rig's STARRETT 66MA gage
 # (v47 machinist review: the blade was never identified); the steps print its
 # inch size and the feeler-stack table its stamped size.
@@ -982,7 +987,7 @@ SETTING_TABLE_ROWS = (
         "GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
         "-",
         STACK_WINDOW,
-        "5-6 IN MICROMETER",
+        "DTI ON GAUGE BLOCKS",
     ),
     (
         "2",
@@ -1578,8 +1583,8 @@ BANK_STEPS = _note_text(
         f"   ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
         "8C. REPEAT 8A-8B FOR GEARS 1 TO 19 IN ORDER, ALL ALIKE.",
         "8D. CLAMP THE STACK LIGHTLY END TO END.",
-        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN",
-        f"   MICROMETER: ACCEPT {STACK_WINDOW}.",
+        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE ON A DTI AGAINST",
+        f"   {STACK_GAUGE_BLOCKS} GAUGE BLOCKS, BOTH ON ONE STOP: ACCEPT {STACK_WINDOW}.",
         "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
         "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
         "8H. REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
