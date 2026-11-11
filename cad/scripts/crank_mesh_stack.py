@@ -18,8 +18,9 @@ sideways off its radial line away from the crossing station, which thickens
 the tooth on the pitch circle and raises the root. Off the pitch circle the
 same shift leans each flank against the screw form, one flank's way at the
 tip and the other's at the root, so the two flanks' contact radii decide what
-it costs. ``station_checks`` reports all of it per face station, NOT gated
-(the margin it shows awaits an owner ruling, #2481).
+it costs. ``station_checks`` reports all of it per face station, plane by
+plane; the gate is ``crank_mesh_free_play``, which samples the same mesh in 3D
+at the print limits with the tooth-angle band and the axis tilts (#2481).
 """
 from __future__ import annotations
 
@@ -381,7 +382,7 @@ def station_checks() -> tuple[StationCheck, ...]:
 
 def station_text() -> str:
     return "\n".join(
-        ["crank mesh by 64T face station (REPORTED, not gated; #2481):"]
+        ["crank mesh by 64T face station (reported; gated in 3D by crank_mesh_free_play, #2481):"]
         + [f"  {row.text()}" for row in station_checks()]
     )
 

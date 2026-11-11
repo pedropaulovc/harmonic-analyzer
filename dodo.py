@@ -3917,6 +3917,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
         SCRIPTS_DIR / "test_standard_mesh_checks.py",
+        # The crank mesh's 3D print-worst free play gates the 64T's thinning (#2481).
+        SCRIPTS_DIR / "test_crank_mesh_free_play.py",
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
         # Finite stock-cutter geometry is a production design contract.
         SCRIPTS_DIR / "test_stock_form_cutter.py",

@@ -414,11 +414,23 @@ def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec
                 outside_dia_mm=2.0 * (corner.support_radius_max_mm + 1.0 / scale),
                 tooth_thickness_mm=corner.pitch_tooth_thickness_mm,
             )
-    # Preserve the source capability, without interpreting it as ideal flank thinning.
+    # Preserve the source capability, without interpreting it as ideal flank
+    # thinning; the 64T's mesh thinning (#2481, normal circular) moves both
+    # ends of its cutting band, and the printed span drops by its base-tangent
+    # projection.
     if part_spec is spec:
-        assert deviations == tuple(
-            _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
-        )
+        cos_incline = math.cos(math.radians(spec.TOOTH_INCLINATION_DEG))
+        thinning = _config.fit("crank_mesh", "gear64_mesh_thinning_mm")
+        assert spec.MESH_THINNING_MM == thinning > 0.0
+        assert deviations == pytest.approx(tuple(
+            deviation - thinning / cos_incline
+            for deviation in _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
+        ))
+        uncut = spec.tooth_band(0.0)
+        cos_alpha = math.cos(math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG))
+        for before, after in zip(uncut.span_limits_mm, spec.BASE_TANGENT_SPAN_LIMITS_MM):
+            assert before - after == pytest.approx(thinning * cos_alpha, abs=0.003)
+        assert spec.OUTSIDE_DIA <= uncut.outside_dia
     assert not hasattr(part_spec, "BACKLASH_MM")
     assert not hasattr(notes, "NORMAL_TOOTH_THICKNESS_DEVIATIONS")
 

@@ -21,6 +21,7 @@ tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model,
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import _config
 import cone_land_key
@@ -146,14 +147,12 @@ CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
 VIRTUAL_TEETH = TEETH / _COS_INCLINE**3
 # The inclination prints in the gear data at one place under the title
-# block's +/-1 deg, as the helix angle did. A setting error d(beta) shifts the 64T
-# normal pitch by p_t sin(beta) d(beta), 0.013 mm at 1 deg, inside the
-# crossed mesh's mid-face worst-corner backlash (crank_mesh_stack.
-# standard_check). Across the face it also turns the tooth line against the
-# 16T, which no gate books yet: crank_mesh_stack.station_checks reports the
-# per-station centre, and with the title block's +/-1 deg the south-face
-# closing corner reads negative for the helix this replaced as for these
-# teeth (#2332 study; owner ruling pending on #2481).
+# block's +/-1 deg, as the helix angle did. A setting error d(beta) shifts the
+# 64T normal pitch by p_t sin(beta) d(beta), 0.013 mm at 1 deg, and across the
+# face turns the tooth line against the 16T about the crossing station. The
+# +/-1 deg is kept (decision 2026-11-11 on #2481, option T): MESH_THINNING_MM
+# below pays for it, and crank_mesh_free_play gates the print-worst corner at
+# these limits.
 TOOTH_INCLINATION_TOLERANCE_DEG = 1.0
 TOOTH_INCLINATION_PLACES = 1
 GEAR_DATA_REFERENCE_PLACES = 3
@@ -180,10 +179,20 @@ TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
 NATIVE_FLANK_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 
 # Geometry selection is finite-support-qualified, not a crossed-mesh certificate.
-# The deviations are about the STANDARD-depth thickness (cutter reference pitch
-# line on the gear's pitch circle). They are thin-only (Main ruling 2026-10-10)
-# so the fixed-centre closing corner keeps positive backlash; the part is
-# modelled at the band's maximum-material limit, the 16T's convention.
+# The cutting band is about the STANDARD-depth thickness (cutter reference
+# pitch line on the gear's pitch circle). It is thin-only (Main ruling
+# 2026-10-10) so the fixed-centre closing corner keeps positive backlash; the
+# part is modelled at the band's maximum-material limit, the 16T's convention.
+#
+# MESH_THINNING_MM moves both ends of that band thinner (normal circular):
+# the same #2 cutter sunk deeper on the same setup, accepted on the printed
+# span over BASE_TANGENT_SPAN_TEETH teeth, with the blank turned down to the
+# deeper cutter's reach by the OUTSIDE_DIA rule below. Decision 2026-11-11 on
+# #2481 (option T) keeps the title block's +/-1 deg on the tooth line and pays
+# for it here. The value is derived, not chosen: test_crank_mesh_free_play
+# holds it at the least MESH_THINNING_STEP_MM step that leaves the print-worst
+# corner crank_mesh_free_play.MARGIN_MM clear in both tooth models, so a pitch,
+# centre or face change fails there with the re-derived value. 0 reverses it.
 #
 # The printed tooth numbers (thickness, span, root, plunge, tip support) are
 # read from the cutter's normal-section SCREW model at the inclination
@@ -191,13 +200,102 @@ NATIVE_FLANK_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 # tooth space below IS that normal section, and its transverse section there
 # differs from the screw model's by under 3 um (test_straight_gash), inside the
 # span's .0001 in printing grid.
-TOOTH_THICKNESS_DEVIATIONS = tuple(
+CUTTING_BAND_DEVIATIONS = tuple(
     _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
 )
+MESH_THINNING_MM = _config.fit("crank_mesh", "gear64_mesh_thinning_mm")
+MESH_THINNING_STEP_MM = 0.01
 _STANDARD_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
 STANDARD_TRANSVERSE_TOOTH_THICKNESS = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, _STANDARD_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 ).pitch_tooth_thickness_mm
+BASE_TANGENT_SPAN_TEETH = math.floor(TEETH * CUTTER_PRESSURE_ANGLE_DEG / 180.0 + 0.5)
+BASE_TANGENT_SPAN_PLACES = 4
+_SPAN_SCALE = 10**BASE_TANGENT_SPAN_PLACES
+
+
+@dataclass(frozen=True)
+class ToothBand:
+    """The printed tooth-thickness band for one mesh thinning."""
+
+    deviations: tuple[float, float]  # (upper, lower), transverse, about standard depth
+    span_limits_mm: tuple[float, float]  # printed, (lower, upper)
+    translation_limits_mm: tuple[float, float]  # the span limits' tool translations
+    outside_dia: float  # the printed blank, floored to its .001 in grid
+
+
+def tooth_band(mesh_thinning_mm: float) -> ToothBand:
+    """The cutting band moved ``mesh_thinning_mm`` (normal circular) thinner,
+    with the span limits and blank the sheet prints for it."""
+    deviations = tuple(
+        deviation - mesh_thinning_mm / _COS_INCLINE for deviation in CUTTING_BAND_DEVIATIONS
+    )
+    raw_translations = tuple(
+        translation_for_pitch_tooth_thickness(
+            TEETH, CUTTER_TEMPLATE, STANDARD_TRANSVERSE_TOOTH_THICKNESS + deviation,
+            TOOTH_INCLINATION_DEG,
+        )
+        for deviation in reversed(deviations)
+    )
+    raw_spans = tuple(
+        StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG)
+        .tangent_span_mm(BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+        for value in raw_translations
+    )
+    # Both ends rounded UP onto the inch grid the sheet prints them at: the
+    # lower end inward (an accepted part keeps the source's thinnest tooth),
+    # the upper end outward so the modelled nominal -- the source's thickest
+    # tooth -- stays inside the printed acceptance.
+    span_limits = tuple(
+        math.ceil(round(span / MM_PER_IN * _SPAN_SCALE, 6)) / _SPAN_SCALE * MM_PER_IN
+        for span in (min(raw_spans), max(raw_spans))
+    )
+    # The extra search bracket is numerical only; the printed span endpoints,
+    # not this bracket, define the actual accepted tool-translation interval.
+    bracket = (
+        min(raw_translations) - NORMAL_MODULE_MM / 100.0,
+        max(raw_translations) + NORMAL_MODULE_MM / 100.0,
+    )
+    translation_limits = tuple(
+        translation_for_tangent_span(
+            TEETH, CUTTER_TEMPLATE, span, BASE_TANGENT_SPAN_TEETH, TOOTH_INCLINATION_DEG,
+            translation_bounds_mm=bracket,
+        )
+        for span in span_limits
+    )
+    # Floored to the .001 in grid it prints at, so the printed size is the model.
+    outside_dia = floor_inch_mm(
+        2.0 * min(
+            StockFormProfile(
+                TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG
+            ).support_radius_max_mm
+            for value in translation_limits
+        )
+        - OUTSIDE_DIA_TOLERANCE_MM,
+        OUTSIDE_DIA_PLACES,
+    )
+    return ToothBand(deviations, span_limits, translation_limits, outside_dia)
+
+
+def profile_corners(band: ToothBand) -> tuple[tuple[str, StockFormProfile], ...]:
+    """Every printed span and outside-diameter corner of ``band``."""
+    return tuple(
+        (
+            f"span {span_side}, outside diameter {od_side}",
+            StockFormProfile(
+                TEETH, CUTTER_TEMPLATE, (band.outside_dia + od_deviation) / 2.0,
+                translation, TOOTH_INCLINATION_DEG,
+            ),
+        )
+        for span_side, translation in zip(("lower", "upper"), band.translation_limits_mm)
+        for od_side, od_deviation in (
+            ("lower", -OUTSIDE_DIA_TOLERANCE_MM), ("upper", OUTSIDE_DIA_TOLERANCE_MM)
+        )
+    )
+
+
+TOOTH_BAND = tooth_band(MESH_THINNING_MM)
+TOOTH_THICKNESS_DEVIATIONS = TOOTH_BAND.deviations
 STOCK_TOOL_TRANSLATION_MM = translation_for_pitch_tooth_thickness(
     TEETH, CUTTER_TEMPLATE,
     STANDARD_TRANSVERSE_TOOTH_THICKNESS + max(TOOTH_THICKNESS_DEVIATIONS),
@@ -207,55 +305,12 @@ _PITCH_PROBE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 )
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = _PITCH_PROBE.pitch_tooth_thickness_mm
-BASE_TANGENT_SPAN_TEETH = math.floor(TEETH * CUTTER_PRESSURE_ANGLE_DEG / 180.0 + 0.5)
-BASE_TANGENT_SPAN_PLACES = 4
-_SPAN_SCALE = 10**BASE_TANGENT_SPAN_PLACES
-_RAW_TRANSLATIONS = tuple(
-    translation_for_pitch_tooth_thickness(
-        TEETH, CUTTER_TEMPLATE, STANDARD_TRANSVERSE_TOOTH_THICKNESS + deviation,
-        TOOTH_INCLINATION_DEG,
-    )
-    for deviation in reversed(TOOTH_THICKNESS_DEVIATIONS)
-)
-_RAW_SPANS = tuple(
-    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG)
-    .tangent_span_mm(BASE_TANGENT_SPAN_TEETH, normal_plane=True)
-    for value in _RAW_TRANSLATIONS
-)
 BASE_TANGENT_SPAN_MM = _PITCH_PROBE.tangent_span_mm(
     BASE_TANGENT_SPAN_TEETH, normal_plane=True
 )
-# Both ends rounded UP onto the inch grid the sheet prints them at: the
-# lower end inward (an accepted part keeps the source's thinnest tooth), the
-# upper end outward so the modelled nominal -- the source's thickest tooth --
-# stays inside the printed acceptance.
-BASE_TANGENT_SPAN_LIMITS_MM = tuple(
-    math.ceil(round(span / MM_PER_IN * _SPAN_SCALE, 6)) / _SPAN_SCALE * MM_PER_IN
-    for span in (min(_RAW_SPANS), max(_RAW_SPANS))
-)
-# The extra search bracket is numerical only; the printed span endpoints,
-# not this bracket, define the actual accepted tool-translation interval.
-_INVERSE_BRACKET = (
-    min(_RAW_TRANSLATIONS) - NORMAL_MODULE_MM / 100.0,
-    max(_RAW_TRANSLATIONS) + NORMAL_MODULE_MM / 100.0,
-)
-STOCK_TOOL_TRANSLATION_LIMITS_MM = tuple(
-    translation_for_tangent_span(
-        TEETH, CUTTER_TEMPLATE, span, BASE_TANGENT_SPAN_TEETH, TOOTH_INCLINATION_DEG,
-        translation_bounds_mm=_INVERSE_BRACKET,
-    )
-    for span in BASE_TANGENT_SPAN_LIMITS_MM
-)
-_CORNER_PROBES = tuple(
-    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG)
-    for value in STOCK_TOOL_TRANSLATION_LIMITS_MM
-)
-# Floored to the .001 in grid it prints at, so the printed size is the model.
-OUTSIDE_DIA = floor_inch_mm(
-    2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
-    - OUTSIDE_DIA_TOLERANCE_MM,
-    OUTSIDE_DIA_PLACES,
-)
+BASE_TANGENT_SPAN_LIMITS_MM = TOOTH_BAND.span_limits_mm
+STOCK_TOOL_TRANSLATION_LIMITS_MM = TOOTH_BAND.translation_limits_mm
+OUTSIDE_DIA = TOOTH_BAND.outside_dia
 STOCK_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 )
@@ -320,19 +375,7 @@ def stock_profile(
     )
 
 
-STOCK_PROFILE_CORNERS = tuple(
-    (
-        f"span {span_side}, outside diameter {od_side}",
-        StockFormProfile(
-            TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + od_deviation) / 2.0,
-            translation, TOOTH_INCLINATION_DEG,
-        ),
-    )
-    for span_side, translation in zip(("lower", "upper"), STOCK_TOOL_TRANSLATION_LIMITS_MM)
-    for od_side, od_deviation in (
-        ("lower", -OUTSIDE_DIA_TOLERANCE_MM), ("upper", OUTSIDE_DIA_TOLERANCE_MM)
-    )
-)
+STOCK_PROFILE_CORNERS = profile_corners(TOOTH_BAND)
 
 # The Ø9.525 MHA-DT-04 land-1 gear seat. This shared spec owns its nominal,
 # round slide-fit clearance and the 1/16 keyway's numbers without pulling the
