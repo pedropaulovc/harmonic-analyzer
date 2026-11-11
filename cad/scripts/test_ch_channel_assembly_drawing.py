@@ -174,6 +174,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     assert "CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND" in north
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-ear-datum")
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-bracket-held")
+    # The fitter leaves this list for the drive train's cylinder stack through
+    # its north-bracket set and comes back at this check (rule 22 hand-off).
+    assert _step_body("north-bracket-held").startswith(
+        f"AFTER {steps.CYLINDER_STACK_REF} THROUGH {steps.NORTH_BRACKET_SET_REF},"
+    )
     # It follows the bank's last sub-step on the bank sheet; positive control:
     # that sub-step is the bank's, not the ear's.
     bank_last = labels[labels.index(north_label) - 1]

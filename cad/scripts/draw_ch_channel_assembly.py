@@ -1176,9 +1176,13 @@ def _fitup_text() -> dict[str, str]:
             f"IF AN {pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE PRESS "
             f"SIZE ON ITS DRAWING AND RETURN TO STEP {n(steps.RODS_PINNED_KEY)}."
         ),
+        # The fitter leaves this list after the rod pins for the drive train's
+        # cylinder stack through its north-bracket set, then comes back here
+        # (#2330 machinist review, rule 22: the hand-off is printed).
         "north-bracket-held": (
-            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET AT "
-            f"{steps.NORTH_BRACKET_SET_REF}, DOES NOT TURN BY HAND."
+            f"AFTER {steps.CYLINDER_STACK_REF} THROUGH {steps.NORTH_BRACKET_SET_REF}, "
+            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET THERE, DOES NOT TURN "
+            "BY HAND."
         ),
         "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
         "north-ear-datum": (
