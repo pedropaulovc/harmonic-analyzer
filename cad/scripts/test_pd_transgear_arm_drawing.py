@@ -185,10 +185,11 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 # .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).  The hook's
 # screw holes take the title block's ±.005 (delegated ruling 2026-11-07, the
 # bar's taps spotted through them), so the hook's screw drift grew; MHA-PD-20
-# faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit.
-_PINNED_FAR_FACE_MARGIN = 0.646
-_PINNED_OLD_PIN_MARGIN = -0.229
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.279
+# faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit; #2413's
+# .1940 +.0010/0 ream floats the pivot .0085 at most (was .0072).
+_PINNED_FAR_FACE_MARGIN = 0.629
+_PINNED_OLD_PIN_MARGIN = -0.246
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.296
 
 
 def _worst_far_face_margin(
@@ -309,6 +310,7 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
         ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
+        ("PivotBoreProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
         ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
@@ -373,17 +375,17 @@ def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) ->
     assert callout.text[2].endswith(arm_notes.PLATE_TAP_QUALIFIER)
 
 
-def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
-    """R9-68: the #10-32 stud tap at S became a reamed bore that holds the
-    MHA-PD-23 pin by a press at both limit pairs, and its ream band only cuts
-    oversize."""
-    loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
-    tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
-    assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
+def test_only_the_pin_land_presses_in_the_bore_at_every_limit() -> None:
+    """R9-68 / #2415: the reamed bore at S holds the MHA-PD-23 pin by its
+    short land's light press at both limits, the running journal passes it
+    clear, and its ream band only cuts oversize."""
+    loosest, tightest = spec.PIN_PRESS_INTERFERENCE
+    assert 0.0 < loosest < tightest <= 0.0005 * 25.4 + 1e-9
+    assert cluster_pin.DIA_MAX < geometry.PIN_BORE_DIA_MIN
+    assert cluster_pin.PRESS_LAND_DIA_MAX - geometry.PIN_BORE_DIA_MAX == pytest.approx(tightest)
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
     assert "MOUTH" not in arm_notes.PIN_BORE_CALLOUT
-    assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
@@ -486,7 +488,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     for name in (
         "check", "read_required_properties", "create_blank_drawing_sheets",
         "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
-        "set_reference_dimensions", "_reference_linear_dimensions", "_set_stock_text",
+        "_reference_linear_dimensions", "_set_stock_text",
         "_end_radius_to_arc", "offset_dimension_text", "project_part_pmi",
         "_one_frame_per_dowel_group", "_overall_reference", "_set_tap_callout_text",
         "set_hole_callout_precision", "_section_captions_without_scale",
@@ -549,88 +551,35 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert ".065 MIN" in note
 
 
-def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
-    """A model reference cannot masquerade as a universal ±.130 bore zone."""
+def test_the_pivot_bore_is_one_reamer_running_fit_on_any_shoulder() -> None:
+    """#2413: a standard reamer's size under a pin-gauge band, not a window
+    matched to a measured shoulder; every as-supplied shoulder runs free."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.16256, 0.18288))
-    assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
+    bore_min, bore_max = geometry.PIVOT_BORE_FULL_LIMITS
+    shoulder_min = pivot_screw.SHOULDER_DIA + min(pivot_screw.SHOULDER_DIA_LIMITS)
+    shoulder_max = pivot_screw.SHOULDER_DIA + max(pivot_screw.SHOULDER_DIA_LIMITS)
+    assert (lower, upper) == pytest.approx((bore_min - shoulder_max, bore_max - shoulder_min))
+    assert min(geometry.PIVOT_BORE_DIA_BAND) == 0.0
+    # The band spans one .001 pin-gauge step: GO at the reamer, NO-GO a step up.
+    assert max(geometry.PIVOT_BORE_DIA_BAND) == pytest.approx(0.001 * 25.4)
+    # The tightest pair still clears the bore's sweep at the angular row.
+    assert lower >= geometry.PIVOT_RUNNING_CLEARANCE_MIN > geometry.PIVOT_AXIS_BINDING_SWEEP_MAX
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-    # The fit's facts, not its wording: reamed to the measured shoulder, the
-    # clearance band and the named screw, in the note the bore's callout links.
+    # The fit's facts, not its wording: the clearance band and the named
+    # screw, in the note the bore's callout links; no measured-shoulder route.
     assert f"SEE NOTE {arm_notes.PIVOT_NOTE}" in arm_notes.PIVOT_BORE_CALLOUT
     flat = " ".join(arm_notes.NOTES[arm_notes.PIVOT_NOTE - 1].split())
-    for fact in ("MEASURED SHOULDER", ".0064-.0072", screw):
+    for fact in (".0065-.0085", screw):
         assert fact in flat, fact
+    assert "MEASURED" not in flat
     assert screw == "MHA-PD-VN-57"
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
     assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
     # Machinist review: the implied 90° to the front face is the title
     # block's angular row; a line restating it adds nothing.
     assert "90°" not in flat
-    assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
-    assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004
-
-
-def test_pivot_fit_pays_the_real_general_angle_before_reducing_loaded_play(monkeypatch) -> None:
-    # No hidden zero-angle assumption, and no stock shoulder variation added
-    # twice to an acceptance fitted to the measured shaft.
-    original = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    monkeypatch.setattr(geometry, "PIVOT_AXIS_BINDING_SWEEP_MAX",
-                        geometry.PIVOT_AXIS_BINDING_SWEEP_MAX + 0.01)
-    wider = geometry.pivot_running_clearance_mm()
-    assert wider[0] > original[0]
-    assert wider[1] - wider[0] == pytest.approx(original[1] - original[0])
-
-
-@pytest.mark.parametrize("stock_deviation", pivot_screw.SHOULDER_DIA_LIMITS)
-def test_matched_pivot_acceptance_follows_each_measured_stock_shoulder(stock_deviation) -> None:
-    shaft = pivot_screw.SHOULDER_DIA + stock_deviation
-    lower, upper = geometry.pivot_bore_limits_mm(shaft)
-    clearance = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower - shaft, upper - shaft) == pytest.approx(clearance)
-    assert geometry.require_pivot_running_fit(lower, shaft) == pytest.approx(clearance[0])
-    assert geometry.require_pivot_running_fit(upper, shaft) == pytest.approx(clearance[1])
-    for rejected in (lower - 0.001, upper + 0.001):
-        with pytest.raises(ValueError, match="measured-shoulder running clearance"):
-            geometry.require_pivot_running_fit(rejected, shaft)
-
-
-def test_replacement_stock_shoulder_needs_its_own_paired_fit_check() -> None:
-    smallest = pivot_screw.SHOULDER_DIA + min(pivot_screw.SHOULDER_DIA_LIMITS)
-    largest = pivot_screw.SHOULDER_DIA + max(pivot_screw.SHOULDER_DIA_LIMITS)
-    bore = geometry.pivot_bore_limits_mm(smallest)[0]
-    with pytest.raises(ValueError, match="measured-shoulder running clearance"):
-        geometry.require_pivot_running_fit(bore, largest)
-    with pytest.raises(ValueError, match="as-supplied stock limits"):
-        geometry.pivot_bore_limits_mm(smallest - 0.001)
-
-
-@pytest.mark.parametrize("persist", (False, True))
-def test_native_pivot_ref_and_conditional_callout_check_void_side_effect(monkeypatch, persist) -> None:
-    class NativeDisplay:
-        def __init__(self):
-            self.text = {}
-
-        def SetText(self, channel, text):
-            if persist:
-                self.text[channel] = text
-            return None  # IDisplayDimension::SetText is VT_VOID.
-
-        def GetText(self, channel):
-            return self.text.get(channel, "")
-
-    display = NativeDisplay()
-    monkeypatch.setattr(part, "_named_dimension", lambda *_: (display, object()))
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
-    if not persist:
-        with pytest.raises(RuntimeError, match="did not persist"):
-            part._author_pivot_fit_annotation(object())
-        return
-    part._author_pivot_fit_annotation(object())
-    assert display.text == {1: "(<MOD-DIAM>", 2: ")", 4: spec.PIVOT_BORE_CALLOUT}
 
 
 # Default-format text, measured on r743-rocker-fix3's render (as
@@ -970,10 +919,12 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
         assert (control.characteristic, control.tolerance, control.datums) == ("position", ".004", ("A", "B", "C"))
         assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
     assert float(position.tolerance) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
-    thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
+    # #2415: the axis follows the bore over the pin's press-land grip only.
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
-        float(square.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM / thinnest
+        float(square.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
+        / cluster_pin.PRESS_LAND_GRIP_MIN
     )
+    assert cluster_pin.PRESS_LAND_GRIP_MIN < geometry.THICKNESS - geometry.THICKNESS_BAND
     # The datums the frames name are the part's: A the front face, B the
     # pivot bore, C the pin bore.
     assert [datum.letter for datum in spec.PART_DATUMS] == ["A", "B", "C"]

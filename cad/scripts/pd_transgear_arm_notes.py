@@ -13,7 +13,12 @@ import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
 from pd_paper_drive_assembly_steps import knob_setting_ref
-from pd_transgear_arm_geometry import PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES
+from pd_transgear_arm_geometry import (
+    PIN_HOLE_DEPTH,
+    PIN_HOLE_DEPTH_PLACES,
+    PIVOT_BORE_DIAMETRAL_CLEARANCE,
+    PIVOT_FIT_CLEARANCE_PLACES,
+)
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_arm_spec import (
     LATCH_PIN_NUMBER,
@@ -21,8 +26,6 @@ from pd_transgear_arm_spec import (
     LATCH_PIN_WALL_PRINTED,
     LOCATOR_PRESS_INTERFERENCE,
     PIN_PRESS_INTERFERENCE,
-    PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_FIT_CLEARANCE_PLACES,
 )
 
 
@@ -58,8 +61,8 @@ def see_note(number: int) -> str:
 
 NOTES = (
     f"{PIVOT_NOTE}. PIVOT BORE: RUNNING FIT ON PIVOT SCREW {_PIVOT_SCREW['number']}"
-    " SHOULDER, REAMED TO\n"
-    "   THE MEASURED SHOULDER (CLEARANCE "
+    " SHOULDER\n"
+    "   (CLEARANCE "
     f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
     f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER}"
     f" (INTERFERENCE {_inch_range(LOCATOR_PRESS_INTERFERENCE)}).\n"

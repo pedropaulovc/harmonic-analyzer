@@ -2,10 +2,10 @@ r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
-fit band, linked by SEE NOTE 1 to the numbered note naming both fits it
-serves, and one bearing-surface finish; the MHA-PD-VN-61 ring groove its
-catalogue Ø and width bands, and every other size is an ordinary model
-dimension at its part-authored places.
+fit band and the press land its reference Ø, both linked by SEE NOTE 1 to
+the numbered note naming their fits, and one bearing-surface finish; the
+MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and every other
+size is an ordinary model dimension at its part-authored places.
 
 The pin axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the domed tip on the
@@ -73,6 +73,7 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     LENGTH,
     OVERALL_LENGTH,
+    PRESS_LAND_LENGTH,
     SURFACE_FINISHES,
 )
 
@@ -114,6 +115,8 @@ def _sheet_y(radius_mm: float) -> float:
 HEAD_APEX_X = _sheet_x(-HEAD_HEIGHT)
 HEAD_BACK_X = _sheet_x(-HEAD_LAND)
 SEAT_X = _sheet_x(0.0)
+LAND_END_X = _sheet_x(PRESS_LAND_LENGTH)
+LAND_MID_X = (SEAT_X + LAND_END_X) / 2.0
 GROOVE_REAR_X = _sheet_x(GROOVE_REAR_STATION)
 LOAD_WALL_X = _sheet_x(GROOVE_STATION)
 FRONT_END_X = _sheet_x(GROOVE_STATION + FRONT_LAND)
@@ -136,7 +139,11 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # sits at the same height right of the head.  The diameters
 # stand above the profile, each on its own section: the shank Ø's SEE NOTE 1
 # under its value, the groove Ø above it with the ring's name above its
-# value.  The tip dome's reference height stands above the tip.
+# value.  The tip dome's reference height stands above the tip.  The press
+# land (#2415) takes its reference Ø above its own length and its .XX length
+# in a row of its own between the profile and the station's row, the shorter
+# baseline nearer the part; the seat root's R MAX stands between the land's
+# extension lines, over that row.
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
@@ -145,6 +152,8 @@ SIDE_KEEP = {
     # audit text-on-line, run 20261024T060429646Z).
     "FrontLand": (TIP_X - 0.008, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
+    "LandLength": (LAND_MID_X, SIDE_CENTER[1] - 0.024),
+    "LandDia": (LAND_MID_X, SHANK_TOP_Y + 0.025),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
     # At the shank's middle: its dimension line, and the arrow below the
@@ -165,20 +174,20 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's one-line R MAX just under the shank, its right end
-    # short of the seat's extension line (the 1.8600's, 2.02's and .09's),
-    # so its shelf and leader rise to the lower corner crossing nothing and
-    # stay above the (.03) and the station's row (round-5 review).
-    "SeatRadius": (SEAT_X - 0.025, SIDE_CENTER[1] - 0.010),
+    # The seat root's one-line R MAX just under the land, between its
+    # extension lines (the seat's, shared by the 1.8600, 2.02 and .09, and
+    # the land end's), so its shelf and leader rise to the lower corner
+    # crossing nothing and stay above the land's .29 row (round-5 review).
+    "SeatRadius": (LAND_MID_X, SIDE_CENTER[1] - 0.013),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
 # proves they arrived.
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
-# The shank's upper silhouette, between the shank Ø's tolerance stack and the
-# head Ø (at 30 mm left of the seat its leader touched the -0.008).
-FINISH_PICK = (SEAT_X - 0.015, SHANK_TOP_Y)
-FINISH_SYMBOL = (SEAT_X - 0.015, SHANK_TOP_Y + 0.008)
+# The shank's upper silhouette ahead of the press land, between the shank Ø's
+# tolerance stack and the land's reference Ø.
+FINISH_PICK = (LAND_END_X - 0.013, SHANK_TOP_Y)
+FINISH_SYMBOL = (LAND_END_X - 0.013, SHANK_TOP_Y + 0.008)
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (SHANK_MID_X + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)

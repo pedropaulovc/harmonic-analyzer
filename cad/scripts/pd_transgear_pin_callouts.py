@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_retaining_ring_spec as RING
+from _fit_ream_slide import REAM_SLIDE
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
+    DIA_BAND,
     FRONT_BUSHING_NUMBER,
     PRESS_INTERFERENCE,
     RING_NUMBER,
@@ -25,23 +27,26 @@ from pd_transgear_pin_spec import (
 
 # The sheet's notes, the part's Manufacturing Notes property.  The press into
 # the arm is the MHA-PD-00 assembly's pin-pressed step; the part sheet gives
-# the fit (rule 23).  The shank's .0002 band is narrower than the shop's
-# turned-diameter row, so numbered note 1, linked from the shank Ø by SEE
-# NOTE 1, names its fit route: the shank is turned to the measured arm ream
-# (rule 4: standard fit names, the interference as REF).  The note prints the
-# arm's undersize ream limits, so the route and the shank's band agree on
-# the sheet (round 1: without them a 1/8 ream read as .1250 and up).  The
-# ring groove's Ø and width name their ring once, in note 2 (rule 4).  Kept
-# here, not in the widely imported spec, so the wording re-keys only this
-# part.
+# the fit (rule 23).  Numbered note 1, linked from the press land's reference
+# Ø and from the shank Ø by SEE NOTE 1, names both fits: the land is turned
+# to the measured arm ream (rule 4: standard fit names, the interference as
+# REF; #2415), and the shank runs in its three mates and passes the ream
+# clear.  The note prints the arm's ream limits, so the route and the land's
+# reference agree on the sheet.  The ring groove's Ø and width name their
+# ring once, in note 2 (rule 4).  Kept here, not in the widely imported
+# spec, so the wording re-keys only this part.
 SHANK_FIT_NOTE = 1
 RING_GROOVE_NOTE = 2
+# The shank's running clearance in its mates' .125 REAM_SLIDE bores (the
+# owned .1260 reamer), named so its band reads as a matched running fit.
+RUNNING_CLEARANCE = (REAM_SLIDE[1] - DIA_BAND[0], REAM_SLIDE[0] - DIA_BAND[1])
 DRAWING_NOTES = "\n".join((
-    f"{SHANK_FIT_NOTE}. PRESS FIT IN THE Ø{inch_text(ARM.PIN_BORE_DIA_MIN, 4)}-"
-    f"{inch_text(ARM.PIN_BORE_DIA_MAX, 4)} REAM OF {ARM_NUMBER}:",
-    "    TURN SHANK TO MEASURED REAM (INTERFERENCE "
+    f"{SHANK_FIT_NOTE}. LAND: PRESS FIT IN THE Ø{inch_text(ARM.PIN_BORE_DIA_MIN, 4)}-"
+    f"{inch_text(ARM.PIN_BORE_DIA_MAX, 4)} REAM OF {ARM_NUMBER}, TURNED TO",
+    "    THE MEASURED REAM (INTERFERENCE "
     f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)}).",
-    f"    RUNNING FIT IN {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}.",
+    f"    SHANK: RUNNING FIT IN {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}",
+    f"    (CLEARANCE {inch_text(RUNNING_CLEARANCE[0], 4)}-{inch_text(RUNNING_CLEARANCE[1], 4)}).",
     f"{RING_GROOVE_NOTE}. RING GROOVE Ø AND WIDTH: FOR RING {RING_NUMBER}",
     f"    (McMASTER {RING.SKU}).",
     "1/4 IN BAR STOCK OK.",
@@ -56,8 +61,9 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # groove's catalogue bands, Ø and width, link to (rule 4: one feature with
 # several tight dimensions names its mate once, on one note linked to all).
 GROOVE_CALLOUT = f"SEE NOTE {RING_GROOVE_NOTE}"
-# The shank's band and its fits are numbered note 1 (rule 7: a callout carries
-# at most two lines of words; the fit route is the note's).
+# The land's reference Ø and the shank's band link their fits in numbered
+# note 1 (rule 7: a callout carries at most two lines of words; the fit route
+# is the note's).
 SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}"
 # The +/-.001 station names the stack it sets once, by drawing number (rule
 # 4): the groove's load wall holds the ring that stops the front bushing and
@@ -70,6 +76,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("PinProfile", "GrooveDia"): GROOVE_CALLOUT},
     CALLOUT_BELOW: {
         ("PinProfile", "ShankDia"): SHANK_CALLOUT,
+        ("PinProfile", "LandDia"): SHANK_CALLOUT,
         ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
         ("PinProfile", "GrooveWidth"): GROOVE_CALLOUT,
     },
@@ -86,11 +93,13 @@ if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
 # ahead of the groove from the tip apex's station, the load wall's and the
 # tip dome: all three print as REFERENCES, "(.03)", "(.04)", "(.12)"
 # (rules 10 and 11: the land ends at the dome's junction, which the shop
-# cannot pick up).
+# cannot pick up).  The press land's Ø is a reference too, "(Ø.1266)": it is
+# made to the measured ream (note 1).
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
     ("HeadDomeProfile", "HeadDomeSagDim"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
     ("TipDomeProfile", "TipDomeSagDim"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
     ("PinProfile", "FrontLand"): {TEXT_PREFIX: "(", TEXT_SUFFIX: ")"},
+    ("PinProfile", "LandDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
 }
 
 

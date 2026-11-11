@@ -156,7 +156,7 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
     assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
         float(arm_control.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
-        / (arm.THICKNESS - arm.THICKNESS_BAND)
+        / registration.PIN.PRESS_LAND_GRIP_MIN
     )
     assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
     # K prints a plain ⊥ Ø.002 to A over its bore (fan-out Q2-A, rule 26);
