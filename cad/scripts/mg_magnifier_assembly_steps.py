@@ -46,7 +46,15 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
     # has its own single-action remedies.
     (DRUM_PRESSED_KEY, DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
-    (AXLE_PRESSED_KEY, AXLE_HELD_KEY, "axle-pressed-out", "axle-remade", "axle-repressed"),
+    (
+        AXLE_PRESSED_KEY,
+        AXLE_HELD_KEY,
+        "axle-pressed-out",
+        "axle-cleaned",
+        "axle-bonded",
+        "axle-bond-set",
+        "axle-bond-cured",
+    ),
     (
         AXLE_TRIAL_KEY,
         "trial-nuts-jammed",
