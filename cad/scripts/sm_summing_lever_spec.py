@@ -176,9 +176,10 @@ CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
 # The spring stations sit on the channel arm plane, the cam plane
 # (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
-# like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
-# _interference_contracts, so an import would put the gear-train and channel
-# config into every assembly's closure. test_sm_summing_lever_drawing pins it.
+# like CHANNEL_Z0/CHANNEL_PITCH, not imported: _sm_summing_interference and
+# _ha_harmonic_analyzer_interference read this spec, so an import would add the
+# gear-train and channel config to those assemblies' closures.
+# test_sm_summing_lever_drawing pins it.
 HOLE_Z_OFFSET = -3.52825
 # The whole coefficient plate now supplies the spring tap's 1.5D engagement
 # at its printed .XX band. Its top and underside remain the

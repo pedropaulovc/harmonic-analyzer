@@ -38,8 +38,8 @@ if abs(TOP_SCREW_Y / 25.4 - round(TOP_SCREW_Y / 25.4, 3)) > 1e-9:
 # MHA-FR-00 step 3 sets every corner's top cross-bore axis to one height above
 # the base underside. It is a dimension on the frame assembly's blanked
 # TopAxisSetting sketch (a construction line up the +X column's axis), which
-# the drawing imports. It prints three places with no band of its own, so the
-# title block's .XXX grade governs it.
+# the drawing imports. It prints three places with the explicit +/- .010 in
+# band defined by fr_frame_setting_bands.TOP_AXIS_HEIGHT_BAND_MM.
 TOP_AXIS_SETTING_FEATURE = "TopAxisSetting"
 TOP_AXIS_HEIGHT_DIMENSION = "TopCrossBoreAxisHeight"
 TOP_AXIS_HEIGHT_PLACES = 3
