@@ -22,6 +22,7 @@ import math
 import os
 import socket
 import subprocess
+import struct
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,7 @@ from win32com.client import VARIANT, Dispatch, DispatchBaseClass
 
 import _com
 import _com_conversation as conv
+import _com_outcome
 import _paths
 import _seat_forensics
 
@@ -238,6 +240,136 @@ class IPart(DispatchBaseClass):
 win32com.client.CLSIDToClass.RegisterCLSID(APP_CLSID, IApp)
 win32com.client.CLSIDToClass.RegisterCLSID(PART_CLSID, IPart)
 
+SHAPE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A003}"
+FACE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A004}"
+MASS_CLSID = "{0BADC0DE-0000-4000-8000-00000000A005}"
+FEATURE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A006}"
+
+
+class ShapeServer(FakeServer):
+    """One plate ``depth`` deep whose faces come in the order the seat lists
+    them (``order``). Its volume and STL follow that order as SolidWorks'
+    do: the volume sums face by face (the last bits move) and the STL lists
+    one triangle per face, corners rotated and normal nudged by position."""
+
+    ORDER = ("face:top", "face:bottom", "face:side")
+    FACES = {
+        "face:top": ((0.0, 1.0, 0.0), 0.1),
+        "face:bottom": ((0.0, -1.0, 0.0), 0.2),
+        "face:side": ((1.0, 0.0, 0.0), 0.3),
+    }
+
+    def __init__(self, order: tuple[str, ...] = ORDER) -> None:
+        super().__init__()
+        self.order = order
+        self.depth = 0.0
+
+    def invoke(self, target: FakeDispatch, dispid: int, flags: int, args: tuple) -> Any:
+        if dispid < 20:
+            return super().invoke(target, dispid, flags, args)
+        self.calls += 1
+        if dispid == 20:
+            self.depth = args[0]
+            return True
+        if dispid == 21:
+            return tuple(FakeDispatch(self, ident) for ident in self.order)
+        if dispid == 22:
+            return FakeDispatch(self, "mass")
+        if dispid == 23:
+            Path(args[0]).parent.mkdir(parents=True, exist_ok=True)
+            Path(args[0]).write_bytes(self._stl())
+            return True
+        if dispid == 24:
+            return self.FACES[target.ident][0]
+        if dispid == 25:
+            # Plain left-to-right addition (sum() compensates since 3.12).
+            volume = 0.0
+            for ident in self.order:
+                volume += self.depth * self.FACES[ident][1]
+            return volume
+        if dispid == 26:
+            # A symmetric plate: its centre of mass is noise around zero.
+            noise = 1e-19 * self.order.index("face:bottom")
+            return (noise, -noise, 0.0)
+        if dispid == 28:
+            return FakeDispatch(self, "feature:plate")
+        return True  # 27: IFace2.Select
+
+    def _stl(self) -> bytes:
+        triangles = []
+        for position, ident in enumerate(self.order):
+            normal, _ = self.FACES[ident]
+            corners = [
+                struct.pack("<3f", *(self.depth * n + k for n in normal))
+                for k in range(3)
+            ]
+            turn = position % 3
+            facet = struct.pack("<3f", normal[0], normal[1] + 1e-7 * position, 0.0)
+            triangles.append(
+                facet + b"".join(corners[turn:] + corners[:turn]) + b"\0\0"
+            )
+        count = struct.pack("<I", len(triangles))
+        return b"fake STL".ljust(80) + count + b"".join(triangles)
+
+
+class IShapeApp(IApp):
+    CLSID = pywintypes.IID(SHAPE_CLSID)
+
+    def SetDepth(self, depth=0.0):  # noqa: N802
+        return self._oleobj_.InvokeTypes(20, LCID, 1, (11, 0), ((5, 1),), depth)
+
+    def GetFaces(self):  # noqa: N802
+        return self._oleobj_.InvokeTypes(21, LCID, 1, (12, 0), ())
+
+    def CreateMassProperty(self):  # noqa: N802
+        ret = self._oleobj_.InvokeTypes(22, LCID, 1, (9, 0), ())
+        if ret is not None:
+            ret = Dispatch(ret, "CreateMassProperty", MASS_CLSID)
+        return ret
+
+    def ExportSTL(self, path=""):  # noqa: N802
+        return self._oleobj_.InvokeTypes(23, LCID, 1, (11, 0), ((8, 1),), path)
+
+    def CreateFeature(self):  # noqa: N802
+        ret = self._oleobj_.InvokeTypes(28, LCID, 1, (9, 0), ())
+        if ret is not None:
+            ret = Dispatch(ret, "CreateFeature", FEATURE_CLSID)
+        return ret
+
+
+class IFeature(DispatchBaseClass):
+    CLSID = pywintypes.IID(FEATURE_CLSID)
+    coclass_clsid = None
+
+    _prop_map_get_ = {"Name": (6, 2, (8, 0), (), "Name", None)}
+    _prop_map_put_ = {"Name": ((6, LCID, 4, 0), ())}
+
+
+class IFace2(DispatchBaseClass):
+    CLSID = pywintypes.IID(FACE_CLSID)
+    coclass_clsid = None
+
+    def Select(self):  # noqa: N802
+        return self._oleobj_.InvokeTypes(27, LCID, 1, (11, 0), ())
+
+    _prop_map_get_ = {"Normal": (24, 2, (12, 0), (), "Normal", None)}
+
+
+class IMassProperty(DispatchBaseClass):
+    CLSID = pywintypes.IID(MASS_CLSID)
+    coclass_clsid = None
+
+    _prop_map_get_ = {
+        "Volume": (25, 2, (5, 0), (), "Volume", None),
+        "CenterOfMass": (26, 2, (12, 0), (), "CenterOfMass", None),
+    }
+
+
+win32com.client.CLSIDToClass.RegisterCLSID(SHAPE_CLSID, IShapeApp)
+win32com.client.CLSIDToClass.RegisterCLSID(FACE_CLSID, IFace2)
+win32com.client.CLSIDToClass.RegisterCLSID(FEATURE_CLSID, IFeature)
+win32com.client.CLSIDToClass.RegisterCLSID(MASS_CLSID, IMassProperty)
+
 
 class FakeAdapter:
     """What a build sees: COM state on attributes, like PyWin32Adapter."""
@@ -359,6 +491,37 @@ async def scenario(
     return result
 
 
+async def shaped(
+    adapter: Any,
+    *,
+    depth: float = 1.0,
+    note: str = "BOND WITH LOCTITE 638",
+    sha: str = "0123abc",
+    measure: bool = True,
+    export: bool = True,
+    feature: str = "Plate",
+) -> None:
+    """A build that names its plate feature, then finds the plate's -Y face
+    the way ``_holes.find_planar_face`` does (every face's normal, in the
+    order the seat lists them), then writes properties, measures and exports."""
+    app = IShapeApp(adapter.swApp._oleobj_)
+    app.CreateFeature().Name = feature
+    app.SetDepth(depth)
+    chosen = None
+    for raw in app.GetFaces():
+        face = IFace2(raw)
+        if face.Normal == (0.0, -1.0, 0.0):
+            chosen = face
+    chosen.Select()
+    app.Add3("Generator", 30, f"harmonic-analyzer @ {sha}", 2)
+    app.Add3("Note", 30, note, 2)
+    if measure:
+        mass = app.CreateMassProperty()
+        assert mass.Volume > 0 and len(mass.CenterOfMass) == 3
+    if export:
+        app.ExportSTL(str(_paths.OUT_SLDPRT.parent / "stl" / "plate.STL"))
+
+
 # FakeServer's RevisionNumber: what record_build reads before the window.
 SW_REVISION = "34.3.0"
 
@@ -367,6 +530,7 @@ def _record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kwargs: Any):
     out_root = tmp_path / "run1"
     monkeypatch.setattr(_paths, "OUT_SLDPRT", out_root / "sldprt")
     server = kwargs.pop("server", None) or FakeServer()
+    build = kwargs.pop("build", scenario)
     adapter = FakeAdapter(server)
     log = tmp_path / "logs" / "L1.jsonl.gz"
     with conv.recording(
@@ -378,7 +542,7 @@ def _record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kwargs: Any):
         audit=kwargs.pop("audit", False),
         callers=kwargs.pop("callers", conv.CallerCapture.FULL),
     ):
-        result = asyncio.run(scenario(adapter, **kwargs))
+        result = asyncio.run(build(adapter, **kwargs))
     return log, result, server, adapter
 
 
@@ -862,6 +1026,231 @@ def test_k1_separates_request_divergence_from_response_differences(
     assert len(divergence["context"]) == 5 and divergence["seq_new"] is not None
 
 
+_REORDERED = ("face:bottom", "face:side", "face:top")
+_ALL_SAME = {"mass": "same", "requests": "same", "answers": "same", "stl": "same"}
+
+
+def _shaped(
+    root: Path, monkeypatch: pytest.MonkeyPatch, order=ShapeServer.ORDER, **kwargs
+):
+    server = ShapeServer(order)
+    log, _, _, _ = _record(root, monkeypatch, server=server, build=shaped, **kwargs)
+    return log
+
+
+def _diff(base: Path, new: Path, result: Path) -> dict[str, Any]:
+    """``com_replay.py diff``, as the shadow runs it."""
+    import com_replay
+
+    rc = com_replay.main(["diff", str(base), str(new), "--result", str(result)])
+    payload = json.loads(result.read_text("utf-8"))
+    assert rc == (0 if payload["request_divergence"] is None else 91)
+    return payload
+
+
+def _stl_bytes(log: Path) -> bytes:
+    [kept] = [
+        kept
+        for files in conv.load(log).trailer["captured"].values()
+        for rel, kept in files.items()
+        if rel.endswith(".STL")
+    ]
+    return conv.capture_dir_of(log).joinpath(kept["file"]).read_bytes()
+
+
+def test_a_face_order_change_diverges_on_a_response_and_makes_the_same_part(
+    tmp_path, monkeypatch
+):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    reordered = _shaped(tmp_path / "b", monkeypatch, _REORDERED)
+    # The seat's noise is real: another volume in the last bit, a centre of
+    # mass that is noise around zero, other STL bytes.
+    volume, com = (
+        [
+            c.result
+            for log in (base, reordered)
+            for c in conv.load(log).calls
+            if c.site == site
+        ]
+        for site in ("IMassProperty.Volume", "IMassProperty.CenterOfMass")
+    )
+    assert volume[0] != volume[1] and _stl_bytes(base) != _stl_bytes(reordered)
+    assert not _com_outcome._close(com[0], com[1])
+    diff = _diff(base, reordered, tmp_path / "diff.json")
+    divergence = diff["request_divergence"]
+    assert (divergence["member_expected"], divergence["field"]) == (
+        "IFace2.Select",
+        "handle",
+    )
+    assert diff["truth_cause"] == "response:IFace2.Normal"
+    assert diff["outcome"] == "same" and diff["outcome_signals"] == _ALL_SAME
+
+
+def test_a_changed_dimension_diverges_on_a_request_and_makes_another_part(
+    tmp_path, monkeypatch
+):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    deeper = _shaped(tmp_path / "b", monkeypatch, depth=1.5)
+    diff = _diff(base, deeper, tmp_path / "diff.json")
+    divergence = diff["request_divergence"]
+    assert (divergence["member_expected"], divergence["field"]) == (
+        "IShapeApp.SetDepth",
+        "args",
+    )
+    assert diff["truth_cause"] == "request" and diff["outcome"] == "different"
+    assert set(diff["outcome_signals"].values()) == {"different"}
+    assert diff["outcome_details"]["mass"]["member"] == "IMassProperty.Volume"
+    assert diff["outcome_details"]["requests"] == {"IShapeApp.SetDepth": [1, 1]}
+
+
+def test_a_property_edit_is_another_part_and_provenance_is_not(tmp_path, monkeypatch):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    noted = _shaped(tmp_path / "b", monkeypatch, note="BOND WITH LOCTITE 648")
+    diff = _diff(base, noted, tmp_path / "diff.json")
+    assert diff["truth_cause"] == "request" and diff["outcome"] == "different"
+    assert diff["outcome_signals"] == {
+        **_ALL_SAME,
+        "requests": "different",
+        "answers": "different",
+    }
+    assert diff["outcome_details"]["requests"] == {"IShapeApp.Add3": [1, 1]}
+    # Another commit stamps another Generator value: masked, the same part.
+    stamped = _shaped(tmp_path / "c", monkeypatch, sha="feedbee")
+    diff = _diff(base, stamped, tmp_path / "stamped.json")
+    assert diff["request_divergence"] is None and diff["truth_cause"] is None
+    assert diff["outcome"] == "same" and diff["outcome_signals"] == _ALL_SAME
+
+
+def test_an_outcome_without_mass_or_stl_is_unknown_unless_something_differs(
+    tmp_path, monkeypatch
+):
+    def outcome(name: str, **kwargs: Any) -> dict[str, Any]:
+        base = _shaped(tmp_path / name / "a", monkeypatch, **kwargs)
+        new = _shaped(tmp_path / name / "b", monkeypatch, _REORDERED, **kwargs)
+        diff = _diff(base, new, tmp_path / name / "diff.json")
+        return {k: diff[k] for k in ("outcome", "outcome_signals")}
+
+    assert outcome("unmeasured", measure=False) == {
+        "outcome": "unknown",
+        "outcome_signals": {**_ALL_SAME, "mass": "absent"},
+    }
+    assert outcome("unexported", export=False) == {
+        "outcome": "unknown",
+        "outcome_signals": {**_ALL_SAME, "stl": "absent"},
+    }
+    # Absent signals never hide a difference.
+    base = _shaped(tmp_path / "c", monkeypatch, measure=False, export=False)
+    deeper = _shaped(
+        tmp_path / "d", monkeypatch, depth=2.0, measure=False, export=False
+    )
+    assert _diff(base, deeper, tmp_path / "d.json")["outcome"] == "different"
+    # Measured on one side only: different, not unknown.
+    measured = _shaped(tmp_path / "e", monkeypatch, export=False)
+    diff = _diff(base, measured, tmp_path / "e.json")
+    assert (diff["outcome"], diff["outcome_signals"]["mass"]) == (
+        "different",
+        "different",
+    )
+    # An STL capture that cannot be read is no evidence.
+    left = _shaped(tmp_path / "f", monkeypatch)
+    right = _shaped(tmp_path / "g", monkeypatch)
+    for capture in conv.capture_dir_of(right).iterdir():
+        capture.unlink()
+    diff = _diff(left, right, tmp_path / "g.json")
+    assert (diff["outcome"], diff["outcome_signals"]["stl"]) == ("unknown", "absent")
+
+
+def test_outcome_noise_is_title_counters_provenance_and_last_bits():
+    text = _com_outcome._text
+    assert text("D1@Sketch1@Part11.Part") == text("D1@Sketch1@Part12.Part")
+    assert text("Assem3") == text("Assem4") and text("Part11") != text("Partial11")
+    assert text("harmonic-analyzer @ 1ee7f38") == text("harmonic-analyzer @ feedbee")
+    assert text("summary: harmonic-analyzer @ 1ee7f38") != text(
+        "summary: harmonic-analyzer @ feedbee"
+    )
+
+    def floats(*values: float) -> dict[str, Any]:
+        return {"t": [{"f": v.hex()} for v in values]}
+
+    # Within 1e-9 of the value's largest component, or of the floor.
+    assert _com_outcome._close(floats(1.0, 1e-20), floats(1.0 + 1e-12, -1e-20))
+    assert not _com_outcome._close(floats(1.0, 0.0), floats(1.0, 1e-8))
+    assert not _com_outcome._close(floats(1e-19, 0.0), floats(0.0, 0.0))
+    assert _com_outcome._close(floats(1e-19, 0.0), floats(0.0, 0.0), 0.5)
+    # Handles are identity: kept by the aligned comparison, erased in sets.
+    assert not _com_outcome._close({"h": 3, "p": "X"}, {"h": 4, "p": "X"})
+    assert _com_outcome._keyed({"h": 3, "p": "X"}) == _com_outcome._keyed(
+        {"h": 4, "p": "X"}
+    )
+
+
+def test_a_divergence_is_labelled_at_or_after_the_last_named_feature(
+    tmp_path, monkeypatch
+):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    # The divergence is the naming itself: at the feature.
+    renamed = _shaped(tmp_path / "b", monkeypatch, feature="PlateBlank")
+    divergence = _diff(base, renamed, tmp_path / "b.json")["request_divergence"]
+    assert divergence["member_expected"] == "IFeature.Name"
+    assert divergence["feature"] == "at Plate"
+    assert "lies at the last IFeature.Name" in divergence["feature_basis"]
+    # A later request: after it.
+    deeper = _shaped(tmp_path / "c", monkeypatch, depth=1.5)
+    divergence = _diff(base, deeper, tmp_path / "c.json")["request_divergence"]
+    assert divergence["member_expected"] == "IShapeApp.SetDepth"
+    assert divergence["feature"] == "after Plate"
+    unnamed = {"feature": None}
+    _com_outcome.label_feature(unnamed)
+    _com_outcome.label_feature(None)
+    assert unnamed == {"feature": None}
+
+
+_SOLID = (0.002, 0.003, -0.125, 6.1e-05, 0.0231, 0.48)
+_INERTIA = (2.46e-07, 2.57e-07, 1.14e-08, 1.5e-24, -3.0e-25, 2.0e-25)
+
+
+def _body_mass(*values: float) -> conv.Call:
+    """An ``IBody2.GetMassProperties`` answer: CenterOfMassX..Z, volume,
+    area, mass, MomXX, MomYY, MomZZ, MomXY, MomZX, MomYZ (API reference)."""
+    result = {"t": [{"f": float(v).hex()} for v in values]}
+    return conv.Call(0, 1, "InvokeTypes", [], "IBody2.GetMassProperties", result=result)
+
+
+def test_a_mass_property_array_is_judged_quantity_by_quantity():
+    base = _body_mass(*_SOLID, *_INERTIA)
+
+    def judged(*values: float) -> str:
+        return _com_outcome._mass_signal([base], [_body_mass(*values)])[0].value
+
+    volume, area, mass = _SOLID[3:]
+    # Last-bit noise in every quantity, near-zero products of inertia
+    # included: the same body.
+    noisy = [math.nextafter(v, math.inf) for v in (*_SOLID, *_INERTIA)]
+    assert judged(*noisy) == "same"
+    assert judged(*_SOLID, *_INERTIA[:3], 3.0e-24, -1.0e-25, 0.0) == "same"
+    # A 1e-6 relative change of any one quantity: another body. The volume's
+    # (6e-11 m^3) is below 1e-9 of the array's largest element (the mass).
+    for index, value in ((3, volume), (4, area), (5, mass)):
+        changed = list(_SOLID)
+        changed[index] = value * (1 + 1e-6)
+        assert judged(*changed, *_INERTIA) == "different", index
+    assert judged(*_SOLID, _INERTIA[0] * (1 + 1e-6), *_INERTIA[1:]) == "different"
+    # A symmetric body's centre is noise around zero: judged on its length.
+    centred = _body_mass(1e-19, -2e-19, 0.0, *_SOLID[3:], *_INERTIA)
+    shifted = _body_mass(-3e-19, 0.0, 1e-19, *_SOLID[3:], *_INERTIA)
+    assert _com_outcome._mass_signal([centred], [shifted])[0].value == "same"
+    # The 13-element forms end with the accuracy, compared on its own.
+    accurate = _body_mass(*noisy, 1.0)
+    assert (
+        _com_outcome._mass_signal([accurate], [_body_mass(*_SOLID, *_INERTIA, 1.0)])[
+            0
+        ].value
+        == "same"
+    )
+    coarse = _body_mass(*_SOLID, *_INERTIA, 2.0)
+    assert _com_outcome._mass_signal([accurate], [coarse])[0].value == "different"
+
+
 def test_caller_capture_modes(tmp_path, monkeypatch):
     full = conv.CallerCapture.FULL
     for mode in conv.CallerCapture:
@@ -912,7 +1301,12 @@ def test_cli_help_imports_no_com():
 def test_recording_modules_stay_out_of_every_recipe_closure():
     import _buildgraph
 
-    modules = ("_com_conversation.py", "com_replay.py", "_replay_shadow.py")
+    modules = (
+        "_com_conversation.py",
+        "_com_outcome.py",
+        "com_replay.py",
+        "_replay_shadow.py",
+    )
     scripts = [
         *_buildgraph.part_scripts(),
         *(_buildgraph.script_for(stem) for stem in _buildgraph.ASSEMBLY_ORDER),
@@ -927,8 +1321,8 @@ def test_recording_modules_stay_out_of_every_recipe_closure():
     )
     assert not leaks
     # Nothing else may import them: only dodo (outside cad/scripts) imports
-    # _replay_shadow, and only the driver imports the engine.
-    names = {"_com_conversation", "com_replay", "_replay_shadow"}
+    # _replay_shadow, and only the driver (and its _com_outcome) the engine.
+    names = {"_com_conversation", "_com_outcome", "com_replay", "_replay_shadow"}
 
     def imported(source: bytes) -> set[str]:
         found: set[str] = set()
@@ -947,9 +1341,10 @@ def test_recording_modules_stay_out_of_every_recipe_closure():
     assert imported(b"from _com_conversation import load\n") == {"_com_conversation"}
     assert imported(b"importlib.import_module('com_replay')\n") == {"com_replay"}
     assert imported(b'"""Shadow recording (``_replay_shadow``)."""\n') == set()
-    assert "_com_conversation.py" in {
+    driver_deps = {
         Path(dep).name for dep in _buildgraph.module_deps_of(SCRIPTS / "com_replay.py")
     }
+    assert {"_com_conversation.py", "_com_outcome.py"} <= driver_deps
 
     importers = []
     for path in SCRIPTS.rglob("*.py"):

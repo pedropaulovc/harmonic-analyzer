@@ -27,7 +27,9 @@
 
 ``diff <a> <b> [--result P]``
     Request divergence and per-member response differences between two logs
-    (JSON on stdout); exit 0 when the recipe requests are identical.
+    (JSON on stdout), plus what caused the divergence and whether the two
+    builds made the same part (``_com_outcome``: ``truth_cause``,
+    ``outcome``); exit 0 when the recipe requests are identical.
 
 dodo records every part build through ``record`` and evaluates the shadow
 replay through ``replay`` and ``diff`` (``_replay_shadow``). Nothing here is
@@ -223,7 +225,20 @@ def main(argv: list[str] | None = None) -> int:
     import _com_conversation as conversation
 
     if args.command == "diff":
-        payload = conversation.compare_conversations(args.base, args.new)
+        import _com_outcome
+
+        base, new = conversation.load(args.base), conversation.load(args.new)
+        payload = conversation.compare_conversations(base, new)
+        _com_outcome.label_feature(payload["request_divergence"])
+        payload.update(
+            _com_outcome.judge(
+                base,
+                new,
+                payload["request_divergence"],
+                conversation.capture_dir_of(args.base),
+                conversation.capture_dir_of(args.new),
+            )
+        )
         if args.result is not None:
             _write_json(args.result, payload)
         sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
