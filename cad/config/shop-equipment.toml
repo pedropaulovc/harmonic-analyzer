@@ -155,10 +155,12 @@ note = "Cuts the MHA-SM-02 knife mount's Ø.4720 +.0015/0 REAM THRU bore in pre-
 # archived inventory listed (45952b66bc tools.slitting-saws) cuts both flanks
 # up to r 31.76, past the 31.75 pitch circle, and through the T120 cone mesh's
 # lowest contact near r 31.34. The .014 blade leaves .002 under the MAX for
-# arbor runout. Its 1 in hole fits that archived R8 one-inch-pilot saw arbor;
-# no arbor is bought. Reach: blade radius 1.375 in = 34.9 mm against the
-# notch's .12 depth; the arbor sits 64.1 mm off the gear axis, 9.4 mm above
-# the tips at the archived 45 mm nut diameter.
+# arbor runout. Its 1 in hole fits the R8 one-inch-pilot saw arbor in that
+# archived record, so no arbor is bought; that arbor's ownership and its 45 mm
+# nut diameter are the archived record's #1413 trial placeholders, not shop
+# facts: if no 1 in arbor is on the shelf, one is bought with the saw. Reach:
+# blade radius 1.375 in = 34.9 mm against the notch's .12 depth; the arbor
+# sits 64.1 mm off the gear axis, 9.4 mm above the tips at a 45 mm nut.
 [tools.cylinder-notch-saw]
 name = "TTC 10-215-014 HSS screw-slotting saw, 2-3/4 x .014 x 1 in hole, 72 teeth"
 kind = "slitting_saw"

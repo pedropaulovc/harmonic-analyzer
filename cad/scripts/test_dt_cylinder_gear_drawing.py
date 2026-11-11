@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import runpy
+import tomllib
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ import pytest
 import _config
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _paths import CAD_ROOT
 from _gear_fit_limits import gear_tip_band_mm
 import build_dt_cylinder_gear as part
 import dt_cylinder_gear_notes as notes
@@ -146,20 +148,14 @@ def test_sighted_notch_prints_only_its_flank_clear_maximum() -> None:
     assert _kerf_flank_hits(0.50) > 0
 
 
-def test_the_listed_notch_saw_cuts_inside_the_printed_maximum() -> None:
-    # #2364: the shop's 1/32 saw cuts both flanks past the pitch circle, so
-    # the notch is cut with the not-yet-owned saw recorded for it.
-    import tomllib
-
+def test_the_listed_notch_saw_fits_the_printed_maximum() -> None:
+    # #2364: the archived 1/32 saw is wider than the MAX, so the notch is cut
+    # with the not-yet-owned saw recorded for it. At or under the MAX the
+    # kerf is flank-clear (test_sighted_notch_prints_only_its_flank_clear_maximum).
     saw = tomllib.loads(
-        (
-            Path(spec.__file__).parent.parent / "config" / "shop-equipment.toml"
-        ).read_text(encoding="utf-8")
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )["tools"]["cylinder-notch-saw"]
-    kerf = saw["thickness_in"] * 25.4
-    assert kerf <= spec.NOTCH_WIDTH
-    assert _kerf_flank_hits(kerf) == 0
-    assert _kerf_flank_hits(1 / 32 * 25.4) > 0
+    assert saw["thickness_in"] * 25.4 <= spec.NOTCH_WIDTH
 
 
 def test_notch_width_limit_is_set_and_read_back_natively(monkeypatch) -> None:
