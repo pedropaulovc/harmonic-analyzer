@@ -248,11 +248,12 @@ def _pivot_stack_text(contract):
     # BORE, not REAM (#2445): the shoulder bottoms on the seat's square
     # floor, which a reamer's 45° lead cannot reach at full diameter and a
     # 3/8 end mill reaches only under the shoulder's size; a boring bar
-    # sizes the wall and squares the floor in one pass.
+    # sizes the wall and squares the floor in one pass. Size first, then
+    # the process word (rule 26), as the sheet's 4X DRILL callout reads.
     return (
-        f'BORE <MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        f'<MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} BORE <HOLE-DEPTH>{size("TopBoreDepth")}\n'
         '  LOCATING FIT, TL-VN-77 SHOULDER\n'
-        f'DRILL <MOD-DIAM>{size("TapDrillDia")} THRU\n'
+        f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
         f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
     )
 

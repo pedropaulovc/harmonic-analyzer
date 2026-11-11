@@ -466,9 +466,9 @@ def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
 
 
 _PIVOT_GENERATED_TEXT = (
-    'BORE <MOD-DIAM>.3750 +.0015/+.0005 <HOLE-DEPTH>.359\n'
+    '<MOD-DIAM>.3750 +.0015/+.0005 BORE <HOLE-DEPTH>.359\n'
     '  LOCATING FIT, TL-VN-77 SHOULDER\n'
-    'DRILL <MOD-DIAM>.257 THRU\n'
+    '<MOD-DIAM>.257 DRILL THRU\n'
     '5/16-18 UNC TAP THRU BELOW SEAT'
 )
 
@@ -962,8 +962,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     if fault == 'split_symbols':
         first = spans.pop(0)
         spans[:0] = [
-            replace(first, text='BORE', xmax=.199),
-            replace(first, text='.3750+.0015/+.0005', xmin=.202, xmax=.248),
+            replace(first, text='.3750+.0015/+.0005BORE', xmin=.193, xmax=.248),
             replace(first, text='.359', xmin=.251, xmax=.263),
         ]
     elif fault == 'unordered_display':

@@ -63,7 +63,7 @@ FINISH_STOCK_MIN_BY_PASS = {"inner": FINISH_STOCK_MIN, "outer": 0.30}
 
 # Transfer from the ACTUAL carrier taps after edge registration: a pilot run
 # up through each tap from below, opened from above in place (TL-00 steps
-# 19G-19J; #2443). Predrilling nominal stations from a separately displaced
+# 19F-19H; #2443). Predrilling nominal stations from a separately displaced
 # raw blank would add an invalid stack.
 CLAMP_TRANSFER_POINTS = (trammel.CL, trammel.CR)
 CLAMP_TRANSFER_BAND = printed_band_mm(2, unit=riser.UNIT)
@@ -83,7 +83,7 @@ def _vertices(radius: float, stations: tuple[float, ...]) -> tuple[Point, ...]:
 INNER_ANCHORS = _vertices(INNER_ANCHOR_RADIUS, INNER_STATIONS)
 OUTER_ANCHORS = _vertices(OUTER_ANCHOR_RADIUS, OUTER_STATIONS)
 # Layout from the blank's end midpoint X0 and registered raw edge Y0, not
-# from a pre-existing HUB hole. Values stay physical mm; TL-00 steps 19B-19C print
+# from a pre-existing HUB hole. Values stay physical mm; the TL-00 strap blank layout table prints
 # these exact rounded coordinates as .XXX inch reference stations.
 LAYOUT_DATUM = (0.0, RAW_Y_MIN)
 LAYOUT_MARKS = {

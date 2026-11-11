@@ -1586,6 +1586,8 @@ ALIGNMENT_PLACES = 4
 ALIGNMENT_INDICATOR = ".0001 SPINDLE TEST INDICATOR"
 # The tables print on sheet 10, the strap holding sheet (the drawing asserts it).
 SETTING_SHEET_NUMBER = 10
+# The strap blank layout table prints on sheet 11, the strap cutting sheet.
+LAYOUT_SHEET_NUMBER = 11
 ASSEMBLED_CAPTION = (
     "SHOWN: INNER PASS, SHOULDER SCREWS IN A1/B1, AT THE SYMMETRIC POSITION "
     f"(PASS TABLE, SHEET {SETTING_SHEET_NUMBER}). OUTER PASS: A2/B2. MACHINE "
@@ -2469,7 +2471,7 @@ ASSEMBLY_STEPS = (
     "10C. RETURN THE TABLE TO THE ORIGIN AS IN STEP 6F.",
     f"10D. MOVE THE TABLE TO {_HUB_DRO} BY A {_HUB_Y_TEXT} GAUGE STACK IN Y, AS "
     "THE RAIL SETTING TABLE'S TITLE STATES.",
-    "10E. RECORD THIS DRO SETTING FOR STEPS 19F AND 20.",
+    "10E. RECORD THIS DRO SETTING FOR STEPS 19E AND 20.",
     f"10F. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
     "SETTING, SPOT FIRST, SPINDLE-GUIDED, NO COUNTERBORE.",
     f"11. STAND THE {QUANTITIES[STOP_PIN]} STOP PINS {_item(STOP_PIN)} CHAMFERED "
@@ -2554,24 +2556,41 @@ _GROOVE = (
 # The layout marks are blank_spec.LAYOUT_MARKS (inches from the end midpoint
 # and the lower raw edge, on the .XXX grid its proof charges); the saw corridor
 # is blank_spec.SAW_EDGE_TOLERANCE, rounded down to the printed places.
-def _layout_chain(marks: tuple[tuple[float, float], ...]) -> str:
-    """A chain's marks in X order from 0, a mirror pair as ``X -a AND a AT
-    Y b``: never ``±``, which the sequence keeps for tolerances."""
+# Before step 1, while the mill table is free: the blanks are cut square and
+# faced (the jig then fills the table), printed ahead of the steps.
+_BLANK_LENGTH = _length(trammel.BLANK_LENGTH, 2)
+BLANK_PREPARATION = (
+    "BEFORE STEP 1, WITH THE MILL TABLE FREE: CUT EACH STRAP BLANK SQUARE TO "
+    f"{_BLANK_LENGTH} LONG AND FACE IT TO THE {strap.NUMBER} THICKNESS, FOR STEP 19."
+)
+
+
+def _layout_rows(name: str, marks: tuple[tuple[float, float], ...]) -> tuple[tuple[str, str, str], ...]:
+    """A chain's marks in X order from 0, one row per mirror pair (the table
+    title says each X is marked at -X and +X): never ``±``, which the
+    sequence keeps for tolerances."""
     pairs: dict[float, float] = {}
     for x, y in marks:
         if pairs.setdefault(abs(x), y) != y:
             raise AssertionError("a layout chain is no longer symmetric about X 0")
-    return ", ".join(
-        ("X 0" if not x else f"X -{_length(x, blank.LAYOUT_PLACES)} AND {_length(x, blank.LAYOUT_PLACES)}")
-        + f" AT Y {_length(y, blank.LAYOUT_PLACES)}"
+    return tuple(
+        (name, _length(x, blank.LAYOUT_PLACES) if x else "0", _length(y, blank.LAYOUT_PLACES))
         for x, y in sorted(pairs.items())
     )
 
 
-_INNER_MARKS = _layout_chain(blank.LAYOUT_MARKS["inner"])
-_OUTER_MARKS = _layout_chain(blank.LAYOUT_MARKS["outer"])
+# The strap blank layout table, atop sheet 11's right column
+# (machinist review: a location is a table row, not a sentence).
+BLANK_LAYOUT_TITLE = (
+    "STRAP BLANK LAYOUT (STEPS 19-19C): X FROM X 0 MIDWAY BETWEEN THE SQUARE "
+    "ENDS, Y FROM THE LOWER RAW EDGE; EACH NONZERO X MARKED AT -X AND +X."
+)
+BLANK_LAYOUT_HEADER = ("CHAIN", "X", "Y")
+BLANK_LAYOUT_ROWS = (
+    *_layout_rows("INNER", blank.LAYOUT_MARKS["inner"]),
+    *_layout_rows("OUTER", blank.LAYOUT_MARKS["outer"]),
+)
 _SAW_CORRIDOR = _bound(blank.SAW_EDGE_TOLERANCE, 3, up=False)
-_BLANK_LENGTH = _length(trammel.BLANK_LENGTH, 2)
 # The end-clamp pilot runs up through the carrier's #8-32 CL/CR taps from
 # below, as step 11C spots the riser: the riser's #30 drill, at its drilled
 # oversize, passes inside the taps' own tap drill, so it never cuts their
@@ -2631,26 +2650,23 @@ OPERATION_STEPS = (
     f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
     f"18B. IF A GROOVE IS SHALLOW, DEEPEN IT TO {_GROOVE[0]} AS IN STEP 18.",
     "18C. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18 ON A NEW RISER.",
-    f"19. PREPARE EACH STRAP BLANK CUT SQUARE TO {_BLANK_LENGTH} LONG AND FACED "
-    f"TO THE {strap.NUMBER} THICKNESS BEFORE STEP 1: THE JIG THEN FILLS THE TABLE.",
-    "19A. MARK X 0 ON THE BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 ALONG "
-    "ITS LOWER RAW EDGE.",
-    "19B. MARK THE INNER CHAIN FROM X 0, Y 0, ANY POINT OFF THE BLANK ON THE "
-    f"LAYOUT SURFACE BESIDE IT: {_INNER_MARKS}.",
-    "19C. MARK THE OUTER CHAIN FROM X 0, Y 0, ANY POINT OFF THE BLANK ON THE "
-    f"LAYOUT SURFACE BESIDE IT: {_OUTER_MARKS}.",
-    "19D. JOIN EACH CHAIN'S MARKS IN X ORDER WITH STRAIGHT LINES TO BOTH "
+    "19. MARK X 0 ON EACH PREPARED BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 "
+    "ALONG ITS LOWER RAW EDGE.",
+    "19A. MARK THE INNER CHAIN'S POINTS FROM THE STRAP BLANK LAYOUT TABLE (SHEET "
+    f"{LAYOUT_SHEET_NUMBER}), ANY POINT OFF THE BLANK ON THE LAYOUT SURFACE BESIDE IT.",
+    "19B. MARK THE OUTER CHAIN'S POINTS FROM THE SAME TABLE IN THE SAME WAY.",
+    "19C. JOIN EACH CHAIN'S MARKS IN X ORDER WITH STRAIGHT LINES TO BOTH "
     "SQUARE ENDS, ON THE BLANK ONLY.",
-    "19E. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
+    "19D. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
     f"CHAIN, KERF ON THE WASTE SIDE: EACH EDGE WITHIN {_SAW_CORRIDOR} OF ITS LINE.",
-    "19F. WITH THE CARRIER ON A1 AND B1 AT THE SYMMETRIC ROW AS IN STEPS 10 AND "
+    "19E. WITH THE CARRIER ON A1 AND B1 AT THE SYMMETRIC ROW AS IN STEPS 10 AND "
     "15-15H, SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
     "STOP PINS, ITS X 0 MARK UNDER THE SPINDLE AT THE STEP 10E SETTING.",
-    f"19G. CLAMPED AS IN STEP 11B, DRILL A {_PILOT_DRILL} PILOT THRU THE BLANK "
+    f"19F. CLAMPED AS IN STEP 11B, DRILL A {_PILOT_DRILL} PILOT THRU THE BLANK "
     "FROM BELOW THROUGH EACH OF THE CARRIER'S 2 END-CLAMP TAPS.",
-    f"19H. OPEN EACH PILOT TO {blank.CLAMP_DRILL} FROM ABOVE, SPINDLE-GUIDED, "
+    f"19G. OPEN EACH PILOT TO {blank.CLAMP_DRILL} FROM ABOVE, SPINDLE-GUIDED, "
     "THRU THE BLANK INTO THE RISER'S HOLE: NEVER INTO THE CARRIER.",
-    f"19J. REPLACE THE CLAMP WITH 2 {_STRAP_CLAMPS} TIGHTENED DIRECTLY ON THE "
+    f"19H. REPLACE THE CLAMP WITH 2 {_STRAP_CLAMPS} TIGHTENED DIRECTLY ON THE "
     "STRAP INTO THE CARRIER'S 2 END-CLAMP TAPS.",
     "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10E.",
     f"20A. DRILL THE STRAP'S HUB HOLE THRU {_HUB_DRILLS} WITH A LIGHT HAND "
@@ -2684,6 +2700,14 @@ if not TOOLING_TOP_Z_MAX >= _STOP_PIN_TOP_MAX > max(_HUB_HEAD_TOP_MAX, *holding.
     raise AssertionError("the stop pins no longer stand tallest over the strap")
 if holding.CLAMP_TOP_Z["CL"] != holding.CLAMP_TOP_Z["CR"]:
     raise AssertionError("the CL and CR heads no longer stand at one height")
+# The feed-lever screw heads, on the lever at the carrier's -Y edge, stand
+# above the stop pins but off the strap: the note names both so the clearance
+# steps read the true fixture top (TL-00 machinist review, #2559).
+LEVER_HEAD_TOP_Z = LEVER_SCREW_PLACEMENTS[0][0][2] + lever_screw.DIMS.head_h
+if not all(abs(p[0][2] - LEVER_SCREW_PLACEMENTS[0][0][2]) < 1e-9 for p in LEVER_SCREW_PLACEMENTS):
+    raise AssertionError("the feed-lever screw heads no longer stand at one height")
+if not LEVER_HEAD_TOP_Z > TOOLING_TOP_Z_MAX:
+    raise AssertionError("the feed-lever heads no longer stand above the stop pins")
 # The heights from the table top the tooling-clearance and depth steps
 # read as references only.
 REFERENCE_HEIGHTS = (
@@ -2691,8 +2715,9 @@ REFERENCE_HEIGHTS = (
     f"STRAP TOP {_length(PART_TOP_Z, 3)}, SHOULDER-SCREW HEADS "
     f"{_length(PIVOT_HEAD_TOP_Z, 3)}, END-CLAMP HEADS "
     f"{_length(holding.CLAMP_TOP_Z['CL'], 3)}, HUB CLAMP HEAD "
-    f"{_length(holding.CLAMP_TOP_Z['hub'], 3)}. THE STOP PIN TOPS STAND "
-    f"TALLEST: FIXTURE TOP {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX."
+    f"{_length(holding.CLAMP_TOP_Z['hub'], 3)}, FEED-LEVER SCREW HEADS "
+    f"{_length(LEVER_HEAD_TOP_Z, 3)} (FIXTURE TOP). OVER THE STRAP THE STOP PIN "
+    f"TOPS STAND TALLEST: {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX."
 )
 # Sheet 2, under the BOM: what item 8's QTY counts and the fitting stock to
 # buy (owner ruling 2026-10-27), the rail kit's acceptance (#2177; its

@@ -1928,7 +1928,7 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
     assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
     assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
-    assert "RECORD" in steps["10E"] and "STEPS 19F AND 20" in steps["10E"]
+    assert "RECORD" in steps["10E"] and "STEPS 19E AND 20" in steps["10E"]
     assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
     assert "STEP 10E" in steps["20"]
     assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
@@ -2066,20 +2066,22 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     # saw corridor, clamp holes, hub drilling and both passes are steps.
     assert not any("PLAN" in text for text in steps.values())
     assert "BEFORE THE FIRST STRAP" in steps["18"]
-    assert spec.strap.NUMBER in steps["19"] and spec._BLANK_LENGTH in steps["19"]
-    for chain, head in (("inner", "19B"), ("outer", "19C")):
+    # The blanks are prepared before step 1, while the table is free.
+    assert spec.strap.NUMBER in spec.BLANK_PREPARATION and spec._BLANK_LENGTH in spec.BLANK_PREPARATION
+    # Every layout mark is a table row (both signs by the title), never a
+    # ± sentence; the steps cite the table.
+    rows = {(chain, x, y) for chain, x, y in spec.BLANK_LAYOUT_ROWS}
+    for chain in ("inner", "outer"):
         for x, y in spec.blank.LAYOUT_MARKS[chain]:
-            assert f"Y {spec._length(y, 3)}" in steps[head]
-            assert (f"X -{spec._length(abs(x), 3)} AND " if x else "X 0") in steps[head]
-    # Mirror pairs never borrow the tolerance sign.
-    assert "±" not in steps["19B"] + steps["19C"]
-    assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19E"]
+            assert (chain.upper(), spec._length(abs(x), 3) if x else "0", spec._length(y, 3)) in rows
+    assert not any("±" in cell for row in spec.BLANK_LAYOUT_ROWS for cell in row)
+    assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19D"]
     # The clamp holes are piloted from the carrier's own taps (a pilot under
-    # the thread's minor diameter), then opened to the clearance drill.
-    assert spec.riser.SCREW_DRILL in steps["19G"] and spec.blank.CLAMP_DRILL in steps["19H"]
-    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19J"]
+    # the tap drill), then opened to the clearance drill.
+    assert spec.riser.SCREW_DRILL in steps["19F"] and spec.blank.CLAMP_DRILL in steps["19G"]
+    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19H"]
     order = list(steps)
-    assert order.index("19E") < order.index("19F") < order.index("19G") < order.index("19H") < order.index("19J")
+    assert order.index("19D") < order.index("19E") < order.index("19F") < order.index("19G") < order.index("19H")
     # #2444: the hub hole is opened in steps, the last one the pre-ream drill,
     # then reamed to the strap's hub hole.
     assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
@@ -2877,8 +2879,11 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     )
     washer = spec._component_local_boxes()[spec.HUB_WASHER]
     assert washer[2] == (-spec.hub_washer.SPIGOT_LENGTH, spec.hub_washer.THICK)
-    assert "THE STOP PIN TOPS STAND TALLEST" in spec.REFERENCE_HEIGHTS
-    assert f"FIXTURE TOP {spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
+    # Both tops print: the true fixture top (the feed-lever heads) and the
+    # stop pins, tallest over the strap.
+    assert spec.LEVER_HEAD_TOP_Z > spec.TOOLING_TOP_Z_MAX
+    assert spec._length(spec.LEVER_HEAD_TOP_Z, 3) in spec.REFERENCE_HEIGHTS
+    assert f"{spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert "BOTH STOP PINS AT FULL HEIGHT" in steps["17A"]
     # Q5 (Owner ruling 2026-11-08 (Pedro), #2144 item 13.2): the washer clearance prints inch,
