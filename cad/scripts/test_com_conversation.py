@@ -16,6 +16,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import dataclasses
+import gzip
 import importlib.util
 import json
 import math
@@ -1275,10 +1276,20 @@ def test_mass_measurements_match_in_any_order():
     # The same bodies measured in another order: the same part.
     assert _mass(base, _bodies(*_LINKS[1:], _LINKS[0]))[0] == "same"
     assert _mass(base, _bodies(_LINKS[1], _LINKS[0], *_LINKS[2:]))[0] == "same"
-    # One body's volume 1e-6 larger, in any order: another part.
+    # One body's volume 1e-6 larger, in another order: another part. The
+    # detail names that body (the base's third) against its grown self (the
+    # new build's second) and the volume, not the mirrored pin now in its
+    # place, whose centre differs.
     grown = (*_LINKS[2][:3], _LINKS[2][3] * (1 + 1e-6), *_LINKS[2][4:])
     signal, detail = _mass(base, _bodies(_LINKS[1], grown, _LINKS[3], _LINKS[0]))
-    assert (signal, detail["member"]) == ("different", "IBody2.GetMassProperties")
+    assert signal == "different"
+    assert {k: detail[k] for k in ("member", "quantity", "ordinal", "nearest")} == {
+        "member": "IBody2.GetMassProperties",
+        "quantity": "Volume",
+        "ordinal": 2,
+        "nearest": 1,
+    }
+    assert float(detail["tolerances"]) == pytest.approx(1e3, rel=0.01)
     # A body more: counted.
     assert _mass(base, _bodies(*_LINKS, _LINKS[0])) == (
         "different",
@@ -1331,10 +1342,11 @@ def test_an_imassproperty_object_is_one_measurement():
     one, two = _measured(5, *first), _measured(6, *second)
     assert _mass(base, [one[0], two[0], one[1], two[1]])[0] == "same"
     # Each volume with the other's centre: the same answers per member, but
-    # other bodies.
+    # other bodies. The nearest unpaired one is judged on its volume.
     swapped = [*_measured(7, first[0], second[1]), *_measured(8, second[0], first[1])]
     signal, detail = _mass(base, swapped)
-    assert (signal, detail["member"]) == ("different", "IMassProperty.CenterOfMass")
+    assert (signal, detail["ordinal"], detail["nearest"]) == ("different", 0, 1)
+    assert (detail["member"], detail["quantity"]) == ("IMassProperty.Volume", "Volume")
 
 
 def _stl(*triangles: tuple[tuple[float, ...], ...], normal=(0.0, 0.0, 0.0)) -> bytes:
@@ -1447,6 +1459,60 @@ def test_stl_geometry_of_a_curved_face_is_its_facets():
         )
         == "bytes"
     )
+    # A right-sized binary STL with a NaN or an infinity is its digest.
+    corners = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
+    finite = _com_outcome._mesh(_stl(tuple(corners)))
+    for bad in (math.nan, math.inf, -math.inf):
+        broken = _com_outcome._mesh(_stl((corners[0], corners[1], (bad, 1.0, 0.0))))
+        assert broken.startswith("bytes:"), bad
+        assert _com_outcome._mesh_difference(finite, broken) == "bytes"
+
+
+def _corrupt_stl_record(log: Path) -> None:
+    """Drop the file name from the log's record of its STL capture (the
+    engine's capture comparison reads only its sha256)."""
+    lines = gzip.decompress(log.read_bytes()).decode("utf-8").splitlines()
+    for index, text in enumerate(lines):
+        line = json.loads(text)
+        if "trailer" not in line:
+            continue
+        for files in line["trailer"]["captured"].values():
+            for rel, kept in files.items():
+                if rel.endswith(".STL"):
+                    del kept["file"]
+        lines[index] = json.dumps(line)
+    log.write_bytes(gzip.compress(("\n".join(lines) + "\n").encode("utf-8")))
+
+
+def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeypatch):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    reordered = _shaped(tmp_path / "b", monkeypatch, _REORDERED)
+    _corrupt_stl_record(reordered)
+    diff = _diff(base, reordered, tmp_path / "diff.json")
+    assert diff["request_divergence"]["member_expected"] == "IFace2.Select"
+    assert diff["truth_cause"] == "response:IFace2.Normal"
+    assert diff["outcome"] == "unknown"
+    assert diff["outcome_signals"] == {**_ALL_SAME, "stl": "absent"}
+    assert diff["outcome_details"]["stl"]["error"] == "KeyError: 'file'"
+
+    # Any fault of the judgement: unknown, recorded, the divergence kept.
+    def fault(*args: Any) -> Any:
+        raise RuntimeError("injected\njudge fault")
+
+    monkeypatch.setattr(_com_outcome, "_mass_signal", fault)
+    diff = _diff(base, reordered, tmp_path / "mass.json")
+    assert diff["outcome_signals"]["mass"] == "absent"
+    assert diff["outcome_details"]["mass"] == {
+        "error": "RuntimeError: injected judge fault"
+    }
+    monkeypatch.setattr(_com_outcome, "outcome", fault)
+    monkeypatch.setattr(_com_outcome, "truth_cause", fault)
+    diff = _diff(base, reordered, tmp_path / "all.json")
+    assert diff["request_divergence"]["member_expected"] == "IFace2.Select"
+    assert diff["truth_cause"] == "error:RuntimeError"
+    assert diff["outcome"] == "unknown"
+    assert set(diff["outcome_signals"].values()) == {"absent"}
+    assert diff["outcome_details"]["truth_cause"]["error"].startswith("RuntimeError")
 
 
 def test_caller_capture_modes(tmp_path, monkeypatch):

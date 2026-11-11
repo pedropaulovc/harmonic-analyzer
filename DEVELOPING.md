@@ -2504,21 +2504,25 @@ not held. Next, the base log is compared with this build's own fresh recording
   against `Part12`), the masked provenance value, and floats within 1e-9 of
   their value's largest float. The named answer need not have steered the
   request: when a source edit follows a reordering, the reordering is named.
+  `error:<type>` means judging the cause raised (message in
+  `outcome_details.truth_cause`).
 - `artefact_outcome`: whether the fresh build made the base's part, from four
   signals that do not depend on call order (`outcome_signals`):
 
   | signal | compared |
   | --- | --- |
-  | `mass` | every mass-property measurement, as a multiset per kind: one `*.GetMassProperties*` answer (one body), or every answer read from one `IMassProperty` object, in the order read (so a volume stays paired with its own centre and inertia). Each measurement must pair with one of the other build's within tolerance, by an assignment (Kuhn's augmenting paths; closeness is not transitive, so pairing greedily or by a sort key could strand one). A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
+  | `mass` | every mass-property measurement, as a multiset per kind: one `*.GetMassProperties*` answer (one body), or every answer read from one `IMassProperty` object, in the order read (so a volume stays paired with its own centre and inertia). Each measurement must pair with one of the other build's within tolerance, by an assignment (Kuhn's augmenting paths; closeness is not transitive, so pairing greedily or by a sort key could strand one). A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero. The first measurement the assignment cannot pair is reported with the other build's unpaired measurement nearest to it (in tolerances) and the quantity farthest beyond tolerance against that one |
   | `requests` | the multiset of recipe requests, handles erased, noise normalised |
   | `answers` | the multiset of (request, answer) pairs, but for mass properties and answers about the session (`IModelDoc2.SummaryInfo` dates, `ISldWorks.GetUserPreference*`) |
-  | `stl` | each exported STL's geometry, whatever its triangulation: the same set of float32 vertices and, per plane, the same outline (the edges just one of the plane's triangles uses, in its winding) and the same area within 1e-9 of the total. A plane is the triangles whose unit normal (to 1e-4) and offset (to 1e-3 mm) bins touch. A curved face has no plane: each flat facet is one, so a curved face re-tessellated over the same vertices compares `different` (a missed reuse, never an unsound one). Triangle order, corner rotation, facet normals and the header are no part of it; a file that is not a well-formed binary STL is compared byte for byte |
+  | `stl` | each exported STL's geometry, whatever its triangulation: the same set of float32 vertices and, per plane, the same outline (the edges just one of the plane's triangles uses, in its winding) and the same area within 1e-9 of the total. A plane is the triangles whose unit normal (to 1e-4) and offset (to 1e-3 mm) bins touch. A curved face has no plane: each flat facet is one, so a curved face re-tessellated over the same vertices compares `different` (a missed reuse, never an unsound one). Triangle order, corner rotation, facet normals and the header are no part of it; a file that is not a well-formed binary STL of finite coordinates is compared byte for byte |
 
   `same`: all four are present and agree. `different`: one differs, or is in
   one log only. `unknown`: nothing differs, but neither log holds a
-  mass-property snapshot or an STL export, or a capture cannot be read. SLDPRT
-  and BMP captures are no signal: a part file's bytes differ on every save, a
-  screenshot's with the seat.
+  mass-property snapshot or an STL export, a capture cannot be read, or
+  judging a signal raised (that signal is `absent`, its error its
+  `outcome_details` entry; the diff's result and request divergence are
+  kept). SLDPRT and BMP captures are no signal: a part file's bytes differ on
+  every save, a screenshot's with the seat.
 
 Every verdict has a `verdict_class`:
 
