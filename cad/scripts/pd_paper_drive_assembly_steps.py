@@ -34,10 +34,11 @@ DRAWING_NUMBER = "MHA-PD-00"
 # (CONTRACT-paper-drive.md §13.2 procedure (1)): the 16T set on its feeler and
 # the seat washer faced (MHA-DT-00 "crank-mesh-checked"), then the selected chain
 # wheel on the crankshaft (MHA-DT-00 "paper-drive-wheel"). Cited by key so the
-# pointer follows any renumbering of MHA-DT-00; both print on its cone-and-crank
-# sequence sheet (draw_dt_drive_train_assembly.SEQUENCE_SHEET).
+# pointer follows any renumbering of MHA-DT-00; both print on its crank
+# sequence sheet (draw_dt_drive_train_assembly.CRANK_SHEET, sheet 8 since #2470
+# added it).
 CRANK_SIDE_KEYS = ("crank-mesh-checked", "paper-drive-wheel")
-CRANK_SIDE_SHEET = 7
+CRANK_SIDE_SHEET = 8
 CRANK_SIDE_REF = (
     f"{dt_drive_train_steps.DRAWING_NUMBER} SHEET {CRANK_SIDE_SHEET}, STEPS "
     + " AND ".join(str(dt_drive_train_steps.step_number(key)) for key in CRANK_SIDE_KEYS)

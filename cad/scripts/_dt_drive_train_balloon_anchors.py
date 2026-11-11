@@ -46,6 +46,11 @@ The cone gear is pinned mid-stack, dt-cone-gear-10: dt-cone-gear-1 sat
 against MHA-DT-07 before the gears slid toward the tip, and its walked
 leader ended 1.9 mm from the 64T gear's (machinist review of 82158b1bb,
 balloons 35 and 36).
+
+MHA-DT-VN-67 is pinned to dt-vn-crank-seat-drive-pin-2, the pin that the
+explode leaves standing clear above the crankshaft. The walk on -1 landed on
+that pin's sliver showing past the MHA-DT-11 collar's back face, beside the
+keeper chain (machinist review of 30dde0c577, balloon 44, two runs).
 """
 
 from __future__ import annotations
@@ -83,7 +88,9 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
     },
     "crank": {
         "dt-crankshaft": BalloonAnchor(),
-        "dt-vn-crank-seat-drive-pin": BalloonAnchor(),
+        "dt-vn-crank-seat-drive-pin": BalloonAnchor(
+            instance="dt-vn-crank-seat-drive-pin-2"
+        ),
         "dt-crank-pinion": BalloonAnchor(),
         "dt-crank-hub": BalloonAnchor(),
         "dt-vn-crank-hub-pin": BalloonAnchor(),

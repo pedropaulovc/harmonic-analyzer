@@ -231,11 +231,11 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     pointers = re.findall(r"(MHA-[A-Z]{2}-00)\b SHEET (\d+), STEPS (\d+) AND (\d+)", text)
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
-        (assembly_contract("dt-drive-train").number, str(drive_train.SEQUENCE_SHEET), *wanted)
+        (assembly_contract("dt-drive-train").number, str(drive_train.CRANK_SHEET), *wanted)
     ]
     assert steps.CRANK_SIDE_KEYS == ("crank-mesh-checked", "paper-drive-wheel")
-    # The cone-and-crank steps are the note package_note_fields stacks on
-    # SEQUENCE_SHEET.
+    # The cone-and-crank steps are the note package_note_fields stacks from
+    # SEQUENCE_SHEET; steps 4 and 5 print on CRANK_SHEET.
     printed = {number for number, _letter in STEP_HEAD.findall(drive_train.CONE_CRANK_STEPS)}
     assert set(wanted) <= printed
     fitup_ref = steps.step_number(drawing.FITUP_CHAIN_KEY)

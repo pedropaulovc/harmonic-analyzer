@@ -204,6 +204,7 @@ SHEET_NAMES = (
     "CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
+    "ASSEMBLY SEQUENCE CONT. - CRANK",
     "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG",
     "ASSEMBLY SEQUENCE CONT. - PINION RIG + CONE SET ON THE BASE",
@@ -234,26 +235,30 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # extra sheets as needed").  The rubric sample review of v47 split every step
 # into one-thing sub-steps (rule 22), so a field may end inside a step, at a
 # lettered sub-step, and its pointer names that sub-step.  The numbered steps
-# read in sheet order: 1-5 on sheet 7 (MHA-PD-00 cites 4 and 5 there), 6-23
-# on 8-10 (split at the sub-steps below); the checks follow the full-detail view
-# (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 -> 8 -> 11).
+# read in sheet order: 1-3 on sheet 7, 4-6 on sheet 8 (MHA-PD-00 cites 4 and
+# 5 there), 7-23 on 9-11 (split at the sub-steps below); the checks follow the
+# full-detail view (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 ->
+# 8 -> 11).  #2470's two-cure tip bonds outgrew sheet 7, which held 1-5, so
+# sheet 8 was added rather than shrinking sheet 7's view (rule 15; Codjiflo
+# review of PR #2531).
 SEQUENCE_SHEET = 7
-BANK_SHEET = 8
-FIT_SHEET = 9
-CONTINUATION_SHEET = 10
+CRANK_SHEET = 8
+BANK_SHEET = 9
+FIT_SHEET = 10
+CONTINUATION_SHEET = 11
 # Every view at 1:2 or smaller prints the teeth/thread-free "Default
 # Simplified" configuration (the policy in _drawing_view_configuration); the
 # user asked for the ENTIRE drive train at 1:2 or larger with every modeled
-# tooth and thread, so sheet 11 carries it.
-FULL_DETAIL_SHEET = 11
-CHECKS_SHEET = 12
-# Step 9D sets the spring gap beside MHA-DT-VN-68 on sheet 13's Detail A.
-BANK_SETTINGS_SHEET = 13
+# tooth and thread, so sheet 12 carries it.
+FULL_DETAIL_SHEET = 12
+CHECKS_SHEET = 13
+# Step 9D sets the spring gap beside MHA-DT-VN-68 on sheet 14's Detail A.
+BANK_SETTINGS_SHEET = 14
 # The DRO targets, feeler stacks, pedestal recheck record and the cone
 # station table: the sheet the steps and checks read their numbers from.
-SETTING_SHEET = 14
+SETTING_SHEET = 15
 # Owner ruling 2026-11-08 (Pedro): one labelled code key defines the cone-gear
-# codes and GEAR 0-19 (code_key_text).  It is the sheet 14 station table,
+# codes and GEAR 0-19 (code_key_text).  It is the sheet 15 station table,
 # titled as the key, and every step sheet's first heading points to it.
 CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET})"
 CODE_KEY_POINTER = f"(CODES: SHEET {SETTING_SHEET} KEY)"
@@ -266,7 +271,7 @@ BANK_SETTING_CENTER = (0.193, 0.195)
 BANK_SPRING_DETAIL_CENTER = (0.105, 0.075)
 BANK_SPRING_CROP_RADIUS_MM = 8.0
 # The bank's settings are labelled on its views, each label naming its
-# setting-table row on sheet 14 (rubric sample review of v47: the steps'
+# setting-table row on sheet 15 (rubric sample review of v47: the steps'
 # equations needed a labelled sketch).  (text, top-left sheet point, model
 # point in mm the leader tip lands on); the spring gap's sits beside Detail A.
 # The layout audit boxes a leader note from its text to its tip, so the three
@@ -299,18 +304,18 @@ BANK_SPRING_LABEL = (
     (0.145, 0.115),
     (cone_line.X_DRUM, bank_settings.AXIS_Y + 5.0, sum(bank.BANK_SPRING_Z) / 2.0),
 )
-# Sheet 13's bank and drum views are removed views of parts alone, so each is
+# Sheet 14's bank and drum views are removed views of parts alone, so each is
 # lettered with its scale and named by a viewing arrow on the sheet 1 FRONT
 # view (drawing-guidelines rule 9; rubric sample round 2).  Both look from
 # the FRONT view's LEFT (model +X, SolidWorks *Right): C runs high on the
 # bank, D just under the arbor axis, 42 mm apart in the model (14 mm at 1:3)
 # so the two letters clear the layout audit's 7.71 mm row pitch as separate
-# blocks (round 3 failed merged-blocks at 8 mm).  Detail A is sheet 13's own
+# blocks (round 3 failed merged-blocks at 8 mm).  Detail A is sheet 14's own
 # letter; MHA-FR-05's print owns its VIEW B.
 BANK_VIEW_LETTER = "C"
 DRUM_VIEW_LETTER = "D"
 # Rule 9 (rubric sample round 11): a view label prints its scale only where it
-# differs from its sheet's; sheet 13 is at BANK_SETTING_SCALE, so only
+# differs from its sheet's; sheet 14 is at BANK_SETTING_SCALE, so only
 # DETAIL A (4:1) carries one.
 BANK_VIEW_CAPTION = f"VIEW {BANK_VIEW_LETTER} - CYLINDER BANK ONLY (ARROW: SHEET 1)"
 DRUM_VIEW_CAPTION = (
@@ -356,7 +361,7 @@ DRUM_STATION_CROP_RADIUS_MM = (
 DRUM_STATION_TEXT_Y = (
     DRUM_STATION_SETTING_CENTER[1] + DRUM_STATION_CROP_RADIUS_MM / 1000.0 + 0.008 + 3 * 0.0056
 )
-# Sheet 13 reads back every setting spec's model-owned dimension the same way.
+# Sheet 14 reads back every setting spec's model-owned dimension the same way.
 SETTING_SPECS = (drum_station_setting,)
 SETTING_DIMENSIONS = {
     feature: names for spec in SETTING_SPECS for feature, names in spec.DRAWING_DIMENSIONS.items()
@@ -617,7 +622,7 @@ SEQUENCE_LEFT_FIELD = (
     NOTE_FIELD_LEFT[2],
     SEQUENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
 )
-# Sheet 14: the setting, pedestal recheck and feeler stack tables stack down
+# Sheet 15: the setting, pedestal recheck and feeler stack tables stack down
 # the left from NOTE_FIELD_LEFT's top (SETTING_TABLE_LEFT); the cone station
 # table prints right of the narrow feeler stack table, under the pedestal
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
@@ -629,10 +634,10 @@ SEQUENCE_LEFT_FIELD = (
 # 20261110T035403233Z measured the key's bottom at 112.5 mm with 0.6 line
 # spare in the 110 mm field).
 STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
-# The external interfaces print on sheet 14 under the feeler stack table,
-# left of the title block (x 216 mm): sheet 12's right field holds the checks
+# The external interfaces print on sheet 15 under the feeler stack table,
+# left of the title block (x 216 mm): sheet 13's right field holds the checks
 # continuation and saved pose (rubric sample round 4: the one-thing check
-# lines outgrew sheet 12).  Round 16's .004 and .020 rows (5.5 mm each, the
+# lines outgrew sheet 13).  Round 16's .004 and .020 rows (5.5 mm each, the
 # R16 print's pitch) take the table bottom from ~120 to ~109 mm.
 INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.101, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
@@ -661,7 +666,7 @@ BOM_REFERENCE_VIEW_FIELD = (
 )
 BOM_REFERENCE_NOTE_FIELD = (0.100, 0.072, BOM_REFERENCE_FIELD[2], 0.040)
 
-# --- sheet 11: the whole drive train, full detail ----------------------------
+# --- sheet 12: the whole drive train, full detail ----------------------------
 # The view (outline only) must fit between the one-line heading and the title
 # block row: NOTE_FIELD's top under the heading, and the title block's top
 # (0.0655) plus the BOM's paper clearance plus the caption under the view
@@ -949,6 +954,14 @@ STACK_WINDOW = inch_window(
     ),
     FIT_LIMIT_PLACES,
 )
+# #2362: the shop owns no 5-6 in micrometer (cad/process/shop.toml gauges),
+# but it owns the Mitutoyo 81-piece inch gauge blocks and a test indicator
+# (shop-equipment.toml): the indicator is zeroed on a wrung stack of the
+# bank's nominal length standing on the stop gear 0's cam face sits on, and
+# the stack is the blocks plus its reading at gear 19 (as check 4F adds an
+# indicator reading to a recorded value).  The blocks print at the model leg's own
+# places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo review of #2532).
+STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
 # Step 9D's spring gap is set with one leaf of the rig's STARRETT 66MA gage
 # (v47 machinist review: the blade was never identified); the steps print its
 # inch size and the feeler-stack table its stamped size.
@@ -956,7 +969,7 @@ if round(bank.BANK_SPRING_SET, 2) not in FITUP.FEELER_GAGE_LEAVES_MM:
     raise AssertionError(f"spring set {bank.BANK_SPRING_SET} mm is not one gage leaf")
 BANK_SPRING_FEELER = inch_text(bank.BANK_SPRING_SET, FEELER_PLACES)
 
-# --- sheet 14: the setting tables ----------------------------------------------
+# --- sheet 15: the setting tables ----------------------------------------------
 # Every DRO target the bank steps set, with what to measure first and how to
 # check it, prints once here as a table row the steps cite (rubric sample
 # review of v47: equations in prose and converted millimetre bands).  The DRO
@@ -977,7 +990,7 @@ SETTING_TABLE_ROWS = (
         "GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
         "-",
         STACK_WINDOW,
-        "5-6 IN MICROMETER",
+        "INDICATOR ON BLOCKS",
     ),
     (
         "2",
@@ -1034,7 +1047,7 @@ def _nearest_leaf(setting: float) -> float:
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
         # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "P")),
+        (STACK_FEELER, (STACK_FEELER,), _step_ref("cone-gears-stacked", "R")),
         (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
         (
             FITUP.DRUM_END_SHIM,
@@ -1170,7 +1183,7 @@ CAM_STAKE_NOTE = "\n".join(
         f"(STEP {steps.step_number('cam-collars-set')})",
     )
 )
-# Sheet 11's Right view puts the front cam's tap at (229.2, 129.2) mm, above
+# Sheet 12's Right view puts the front cam's tap at (229.2, 129.2) mm, above
 # the base plate (bottom near y 119 mm), with its hold-down screws hanging to
 # y 106 mm at x 142-145 mm and x 237-248 mm and the caption at y 90.6-95.4 mm
 # (run 20261018T154747118Z, whose 22.5 mm drop overlapped the caption by
@@ -1237,7 +1250,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
-# Step 1P's phasing comb is a shop tool in the cone-gear indexing kit, never
+# Steps 1S and 2B's phasing comb is a shop tool in the cone-gear indexing kit, never
 # a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
 # and its blade (machinist review of bd81283964: an undefined tool and word).
 PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
@@ -1288,7 +1301,7 @@ CONE_CRANK_STEPS = _note_text(
         # gears close; the wrap counts 1B's placeholder at its width.  Codjiflo
         # review of PR 2: the tip's stations come only from closed faces (T018
         # on T024, T012 on T018, MHA-DT-37's leaves on T012; the spigot never
-        # bottoms), so 1E and 1R push MHA-DT-37 through that chain to T024.
+        # bottoms), so 1E and 2A push MHA-DT-37 through that chain to T024.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
         "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
@@ -1304,22 +1317,57 @@ CONE_CRANK_STEPS = _note_text(
         "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
         "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
         "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        # #2470: T024 slides back along its coated land onto the feeler, so
+        # its squeeze-out reaches T030's back face, the leaf and the key's
+        # back end, the faces that must stay free for the stack float: they
+        # are waxed so the compound cannot hold them.  The joint is degreased
+        # first so no solvent carries the wax onto the land (Codjiflo review
+        # of PR #2531), and the wax comes off once T024 has cured (as 7E).
+        "1P. DEGREASE T024'S BORE AND ITS MHA-DT-04 LAND.",
+        f"1Q. COAT T030'S BACK FACE, THE KEY'S BACK END AND THE {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER WITH {HANDLE_RELEASE}, NONE ON THE LAND.",
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
-        f"1P. BOND T024 ON MHA-DT-04, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
-        "1Q. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
-        "1R. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        f"1R. BOND T024 ON THE LAND, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
         # Owner ruling 2026-11-10: one comb blade drops in one tooth space of
         # each gear.  T030's keyway centreline runs through its phase-0 tooth
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
         # 180/30 deg off the key; the comb goes on only one way round, so the
         # step names the key and the other blades take the bonded gears'
-        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Sheet
-        # 7's left field has no line to spare, so the step stays one line; the
-        # sheet 14 code key names the comb and its blades (code_key_text).
+        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  The
+        # sheet 15 code key names the comb and its blades (code_key_text).
+        # #2470: the bonds cure in two rounds so no joint waits on the others
+        # inside the fixture time: T024 alone first (the comb's other blades
+        # stand over air), then the spigot's three joints once T024 has cured,
+        # since pushing T018 onto T024 loads it.
         f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
-        # The sheet 1 note's cure and hand acceptance close the bonds.
-        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BONDS GRAB.",
+        f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
+        "1U. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
+        # #2470: T024 cures alone so it is accepted alone, before three wet
+        # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
+        # fit has nothing to adjust, so the remedy parts it (drawing-
+        # guidelines: about 250 C releases 638) and cleans the cured film out.
+        f"1V. CHECK THAT {PHASING_COMB} DROPS INTO T030 AND T024.",
+        "1W. IF IT DOES NOT, TAKE T024 OFF AT 250 DEG C.",
+        "1X. CLEAN THE CURED 638 OUT OF ITS BORE AND OFF THE LAND.",
+        "1Y. REDO FROM 1P.",
+        # Step 1 has no letter left for the spigot's round, so it opens step 2,
+        # before the post goes on.
+        "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
+        "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        f"2B. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        # #2470: the coated spigot seals the blind socket's air in as it
+        # enters; held home, the compressed air cannot back T018 off T024
+        # before the bonds grab.
+        "2C. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
+        f"2D. REMOVE {PHASING_COMB}.",
+        # The cured tip is accepted on the comb; the remedy parts every tip
+        # bond, cleans the film off the coated spigot and the pivot too, and
+        # redoes the tip from 1M, since the heat also frees a 1N bond on
+        # MHA-DT-38 (Codjiflo reviews of PR #2531).
+        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
+        "2F. IF IT DOES NOT, TAKE THE BONDED TIP PARTS OFF AT 250 DEG C.",
+        "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
+        "2H. REDO FROM 1M.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1328,23 +1376,23 @@ CONE_CRANK_STEPS = _note_text(
         # The sheet states the actual minimum, never the governance label.
         # Rubric sample round 6 (rule 22): the stock is the BOM row's, so the
         # step does one thing.
-        "2. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
+        "2J. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
         # maximum never rounds outward, and the part's places print it whole.
         # Rule 22 (rubric sample round 10 lint): one sentence; the REF cut
         # length and the stated engagement are the cut's own facts.  FLUSH TO
         # .005 SHORT is the never-proud limit (MHA-DT-VN-61's own sheet dropped
         # NEVER PROUD as a restatement; PR 2 round 4 needed its line here).
-        "2A. CUT EACH MHA-DT-VN-61 TO FIT, "
+        "2K. CUT EACH MHA-DT-VN-61 TO FIT, "
         f"({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
         "REF LONG: FLUSH TO "
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
         " SHORT OF THE MHA-DT-20 UNDERSIDE, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
-        "2B. DEBURR THE CUT ENDS.",
-        "2C. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
+        "2L. DEBURR THE CUT ENDS.",
+        "2M. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the end screw's
         # load (#914), and the model mates it (#1058).
-        "2D. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
+        "2N. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.
@@ -1354,8 +1402,8 @@ CONE_CRANK_STEPS = _note_text(
         # squared and tight, pressed in the foot's blind ream and a slip fit in
         # the plate's opened ream, stops the block turning about its one screw.
         # The block never comes off: the dowel goes in from below.
-        "2E. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
-        "2F. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
+        "2P. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
+        "2Q. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): T006's pivot runs in
         # MHA-DT-39's reamed end hole.  Its lateral error is taken up by
         # turning MHA-DT-05 on its screws' clearance (Codex P1 on #1136,
@@ -1364,17 +1412,17 @@ CONE_CRANK_STEPS = _note_text(
         # TIP_VERTICAL_CAPACITY_MM).  User decision 2026-10-12: the post is
         # held pushed toward the tip block while it is turned and its screws
         # tightened (dt_cone_tip_air books that).
-        "2G. THREAD MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT.",
-        "2H. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2K.",
-        "2J. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
-        "2K. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
-        "2L. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
-        "2M. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
+        "2R. THREAD MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT.",
+        "2S. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2U.",
+        "2T. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
+        "2U. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
+        "2V. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
+        "2W. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
         # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
         # is a slip fit, and the step says what to do then (as 4A-4B).
-        "2N. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
-        "2P. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
-        "2Q. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
+        "2X. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
+        "2Y. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "2Z. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
         # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
         # SHAFT_END_PLAY: 1/8 turn of 1/4-28 is 0.113) and the pinch screw
@@ -1388,7 +1436,7 @@ CONE_CRANK_STEPS = _note_text(
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
-        # acceptance, worded as 2Q's, once the end play is final.
+        # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
@@ -1518,8 +1566,8 @@ CONE_CRANK_STEPS = _note_text(
 # front, hence W in the front strap's Y; the back pedestal is then set from
 # the actual accepted stack on the spring-gap feeler.  The front pedestal's
 # location and seat run as 8K-8Z, so step 9D is the spring-gap set (setting
-# table row 4, sheet 13 DETAIL A).  Every DRO target is
-# a SETTING_TABLE row on sheet 14.
+# table row 4, sheet 14 DETAIL A).  Every DRO target is
+# a SETTING_TABLE row on sheet 15.
 # The DRO zero every later bank and back-ear setting reads from.
 DRO_ZERO_STEP = "8P"
 BANK_STEPS = _note_text(
@@ -1537,12 +1585,12 @@ BANK_STEPS = _note_text(
         f"8B. AS EACH GEAR GOES ON, SET ITS {CONNECTING_ROD} CONNECTING ROD AND {ROCKER_ARM}",
         f"   ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
         "8C. REPEAT 8A-8B FOR GEARS 1 TO 19 IN ORDER, ALL ALIKE.",
-        "8D. CLAMP THE STACK LIGHTLY END TO END.",
-        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN",
-        f"   MICROMETER: ACCEPT {STACK_WINDOW}.",
+        "8D. CLAMP THE STACK LIGHTLY END TO END, GEAR 0 CAM FACE ON A STOP.",
+        f"8E. MEASURE GEAR 19'S BACK FACE ON AN INDICATOR ZEROED ON {STACK_GAUGE_BLOCKS} GAUGE",
+        f"   BLOCKS ON THAT STOP: ACCEPT {STACK_GAUGE_BLOCKS} PLUS THE READING IN {STACK_WINDOW}.",
         "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
         "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
-        "8H. REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
+        f"8H. REPEAT 8D-8E UNTIL {STACK_GAUGE_BLOCKS} PLUS THE READING IS IN ITS WINDOW.",
         "8J. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
         # Rubric sample round 9 (rule 22): the base set-up is two actions.
         "8K. PUT BASE MHA-FR-01 ON THE MILL TABLE OUT OF THE FRAME, WITHOUT ITS",
@@ -1882,7 +1930,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
 
 
 # Each feeler the rig steps and checks print is a stack of gage leaves the
-# sheet 14 table lists (rubric sample review of v47: no mm in the steps).
+# sheet 15 table lists (rubric sample review of v47: no mm in the steps).
 # Step 11's "PIN STATION" is MHA-DT-33's part-spec wording; the arbor's print
 # dimensions it as the COLLAR PIN hole (rubric sample round 2: undefined term).
 FEELER_TABLE_NOTE = _note_text(
@@ -2049,7 +2097,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N-1R, 2P, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2Y, 4B, 6B, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2085,43 +2133,55 @@ def _split_sequence_chain(
 
 
 # The fields, in reading order (package_note_fields): sheet 7's left field
-# carries the direction key and the first steps, its full-height right field
-# the rest through 5 (MHA-PD-00 cites 4 and 5 on SEQUENCE_SHEET); sheets 8-10
-# carry 6-23, each field cut at a sub-step by the constants below.  Sub-step
-# splits keep every field full once the one-thing lines grew the sequence
-# (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
-# proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('post-and-tip-block')}M"
-CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
+# carries the direction key and step 1, its full-height right field 2-3 (the
+# spigot's bond round opens step 2); sheet 8 carries 4-6 (MHA-PD-00
+# cites 4 and 5 on CRANK_SHEET), each step whole; sheets 9-11 carry 7-23, each
+# field cut at a sub-step by the constants below.  Sub-step splits keep every
+# field full once the one-thing lines grew the sequence (rubric sample rounds
+# 2 and 4); test_every_note_field_holds_its_stacked_blocks proves each fits.
+CONE_CONTINUED_FROM = str(steps.step_number("post-and-tip-block"))
+CRANK_SHEET_FROM = str(steps.step_number("crank-mesh-checked"))
+CRANK_SHEET_RIGHT_FROM = f"{steps.step_number('crank-hub-fitted')}D"
+CRANK_CONTINUED_FROM = str(steps.step_number("crank-handle-fitted"))
 _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
-CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
+(
+    CONE_CRANK_PRIMARY,
+    CONE_CRANK_CONTINUED,
+    CRANK_SHEET_LEFT,
+    CRANK_SHEET_RIGHT,
+    CRANK_CONTINUED,
+) = _split_sequence_chain(
     CONE_CRANK_STEPS,
-    (CONE_CONTINUED_FROM, "ASSEMBLY SEQUENCE CONT. - CONE SET AND CRANK"),
+    (CONE_CONTINUED_FROM, "ASSEMBLY SEQUENCE CONT. - CONE SET"),
+    (CRANK_SHEET_FROM, _CRANK_CONTINUED_HEADING),
+    (CRANK_SHEET_RIGHT_FROM, "ASSEMBLY SEQUENCE CONT. - CRANK"),
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}F"
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}B"
+BANK_CONTINUED_FROM = str(steps.step_number("cylinder-bank-located"))
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}W"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
     (BANK_LAST_FROM, f"{_BANK_CONTINUED_HEADING} {CODE_KEY_POINTER}"),
 )
-# Rounds 19-20: step 23's pivot-seat transfer moves each rig split on
-# (11B, 16E, 21F), the bank having handed 9R's lines to sheet 9.
+# Rounds 19-20: step 23's pivot-seat transfer moved each rig split on; #2470
+# moved step 6 to sheet 8, so the bank and rig splits moved on to refill
+# sheets 9-11 (16C, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
+# the checks' tip-gap reset cites it.
 RIG_SPLITS = (
-    (f"{steps.step_number('arbor-collar-pinned')}B", RIG_SEQUENCE_HEADING),
+    (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
     (
-        f"{steps.step_number('straps-pinned-to-torque-shaft')}E",
+        f"{steps.step_number('rig-located')}E",
         f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
     ),
     (
-        f"{steps.step_number('cam-collars-set')}F",
+        f"{steps.step_number('other-base-mounting')}J",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )
 # The one-thing check lines (rubric sample round 4) run checks 1-5 down
-# sheet 12's left field; 5A heads its right field, over the saved pose.
+# sheet 13's left field; 5A heads its right field, over the saved pose.
 CHECKS_CONTINUED_FROM = "5B"
 CHECKS_PRIMARY, CHECKS_CONTINUED = _split_sequence_notes(
     CHECKS,
@@ -2631,8 +2691,9 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
     (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
-    the ``cylinder_gears`` MHA-DT-12, counted from the front, and step 1P's
-    phasing comb and its blades (a shop tool on its own print, no BOM row)."""
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1S
+    and 2B's phasing comb and its blades (a shop tool on its own print, no
+    BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)
     half = (len(rows) + 1) // 2
@@ -2738,9 +2799,30 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             NOTE_FIELD_RIGHT,
             (
                 (
-                    "cone set and crank sequence continuation",
-                    CONE_CRANK_CONTINUED
-                    + cont(CRANK_CONTINUED_FROM, sheet(BANK_SHEET)),
+                    "cone set sequence continuation",
+                    CONE_CRANK_CONTINUED + cont(CRANK_SHEET_FROM, sheet(CRANK_SHEET)),
+                ),
+            ),
+        ),
+        NoteField(
+            CRANK_SHEET,
+            f"sheet {CRANK_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (
+                (
+                    "crank sequence",
+                    CRANK_SHEET_LEFT + cont(CRANK_SHEET_RIGHT_FROM, right),
+                ),
+            ),
+        ),
+        NoteField(
+            CRANK_SHEET,
+            f"sheet {CRANK_SHEET} right note field",
+            ISO_RIGHT_FIELD,
+            (
+                (
+                    "crank hub sequence",
+                    CRANK_SHEET_RIGHT + cont(CRANK_CONTINUED_FROM, sheet(BANK_SHEET)),
                 ),
             ),
         ),
@@ -2983,7 +3065,7 @@ def table_column_widths(
 def table_box_violations(
     box: tuple[float, float, float, float], *, label: str
 ) -> list[str]:
-    """A sheet 14 table stays above the note floor, off the station table
+    """A sheet 15 table stays above the note floor, off the station table
     and over the interface notes."""
     x0, y0, x1, y1 = box
     station = STATION_TABLE_FIELD
@@ -3889,7 +3971,7 @@ def _reference_iso(
 
 
 def _add_view_arrows(adapter: Any, front: Any, top: Any) -> list[str]:
-    """Sheet 13's removed views C and D and sheet 11's full-detail view E
+    """Sheet 14's removed views C and D and sheet 12's full-detail view E
     look from the projected group's LEFT (model +X): each is named by a
     letter note whose straight leader is the viewing arrow.  C and D end at
     the FRONT view's left edge at the height of what they show; E, the whole
@@ -4214,6 +4296,13 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
 
 
+def _place_crank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
+    _activate_sheet(adapter, SHEET_NAMES[CRANK_SHEET - 1])
+    _heading(adapter, CRANK_SHEET)
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="crank reference isometric")
+    return _stack_sheet_note_fields(adapter, facts, CRANK_SHEET)
+
+
 def _place_bank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[BANK_SHEET - 1])
     _heading(adapter, BANK_SHEET)
@@ -4400,7 +4489,7 @@ def _place_bank_setting_sheet(
     )
     drum_keep = {drum_station_setting.DIMENSION: (leg_middle[0], DRUM_STATION_TEXT_Y)}
     # The bank's closed stack and spring gap print as setting-table rows
-    # (sheet 14) and labels here, not as the model's imported setting
+    # (sheet 15) and labels here, not as the model's imported setting
     # dimensions: those carry a model-authored converted band and compass
     # wording the drawing cannot re-word without dirtying the source.
     annotations = []
@@ -4838,6 +4927,8 @@ def _place_package(
     step("BOM view")
     findings += _place_sequence_sheet(adapter, facts)
     step("sequence sheet")
+    findings += _place_crank_sheet(adapter, facts)
+    step("crank sheet")
     findings += _place_bank_sheet(adapter, facts)
     step("bank sheet")
     settings_settled = _place_bank_setting_sheet(adapter, facts, step)

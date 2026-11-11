@@ -87,29 +87,77 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
-def test_the_tip_is_measured_dry_then_bonded_on_the_feeler() -> None:
+def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
     bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
     the MHA-DT-03-TL-02 phasing comb, T030's blade beside the key (owner
-    rulings 2026-11-09 and 2026-11-10)."""
+    rulings 2026-11-09 and 2026-11-10).  #2470: T024's joint is degreased,
+    the faces its squeeze-out reaches are waxed, and T024 is bonded, phased,
+    cured and accepted on the comb alone; step 2 then bonds and phases the
+    spigot's joints, the spigot held home in its blind socket, and accepts
+    the cured tip before the post goes on.  Each failed acceptance parts its
+    bonds, cleans the film out and redoes the round, the second from
+    MHA-DT-38's check, which the heat undoes."""
+    feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
+    comb = "ENGAGE MHA-DT-03-TL-02"
+
+    def in_order(text: str, phrases: tuple[str, ...]) -> list[int]:
+        positions: list[int] = []
+        for phrase in phrases:
+            positions.append(text.find(phrase, positions[-1] + 1 if positions else 0))
+            assert positions[-1] != -1, phrase
+        return positions
+
+    # One bond before the first comb; T012, T018 and the spigot before the
+    # second ("BOND T0..." or "BOND MHA-...", never "THE BOND GRABS").
+    def bonds(text: str) -> int:
+        return text.count("BOND T0") + text.count("BOND MHA-")
+
     stack = _step_body("cone-gears-stacked")
-    order = (
-        "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
-        "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
-        "PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024",
-        "ACCEPT",
-        "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
-        f"BOND T024 ON MHA-DT-04, "
-        f"{sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)} FEELER ON T030",
-        "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
-        "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024,",
-        "ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
-        "REMOVE MHA-DT-03-TL-02 AND THE FEELER",
+    first = in_order(
+        stack,
+        (
+            "DRY, NO FEELER",
+            "ACCEPT",
+            "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
+            "DEGREASE T024",
+            "PASTE WAX",
+            f"BOND T024 ON THE LAND, {feeler} FEELER ON T030",
+            comb,
+            "ONCE THE BOND GRABS",
+            "24 H CURE",
+            "WIPE THE WAX OFF",
+            "DROPS INTO T030 AND T024",
+            "250 DEG C",
+            "CURED 638",
+            "REDO FROM 1P.",
+        ),
     )
-    positions = [stack.find(phrase) for phrase in order]
-    assert -1 not in positions, positions
-    assert positions == sorted(positions)
+    assert "NONE ON THE LAND" in stack
+    assert bonds(stack[first[2] : first[6]]) == 1
+    assert bonds(stack[first[6] :]) == 0
+
+    post = _step_body("post-and-tip-block")
+    second = in_order(
+        post,
+        (
+            "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
+            "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024",
+            comb,
+            "HOLD MHA-DT-37 HOME",
+            "DROPS INTO ALL FIVE GEARS",
+            "250 DEG C",
+            "SPIGOT, PIVOT",
+            "REDO FROM 1M.",
+            "ALIGN THE MHA-DT-05 COUNTERBORES",
+        ),
+    )
+    assert post.startswith("BOND T012")
+    assert bonds(post[: second[2]]) == 2
+    assert "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND." in "\n".join(
+        SEQUENCE_BLOCKS
+    )
 
 
 def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
