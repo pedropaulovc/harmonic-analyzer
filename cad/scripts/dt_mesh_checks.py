@@ -9,14 +9,14 @@ Every value comes from the part specs and config:
   tightest pair backlash >= 0, with no tip on a root and no tip past the
   mate's base tangent (T012..T120). What the stack gates is that the gears do
   not come loose: nominal contact ratio >= 1.0 at the loosest centre a feel
-  set leaves a cone (test_standard_mesh_checks). The contact ratio of the
-  printed corners there is reported only;
-* the T006 shortfall (pending exception ruling #971): its printed corners keep
-  >= 0.02 mm backlash where the swing locks (``backlash_set_mm`` at the
-  highest first bind of any pair, which another pair holds), and its
-  DT6-FORM1 relief must stay clear of every printed drum-tip corner's path
-  there and at the loosest running centre (``t006_relief_clearance_mm``), so
-  the relief never holds the swing out further than the flanks do.
+  set leaves a cone, plus the felt ease (``contact_ratio_eased``,
+  test_standard_mesh_checks). The contact ratio of the printed corners there
+  is reported only;
+* the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief
+  must stay clear of every printed drum-tip corner's path where the swing
+  locks and at the loosest running centre (``t006_relief_clearance_mm``), so
+  the relief never holds the swing out further than the flanks do. Its
+  backlash where the swing locks (``backlash_set_mm``) is reported.
 
 The 32T alignment check lives in alignment_mesh_check, the crossed 16T:64T
 crank check with its stack in crank_mesh_stack.
@@ -53,19 +53,21 @@ class ConeMeshCheck:
     backlash_max_mm: float  # REF: every printed corner pair at the ceiling
     interference_margin_floor_mm: float
     root_clearance_floor_mm: float
-    backlash_set_mm: float  # every printed corner pair where the swing locks
+    backlash_set_mm: float  # REF: every printed corner pair where the swing locks
+    contact_ratio_eased: float  # the nominal profiles at the ceiling plus the ease
 
     def text(self) -> str:
         lo, hi = self.centre.range_mm
         return (
             f"{self.name}: centre {lo:.3f} first bind .. {hi:.3f} loosest running; "
             f"contact ratio {self.contact_ratio_nominal:.3f} nominal, "
+            f"{self.contact_ratio_eased:.3f} eased, "
             f"{self.contact_ratio_corner:.3f} printed corners (REF) at the loosest; "
             f"backlash {self.backlash_floor_mm:.3f} at the first bind, "
             f"{self.backlash_max_mm:.3f} loosest (REF); "
             f"interference margin {self.interference_margin_floor_mm:.3f} and "
             f"root clearance {self.root_clearance_floor_mm:.3f} at the first bind; "
-            f"backlash {self.backlash_set_mm:.3f} where the swing locks"
+            f"backlash {self.backlash_set_mm:.3f} where the swing locks (REF)"
         )
 
 
@@ -100,6 +102,7 @@ def cone_check(teeth: int) -> ConeMeshCheck:
         min(interference_margin(a, b, c, alpha) for a, b, c in binds),
         min(root_clearance(a, b, c) for a, b, c in binds),
         min(backlash(a, b, centre.set_max_mm, alpha) for a, b in pairs),
+        contact_ratio(gear, mate, loosest + cone_set_stack.FEEL_EASE_MM, alpha, module),
     )
 
 

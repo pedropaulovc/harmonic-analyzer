@@ -143,9 +143,13 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 # first bind at its end and swings the set in to the first bind, easing out
 # only until the gears turn, so the arbor line lies on the binds at both ends
 # and every pair lies between the pairs that hold the swing, none above this
-# at its tightest phase.  The ease is felt, not booked: past the ceiling the
-# loosest-meshing T012 keeps a contact ratio above 1.0 for a further 0.04 mm.
+# at its tightest phase.
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
+# The felt ease past the first bind (check 4N: "until the gears turn
+# freely"): not printed or measured, so the contact-ratio gate holds it as an
+# allowance past the ceiling (dt_mesh_checks.contact_ratio_eased); the
+# loosest-meshing T012 keeps a contact ratio above 1.0 for ~0.042 mm there.
+FEEL_EASE_MM = 0.04
 # The far phase of the running runout: the set is felt at the tightest phase
 # of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)
 # open the centre by up to 2 x TIR at the opposite phase.
@@ -179,9 +183,10 @@ def cone_centre(teeth: int) -> ConeCentre:
 
 # The T120 centre's largest departure from the CAD placement under a feel
 # set: the swing's angle error at T120.  The bore centres sit at the
-# effective (tooth-contact) bind on the tight side and up to one TIR above it
-# on the loose side, where the two eccentricities point at each other.
+# effective (tooth-contact) bind on the tight side and up to one TIR above it,
+# plus the felt ease, on the loose side, where the two eccentricities point at
+# each other.
 SWING_SET_FROM_PLACEMENT_MM = max(
     abs(min(first_bind_offsets_mm(120)) - SET_ABOVE_STANDARD_MM),
-    abs(SET_OFFSET_MAX_MM + TOOTH_RUNOUT_TIR_MM - SET_ABOVE_STANDARD_MM),
+    abs(SET_OFFSET_MAX_MM + TOOTH_RUNOUT_TIR_MM + FEEL_EASE_MM - SET_ABOVE_STANDARD_MM),
 )

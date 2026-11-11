@@ -117,9 +117,9 @@ TOOTH_THICKNESS_BAND = (0.0762, -0.0762)
 # can reach a contact ratio of 1, so its tooth is sized for no binding and
 # the drum-tip path instead.
 # * Thickness 0.872 at the tool pitch, the band's upper limit
-#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND), chosen for >= 0.02 backlash where the
-#   swing locks (~std + 0.10, another pair's first bind; the feel set, owner
-#   direction 2026-11-11), gated as dt_mesh_checks backlash_set_mm.
+#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND), chosen for >= 0.02 backlash at the
+#   former feeler set's closed centre; under the feel set (owner direction
+#   2026-11-11) it reads 0.036 where the swing locks (REF, backlash_set_mm).
 # * Root R 1.10 sets the plunge; the involute stops where the relief rejoins it.
 # * Relief: the path of one virtual drum-tip point, held at C0 = standard +
 #   CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM (0.09) with the thick tooth's

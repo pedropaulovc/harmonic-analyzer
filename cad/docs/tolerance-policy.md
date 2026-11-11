@@ -124,13 +124,14 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   after the set. No setting reading is booked: the feel set guarantees that
   no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
   gear). Gated: nominal contact ratio ≥ 1.0 at the loosest centre a feel set
-  leaves the cone. Reported only (REF): the printed-corner contact ratio
-  there. A gear that binds is cleared by easing the swing, not by stoning a
-  tip.
-- **T006** (pending exception ruling #971): its printed corners keep ≥ 0.02 mm
-  backlash where the swing locks, and its DT6-FORM1 relief stands ≥ 0.010 mm
-  clear of every printed drum-tip path at that set and the loosest running
-  centre, so it never holds the swing out; its contact ratio (≈ 0.77) is REF.
+  leaves the cone, plus a 0.04 mm felt-ease allowance. Reported only (REF):
+  the printed-corner contact ratio there. A gear that binds is cleared by
+  easing the swing, not by stoning a tip.
+- **T006** (pending exception ruling #971): its DT6-FORM1 relief stands
+  ≥ 0.010 mm clear of every printed drum-tip path where the swing locks and at
+  the loosest running centre, so it never holds the swing out; its contact
+  ratio (≈ 0.77) and its backlash where the swing locks (0.036 mm) are REF.
+  The feeler set's 0.02 mm backlash has no counterpart under the feel set.
 - **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
   nominal centre, positive backlash and no interference at the worst corner;
   the open-corner contact ratio is REF.

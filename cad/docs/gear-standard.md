@@ -119,17 +119,18 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout. Nominal ratios there run
-  from 1.07 (T012) up to about 1.20; T012 keeps a ratio above 1.0 for a
-  further 0.04 mm of easing.
+  any pair, opened by both gears' running runout, plus a 0.04 mm allowance
+  for the felt ease (`cone_set_stack.FEEL_EASE_MM`). Nominal ratios at the
+  ceiling run from 1.07 (T012) up to about 1.20.
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
-  ratio of 1 against the 20° 120T drum. Its printed corners keep at least
-  0.02 mm backlash where the swing locks (0.036 mm; another pair's first bind
-  holds the swing there), and its DT6-FORM1 relief is gated at least 0.010 mm
-  clear of every printed drum-tip path at that set and at the loosest running
-  centre, so the relief never holds the swing out further than the flanks
-  do. Its contact ratio, 0.774 nominal and 0.765 at the printed corners, is
-  reference only.
+  ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
+  least 0.010 mm clear of every printed drum-tip path where the swing locks
+  and at the loosest running centre, so the relief never holds the swing out
+  further than the flanks do. Its contact ratio, 0.774 nominal and 0.765 at
+  the printed corners, and its backlash where the swing locks (0.036 mm at the
+  printed corners) are reference only: the 0.02 mm backlash of the
+  2026-10-10 feeler set has no counterpart once the swing locks wherever no
+  gear binds.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
   1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
   Its open-corner ratio is reference only.

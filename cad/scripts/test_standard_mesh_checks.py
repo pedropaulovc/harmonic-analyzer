@@ -11,11 +11,13 @@ printed it (dt_crank_drive_gear_notes, user ruling 2026-09-30).
 
 Pending exception rulings (#971):
 * T006 (user ruling 2026-10-10): no full-depth six-tooth form reaches a
-  contact ratio of 1 against the shared 20 deg drum. Its printed corners keep
-  >= 0.02 mm backlash where the swing locks (another pair's first bind holds
-  it), and its ground relief is gated at least 10 um clear of every drum-tip
-  corner's path at that set and at the loosest running centre, so the relief
-  never holds the swing out; its contact ratio is reported.
+  contact ratio of 1 against the shared 20 deg drum. Its ground relief is
+  gated at least 10 um clear of every drum-tip corner's path where the swing
+  locks and at the loosest running centre, so the relief never holds the
+  swing out; its contact ratio and its backlash where the swing locks are
+  reported. The 0.02 mm backlash of the 2026-10-10 feeler set has no
+  counterpart under the feel set, which locks wherever no gear binds (owner
+  direction 2026-11-11, #2365).
 * The alignment pinion is a fit-up mesh: its contact ratio is reported, not
   gated (tolerances/gear_tip.yaml note).
 """
@@ -35,7 +37,6 @@ EXEMPT_CONE_TEETH = frozenset({6})
 CONE_TEETH = tuple(t for t in cone.CONE_TEETH if t not in EXEMPT_CONE_TEETH)
 CONE_NOMINAL_CONTACT_RATIO_MIN = 1.0
 T006_RELIEF_CLEARANCE_MIN_MM = 0.010
-T006_SET_BACKLASH_MIN_MM = 0.02
 
 
 def _require_no_bind(check) -> None:
@@ -47,7 +48,8 @@ def _require_no_bind(check) -> None:
 @pytest.mark.parametrize("teeth", CONE_TEETH)
 def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> None:
     check = dt_mesh_checks.cone_check(teeth)
-    assert check.contact_ratio_nominal >= CONE_NOMINAL_CONTACT_RATIO_MIN, check.text()
+    # The ceiling plus the felt ease (cone_set_stack.FEEL_EASE_MM).
+    assert check.contact_ratio_eased >= CONE_NOMINAL_CONTACT_RATIO_MIN, check.text()
 
 
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:
@@ -57,11 +59,6 @@ def test_alignment_drum_fitup_mesh_cannot_bind() -> None:
 def test_t006_relief_never_holds_the_swing_out() -> None:
     clearance = dt_mesh_checks.t006_relief_clearance_mm()
     assert clearance >= T006_RELIEF_CLEARANCE_MIN_MM, f"T006 relief clearance {clearance:.4f} mm"
-
-
-def test_t006_keeps_its_ruled_backlash_where_the_swing_locks() -> None:
-    check = dt_mesh_checks.cone_check(6)
-    assert check.backlash_set_mm >= T006_SET_BACKLASH_MIN_MM, check.text()
 
 
 def test_t006_relief_centre_lies_inside_its_feel_set_range() -> None:

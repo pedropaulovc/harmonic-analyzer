@@ -1575,7 +1575,7 @@ BANK_STEPS = _note_text(
         # matched set, each faced to the running shortfall, so the stack meets
         # 8E's window with the band, window and guards unchanged; 8F-8G stay
         # the fallback.  The full rule is the MHA-DT-12 process record.
-        "FACE GEARS 0-19 IN ORDER, EACH CANCELLING THE EARLIER GEARS' EXCESS.",
+        "FACE GEARS 0-19 IN ORDER, EACH TO NOMINAL LESS THE EARLIER DEVIATIONS.",
         # Owner ruling 2026-11-08 (Pedro): GEAR 0-19 are defined in the sheet 7
         # code key (code_key_text), not by a prose line here.
         "8. WRITE DOWN EACH MHA-DT-12'S MICED THICKNESS, CAM FACE TO BACK FACE.",
@@ -1999,9 +1999,12 @@ CHECKS = _note_text(
         "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
         f"{SETTING_SHEET}): EACH RECORDED VALUE PLUS ITS INDICATOR READING MUST BE IN "
         "ITS ACCEPT RANGE.",
-        "4H. IF A PEDESTAL IS OUT, EASE ITS MHA-DT-VN-62.",
-        "4J. RESET IT INTO ITS ACCEPT RANGE ON ITS INDICATORS.",
-        "4K. TIGHTEN ITS MHA-DT-VN-62.",
+        # A pedestal outside its range after 4E means a part is out of print:
+        # resetting it by indicator would take that end off its binds, so
+        # the part is corrected and the alignment redone (Codjiflo r2, #2557).
+        "4H. IF A PEDESTAL IS OUT, SWING THE CONE SET OUT.",
+        "4J. CORRECT THE OUT-OF-PRINT PART AT THAT END.",
+        "4K. REDO 4C-4G.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
         f"4N. EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} CRANK TURNS.",
