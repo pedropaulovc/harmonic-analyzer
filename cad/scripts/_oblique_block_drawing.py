@@ -245,8 +245,12 @@ def _pivot_stack_text(contract):
         return ('-' if mm < 0 else '+') + magnitude
 
     lower, upper = deviations(contract.BORE_BAND)
+    # BORE, not REAM (#2445): the shoulder bottoms on the seat's square
+    # floor, which a reamer's 45° lead cannot reach at full diameter and a
+    # 3/8 end mill reaches only under the shoulder's size; a boring bar
+    # sizes the wall and squares the floor in one pass.
     return (
-        f'REAM <MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        f'BORE <MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
         '  LOCATING FIT, TL-VN-77 SHOULDER\n'
         f'DRILL <MOD-DIAM>{size("TapDrillDia")} THRU\n'
         f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
@@ -523,7 +527,7 @@ def _inch_ref(mm: float) -> str:
 # (rule 7). The floor keeps the RV-01 fact, worded as RV-01's ``where``.
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
-    'BoreDia': {'suffix': f' REAM <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
+    'BoreDia': {'suffix': f' BORE <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
                 'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',

@@ -127,6 +127,8 @@ import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_blank_spec as blank
+import ch_rocker_strap_spec as strap
 import ch_rocker_arm_tl_oblique_holding_spec as holding
 
 holding.require_clearance()
@@ -1499,6 +1501,24 @@ if not (
     and "largest block 4 in" in _GAUGE_SET["note"]
 ):
     raise AssertionError("the shop's gauge-block set moved; recheck the rail-setting stacks")
+# Step 1's rail trim tool (#2446; shop-equipment tools.rail-trim-grinder):
+# no owned saw cuts the hardened HGR15 rail, so each end is cut long with an
+# abrasive cut-off wheel and ground square to its mark. Owner ruling #2144
+# item 13.1 A (2026-11-08) keeps the trimmed ends flush with the bars.
+_RAIL_TRIM_GRINDER = tomllib.loads(
+    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+)["tools"]["rail-trim-grinder"]
+if not (
+    _RAIL_TRIM_GRINDER["kind"] == "angle_grinder"
+    and {"cut-off", "grinding"} <= set(_RAIL_TRIM_GRINDER["wheels"])
+    and all(
+        wheel["max_rpm"] >= _RAIL_TRIM_GRINDER["max_rpm"]
+        for wheel in _RAIL_TRIM_GRINDER["wheels"].values()
+        if "max_rpm" in wheel
+    )
+):
+    raise AssertionError("the rail-trim grinder record moved; recheck step 1's trim")
+RAIL_CUT_OFF_ALLOWANCE_IN = "1/16"
 # The PM-30MV's X travel (cad/process/shop.toml machines.pm-30mv, the
 # catalogue 23 in) is not a measurement of the installed mill: the travel
 # with the DRO scale fitted can only be smaller, and step 6's origin is the
@@ -2028,12 +2048,6 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# The rocker-arm process plan (the held MHA-CH-06 route for the arm and its
-# MHA-CH-13 strap; its 0.3-format plan.toml was retired in the prechips cutover,
-# last at 45952b66bc:cad/process/ch_rocker_arm/plan.toml) owns the blank, its
-# chords, its loose CL/CR holes and the strap hub's drill/ream with its tool
-# envelope; TL-00 cites its operations and repeats none of its numbers.
-PROCESS_PLAN = "MHA-CH-06 PLAN"
 # The in-situ HUB position (owner ruling 3, 2026-11-07): step 10 taps the
 # carrier's HUB there and every strap's hub hole is drilled and reamed at the
 # same DRO setting, so their relative eccentricity is the DRO's repeatability,
@@ -2287,15 +2301,19 @@ ASSEMBLY_STEPS = (
     f"1B. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
     "1C. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
     "THE KIT.",
-    f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
-    "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
-    "1E. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
+    f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR'S LENGTH, THE SAME "
+    "AMOUNT OFF EACH END, AS IN STEPS 1E-1F.",
+    f"1E. CUT EACH RAIL END {RAIL_CUT_OFF_ALLOWANCE_IN} LONG WITH AN ANGLE "
+    "GRINDER'S CUT-OFF WHEEL, CARRIAGES OFF AS IN STEP 1C.",
+    "1F. GRIND EACH CUT END SQUARE WITH THE GRINDER'S GRINDING WHEEL UNTIL "
+    "FLUSH WITH ITS BAR'S END.",
+    "1G. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
     f"{RAIL_RECEIPT_REFERENCE} NOTE 1.",
-    "1F. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THAT PLAN: RAIL AND BAR "
-    "MARKED AS A PAIR.",
-    f"1G. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
+    f"1H. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THE {BASE_BAR_NUMBER} "
+    "PROCESS PLAN: RAIL AND BAR MARKED AS A PAIR.",
+    f"1J. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
     "BY HAND WITHOUT MOVING THE RAIL.",
-    "1H. CLEAN ALL CUTTING GRIT FROM THE RAILS AND BARS.",
+    "1K. CLEAN ALL CUTTING AND GRINDING GRIT FROM THE RAILS AND BARS.",
     f"2. LAY BASE BAR 1 {_item(BASE_BAR_1)} AS DRAWN AND BASE BAR 2 "
     f"{_item(BASE_BAR_2)} TURNED OVER, AS SHOWN ON SHEET 1.",
     "2A. FIT RAIL 1 ON BAR 1 AND RAIL 2 ON BAR 2, EACH WITH "
@@ -2450,7 +2468,7 @@ ASSEMBLY_STEPS = (
     "10C. RETURN THE TABLE TO THE ORIGIN AS IN STEP 6F.",
     f"10D. MOVE THE TABLE TO {_HUB_DRO} BY A {_HUB_Y_TEXT} GAUGE STACK IN Y, AS "
     "THE RAIL SETTING TABLE'S TITLE STATES.",
-    "10E. RECORD THIS DRO SETTING FOR STEP 20.",
+    "10E. RECORD THIS DRO SETTING FOR STEPS 19F AND 20.",
     f"10F. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
     "SETTING, SPOT FIRST, SPINDLE-GUIDED, NO COUNTERBORE.",
     f"11. STAND THE {QUANTITIES[STOP_PIN]} STOP PINS {_item(STOP_PIN)} CHAMFERED "
@@ -2528,6 +2546,44 @@ _GROOVE = (
     f"{_length(RISER_GROOVE_DEPTH, 3)} DEEP",
     f"{_length(_GROOVE_MIN, 3)}-{_length(_GROOVE_MAX, 3)}",
 )
+
+
+# Strap blank preparation and drilling on the jig (#2443): the retired
+# MHA-CH-06 plan's S0-S3 printed here, so TL-00 cites no unreleased document.
+# The layout marks are blank_spec.LAYOUT_MARKS (inches from the end midpoint
+# and the lower raw edge, on the .XXX grid its proof charges); the saw corridor
+# is blank_spec.SAW_EDGE_TOLERANCE, rounded down to the printed places.
+def _layout_chain(marks: tuple[tuple[float, float], ...]) -> str:
+    """A chain's marks, mirror pairs as ``X ±a Y b``, in X order from 0."""
+    pairs: dict[float, float] = {}
+    for x, y in marks:
+        if pairs.setdefault(abs(x), y) != y:
+            raise AssertionError("a layout chain is no longer symmetric about X 0")
+    return ", ".join(
+        ("X 0" if not x else "X ±" + _length(x, blank.LAYOUT_PLACES))
+        + f" Y {_length(y, blank.LAYOUT_PLACES)}"
+        for x, y in sorted(pairs.items())
+    )
+
+
+_INNER_MARKS = _layout_chain(blank.LAYOUT_MARKS["inner"])
+_OUTER_MARKS = _layout_chain(blank.LAYOUT_MARKS["outer"])
+_SAW_CORRIDOR = _bound(blank.SAW_EDGE_TOLERANCE, 3, up=False)
+_BLANK_LENGTH = _length(trammel.BLANK_LENGTH, 2)
+# The end-clamp pilot runs up through the carrier's #8-32 CL/CR taps from
+# below, as step 11C spots the riser: the riser's own #30 drill passes under
+# the tap's minor diameter (UNC-2B minimum .130, ASME B1.1), so it guides on
+# the thread crests without cutting them. The 7/32 opening is blank_spec's.
+_PILOT_DRILL = riser.SCREW_DRILL
+if not riser.SCREW_DRILL_DIA < 0.130 * trammel.INCH or fasteners.END_CLAMP.thread != "#8-32":
+    raise AssertionError("the end-clamp pilot no longer clears the carrier's tap")
+# The hub hole is drilled in steps to the pre-ream size (#2444): only the
+# last drill cuts at the full radius, so the carrier, supported only at A1
+# and B1, takes a fraction of a full-size drill's thrust. 25/64 leaves .0094
+# on diameter for the .4000 reamer (Machinery's Handbook 27th ed. p.833).
+HUB_DRILL_STEPS = ("1/8", "1/4", "25/64")
+_HUB_DRILLS = ", THEN ".join(HUB_DRILL_STEPS)
+
 OPERATION_STEPS = (
     "15. ISOLATE THE SPINDLE.",
     "15A. WITHDRAW THE CUTTER AND ITS HOLDER.",
@@ -2557,16 +2613,29 @@ OPERATION_STEPS = (
     f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
     f"18B. IF A GROOVE IS SHALLOW, DEEPEN IT TO {_GROOVE[0]} AS IN STEP 18.",
     "18C. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18 ON A NEW RISER.",
-    f"19. LOAD ONLY A STRAP BLANK FINISHED PER {PROCESS_PLAN} S0-S1 AND S2 "
-    "OP20: FACED, LAID OUT, BANDSAWN, END-CLAMP HOLES DRILLED, NO HUB HOLE.",
-    "19A. SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
-    "STOP PINS, ALONG THE STRAP TO ITS END MARK.",
-    f"19B. TIGHTEN 2 {_STRAP_CLAMPS} DIRECTLY ON THE STRAP INTO THE CARRIER'S "
-    "2 END-CLAMP TAPS.",
+    f"19. LOAD ONLY STRAP BLANKS CUT SQUARE TO {_BLANK_LENGTH} LONG AND FACED TO "
+    f"THE {strap.NUMBER} THICKNESS BEFORE STEP 1.",
+    "19A. MARK X 0 ON THE BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 ALONG "
+    "ITS LOWER RAW EDGE.",
+    f"19B. MARK THE INNER CHAIN FROM X 0, Y 0: {_INNER_MARKS}.",
+    f"19C. MARK THE OUTER CHAIN FROM X 0, Y 0: {_OUTER_MARKS}.",
+    "19D. JOIN EACH CHAIN'S MARKS IN X ORDER WITH STRAIGHT LINES TO BOTH "
+    "SQUARE ENDS.",
+    "19E. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
+    f"CHAIN, KERF ON THE WASTE SIDE: EACH EDGE WITHIN {_SAW_CORRIDOR} OF ITS LINE.",
+    "19F. SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
+    "STOP PINS, ITS X 0 MARK UNDER THE SPINDLE AT THE STEP 10E SETTING.",
+    f"19G. CLAMPED AS IN STEP 11B, DRILL A {_PILOT_DRILL} PILOT THRU THE BLANK "
+    "FROM BELOW THROUGH EACH OF THE CARRIER'S 2 END-CLAMP TAPS.",
+    f"19H. OPEN EACH PILOT TO {blank.CLAMP_DRILL} FROM ABOVE, SPINDLE-GUIDED, "
+    "THRU THE BLANK ONLY: NEVER INTO THE CARRIER.",
+    f"19J. REPLACE THE CLAMP WITH 2 {_STRAP_CLAMPS} TIGHTENED DIRECTLY ON THE "
+    "STRAP INTO THE CARRIER'S 2 END-CLAMP TAPS.",
     "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10E.",
-    f"20A. DRILL AND REAM THE STRAP'S HUB HOLE THRU PER {PROCESS_PLAN} S2 "
-    "OP30-OP40, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE "
-    "CARRIER.",
+    f"20A. DRILL THE STRAP'S HUB HOLE THRU {_HUB_DRILLS} WITH A LIGHT HAND "
+    "FEED, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE CARRIER.",
+    f"20B. REAM IT THRU AT THE SAME SETTING TO THE {strap.NUMBER} HUB HOLE, "
+    "INTO THE RISER'S RELIEF.",
     f"21. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
     "HOLE: FLANGE FLAT ON THE STRAP.",
     f"21A. TORQUE THE HUB CLAMP SCREW, A {_STRAP_CLAMPS}, TO "
@@ -2578,8 +2647,8 @@ OPERATION_STEPS = (
     f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
     "21E. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
     "REFERENCE HEIGHTS.",
-    f"21F. CUT THE STRAP PER {PROCESS_PLAN} S3 OP10-OP20 OVER BOTH PASSES WITH "
-    "ALL 3 CLAMP SCREWS IN PLACE.",
+    "21F. CUT THE STRAP'S INNER EDGE OVER THE INNER PASS, THEN ITS OUTER EDGE "
+    "OVER THE OUTER PASS AFTER STEPS 15-15H, ALL 3 CLAMP SCREWS IN PLACE.",
     "21G. START EACH CUT AT AN EDGE WITH CLEARANCE BESIDE THE CUTTER, NEVER AS "
     "A FULL-WIDTH SLOT OR A PLUNGE.",
 )

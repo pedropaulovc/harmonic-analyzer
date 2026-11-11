@@ -1928,7 +1928,7 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
     assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
     assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
-    assert "RECORD" in steps["10E"] and "STEP 20" in steps["10E"]
+    assert "RECORD" in steps["10E"] and "STEPS 19F AND 20" in steps["10E"]
     assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
     assert "STEP 10E" in steps["20"]
     assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
@@ -2058,26 +2058,39 @@ def test_step_6_places_the_origin_from_the_middle_t_slot() -> None:
     assert -trammel.TABLE_CENTRE_Y == pytest.approx(1.244 * trammel.INCH, abs=0.0005 * trammel.INCH)
 
 
-def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
+def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> None:
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     numbers = list(dict.fromkeys(re.match(r"\d+", head).group(0) for head in steps))
     assert numbers == [str(n) for n in range(15, 22)]
-    assert spec.PROCESS_PLAN == "MHA-CH-06 PLAN"
-    # The riser is cut before the first strap; the strap is prepared, drilled
-    # and reamed, then cut per the plan's sections.
+    # #2443: no step cites the retired MHA-CH-06 plan; the blank's layout,
+    # saw corridor, clamp holes, hub drilling and both passes are steps.
+    assert not any("PLAN" in text for text in steps.values())
     assert "BEFORE THE FIRST STRAP" in steps["18"]
-    assert "PLAN S0-S1 AND S2 OP20" in steps["19"]
-    assert "PLAN S2 OP30-OP40" in steps["20A"]
-    assert "PLAN S3 OP10-OP20" in steps["21F"]
+    assert spec.strap.NUMBER in steps["19"] and "BEFORE STEP 1" in steps["19"]
+    for chain, head in (("inner", "19B"), ("outer", "19C")):
+        for x, y in spec.blank.LAYOUT_MARKS[chain]:
+            assert f"Y {spec._length(y, 3)}" in steps[head]
+            assert (f"X ±{spec._length(abs(x), 3)}" if x else "X 0") in steps[head]
+    assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19E"]
+    assert "STEP 10E" in steps["19F"]
+    assert "STEP 11B" in steps["19G"] and "FROM BELOW" in steps["19G"]
+    assert spec.riser.SCREW_DRILL in steps["19G"]
+    assert spec.blank.CLAMP_DRILL in steps["19H"] and "NEVER INTO THE CARRIER" in steps["19H"]
+    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19J"]
+    order = list(steps)
+    assert order.index("19F") < order.index("19G") < order.index("19H") < order.index("19J")
+    # #2444: the hub hole is opened in steps, the last one the pre-ream drill,
+    # then reamed to the strap's hub hole.
+    assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
+    assert spec.strap.NUMBER in steps["20B"] and steps["20B"].startswith("20B. REAM")
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
     assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
     assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
     assert spec._item(spec.HUB_WASHER) in steps["21"]
     for text in steps.values():
-        # The plan prints the blank, chords and the hub tool envelope.
         assert "350 MM" not in text and "REAMER" not in text
-    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19B"]
     assert "ALL 3 CLAMP SCREWS" in steps["21F"]
+    assert "INNER PASS" in steps["21F"] and "OUTER PASS" in steps["21F"] and "STEPS 15-15H" in steps["21F"]
 
 
 def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
@@ -2496,6 +2509,22 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     assert f"{spec.RAIL_RECEIPT_REFERENCE} NOTE 1" in preparation
     assert f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN" in guide_rail.DRAWING_NOTES
     assert " MM MIN" not in preparation
+
+
+def test_rail_trim_names_a_recorded_abrasive_tool_and_keeps_flush_ends() -> None:
+    # #2446: no owned saw cuts the hardened rail; the trim is cut long with
+    # the recorded grinder's cut-off wheel, ground to the mark, ends flush
+    # (owner ruling #2144 item 13.1 A), carriages off before any cutting.
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    record = spec._RAIL_TRIM_GRINDER
+    assert record["present"] is False and record["purchase"]
+    assert "TRIM EACH RAIL" in steps["1D"] and "STEPS 1E-1F" in steps["1D"]
+    assert "CUT-OFF WHEEL" in steps["1E"] and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
+    assert "STEP 1C" in steps["1E"]
+    assert "GRINDING WHEEL" in steps["1F"] and "FLUSH" in steps["1F"]
+    order = list(steps)
+    assert order.index("1C") < order.index("1D") < order.index("1E") < order.index("1F") < order.index("1G")
+    assert "GRIT" in steps["1K"] and order.index("1K") < order.index("2")
 
 
 def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:

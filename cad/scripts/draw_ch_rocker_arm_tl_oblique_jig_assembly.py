@@ -107,6 +107,9 @@ STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
 HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
+# The strap's preparation, drilling and cutting steps (#2443: the retired
+# MHA-CH-06 plan's route, now printed) continue the sequence on their own sheet.
+CUTTING_SHEET = "STRAP CUTTING"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 LINEAR_MOTION_SHEET = "LINEAR MOTION FROM ABOVE"
 
@@ -396,6 +399,7 @@ SHEET_NAMES = (
     FIT_SHEET,
     OPERATION_SHEET,
     HOLDING_SHEET,
+    CUTTING_SHEET,
     LINEAR_MOTION_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
@@ -451,6 +455,7 @@ def package_sheet_scales(
         FIT_SHEET: NOTES_REFERENCE_SCALE,
         OPERATION_SHEET: ISOMETRIC_SCALE,
         HOLDING_SHEET: NOTES_REFERENCE_SCALE,
+        CUTTING_SHEET: NOTES_REFERENCE_SCALE,
         LINEAR_MOTION_SHEET: LINEAR_MOTION_SCALE,
     }
     return {
@@ -1087,7 +1092,7 @@ class StepsSheet:
         )
 
 
-INSTRUCTION_SHEETS = (STEPS_SHEET, FIT_SHEET, OPERATION_SHEET, HOLDING_SHEET)
+INSTRUCTION_SHEETS = (STEPS_SHEET, FIT_SHEET, OPERATION_SHEET, HOLDING_SHEET, CUTTING_SHEET)
 STEPS_HEADING = (
     f"ASSEMBLY SEQUENCE (SHEETS {SHEET_NAMES.index(INSTRUCTION_SHEETS[0]) + 1}-"
     f"{SHEET_NAMES.index(INSTRUCTION_SHEETS[-1]) + 1})"
@@ -1153,7 +1158,8 @@ def steps_sheets(lines: Sequence[str]) -> tuple[StepsSheet, ...]:
         rest = rest[count:]
         sheets.append(StepsSheet(sheet, left, right))
     if rest:
-        raise ValueError(f"the instructions overrun sheets 7-10 by {len(rest)} lines")
+        first, last = (SHEET_NAMES.index(INSTRUCTION_SHEETS[i]) + 1 for i in (0, -1))
+        raise ValueError(f"the instructions overrun sheets {first}-{last} by {len(rest)} lines")
     return tuple(sheets)
 
 

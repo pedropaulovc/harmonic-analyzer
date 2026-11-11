@@ -61,9 +61,10 @@ SLIVER_MARGIN_MIN = 3.0
 FINISH_STOCK_MIN = 4.0  # inner R800 only
 FINISH_STOCK_MIN_BY_PASS = {"inner": FINISH_STOCK_MIN, "outer": 0.30}
 
-# Transfer from the ACTUAL carrier taps after edge registration, lift and
-# drill off-jig, then refit to the same registration. Predrilling nominal
-# stations from a separately displaced raw blank would add an invalid stack.
+# Transfer from the ACTUAL carrier taps after edge registration: a pilot run
+# up through each tap from below, opened from above in place (TL-00 steps
+# 19F-19J; #2443). Predrilling nominal stations from a separately displaced
+# raw blank would add an invalid stack.
 CLAMP_TRANSFER_POINTS = (trammel.CL, trammel.CR)
 CLAMP_TRANSFER_BAND = printed_band_mm(2, unit=riser.UNIT)
 CLAMP_DRILL = "7/32"

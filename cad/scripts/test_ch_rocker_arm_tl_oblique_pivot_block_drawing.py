@@ -412,7 +412,7 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
     assert printed['CarriageCounterbores3Dia'] == {
         'prefix': '4X <HOLE-SPOT><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
     assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
-    assert printed['BoreDia']['suffix'] == ' REAM <HOLE-DEPTH> (.359)'
+    assert printed['BoreDia']['suffix'] == ' BORE <HOLE-DEPTH> (.359)'
     assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)
     assert printed['TapDrillDia'] == {'suffix': ' DRILL THRU', 'above': '', 'below': '5/16-18 UNC THRU'}
     assert printed['CarriageDrills1Dia']['prefix'] == '4X <MOD-DIAM>'
@@ -466,7 +466,7 @@ def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
 
 
 _PIVOT_GENERATED_TEXT = (
-    'REAM <MOD-DIAM>.3750 +.0015/+.0010 <HOLE-DEPTH>.359\n'
+    'BORE <MOD-DIAM>.3750 +.0015/+.0010 <HOLE-DEPTH>.359\n'
     '  LOCATING FIT, TL-VN-77 SHOULDER\n'
     'DRILL <MOD-DIAM>.257 THRU\n'
     '5/16-18 UNC TAP THRU BELOW SEAT'
@@ -756,7 +756,7 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
     elif fault == 'duplicate_captions':
-        case.note.text = case.note.text.replace('REAM', 'REAM REAM')
+        case.note.text = case.note.text.replace('BORE', 'BORE BORE')
     elif fault == 'drill_value':
         case.note.text = case.note.text.replace('.257', '.258')
     elif fault == 'depth_value':
@@ -962,7 +962,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     if fault == 'split_symbols':
         first = spans.pop(0)
         spans[:0] = [
-            replace(first, text='REAM', xmax=.199),
+            replace(first, text='BORE', xmax=.199),
             replace(first, text='.3750+.0015/+.0010', xmin=.202, xmax=.248),
             replace(first, text='.359', xmin=.251, xmax=.263),
         ]

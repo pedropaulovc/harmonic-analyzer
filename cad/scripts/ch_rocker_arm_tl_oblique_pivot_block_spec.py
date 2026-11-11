@@ -15,7 +15,8 @@ three-place rounding of their exact vendor offsets from the -X and -Y edges.
 
 The seat takes the TL-VN-77 inch shoulder screw (owner ruling 2026-10-30: the
 metric shop tap becomes an extended-thread 5/16-18 precision shoulder screw): a
-.375 REAM_SLIDE seat on the owned .3760 reamer, and a 5/16-18 tap through
+.375 REAM_SLIDE-band seat bored flat-bottomed (#2445: the shoulder bottoms on its
+square floor, which a reamer's lead cannot finish), and a 5/16-18 tap through
 below it. The shop cuts the screw's thread to length so that its full-form
 engagement meets 1.5D and its tip stands inside the block at every band.
 
@@ -62,7 +63,7 @@ STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
 # enough that the unshimmed gap is open at every band; shims, which only
 # close it, are the fitting adjustment.
 BORE_DIA = 9.525  # .375
-BORE_BAND = REAM_SLIDE  # .3760-.3765 on the owned .3760 reamer
+BORE_BAND = REAM_SLIDE  # .3760-.3765, bored to a flat floor (#2445)
 BORE_PLACES = 4
 BORE_DEPTH = 9.1186  # .359
 _bore_lower, _bore_upper = deviations(BORE_BAND)
@@ -217,7 +218,7 @@ PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("BlockHeight")
                            - (BORE_DEPTH + _band("TopBoreDepth")) - _CUT_MAX)
 CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
-    "BoreDia": "REAM", "TapDrillDia": "DRILL THRU",
+    "BoreDia": "BORE", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
     "CarriageCounterbores3Dia": "4X COUNTERBORE FROM TOP",
 }
