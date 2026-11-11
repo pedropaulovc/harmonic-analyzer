@@ -1,8 +1,8 @@
-"""The reducer's S-K setting as model dimensions (MHA-PD-00 VIEW K).
+"""The reducer's S-K setting as model dimensions (MHA-PD-00 DETAIL K).
 
 The matched knob bore K is jig-bored on the mill DRO from the arm's reamed
-pin bore S, before the MHA-PD-23 pin is pressed into it (its one turned shank
-is the pressed pin's running axis): the arm trammed on its pivot bore P and
+pin bore S, on the shank of the MHA-PD-23 pin already pressed into it (the
+cluster's running axis; #2417): the arm trammed on its pivot bore P and
 S, the DRO zeroed on S, the plate tapped till its knob bore indicates true at
 K's two coordinates from S, along the arm toward P and across it to the
 plate's notch side. K is aimed at the middle of the +x/-0 set band
@@ -18,7 +18,7 @@ S along the arm, S to Q along it toward P, Q to K across it, and the S-K
 line, on which the nominal centre N stands at CENTRE_DISTANCE from S. S to N
 is the set band itself, a toleranced model dimension (+x/-0); the two DRO
 coordinates to the aimed K are references. All three are marked for
-MHA-PD-00, whose sheet 5 VIEW K prints them and whose arm-plate-located
+MHA-PD-00, whose sheet 6 DETAIL K prints them and whose arm-plate-located
 step cites it; the step prints no value of its own. No solid or pose
 changes.
 """
