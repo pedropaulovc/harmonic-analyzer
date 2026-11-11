@@ -322,7 +322,7 @@ still loads and only that task fails, naming the missing plan.
 |---|---|---|
 | 0 from both | pass | `traveler.html` and `traveler-hobby.html` written |
 | 1 (wrapper) | fail, no stamp | uv itself failed: `uv` missing, the latest prechips could not be resolved, or a render's `uv tool run` failed before prechips ran (stderr carries uv's `error:` or `×` diagnostic, not prechips' `prechips:` prefix); not a refusal, so neither file kept and the plan is not at fault |
-| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `machine_capacity`); neither file kept |
+| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`, `machine_capacity`); neither file kept |
 | other nonzero | fail, no stamp | consumer failure; neither file kept |
 
 The `pro` profile enforces every check listed above and prints a concise sheet.
@@ -341,10 +341,11 @@ pipeline and per-profile spans carry the resolved `prechips.version`.
 A missing plan, an unresolved version or a nonzero exit marks the pipeline span
 as failed.
 
-Current state: under prechips 0.9 the base bar and end bracket pass both
-profiles on the v48 manifests. The feed lever's plan
-refuses on `tool_sizing` (its
-11/32 drill is below the drawing's hole band) and is held out of
+Current state: under prechips 0.10.1 the base bar and end bracket pass both
+profiles on the v48 manifests, including the new `vise_holding` check against
+`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever's plan passes
+`vise_holding` but refuses on `tool_sizing` (its 11/32 drill is below the
+drawing's hole band) and is held out of
 `TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.

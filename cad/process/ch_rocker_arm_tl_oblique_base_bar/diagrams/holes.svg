@@ -11,7 +11,7 @@
   <rect x="241" y="56" width="192" height="16" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
   <rect x="241" y="{{view.bottom}}" width="192" height="16" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
 
-  <!-- CAD finished bar, C'BORE SIDE up, ZERO EDGE at back -->
+  <!-- CAD finished bar, far face up, ZERO EDGE at back -->
   <rect id="bar" x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.hpx}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
   <line x1="{{view.x0}}" y1="{{view.datum_y}}" x2="{{view.x1}}" y2="{{view.datum_y}}" stroke="#a33" stroke-width="3"/>
 
@@ -20,7 +20,7 @@
     <rect x="243" y="75" width="188" height="5"/>
     <rect x="243" y="{{view.lower_parallel_y}}" width="188" height="5"/>
     <circle cx="{{view.jack1_x}}" cy="{{view.jack1_y}}" r="10"/>
-    <circle cx="{{view.jack2_x}}" cy="{{view.jack2_y}}" r="9"/>
+    <circle cx="{{view.jack2_x}}" cy="{{view.jack2_y}}" r="10"/>
   </g>
 
   <!-- CAD rail holes, counterbored bracket holes and slots -->
@@ -30,10 +30,11 @@
 
   <!-- feature labels -->
   <g id="feature-labels" data-cad-group="feature-labels"/>
-  <text x="250" y="{{view.cbore_label_y}}">C'BORE SIDE up</text>
+  <text x="250" y="{{view.side_label_y}}">bar 1: C'BORE SIDE up</text>
+  <text x="250" y="{{view.side_label2_y}}">bar 2: RAIL SIDE up</text>
   <text x="{{view.rail_label_x}}" y="{{view.rail_label_y}}">{{cad.rail_range}}, Y {{cad.rail_y_in:.4f}}</text>
-  <text x="{{view.jack1_label_x}}" y="{{view.jack1_label_y}}">jack</text>
-  <text x="{{view.jack2_label_x}}" y="{{view.jack2_label_y}}" text-anchor="end">jack</text>
+  <text x="{{view.jack1_label_x}}" y="{{view.jack1_label_y}}">jack, touch only</text>
+  <text x="{{view.jack2_label_x}}" y="{{view.jack2_label_y}}" text-anchor="end">jack, touch only</text>
 
   <!-- datum origin X0/Y0 at back-left -->
   <g transform="translate({{view.x0}} {{view.top}})">

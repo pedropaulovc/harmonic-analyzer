@@ -27,15 +27,17 @@ quantity = 1
 # Hand sheet (v47 drawing 2X R.2, lines scribed .20 from end and sides); no
 # v48 record. The scribed lines sit one corner radius back.
 corner_radius_in = 0.2
-overhang_in = 0.4                # Hand sheet: ZERO END, then grip end, ~.4 past the jaw side.
+# Hand sheet: ZERO END, then grip end, ~.4 past the jaw side. The adapter
+# binds cad.overhang_mm from it for vise_hold.
+overhang_in = 0.4
 y_touch_x_in = 8.0               # Hand sheet: Y0 touched past the right jaw side.
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
 # run from spindle nose to tip (holder gauge + projection). Archive values are
 # archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
-vise_bed_height_mm = 73.3044     # Archive fixtures.vise-pm-6.bed_height_in 2.886.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 parallel_height_mm = 25.4        # 1 in parallels (archive parallels-lms-6745 1in).
 parallel_thickness_mm = 3.175    # Archive parallels-lms-6745 thickness_in 0.125.
-vise_jaw_width_mm = 158.6738     # Archive fixtures.vise-pm-6.jaw_width_in 6.247.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 end_cut_tip_z_mm = -1.016        # Hand sheet: cutter .04 below the bar.
 drill_tip_z_mm = -2.54           # Hand sheet: drill about .1 past breakthrough.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
@@ -74,6 +76,7 @@ title = "Saw blank"
 machine = "Saw / bench"
 indexing = "none"
 envelope = "other"
+vise_hold = "other"
 diagram = { file = "diagrams/feed-lever/saw.svg", alt = "The lever blank from the measured bar end" }
 
 [[setups.operations]]
@@ -95,6 +98,8 @@ diagram = { file = "diagrams/feed-lever/zero-end.svg", alt = "ZERO END out left 
 # The cutter centre and edge finder stay within the lever length plus one
 # cutter diameter; across the 1 in width plus one diameter.
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+# ZERO EDGE and the opposite edge are the bar's as-bought 1/2 in edges.
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{cad.overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -135,6 +140,8 @@ holding = "Same vise, ZERO EDGE at fixed jaw, slid left: grip end ~{{process.ove
 datum = "Re-find X0 on ZERO END; keep Y."
 diagram = { file = "diagrams/feed-lever/grip-end.svg", alt = "Slid left: grip end out right of the vise and cut to length from ZERO END" }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+# ZERO END is only cleaned up, so the blank length bounds the part.
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{cad.overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -151,6 +158,7 @@ title = "Grip corners / deburr / inspect"
 machine = "Bench vise, soft jaws"
 indexing = "none"
 envelope = "other"
+vise_hold = "other"
 diagram = { file = "diagrams/feed-lever/corners.svg", alt = "Finished lever and the grip end upright in soft jaws with scribed lines and filed corners" }
 
 [[setups.operations]]
