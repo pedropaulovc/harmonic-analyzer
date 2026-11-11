@@ -62,9 +62,10 @@ CALLOUTS: dict[str, str] = {
     "BodyThickness": REBATE_LINK,
     "ScaleStartX": STATION_LINK,
     "Tick0Width": f"ALL GRADUATIONS\n{part.GRADUATION_WIDTH_CALLOUT}",
-    # The V's included angle prints from the spec as NumeralDepth's does
-    # (2026-10-23 owner ruling on the numeral V, extended to the graduations
-    # by #2433: one bit cuts both); the model drafts each wall half of it.
+    # Delegated ruling 2026-11-11 (#2433, pending owner confirmation, #2144):
+    # the graduations' V angle prints from the spec as NumeralDepth's does,
+    # following the 2026-10-23 owner ruling on the numeral V (one bit cuts
+    # both); the model drafts each wall half of it.
     "TickDepth": (f"GRADUATIONS: {part.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
                   f"{part.GRADUATION_FLOOR_CALLOUT}"),
     "FullTickLength": "FULL TICKS",

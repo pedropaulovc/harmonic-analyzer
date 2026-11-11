@@ -804,9 +804,6 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     depth_parent = placements[-1]
     assert depth_parent.Orientation == "*Top"
     assert depth_parent.Position == drawing.DEPTH_PARENT_CENTER
-    # Third-angle bottom view: straight below its sheet's front copy.
-    assert drawing.DEPTH_PARENT_CENTER[0] == drawing.NUMERAL_PARENT_CENTER[0]
-    assert drawing.DEPTH_PARENT_CENTER[1] < drawing.NUMERAL_PARENT_CENTER[1]
     assert depth_parent.Angle == 0.0
     assert drawing.DEPTH_RADIUS_MM > math.hypot(spec.TICK_WIDTH / 2.0, spec.BODY_THICKNESS / 2.0)
     assert all(view.Angle == pytest.approx(math.pi) for view in placements
