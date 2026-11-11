@@ -2094,9 +2094,14 @@ def _step_text(
             reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
             # The trial counts only if nothing moved under it: S still at the
-            # DRO's zero and N still true at its settings.
-            f"CHECK: RE-INDICATED, S READS TRUE AT THE DRO'S ZERO AND "
-            f"{KNOB_BORE_LETTER} AT ITS SETTINGS.",
+            # DRO's zero and N still true at its settings.  Named in full and
+            # pointed back like 12H: the step can pack onto a sheet without
+            # the DETAIL K key (machinist review on 0a4408f590).
+            f"CHECK: RE-INDICATED PER {s('arm-plate-located', 2)} "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}), "
+            f"{n['pd-transgear-arm']} PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
+            f"{n['pd-transgear-arm-plate']} KNOB BORE {KNOB_BORE_LETTER} AT ITS "
+            "SETTINGS.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
             # The plate is not moved to chase a reading: the S to N band stays
             # the setting's limit (owner ruling on #2034 x #2011; #2144 item

@@ -2506,6 +2506,27 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     )
 
 
+def test_every_step_naming_s_or_n_defines_them_or_points_to_their_key() -> None:
+    """Machinist review on 0a4408f590 (rule 22): step 12R packed onto a sheet
+    without the DETAIL K key and used S and N bare. Each sheet's step that
+    reads S or N names the bore's part or points to the key's sheet."""
+    key_sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1
+    bare = re.compile(rf"(?<![\w'])(S|{drawing.KNOB_BORE_LETTER})\b(?! TO )")
+    for column in drawing.pack_step_columns(
+        drawing._step_text(operating_domain=_unit_operating_domain())
+    ):
+        if column.sheet == drawing.KNOB_SETTING_SHEET:
+            continue
+        for step in re.split(r"\n(?=\d+[A-Z]?\. )", column.text):
+            flat = " ".join(step.split())
+            if "DRO" not in flat or not bare.search(flat):
+                continue
+            assert f"(SHEET {key_sheet})" in flat or (
+                "PIN BORE S" in flat
+                and f"KNOB BORE {drawing.KNOB_BORE_LETTER}" in flat
+            ), flat
+
+
 def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     """#2417: the mesh is read on its real seats while the plate is clamped,
     again once it is doweled, and only confirmed at the chain fit-up."""
@@ -2528,10 +2549,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # setting before it and never moved to chase a reading, so the S to N
     # band stays the limit; S and N are proven unmoved before the pilots.
     assert located.rindex("TAP THE PLATE") < trial
-    assert (
-        f"S READS TRUE AT THE DRO'S ZERO AND {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS"
-        in located[lifted:]
-    )
+    recheck = located[lifted:]
+    assert "S READS TRUE AT THE DRO'S ZERO" in recheck
+    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS" in recheck
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
     # The setting is made where the mesh is: S is indicated at the disc's height.
     assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
