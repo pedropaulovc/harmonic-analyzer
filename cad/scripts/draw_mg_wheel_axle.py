@@ -227,9 +227,12 @@ DETAIL_KEEP = {
     # mouth; its text stands over the radius's block, so the radius's leader
     # meets neither the line nor the text on either side of the line (run
     # 20261027T064924192Z: at 0.3 the leader crossed this line, rule 14).
+    # #2399: its function rides one callout row under the value, so the text
+    # stands 5 mm higher than the bare MAX did, the row ~4 mm over the
+    # radius's block and the value ~3 mm under the overall row.
     "ReliefDia": (
         _detail_xy(0.0, STEP_Y + 0.7)[0],
-        _DETAIL_TOP + 0.015,
+        _DETAIL_TOP + 0.020,
     ),
     # "2X / R.008 MAX" up-left over the crop, under the Ø's text: the ~21 mm
     # block ends just left of the step-side root's centre, so its leader drops

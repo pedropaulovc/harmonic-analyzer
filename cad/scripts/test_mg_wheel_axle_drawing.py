@@ -245,7 +245,9 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
         encoding="utf-8"
     )
     authored = callouts.authored_by_name()
-    assert set(authored) == {"PinDia", "ReliefRootR", "PinLength"}
+    assert set(authored) == {"PinDia", "ReliefDia", "ReliefRootR", "PinLength"}
+    # The neck's Ø states the function that needs its third place.
+    assert "THREAD MINOR" in authored["ReliefDia"][callouts.CALLOUT_BELOW]
     assert authored["PinLength"] == {
         callouts.TEXT_PREFIX: "(",
         callouts.TEXT_SUFFIX: ")",
