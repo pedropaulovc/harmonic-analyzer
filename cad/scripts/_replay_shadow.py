@@ -675,7 +675,18 @@ VERDICT_CLASSES: dict[str, VerdictClass] = {
 
 @dataclass
 class Shadow:
-    """What a shadow replay of the current source against a base found."""
+    """What a shadow replay of the current source against a base found.
+
+    ``ground_truth``: whether this build's own recording issued the base's
+    requests (request equality, ``same``/``diverged``). ``truth_cause``: what
+    preceded its first divergence, ``response:<member>`` (SolidWorks answered
+    differently first) or ``request`` (the source asked something else).
+    ``outcome``: whether this build made the base's part (``same``,
+    ``different``, ``unknown``: ``_com_outcome.Outcome``). A no-op proves the
+    current source maps the base's answers onto the base's requests, so with
+    pinned inputs a live request divergence after a no-op comes from
+    SolidWorks: request equality is telemetry about the seat, the outcome is
+    the oracle."""
 
     verdict: str
     recorded: int | None = None
@@ -686,6 +697,10 @@ class Shadow:
     reason: str | None = None
     ground_truth: str = "unknown"
     request_divergence: dict[str, Any] | None = None
+    truth_cause: str | None = None
+    outcome: str = "unknown"
+    outcome_signals: dict[str, str] = field(default_factory=dict)
+    outcome_details: dict[str, Any] | None = None
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -693,9 +708,29 @@ class Shadow:
 
     @property
     def soundness_alarm(self) -> bool:
-        """A replay NOOP although the fresh recording's requests diverged
-        from the base: the replay would have reused a wrong artefact."""
-        return self.verdict == "noop" and self.ground_truth == "diverged"
+        """A replay NOOP although this build made another part than the base:
+        reuse would have served a wrong artefact."""
+        return self.verdict == "noop" and self.outcome == "different"
+
+    @property
+    def seat_nondeterminism(self) -> bool:
+        """A replay NOOP, this build's requests diverged from the base after
+        SolidWorks answered differently, and it made the same part: the seat
+        varied, not the source (2026-11-11: one body's faces listed in another
+        order). Counted, never an alarm."""
+        return (
+            self.verdict == "noop"
+            and self.ground_truth == "diverged"
+            and (self.truth_cause or "").startswith("response:")
+            and self.outcome == "same"
+        )
+
+    @property
+    def noop_outcome_unknown(self) -> bool:
+        """A replay NOOP whose outcome could not be compared (a log without a
+        mass-property snapshot or an STL export, or no comparison): neither an
+        alarm nor evidence of soundness. Counted apart."""
+        return self.verdict == "noop" and self.outcome == "unknown"
 
     @property
     def false_divergence(self) -> bool:
@@ -839,7 +874,9 @@ def shadow_of(
     diff_rc: int | None,
     diff: dict[str, Any] | None,
 ) -> Shadow:
-    """Fold the replay result and the request comparison into one Shadow."""
+    """Fold the replay result and the comparison of this build's recording
+    with the base (request equality, its cause, the outcome) into one
+    Shadow."""
     if replay_rc is None:
         shadow = Shadow("timeout", reason="replay exceeded the shadow budget")
     elif replay is None:
@@ -860,6 +897,10 @@ def shadow_of(
         shadow.ground_truth = (
             "same" if diff["request_divergence"] is None else "diverged"
         )
+        shadow.truth_cause = diff.get("truth_cause")
+        shadow.outcome = str(diff.get("outcome") or "unknown")
+        shadow.outcome_signals = dict(diff.get("outcome_signals") or {})
+        shadow.outcome_details = diff.get("outcome_details")
     return shadow
 
 
@@ -915,8 +956,10 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     """One line (never a newline) of what a recorded build's shadow step did:
     publication outcome and bundle bytes; the base lookup (base key or none,
     manifests listed and read, seconds); the shadow replay's verdict, requests
-    served of recorded, seconds; and the ground truth from this build's own
-    requests. ``-`` marks a step the build never reached."""
+    served of recorded, seconds; the ground truth from this build's own
+    requests; the outcome against the base's and the truth's cause; then the
+    markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
+    ``noop_outcome_unknown``). ``-`` marks a step the build never reached."""
 
     def shown(name: str, unit: str = "") -> str:
         value = record.get(name)
@@ -939,9 +982,14 @@ def report_line(label: str, record: dict[str, Any]) -> str:
         f"shadow={shown('verdict')} served={shown('served')}/{shown('recorded')} "
         f"{shown('wall_s', 's')}",
         f"truth={shown('ground_truth')}",
+        f"outcome={shown('artefact_outcome')} cause={shown('truth_cause')}",
     ]
     if record.get("soundness_alarm"):
         segments.append("SOUNDNESS ALARM")
+    if record.get("seat_nondeterminism"):
+        segments.append("seat_nondeterminism")
+    if record.get("noop_outcome_unknown"):
+        segments.append("noop_outcome_unknown")
     return " | ".join(segments)
 
 
@@ -1070,7 +1118,15 @@ def _after_build(
             "differing_count": len(base.differing),
             "differing_classes": ",".join(f"{k}:{v}" for k, v in base.classes.items()),
             "ground_truth": shadow.ground_truth,
+            "truth_cause": shadow.truth_cause,
+            "artefact_outcome": shadow.outcome,
+            "outcome_signals": ",".join(
+                f"{name}:{signal}" for name, signal in shadow.outcome_signals.items()
+            )
+            or None,
             "soundness_alarm": shadow.soundness_alarm,
+            "seat_nondeterminism": shadow.seat_nondeterminism,
+            "noop_outcome_unknown": shadow.noop_outcome_unknown,
             "false_divergence": shadow.false_divergence,
             "wall_s": wall,
         }
@@ -1092,6 +1148,10 @@ def _after_build(
                 "replay_verdict": shadow.verdict,
                 "served": shadow.served,
                 "recorded": shadow.recorded,
+                "outcome_signals": shadow.outcome_signals,
+                "outcome_details": shadow.outcome_details,
+                "ground_truth": shadow.ground_truth,
+                "truth_cause": shadow.truth_cause,
                 "request_divergence": shadow.request_divergence,
             },
             sort_keys=True,
@@ -1101,7 +1161,7 @@ def _after_build(
         _telemetry.error(
             f"[com-replay] SOUNDNESS ALARM {label}: the replay against base "
             f"{str(base.manifest.get('key', ''))[:12]} was a no-op, but this "
-            f"build's own requests diverged from that base: {evidence}",
+            f"build made another part than that base: {evidence}",
             label=label,
             base_key=str(base.manifest.get("key", "")),
         )

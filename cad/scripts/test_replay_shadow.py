@@ -14,6 +14,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -573,7 +574,7 @@ def test_a_recording_publishes_beside_the_part_archive(
     assert logged["info"] == [
         f"[com-replay] part:{_STEM}: recorded | publish=stored bytes={len(data)} "
         "| lookup=- base=- differing=- listed=- read=- - | shadow=- served=-/- - "
-        "| truth=-"
+        "| truth=- | outcome=- cause=-"
     ]
     published_spans = spans.named("replay.")
     assert [entry["name"] for entry in published_spans] == [
@@ -875,8 +876,22 @@ _DIVERGED = {
     "served": 4,
     "divergence": {"field": "member", "member_actual": "IApp.Add"},
 }
-_SAME = {"request_divergence": None}
-_DIFFERENT = {"request_divergence": {"index": 4, "field": "args"}}
+_SAME = {"request_divergence": None, "truth_cause": None, "outcome": "same"}
+_DIFFERENT = {
+    "request_divergence": {"index": 4, "field": "args"},
+    "truth_cause": "request",
+    "outcome": "different",
+}
+# The fleet's first alarm (2026-11-11): one body's faces listed in another
+# order, the same part.
+_REORDERED = {
+    "request_divergence": {"index": 1501, "field": "handle"},
+    "truth_cause": "response:IFace2.Normal",
+    "outcome": "same",
+}
+_UNMEASURED = {"request_divergence": None, "truth_cause": None, "outcome": "unknown"}
+# The base's exact requests, another part: the seat changed the geometry.
+_RESHAPED = {"request_divergence": None, "truth_cause": None, "outcome": "different"}
 
 
 def _verdict(name: str) -> dict[str, Any]:
@@ -884,22 +899,19 @@ def _verdict(name: str) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize(
-    ("replay_rc", "replay", "diff", "verdict", "truth", "kind", "alarm", "false"),
+    ("replay_rc", "replay", "diff", "verdict", "truth", "kind", "flags"),
     [
-        (0, _NOOP, _SAME, "noop", "same", "noop", False, False),
-        (0, _NOOP, _DIFFERENT, "noop", "diverged", "noop", True, False),
-        (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", False, False),
-        (91, _DIVERGED, _SAME, "diverged", "same", "divergence", False, True),
-        (
-            91,
-            _verdict("exhausted"),
-            _SAME,
-            "exhausted",
-            "same",
-            "divergence",
-            False,
-            True,
-        ),
+        (0, _NOOP, _SAME, "noop", "same", "noop", ""),
+        (0, _NOOP, _DIFFERENT, "noop", "diverged", "noop", "alarm"),
+        (0, _NOOP, _RESHAPED, "noop", "same", "noop", "alarm"),
+        (0, _NOOP, _REORDERED, "noop", "diverged", "noop", "seat"),
+        (0, _NOOP, _UNMEASURED, "noop", "same", "noop", "unknown"),
+        # No comparison at all: a noop nothing confirms.
+        (0, _NOOP, None, "noop", "unknown", "noop", "unknown"),
+        (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", ""),
+        (91, _DIVERGED, _REORDERED, "diverged", "diverged", "divergence", ""),
+        (91, _DIVERGED, _SAME, "diverged", "same", "divergence", "false"),
+        (91, _verdict("exhausted"), _SAME, "exhausted", "same", "divergence", "false"),
         (
             91,
             _verdict("unconsumed"),
@@ -907,8 +919,7 @@ def _verdict(name: str) -> dict[str, Any]:
             "unconsumed",
             "same",
             "divergence",
-            False,
-            True,
+            "false",
         ),
         # A refusal or a failure of the machinery is no judgement: never a
         # false divergence, whatever the ground truth.
@@ -919,22 +930,28 @@ def _verdict(name: str) -> dict[str, Any]:
             "input_mismatch",
             "same",
             "refusal",
-            False,
-            False,
+            "",
         ),
-        (91, _verdict("sandbox"), _SAME, "sandbox", "same", "refusal", False, False),
-        (91, _verdict("error"), _SAME, "error", "same", "infrastructure", False, False),
-        (None, None, _SAME, "timeout", "same", "infrastructure", False, False),
-        (3, None, None, "error", "unknown", "infrastructure", False, False),
+        (91, _verdict("sandbox"), _SAME, "sandbox", "same", "refusal", ""),
+        (91, _verdict("error"), _SAME, "error", "same", "infrastructure", ""),
+        (None, None, _SAME, "timeout", "same", "infrastructure", ""),
+        (3, None, None, "error", "unknown", "infrastructure", ""),
     ],
 )
-def test_a_shadow_folds_replay_and_ground_truth(
-    replay_rc, replay, diff, verdict, truth, kind, alarm, false
+def test_a_shadow_folds_replay_ground_truth_and_outcome(
+    replay_rc, replay, diff, verdict, truth, kind, flags
 ):
     result = shadow.shadow_of(replay_rc, replay, 0 if diff else None, diff)
     assert (result.verdict, result.ground_truth) == (verdict, truth)
     assert result.verdict_class is shadow.VerdictClass(kind)
-    assert (result.soundness_alarm, result.false_divergence) == (alarm, false)
+    assert result.outcome == (diff or {}).get("outcome", "unknown")
+    assert result.truth_cause == (diff or {}).get("truth_cause")
+    assert {
+        "alarm": result.soundness_alarm,
+        "seat": result.seat_nondeterminism,
+        "unknown": result.noop_outcome_unknown,
+        "false": result.false_divergence,
+    } == {name: name == flags for name in ("alarm", "seat", "unknown", "false")}
 
 
 def test_every_verdict_has_a_class():
@@ -968,6 +985,9 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
             substitutions=0,
             ground_truth="diverged",
             request_divergence=divergence,
+            truth_cause="request",
+            outcome="different",
+            outcome_signals={"mass": "different", "stl": "same"},
         )
 
     monkeypatch.setattr(shadow, "evaluate", evaluate)
@@ -985,6 +1005,8 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     assert len(record["alarm_evidence"]) == shadow.EVIDENCE_CHARS
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.soundness_alarm"] is True
+    assert span["replay.artefact_outcome"] == record["artefact_outcome"] == "different"
+    assert span["replay.outcome_signals"] == "mass:different,stl:same"
     assert span["replay.base_key"] == base.key[:12]
     assert span["replay.verdict_class"] == record["verdict_class"] == "noop"
     # One INFO line per recorded build; the evaluated one carries every step.
@@ -997,7 +1019,9 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
         "listed=2 read=2 "
     )
     assert "| shadow=noop served=10/10 " in line
-    assert line.endswith("| truth=diverged | SOUNDNESS ALARM")
+    assert line.endswith(
+        "| truth=diverged | outcome=different cause=request | SOUNDNESS ALARM"
+    )
     assert span["service"] == _telemetry.BUILD_INFRA_SERVICE
     assert [entry["name"].split()[0] for entry in spans.named("replay.")] == [
         "replay.after_build",
@@ -1009,6 +1033,55 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
         "replay.base_lookup",
         "replay.shadow",
     ]
+
+
+# The hourly fleet report's parser of the INFO line.
+_REPORT_LINE = re.compile(r"shadow=(\S+) served=(\S+).*?truth=(\S+)")
+
+
+@pytest.mark.parametrize(
+    ("found", "marker", "line_end"),
+    [
+        (
+            {
+                "ground_truth": "diverged",
+                "truth_cause": "response:IFace2.Normal",
+                "outcome": "same",
+            },
+            "seat_nondeterminism",
+            "| truth=diverged | outcome=same cause=response:IFace2.Normal "
+            "| seat_nondeterminism",
+        ),
+        (
+            {"ground_truth": "same", "outcome": "unknown"},
+            "noop_outcome_unknown",
+            "| truth=same | outcome=unknown cause=- | noop_outcome_unknown",
+        ),
+    ],
+)
+def test_a_noop_the_outcome_does_not_contradict_is_counted_never_an_alarm(
+    blob, tmp_path, monkeypatch, spans, logged, found, marker, line_end
+):
+    def evaluate(recording, base, summary):
+        return shadow.Shadow("noop", recorded=10, served=10, **found)
+
+    monkeypatch.setattr(shadow, "evaluate", evaluate)
+    _two_builds(tmp_path, monkeypatch)
+    assert logged["error"] == []
+    record = _events(tmp_path, "replay_shadow")[-1]
+    flags = ("soundness_alarm", "seat_nondeterminism", "noop_outcome_unknown")
+    assert {name: record[name] for name in flags} == {
+        name: name == marker for name in flags
+    }
+    [span] = spans.named("replay.shadow ")
+    assert span[f"replay.{marker}"] is True and span["replay.soundness_alarm"] is False
+    line = logged["info"][-1]
+    assert line.endswith(line_end)
+    assert _REPORT_LINE.search(line).groups() == (
+        "noop",
+        "10/10",
+        found["ground_truth"],
+    )
 
 
 def test_a_failed_evaluation_is_a_verdict_not_a_failure(
@@ -1132,6 +1205,14 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
     assert (
         not second_record["soundness_alarm"] and not second_record["false_divergence"]
     )
+    # The fake build measures nothing and exports no STL: a noop the outcome
+    # can neither confirm nor contradict.
+    assert (second_record["artefact_outcome"], second_record["truth_cause"]) == (
+        "unknown",
+        None,
+    )
+    assert second_record["noop_outcome_unknown"]
+    assert not second_record["seat_nondeterminism"]
     assert second_record["differing"] == [cache._rel(config)]
     # The replay's scratch is gone; its logs and the local verdict remain.
     assert list(shadow.SCRATCH.iterdir()) == []
@@ -1320,7 +1401,12 @@ def test_com_subprocesses_issue_set_ordered_requests_in_one_order(
 def test_recordings_are_no_task_input_or_output(monkeypatch):
     monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
     dodo = _load_dodo()
-    modules = {"_com_conversation.py", "com_replay.py", "_replay_shadow.py"}
+    modules = {
+        "_com_conversation.py",
+        "_com_outcome.py",
+        "com_replay.py",
+        "_replay_shadow.py",
+    }
     owned = (shadow.RECORDINGS.resolve(), shadow.SCRATCH.resolve())
     # One real part task (every part task is built by the same _part_task; the
     # closure test covers every recipe's module closure).

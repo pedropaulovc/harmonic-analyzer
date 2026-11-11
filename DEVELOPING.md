@@ -2371,8 +2371,8 @@ and refuses (`input_mismatch`) a base recorded under another seed or none.
 
 Assemblies, drawings and gates are not recorded. Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
-input, and the three modules (`_replay_shadow.py`, `_com_conversation.py`,
-`com_replay.py`) are in no recipe closure
+input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
+`_com_outcome.py`, `com_replay.py`) are in no recipe closure
 (`test_recording_modules_stay_out_of_every_recipe_closure`,
 `test_recordings_are_no_task_input_or_output`).
 
@@ -2441,6 +2441,12 @@ retention without a warning. Manifests and bundles live under sibling
 prefixes, so the base lookup lists manifests only, every page of them, and
 then takes the newest: no cut is ever made in the listing's name order.
 
+The engine digest in the prefix is the SHA-256 of `_com_conversation.py`
+alone (the log header's `engine`): changing that module starts a fresh set of
+bases, since a replay refuses a log of another engine. The comparison of two
+recordings (`_com_outcome`), the driver (`com_replay.py`) and `_replay_shadow`
+are outside it and can change without retiring the published recordings.
+
 The manifest holds the stem, key, per-input digests (the cache's
 `key_inputs`), the cache salt and epoch (the two key inputs that are not
 files), the engine SHA-256, the SolidWorks revision, request counts and the
@@ -2486,11 +2492,33 @@ own fresh recording (`--seat-log`), both read by the recorder from
 `sw_revision`). An unknown revision on either side refuses too. The replay
 serves recorded responses and refuses live COM, writes outside its scratch,
 and non-loopback network. The worker slot gets a hard 120 s budget; the seat is
-not held. Next, the base log is compared with this build's own fresh recording,
-which is the ground truth:
+not held. Next, the base log is compared with this build's own fresh recording
+(`com_replay.py diff`, `_com_outcome.judge`):
 
-- `ground_truth=same`: the fresh build issued exactly the base's requests.
-- `ground_truth=diverged`: it did not.
+- `ground_truth`: `same` when the fresh build issued exactly the base's
+  requests in the base's order, `diverged` when it did not.
+- `truth_cause`: what preceded the first request difference.
+  `response:<member>` names the nearest earlier answer that differs beyond
+  noise; `request` means every earlier answer agreed, so the script asked
+  something else. Noise is SolidWorks' new-document title counters (`Part11`
+  against `Part12`), the masked provenance value, and floats within 1e-9 of
+  their value's largest float. The named answer need not have steered the
+  request: when a source edit follows a reordering, the reordering is named.
+- `artefact_outcome`: whether the fresh build made the base's part, from four
+  signals that do not depend on call order (`outcome_signals`):
+
+  | signal | compared |
+  | --- | --- |
+  | `mass` | every mass-property answer, matched by order per member, within 1e-9 of the quantity's largest component; a centre of mass also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
+  | `requests` | the multiset of recipe requests, handles erased, noise normalised |
+  | `answers` | the multiset of (request, answer) pairs, but for mass properties and answers about the session (`IModelDoc2.SummaryInfo` dates, `ISldWorks.GetUserPreference*`) |
+  | `stl` | each exported STL's triangles as a multiset: corners rotated to start at the least (winding kept), facet normals and header dropped |
+
+  `same`: all four are present and agree. `different`: one differs, or is in
+  one log only. `unknown`: nothing differs, but neither log holds a
+  mass-property snapshot or an STL export, or a capture cannot be read. SLDPRT
+  and BMP captures are no signal: a part file's bytes differ on every save, a
+  screenshot's with the seat.
 
 Every verdict has a `verdict_class`:
 
@@ -2501,13 +2529,52 @@ Every verdict has a `verdict_class`:
 | `refusal` | `input_mismatch`, `sandbox` | the replay declined to judge, by design |
 | `infrastructure` | `error`, `timeout`, `unavailable` | no judgement, for a reason of the machinery's own |
 
-A replay `noop` whose ground truth is `diverged` is a **soundness alarm**: if
-recordings had been reused, a wrong artefact would have been reused. It is
-logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence) and never
-fails the build. A `divergence`-class verdict with `ground_truth=same` is a
-`false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
-infrastructure verdicts are never false divergences; count them by
-`verdict_class`. The work directory is removed afterwards.
+What a `noop` proves, and what it does not:
+
+| proves | does not prove |
+| --- | --- |
+| under the base's recorded answers, the current source issues exactly the base's recipe requests (the masked provenance value aside) | that a fresh build gets the same answers |
+| the inputs a replay pins match: log schema, engine, environment keys, the files COM arguments name, SolidWorks revision | what the source does on branches the recorded answers never took |
+| | anything SolidWorks reads outside COM arguments (registry, preferences, seat state), the arguments of recipe-inert calls (compared by count only), the masked value |
+| | that the part file is byte-identical |
+
+Because Python's inputs are pinned, a fresh build whose requests diverge from
+the base after a `noop` was steered by SolidWorks, not by the source. Request
+equality therefore measures the seat and stays telemetry; the outcome is the
+oracle:
+
+- A **soundness alarm** is a `noop` whose `artefact_outcome` is `different`:
+  if recordings had been reused, another part would have been reused. It is
+  logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence with
+  the signals) and never fails the build.
+- `seat_nondeterminism` is a `noop` with `ground_truth=diverged`,
+  `truth_cause=response:<member>` and `artefact_outcome=same`: SolidWorks
+  answered differently and the part is the same. It is counted (a marker on
+  the INFO line, a field in the record and span), never an alarm.
+- `noop_outcome_unknown` is a `noop` whose outcome is `unknown` or was never
+  compared: neither an alarm nor evidence of soundness, counted apart.
+- A `divergence`-class verdict with `ground_truth=same` is a
+  `false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
+  infrastructure verdicts are never false divergences; count them by
+  `verdict_class`.
+
+The work directory is removed afterwards.
+
+Observed SolidWorks variation (2026-11-11): `IBody2.GetFaces` listed the same
+faces of one body in another order between builds, including two consecutive
+documents of one SolidWorks session. Every reordering moved a -Y planar face,
+right after a Hole Wizard feature was finalised, and
+`_holes.find_planar_face` measured the faces in the order listed. On
+`part:dt_cone_swing_platform` this raised the fleet's first alarm under the
+earlier request-equality rule: the replay was a `noop` and the fresh build's
+requests diverged at the face search, yet its mass properties, request and
+answer multisets and STL were the base's. Two request-identical
+`dt_crank_pinion` builds wrote the same STL triangles in another order, with
+corners rotated and normals off in the last bits. Over that day's 38
+consecutive same-part recording pairs, all 26 request-identical pairs and both
+reordered `dt_cone_swing_platform` pairs compare `same`; every pair with a
+source or configuration edit compares `different`, including the
+property-only edits.
 
 ### What it costs a task
 
@@ -2555,7 +2622,7 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`), `replay.bundle_bytes` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
-| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.soundness_alarm`, `replay.false_divergence`, `replay.wall_s` |
+| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.wall_s` |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -2574,14 +2641,17 @@ Each recorded build also appends one `replay_shadow` record to
 and ends with one INFO line in the task log, for example:
 
 ```text
-[com-replay] part:pd_transgear_arm_plate: evaluated | publish=stored bytes=412160 | lookup=found base=f1016ee56b74 differing=1 listed=3 read=3 0.412s | shadow=noop served=1874/1874 9.84s | truth=same
+[com-replay] part:pd_transgear_arm_plate: evaluated | publish=stored bytes=412160 | lookup=found base=f1016ee56b74 differing=1 listed=3 read=3 0.412s | shadow=noop served=1874/1874 9.84s | truth=same | outcome=same cause=-
 ```
 
-(`-` marks a step the build never reached). On a farm leaf `cache.jsonl` stays
-on the worker, so use Application Insights for fleet-wide results.
+(`-` marks a step the build never reached). A `SOUNDNESS ALARM`,
+`seat_nondeterminism` or `noop_outcome_unknown` marker ends the line when it
+applies. On a farm leaf `cache.jsonl` stays on the worker, so use Application
+Insights for fleet-wide results. The `replay_shadow` record's outcome fields
+are `artefact_outcome` and `truth_cause`: `outcome` is the step's.
 
-Verdict classes, alarms and false divergences per stem (drop `by stem` for the
-fleet total):
+Verdict classes, alarms, seat nondeterminism, unconfirmed no-ops and false
+divergences per stem (drop `by stem` for the fleet total):
 
 ```kusto
 dependencies
@@ -2589,13 +2659,17 @@ dependencies
 | extend stem=tostring(customDimensions.label),
          kind=tostring(customDimensions["replay.verdict_class"]),
          alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
+         seat=tolower(tostring(customDimensions["replay.seat_nondeterminism"])) == "true",
+         unknown=tolower(tostring(customDimensions["replay.noop_outcome_unknown"])) == "true",
          false_divergence=tolower(tostring(customDimensions["replay.false_divergence"])) == "true",
          wall=todouble(customDimensions["replay.wall_s"])
 | summarize evaluated=count(), noop=countif(kind == "noop"),
             divergence=countif(kind == "divergence"),
             refusal=countif(kind == "refusal"),
             infrastructure=countif(kind == "infrastructure"),
-            alarms=countif(alarm), false_divergences=countif(false_divergence),
+            alarms=countif(alarm), seat_nondeterminism=countif(seat),
+            noop_outcome_unknown=countif(unknown),
+            false_divergences=countif(false_divergence),
             p50_wall_s=percentile(wall, 50), p95_wall_s=percentile(wall, 95)
             by stem
 | order by alarms desc, evaluated desc
@@ -2639,6 +2713,8 @@ jq -s '
     classes: ([$s[] | select(.verdict_class)] | group_by(.verdict_class)
               | map({key: .[0].verdict_class, value: length}) | from_entries),
     false_divergences: [$s[] | select(.false_divergence == true)] | length,
+    seat_nondeterminism: [$s[] | select(.seat_nondeterminism == true)] | length,
+    noop_outcome_unknown: [$s[] | select(.noop_outcome_unknown == true)] | length,
     per_stem: ($s | group_by(.label) | map({
       label: .[0].label,
       verdicts: (group_by(.verdict // .outcome)
