@@ -3491,12 +3491,40 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
         "WebRingDraft": ("WEBS", "CROSSBAR", "POCKETS", "GUSSETS", "PADS", "SET-BOSS SIDES"),
         "BossesUpperDraft": ("FLANGE RIMS", "SET-BOSS FACE", "4X BOSS", "HUB BARRELS"),
     }
+    # The added draft's band is the tighter one (the title block's angle row
+    # is ±1°), so rule 4 has its callout say what the 2° minimum holds, and
+    # rule 3 gives the form: the wall, with its value.  Rule 7 allows a
+    # callout two lines of words, so the faces share the first (machinist
+    # reviews of 518e3d01e1 and 7dfc6b6c5f).  The taken-out band is the title
+    # block's own and gives no reason.
+    reason = {
+        "WebRingDraft": ["HOLDS 2-56 TAP WALL .080 MIN"],
+        "BossesUpperDraft": [],
+    }
     for name, own in faces.items():
         rows = callouts[name].splitlines()
         assert len(rows) == 2 and rows[0].startswith("DRAFT, "), name
-        assert all(face in callouts[name].replace("\n", " ") for face in own), name
+        listed = rows[: len(rows) - len(reason[name])]
+        assert rows[len(listed) :] == reason[name], name
+        assert all(len(row.split()) <= 6 for row in reason[name]), name
+        assert all(face in " ".join(listed) for face in own), name
         (other,) = set(faces) - {name}
         assert not [face for face in faces[other] if face in callouts[name]], name
+    assert sum(spec.DRAFT_ADDED_DEVIATIONS_DEG) < sum(
+        spec.DRAFT_TAKEN_OUT_DEVIATIONS_DEG
+    )
+    (stated,) = reason["WebRingDraft"]
+    assert keeper_screw.THREAD.lstrip("#") in stated
+    # The stated wall is the rule 17 target, which the keeper drill's wall
+    # holds at the 2° minimum (.0807) and loses a degree lower (.0636).
+    assert f"{WALL_TARGET_MM / 25.4:.3f}".lstrip("0") in stated.split()
+    drill_rise = part._KEEPER_DRILL_BOTTOM_Y + part.HALF_H
+    thinner = part.KEEPER_TAP_DRILL_WALL_MARGIN - drill_rise * (
+        part.DRAFT_T_ADDED_MIN - math.tan(math.radians(spec.DRAFT_DEG - 1.0))
+    )
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN >= WALL_TARGET_MM > thinner
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN >= part.KEEPER_TAP_DRILL_WALL_MARGIN
+    assert thinner / 25.4 == pytest.approx(0.0636, abs=5e-5)
     # The wedges: the web's outer face opens outward going up (added draft),
     # the upper barrel closes inward (taken out above the faced top).
     wedges = drawing.DATUM_DRAFT_WEDGES
@@ -3532,16 +3560,19 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
         # (then on sheet 2) about their points: the added band's stacked
         # +1°/0° stands its upper limit 5.56 mm over the point and its second
         # callout row 10.08 under it; the taken-out band's ±1° is the plain
-        # three rows, 2.78 over and 8.33 under.  Glyphs stand 4.5 over a
-        # row's line and ran 2.63 mm each at the widest (the rows' wording
-        # has changed since: their widths are that estimate until a farm run
+        # three rows, 2.78 over and 8.33 under.  A further row moves both
+        # ends half a row pitch (2.78 mm).  Glyphs stand 4.5 over a row's
+        # line and ran 2.63 mm each at the widest (the rows' wording has
+        # changed since: their widths are that estimate until a farm run
         # prints them).
         tx, ty = drawing.DATUM_FRONT_TEXT_OFFSETS[name]
-        half = max(map(len, callouts[name].splitlines())) * 0.00263 / 2.0
+        rows = callouts[name].splitlines()
+        half = max(map(len, rows)) * 0.00263 / 2.0
         band = spec.DRAFT_ANGLE_DIMENSIONS[printed[name]][1]
         stacked = band == spec.DRAFT_ADDED_DEVIATIONS_DEG
         over, under = (0.00556, 0.01008) if stacked else (0.00278, 0.00833)
-        block = (tx - half, ty - under, tx + half, ty + over + 0.0045)
+        more = (len(rows) - 2) * 0.00278
+        block = (tx - half, ty - under - more, tx + half, ty + over + more + 0.0045)
         blocks[name] = block
         assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink, name
         assert block[3] <= frame[3] - ink, name
@@ -5971,17 +6002,20 @@ def test_hanger_station_line_ends_inside_short_of_the_station_rows() -> None:
 
 def test_boss_diameter_reads_apart_from_the_f_f_stacks() -> None:
     """Machinist review at rubric 848e03f (rule 15, 2 of 3 runs): at
-    (0.215, 0.100) "CYLINDRICAL BOSS" shared a line with F-F's "1.437" and
-    read as one callout.  The Ø1.18 rows (value 3 mm over, first callout row
-    3 mm under the point, ~2.6 mm a glyph) stand a row-and-more over the
+    (0.215, 0.100) the Ø1.18's first row shared a line with F-F's "1.437"
+    and read as one callout.  The Ø1.18 rows (value 3 mm over, first callout
+    row 3 mm under the point, ~2.6 mm a glyph) stand a row-and-more over the
     grip's value row, left of detail J's circle and right of F-F's station
     block.  Owner ruling D1 (#2333) takes the barrel's draft out below the
     underside, so a second row, one 5.56 mm pitch lower, says where the
     Ø1.18 holds (farm run 20261111T023438415Z: rows from 126.8, 121.2 and
-    115.6 about y 124.0, the widest 42.6 mm)."""
+    115.6 about y 124.0), and the first names it the hub barrel, as sheet
+    7's draft callout does: a drafted barrel is no cylinder (Codjiflo round
+    2 of 518e3d01e1)."""
     x, y = drawing.HUB_BOSS_DIA_TEXT_XY
     rows = drawing.HUB_BOTTOM_CALLOUTS["HubDia"].splitlines()
-    assert rows == ["CYLINDRICAL BOSS", "AT UNDERSIDE"]
+    assert rows == ["HUB BARREL", "AT UNDERSIDE"]
+    assert "HUB BARRELS" in drawing.DATUM_FRONT_CALLOUTS["BossesUpperDraft"]
     half_w = max(map(len, rows)) * 0.0026 / 2.0
     box = (x - half_w, y - 0.006 - (len(rows) - 1) * _ROW_PITCH, x + half_w, y + 0.006)
     grip_value_y = drawing.HANGER_GRIP_OFFSET_XY[1] + 0.00278
@@ -6030,7 +6064,7 @@ def test_pad_width_leaves_the_plan_for_detail_j() -> None:
     # Owner ruling D1 (#2333): the hub barrel's draft is taken out from the
     # faced underside, so its Ø1.18 says where it holds: 1 mm under it the
     # barrel has narrowed 1 x tan 2° = .035 mm a side.
-    assert drawing.HUB_BOTTOM_CALLOUTS["HubDia"] == "CYLINDRICAL BOSS\nAT UNDERSIDE"
+    assert drawing.HUB_BOTTOM_CALLOUTS["HubDia"] == "HUB BARREL\nAT UNDERSIDE"
     assert part.HUB_BOSS_DIA / 25.4 == pytest.approx(1.18, abs=5e-3)
     rim = (part.GOOSENECK_X + part.HUB_BOSS_DIA / 2.0, -part.HALF_H - 1.0, part.GOOSENECK_Z)
     assert part._casting_occupies(rim[0] - 0.05, *rim[1:])
@@ -6833,8 +6867,7 @@ def test_side_rail_web_text_stands_beside_its_own_section() -> None:
     native rows: a three-row block's value line 2.78 mm over its text
     point, glyphs 4.5 over a line, the last row's line -- the dimension
     line -- 8.33 under the point; ".51 ±.03" 16.79 mm wide, "AT UNDERSIDE"
-    31.40, "RAIL HEIGHT" 26.78; a two-row block's line 5.56 under its
-    point."""
+    31.40, "RAIL HEIGHT" 26.78."""
     x, y = drawing.SIDE_WEB_TEXT_XY
     assert drawing.SIDE_SECTION_KEEP == {"SideWebT": drawing.SIDE_WEB_TEXT_XY}
     assert drawing.SIDE_WEB_QUALIFIER.splitlines() == ["2X WEB", "AT UNDERSIDE"]
@@ -6848,9 +6881,43 @@ def test_side_rail_web_text_stands_beside_its_own_section() -> None:
     assert x + 0.01679 / 2.0 <= drawing._side_section_xy(-part.OUTER_X, 0.0)[0] - ink
     # The dimension line stands under the underside the width is taken on.
     assert drawing._side_section_xy(0.0, -part.HALF_H)[1] - line_y >= ink
-    assert drawing.GEOMETRY_TOP_KEEP["SideFlangeWidth"][1] - 0.00556 - top >= ink
+    assert drawing.GEOMETRY_TOP_KEEP["SideFlangeWidth"][1] - 0.00833 - top >= ink
     rail_height_right = drawing.GEOMETRY_FRONT_KEEP["RingHeight"][0] + 0.02678 / 2.0
     assert (x - half) - rail_height_right >= ink
+
+
+def test_flange_widths_say_the_faced_top_they_hold_at() -> None:
+    """Owner ruling D1 (#2333) takes the flange rims' draft out, so the 1.50
+    and 1.35 flange widths are nominal on the faced top and narrow under it:
+    each says AT FACED TOP, as a web width says AT UNDERSIDE (Codjiflo round
+    2 of 518e3d01e1: a drafted size with no station).  The third row lifts
+    each text point half a row pitch, which leaves the dimension line, 8.33
+    mm under the point, where farm run 20261111T043554104Z printed it."""
+    callouts = {
+        "FrFlangeWidth": drawing.RAIL_SECTION_CALLOUTS["FrFlangeWidth"],
+        "SideFlangeWidth": drawing.GEOMETRY_CALLOUTS["SideFlangeWidth"],
+    }
+    assert callouts["FrFlangeWidth"].splitlines() == ["2X FLANGE", "AT FACED TOP"]
+    assert callouts["SideFlangeWidth"].splitlines() == [
+        "2X SIDE FLANGE",
+        "AT FACED TOP",
+    ]
+    assert set(callouts) <= set(spec.AS_CAST_DIMENSIONS["OuterProfile"])
+    # A rim stands at its nominal on the faced top and has receded at the
+    # flange's underside, on the side rails and on the front and rear ones.
+    top, bottom = part.HALF_H - 1e-3, part.FLANGE_BOT_Y + 1e-3
+    for at in (
+        (part.OUTER_X - 0.05, spec.SIDE_SECTION_Z),
+        (spec.RAIL_SECTION_X, part.OUTER_Z - 0.05),
+    ):
+        assert part._casting_occupies(at[0], top, at[1])
+        assert not part._casting_occupies(at[0], bottom, at[1])
+    assert drawing.RAIL_SECTION_KEEP["FrFlangeWidth"][1] - 0.00833 == pytest.approx(
+        0.22445, abs=1e-5
+    )
+    assert drawing.GEOMETRY_TOP_KEEP["SideFlangeWidth"][1] - 0.00833 == pytest.approx(
+        0.11445, abs=1e-5
+    )
 
 
 def test_cross_tap_callout_counts_all_four_taps_then_names_its_mate() -> None:

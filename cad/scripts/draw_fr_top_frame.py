@@ -751,11 +751,12 @@ HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
 # Up the open strip left of detail J, clear of F-F's grip and depth stacks:
-# at (0.215, 0.100) its "CYLINDRICAL BOSS" row shared a line with F-F's
-# "1.437" and read as "1.437 CYLINDRICAL BOSS" (machinist review at rubric
-# 848e03f, rule 15, 2 of 3 runs).  Its rows now stand ~20 mm over the grip
-# value, 11 mm right of F-F's +X BASIC box, and its right end ~10 mm outside
-# the detail circle.
+# at (0.215, 0.100) its first row shared a line with F-F's "1.437" and read
+# as one callout with it (machinist review at rubric 848e03f, rule 15, 2 of
+# 3 runs).  Its rows now stand ~20 mm over the grip value, 11 mm right of
+# F-F's +X BASIC box, and its right end ~16 mm outside the detail circle.
+# The barrel is drafted (owner ruling D1, #2333), so the row names it the
+# way sheet 7's draft callout does, not as a cylinder.
 HUB_BOSS_DIA_TEXT_XY = (0.205, 0.124)
 # The 28.0 rail pad, RibProfile's native width (a Top-plane sketch, so it
 # imports into this view from below), where its two faces are drawn: farm
@@ -794,7 +795,7 @@ HUB_BOTTOM_KEEP = {
     "SetBossFace": SET_BOSS_FACE_LINE_XY,
 }
 HUB_BOTTOM_CALLOUTS = {
-    "HubDia": "CYLINDRICAL BOSS\nAT UNDERSIDE",
+    "HubDia": "HUB BARREL\nAT UNDERSIDE",
     "RibWidth": "FULL-HEIGHT\nPAD WIDTH",
     "GussetT": "2X GUSSET",
     "SetBossFace": "AT FACED TOP",
@@ -1267,7 +1268,7 @@ GEOMETRY_TOP_KEEP = {
         0.2435,
     ),
     "Depth": (0.046, 0.1335),
-    "SideFlangeWidth": (0.250, 0.120),
+    "SideFlangeWidth": (0.250, 0.12278),
 }
 # The front view carries the rail's web depth -- the web ring's own driving
 # extrude depth, the same finished top-to-underside thickness F-F prints as
@@ -1282,10 +1283,16 @@ GEOMETRY_FRONT_KEEP = {
     "RingHeight": (0.238, 0.091),
     "RootR": (0.190, 0.071),
 }
+# A flange rim's draft is taken out (owner ruling D1, #2333), so a flange
+# width holds at the faced top and says so, as a web width says the
+# underside: 8.1 mm of flange at 2° ±1° moves each rim up to 0.43 mm, the
+# width up to 0.85, against a ±.03 (0.76) band.  The third row lifts each
+# block half a row pitch (2.78 mm), which keeps its dimension line where it
+# stood.
 GEOMETRY_CALLOUTS = {
     "Width": "RAIL FLANGE EXTENT",
     "Depth": "RAIL FLANGE EXTENT",
-    "SideFlangeWidth": "2X SIDE FLANGE",
+    "SideFlangeWidth": "2X SIDE FLANGE\nAT FACED TOP",
     "RingHeight": "RAIL HEIGHT",
     "RootR": "TYP WEB ROOT",
 }
@@ -1293,12 +1300,12 @@ GEOMETRY_CALLOUTS = {
 # the web, 2.6 mm right of the flange thickness's lower arrow tail (x 372).
 RAIL_SECTION_KEEP = {
     "FrWebT": (0.383, 0.1948),
-    "FrFlangeWidth": (0.328, 0.230),
+    "FrFlangeWidth": (0.328, 0.23278),
     "FlangeT": (0.372, 0.2117),
 }
 RAIL_SECTION_CALLOUTS = {
     "FrWebT": "2X WEB WIDTH\nAT UNDERSIDE",
-    "FrFlangeWidth": "2X FLANGE",
+    "FrFlangeWidth": "2X FLANGE\nAT FACED TOP",
     "FlangeT": "TYP TOP FLANGE",
 }
 # The 8.1 flange run is 2.7 mm of paper: its text parks on a leader.
@@ -1521,6 +1528,16 @@ def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
 # the vertex, lean, rise in sheet m), and each value parks off its arc on a
 # leader with the faces it governs: the added draft's rows left over the
 # view, the taken-out draft's right of it, 7 mm inside the border (y 266.7).
+#
+# The added draft's band is the tighter one (the title block's angle row is
+# ±1°), so its callout states the wall its 2° minimum holds, in rule 3's
+# form: the MHA-CH-07 keeper's 2-56 tap drill in the rail web keeps .0807 in
+# at 2° and .0636 at 1° (machinist review of 518e3d01e1: a tight band whose
+# function prints nowhere is a rule 4 blocker; of 7dfc6b6c5f: a reason in
+# any other form is narration, and a callout carries two lines of words at
+# most, rule 7).  The faces therefore share one row, 149.3 mm of glyphs by
+# farm run 20261111T043554104Z's two (79.5 + 68.5 and a space), its right
+# end 7.6 mm short of the wedge.
 DATUM_DRAFT_WEDGES = {
     "WebRingDraft": (WEB_OUT_X, 1.0, 0.012),
     "BossesUpperDraft": (PLAN_HALF_X, -1.0, 0.018),
@@ -1533,11 +1550,14 @@ DATUM_FRONT_KEEP = {
     for name, (x, lean, rise) in DATUM_DRAFT_WEDGES.items()
 }
 DATUM_FRONT_CALLOUTS = {
-    "WebRingDraft": "DRAFT, WEBS, CROSSBAR, POCKETS,\nGUSSETS, PADS, SET-BOSS SIDES",
+    "WebRingDraft": (
+        "DRAFT, WEBS, CROSSBAR, POCKETS, GUSSETS, PADS, SET-BOSS SIDES\n"
+        "HOLDS 2-56 TAP WALL .080 MIN"
+    ),
     "BossesUpperDraft": "DRAFT, FLANGE RIMS, SET-BOSS FACE,\n4X BOSS AND HUB BARRELS",
 }
 DATUM_FRONT_TEXT_OFFSETS = {
-    "WebRingDraft": (0.1722, 0.2506),
+    "WebRingDraft": (0.136, 0.2506),
     "BossesUpperDraft": (0.2731, 0.2533),
 }
 
