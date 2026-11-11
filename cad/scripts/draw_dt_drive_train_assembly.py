@@ -1242,7 +1242,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # key defines TNNN for MHA-DT-03 only (review of 5994f29c83, rule 4).
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
-# Steps 1R and 1V's phasing comb is a shop tool in the cone-gear indexing kit, never
+# Steps 1S and 2B's phasing comb is a shop tool in the cone-gear indexing kit, never
 # a BOM row (owner rulings 2026-11-09 and 2026-11-10); the code key names it
 # and its blade (machinist review of bd81283964: an undefined tool and word).
 PHASING_COMB = str(_config.parts("dt-cone-gear-tl-phasing-comb")["number"])
@@ -1293,7 +1293,7 @@ CONE_CRANK_STEPS = _note_text(
         # gears close; the wrap counts 1B's placeholder at its width.  Codjiflo
         # review of PR 2: the tip's stations come only from closed faces (T018
         # on T024, T012 on T018, MHA-DT-37's leaves on T012; the spigot never
-        # bottoms), so 1E and 1W push MHA-DT-37 through that chain to T024.
+        # bottoms), so 1E and 2A push MHA-DT-37 through that chain to T024.
         "1. SEAT MHA-DT-VN-71 IN THE MHA-DT-04 KEYSEAT, TO ITS COLLAR END.",
         "1A. SLIDE MHA-DT-07 ON MHA-DT-VN-71 AGAINST THE MHA-DT-04 COLLAR.",
         "1B. SLIDE T120 TO T030 ({keyed_gears}X MHA-DT-03) ON, T120 FIRST.",
@@ -1334,25 +1334,32 @@ CONE_CRANK_STEPS = _note_text(
         f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
         f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
         "1U. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
-        "1V. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
-        "1W. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
-        f"1X. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        # #2470: T024 cures alone so it is accepted alone, before three wet
+        # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
+        # fit has nothing to adjust, so the remedy parts it (drawing-
+        # guidelines: about 250 C releases 638) and cleans the cured film out.
+        f"1V. CHECK THAT {PHASING_COMB} DROPS INTO T030 AND T024.",
+        "1W. IF IT DOES NOT, TAKE T024 OFF AT 250 DEG C.",
+        "1X. CLEAN THE CURED 638 OUT OF ITS BORE AND OFF THE LAND.",
+        "1Y. REDO FROM 1P.",
+        # Step 1 has no letter left for the spigot's round, so it opens step 2,
+        # before the post goes on.
+        "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
+        "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
+        f"2B. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024
         # before the bonds grab.
-        "1Y. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
-        f"1Z. REMOVE {PHASING_COMB}.",
-        # #2470: phase is what the comb set, so the cured tip is accepted on
-        # it before the post goes on; a bonded slip fit has nothing to adjust,
-        # so the remedy parts the bonds (drawing-guidelines: about 250 C
-        # releases 638), cleans the cured film out and redoes the tip from
-        # 1M, since the heat also frees a 1N bond on MHA-DT-38 (Codjiflo
-        # review of PR #2531).  Step 1 has no letter left, so the acceptance
-        # opens step 2.
-        f"2. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
-        "2A. IF IT DOES NOT, TAKE THE BONDED TIP PARTS OFF AT 250 DEG C.",
-        "2B. CLEAN THE CURED 638 OUT OF THEIR BORES, THE LAND AND THE SOCKET.",
-        "2C. REDO FROM 1M.",
+        "2C. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
+        f"2D. REMOVE {PHASING_COMB}.",
+        # The cured tip is accepted on the comb; the remedy parts every tip
+        # bond, cleans the film off the coated spigot and the pivot too, and
+        # redoes the tip from 1M, since the heat also frees a 1N bond on
+        # MHA-DT-38 (Codjiflo reviews of PR #2531).
+        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
+        "2F. IF IT DOES NOT, TAKE THE BONDED TIP PARTS OFF AT 250 DEG C.",
+        "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
+        "2H. REDO FROM 1M.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1361,23 +1368,23 @@ CONE_CRANK_STEPS = _note_text(
         # The sheet states the actual minimum, never the governance label.
         # Rubric sample round 6 (rule 22): the stock is the BOM row's, so the
         # step does one thing.
-        "2D. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
+        "2J. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
         # maximum never rounds outward, and the part's places print it whole.
         # Rule 22 (rubric sample round 10 lint): one sentence; the REF cut
         # length and the stated engagement are the cut's own facts.  FLUSH TO
         # .005 SHORT is the never-proud limit (MHA-DT-VN-61's own sheet dropped
         # NEVER PROUD as a restatement; PR 2 round 4 needed its line here).
-        "2E. CUT EACH MHA-DT-VN-61 TO FIT, "
+        "2K. CUT EACH MHA-DT-VN-61 TO FIT, "
         f"({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
         "REF LONG: FLUSH TO "
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
         " SHORT OF THE MHA-DT-20 UNDERSIDE, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
-        "2F. DEBURR THE CUT ENDS.",
-        "2G. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
+        "2L. DEBURR THE CUT ENDS.",
+        "2M. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the end screw's
         # load (#914), and the model mates it (#1058).
-        "2H. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
+        "2N. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.
@@ -1387,8 +1394,8 @@ CONE_CRANK_STEPS = _note_text(
         # squared and tight, pressed in the foot's blind ream and a slip fit in
         # the plate's opened ream, stops the block turning about its one screw.
         # The block never comes off: the dowel goes in from below.
-        "2J. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
-        "2K. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
+        "2P. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
+        "2Q. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): T006's pivot runs in
         # MHA-DT-39's reamed end hole.  Its lateral error is taken up by
         # turning MHA-DT-05 on its screws' clearance (Codex P1 on #1136,
@@ -1397,17 +1404,17 @@ CONE_CRANK_STEPS = _note_text(
         # TIP_VERTICAL_CAPACITY_MM).  User decision 2026-10-12: the post is
         # held pushed toward the tip block while it is turned and its screws
         # tightened (dt_cone_tip_air books that).
-        "2L. THREAD MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT.",
-        "2M. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2P.",
-        "2N. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
-        "2P. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
-        "2Q. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
-        "2R. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
+        "2R. THREAD MHA-DT-39 INTO MHA-DT-21 OVER THE MHA-DT-37 PIVOT.",
+        "2S. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2U.",
+        "2T. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
+        "2U. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
+        "2V. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
+        "2W. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
         # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
         # is a slip fit, and the step says what to do then (as 4A-4B).
-        "2S. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
-        "2T. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
-        "2U. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
+        "2X. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
+        "2Y. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "2Z. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
         # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
         # SHAFT_END_PLAY: 1/8 turn of 1/4-28 is 0.113) and the pinch screw
@@ -1421,7 +1428,7 @@ CONE_CRANK_STEPS = _note_text(
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
-        # acceptance, worded as 2U's, once the end play is final.
+        # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
@@ -2082,7 +2089,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N-1W, 2T, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2Y, 4B, 6B, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2118,8 +2125,8 @@ def _split_sequence_chain(
 
 
 # The fields, in reading order (package_note_fields): sheet 7's left field
-# carries the direction key and step 1 with step 2's tip acceptance, its
-# full-height right field the rest through 3; sheet 8 carries 4-6 (MHA-PD-00
+# carries the direction key and step 1, its full-height right field 2-3 (the
+# spigot's bond round opens step 2); sheet 8 carries 4-6 (MHA-PD-00
 # cites 4 and 5 on CRANK_SHEET), each step whole; sheets 9-11 carry 7-23, each
 # field cut at a sub-step by the constants below.  Sub-step splits keep every
 # field full once the one-thing lines grew the sequence (rubric sample rounds
@@ -2676,8 +2683,8 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     """The package's labelled code key (owner ruling 2026-11-08, Pedro): the
     MHA-DT-03 codes as the model configures them, by station front to back
     (``rows``, from the placed cone gears), two columns, GEAR 0 to the last of
-    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1R
-    and 1V's phasing comb and its blades (a shop tool on its own print, no
+    the ``cylinder_gears`` MHA-DT-12, counted from the front, and steps 1S
+    and 2B's phasing comb and its blades (a shop tool on its own print, no
     BOM row)."""
     code = rows[0][1]
     digits = "N" * (len(code) - 1)

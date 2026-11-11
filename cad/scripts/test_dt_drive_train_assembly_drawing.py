@@ -45,9 +45,9 @@ EXTERNAL_NUMBERS = frozenset(
         # Step 8A's MHA-CH-00 connecting rod and rocker arm pairs.
         drawing.CONNECTING_ROD,
         drawing.ROCKER_ARM,
-        # Check 5's feed sense, named on sheet 14's interface lines.
+        # Check 5's feed sense, named on sheet 15's interface lines.
         drawing.PLATEN_NUMBER,
-        # Steps 1S and 1X's phasing comb: a shop tool in the cone-gear indexing kit,
+        # Steps 1S and 2B's phasing comb: a shop tool in the cone-gear indexing kit,
         # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
         _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
@@ -825,7 +825,7 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
         )
     )
     # The inch sheet prints the setting to the thousandth; the feeler stack
-    # table (sheet 14) lists the leaves by their stamped metric size.
+    # table (sheet 15) lists the leaves by their stamped metric size.
     printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
     assert printed is not None
     assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=0.0127)
@@ -838,7 +838,7 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
 
 def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
-    sets is a sheet 14 row citing it; check cites carry CHECK.  The table
+    sets is a sheet 15 row citing it; check cites carry CHECK.  The table
     stays left of the cone station table."""
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
     assert "4H, 4J" in rows[".004"]
@@ -1138,16 +1138,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
     assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
-    # Steps 1S and 1X's comb is a shop tool with no BOM row: the key names it
+    # Steps 1S and 2B's comb is a shop tool with no BOM row: the key names it
     # and defines the BLADE the steps cite (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
-    for letter in "SX":
-        step = drawing.CONE_CRANK_STEPS[
-            drawing.CONE_CRANK_STEPS.index(f"1{letter}. ") :
-        ]
-        assert step.startswith(
-            f"1{letter}. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE"
-        )
+    for head in ("1S", "2B"):
+        step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index(f"{head}. ") :]
+        assert step.startswith(f"{head}. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:
