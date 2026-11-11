@@ -172,10 +172,18 @@ ROOT_CALLOUT = "ROOTS R.015 MAX"
 TOP_PIN_NAME = "BAR PIVOT PIN"
 PIN_FIT_NOTE_NUMBER = 1
 PIN_FIT_INTERFERENCE = (".0002", ".0008")
+# #2341: the side-face flatness zone is narrower than the shop's form row
+# (.001 per inch, about .032 over this bar), so its frame links the route in
+# a numbered note (rule 4: necessity, then the shop table): the reason, the
+# mate it clears, then the supply route (bought CF square can bow about .013
+# over this length, so the stock is straightened or selected to the zone).
+SIDE_FLATNESS_NOTE_NUMBER = 2
 DRAWING_NOTES = (
     f"{PIN_FIT_NOTE_NUMBER}. MATCHED PRESS FIT ON {TOP_PIN_NAME} {TOP_PIN_NUMBER}:"
     f"\n    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
     " UNDER THE MEASURED PIN."
+    f"\n{SIDE_FLATNESS_NOTE_NUMBER}. SIDE FACES CLEAR THE NEXT MHA-CH-01 BAR:"
+    "\n    STOCK STRAIGHTENED OR SELECTED TO THEIR FLATNESS."
 )
 # Each line stays within ~21 characters (~55 mm at the sheet's dimension
 # font): the callouts sit between a notch's crop circle and its neighbours,
@@ -207,14 +215,14 @@ if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
 
 # #2341: the side faces' flatness (ch_amplitude_bar_spec.GEOMETRIC_TOLERANCES_IN)
 # prints as a native frame on the full-length view, on the right side face;
-# under it, one line naming the faces it holds (the native below-frame text
-# keeps one line: r1 leaf 20261111T225642Z, a multi-line text did not read
-# back). The route (bought CF square can bow about .013 over this length, so
-# it is straightened or selected) is the registry's process note, and
-# MHA-CH-00's feeler step is the bank's acceptance.
-SIDE_FLATNESS_CALLOUT = "BOTH SIDE FACES"
+# under it, one line naming the faces it holds and linking note 2's route
+# (the native below-frame text keeps one line: r1 leaf 20261111T225642Z, a
+# multi-line text did not read back). MHA-CH-00's feeler step is the bank's
+# acceptance.
+SIDE_FLATNESS_CALLOUT = f"BOTH SIDES, SEE NOTE {SIDE_FLATNESS_NOTE_NUMBER}"
 
-# The one sheet note is the pin hole's matched fit. The title-block QTY owns
+# The sheet notes are the pin hole's matched fit and the side faces' route
+# (#2341). The title-block QTY owns
 # the count, the FINISH field the plating, and the views both notches' depth
 # and common plane (machinist round 2, #1293: "BOTH END NOTCHES THRU THE FULL
 # DEPTH, IN ONE COMMON PLANE" repeated what the front view and the isometrics

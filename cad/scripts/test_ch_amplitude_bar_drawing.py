@@ -104,6 +104,8 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert notes.DRAWING_NOTES.splitlines() == [
         "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-CH-11:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+        "2. SIDE FACES CLEAR THE NEXT MHA-CH-01 BAR:",
+        "    STOCK STRAIGHTENED OR SELECTED TO THEIR FLATNESS.",
     ]
     assert notes.TOP_PIN_NAME == "BAR PIVOT PIN"
     # The acceptance stays inside the FN2 window the pin budget is held to.
@@ -538,14 +540,16 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
         assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 3
 
 
-def test_the_one_note_is_the_pin_holes_matched_fit() -> None:
+def test_the_notes_are_the_pin_fit_and_the_side_face_route() -> None:
     """Machinist round 1 (#1293): the section, the hole, the roots and the
     plating left the notes for their dimensions and the FINISH field; round 2:
     the last line repeated what the views show. Fan-out screen 2026-11-07:
     the reamed hole's band is narrower than the reamer row, so its matched
     press fit is the sheet's one numbered note, property-linked from the part
-    and linked from the hole's callout; it stands under DETAIL A's label, right
-    of the front view and left of the title block."""
+    and linked from the hole's callout. #2341: the side-face flatness zone is
+    narrower than the shop's form row, so its frame links note 2's route. The
+    block stands under DETAIL A's label, right of the front view and left of
+    the title block, within rule 7's four lines."""
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(bar.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in draw_source
@@ -557,8 +561,16 @@ def test_the_one_note_is_the_pin_holes_matched_fit() -> None:
     width = max(len(line) for line in notes.DRAWING_NOTES.splitlines()) * _CHAR
     a = drawing.DETAIL_A
     assert drawing.FRONT_CENTER[0] + 0.005 < x and x + width < 0.216
+    rows = len(notes.DRAWING_NOTES.splitlines())
+    assert rows <= 4
+    assert notes.DRAWING_NOTES.splitlines()[2].startswith(
+        f"{notes.SIDE_FLATNESS_NOTE_NUMBER}. "
+    )
+    assert notes.SIDE_FLATNESS_CALLOUT.endswith(
+        f"SEE NOTE {notes.SIDE_FLATNESS_NOTE_NUMBER}"
+    )
     assert y < a.label_xy[1] - 2 * _LINE - 0.002
-    assert y - 2 * _LINE > 0.0127
+    assert y - rows * _LINE > 0.0127
 
 
 def test_view_c_is_named_by_its_arrow_on_detail_b() -> None:
@@ -824,15 +836,20 @@ def test_side_flatness_frame_stands_east_of_the_bar_clear_of_the_details() -> No
     assert "quantity=SIDE_FLATNESS_CALLOUT" in source
     lines = ch_amplitude_bar_notes.SIDE_FLATNESS_CALLOUT.splitlines()
     # The native below-frame text reads back one line only (r1 leaf).
-    assert lines == ["BOTH SIDE FACES"]
+    assert lines == ["BOTH SIDES, SEE NOTE 2"]
     bar_right = drawing.FRONT_CENTER[0] + spec.BAR_WIDTH / 4000.0
     frame_x = bar_right + drawing.SIDE_FLATNESS_FRAME_DX
     frame_y = drawing.FRONT_CENTER[1] + drawing.SIDE_FLATNESS_FRAME_DY
     right = frame_x + max(len(line) for line in lines) * _CHAR
     bottom = frame_y - 0.004 - len(lines) * _LINE
     assert frame_x - bar_right >= 0.005
+    top = frame_y + 0.006
     for view in drawing.CROPPED_VIEWS:
-        assert right + 0.002 <= view.centre[0] - view.crop_radius, view.name
+        # The block's nearest point to each crop circle stands outside it.
+        cx, cy = view.centre
+        dx = max(frame_x - cx, 0.0, cx - right)
+        dy = max(bottom - cy, 0.0, cy - top)
+        assert math.hypot(dx, dy) >= view.crop_radius + 0.002, view.name
         label_w = max(len(line) for line in view.label_text.splitlines()) * _CHAR
         assert right + 0.002 <= view.label_xy[0] - label_w / 2.0, view.name
     assert bottom > drawing.NOTES_XY[1] + 0.010
