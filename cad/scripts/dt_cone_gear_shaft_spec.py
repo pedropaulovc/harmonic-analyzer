@@ -682,6 +682,44 @@ if KEY_NORTH_MARGIN_MM <= 0.0:
         f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
     )
 
+# The key's reach (#1038).  The margin above only stops the key SHORT of
+# T024; a key a whole face short passed it and silently dropped T030 (at the
+# .300 pitch the 4.52 key ended 9.3 south of T024).  So the other end is
+# proved too: at nominal the key's north end lies on land 1, and at
+# print-worst it still drives T030, the last keyed gear, over at least half
+# its face.  Worst case: the keyseat end's .XX location and the key's .XX
+# length at their low limits, T030 as far north as it goes -- floated
+# against T024, T024's south face at the north end of its stack and feeler
+# band (dt_cone_gear_stack.face_band), T030 at its thinnest.
+_KEY_SOUTH_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
+KEY_NORTH_END_STATION = _KEY_SOUTH_END_STATION + cone_land_key.KEY_LENGTH_MM
+if KEY_NORTH_END_STATION > SECTION_ENDS[KEYED_LAND]:
+    raise AssertionError(
+        f"the key's north end {KEY_NORTH_END_STATION:.4f} overhangs land 1's end "
+        f"{SECTION_ENDS[KEYED_LAND]:.4f}"
+    )
+KEY_T030_ENGAGEMENT_FLOOR_MM = CONE_GEAR_FACE_WIDTH / 2.0
+_T030_SOUTH_FACE_MAX_STATION = (
+    FRONT_STUB
+    + gear_faces(T024_SEAT)[0]
+    + cone_tip_cluster.TIP_SET_SHIFT_MM
+    + face_band(T024_SEAT, "south")[0]
+    - _FACE_WIDTH_LIMITS[0]
+)
+KEY_T030_ENGAGEMENT_MIN_MM = (
+    KEY_NORTH_END_STATION
+    + printed_length_deviations("Sec1KeyseatEndSet")[0]
+    - printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
+    - _T030_SOUTH_FACE_MAX_STATION
+)
+if KEY_T030_ENGAGEMENT_MIN_MM < KEY_T030_ENGAGEMENT_FLOOR_MM:
+    raise AssertionError(
+        "the key drives T030 over "
+        f"{KEY_T030_ENGAGEMENT_MIN_MM:.4f} mm at print-worst, under half its "
+        f"face ({KEY_T030_ENGAGEMENT_FLOOR_MM:.4f}); a negative reach is a "
+        "gear the key no longer drives"
+    )
+
 # The keyseat's end at its printed low limit, cut by the widest end mill
 # (the keyseat's upper width), keeps KEYSEAT_END_COLLAR_MARGIN_MM of the
 # collar's tip-side face, the 64T's seat and the stack's origin, uncut.
