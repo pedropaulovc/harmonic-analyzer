@@ -143,8 +143,8 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # value.  The tip dome's reference height stands above the tip.  The press
 # land (#2415) takes its reference Ø above its own length and its .XX length
 # in a row of its own between the profile and the station's row, the shorter
-# baseline nearer the part; the seat root's R MAX stands between the land's
-# extension lines, over that row.
+# baseline nearer the part; the seat root's R MAX stands left of the land,
+# over that row.
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
@@ -175,11 +175,13 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's one-line R MAX just under the land, between its
-    # extension lines (the seat's, shared by the 1.8600, 2.02 and .09, and
-    # the land end's), so its shelf and leader rise to the lower corner
-    # crossing nothing and stay above the land's .29 row (round-5 review).
-    "SeatRadius": (LAND_MID_X, SIDE_CENTER[1] - 0.013),
+    # The seat root's one-line R MAX under the shank, its right end short of
+    # the land end's extension line: the 23 mm text does not fit between
+    # that line and the seat's (the 1.8600's, 2.02's, .09's and .29's), where
+    # run 20261111T193324863Z printed it crossed by the seat's (text-on-line).
+    # Its leader rises to the lower corner over the land, crossing only the
+    # land end's extension line, and stays above the land's .29 row.
+    "SeatRadius": (LAND_END_X - 0.014, SIDE_CENTER[1] - 0.010),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
