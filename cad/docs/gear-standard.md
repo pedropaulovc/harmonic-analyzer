@@ -10,7 +10,7 @@ involute cutter instead of making cutters for an odd pitch.
 | Meshing domain | Parts | Tooth system |
 |---|---|---|
 | Cone and cylinder train | `dt-cone-tip-gear` T006, `dt-cone-gear` T012–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
-| Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, straight teeth inclined 13.0011° right hand) | normal 24DP, normal PA20 |
+| Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, straight teeth inclined 12.0247° right hand) | normal 24DP, normal PA20 |
 | Paper-drive reducer | `pd-rack-pinion` (150T disc), `pd-transgear-knob-shaft` (integral 15T) | 48DP, PA20 (#1 and #7, added to the cone set) |
 | Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
 | Chain | crank and knob sprockets, 66 links | ANSI #25 |
@@ -304,12 +304,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   floor is Ø2.136 mm MIN, so the cutter runs off over the stems and no web
   remains to break. The thinnest cone web is now T012's 1.641 mm over its
   reamed spigot bore.
-- The 64T crank gear has straight teeth inclined 13.0011° right hand (owner
+- The 64T crank gear has straight teeth inclined 12.0247° right hand (owner
   ruling 2026-11-10, #2332 option A, superseding the earlier true helix of lead
   945.86 mm per turn). Each tooth space is one straight pass of the #2 stock
   cutter with plain indexing on the shop's Precision Matthews BS-0
   ([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0))
-  tilted 13°, so no lead gearing or spiral-capable head is needed. The cutter
+  tilted 12°, so no lead gearing or spiral-capable head is needed. The cutter
   centre plane crosses the gear axis 1.778 mm (.07 in) north of the south
   face. The tilt sense sets the hand
   ([machining-dfm.md](machining-dfm.md#crossed-crank-pair-normal-24dp-pa20)).
@@ -317,11 +317,11 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   new. The printed tooth data, the error budget and the mid-face mesh check
   are unchanged. Away from the station where the cutter crosses the axis a
   straight tooth is thicker on the pitch circle than the helix was, by up to
-  0.017 mm at the north face; `crank_mesh_stack.station_checks` books it per
+  0.011 mm at the north face; `crank_mesh_stack.station_checks` books it per
   face station (#2481). Off the pitch circle its flanks also lean against the
   helix's, one way at the tip and the other at the root; with drive and coast
-  contact at different radii that takes 0.016 mm more backlash at the south
-  face and 0.040 mm at the north face in the plane model. `station_checks`
+  contact at different radii that takes 0.014 mm more backlash at the south
+  face and 0.033 mm at the north face in the plane model. `station_checks`
   reports it beside the backlash and does not gate it (#2481). The ruling is
   conditional on the straight model
   passing the drive-train interference and soundness gates.

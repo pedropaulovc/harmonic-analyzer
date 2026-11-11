@@ -106,11 +106,13 @@ def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None
 
 
 # Backlash the straight tooth takes beyond its thickening, south face to north
-# face, from the direct 3D evaluation recorded on #2481 (v3 comment,
+# face, from the direct 3D evaluation of #2481 (v3 comment,
 # issue_margin_v3.py, "lean check": as-cut straight spaces against the 16T
 # with the 64T slid to the axes' common perpendicular, ideal involutes, less
-# the same run with the retired screw form and less the thickening).
-STRAIGHT_TOOTH_LEAN_3D_MM = (0.0153, 0.0000, 0.0137, 0.0255, 0.0366)
+# the same run with the retired screw form and less the thickening), run at
+# the .300 in pitch's 12.0247 deg incline and 6.6472 face (#1038) with that
+# sampler as #2591 carries it (crank_mesh_free_play.straight_tooth_lean_3d).
+STRAIGHT_TOOTH_LEAN_3D_MM = (0.0139, 0.0009, 0.0109, 0.0215, 0.0308)
 
 
 def test_crank_mesh_station_report_resolves_the_straight_tooth_lean() -> None:

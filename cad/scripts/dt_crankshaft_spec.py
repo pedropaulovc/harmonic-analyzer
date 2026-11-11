@@ -64,7 +64,7 @@ _step = dt_crank_pinion_spec.print_step
 
 # The restored v36 post's north boss face, measured from the shifted dome root.
 # Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = cone_line.cone_station(cone_line.POST_STATION)[2] + 183.0 + 21.3753
+POST_BORE_END = cone_line.cone_station(cone_line.POST_STATION)[2] + 183.0 + 21.3868
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
@@ -303,30 +303,20 @@ if PINION_PIN_EDGE_TO_END_WORST < dt_crank_pinion_spec.PIN_EDGE_MIN_WORST - 1e-9
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
-# --- ch. 23 crank seat (CONTRACT-crank): the integral collar replaces the
-# plain 5-mm T12 band.  Its front is a Ø.689 seat spigot whose face is
-# MHA-PD-09's seat, at the shared provider's SEAT_FACE_Z, stepping up to the Ø.81
-# collar body, whose rear face bears on the post boss's south face.  The #25
-# plates wrapping the T12 pass over the spigot and in front of the body's
-# front face: long enough that a bought chain's
-# envelope, floated rearmost on the thinnest wheel
-# (_sprocket_seat_geometry.chain_reach_rear, 3.59 behind the seat), keeps
-# air to the body at the spigot's print-worst length (the drive train asserts
-# it, with the radial air for the CAD link and a real ANSI plate).  The seat
-# diameter is the interface both shafts share, so the pure provider owns it.
-# #290: .689 +.000/-.004 (fit row D2s); the shared provider carries the
-# band in inch, and this sheet reads it.
+# --- ch. 23 crank seat (CONTRACT-crank): the integral collar is one Ø.689
+# seat spigot.  Its front face is MHA-PD-09's seat, at the shared provider's
+# SEAT_FACE_Z, and its rear face bears on the post boss's south face (owner
+# ruling D1, 2026-10-15: no washer).  The #25 plates wrapping the T12 pass
+# over it, in front of the post boss: a bought chain's envelope, floated
+# rearmost on the thinnest wheel (_sprocket_seat_geometry.chain_reach_rear,
+# 3.59 behind the seat), keeps air to the boss at the collar's print-worst
+# length (the drive train asserts it, with the radial air for the CAD link
+# and a real ANSI plate).  The seat diameter is the interface both shafts
+# share, so the pure provider owns it.  #290: .689 +.000/-.004 (fit row
+# D2s); the shared provider carries the band in inch, and this sheet reads
+# it.
 SPIGOT_DIA = 17.5006  # .689, seat_geometry.SEAT_SPIGOT_DIA
 SPIGOT_DIA_BAND = seat_geometry.SPIGOT_DIA_BAND
-# User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
-# band and the body's front face stayed put, so the spigot grew.  Owner
-# ruling D1 (2026-10-15) deleted the crank-seat washer and ran the body back
-# to the post boss: the collar is the seat face to the boss's south face,
-# floored to its print so the model's rear face stands under a print step
-# short of the boss (the fitter pulls it hard on).
-SPIGOT_LENGTH = 5.7912  # .228
-COLLAR_DIA = 20.574  # .81
-SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
 # Two pressed MHA-DT-VN-67 dowels on the wheel's pin circle at its +/-Y holes,
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set
@@ -340,13 +330,11 @@ DRIVE_PIN_OFFSET_PLACES = seat_geometry.DRIVE_PIN_OFFSET_PLACES
 DRIVE_PIN_HOLE_DIA = seat_geometry.DRIVE_PIN_HOLE_DIA
 DRIVE_PIN_DEPTH = dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH  # 3.95
 DRIVE_PIN_FLOOR = SEAT_COLLAR + DRIVE_PIN_DEPTH
-if not SEAT_COLLAR < SPIGOT_END < COLLAR_REAR:
-    raise AssertionError("the seat spigot must end inside the collar")
 if not SEAT_COLLAR < DRIVE_PIN_FLOOR < COLLAR_REAR:
     raise AssertionError("the blind drive-pin holes must end inside the collar")
 _PIN_HOLE_OUTER_R = DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_HOLE_DIA / 2.0
-if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
-    raise AssertionError("the spigot must enclose the pin holes, inside the body")
+if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0:
+    raise AssertionError("the spigot must enclose the pin holes")
 
 # Functional bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), each at the places that print it:
 # - The two collar faces print from the far end like every station, but at
@@ -358,12 +346,6 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   the ANSI #25 plates wrapping the T12, floated off-centre by
 #   WHEEL_SEAT_FLOAT, lose their worst-case radial air; under it the rim to
 #   the pin holes thins (DRIVE_PIN_SPIGOT_RIM_WORST).
-# - The spigot's length prints from the seat face, not the far end, so the
-#   body's front face rides with the wheel and the chain: +/-.002 at .XXX
-#   keeps a bought chain's envelope clear of it.
-# - The collar body OD is not a seat and meets no mate (machinist review of
-#   5a219a81904f): it prints at two places under the title block's .XX band,
-#   and the bearing ring it gives the post boss holds at either limit.
 # - The MHA-PD-09 holes (PIN_HOLE_DIA) slip over the pins with diametral
 #   clearance that absorbs the pin spacing error of BOTH parts; each pin's
 #   location band spends half of it here, leaving the wheel the same share.
@@ -372,8 +354,6 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   of the crank hub and engaged in the wheel.  +/-.004, printed at the
 #   hole callout's places.
 SPIGOT_DIA_PLACES = 3
-SPIGOT_LENGTH_PLACES = 3
-SPIGOT_LENGTH_TOL = 0.0508
 # The drive-pin holes print through a native callout on their cut-extrude
 # (size and depth stay the model's), not as marked dimensions.  The shared
 # .0930 REAM_H7 hole needs four inch places to print its limits truthfully
@@ -397,6 +377,16 @@ SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[0] - _SEAT_STATION_LOWER,
     SHAFT_LENGTH_BAND[1] - _SEAT_STATION_UPPER,
 )
+# The collar between its two far-end stations, shortest with the seat station
+# short and the rear station long.  The chain's rearmost reach to the post
+# boss and the wall under the blind drive-pin holes both read it.
+_REAR_STATION_UPPER = printed_deviations(
+    SHAFT_LENGTH - COLLAR_REAR,
+    COLLAR_STATION_PLACES,
+    (-COLLAR_STATION_TOL, COLLAR_STATION_TOL),
+    unit=UNIT,
+)[1]
+COLLAR_LENGTH_MIN = COLLAR_LENGTH + _SEAT_STATION_LOWER - _REAR_STATION_UPPER
 _DOWEL_OD = tuple(
     dt_vn_crank_seat_drive_pin_spec.DIA + inch * dt_vn_crank_seat_drive_pin_spec.MM_PER_IN
     for inch in dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN
@@ -437,10 +427,24 @@ if (
     DRIVE_PIN_CIRCLE_RADIUS - DRIVE_PIN_OFFSET_TOL - _KNOCKOUT_DIA_MAX / 2.0
     <= JOURNAL_BORE_DIA / 2.0 + JOURNAL_BORE_BAND[0] + BORE_MOUTH_BREAK_MAX
     or DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_OFFSET_TOL + _KNOCKOUT_DIA_MAX / 2.0
-    >= COLLAR_DIA / 2.0 - BORE_MOUTH_BREAK_MAX
+    >= (SPIGOT_DIA + SPIGOT_DIA_BAND[1]) / 2.0 - BORE_MOUTH_BREAK_MAX
 ):
     raise AssertionError("the knockout must leave the rear face on its bearing ring")
 _SPIGOT_R_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1]) / 2.0
+# The rear face's bearing ring on the post boss, between the bore mouth's
+# break and the collar's own edge break at their printed limits.  It carries
+# the hand crank's end thrust only.
+COLLAR_BEARING_RING_WORST = (
+    _SPIGOT_R_WORST
+    - BORE_MOUTH_BREAK_MAX
+    - (JOURNAL_BORE_DIA / 2.0 + JOURNAL_BORE_BAND[0] + BORE_MOUTH_BREAK_MAX)
+)
+if COLLAR_BEARING_RING_WORST < WALL_TARGET_MM:
+    raise AssertionError("the collar's rear face leaves the post boss too thin a bearing ring")
+# The collar left under each blind drive-pin hole, which its knockout pierces.
+DRIVE_PIN_FLOOR_WALL_WORST = COLLAR_LENGTH_MIN - (DRIVE_PIN_DEPTH + DRIVE_PIN_DEPTH_TOL)
+if DRIVE_PIN_FLOOR_WALL_WORST < WALL_FLOOR_MM:
+    raise AssertionError("the blind drive-pin holes leave under the wall floor behind them")
 _PIN_HOLE_OUTER_R_WORST = (
     DRIVE_PIN_CIRCLE_RADIUS
     + DRIVE_PIN_OFFSET_TOL
@@ -621,9 +625,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "JournalProfile": {"JournalDiaDim"},
     "ReliefProfile": {"ReliefDiaDim"},
     "PinionSeatProfile": {"PinionSeatDiaDim", "NeckDiaDim"},
-    "CollarProfile": {"CollarDiaDim"},
     "SpigotProfile": {"SpigotDiaDim"},
-    "Spigot": {"SpigotLength"},
     "DrivePinProfile": {"DrivePinOffset1", "DrivePinOffset2"},
     "StationReference": {
         "OverallLength",
@@ -651,9 +653,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "JournalProfile": {"JournalDiaDim": 4},  # 11.4046, .449 in
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 4, "NeckDiaDim": NECK_DIA_PLACES},
-    "CollarProfile": {"CollarDiaDim": 2},
     "SpigotProfile": {"SpigotDiaDim": SPIGOT_DIA_PLACES},
-    "Spigot": {"SpigotLength": SPIGOT_LENGTH_PLACES},
     "DrivePinProfile": {
         "DrivePinOffset1": DRIVE_PIN_OFFSET_PLACES,
         "DrivePinOffset2": DRIVE_PIN_OFFSET_PLACES,

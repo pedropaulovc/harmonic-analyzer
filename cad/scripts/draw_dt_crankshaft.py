@@ -95,7 +95,6 @@ from dt_crankshaft_notes import (
     SPIGOT_CALLOUT,
 )
 from dt_crankshaft_spec import (
-    COLLAR_DIA,
     COLLAR_REAR,
     CROSS_HOLE_PROCESS,
     DIAMETER_REFERENCES,
@@ -123,7 +122,7 @@ from dt_crankshaft_spec import (
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SPHERICAL_DIMENSIONS,
-    SPIGOT_END,
+    SPIGOT_DIA,
     SURFACE_FINISHES,
 )
 
@@ -183,7 +182,6 @@ RELIEF_START_X = _sheet_x(RELIEF_START)
 RELIEF_END_X = _sheet_x(RELIEF_END)
 SEAT_STEP_X = _sheet_x(SEAT_STEP)
 COLLAR_SEAT_X = _sheet_x(SEAT_COLLAR)
-SPIGOT_END_X = _sheet_x(SPIGOT_END)
 COLLAR_REAR_X = _sheet_x(COLLAR_REAR)
 FAR_END_X = _sheet_x(SHAFT_LENGTH)
 JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
@@ -191,13 +189,13 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 # Baseline rows below the profile, all from the FAR END and stacked
 # shortest-first so no extension line crosses a dimension line.  The text
 # sits ~3 mm above its requested point and the dimension line ~5 mm below
-# it; the two seat-collar stations make ten rows between the Ø20.6 collar's
+# it; the two seat-collar stations make ten rows between the collar's
 # underside and the title block, so the pitch closes from 12 to 9.5 mm.  The
 # 2.0 dome height stands over the first row at the far left, where no
 # baseline reaches; the last row clears the title block.
 _ROW_PITCH = 0.0095
 _ROW_Y = tuple(round(0.162 - k * _ROW_PITCH, 4) for k in range(10))
-# The seven diameters are authored in end-profile sketches; the end view
+# The six diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe):
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
@@ -207,7 +205,6 @@ END_DIAMETERS = {
     "ReliefDiaDim": (0.036, 0.241),
     "PinionSeatDiaDim": (0.036, 0.254),
     "SpigotDiaDim": (0.024, 0.241),
-    "CollarDiaDim": (0.024, 0.254),
     "NeckDiaDim": (0.024, 0.228),
 }
 # The drive-pin holes' locations stay in the end view, the one view that
@@ -244,10 +241,6 @@ SIDE_KEEP = {
     # Ø9.525 dimension: the radial leader runs down, right of the one and
     # left of the other, to the dome's sphere.
     "DomeSphereRadius": (DOME_TIP_X - 0.005, 0.230),
-    # The seat spigot's length from the seat face: text below-left of the
-    # spigot, between the cross-hole's and the collar seat's extension lines,
-    # above every row that spans it.
-    "SpigotLength": ((PIN_X + COLLAR_SEAT_X) / 2.0, 0.148),
 }
 # The 16T pin cross-hole's size prints in its own callout, a REF Ø on the
 # size line (PINION_PIN_CALLOUT): the model's REF witness PinionPinHoleDia
@@ -271,9 +264,6 @@ UNPRINTED_DIMENSIONS = frozenset({"PinionPinHoleDia"})
 # block (HOLE_CALLOUT_XY): left of it the Ø9.525's block lands 3.5 mm clear
 # of it, right of it the Ø17.50's block tops out 6 mm under it (machinist
 # review of b5c02e5d6: the leader crossed the Ø9.525's landing line).  The
-# Ø20.6 (one place, no band) drops under the Ø17.50's landing line, 1 mm
-# higher than its first spot so the collar-rear finish symbol under its
-# shelf's end can rise with it (COLLAR_REAR_FINISH), and the
 # Ø11.388 stands 4 mm right of the Ø17.50's block (layout audit of
 # 902433a8d: 2.3 mm read as one callout), its landing line 2 mm over the
 # outboard journal's finish symbol and its fit row 7 mm under the cross-hole
@@ -297,7 +287,6 @@ DIAMETER_POSITIONS = {
     # Raised 17 mm over the 16T pin cross-hole's REF Ø.
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2295),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
-    "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
 # Each fit diameter keeps its fit name above its value and links numbered
@@ -306,7 +295,7 @@ DIAMETER_POSITIONS = {
 # passes right of the Ø.3750's block and the 16T pin note's leader right of
 # the Ø.3125's (farm round 1: the 116-mm route rows ran through both).  The
 # bare necks carry their own loose diameter.  The 2X Ø.4490 names both
-# bearing lands across the relief.  The spigot's diameter and length link
+# bearing lands across the relief.  The spigot's diameter links
 # note 2, the chain they clear.
 CALLOUTS_ABOVE = {
     "ShaftDiaDim": SLIDING_FIT,
@@ -318,7 +307,6 @@ CALLOUTS_ABOVE = {
 # rule 7): the sprocket they serve is named once, on the holes' REAM callout.
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
-    "SpigotLength": SPIGOT_CALLOUT,
     "ShaftDiaDim": FIT_CALLOUT,
     "JournalDiaDim": FIT_CALLOUT,
     "PinionSeatDiaDim": FIT_CALLOUT,
@@ -336,7 +324,7 @@ SUFFIXES = {
 # land just short of the relief shoulder; the inboard symbol retains its
 # clear spot above the relief.  The collar's rear (boss) face takes its
 # own symbol on that face's edge-on line ABOVE the axis, the symbol in the
-# pocket over the outboard land under the collar's Ø20.6 text: under the axis
+# pocket over the outboard land under the spigot's Ø text: under the axis
 # every way to that face crosses a station's extension line.
 JOURNAL_FINISHES = {
     "outboard_journal": (
@@ -352,16 +340,16 @@ JOURNAL_FINISHES = {
 }
 # The landing on the rear (thrust) face's edge-on line, 0.8 mm (1.6 mm on the
 # sheet) inside the collar's silhouette, so the head ends on that face and not
-# on the corner it shares with the Ø20.6 OD (machinist review of e04fd60ab:
+# on the corner it shares with the collar's OD (machinist review of e04fd60ab:
 # a corner landing read as either surface).  The leader attaches to the
 # planar face itself (_collar_rear_face): selected by its rim, SolidWorks
 # lands a point on an edge-on circle at its projected extreme, the corner
 # (run 20261001T051043622Z: requested y 0.1986, landed 0.2006).  The symbol
-# sits 1 mm higher than when it landed on the corner, with the Ø20.6 over it,
+# sits 1 mm higher than when it landed on the corner, under the spigot's Ø block,
 # so the near-level leader keeps the head 2 mm clear of the Ø9.5's printed
 # Ø; any lower a landing and the head closes on that Ø.
 COLLAR_REAR_FINISH = (
-    (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0 - 0.8)),
+    (COLLAR_REAR_X, _sheet_y(SPIGOT_DIA / 2.0 - 0.8)),
     (COLLAR_REAR_X + 0.0069, 0.1983),
 )
 # The drive-pin holes' native REAM callout (size and depth from the cut, the
@@ -819,15 +807,15 @@ def _is_lower_knockout_floor(edge: Any) -> bool:
 
 
 def _collar_rear_rim(adapter: Any, view: Any) -> Any:
-    """Return the Ø20.6 collar's rear-face rim, seen edge-on in the side view.
+    """Return the collar's rear-face rim, seen edge-on in the side view.
 
     A sheet pick on that vertical line found no edge natively (run
     20261001T035353825Z) though the same pick passed on f7c9771b3.  The
     model circle centred on the shaft axis at the rear-face station is
-    unambiguous; the collar's other Ø20.6 rim sits at its seat face,
+    unambiguous; the collar's other rim sits at its seat face,
     SEAT_COLLAR.
     """
-    radius_mm = COLLAR_DIA / 2.0
+    radius_mm = SPIGOT_DIA / 2.0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = (
@@ -854,7 +842,7 @@ def _collar_rear_rim(adapter: Any, view: Any) -> Any:
             ):
                 return edge
     raise RuntimeError(
-        f"crankshaft side view has no visible Ø{COLLAR_DIA} rim at the collar "
+        f"crankshaft side view has no visible Ø{SPIGOT_DIA} rim at the collar "
         f"rear station {COLLAR_REAR}"
     )
 
@@ -862,7 +850,7 @@ def _collar_rear_rim(adapter: Any, view: Any) -> Any:
 def _collar_rear_face(rim: Any) -> Any:
     """Return the controlled planar rear (thrust) face that ``rim`` bounds.
 
-    The rim joins that face and the Ø20.6 OD; only the face matches the
+    The rim joins that face and the collar's OD; only the face matches the
     part-owned ``collar_rear_face`` finish control.  None or both fail.
     """
     control = surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face")

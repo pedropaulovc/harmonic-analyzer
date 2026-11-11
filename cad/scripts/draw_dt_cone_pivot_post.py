@@ -308,27 +308,27 @@ FRONT_KEEP = {
     # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
     # from the 38.10 box at x 173.1 (r4 view-crowding).  Centred at x=0.1344
     # it ended 14.1 mm short of the 38.10 (at 0.1356, 12.94 mm: r6
-    # view-crowding), the 13° arrow's tip ~1 mm off its size line's left end
+    # view-crowding), the 12° arrow's tip ~1 mm off its size line's left end
     # (r5 layout audit, advisory), and at y=0.169 its near-side leader rises
-    # from the bore's upper-right rim under the 13° arc.  The head's Ø is not
+    # from the bore's upper-right rim under the 12° arc.  The head's Ø is not
     # given here: its extension lines run the head's full height and the
     # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
     # At (0.1330, 0.1675) (farm run 20261101T142805608Z, machinist review) the
     # second row's underline printed 7.31 mm under the given y, 0.8 mm over
     # the head's top edge and HeadHt's upper extension line, parallel to both.
     # 4 mm right and 2.25 mm up stand it ~3 mm over them, the Ø ~2 mm under
-    # the 13° arc.  The block keeps two rows (a third would drop onto the
-    # head's top edge, and the 13° arc caps it above): the size alone, then
+    # the 12° arc.  The block keeps two rows (a third would drop onto the
+    # head's top edge, and the 12° arc caps it above): the size alone, then
     # "REAM THRU, SEE NOTE 1" (rule 26: size, process, depth; rule 7: the fit
     # and the mesh the bore's location sets are numbered note 1).  That row is
-    # the widest, low under the 13° arc and the 1.697, whose block shrank to
+    # the widest, low under the 12° arc and the 1.694, whose block shrank to
     # its value and band (rule 7).
     "CrankBoreDia": (0.1370, 0.16975),
 }
 
-# The plan's angled ray is the cone bore's axis; its basic 13° runs to it
+# The plan's angled ray is the cone bore's axis; its basic 12° runs to it
 # from the crank axis.  A pointer note names it, the text right of the head
-# circle above the 13° box and below the counterbore callout's leader, its
+# circle above the 12° box and below the counterbore callout's leader, its
 # tip on the ray inside the head circle, below the right counterbore's
 # centre mark (r13 machinist review: "an unlabelled thin dash-dot ray").
 CONE_AXIS_LABEL = "CONE BORE AXIS"

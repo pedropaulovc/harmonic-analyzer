@@ -56,11 +56,10 @@ CROSS_HOLE_NOTE = "\n".join(
     )
 )
 
-# Note 2: the seat spigot.  Its diameter (held under nominal) and its length
-# from the seat face are one feature with one reason: the #25 chain wrapping
-# the sprocket passes over the spigot and in front of the collar body
-# (dt_crankshaft_spec).  Rule 4: one feature's tight dimensions name the mate
-# once, on one numbered note linked to each; rule 26: never AIR for clearance.
+# Note 2: the seat spigot.  Its diameter is held under nominal for one
+# reason: the #25 chain wrapping the sprocket passes over the spigot
+# (dt_crankshaft_spec).  Rule 4: a tight dimension names its mate on a
+# numbered note linked to it; rule 26: never AIR for clearance.
 SPIGOT_NOTE_NUMBER = 2
 SPIGOT_CALLOUT = see_note(SPIGOT_NOTE_NUMBER)
 # The chain by its drawing number, its catalogue size after it (rule 4).
