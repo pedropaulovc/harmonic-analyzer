@@ -742,3 +742,17 @@ def test_pattern_notch_reference_requires_one_named_locator(monkeypatch, count) 
         drawing._pattern_notch_reference(
             adapter, [_PatternAnnotation() for _ in range(count)]
         )
+
+
+def test_matched_set_making_aims_at_the_modelled_thickness_inside_its_band() -> None:
+    # #2362 option g: the registry process tells the shop to face each gear to
+    # the nominal less the earlier gears' running deviation, inside the band.
+    import re
+
+    process = _config.parts("dt-cylinder-gear")["process"]
+    aim, upper = re.search(r"to \.(\d{4}) less .*\+/-\.(\d{4})", process).groups()
+    assert float(f".{aim}") * 25.4 == pytest.approx(spec.OVERALL_THICKNESS, abs=0.00127)
+    assert float(f".{upper}") * 25.4 == pytest.approx(spec.OVERALL_THICKNESS_BAND[0])
+    assert -spec.OVERALL_THICKNESS_BAND[1] == pytest.approx(
+        spec.OVERALL_THICKNESS_BAND[0]
+    )
