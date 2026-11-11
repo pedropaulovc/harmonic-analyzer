@@ -201,10 +201,13 @@ def straight_root_rise(station_mm: float) -> float:
     return math.hypot(gear64.ROOT_DIA / 2.0, shift) - gear64.ROOT_DIA / 2.0
 
 
-_LEAN_FLANK_SAMPLES = 400
-_LEAN_MESH_PHASES = 61
+# Coarse enough to keep stack_text() near a second (the drive-train build
+# logs it); finer sampling moves the lean by under 0.0002 mm.
+_LEAN_FLANK_SAMPLES = 200
+_LEAN_MESH_PHASES = 31
 
 
+@functools.lru_cache(maxsize=None)
 def _as_cut_flank(shift_mm: float, side: int) -> tuple[np.ndarray, np.ndarray]:
     """(radius, azimuth) along one flank of the straight tooth space's
     transverse section ``shift_mm`` off its radial line."""
@@ -277,29 +280,26 @@ def _sampled_backlash(pin, gear, centre: float, turn, resolved: bool) -> float:
         for side in (1, -1)
     }
     tooth_half = pin.pitch_thickness / (2.0 * pin.pitch_radius) + involute(alpha)
-    least = math.inf
-    for phase in np.linspace(-0.5, 0.5, _LEAN_MESH_PHASES):
-        free = 0.0
-        for side in (1, -1):
-            clear = math.inf
-            for pair in (-2, -1, 0, 1, 2):
-                azimuth = (phase + pair) * pitch / gear.pitch_radius + flank[side]
-                x, y = radius * np.cos(azimuth) - centre, radius * np.sin(azimuth)
-                reach = np.hypot(x, y)
-                met = reach <= pin.tip_radius
-                if not met.any():
-                    continue
-                tooth_centre = math.pi - (phase + pair) * 2.0 * math.pi / pin.teeth
-                off_centre = (np.arctan2(y, x)[met] - tooth_centre + math.pi) % (
-                    2.0 * math.pi
-                ) - math.pi
-                half = tooth_half - involute(
-                    np.arccos(base_p / np.maximum(reach[met], base_p))
-                )
-                clear = min(clear, float(np.min(-side * off_centre - half)))
-            free += clear
-        least = min(least, free)
-    return least * centre * pin.pitch_radius / (pin.pitch_radius + gear.pitch_radius)
+    phase = np.linspace(-0.5, 0.5, _LEAN_MESH_PHASES)[:, None, None]
+    step = phase + np.arange(-2, 3)[None, :, None]  # (mesh phase, tooth pair, 1)
+    free = 0.0
+    for side in (1, -1):
+        azimuth = step * pitch / gear.pitch_radius + flank[side]
+        x, y = radius * np.cos(azimuth) - centre, radius * np.sin(azimuth)
+        reach = np.hypot(x, y)
+        tooth_centre = math.pi - step * 2.0 * math.pi / pin.teeth
+        off_centre = (np.arctan2(y, x) - tooth_centre + math.pi) % (
+            2.0 * math.pi
+        ) - math.pi
+        half = tooth_half - involute(np.arccos(base_p / np.maximum(reach, base_p)))
+        clear = np.where(reach <= pin.tip_radius, -side * off_centre - half, np.inf)
+        free = free + clear.min(axis=(1, 2))
+    return (
+        float(np.min(free))
+        * centre
+        * pin.pitch_radius
+        / (pin.pitch_radius + gear.pitch_radius)
+    )
 
 
 def sampled_station_backlash(station_mm: float, *, lean: bool) -> float:
