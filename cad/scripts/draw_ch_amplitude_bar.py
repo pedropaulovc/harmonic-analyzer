@@ -405,7 +405,7 @@ FINISH_CHAR_HEIGHT = 0.0025
 FINISH_SHOULDER = 0.0063
 # #2341: the side faces' flatness frame stands this far east of and above its
 # leader's landing at the right side face's mid-length, west of the detail
-# views' crop circles (x 0.116 on); its four-line callout hangs under it.
+# views' crop circles (x 0.116 on); its one-line callout hangs under it.
 SIDE_FLATNESS_FRAME_DX = 0.008
 SIDE_FLATNESS_FRAME_DY = 0.014
 

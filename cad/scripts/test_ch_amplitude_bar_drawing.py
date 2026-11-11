@@ -814,7 +814,7 @@ def test_side_face_flatness_closes_the_mid_span_gap() -> None:
 
 def test_side_flatness_frame_stands_east_of_the_bar_clear_of_the_details() -> None:
     """#2341: the native flatness frame lands on the right side face at
-    mid-length in the 1:4 front view; the frame and its four-line callout
+    mid-length in the 1:4 front view; the frame and its one-line callout
     stand east of the bar and west of every detail view's crop circle and
     label, above the sheet note."""
     spec = ch_amplitude_bar_spec
@@ -823,7 +823,8 @@ def test_side_flatness_frame_stands_east_of_the_bar_clear_of_the_details() -> No
     assert 'tolerance=GEOMETRIC_TOLERANCES_IN["side face flatness"]' in source
     assert "quantity=SIDE_FLATNESS_CALLOUT" in source
     lines = ch_amplitude_bar_notes.SIDE_FLATNESS_CALLOUT.splitlines()
-    assert len(lines) <= 4
+    # The native below-frame text reads back one line only (r1 leaf).
+    assert lines == ["BOTH SIDE FACES"]
     bar_right = drawing.FRONT_CENTER[0] + spec.BAR_WIDTH / 4000.0
     frame_x = bar_right + drawing.SIDE_FLATNESS_FRAME_DX
     frame_y = drawing.FRONT_CENTER[1] + drawing.SIDE_FLATNESS_FRAME_DY

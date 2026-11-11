@@ -207,12 +207,12 @@ if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
 
 # #2341: the side faces' flatness (ch_amplitude_bar_spec.GEOMETRIC_TOLERANCES_IN)
 # prints as a native frame on the full-length view, on the right side face;
-# under it, which faces it holds, the mate it runs beside (rule 4), and the
-# fit route its band needs (bought CF square can bow about .013 over this
-# length: the stock is straightened or selected to it). Each line
-# stays within 15 characters: the block stands between the bar and the
-# detail views' crop circles.
-SIDE_FLATNESS_CALLOUT = "BOTH SIDE FACES\nBESIDE NEXT BAR\nSTRAIGHTEN OR\nSELECT STOCK"
+# under it, one line naming the faces it holds (the native below-frame text
+# keeps one line: r1 leaf 20261111T225642Z, a multi-line text did not read
+# back). The route (bought CF square can bow about .013 over this length, so
+# it is straightened or selected) is the registry's process note, and
+# MHA-CH-00's feeler step is the bank's acceptance.
+SIDE_FLATNESS_CALLOUT = "BOTH SIDE FACES"
 
 # The one sheet note is the pin hole's matched fit. The title-block QTY owns
 # the count, the FINISH field the plating, and the views both notches' depth
