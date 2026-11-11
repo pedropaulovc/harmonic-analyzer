@@ -82,7 +82,7 @@ from ms_stick_spec import (  # noqa: E402
     NUMERAL_LAYER_DXFS,
     NUMERAL_ROTATION_DEG,
     NUMERAL_STROKE_WIDTH_MM,
-    NUMERAL_V_INCLUDED_ANGLE_DEG,
+    ENGRAVING_V_INCLUDED_ANGLE_DEG,
     SCALE_START_X,
     TICK_LENGTH,
     TICK_WIDTH,
@@ -243,7 +243,7 @@ def _depth_field(rects: list[Ring], xs: np.ndarray, ys: np.ndarray) -> np.ndarra
     its bounding box covers, with the same elementwise arithmetic; any other
     grid takes the whole-grid path.
     """
-    slope = math.tan(math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
+    slope = math.tan(math.radians(ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0))
     depth = np.zeros_like(xs)
     columns = rows = None
     if (

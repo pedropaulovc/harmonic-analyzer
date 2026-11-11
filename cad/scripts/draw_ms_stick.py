@@ -5,7 +5,7 @@ its dimensions link. GRADUATIONS tables every graduation's station from the
 zero tick and enlarges a decade with its pitches as references; TICK LENGTHS
 gives groove width and each length a local detail without cross-strip
 extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
-detail H at the 10) from the open-edge Top detail for the square-bottom
+detail H at the 10) from the open-edge Top detail for the V graduations'
 groove depth. Each detail's parent on sheets 2-4 is a reduced copy of a
 sheet 1 view, labelled with that view's name and scale. Section G-G cuts the
 whole .315 x .118 bar across both strokes of the zero numeral, so the true V

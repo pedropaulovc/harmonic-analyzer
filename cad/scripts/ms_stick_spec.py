@@ -8,7 +8,10 @@ The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXFs.
 The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
 numerals cut as true 30-degree included V grooves (the model drafts every
-stroke wall 15 degrees). The square-bottom graduations stay fixed.
+stroke wall 15 degrees). Issue #2433: the graduations are the same 30-degree
+V, so one engraving bit (shop-equipment.toml tools.ms-stick-engraver) cuts
+every tick and numeral stroke; no tool in the shop cuts the former
+square-bottom .016-.024 groove.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each the exact decimal of the inch value it prints (see
@@ -59,6 +62,9 @@ SCALE_END_MARGIN = 3.43
 # stop and the bar stations against is unmoved; it prints 2.224 at the
 # stations' +/-.002.
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
+# The face width .016 MIN (.024 MAX below) at the face of a 30-degree V
+# .020 MIN deep: the drafted walls leave TICK_TIP_FLAT_MM at the root, as a
+# .005-tip bit plunged .021-.033 cuts it.
 TICK_WIDTH = 0.4064  # .016 MIN
 TICK_LENGTH = 3.048  # .12
 MINOR_TICK_LENGTH = 1.778  # .07
@@ -81,11 +87,31 @@ NUMERAL_ROTATION_DEG = 90
 # V bit (the easiest hobby-mill route in brass). Single-stroke numerals, 0.24
 # wide at the face (12% of the .08 height, legible and enamel-holding) and
 # .016 MIN deep; the drafted walls leave only NUMERAL_TIP_FLAT_MM at the root.
-NUMERAL_V_INCLUDED_ANGLE_DEG = 30.0
+ENGRAVING_V_INCLUDED_ANGLE_DEG = 30.0
 NUMERAL_STROKE_WIDTH_MM = 0.24
 NUMERAL_DEPTH = 0.4064  # .016 MIN
-NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * math.tan(
-    math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0)
+_V_HALF_SLOPE = math.tan(math.radians(ENGRAVING_V_INCLUDED_ANGLE_DEG / 2.0))
+NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * _V_HALF_SLOPE
+TICK_TIP_FLAT_MM = TICK_WIDTH - 2.0 * TICK_DEPTH * _V_HALF_SLOPE
+if not TICK_TIP_FLAT_MM > 0.0:
+    raise AssertionError(f"a {TICK_WIDTH} wide tick's V closes above its {TICK_DEPTH} depth")
+
+
+def tick_v_volume_mm3(length_mm: float) -> float:
+    """Volume (mm^3) one V tick removes: its TICK_WIDTH x ``length_mm`` face outline
+    (the open end runs off the ruled edge) cut TICK_DEPTH deep with every wall
+    drafted inward, the integral over depth z of (w - 2zs) * (L - zs)."""
+    w, d, s = TICK_WIDTH, TICK_DEPTH, _V_HALF_SLOPE
+    return w * length_mm * d - (w + 2.0 * length_mm) * s * d**2 / 2.0 + 2.0 * s**2 * d**3 / 3.0
+
+
+# Every tick cut: eleven full ticks, the minor ticks of ten divisions and the
+# half-division tick, which covers the minor tick it overcuts.
+TICK_VOLUME_MM3 = (
+    DIVISION_COUNT * tick_v_volume_mm3(TICK_LENGTH)
+    + (DIVISION_COUNT - 1) * (MINOR_PER_DIVISION - 1) * tick_v_volume_mm3(MINOR_TICK_LENGTH)
+    - tick_v_volume_mm3(MINOR_TICK_LENGTH)
+    + tick_v_volume_mm3(HALF_TICK_LENGTH)
 )
 # Each stroke's ends are the V bit's footprint, a half-round inscribed in this
 # many facets (gen_ms_stick_numerals_dxf), so joints reach the full depth.
@@ -94,7 +120,7 @@ NUMERAL_END_FACETS = 8
 # facets meet and the cut collapses. NumeralDepth is editable only below it.
 NUMERAL_DEPTH_MAX_MM = (
     NUMERAL_STROKE_WIDTH_MM / 2.0 * math.cos(math.pi / (2 * NUMERAL_END_FACETS))
-    / math.tan(math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
+    / _V_HALF_SLOPE
 )
 if not 0.0 < NUMERAL_DEPTH < NUMERAL_DEPTH_MAX_MM:
     raise AssertionError(

@@ -187,3 +187,21 @@ material = "rocker-1018-cold-finished"
 sfm = 65
 chip_load_mm_per_tooth = 0.0254
 flutes = 4
+
+# HA: the MHA-MS-01 stick's engraving bit (cad/config/shop-equipment.toml
+# tools.ms-stick-engraver: make, SKU, 30 deg V, .005 in tip) on its brass,
+# read by test_ms_stick_drawing. Source: 2L "Feeds and Speeds for Engraving
+# with an Engraving Tool" (engraving_tool_speed_and_feed_table.pdf, read live
+# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm (the
+# PM-30MV's top speed), halved for small tip widths as its note says: 3 in/min
+# by handwheel, plunge at half that; passes .005 deep, the last .001-.002 at a
+# slower feed to leave no burr.
+[tools.ms-stick-engraver]
+description = "30 deg included V carbide engraving bit, .005 in tip, 1/8 in shank, single flute"
+diameter_mm = 3.175
+
+[settings.ms-stick-engrave-brass]
+tool = "ms-stick-engraver"
+material = "ms-stick-brass"
+rpm = 3000
+feed = "3 in/min"
