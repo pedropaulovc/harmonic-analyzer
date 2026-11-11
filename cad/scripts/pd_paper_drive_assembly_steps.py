@@ -117,6 +117,9 @@ SEQUENCE: tuple[str, ...] = (
     "loaded-rack-geometry-checked",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
+    # The reducer's confirmation remedies, one action each, take more
+    # sub-steps than one step's letters (machinist review, #2417).
+    "fitup-mesh-remedied",
     # The D-collar's rear face is fitted on the actual gear front F; the
     # thumbnut reacts through pilot, collar and F.
     "collar-rear-faced-to-fit",
