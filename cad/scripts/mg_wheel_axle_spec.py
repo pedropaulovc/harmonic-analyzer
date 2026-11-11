@@ -61,41 +61,41 @@ THREAD_BASIC_MINOR = THREAD_MAJOR - 1.082532 * THREAD_PITCH  # 2.158
 THREAD_ROOT_2A_MIN = (0.0925 - 0.649519 / 40.0) * MM_PER_IN  # 1.937
 # Thread relief at the shank step (drawing-guidelines.md rule 16: a thread
 # that runs to a shoulder gets a relief of at least one pitch; the 2026-10-24
-# ENFORCE review's blocker). The groove is turned after the die
-# (mg-wheel-axle.yaml process, #2399), so it takes the die's lead run-out and
-# full thread reaches the groove's far edge, and the die's torque never
-# crosses the neck. Like the vertical rod's (MHA-MG-04), the groove mates with
-# nothing: its root radius prints as a single MAX limit (swTolMAX prints the
-# model value, so the model IS the limit), both internal corners the grooving
-# tool's nose, R.008 MAX (the title block's R.040 would not fit the groove).
-# Its Ø prints as a LIMIT pair, the model at the MAX: .073 under the die's
-# root, and a MIN (#2399: a MAX alone let the neck be cut to any size) from
-# the standard undercut's band, DIN 76-1's h13 on its Ø (IT13 over 1-3 mm,
-# 0.14 mm = .0055), .073 - .0055 = .0675 rounded up to .068. No stack reads
-# the floor; it bounds the neck's strength, which then carries no press
-# (MHA-MG-00 pushes on the step, mg_magnifier_assembly_sheet) and no die
-# torque. Its width prints as a LIMIT pair: the model .043 >= the die's
-# 1.5-pitch lead (.0375) is the MAX, held under the first nut's worst-case
-# station off the step
+# ENFORCE review's blocker). The die's lead runs out in the groove, so full
+# thread reaches the groove's far edge. Like the vertical rod's (MHA-MG-04),
+# the groove mates with nothing: its root radius prints as a single MAX limit
+# (swTolMAX prints the model value, so the model IS the limit), both internal
+# corners the grooving tool's nose, R.008 MAX (the title block's R.040 would
+# not fit the groove). Its Ø prints plain on the title block's .XXX +/-.005
+# (#2399: the old "Ø.073 MAX" let the neck be cut to any size): the nominal
+# .071 is the largest on the .001 grid whose upper limit, .076, stays under
+# the die's root (.0763), so the floor is .066 (rule 4: no mate, no tighter
+# band). MHA-MG-00 presses the pin on its step, never through the neck
+# (mg_magnifier_assembly_sheet.PRESS_SLEEVE); the registry's process cuts
+# the groove after the die, but the floor does not rest on that order.
+# Its width prints as
+# a LIMIT pair: the model .043 >= the die's 1.5-pitch lead (.0375) is the
+# MAX, held under the first nut's worst-case station off the step
 # (mg_wheel_group NUT_RUNOUT_MARGIN; a narrower groove only moves the run-out
 # back to the die's lead), and rule 16's one pitch (.025) the MIN, rounded up
 # to .028 (codjiflo #1996: a MAX alone accepted a groove under one pitch).
 # The title block's .XXX +/-.005 would put the nut on the run-out.
-RELIEF_DIA = 1.8542  # .073
-RELIEF_DIA_MIN = 1.7272  # .068
-RELIEF_DIA_H13 = 0.14  # DIN 76-1 undercut Ø band, IT13 over 1-3 mm
+RELIEF_DIA = 1.8034  # .071
 RELIEF_WIDTH = 1.0922  # .043
 RELIEF_WIDTH_MIN = 0.7112  # .028
 RELIEF_ROOT_R = 0.2032  # .008
 RELIEF_PLACES = 3
 TOL_TYPE_LIMIT = 3  # swTolType_e.swTolLIMIT
 TOL_TYPE_MAX = 6  # swTolType_e.swTolMAX
+# The neck's printed limits, the title block's band about its nominal.
+RELIEF_DIA_LIMITS = tuple(
+    RELIEF_DIA + deviation
+    for deviation in printed_deviations(RELIEF_DIA, RELIEF_PLACES, unit=UNIT)
+)
 # Full thread starts this far past the step at the latest.
 FULL_THREAD_FROM_STEP_MAX = max(RELIEF_WIDTH, DIE_RUNOUT)  # .043
-if not RELIEF_DIA <= THREAD_ROOT_2A_MIN < THREAD_BASIC_MINOR < THREAD_MAJOR:
+if not RELIEF_DIA_LIMITS[1] <= THREAD_ROOT_2A_MIN < THREAD_BASIC_MINOR:
     raise AssertionError("wheel-axle relief Ø leaves thread at the 2A root")
-if not RELIEF_DIA - RELIEF_DIA_H13 <= RELIEF_DIA_MIN < RELIEF_DIA:
-    raise AssertionError("wheel-axle relief Ø MIN is outside the undercut's h13 band")
 if not THREAD_PITCH <= DIE_RUNOUT <= RELIEF_WIDTH:
     raise AssertionError("wheel-axle relief does not take the die's lead")
 if not THREAD_PITCH <= RELIEF_WIDTH_MIN < RELIEF_WIDTH:
@@ -173,12 +173,12 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PinProfile", "ThreadLength"): THREAD_LEN_BAND,
 }
 # The relief's root radius prints as a single MAX limit (model value =
-# limit); its Ø and width as LIMIT pairs, (MIN, MAX) mm, the model at the MAX.
+# limit); its width as a LIMIT pair, (MIN, MAX) mm, the model at the MAX; its
+# Ø on the title block.
 SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
     ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, TOL_TYPE_MAX),
 }
 LIMIT_PAIRS: dict[tuple[str, str], tuple[float, float]] = {
-    ("PinProfile", "ReliefDia"): (RELIEF_DIA_MIN, RELIEF_DIA),
     ("PinProfile", "ReliefWidth"): (RELIEF_WIDTH_MIN, RELIEF_WIDTH),
 }
 # Inch places; the overall reference and the dome R .XX. The sheet dresses the

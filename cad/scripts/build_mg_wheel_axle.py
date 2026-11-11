@@ -16,8 +16,8 @@ Built as ONE Front-plane revolve (PinProfile -> Pin) plus the relief's two
 root rounds (ReliefRoots): every printed diameter and length is a named
 dimension, the shank from the back end and the thread from the gauged step,
 so the drawing inserts them as model items
-(mg_wheel_axle_spec.DRAWING_DIMENSIONS). The relief's Ø and width are LIMIT
-pairs and its root radius a single MAX limit, and every callout the sheet
+(mg_wheel_axle_spec.DRAWING_DIMENSIONS). The relief's width is a LIMIT pair
+and its root radius a single MAX limit, and every callout the sheet
 prints is authored here on its source dimension (mg_wheel_axle_callouts; the
 drawing only reads them back, #1942).
 The #4-40 end carries a cosmetic thread so the pictorial matches the callout.

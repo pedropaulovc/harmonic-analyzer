@@ -230,27 +230,39 @@ def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
     relief neck. Both presses that drive the axle in push on its shank step
     through one sleeve that clears the thread and dome and lands on the
     step's flat."""
+    from _printed_tolerance import (
+        drilled_oversize_mm,
+        edge_break_chamfer_mm,
+        edge_break_radius_mm,
+    )
+
     spec = mg_wheel_axle_spec
-    bore, od, length = (
-        notes.PRESS_SLEEVE_BORE,
-        notes.PRESS_SLEEVE_OD,
-        notes.PRESS_SLEEVE_LENGTH,
+    inch = 25.4
+    # The #32 number drill is .116; the sleeve's bore at the title block's
+    # drilled limit still lands inside the step's flat, a full edge break in.
+    assert notes.PRESS_SLEEVE_DRILL == "#32"
+    assert notes.PRESS_SLEEVE_BORE == pytest.approx(0.116 * inch)
+    bore_max = notes.PRESS_SLEEVE_BORE + drilled_oversize_mm(unit=spec.UNIT)
+    edge_break = max(
+        edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT)
     )
-    edge_break = 0.010 * 25.4  # the title block's break, .010 MAX
-    assert spec.THREAD_MAJOR < bore < spec.PIN_DIA - spec.PIN_DIA_TOL - 2 * edge_break
-    assert od > spec.PIN_DIA + spec.PIN_DIA_TOL
+    flat = spec.PIN_DIA - spec.PIN_DIA_TOL - 2.0 * edge_break
+    assert spec.THREAD_MAJOR < notes.PRESS_SLEEVE_BORE < bore_max < flat
+    assert notes.PRESS_SLEEVE_OD > spec.PIN_DIA + spec.PIN_DIA_TOL
     longest_tip = spec.THREAD_LEN + spec.THREAD_LEN_BAND[0] + spec.DOME_H
-    assert length > longest_tip
-    assert notes.PRESS_SLEEVE == (
-        "A STEEL SLEEVE OVER THE THREAD (1/8 DRILLED BORE, .25 OD, .50 LONG)"
-    )
-    pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert f"ON ITS SHOULDER ONLY, THROUGH {notes.PRESS_SLEEVE}" in pressed
+    assert notes.PRESS_SLEEVE_LENGTH > longest_tip
+    # The top press force on the worst annulus stays inside a finished face's
+    # static bearing (1.8 x yield); on the neck it would be several times it.
+    area = math.pi / 4.0 * ((flat / inch) ** 2 - (bore_max / inch) ** 2)
+    assert notes.STEP_BEARING_AREA_MIN_SQIN == pytest.approx(area)
+    assert notes.PRESS_FORCE_MAX_KIP / area <= 1.8 * notes.AXLE_YIELD_KSI
+    neck = math.pi / 4.0 * (spec.RELIEF_DIA_LIMITS[1] / inch) ** 2
+    assert notes.PRESS_FORCE_MAX_KIP / neck > 3.0 * notes.AXLE_YIELD_KSI
+    # Both presses that drive the axle in name the sleeve; the re-press
+    # points back to the first press's step.
+    assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
     further = notes.STEP_TEXT["axle-pressed-further"]
-    assert further.endswith(
-        f"ON ITS SHOULDER THROUGH THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)}"
-        " SLEEVE."
-    )
+    assert f"STEP {steps.step_number(steps.AXLE_PRESSED_KEY)} SLEEVE" in further
 
 
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
