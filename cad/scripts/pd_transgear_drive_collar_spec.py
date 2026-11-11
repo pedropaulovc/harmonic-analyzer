@@ -621,31 +621,52 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
 
 # --- The chain plane in service (contract §13.2, R9-2 / R9-17) ----------------
 # Tsubaki's ±1 sprocket offset at every printed corner, floats included.  The
-# fit-up sets the pair (knob against crank, mid-planes) at CHAIN_SET_RANGE:
-# the setting band on the front faces, then half the MHA-PD-09 plate band
-# either way (#2420; it was the contract's enumerated -0.3103..+0.05, which
-# the .002 ±.002 setting sat inside).  In service the crank shaft's end play
-# and the knob's end float move the knob wheel forward. R9-70 adds the wheel's
-# own float under the thumbnut, forward only (the collar body is its rear
-# stop), and K-1 sets the knob's end float on a feeler at fit-up, so it no
-# longer carries the journal, ring and hub-to-boss bands (contract: 0..0.35).
-# R9-71: the MHA-PD-VN-63 spring holds the arm on the MHA-PD-20 spacer, which is pressed on the
-# MHA-PD-VN-57 shoulder, so the hanger has no end play and its tilt is fixed in
-# the bar's frame, where the fit-up reads it:
-# -0.2786 - 0.25 - 0.254 - 0.1524 = -0.935 .. +0.177.
+# fit-up reads the pair (knob against crank) on the front faces, the knob
+# wheel held back on its seat, within a band about FIT_UP_OFFSET_TARGET; the
+# mid-planes lie half the MHA-PD-09 plate band either way of the faces.  In
+# service the crank shaft's end play and the knob's end float move the knob
+# wheel forward. R9-70 adds the wheel's own float under the thumbnut, forward
+# only (the collar body is its rear stop), and K-1 sets the knob's end float
+# on a feeler at fit-up, so it no longer carries the journal, ring and
+# hub-to-boss bands (contract: 0..0.35).  R9-71: the MHA-PD-VN-63 spring holds
+# the arm on the MHA-PD-20 spacer, which is pressed on the MHA-PD-VN-57
+# shoulder, so the hanger has no end play and its tilt is fixed in the bar's
+# frame, where the fit-up reads it.  The setting (CHAIN_SET_RANGE) and the
+# re-check (pd_paper_drive_assembly_steps) both pass through
+# chain_offset_in_service, so the two cannot drift apart.  #2420: the set
+# range was the contract's enumerated -0.3103..+0.05 (R9-70, before
+# fe4188eb5a held the wheel back on its seat for both readings); its forward
+# excess over the .05 ±.05 mm band's mid-planes (-0.15) is about the wheel's
+# 0.15 float under the nut, which a floated reading set into the pair and
+# the held-back reading now pays once, in service, below.
+# Setting .002 ±.007: -0.2786 - 0.25 - 0.254 - 0.1524 = -0.935 .. +0.177.
 CHAIN_OFFSET_LIMIT = 1.0
-_HALF_PLATE_SPREAD = (max(PLATE_BAND) - min(PLATE_BAND)) / 2.0
-CHAIN_SET_RANGE = (
-    -(FIT_UP_OFFSET_TARGET + FIT_UP_OFFSET_SET_TOL) - _HALF_PLATE_SPREAD,
-    FIT_UP_OFFSET_SET_TOL - FIT_UP_OFFSET_TARGET + _HALF_PLATE_SPREAD,
-)
 CRANK_END_PLAY_MAX = 0.25
 HANGER_AXIAL_PLAY_MAX = 0.0
 KNOB_END_FLOAT_MAX = END_FLOAT + END_FLOAT_SET_TOL  # 0.25
-CHAIN_OFFSET_IN_SERVICE = (
-    CHAIN_SET_RANGE[0] - CRANK_END_PLAY_MAX - KNOB_END_FLOAT_MAX - max(KNOB_FLOAT_RANGE),
-    CHAIN_SET_RANGE[1] + HANGER_AXIAL_PLAY_MAX,
-)
+_HALF_PLATE_SPREAD = (max(PLATE_BAND) - min(PLATE_BAND)) / 2.0
+
+
+def chain_pair_range(face_tol: float) -> tuple[float, float]:
+    """Knob-wheel mid-plane against the crank wheel's (forward is minus),
+    for front faces read held back within ``face_tol`` of the target."""
+    return (
+        -(FIT_UP_OFFSET_TARGET + face_tol) - _HALF_PLATE_SPREAD,
+        face_tol - FIT_UP_OFFSET_TARGET + _HALF_PLATE_SPREAD,
+    )
+
+
+def chain_offset_in_service(face_tol: float) -> tuple[float, float]:
+    """The pair read within ``face_tol``, then every service float."""
+    low, high = chain_pair_range(face_tol)
+    return (
+        low - CRANK_END_PLAY_MAX - KNOB_END_FLOAT_MAX - max(KNOB_FLOAT_RANGE),
+        high + HANGER_AXIAL_PLAY_MAX,
+    )
+
+
+CHAIN_SET_RANGE = chain_pair_range(FIT_UP_OFFSET_SET_TOL)
+CHAIN_OFFSET_IN_SERVICE = chain_offset_in_service(FIT_UP_OFFSET_SET_TOL)
 CHAIN_OFFSET_MARGIN = CHAIN_OFFSET_LIMIT - max(map(abs, CHAIN_OFFSET_IN_SERVICE))
 if CHAIN_OFFSET_MARGIN < 0.0:
     raise AssertionError(

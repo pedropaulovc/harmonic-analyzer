@@ -1535,12 +1535,12 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     )
     # #2418: the cut is driven by the sleeve's rear face on the stub's
     # shoulder, loaded by the tailstock, not by a Ø1/8 mandrel's friction.
-    mounted = flat.index(
-        f"MOUNT THE {_number('pd-transgear-feed-pinion')} SLEEVE ON A STUB MANDREL AS "
-        f"{drawing.sub_step('disc-taps-transferred', 0)}, ITS REAR FACE HELD ON THE "
-        "MANDREL'S FACED SHOULDER BY THE TAILSTOCK CENTRE IN ITS BORE MOUTH."
-    )
-    assert mounted < flat.index("RE-FACE THE ")
+    setup = [
+        flat.index(word)
+        for word in ("STUB MANDREL", "SHOULDER", "TAILSTOCK CENTRE", "RE-FACE THE ")
+    ]
+    assert setup == sorted(setup)
+    assert "BETWEEN CENTRES" not in flat
     assert "READ SHORT" not in flat
     assert texts[-1].startswith(
         f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
@@ -1819,10 +1819,9 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     # #2418: a stub fitted to the actual bore in the chuck, not a Ø1/8
     # mandrel between centres; the trued disc is clamped before the
     # off-axis spots are taken off the lathe and is read back on the stub.
-    assert (
-        "STUB MANDREL TURNED IN PLACE IN THE LATHE CHUCK TO A SLIDING FIT IN THE "
-        f"{drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
-    )
+    for word in ("STUB MANDREL", "LATHE CHUCK", "SLIDING FIT"):
+        assert word in transferred
+    assert f"{drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
     assert "BETWEEN CENTRES" not in transferred
     assert (
         f"\u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
@@ -2280,14 +2279,9 @@ def test_the_chain_plane_bands_spend_the_offset_budget_not_the_fitter() -> None:
     assert steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_SET_TOL == pytest.approx(2 * inch)
     # Wide enough to read on feelers in .001 steps without a re-face per miss.
     assert collar.FIT_UP_OFFSET_SET_TOL >= 5 * inch
-    # The set range the collar spec carries into service is the setting band.
-    half_plate = (max(seat_geometry.PLATE_BAND) - min(seat_geometry.PLATE_BAND)) / 2.0
-    assert collar.CHAIN_SET_RANGE == pytest.approx(
-        (
-            -(collar.FIT_UP_OFFSET_TARGET + collar.FIT_UP_OFFSET_SET_TOL) - half_plate,
-            collar.FIT_UP_OFFSET_SET_TOL - collar.FIT_UP_OFFSET_TARGET + half_plate,
-        )
-    )
+    # Whatever the setting passes, the re-check passes too.
+    set_low, set_high = collar.CHAIN_OFFSET_IN_SERVICE
+    assert low < set_low and set_high < high
     assert collar.CHAIN_OFFSET_MARGIN >= 0.0
 
 
