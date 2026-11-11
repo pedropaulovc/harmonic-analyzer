@@ -48,11 +48,12 @@ its first-root position; no second general note restates that location.
      stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner rulings
      2026-11-09 and 2026-11-10: one blade per gear in the tooth space beside its phase-0 tooth, T030 to
      T006), and let it cure before load; a bonded
-     slip fit has nothing to adjust afterwards. The bonds cure in two rounds (#2470): T024 alone first, with
-     T030's back face, the key's back end and the feeler waxed against its squeeze-out; then, once T024 has
-     cured, T018, T012 and the spigot, the spigot held home in its blind socket until the bonds grab. After
-     the cure the comb must still drop into all five gears; if it does not, the bonds are parted at about
-     250 °C and redone.
+     slip fit has nothing to adjust afterwards. The bonds cure in two rounds (#2470): T024 alone first, its
+     joint degreased, then T030's back face, the key's back end and the feeler waxed (none on the land)
+     against its squeeze-out; then, once T024 has cured and the wax is wiped off, T018, T012 and the spigot,
+     the spigot held home in its blind socket until the bonds grab. Step 2 opens on the acceptance: the comb
+     must still drop into all five gears; if it does not, the tip parts come off at about 250 °C, the cured
+     film is cleaned out, and the tip is redone from MHA-DT-38's check (the heat frees a bond there too).
      The MHA-DT-38 brass bushing is pressed on the pivot against the leaves, made to its measured bore.
      The MHA-DT-39 end screw (stock 91794A558 with a reamed Ø.0630 × .12 in pivot hole, wall to the 2A
      thread root .067 in MIN, RV-01) threads into MHA-DT-21: run it in until the shaft stops shuttling, back

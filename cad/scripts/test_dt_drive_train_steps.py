@@ -92,42 +92,58 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
     bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
     the MHA-DT-03-TL-02 phasing comb, T030's blade beside the key (owner
-    rulings 2026-11-09 and 2026-11-10).  #2470: T024 is bonded and phased
-    alone, with the faces its squeeze-out reaches waxed first, and cures
-    before the spigot's three joints are made and phased, the spigot held
-    home in its blind socket; the cured cluster is accepted on the comb."""
+    rulings 2026-11-09 and 2026-11-10).  #2470: T024's joint is degreased,
+    the faces its squeeze-out reaches are waxed, and T024 is bonded and
+    phased alone and cures before the spigot's joints are made and phased,
+    the spigot held home in its blind socket; step 2 accepts the cured tip on
+    the comb before the post goes on, and a failed tip is parted and redone
+    from MHA-DT-38's check."""
     stack = _step_body("cone-gears-stacked")
     feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
+    comb = "ENGAGE MHA-DT-03-TL-02"
     order = (
-        "SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER",
-        "SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY",
-        "PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024",
+        "DRY, NO FEELER",
         "ACCEPT",
         "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
-        f"WAX T030'S BACK FACE, THE KEY'S BACK END AND THE {feeler} FEELER",
-        f"BOND T024 ON MHA-DT-04, {feeler} FEELER ON T030",
-        "1R. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
-        "REMOVE MHA-DT-03-TL-02 AND THE FEELER ONCE THE BOND GRABS",
-        "AFTER T024'S 24 H CURE, BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
-        "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024,",
-        "1V. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE BESIDE THE KEY",
-        "HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB",
-        "1X. REMOVE MHA-DT-03-TL-02.",
-        "ONCE CURED, CHECK THAT MHA-DT-03-TL-02 DROPS INTO ALL FIVE GEARS",
-        "IF IT DOES NOT, PART THE TIP BONDS AT 250 DEG C AND REDO FROM 1P",
+        "DEGREASE T024",
+        "PASTE WAX",
+        f"BOND T024 ON THE LAND, {feeler} FEELER ON T030",
+        comb,
+        "ONCE THE BOND GRABS",
+        "24 H CURE",
+        "BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT",
+        "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024",
+        comb,
+        "HOLD MHA-DT-37 HOME",
     )
-    positions = [stack.find(phrase) for phrase in order]
-    assert -1 not in positions, positions
-    assert positions == sorted(positions)
+    positions = []
+    for phrase in order:
+        positions.append(stack.find(phrase, positions[-1] + 1 if positions else 0))
+        assert positions[-1] != -1, phrase
+    # The wax goes on after the degrease and never onto T024's land, and
+    # comes off once T024 has cured.
+    assert "NONE ON THE LAND" in stack
+    assert "WIPE THE WAX OFF" in stack[positions[8] :]
 
     # One bond before the first comb; T012, T018 and the spigot before the
     # second ("BOND T0..." or "BOND MHA-...", never "THE BOND GRABS").
     def bonds(text: str) -> int:
         return text.count("BOND T0") + text.count("BOND MHA-")
 
-    first, second = positions[7], positions[11]
-    assert bonds(stack[positions[6] : first]) == 1
-    assert bonds(stack[first:second]) == 2
+    assert bonds(stack[positions[2] : positions[6]]) == 1
+    assert bonds(stack[positions[6] : positions[11]]) == 2
+
+    # Step 2 opens on the cured tip's acceptance and its remedy, before the
+    # post goes on; the redo starts at MHA-DT-38's check, which the heat undoes.
+    post = _step_body("post-and-tip-block")
+    accept = post.find("DROPS INTO ALL FIVE GEARS")
+    redo = post.find("REDO FROM 1M.")
+    assert post.startswith("ONCE CURED, CHECK THAT MHA-DT-03-TL-02")
+    assert 0 < accept < post.find("250 DEG C") < post.find("CURED 638") < redo
+    assert redo < post.find("ALIGN THE MHA-DT-05 COUNTERBORES")
+    assert "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND." in "\n".join(
+        SEQUENCE_BLOCKS
+    )
 
 
 def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:

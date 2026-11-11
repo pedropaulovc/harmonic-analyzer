@@ -47,7 +47,7 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.ROCKER_ARM,
         # Check 5's feed sense, named on sheet 14's interface lines.
         drawing.PLATEN_NUMBER,
-        # Steps 1R and 1V's phasing comb: a shop tool in the cone-gear indexing kit,
+        # Steps 1S and 1X's phasing comb: a shop tool in the cone-gear indexing kit,
         # never a drive-train BOM row (owner ruling 2026-11-09, PR #1992).
         _config.parts("dt-cone-gear-tl-phasing-comb")["number"],
     }
@@ -241,6 +241,7 @@ def test_the_package_prints_each_numbered_assembly_step_once() -> None:
         for field in drawing.package_note_fields(_drawing_facts())
         if field.sheet in (
             drawing.SEQUENCE_SHEET,
+            drawing.CRANK_SHEET,
             drawing.BANK_SHEET,
             drawing.FIT_SHEET,
             drawing.CONTINUATION_SHEET,
@@ -255,17 +256,19 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
     assert (
         drawing.SEQUENCE_SHEET,
+        drawing.CRANK_SHEET,
         drawing.BANK_SHEET,
         drawing.FIT_SHEET,
         drawing.CONTINUATION_SHEET,
         drawing.FULL_DETAIL_SHEET,
         drawing.CHECKS_SHEET,
         drawing.BANK_SETTINGS_SHEET,
-    ) == (7, 8, 9, 10, 11, 12, 13), "the numbered steps read in sheet order"
+    ) == (7, 8, 9, 10, 11, 12, 13, 14), "the numbered steps read in sheet order"
     assert len(names) == drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
+    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
@@ -278,8 +281,32 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
     sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
     assert sequence_right.endswith(
+        f"CONT. STEP {drawing.CRANK_SHEET_FROM}: SHEET {drawing.CRANK_SHEET}."
+    )
+    crank_right = fields[f"sheet {drawing.CRANK_SHEET} right note field"].blocks[-1][1]
+    assert crank_right.endswith(
         f"CONT. STEP {drawing.CRANK_CONTINUED_FROM}: SHEET {drawing.BANK_SHEET}."
     )
+    # MHA-PD-00 cites steps 4 and 5 on the crank sheet: both print whole there.
+    def sequence(sheets: set[int]) -> str:
+        return "\n".join(
+            text
+            for field in fields.values()
+            if field.sheet in sheets
+            for _label, text in field.blocks
+        )
+
+    others = {
+        drawing.SEQUENCE_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CONTINUATION_SHEET,
+    }
+    crank = sequence({drawing.CRANK_SHEET})
+    for key in ("crank-mesh-checked", "paper-drive-wheel"):
+        number = drawing.steps.step_number(key)
+        assert re.search(rf"^{number}\. ", crank, re.MULTILINE), key
+        assert not re.search(rf"^{number}[A-Z]?\. ", sequence(others), re.MULTILINE)
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
@@ -815,7 +842,7 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     stays left of the cone station table."""
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
     assert "4H, 4J" in rows[".004"]
-    assert "CHECK 4D" in rows[".018"] and "1Q" in rows[".018"]
+    assert "CHECK 4D" in rows[".018"] and "1R" in rows[".018"]
     assert rows[".020"] == "CHECK 4D, 4M"
     assert "4F" in rows[".010"]
     checks = " ".join(drawing.CHECKS.split())
@@ -876,6 +903,7 @@ def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> 
     assert f"GEAR 0-{last_gear} = MHA-DT-12 FROM THE FRONT" in key
     step_sheets = (
         drawing.SEQUENCE_SHEET,
+        drawing.CRANK_SHEET,
         drawing.BANK_SHEET,
         drawing.FIT_SHEET,
         drawing.CONTINUATION_SHEET,
@@ -1110,10 +1138,10 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table[1] == "TNNN = MHA-DT-03 WITH NNN TEETH, BY STATION, FRONT TO BACK:"
     assert table[2].startswith("STN  1  T120")
     assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
-    # Steps 1R and 1V's comb is a shop tool with no BOM row: the key names it
+    # Steps 1S and 1X's comb is a shop tool with no BOM row: the key names it
     # and defines the BLADE the steps cite (machinist review of bd81283964).
     assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
-    for letter in "RV":
+    for letter in "SX":
         step = drawing.CONE_CRANK_STEPS[
             drawing.CONE_CRANK_STEPS.index(f"1{letter}. ") :
         ]
