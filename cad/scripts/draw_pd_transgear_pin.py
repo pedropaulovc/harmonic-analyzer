@@ -51,6 +51,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
+from _gtol_face_resolve import resolve_faces
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -184,13 +185,17 @@ SIDE_KEEP = {
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
 # proves they arrived.
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
-# The shank's upper silhouette ahead of the press land, between the shank Ø's
-# tolerance stack and the land's reference Ø.  The leader lands there by
-# selection point (the wheel-axle journal's pattern): inserted without it,
-# the rebuilt symbol re-attached to another face's silhouette (run
-# 20261111T181535941Z, same_entity=False).
-FINISH_PICK = (LAND_END_X - 0.013, SHANK_TOP_Y)
-FINISH_SYMBOL = (LAND_END_X - 0.013, SHANK_TOP_Y + 0.008)
+# The shank's finish: the part-owned ``journal`` control's ONE Ø.125
+# cylinder, resolved on the part the side view references and attached as
+# that model FACE, its leader landing on the upper outline ahead of the press
+# land, between the shank Ø's tolerance stack and the land's reference Ø.
+# Not a SILHOUETTE pick: on farm runs 20261111T181535941Z and
+# 20261111T190609060Z ISilhouetteEdge::GetFace failed IsSame against the
+# picked silhouette's (same_entity=False, dangling=False), with or without a
+# selection-point landing (draw_mg_magnifying_lever's rod finish; the face is
+# proven by IsSame and the landing readback pins the flank and station).
+FINISH_STATION_MM = PRESS_LAND_LENGTH + 0.013 * 1000.0 / _S
+FINISH_SYMBOL = (_sheet_x(FINISH_STATION_MM), SHANK_TOP_Y + 0.008)
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (SHANK_MID_X + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
@@ -250,6 +255,31 @@ def _dress_seat_radius(adapter: Any, annotations: list[Any]) -> None:
     display.ArcExtensionLineOrOppositeSide = False
     if display.ArcExtensionLineOrOppositeSide is not False:
         raise RuntimeError("SeatRadius leader still runs to the opposite side")
+
+
+def _shank_finish_pick(adapter: Any, side: Any) -> tuple[Any, tuple[float, float]]:
+    """The shank finish's target: ``(controlled face, sheet landing)``.
+
+    The face is the one the part's own Ra PMI names (``SURFACE_FINISHES``'
+    ``journal``), resolved on the part the side view references; the landing
+    is the upper of the shank's two outline points at ``FINISH_STATION_MM``.
+    """
+    document = _early_bound(
+        _early_bound(side, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    control = surface_finish_by_key(SURFACE_FINISHES, "journal")
+    face = resolve_faces(document, {control.key: control.face})[control.key]
+    flanks = model_points_in_view(
+        adapter,
+        side,
+        tuple(
+            (0.0, sign * DIA / 2000.0, FINISH_STATION_MM / 1000.0)
+            for sign in (1.0, -1.0)
+        ),
+        label="MHA-PD-23 shank finish landing",
+        names=("flank +Y", "flank -Y"),
+    )
+    return face, max(flanks, key=lambda xy: xy[1])
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
@@ -370,15 +400,16 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=CENTERLINE_PICK,
         label="MHA-PD-23 turning axis",
     )
+    shank_face, shank_landing = _shank_finish_pick(adapter, side)
     add_surface_finish(
         adapter,
         side,
-        edge_xy=FINISH_PICK,
+        entity=shank_face,
+        leader_attach_xy=shank_landing,
         symbol_xy=FINISH_SYMBOL,
-        leader_attach_xy=FINISH_PICK,
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
         label="MHA-PD-23 shank finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
