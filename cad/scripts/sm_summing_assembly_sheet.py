@@ -163,12 +163,14 @@ ASSEMBLED_NOTES = (
 # cut on the part, so the former knife-mount transfer (sm Q3: hang it
 # soft, spot, drill, tap, harden) is gone. Owner ruling 2026-11-08 (Pedro),
 # #2144 item 11.3 (scheme S1): one dowel per mount; with both bolts
-# finger-tight a gauge bar through both bores sets the mounts' yaw, the
-# bolts are tightened and the bar must slide out (step 5). The lever's
+# finger-tight a gauge bar through both bores sets the front mount's yaw,
+# its bolt is tightened and the bar must slide out (step 5). The lever's
 # rigid outward stubs cannot enter two fixed bores, so the rear mount comes
 # off to take its stub and is
 # re-hung and swung until the rock gauge passes (step 6;
-# build_sm_summing_assembly's rock and rear-yaw budgets). Owner ruling
+# build_sm_summing_assembly's rock and rear-yaw budgets): 6G, not the bar,
+# sets the rear mount, so its bolt stays finger-tight through step 5 (#2400:
+# tightening it there was undone at step 6). Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
 # shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
 # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end
@@ -208,8 +210,8 @@ ASSEMBLY_STEPS = (
     "5A. TURN EACH CUT MHA-SM-VN-52 DOWN THROUGH ITS WASHER AND HOLE INTO ITS "
     "MOUNT BY HAND UNTIL ITS HEAD MEETS THE WASHER (FINGER-TIGHT).",
     f"5B. SLIDE A {KNIFE_GAUGE_BAR}, THROUGH BOTH MOUNTS.",
-    "5C. TIGHTEN BOTH BOLTS UNTIL EACH TOP SEAT IS DRAWN UP FLAT TO THE "
-    "CROSSBAR UNDERSIDE.",
+    "5C. TIGHTEN THE FRONT MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT "
+    "TO THE CROSSBAR UNDERSIDE (THE REAR MOUNT IS SET AT 6G).",
     "5D. WITHDRAW THE BAR (CHECK 6).",
     "6. REMOVE THE REAR MOUNT'S BOLT.",
     "6A. LIFT THE REAR MOUNT OFF ITS DOWEL.",
