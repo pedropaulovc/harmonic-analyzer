@@ -547,19 +547,25 @@ STEP_TEXT = {
         f"OF ITS {_BASE} SOCKET WITH A {TRANSFER_PUNCH_TEXT} TRANSFER PUNCH."
     ),
     "lower-columns-lifted": f"LIFT THE COLUMNS OUT OF {_BASE}.",
+    # The Ø.197 hole floats the .190 screw only .0035 a side, less than the
+    # punch's play, the drill's start and the casting's screw line off its
+    # socket axis can add up to (codjiflo review of PR #2552): the seated
+    # check and a file close that stack at assembly (rule 19), as the screw
+    # is what the hole must pass.
     steps.LOWER_HOLES_DRILLED_KEY: (
         f"ON THE MILL, DRILL EACH COLUMN Ø{CROSS_HOLE_TEXT} AT ITS SPOT THROUGH BOTH "
         "WALLS, SQUARE TO AND THROUGH THE TUBE AXIS, AND DEBURR BOTH HOLES."
     ),
+    steps.COLUMNS_RESEATED_KEY: f"RESEAT EACH {_COLUMN} IN {_BASE} ON ITS MATCH MARK.",
     steps.LOWER_HOLES_CHECKED_KEY: (
-        f"CHECK ONE {_CROSS} PASSES FREELY THROUGH BOTH Ø{CROSS_HOLE_TEXT} HOLES OF "
-        "EACH COLUMN, ITS THREAD NOT CATCHING."
+        f"CHECK ONE {_CROSS} PASSES BOTH TUBE HOLES OF EACH SEATED COLUMN AND "
+        "STARTS BY HAND IN THE TAPPED SOCKET WALL."
     ),
     "lower-holes-reworked": (
-        "IF IT CATCHES, DEBURR THAT HOLE AGAIN AND REPEAT "
-        f"{_step(steps.LOWER_HOLES_CHECKED_KEY)}."
+        "IF A TUBE HOLE STOPS IT, LIFT THAT COLUMN OUT, EASE THE HOLE TOWARD "
+        f"THE SCREW WITH A ROUND FILE AND REPEAT {_step(steps.COLUMNS_RESEATED_KEY)}"
+        f" AND {_step(steps.LOWER_HOLES_CHECKED_KEY)}."
     ),
-    steps.COLUMNS_RESEATED_KEY: f"RESEAT EACH {_COLUMN} IN {_BASE} ON ITS MATCH MARK.",
     "top-frame-lowered": (
         f"LOWER {_TOP} OVER THE COLUMNS, TURNED AS SECTION B-B (SHEET 1) SHOWS."
     ),
@@ -567,13 +573,13 @@ STEP_TEXT = {
         f"FIT EACH {_TOP} SOCKET TO ITS OWN {_COLUMN}: IT SLIDES ON BY HAND, NO ROCK."
     ),
     "top-match-marked": f"MATCH-MARK EACH {_COLUMN} AND ITS {_TOP} SOCKET THE SAME WAY.",
-    # #2389: no mate needs this height closer than a tape reads
+    # #2389: no mate needs this height closer than a rule reads
     # (fr_frame_setting_bands), so the base stands on the bench it is built
-    # on and a tape reads from that bench to the hole centre.
+    # on and a steel rule stands on that bench, read at the hole centre.
     steps.TOP_AXIS_SET_KEY: (
         f"SET EACH {_TOP} SOCKET CROSS-HOLE AXIS TO THE {TOP_AXIS_HEIGHT_TEXT} HEIGHT "
         f"ABOVE THE UNDERSIDE OF {_BASE} (SHEET 1), {_BASE} ON A FLAT BENCH: READ "
-        "WITH A TAPE MEASURE FROM THE BENCH TO THE CENTRE OF THE HOLE."
+        "WITH A STEEL RULE STOOD ON THE BENCH, AT THE CENTRE OF THE HOLE."
     ),
     steps.TOP_FRAME_CLAMPED_KEY: f"CLAMP {_TOP} TO THE COLUMNS AT THAT HEIGHT.",
     "columns-marked": (
@@ -599,15 +605,17 @@ STEP_TEXT = {
     "upper-holes-drilled": (
         f"DRILL THE NEW SPOTS AS {_step(steps.LOWER_HOLES_DRILLED_KEY)}."
     ),
-    steps.UPPER_HOLES_CHECKED_KEY: (
-        f"REPEAT THE {_step(steps.LOWER_HOLES_CHECKED_KEY)} CHECK ON THE NEW HOLES."
-    ),
-    "upper-holes-reworked": (
-        "IF IT FAILS, DEBURR THAT HOLE AGAIN AND REPEAT "
-        f"{_step(steps.UPPER_HOLES_CHECKED_KEY)}."
-    ),
     "frame-reassembled": (
         f"RESEAT THE COLUMNS AND {_TOP} AS {_step(steps.FRAME_RESEATED_KEY)}."
+    ),
+    steps.UPPER_HOLES_CHECKED_KEY: (
+        f"REPEAT THE {_step(steps.LOWER_HOLES_CHECKED_KEY)} CHECK AT EACH {_TOP} "
+        "SOCKET."
+    ),
+    "upper-holes-reworked": (
+        f"IF A TUBE HOLE STOPS IT, {_LIFT_OFF[:-1]}, EASE THE HOLE AS "
+        f"{_step('lower-holes-reworked')} AND REPEAT FROM "
+        f"{_step('frame-reassembled')}."
     ),
     # The far-wall engagement accepted at the bench, before the screw goes in
     # (CROSS_SCREW_FULL_THREAD_MIN_IN): the installed thread is out of sight.
@@ -667,10 +675,10 @@ if tuple(STEP_TEXT) != steps.SEQUENCE:
 STEP_GROUPS = (
     (f"NAMEPLATE ON {_BASE}", steps.NAMEPLATE_SET_KEY),
     (f"COLUMNS IN {_BASE}", steps.COLUMNS_ROUGH_CUT_KEY),
-    (f"{_TOP} ON THE COLUMNS", steps.COLUMNS_RESEATED_KEY),
+    (f"{_TOP} ON THE COLUMNS", "top-frame-lowered"),
     ("COLUMNS CUT TO LENGTH", "columns-marked"),
     (f"TUBE HOLES AT {_TOP}", "upper-holes-marked"),
-    ("FASTENING AND CAPS", "frame-reassembled"),
+    ("FASTENING AND CAPS", "cross-screws-measured"),
     (f"SUPPORT ON {_BASE}", "support-seated"),
     ("SET SCREW AND FINAL CHECKS", steps.GOOSENECK_STARTED_KEY),
 )

@@ -769,7 +769,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
         "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
-        "fr_tube_frame",  # columns: socket slip fit; cross holes opened to Ø.197 so a MHA-FR-VN-53 passes "ITS THREAD NOT CATCHING" (fr_frame_assembly_steps lower-/upper-holes-checked)
+        "fr_tube_frame",  # columns: socket slip fit; cross holes spotted through each casting clearance hole and drilled Ø.197, then a MHA-FR-VN-53 tried through the seated column (fr_frame_assembly_steps lower-/upper-holes-checked)
         "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (fr_frame_assembly_steps caps-pushed-on)
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread

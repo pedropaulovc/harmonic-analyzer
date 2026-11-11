@@ -875,6 +875,15 @@ def test_tube_cross_holes_are_spotted_through_the_clearance_hole_not_drilled() -
     lifted = steps.step_number("lower-columns-lifted")
     drilled = steps.step_number(steps.LOWER_HOLES_DRILLED_KEY)
     assert marked < lifted < drilled
+    # The screw is tried in the seated column, where a hole off the
+    # casting's screw line shows, and the remedy works the tube hole.
+    reseated = steps.step_number(steps.COLUMNS_RESEATED_KEY)
+    checked = steps.step_number(steps.LOWER_HOLES_CHECKED_KEY)
+    assert drilled < reseated < checked
+    assert steps.SEQUENCE[checked] == "lower-holes-reworked"
+    reassembled = steps.step_number("frame-reassembled")
+    upper_checked = steps.step_number(steps.UPPER_HOLES_CHECKED_KEY)
+    assert steps.step_number("upper-holes-drilled") < reassembled < upper_checked
     assert drawing.TRANSFER_PUNCH_TEXT in _step(steps.LOWER_HOLES_MARKED_KEY)
     assert "DRILL" not in _step(steps.LOWER_HOLES_MARKED_KEY)
 

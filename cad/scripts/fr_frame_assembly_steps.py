@@ -55,17 +55,19 @@ SEQUENCE: tuple[str, ...] = (
     NAMEPLATE_SCREWED_KEY,
     "nameplate-flat-checked",
     "nameplate-heads-checked",
-    # Columns fitted, marked and their lower cross holes transferred.
+    # Columns fitted, marked and their lower cross holes transferred, then
+    # checked with the columns back in their sockets, where a tube hole off
+    # the casting's screw line shows (#2388).
     COLUMNS_ROUGH_CUT_KEY,
     "base-sockets-fitted",
     "base-match-marked",
     LOWER_HOLES_MARKED_KEY,
     "lower-columns-lifted",
     LOWER_HOLES_DRILLED_KEY,
+    COLUMNS_RESEATED_KEY,
     LOWER_HOLES_CHECKED_KEY,
     "lower-holes-reworked",
     # The top frame on the columns, at the controlling height.
-    COLUMNS_RESEATED_KEY,
     "top-frame-lowered",
     "top-sockets-fitted",
     "top-match-marked",
@@ -78,14 +80,15 @@ SEQUENCE: tuple[str, ...] = (
     "columns-chamfered",
     FRAME_RESEATED_KEY,
     "top-axis-reset",
-    # The upper tube holes, transferred from the top frame.
+    # The upper tube holes, transferred from the top frame and checked with
+    # the frame reassembled.
     "upper-holes-marked",
     "frame-lifted-for-drill",
     "upper-holes-drilled",
+    "frame-reassembled",
     UPPER_HOLES_CHECKED_KEY,
     "upper-holes-reworked",
     # The frame screwed together and capped.
-    "frame-reassembled",
     "cross-screws-measured",
     "cross-screws-replaced",
     CROSS_SCREWS_DRIVEN_KEY,
