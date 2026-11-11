@@ -26,7 +26,7 @@ its first-root position; no second general note restates that location.
 
 - **Three parts carry the whole risk. Everything else is generous.**
   1. **`dt-cone-tip-gear` (T006, MHA-DT-37)** — six leaves on a **Ø4.31 mm OD** solid, with an integral
-     Ø.0625 in spigot (.71 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
+     Ø.0625 in spigot (.76 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
      (owner decision C1 keyed, 2026-11-09, PR #1992). The single hardest part in the machine. Its
      turning route is **not selected**: the part's process text and sheet note 3 (`CENTRES OK.`) name
      centres and a steady, but no listed centre or steady rest fits a Ø.0625 stem
