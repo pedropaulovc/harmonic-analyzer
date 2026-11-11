@@ -3732,14 +3732,14 @@ def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
         )
 
     _telemetry.info(f"holes/sockets table cells before the arrows: {cells()!r}")
-    _soft("hole-table origin arrows", _set_table_origin_arrows, adapter, table, corner_xy)
+    _set_table_origin_arrows(adapter, table, corner_xy)
     rows = cells()
     _telemetry.info(f"holes/sockets table cells: {rows!r}")
     if leading_zero_locations(rows[1:]):
         raise RuntimeError(f"holes/sockets LOC cells kept a leading zero: {rows!r}")
     bound = bind_hole_table_rows(rows[1:], LENGTH_UNITS[UNIT])
     if negative_locations(rows[1:]):
-        _fail(f"holes/sockets LOC cells read negative from the corner: {rows!r}")
+        raise RuntimeError(f"holes/sockets LOC cells read negative from the corner: {rows!r}")
     if table.InsertColumn2(_INSERT_COLUMN_AFTER, 3, HOLE_TABLE_MATE_COLUMN, 0) is not True:
         raise RuntimeError("holes/sockets table refused its MATE column")
     if table.SetColumnTitle2(4, HOLE_TABLE_MATE_COLUMN, False) is not True:
@@ -3892,49 +3892,10 @@ def _set_precise_curve_quality(adapter: Any) -> None:
     )
 
 
-# TEMPORARY (#2333): the casting sheets' first print runs soft -- a step that
-# fails is logged under this marker and the leaf goes on to export, so one
-# farm run shows every miss.  Removed before the strict run.
-_SOFT_FAILURES: list[str] = []
-# The soft print also reports every layout finding without failing, so its
-# PDF and audit report publish; removed with the soft wrapper.
+# TEMPORARY (#2333): the casting sheets' layout iterations report every
+# layout finding without failing, so each PDF and audit report publish.
+# Removed before the strict run.
 _layout_audit.ENFORCED_KINDS = frozenset()
-
-
-def _soft(label: str, step: Any, /, *args: Any, **kwargs: Any) -> Any:
-    try:
-        return step(*args, **kwargs)
-    except Exception as exc:  # noqa: BLE001
-        _SOFT_FAILURES.append(label)
-        _telemetry.info(f"SOFT2333 {label}: ERROR {exc!r}")
-        return None
-
-
-def _fail(message: str) -> None:
-    _SOFT_FAILURES.append(message)
-    _telemetry.info(f"SOFT2333 check: {message}")
-
-
-def _curate(
-    adapter: Any, view: Any, *, keep: dict[str, tuple[float, float]], view_label: str
-) -> list[Any]:
-    try:
-        return curate_view_dimensions(
-            adapter, view, keep=keep, view_label=view_label,
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
-    except RuntimeError as exc:
-        if "is missing model dimensions" not in str(exc):
-            raise
-        _fail(str(exc))
-        found = []
-        for raw in _early_bound(view, "IView").GetDisplayDimensions() or ():
-            annotation = _early_bound(
-                _early_bound(raw, "IDisplayDimension").GetAnnotation(), "IAnnotation"
-            )
-            if dimension_name(adapter, annotation) in keep:
-                found.append(annotation)
-        return found
 
 
 @dataclass(frozen=True)
@@ -4121,24 +4082,33 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
     )
     set_hidden_lines_removed(adapter, front)
     set_hidden_lines_removed(adapter, bottom)
-    dimensions = _curate(
-        adapter, bottom, keep=DATUM_BOTTOM_KEEP, view_label="cast datum underside",
+    dimensions = curate_view_dimensions(
+        adapter,
+        bottom,
+        keep=DATUM_BOTTOM_KEEP,
+        view_label="cast datum underside",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "datum sheet blank callouts", set_dimension_callouts,
-        adapter, dimensions, {name: "" for name in DATUM_BOTTOM_KEEP},
+    set_dimension_callouts(
+        adapter,
+        dimensions,
+        {name: "" for name in DATUM_BOTTOM_KEEP},
     )
-    _soft(
-        "datum sheet above callouts", set_dimension_callouts,
-        adapter, dimensions, DATUM_BOTTOM_CALLOUTS_ABOVE, location="above",
+    set_dimension_callouts(
+        adapter,
+        dimensions,
+        DATUM_BOTTOM_CALLOUTS_ABOVE,
+        location="above",
     )
-    _soft(
-        "datum sheet callouts", set_dimension_callouts,
-        adapter, dimensions, DATUM_BOTTOM_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        dimensions,
+        DATUM_BOTTOM_CALLOUTS,
     )
-    _soft(
-        "datum sheet text offsets", offset_dimension_text,
-        adapter, dimensions, DATUM_BOTTOM_TEXT_OFFSETS,
+    offset_dimension_text(
+        adapter,
+        dimensions,
+        DATUM_BOTTOM_TEXT_OFFSETS,
     )
     edges = scan_view_edges(bottom, label="cast datum underside")
 
@@ -4165,7 +4135,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
             )),
         )
 
-    _soft("datum sheet crossbar median", median)
+    median()
     # The F and G planes' traces through their targets, to the corner sheet
     # 3's table counts from; G runs on to the front, where D's station
     # starts from it.
@@ -4192,7 +4162,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
             adapter, lines, label="cast datum plane trace", stage="drawn", **font
         )
 
-    _soft("datum sheet plane traces", traces)
+    traces()
 
     document = _early_bound(
         _early_bound(bottom, "IView").ReferencedDocument, "IModelDoc2"
@@ -4224,18 +4194,19 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
             )[:2]
         )
         offset = DATUM_TARGET_SYMBOL_OFFSETS[target]
-        symbols[target] = _soft(
-            f"datum target {target}", add_datum_target,
-            adapter, view, target=target, target_xy=at,
+        symbols[target] = add_datum_target(
+            adapter,
+            view,
+            target=target,
+            target_xy=at,
             symbol_xy=(at[0] + offset[0], at[1] + offset[1]),
-            entity=faces[distinct[face_specs[target]]], entity_type="FACE",
+            entity=faces[distinct[face_specs[target]]],
+            entity_type="FACE",
             label=f"cast datum target {target}",
         )
-        if symbols[target] is not None:
-            _telemetry.info(
-                f"cast datum target {target}: "
-                f"{datum_target_readback(symbols[target])!r}"
-            )
+        _telemetry.info(
+            f"cast datum target {target}: {datum_target_readback(symbols[target])!r}"
+        )
 
     # Each boss-bottom target's BASIC radius from its socket axis, stated on
     # E3 for the three: each stands on its own socket's centre line.
@@ -4252,7 +4223,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
         )
         _basic_target_location(adapter, display, DATUM_E_RADIUS_TEXT_XY, label=label)
 
-    _soft("datum sheet E radius", radius)
+    radius()
 
     def datum_d() -> None:
         width = _named_dimension(adapter, dimensions, "BarWidth")
@@ -4261,7 +4232,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
             _early_bound(width.GetSpecificAnnotation(), "IDisplayDimension"),
         )
 
-    _soft("datum sheet datum D", datum_d)
+    datum_d()
 
     # The barrel targets' height over the boss bottoms: one phantom line at
     # that height across the rear-west boss, located BASIC from its bottom.
@@ -4306,7 +4277,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
         )
         _basic_target_location(adapter, display, DATUM_HEIGHT_TEXT_XY, label=label)
 
-    _soft("datum sheet barrel target height", height)
+    height()
     return dimensions
 
 
@@ -4434,35 +4405,46 @@ async def build(adapter: Any) -> dict[str, str]:
     # carry their count (rule 26), not a prose note under the caption (rule
     # 9).  All three are the model's own dimensions with their ±.03 (owner
     # ruling B2, #2333); the root radius is the front view's.
-    rail_section_dimensions = _curate(
-        adapter, rail_section, keep=RAIL_SECTION_KEEP,
+    rail_section_dimensions = curate_view_dimensions(
+        adapter,
+        rail_section,
+        keep=RAIL_SECTION_KEEP,
         view_label="T rail section H-H",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "H-H callouts", set_dimension_callouts,
-        adapter, rail_section_dimensions, RAIL_SECTION_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        rail_section_dimensions,
+        RAIL_SECTION_CALLOUTS,
     )
-    _soft(
-        "H-H flange text offset", offset_dimension_text,
-        adapter, rail_section_dimensions, {"FlangeT": FLANGE_T_TEXT_OFFSET_XY},
+    offset_dimension_text(
+        adapter,
+        rail_section_dimensions,
+        {"FlangeT": FLANGE_T_TEXT_OFFSET_XY},
     )
     # The rim break's run across the faced top to the drafted rim, between
     # its two corners.
-    _soft(
-        "H-H top rim chamfer", _checked_dimension,
-        adapter, rail_section,
+    _checked_dimension(
+        adapter,
+        rail_section,
         p0=(rail_cut_x, HALF_H, INNER_Z + EDGE_CHAMFER),
         p1=(rail_cut_x, HALF_H - TOP_BREAK_DROP, INNER_Z + TOP_BREAK_RECEDE),
-        text_xy=(0.290, 0.250), label="top rim chamfer",
-        expected_mm=TOP_BREAK_DROP, orientation="horizontal",
-        entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
-        suffix="X 45° TOP RIMS", edges=rail_section_edges,
+        text_xy=(0.290, 0.250),
+        label="top rim chamfer",
+        expected_mm=TOP_BREAK_DROP,
+        orientation="horizontal",
+        entity_types=("VERTEX", "VERTEX"),
+        exact_vertices=True,
+        suffix="X 45° TOP RIMS",
+        edges=rail_section_edges,
     )
-    _soft(
-        "H-H web position", _web_position_frame,
-        adapter, rail_section, rail_section_edges,
+    _web_position_frame(
+        adapter,
+        rail_section,
+        rail_section_edges,
         landing_mm=(
-            rail_cut_x, WEB_POSITION_LANDING_Y,
+            rail_cut_x,
+            WEB_POSITION_LANDING_Y,
             WEB_IN_Z - (WEB_POSITION_LANDING_Y + HALF_H) * DRAFT_T,
         ),
         frame_xy=RAIL_WEB_POSITION_FRAME_XY,
@@ -4510,20 +4492,26 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, side_section)
     side_section_edges = scan_view_edges(side_section, label="E-E side rail section")
-    side_section_dimensions = _curate(
-        adapter, side_section, keep=SIDE_SECTION_KEEP,
+    side_section_dimensions = curate_view_dimensions(
+        adapter,
+        side_section,
+        keep=SIDE_SECTION_KEEP,
         view_label="side rail section E-E",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "E-E callouts", set_dimension_callouts,
-        adapter, side_section_dimensions, {"SideWebT": SIDE_WEB_QUALIFIER},
+    set_dimension_callouts(
+        adapter,
+        side_section_dimensions,
+        {"SideWebT": SIDE_WEB_QUALIFIER},
     )
-    _soft(
-        "E-E web position", _web_position_frame,
-        adapter, side_section, side_section_edges,
+    _web_position_frame(
+        adapter,
+        side_section,
+        side_section_edges,
         landing_mm=(
             -WEB_IN_X + (WEB_POSITION_LANDING_Y + HALF_H) * DRAFT_T,
-            WEB_POSITION_LANDING_Y, SIDE_SECTION_Z,
+            WEB_POSITION_LANDING_Y,
+            SIDE_SECTION_Z,
         ),
         frame_xy=SIDE_WEB_POSITION_FRAME_XY,
         label="side rail web position",
@@ -4566,17 +4554,21 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimensions with their ±.03 (owner ruling B2, #2333).  Its flange is the
     # rails' .32 again, a reference here: from the faced top to the
     # underside's flat, 1 mm in from the drafted side.
-    crossbar_section_dimensions = _curate(
-        adapter, crossbar_section, keep=CROSSBAR_SECTION_KEEP,
+    crossbar_section_dimensions = curate_view_dimensions(
+        adapter,
+        crossbar_section,
+        keep=CROSSBAR_SECTION_KEEP,
         view_label="crossbar section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "M-M callouts", set_dimension_callouts,
-        adapter, crossbar_section_dimensions, CROSSBAR_SECTION_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        crossbar_section_dimensions,
+        CROSSBAR_SECTION_CALLOUTS,
     )
-    _soft(
-        "M-M text offsets", offset_dimension_text,
-        adapter, crossbar_section_dimensions,
+    offset_dimension_text(
+        adapter,
+        crossbar_section_dimensions,
         {
             "CrossbarWebT": CROSSBAR_WEB_TEXT_XY,
             "PocketDepth": CROSSBAR_POCKET_DEPTH_TEXT_XY,
@@ -4594,16 +4586,21 @@ async def build(adapter: Any) -> dict[str, str]:
         if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
             raise RuntimeError("crossbar pocket depth did not keep its arrows inside")
 
-    _soft("M-M pocket depth arrows", pocket_arrows_inside)
-    _soft(
-        "M-M crossbar flange thickness", _checked_dimension,
-        adapter, crossbar_section,
+    pocket_arrows_inside()
+    _checked_dimension(
+        adapter,
+        crossbar_section,
         p0=(HANGER_X, HALF_H, SIDE_SECTION_Z),
         p1=(BAR_X0 - POCKET_H * DRAFT_T + 1.0, FLANGE_BOT_Y, SIDE_SECTION_Z),
-        text_xy=CROSSBAR_FLANGE_LINE_XY, label="crossbar flange thickness",
-        expected_mm=FLANGE, orientation="vertical", exact_linear=True,
-        suffix="CROSSBAR FLANGE", offset_text=CROSSBAR_FLANGE_TEXT_XY,
-        edges=crossbar_section_edges, reference=True,
+        text_xy=CROSSBAR_FLANGE_LINE_XY,
+        label="crossbar flange thickness",
+        expected_mm=FLANGE,
+        orientation="vertical",
+        exact_linear=True,
+        suffix="CROSSBAR FLANGE",
+        offset_text=CROSSBAR_FLANGE_TEXT_XY,
+        edges=crossbar_section_edges,
+        reference=True,
     )
     _add_view_centerlines(
         adapter, crossbar_section,
@@ -4617,28 +4614,37 @@ async def build(adapter: Any) -> dict[str, str]:
     # The plan carries the flange's extents and the side flange's width; the
     # front view the rail height, the three printed draft angles and the
     # root radius.
-    geometry_top_dimensions = _curate(
-        adapter, geometry_top, keep=GEOMETRY_TOP_KEEP, view_label="geometry top",
+    geometry_top_dimensions = curate_view_dimensions(
+        adapter,
+        geometry_top,
+        keep=GEOMETRY_TOP_KEEP,
+        view_label="geometry top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    geometry_front_dimensions = _curate(
-        adapter, geometry_front, keep=GEOMETRY_FRONT_KEEP, view_label="geometry front",
+    geometry_front_dimensions = curate_view_dimensions(
+        adapter,
+        geometry_front,
+        keep=GEOMETRY_FRONT_KEEP,
+        view_label="geometry front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     geometry_annotations = [*geometry_top_dimensions, *geometry_front_dimensions]
     geometry_callouts = {
         name: "" for name in (*GEOMETRY_TOP_KEEP, *GEOMETRY_FRONT_KEEP)
     }
     geometry_callouts.update(GEOMETRY_CALLOUTS)
-    _soft(
-        "geometry callouts", set_dimension_callouts,
-        adapter, geometry_annotations, geometry_callouts,
+    set_dimension_callouts(
+        adapter,
+        geometry_annotations,
+        geometry_callouts,
     )
-    _soft(
-        "geometry rail height reference", _reference_model_rail_height,
-        adapter, geometry_front_dimensions,
+    _reference_model_rail_height(
+        adapter,
+        geometry_front_dimensions,
     )
-    _soft(
-        "geometry plan references", _reference_plan_outlines,
-        adapter, geometry_top_dimensions,
+    _reference_plan_outlines(
+        adapter,
+        geometry_top_dimensions,
     )
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
@@ -4692,8 +4698,8 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
         )
 
-    _soft("geometry overall width", overall_width)
-    _soft("geometry overall depth", overall_depth)
+    overall_width()
+    overall_depth()
     # The side flange's symmetry: its sockets' shared axis, drawn between
     # the right-hand bosses through the rail the 1.35 spans.
     _add_view_centerlines(
@@ -4850,8 +4856,8 @@ async def build(adapter: Any) -> dict[str, str]:
             )),
         )
 
-    _soft("holes/sockets crossbar median", crossbar_median)
-    _soft("holes/sockets datum traces", _draw_datum_traces, adapter, detail_top)
+    crossbar_median()
+    _draw_datum_traces(adapter, detail_top)
     # Each hanger hole's Z station, .XXX from the front sockets' shared axis
     # (owner ruling D2, #2333): drawn between the front bosses, it is the
     # line both stations stand from.
@@ -4864,18 +4870,24 @@ async def build(adapter: Any) -> dict[str, str]:
         (STUD_Z_FRONT, "front hanger z from upper sockets"),
         (STUD_Z_REAR, "rear hanger z from upper sockets"),
     ):
-        _soft(
-            label, _checked_dimension,
-            adapter, detail_top,
-            p0=(HANGER_X, HALF_H, FRONT_COLUMN_Z), p1=(HANGER_X, HALF_H, station_z),
-            text_xy=HANGER_Z_TEXT_XY[label], label=label,
-            expected_mm=station_z - FRONT_COLUMN_Z, orientation="vertical",
-            center=True, entity_types=("SKETCHSEGMENT", "EDGE"),
+        _checked_dimension(
+            adapter,
+            detail_top,
+            p0=(HANGER_X, HALF_H, FRONT_COLUMN_Z),
+            p1=(HANGER_X, HALF_H, station_z),
+            text_xy=HANGER_Z_TEXT_XY[label],
+            label=label,
+            expected_mm=station_z - FRONT_COLUMN_Z,
+            orientation="vertical",
+            center=True,
+            entity_types=("SKETCHSEGMENT", "EDGE"),
             entities=(
                 front_socket_axis,
                 detail_top_edges.circle_at(
-                    (HANGER_X, HALF_H, station_z), HANGER_CLEARANCE_DIA / 2.0,
-                    axis=(0.0, 1.0, 0.0), label=label,
+                    (HANGER_X, HALF_H, station_z),
+                    HANGER_CLEARANCE_DIA / 2.0,
+                    axis=(0.0, 1.0, 0.0),
+                    label=label,
                 ).edge,
             ),
         )
@@ -4956,13 +4968,15 @@ async def build(adapter: Any) -> dict[str, str]:
         (((-COLUMN_X, HALF_H, FRONT_COLUMN_Z + BOSS_DIA / 2.0 + SECTION_AXIS_OVERRUN_MM),
           (-COLUMN_X, HALF_H, REAR_COLUMN_Z - BOSS_DIA / 2.0 - SECTION_AXIS_OVERRUN_MM)),),
     )
-    _soft(
-        "holes/sockets table", _socket_hole_table,
-        adapter, detail_top, detail_top_edges,
+    _socket_hole_table(
+        adapter,
+        detail_top,
+        detail_top_edges,
     )
-    _soft(
-        "holes/sockets composite frame", _socket_position_frame,
-        adapter, detail_top, detail_top_edges,
+    _socket_position_frame(
+        adapter,
+        detail_top,
+        detail_top_edges,
     )
     # Under the table at x 30 mm: from x 40 the then 70-character edge-break
     # line ran 2.4 mm into the title block (farm 30394c1da keep-out); its 67
@@ -5031,9 +5045,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="holes/sockets front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail_section_dimensions = _curate(
-        adapter, detail_section, keep=DETAIL_SECTION_KEEP,
+    detail_section_dimensions = curate_view_dimensions(
+        adapter,
+        detail_section,
+        keep=DETAIL_SECTION_KEEP,
         view_label="holes/sockets section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     section_annotations = [*detail_front_dimensions, *detail_section_dimensions]
     section_callouts = {
@@ -5041,9 +5058,10 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     section_callouts.update(FRONT_CALLOUTS)
     section_callouts.update(SECTION_CALLOUTS)
-    _soft(
-        "A-A callouts", set_dimension_callouts,
-        adapter, section_annotations, section_callouts,
+    set_dimension_callouts(
+        adapter,
+        section_annotations,
+        section_callouts,
     )
     imported_annotations += section_annotations
     counterbore_annotations = [
@@ -5135,7 +5153,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _finish_leader_tail(symbol, label="corner boss top")
 
-    _soft("A-A boss top finish", boss_top_finish)
+    boss_top_finish()
     boss_above = _checked_dimension(
         adapter, detail_section,
         p0=boss_top_point, p1=rail_top_point,
@@ -5335,23 +5353,28 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, hub_top, keep=HUB_TOP_KEEP,
         view_label="hub location", dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    hub_left_dimensions = _curate(
-        adapter, detail_left, keep=HUB_LEFT_KEEP, view_label="hub side",
+    hub_left_dimensions = curate_view_dimensions(
+        adapter,
+        detail_left,
+        keep=HUB_LEFT_KEEP,
+        view_label="hub side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "hub blank callouts", set_dimension_callouts,
-        adapter, [*hub_top_dimensions, *hub_left_dimensions],
+    set_dimension_callouts(
+        adapter,
+        [*hub_top_dimensions, *hub_left_dimensions],
         {name: "" for name in (*HUB_TOP_KEEP, *HUB_LEFT_KEEP)},
     )
-    _soft(
-        "hub side callouts", set_dimension_callouts,
-        adapter, hub_left_dimensions, HUB_LEFT_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        hub_left_dimensions,
+        HUB_LEFT_CALLOUTS,
     )
     set_dimension_callouts(adapter, hub_top_dimensions, HUB_TOP_CALLOUTS)
     imported_annotations += [*hub_top_dimensions, *hub_left_dimensions]
-    _soft(
-        "hub side text offsets", offset_dimension_text,
-        adapter, hub_left_dimensions,
+    offset_dimension_text(
+        adapter,
+        hub_left_dimensions,
         {
             "SetBossWidth": SET_BOSS_WIDTH_TEXT_XY,
             "HubBossDrop": HUB_BOSS_DROP_OFFSET_XY,
@@ -5486,9 +5509,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # ramp rises over the outer .87 of each side and the inner .63 stays a
     # full-depth flat buried inside the boss, which is why the drop does not
     # appear within the ramp's own run.
-    _soft(
-        "hub gusset ramp angle", _gusset_ramp_angle,
-        adapter, detail_left, detail_left_edges,
+    _gusset_ramp_angle(
+        adapter,
+        detail_left,
+        detail_left_edges,
     )
     set_hidden_lines_removed(adapter, detail_left)
     if add_note(adapter, HUB_LEFT_TITLE, *HUB_LEFT_TITLE_XY) is None:
@@ -5497,9 +5521,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_view_caption(adapter, hub_section, HUB_SECTION_CAPTION_XY)
     # Sheet 7 imports before sheet 6: both keep dimensions of the crossbar's
     # one profile sketch, and D's width and station must land here.
-    imported_annotations += (
-        _soft("cast datum sheet", _cast_datum_sheet, adapter, ddoc) or []
-    )
+    imported_annotations += _cast_datum_sheet(adapter, ddoc)
     if not ddoc.ActivateSheet("UNDERSIDE"):
         raise RuntimeError("failed to activate top-frame underside sheet")
     hub_bottom_parent = place_view(
@@ -5513,18 +5535,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # communicated nothing, its circles printed faceted).
     set_hidden_lines_removed(adapter, geometry_bottom)
     hub_bottom_edges = scan_view_edges(hub_bottom_parent, label="underside locator")
-    bottom_dimensions = _curate(
-        adapter, geometry_bottom, keep=HUB_BOTTOM_KEEP,
+    bottom_dimensions = curate_view_dimensions(
+        adapter,
+        geometry_bottom,
+        keep=HUB_BOTTOM_KEEP,
         view_label="enlarged underside geometry",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "enlarged underside callouts", set_dimension_callouts,
-        adapter, bottom_dimensions, HUB_BOTTOM_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        bottom_dimensions,
+        HUB_BOTTOM_CALLOUTS,
     )
     imported_annotations += bottom_dimensions
-    _soft(
-        "enlarged underside text offsets", offset_dimension_text,
-        adapter, bottom_dimensions,
+    offset_dimension_text(
+        adapter,
+        bottom_dimensions,
         {
             "RibWidth": RIB_WIDTH_TEXT_XY,
             "GussetT": HUB_GUSSET_T_OFFSET_XY,
@@ -5561,17 +5587,21 @@ async def build(adapter: Any) -> dict[str, str]:
     # (owner ruling B2, #2333).  The land end's 8 mm run cannot hold its
     # text, which parks right on a jog; the pocket length's block parks over
     # the plan's top-left corner.
-    underside_dimensions = _curate(
-        adapter, hub_bottom_parent, keep=UNDERSIDE_KEEP,
+    underside_dimensions = curate_view_dimensions(
+        adapter,
+        hub_bottom_parent,
+        keep=UNDERSIDE_KEEP,
         view_label="underside locator",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _soft(
-        "underside callouts", set_dimension_callouts,
-        adapter, underside_dimensions, UNDERSIDE_CALLOUTS,
+    set_dimension_callouts(
+        adapter,
+        underside_dimensions,
+        UNDERSIDE_CALLOUTS,
     )
-    _soft(
-        "underside text offsets", offset_dimension_text,
-        adapter, underside_dimensions,
+    offset_dimension_text(
+        adapter,
+        underside_dimensions,
         {"LandEnd": LAND_TEXT_OFFSET_XY, "PocketLength": POCKET_LENGTH_OFFSET_XY},
     )
     imported_annotations += underside_dimensions
@@ -5589,7 +5619,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if int(land.ArrowSide) != _DIM_ARROWS_INSIDE:
             raise RuntimeError("land end from crossbar face did not keep its arrows inside")
 
-    _soft("underside land end arrows", land_arrows_inside)
+    land_arrows_inside()
     # The front sockets' shared axis, the line the pocket's front end stands
     # from (rule 26: holes in line share a drawn centreline).
     _add_view_centerlines(
@@ -5668,11 +5698,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
     auto_tapped_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {auto_tapped_notes}")
-    _soft(
-        "imported precision", assert_imported_precision,
-        adapter, imported_annotations, DRAWING_PRECISION_BY_NAME,
+    assert_imported_precision(
+        adapter,
+        imported_annotations,
+        DRAWING_PRECISION_BY_NAME,
     )
-    _telemetry.info(f"SOFT2333 summary: {len(_SOFT_FAILURES)} {_SOFT_FAILURES!r}")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -5691,9 +5721,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_redundant_notes=0,
         # The 43.0 shifts in a rebuild after its placement readback, so it is
         # held on its line after the settling rebuild (machinist review r4).
-        settled_checks=(
-            lambda: _soft("pocket from socket settled", _pocket_from_socket_settled),
-        ),
+        settled_checks=(_pocket_from_socket_settled,),
     )
 
 
