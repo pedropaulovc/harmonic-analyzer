@@ -80,15 +80,19 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
     assert spec.RELIEF_WIDTH >= spec.THREAD_PITCH
     assert 2.0 * spec.RELIEF_ROOT_R < spec.RELIEF_WIDTH_MIN
     assert spec.FULL_THREAD_FROM_STEP_MAX == spec.RELIEF_WIDTH
-    # The Ø and root radius print as single MAX limits at their model values;
-    # the width as a LIMIT pair whose MIN holds rule 16's one pitch.
+    # The root radius prints as a single MAX limit at its model value; the Ø
+    # and width as LIMIT pairs whose MINs hold the neck's floor (#2399: a MAX
+    # alone accepted any thinner neck) and rule 16's one pitch.
     assert spec.SINGLE_LIMITS == {
-        ("PinProfile", "ReliefDia"): (spec.RELIEF_DIA, spec.TOL_TYPE_MAX),
         ("ReliefRoots", "ReliefRootR"): (spec.RELIEF_ROOT_R, spec.TOL_TYPE_MAX),
     }
     assert spec.LIMIT_PAIRS == {
-        ("PinProfile", "ReliefWidth"): (spec.RELIEF_WIDTH_MIN, spec.RELIEF_WIDTH)
+        ("PinProfile", "ReliefDia"): (spec.RELIEF_DIA_MIN, spec.RELIEF_DIA),
+        ("PinProfile", "ReliefWidth"): (spec.RELIEF_WIDTH_MIN, spec.RELIEF_WIDTH),
     }
+    assert spec.RELIEF_DIA_MIN == pytest.approx(0.068 * 25.4)
+    # Inside the standard undercut's h13 band (0.14 mm) under the MAX.
+    assert spec.RELIEF_DIA - 0.14 <= spec.RELIEF_DIA_MIN < spec.RELIEF_DIA
     assert spec.RELIEF_WIDTH_MIN == pytest.approx(0.028 * 25.4)
     assert spec.THREAD_PITCH <= spec.RELIEF_WIDTH_MIN
     assert spec.TOL_TYPE_MAX == 6  # swTolType_e.swTolMAX

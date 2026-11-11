@@ -225,6 +225,34 @@ def test_the_axle_press_goes_to_the_plain_end_window_as_a_first_setting() -> Non
     assert "GOVERN" not in notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
 
 
+def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
+    """#2399: a press on the threaded end drives the interference through the
+    relief neck. Both presses that drive the axle in push on its shank step
+    through one sleeve that clears the thread and dome and lands on the
+    step's flat."""
+    spec = mg_wheel_axle_spec
+    bore, od, length = (
+        notes.PRESS_SLEEVE_BORE,
+        notes.PRESS_SLEEVE_OD,
+        notes.PRESS_SLEEVE_LENGTH,
+    )
+    edge_break = 0.010 * 25.4  # the title block's break, .010 MAX
+    assert spec.THREAD_MAJOR < bore < spec.PIN_DIA - spec.PIN_DIA_TOL - 2 * edge_break
+    assert od > spec.PIN_DIA + spec.PIN_DIA_TOL
+    longest_tip = spec.THREAD_LEN + spec.THREAD_LEN_BAND[0] + spec.DOME_H
+    assert length > longest_tip
+    assert notes.PRESS_SLEEVE == (
+        "A STEEL SLEEVE OVER THE THREAD (1/8 DRILLED BORE, .25 OD, .50 LONG)"
+    )
+    pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert f"ON ITS SHOULDER ONLY, THROUGH {notes.PRESS_SLEEVE}" in pressed
+    further = notes.STEP_TEXT["axle-pressed-further"]
+    assert further.endswith(
+        f"ON ITS SHOULDER THROUGH THE STEP {steps.step_number(steps.AXLE_PRESSED_KEY)}"
+        " SLEEVE."
+    )
+
+
 def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
     """Delegated ruling (assembly-step moves): the drum press step carries
     the drum face's window below the spigot end (DRUM_RECESS)."""

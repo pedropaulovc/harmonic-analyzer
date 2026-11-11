@@ -8,4 +8,4 @@ mg-wheel-axle:
   drawing_unit: in
   fit_class: shaft_in_bushing
   # Pedro's owner ruling, 2026-11-05 (coordinator session): thread stays die-cut.
-  process: "cut from 3/16 drill rod; thread blank and domed tip turned; die-cut #4-40 thread; pressed into the wheel bar to its gauge from the front face at assembly"
+  process: "cut from 3/16 drill rod; thread blank and domed tip turned; die-cut #4-40 thread; thread relief turned after the thread; pressed into the wheel bar to its gauge from the front face at assembly, pushed on the shank step"
