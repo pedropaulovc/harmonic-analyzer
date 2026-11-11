@@ -72,10 +72,10 @@ the cone spec owns each tip, tooth thickness and gap floor, and
 dt_mesh_checks runs the closed-form standard checks of every drum mesh.
 The 16T crank pinion mesh is DIFFERENT: on its near-VERTICAL line of
 centres the radial interleave is nearly constant across the face, while
-the crossing manifests as LATERAL flank misregistration. The 64T is a
-true right-hand helical gear at the configured cone incline, with normal
-pitch and pressure angle shared by the straight 16T pinion
-(build_dt_crank_drive_gear.py), and
+the crossing manifests as LATERAL flank misregistration. The 64T has
+straight right-hand teeth inclined at the configured cone incline (owner
+ruling 2026-11-10, #2332), with normal pitch and pressure angle shared by
+the straight 16T pinion (build_dt_crank_drive_gear.py), and
 the pinion stands PROUD of the pivot post's uncut casting face (img06:
 no relief pocket in the casting). Its south tooth face seats 0.25 mm
 north of that boss face; the span checks below keep it off the T120
@@ -266,7 +266,7 @@ if abs(Y_DRIVE - CAM_SHAFT_XY[1]) > 1e-9 or abs(DRUM_X - CAM_SHAFT_XY[0]) > 1e-9
 # The source-owned post journal sits on the 1/4-inch platform. Its raised
 # drive-axis datum feeds the arbor pedestals, channel cams and connecting rods.
 
-# Normal pitch and the actual cone incline determine the helical transverse
+# Normal pitch and the actual cone incline determine the inclined transverse
 # pitch; the straight 16T and both gears' addenda use the normal cutter.
 from dt_crank_drive_gear_spec import (  # noqa: E402
     CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER,
@@ -410,7 +410,7 @@ GEAR64_SEAT = cone_station(GEAR64_CENTRE_STATION)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
 
-# The true RH helical 64T follows the cone incline and meshes the straight
+# The straight RH inclined 64T follows the cone incline and meshes the straight
 # 16T at their shared standard normal pitch. Only the crank bore height
 # moves; the cone journal, solid stack and both axial seats retain their datums.
 ADD16 = 25.4 / DP_CRANK_CUTTER
@@ -479,7 +479,7 @@ if not math.isclose(
 # (dt_crank_pinion_spec.pitch_point_azimuths), not the line of centres
 # ALPHA64/ALPHA16 above, which sat 1.68 pinion degrees off it and interfered
 # at 8e991c4ac. The 64T is keyed at its authored phase (a tooth centred at
-# azimuth 0 -- for the helical teeth that is the MID-FACE azimuth), so its
+# azimuth 0 -- for the inclined teeth that is the MID-FACE azimuth), so its
 # nearest tooth leads the pitch point; the pinion's gap sits that same arc
 # (64/16 pinion degrees per 64T degree) past it on ITS side
 # (dt_crank_pinion_spec.tooth_in_gap_seed_deg).
@@ -6199,7 +6199,8 @@ async def build(adapter) -> dict[str, str]:
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
     # anti-spin (see _key_to_shaft), replacing its lock with no fix/lock/tuned
-    # angle. The 64T uses its Axis2 central axis, the cone gears their Axis1.
+    # angle. The 64T uses its named BoreAxis (build_dt_crank_drive_gear: its
+    # tooth cut makes reference axes first), the cone gears their Axis1.
     # The 64T seat is a contact: its Front plane IS its south face (the blank
     # is sketched on Front and extruded +z by the face width, and
     # _place_on_shaft puts that origin face/2 south of the gear's centre), so
@@ -6208,7 +6209,7 @@ async def build(adapter) -> dict[str, str]:
     await _key_to_shaft(
         adapter,
         gear64,
-        "Axis2",
+        "BoreAxis",
         cone_axis,
         cone_shaft,
         cone_o,
@@ -6593,7 +6594,7 @@ async def build(adapter) -> dict[str, str]:
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
-        named_ref(f"Axis2@{gear64}", "AXIS"),
+        named_ref(f"BoreAxis@{gear64}", "AXIS"),
         _config.machine("gear_train", "crank_drive_ratio"),
         label="16T:64T crank drive",
     )

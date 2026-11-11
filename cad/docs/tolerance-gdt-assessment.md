@@ -164,7 +164,7 @@ tolerance.**
      the cone and cylinder gear specs both read it through `read_config`, so the whole
      20-pair train and the 32T alignment pinion share it by construction);
    - **crossed crank pair — normal 24DP / 20° PA** (`gear_train.yaml crank_drive_normal_module_mm`),
-     a straight 16T pinion driving a right-hand 13.0011° helical 64T;
+     a straight 16T pinion driving a 64T with straight right-hand teeth inclined 13.0011° (#2332);
    - **paper-drive reducer — 48DP / 20°** (`pd_rack_pinion_spec.py`, 150T disc and the 15T knob
      pinion since #2034; same pitch as the cone train, cut with the #1 and #7 cutters the cones
      do not use, and a separate meshing pair);

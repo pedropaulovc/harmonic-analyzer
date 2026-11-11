@@ -1,6 +1,6 @@
 ---
 name: crank-mesh-crossed-helical
-description: 16T:64T crank mesh is a crossed-axis pair — engaged via a TRUE-helix 64T (swept teeth) + 0.15 backlash + root relief, proud-of-casting placement; crossed_mesh_study.py is the repro/gate
+description: 16T:64T crank mesh is a crossed-axis pair — engaged via 64T teeth inclined at the shaft angle (TRUE helix 2026-07..2026-11; straight inclined teeth since owner ruling 2026-11-10, #2332) + thickness tolerance + root relief, proud-of-casting placement; crossed_mesh_study.py is the repro/gate
 metadata:
   type: project
 ---
@@ -8,6 +8,8 @@ metadata:
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 > Gear standard update (2026-10): the pair is now normal 24DP PA20 cut with stock 24DP cutters, and the 64T helix equals the 13.0011° cone incline ([gear-standard.md](../cad/docs/gear-standard.md)). The 12.5182° angle, SIN_I, centre and seed-window figures below are the 2026-07 old-profile values and certify nothing about the stock-form pair; the crossed-helical reasoning still holds.
+
+> Owner ruling 2026-11-10 (#2332, option A) supersedes the true helix: the 64T now has STRAIGHT teeth inclined 13.0011° (= cone incline) right hand to its axis, each tooth space one straight pass of the #2 / 55T normal 24DP PA20 stock form cutter with plain indexing on the BS-0 tilted 13° (no lead gearing). The cutter centre plane crosses the gear axis 1.778 mm (.07 in) north of the south (collar) face; elsewhere the straight space departs from the screw by (1 − ρ/R) of its tangential shift, zero on the pitch circle to first order, and the tooth is thicker on the pitch circle by about 2 tan α · s²/2R for a shift s (0.002 mm at the south face, 0.017 mm at the north). Spec names: `TOOTH_INCLINATION_DEG`, `TOOTH_HAND`, `TOOTH_SPACE_CROSSING`, `TOOTH_SPACE` (`straight_gash.py`); `HELIX_*` are gone. Printed tooth data, the error budget and the mid-face mesh check are unchanged; `crank_mesh_stack.station_checks` reports centre, tooth thickening and backlash per face station, not gated (south-face closing corner 0.009 mm nominal, negative under the title block's ±1° on the tooth angle: owner ruling pending on #2481). Approval is conditional on the drive-train interference and soundness gates. "Straight teeth cannot engage" below means teeth parallel to the 64T axis, not teeth inclined at the shaft angle. The helix history below stays historical.
 
 
 The crank-pinion (16T) : crank-drive-gear (64T) mesh crosses axes: the 64T

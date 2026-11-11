@@ -188,7 +188,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"Normal {gear64.CUTTER_DIAMETRAL_PITCH:g}DP "
         f"PA{gear64.CUTTER_PRESSURE_ANGLE_DEG:g} pair" in crank_row[1]
     )
-    assert f"beta = cone incline {gear64.HELIX_ANGLE_DEG:.15g}°" in crank_row[1]
+    assert f"beta = cone incline {gear64.TOOTH_INCLINATION_DEG:.15g}°" in crank_row[1]
     upper, lower = gear64.FACE_WIDTH_BAND
     assert f"face {gear64.FACE_WIDTH:.4f} +{upper:.5f}/{lower:.5f}" in crank_row[1]
     for fragment in (

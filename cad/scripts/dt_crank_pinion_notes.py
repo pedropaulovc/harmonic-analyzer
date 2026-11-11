@@ -88,7 +88,7 @@ BACKLASH_LABEL = f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT A
 TOOTH_RUNOUT = "FULL LENGTH OF TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
 
 # The spur's normal and transverse sections coincide. Its physical tooth
-# count selects a different stock cutter from the helical mate's virtual count.
+# count selects a different stock cutter from the inclined mate's virtual count.
 GEAR_DATA = mate_notes.gear_data_note(
     [
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
@@ -127,6 +127,8 @@ GEAR_DATA = mate_notes.gear_data_note(
         # The title block's edge break would erase these fine teeth; the
         # requirement is a tooth fact, so it reads with them, as on the 64T.
         ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
-        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T RIGHT-HAND HELICAL"),
+        # The 64T's tooth line prints on its own sheet; it changes nothing
+        # this spur is cut to (machinist review on #2482, rule 26).
+        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T"),
     ]
 )

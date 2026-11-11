@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the crank-drive gear and its drawing.
 
-The dark steel 64T gear at the cone set's large end; it carries the crossed-axis
-helical accommodation for its straight 16T crank pinion mate (4:1 crank-to-cone
-reduction).
+The dark steel 64T gear at the cone set's large end; its straight teeth,
+inclined to its axis, carry the crossed-axis accommodation for its straight
+16T crank pinion mate (4:1 crank-to-cone reduction).
 
 Recreated under ``cad/docs/drawing-guidelines.md``. The six blank,
 bore and entry sizes -- outside diameter, face width, round bore, keyway
@@ -38,6 +38,7 @@ from stock_form_cutter import (
     translation_for_tangent_span,
 )
 from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
+from straight_gash import StraightGash, midface_gap_azimuth_rad
 
 
 MM_PER_IN = 25.4
@@ -60,9 +61,12 @@ def floor_inch_mm(value_mm: float, places: int) -> float:
 
 TEETH = 64
 
-# The 64T's right-hand helix follows the actual cone-shaft incline; its
-# straight 16T mate shares the configured normal-pitch cutter system.
-HELIX_ANGLE_DEG = cone_line.INCLINE_DEG
+# Straight teeth inclined to the 64T's axis by the actual cone-shaft incline,
+# right hand (owner ruling 2026-11-10 on #2332, option A, superseding the
+# true-helix tooth): its straight 16T mate shares the configured normal-pitch
+# cutter system, and the crossing is the cone incline because the crankshaft
+# stays parallel to the cylinders.
+TOOTH_INCLINATION_DEG = cone_line.INCLINE_DEG
 
 # Face width.  The v36 MHA-DT-05 casting is restored: its crank boss's north
 # face is the collar's tangent plane again, so the 64T's SOUTH face -- seated
@@ -109,16 +113,17 @@ if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WID
 
 # Both gears use the same standard normal-pitch/pressure-angle system.
 # Form milling uses a 14--16T cutter for the straight pinion and a
-# 55--134 virtual-tooth cutter for the 64T helix (z/cos(beta)^3).
+# 55--134 virtual-tooth cutter for the inclined 64T (z/cos(beta)^3: the
+# normal section's pitch-point curvature is the same as a helix's).
 NORMAL_MODULE_MM = _config.machine("gear_train", "crank_drive_normal_module_mm")
-_COS_HELIX = math.cos(math.radians(HELIX_ANGLE_DEG))
+_COS_INCLINE = math.cos(math.radians(TOOTH_INCLINATION_DEG))
 CUTTER_DIAMETRAL_PITCH = MM_PER_IN / NORMAL_MODULE_MM
 CUTTER_PRESSURE_ANGLE_DEG = _config.machine(
     "gear_train", "crank_drive_pressure_angle_deg"
 )
-DIAMETRAL_PITCH = CUTTER_DIAMETRAL_PITCH * _COS_HELIX
+DIAMETRAL_PITCH = CUTTER_DIAMETRAL_PITCH * _COS_INCLINE
 PRESSURE_ANGLE_DEG = math.degrees(
-    math.atan(math.tan(math.radians(CUTTER_PRESSURE_ANGLE_DEG)) / _COS_HELIX)
+    math.atan(math.tan(math.radians(CUTTER_PRESSURE_ANGLE_DEG)) / _COS_INCLINE)
 )
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # transverse
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
@@ -127,29 +132,30 @@ PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 DEDENDUM_FACTOR = 1.25
 
 # Hand: the tooth azimuth advances counter-clockwise about +z as z increases
-# (``_gear._TWIST_CCW``), which is a RIGHT-hand helix. It is the one tooth-system
-# fact a mirrored part would get wrong and no view can settle, so the data block
-# states it in words.
-HELIX_HAND = "RIGHT HAND"
+# (straight_gash: the tooth line d = cos(beta) z + sin(beta) t), a RIGHT-hand
+# tooth. It is the one tooth-system fact a mirrored part would get wrong, so
+# the data block states it in words.
+TOOTH_HAND = "RIGHT HAND"
 
-# Form-cutter selection uses the helix's equivalent normal-section tooth count,
-# not its physical count. Lead is the axial travel for one right-hand turn.
+# Form-cutter selection uses the inclined teeth's equivalent normal-section
+# tooth count, not their physical count.
 CUTTER_TEMPLATE = template_for_teeth(
-    TEETH / _COS_HELIX**3, CUTTER_DIAMETRAL_PITCH, CUTTER_PRESSURE_ANGLE_DEG
+    TEETH / _COS_INCLINE**3, CUTTER_DIAMETRAL_PITCH, CUTTER_PRESSURE_ANGLE_DEG
 )
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
-VIRTUAL_TEETH = TEETH / _COS_HELIX**3
-HELIX_LEAD_MM = math.pi * PITCH_DIA / math.tan(math.radians(HELIX_ANGLE_DEG))
-GEAR_DATA_HELIX_PLACES = 1
-# The helix angle is the controlling helix spec, at the title block's +/-1
-# deg; the lead it implies is REF. With the 16T spur's axis fixed, a helix
-# error d(beta) at the turned blank shifts the 64T normal pitch by
-# p_t sin(beta) d(beta), 0.013 mm at 1 deg, well inside the crossed mesh's
-# 0.069 worst-corner backlash (crank_mesh_stack.standard_check), so the
-# ordinary angular tolerance keeps backlash > 0 (machinist review: neither
-# helix nor lead was controlling).
-HELIX_ANGLE_TOLERANCE_DEG = 1.0
+VIRTUAL_TEETH = TEETH / _COS_INCLINE**3
+# The inclination prints in the gear data at one place under the title
+# block's +/-1 deg, as the helix angle did. A setting error d(beta) shifts the 64T
+# normal pitch by p_t sin(beta) d(beta), 0.013 mm at 1 deg, inside the
+# crossed mesh's mid-face worst-corner backlash (crank_mesh_stack.
+# standard_check). Across the face it also turns the tooth line against the
+# 16T, which no gate books yet: crank_mesh_stack.station_checks reports the
+# per-station centre, and with the title block's +/-1 deg the south-face
+# closing corner reads negative for the helix this replaced as for these
+# teeth (#2332 study; owner ruling pending on #2481).
+TOOTH_INCLINATION_TOLERANCE_DEG = 1.0
+TOOTH_INCLINATION_PLACES = 1
 GEAR_DATA_REFERENCE_PLACES = 3
 
 # The blank's outside diameter is the one tooth-system number the turner sets
@@ -165,33 +171,40 @@ OUTSIDE_DIA_PLACES = 3
 # Critical tooth-cutting setup, indicated to the finished bore. This process
 # limit is shared by both shop gears; it is not an AGMA/form accuracy class.
 TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
-# Native sweep-fidelity bound for the twisted screw sweep (_gear's flank
-# probe), NOT a machining band. Bore TIR allows TIR/2 radial eccentricity;
-# the numerical sweep's surface sag may use one tenth of that, TIR/20
-# (0.0025 mm at the configured 0.05 TIR). The probe measured 1.4 um sag on the
-# farm (probe 20261009T195743546Z); a wrong hand, missing twist or wrong phase
-# moves the quarter-face flank by tenths of a millimetre, so detection holds.
-NATIVE_SWEEP_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
+# Native fidelity bound for the cut tooth space (_straight_gash_gear's flank probe), NOT a
+# machining band. Bore TIR allows TIR/2 radial eccentricity; the equation-
+# curve profile's numerical sag may use one tenth of that, TIR/20 (0.0025 mm
+# at the configured 0.05 TIR). A wrong hand, inclination, crossing or seed
+# moves a three-quarter-face flank by tenths of a millimetre or more, so
+# detection holds.
+NATIVE_FLANK_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 
 # Geometry selection is finite-support-qualified, not a crossed-mesh certificate.
 # The deviations are about the STANDARD-depth thickness (cutter reference pitch
 # line on the gear's pitch circle). They are thin-only (Main ruling 2026-10-10)
 # so the fixed-centre closing corner keeps positive backlash; the part is
 # modelled at the band's maximum-material limit, the 16T's convention.
+#
+# The printed tooth numbers (thickness, span, root, plunge, tip support) are
+# read from the cutter's normal-section SCREW model at the inclination
+# (StockFormProfile's helix_angle_deg): at the crossing station the straight
+# tooth space below IS that normal section, and its transverse section there
+# differs from the screw model's by under 3 um (test_straight_gash), inside the
+# span's .0001 in printing grid.
 TOOTH_THICKNESS_DEVIATIONS = tuple(
     _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
 )
 _STANDARD_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
 STANDARD_TRANSVERSE_TOOTH_THICKNESS = StockFormProfile(
-    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, _STANDARD_TRANSLATION_MM, HELIX_ANGLE_DEG
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, _STANDARD_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 ).pitch_tooth_thickness_mm
 STOCK_TOOL_TRANSLATION_MM = translation_for_pitch_tooth_thickness(
     TEETH, CUTTER_TEMPLATE,
     STANDARD_TRANSVERSE_TOOTH_THICKNESS + max(TOOTH_THICKNESS_DEVIATIONS),
-    HELIX_ANGLE_DEG,
+    TOOTH_INCLINATION_DEG,
 )
 _PITCH_PROBE = StockFormProfile(
-    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 )
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = _PITCH_PROBE.pitch_tooth_thickness_mm
 BASE_TANGENT_SPAN_TEETH = math.floor(TEETH * CUTTER_PRESSURE_ANGLE_DEG / 180.0 + 0.5)
@@ -200,12 +213,12 @@ _SPAN_SCALE = 10**BASE_TANGENT_SPAN_PLACES
 _RAW_TRANSLATIONS = tuple(
     translation_for_pitch_tooth_thickness(
         TEETH, CUTTER_TEMPLATE, STANDARD_TRANSVERSE_TOOTH_THICKNESS + deviation,
-        HELIX_ANGLE_DEG,
+        TOOTH_INCLINATION_DEG,
     )
     for deviation in reversed(TOOTH_THICKNESS_DEVIATIONS)
 )
 _RAW_SPANS = tuple(
-    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, HELIX_ANGLE_DEG)
+    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG)
     .tangent_span_mm(BASE_TANGENT_SPAN_TEETH, normal_plane=True)
     for value in _RAW_TRANSLATIONS
 )
@@ -228,13 +241,13 @@ _INVERSE_BRACKET = (
 )
 STOCK_TOOL_TRANSLATION_LIMITS_MM = tuple(
     translation_for_tangent_span(
-        TEETH, CUTTER_TEMPLATE, span, BASE_TANGENT_SPAN_TEETH, HELIX_ANGLE_DEG,
+        TEETH, CUTTER_TEMPLATE, span, BASE_TANGENT_SPAN_TEETH, TOOTH_INCLINATION_DEG,
         translation_bounds_mm=_INVERSE_BRACKET,
     )
     for span in BASE_TANGENT_SPAN_LIMITS_MM
 )
 _CORNER_PROBES = tuple(
-    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, HELIX_ANGLE_DEG)
+    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, TOOTH_INCLINATION_DEG)
     for value in STOCK_TOOL_TRANSLATION_LIMITS_MM
 )
 # Floored to the .001 in grid it prints at, so the printed size is the model.
@@ -244,13 +257,50 @@ OUTSIDE_DIA = floor_inch_mm(
     OUTSIDE_DIA_PLACES,
 )
 STOCK_PROFILE = StockFormProfile(
-    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, TOOTH_INCLINATION_DEG
 )
 ROOT_DIA_MIN = 2.0 * STOCK_PROFILE.root_radius_min_mm
 ROOT_DIA_MAX = 2.0 * STOCK_PROFILE.root_radius_max_mm
 ROOT_DIA = ROOT_DIA_MIN
 WHOLE_DEPTH = STOCK_PROFILE.blank_radius_mm - STOCK_PROFILE.root_radius_min_mm
 TOOL_PLUNGE_MM = STOCK_PROFILE.plunge_mm
+
+# The straight tooth space (straight_gash). Each space is exactly the
+# cutter's form where the cutter's centre plane crosses the blank axis,
+# TOOTH_SPACE_CROSSING north of the SOUTH (collar, z = 0) face; elsewhere it
+# leans against the screw model by (1 - rho/R) of its tangential shift, zero
+# on the pitch circle. The 16T bears on the south edge: the layout closes the
+# centre toward the south face, where the axes cross in plan
+# (crank_mesh_stack.centre_at_station). Exact anywhere from
+# mid-face to the south face keeps that edge within the helix's mesh; the
+# station is the middle of that range, a quarter face north of the collar
+# face (equally, a quarter face toward it from mid-face), on the .XX grid the
+# gear data prints, whose title-block band keeps it inside the range.
+TOOTH_SPACE_CROSSING_PLACES = 2
+TOOTH_SPACE_CROSSING = (
+    round(FACE_WIDTH / 4.0 / MM_PER_IN, TOOTH_SPACE_CROSSING_PLACES) * MM_PER_IN
+)
+_CROSSING_ROW = printed_band_mm(TOOTH_SPACE_CROSSING_PLACES, unit=UNIT)
+if not 0.0 < TOOTH_SPACE_CROSSING - _CROSSING_ROW < TOOTH_SPACE_CROSSING + _CROSSING_ROW < FACE_WIDTH / 2.0:
+    raise AssertionError("the tooth-space crossing band leaves the south half-face")
+# The cutter form in its own plane, reaching 0.05 mm past the tip so every
+# normal-section point the blank cylinder can hold is cutter form
+# (StraightGash.removed_volume_mm3 refuses otherwise); the tip support stays
+# 0.19 mm beyond that.
+TOOTH_SPACE_FORM = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0 + 0.05, STOCK_TOOL_TRANSLATION_MM, 0.0
+)
+# The seed space is clocked so a TOOTH is centred on +X on the pitch circle at
+# mid-face, the authored phase the assembly meshes the 16T against.
+TOOTH_SPACE = StraightGash(
+    TOOTH_INCLINATION_DEG,
+    TOOTH_SPACE_CROSSING,
+    midface_gap_azimuth_rad(
+        TEETH, PITCH_DIA / 2.0, TOOTH_INCLINATION_DEG, TOOTH_SPACE_CROSSING, FACE_WIDTH
+    ),
+    FACE_WIDTH,
+    OUTSIDE_DIA / 2.0,
+)
 
 
 def stock_profile(
@@ -260,13 +310,13 @@ def stock_profile(
     translation = (
         STOCK_TOOL_TRANSLATION_MM if tooth_thickness_mm is None
         else translation_for_pitch_tooth_thickness(
-            TEETH, CUTTER_TEMPLATE, tooth_thickness_mm, HELIX_ANGLE_DEG
+            TEETH, CUTTER_TEMPLATE, tooth_thickness_mm, TOOTH_INCLINATION_DEG
         )
     )
     return StockFormProfile(
         TEETH, CUTTER_TEMPLATE,
         (OUTSIDE_DIA if outside_dia_mm is None else outside_dia_mm) / 2.0,
-        translation, HELIX_ANGLE_DEG,
+        translation, TOOTH_INCLINATION_DEG,
     )
 
 
@@ -275,7 +325,7 @@ STOCK_PROFILE_CORNERS = tuple(
         f"span {span_side}, outside diameter {od_side}",
         StockFormProfile(
             TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + od_deviation) / 2.0,
-            translation, HELIX_ANGLE_DEG,
+            translation, TOOTH_INCLINATION_DEG,
         ),
     )
     for span_side, translation in zip(("lower", "upper"), STOCK_TOOL_TRANSLATION_LIMITS_MM)
@@ -378,9 +428,13 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # ``keep`` maps. ---
 #
 # ``OutsideDiaReference`` is a construction-geometry sketch whose single driving
-# dimension IS the tip circle: the helix recipe grows the teeth off a ROOT
-# cylinder blank, so no solid feature owns the diameter the turner sets, and
+# dimension IS the tip circle the turner sets: it carries the band and callout
+# independently of whichever recipe cuts the teeth, and
 # drawing-simplicity-policy.md `How the repository implements the guidelines` says model it rather than type it into the data block.
+# The tooth line has no native dimension: no view shows a tooth's line on a
+# drawn edge (machinist review of farm proof r3 on #2482 refused a 13 deg
+# measured between construction rays in the bore), so its inclination, hand
+# and crossing station print in the gear data, as the helix angle did.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutsideDiaReference": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},

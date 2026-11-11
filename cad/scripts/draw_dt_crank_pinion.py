@@ -524,6 +524,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _isometric_clears_boss_dia(iso)
+    # r8's machinist review read the 3:1 isometric's edge lines as facets
+    # (rule 8). Hiding tangent edges drops the tooth-band shoulder seam (farm
+    # r11); the lines along each flank are real sharp face boundaries of the
+    # stock form and stay, with the silhouettes and tip corners.
+    iso.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(iso.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide isometric tangent edges")
+    iso.UpdateViewDisplayGeometry()
 
     front_annotations = curate_view_dimensions(
         adapter,

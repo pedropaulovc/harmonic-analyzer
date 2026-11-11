@@ -8,11 +8,13 @@ The crank bore's configured height closes the mesh at the physical 64T
 centre without moving the 48DP cone stack or its face/seat datums.
 
 CROSSED-MESH CUT: the 64T rides the cone shaft while the straight 16T
-spins about machine z. The finite normal-24DP PA20 stock #2/55T master
-owns the actual tooth form. The complete physical-pitch material sector
-is a nominal normal-section screw sweep with a right-hand constant lead,
-not an ideal transverse N64 involute or a physical disc-cutter envelope.
-Actual crossed-mesh engineering acceptance remains separate from this CAD gate.
+spins about machine z. Its teeth are STRAIGHT, inclined to its axis by the
+cone incline, right hand (owner ruling 2026-11-10 on #2332, option A,
+superseding the true helix): each tooth space is the finite normal-24DP PA20
+stock #2/55T form, cut as a straight prism along the tooth line, its centre
+plane crossing the axis TOOTH_SPACE_CROSSING north of the south face
+(straight_gash). Actual crossed-mesh engineering acceptance remains separate
+from this CAD gate (crank_mesh_stack).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -27,9 +29,9 @@ annulus remains intact. Its south face butts against the MHA-DT-04 thrust
 collar; the north face touches T120 in the solid cone-gear stack. The 64T
 has no tooth-to-key clock requirement.
 
-Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH; the helix
-twist is symmetric about the mid-face plane (the assembly's phase math
-references the mid-face azimuth).
+Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH with the
+SOUTH (collar) face at z = 0; a tooth is centred on +X on the pitch circle at
+mid-face (the assembly's phase math references the mid-face azimuth).
 
 Run (SolidWorks already open)::
 
@@ -61,7 +63,8 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
-from _gear import build_stock_form_gear, volume_check
+from _gear import volume_check
+from _straight_gash_gear import build_straight_gash_gear
 from _part_pmi import author_part_pmi
 from gear_face_band import GEAR_FACE_WIDTH_BAND
 from dt_crank_drive_gear_notes import GEAR_DATA
@@ -75,11 +78,13 @@ from dt_crank_drive_gear_spec import (
     KEYWAY_T_BAND,
     KEYWAY_WIDTH,
     KEYWAY_WIDTH_BAND,
-    NATIVE_SWEEP_BOUND_MM,
+    NATIVE_FLANK_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
-    STOCK_PROFILE,
     SURFACE_FINISHES,
+    TEETH,
+    TOOTH_SPACE,
+    TOOTH_SPACE_FORM,
     UNIT,
 )
 
@@ -164,6 +169,8 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
+# The assembly's coaxial and gear mates select the bore axis by this name.
+BORE_AXIS = "BoreAxis"
 
 # The 64T seats on MHA-DT-04's keyed land 1.
 BORE_DIAMETER = 0.375 * IN
@@ -189,10 +196,10 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # The shared helper sweeps the complete finite stock-form sector, including
-    # offcentre root-floor lobes; its phase and Green-volume gates precede pattern.
-    disc = await build_stock_form_gear(
-        adapter, STOCK_PROFILE, FACE_WIDTH, screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM
+    # The shared helper cuts one straight stock-form tooth space through the
+    # full-tip blank, gates its volume and native flanks, then patterns it.
+    disc = await build_straight_gash_gear(
+        adapter, TOOTH_SPACE_FORM, TOOTH_SPACE, TEETH, flank_bound_mm=NATIVE_FLANK_BOUND_MM
     )
     volume = disc.volume
 
@@ -210,7 +217,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
     ]
 
-    # Cut one keyed bore through the finished helix: the bore's major arc
+    # Cut one keyed bore through the finished teeth: the bore's major arc
     # through local -X, closed on +X by the keyway's two sides and top. A
     # construction witness from the far (-X) arc wall, on the axis, to the
     # keyway top's midpoint owns the native T measurement (KeywayT, ANSI
@@ -312,8 +319,15 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "south bore chamfer", expected, 0.03 * v_chamfer + 0.15)
 
     # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+    # selection (M6 mated-DOF drive train). Renamed BoreAxis: the tooth cut
+    # creates its own reference axes first, so the default AxisN ordinal the
+    # assembly used to quote (Axis2) now names the tooth space's pivot (farm
+    # run 20261110T211638308Z: '64T coaxial' landed 36.75 mm off).
+    bore_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis"
+    )
+    _feature_by_name(adapter, bore_axis).Name = BORE_AXIS
+    _telemetry.success(f"feature {bore_axis!r} -> {BORE_AXIS!r}")
 
     # Apply the deferred drive equations after the whole model + a rebuild exist,
     # then re-check: each equation evaluates to the as-built value, so the
@@ -351,12 +365,11 @@ async def build(adapter) -> dict[str, str]:
         expected, 0.03 * v_chamfer + 0.15,
     )
 
-    # The actual blank circle, as a REFERENCE sketch. The helix grows a complete
-    # stock material sector off an embedded base cylinder, so no solid feature
-    # owns the outside diameter -- yet the OD is the first size the turner sets
-    # and the print must carry it as a model dimension, not as text in the data
-    # block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference
-    # sketch whose one driving dimension IS the value"). Construction geometry:
+    # The actual blank circle, as a REFERENCE sketch. The OD is the first size
+    # the turner sets and the print must carry it as a model dimension, not as
+    # text in the data block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference
+    # sketch whose one driving dimension IS the value"); this sketch owns its
+    # band and callout whatever recipe cuts the teeth. Construction geometry:
     # its dimension imports onto the sheet, the circle itself is never drawn.
     check("create_sketch tip reference", await adapter.create_sketch("Front"))
     tip_ref = await define_circle(

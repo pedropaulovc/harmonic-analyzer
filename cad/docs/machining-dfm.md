@@ -1076,17 +1076,25 @@ so it does not give a six-tooth form.
 | part | teeth | form | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
 | `dt-crank-pinion` | 16 | straight spur | #7 | 2 turns + 10 on 20 |
-| `dt-crank-drive-gear` | 64 | right-hand helix 13.0011°, lead 945.862 mm | #2 (virtual 69 teeth) | 10 on 16 |
+| `dt-crank-drive-gear` | 64 | straight teeth inclined 13.0011° right hand | #2 (virtual 69 teeth) | 10 on 16 |
 
-The 64T is cut with the cutter chosen for its virtual tooth count, N / cos³ of the helix angle,
-which lands in the #2 range ([John F's workshop, helical gears](https://johnfsworkshop.org/home/making-other/gears-links/helical-gears-links/making-helical-gears-on-a-vertical-milling-machine/)).
-The table is swivelled to the helix angle and the head is geared to the table leadscrew so the
-blank turns once per 945.862 mm of travel. That needs a spiral-capable universal dividing head;
-indexing alone, even with a DRO, cannot generate the lead. The installed Precision Matthews BS-0
-is sold as semi-universal
-([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)); the BS-2 is sold as able to
-cut spirals ([BS-2](https://www.precisionmatthews.com/products/dividinghead-bs-2)). Change gears
-for the lead depend on the head and the table screw: `TODO(cut it first)`.
+Owner ruling 2026-11-10 (#2332, option A) supersedes the earlier true right-hand helix (lead
+945.862 mm): the 64T has straight teeth inclined at the cone incline. The cutter is still the one
+chosen for its virtual tooth count, N / cos³ of the 13.0011° inclination, which lands in the #2
+range ([John F's workshop, helical gears](https://johnfsworkshop.org/home/making-other/gears-links/helical-gears-links/making-helical-gears-on-a-vertical-milling-machine/)).
+Tilt the installed Precision Matthews BS-0
+([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)) 13°, feed the #2 cutter in
+a straight line through each tooth space and plain-index between spaces. Set the cutter centre
+plane to cross the gear axis 1.778 mm (.07 in) north of the south (collar) face. No lead gearing
+or spiral-capable head is needed. The printed tooth data are unchanged; approval is conditional
+on the straight model passing the drive-train interference and soundness gates.
+
+The tilt sense sets the hand, and every other printed number is the same for a left-hand gear.
+With the cutter on the vertical spindle's stub arbor (cutter plane horizontal) and the head at
+the left end of the table, raise the head's nose 13° and cut on the operator's side of the
+blank. Putting the head at the right end, or the cutter behind the blank, cuts a left-hand gear;
+doing both cuts a right-hand one again. Check the first scribed pass and the finished gear:
+stood on either face, the teeth nearest you rise to the right.
 
 Set each crank gear up for tooth cutting within 0.05 mm TIR of its finished bore
 (`cad/config/tolerances/crank_mesh.yaml`, `tooth_cutting_runout_tir_mm`, read by both gear specs). This is a

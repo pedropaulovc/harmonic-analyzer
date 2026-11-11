@@ -2118,8 +2118,8 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     assert placed["dt-crank-drive-gear"] == pytest.approx(south, abs=1e-9)
 
 
-def test_the_64t_build_hands_the_stock_helper_its_profile_and_sweep_bound(monkeypatch) -> None:
-    """Run the real 64T build up to its stock-form gear, recording the call."""
+def test_the_64t_build_hands_the_straight_gash_helper_its_form_and_bound(monkeypatch) -> None:
+    """Run the real 64T build up to its tooth cut, recording the call."""
     import asyncio
     from unittest.mock import AsyncMock, MagicMock
 
@@ -2130,179 +2130,142 @@ def test_the_64t_build_hands_the_stock_helper_its_profile_and_sweep_bound(monkey
 
     calls = []
 
-    async def stock_form_gear(*args, **kwargs):
+    async def straight_gash_gear(*args, **kwargs):
         calls.append((args[1:], kwargs))
         raise Reached
 
     monkeypatch.setattr(crank, "check", MagicMock())
     monkeypatch.setattr(crank, "set_global", AsyncMock())
     monkeypatch.setattr(crank, "apply_package_model_units", MagicMock())
-    monkeypatch.setattr(crank, "build_stock_form_gear", stock_form_gear)
+    monkeypatch.setattr(crank, "build_straight_gash_gear", straight_gash_gear)
     with pytest.raises(Reached):
         asyncio.run(crank.build(AsyncMock()))
     assert calls == [(
-        (crank.STOCK_PROFILE, crank.FACE_WIDTH),
-        {"screw_sweep_bound_mm": crank.NATIVE_SWEEP_BOUND_MM},
+        (crank.TOOTH_SPACE_FORM, crank.TOOTH_SPACE, crank.TEETH),
+        {"flank_bound_mm": crank.NATIVE_FLANK_BOUND_MM},
     )]
 
 
-def test_the_64t_native_stock_tooth_preserves_material_and_phase_gates(monkeypatch) -> None:
-    """Record the released helper's real profile recipe, without native CAD."""
+def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeypatch) -> None:
+    """Record the helper's real recipe, without native CAD (owner ruling
+    2026-11-10 on #2332: straight teeth inclined to the axis)."""
     import asyncio
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
 
-    import _gear
+    import _straight_gash_gear as _gear
     import dt_crank_drive_gear_spec as gear
 
-    profile = gear.STOCK_PROFILE
+    form, gash = gear.TOOTH_SPACE_FORM, gear.TOOTH_SPACE
+    assert gash.inclination_deg == cone_line.INCLINE_DEG
     face = gear.FACE_WIDTH
-    assert profile.teeth == gear.TEETH
-    assert profile.helix_angle_deg == cone_line.INCLINE_DEG
-    assert profile.helix_angle_deg > 0.0
-    base_radius = profile.foot_radius_mm
-    twist = face * math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
-    material_calls = []
-    emitted = []
     events = []
     volumes = {}
-    tooth_body = type(profile).tooth_body_segments
-
-    def record_material_sector(self, **kwargs):
-        segments = tooth_body(self, **kwargs)
-        material_calls.append((kwargs, segments))
-        return segments
-
-    async def record_curve(_adapter, name, x, y):
-        emitted.append((name, x, y))
-        return name
+    planes = []
+    curves = []
+    expressions = []
 
     async def record_volume(_adapter, label, expected, tolerance):
         volumes[label] = (expected, tolerance)
         events.append(label)
         return expected
 
-    async def record_sweep(_adapter, width, *, twist_deg):
-        assert width == face
-        assert twist_deg == pytest.approx(math.degrees(twist))
-        events.append("sweep")
-        return "StockSweep"
+    async def record_plane(_adapter, name, **kwargs):
+        planes.append((name, kwargs))
 
-    def record_probe(_adapter, actual_profile, width, *, midface_tooth_phase_rad, tolerance_mm):
-        assert tolerance_mm == gear.NATIVE_SWEEP_BOUND_MM
-        assert actual_profile is profile
-        assert width == face
-        assert midface_tooth_phase_rad == 0.0
-        events.append("native phase probe")
+    async def record_crossing(_adapter, name, z_mm):
+        planes.append((name, {"z_mm": z_mm}))
+
+    async def record_curve(_adapter, name, x, y):
+        curves.append(name)
+        expressions.append((x, y))
+        return name
+
+    def record_flanks(_adapter, section, actual, *, tolerance_mm):
+        assert (section, actual, tolerance_mm) == (form, gash, gear.NATIVE_FLANK_BOUND_MM)
+        events.append("flank gate")
 
     async def record_pattern(_adapter, seed, teeth, radius, station):
         assert (seed, teeth, radius, station) == (
-            "StockSweep", profile.teeth, profile.blank_radius_mm, face / 2.0
+            "ToothSpaceCut", gear.TEETH, gash.blank_radius_mm, face / 2.0
         )
         events.append("pattern")
-        return SimpleNamespace(name="StockPattern")
+        return SimpleNamespace(name="ToothSpacePattern")
 
-    monkeypatch.setattr(type(profile), "tooth_body_segments", record_material_sector)
     monkeypatch.setattr(_gear, "check", lambda _label, value: value)
     for name in ("define_circle", "ensure_fully_defined"):
         monkeypatch.setattr(_gear, name, AsyncMock())
     monkeypatch.setattr(_gear, "name_last_feature", lambda *_args: None)
-    monkeypatch.setattr(_gear, "equation_curve", record_curve)
+    monkeypatch.setattr(_gear, "blank_reference_geometry", lambda *_args: None)
     monkeypatch.setattr(_gear, "volume_check", record_volume)
-    monkeypatch.setattr(_gear, "_sweep_tooth_sketch", record_sweep)
-    monkeypatch.setattr(_gear, "assert_stock_screw_sweep_phase", record_probe)
+    monkeypatch.setattr(_gear, "_plane_through", record_plane)
+    monkeypatch.setattr(_gear, "_crossing_plane", record_crossing)
+    # The frame the farm read back (run 20261110T210742240Z): an off-origin
+    # sketch with a 3.4e-18 residue, which ``.12g`` spelled as an exponent
+    # the equation parser rejected.
+    monkeypatch.setattr(
+        _gear, "_sketch_mapper", lambda *_args: (
+            (3.3881317890172014e-18, 0.39999645716715093, -2.1684043449710089e-16),
+            (-0.9999999999999998, 0.0, 0.0),
+            (0.0, -1.0000000000000002, 0.0),
+        )
+    )
+    monkeypatch.setattr(_gear, "equation_curve", record_curve)
+    monkeypatch.setattr(_gear, "assert_straight_gash_flanks", record_flanks)
     monkeypatch.setattr(_gear, "pattern_about_z", record_pattern)
     adapter = AsyncMock()
+    adapter.create_axis = AsyncMock(
+        side_effect=[SimpleNamespace(name="GearAxis"), SimpleNamespace(name="PivotAxis")]
+    )
+    adapter.create_cut_extrude = AsyncMock(return_value=SimpleNamespace(name="ToothSpaceCut"))
     disc = asyncio.run(
-        _gear.build_stock_form_gear(
-            adapter, profile, face, screw_sweep_bound_mm=gear.NATIVE_SWEEP_BOUND_MM
+        _gear.build_straight_gash_gear(
+            adapter, form, gash, gear.TEETH, flank_bound_mm=gear.NATIVE_FLANK_BOUND_MM
         )
     )
 
     assert adapter.create_sketch.await_args_list[0].args == ("Front",)
-    extrusion = adapter.create_extrusion.await_args.args[0]
-    assert extrusion.depth == face
-    assert not extrusion.reverse_direction
-    assert material_calls[0][0] == {
-        "unit_scale": 1.0 / _gear.IN,
-        "embed_radius_mm": base_radius - _gear._TOOTH_EMBED_MM,
-        "rotate_rad": pytest.approx(-twist / 2.0),
-    }
-    assert len(material_calls) == 1
-    assert emitted == [(s.name, s.x, s.y) for s in material_calls[0][1]]
-    base_area = math.pi * base_radius**2
-    blank_area = math.pi * profile.blank_radius_mm**2
-    sector_area = (blank_area - base_area) / profile.teeth - profile.gap_area_mm2
-    assert sector_area > 0.0
-    seed_volume = (base_area + sector_area) * face
-    final_volume = (blank_area - profile.teeth * profile.gap_area_mm2) * face
-    assert volumes["seeded tooth/gap"] == (pytest.approx(seed_volume), 1.0)
-    assert volumes["toothed disc"] == (
-        pytest.approx(final_volume), pytest.approx(0.01 * final_volume)
-    )
-    assert events.index("seeded tooth/gap") < events.index("native phase probe")
-    assert events.index("native phase probe") < events.index("pattern")
-    assert events.index("pattern") < events.index("toothed disc")
-    assert disc.volume == pytest.approx(final_volume)
-    assert disc.tooth_features == ("StockSweep", "StockPattern")
-
-
-@pytest.mark.parametrize(
-    "twist_sign, phase_offset",
-    [(1.0, 0.0), (0.0, 0.0), (-1.0, 0.0), (1.0, 0.2)],
-)
-def test_the_64t_phase_gate_samples_physical_flanks_and_rejects_wrong_sweeps(
-    monkeypatch, twist_sign, phase_offset
-) -> None:
-    """Synthetic native flank points exercise the gate, not a sweep option bag."""
-    from types import SimpleNamespace
-
-    import _gear
-    import dt_crank_drive_gear_spec as gear
-
-    profile = gear.STOCK_PROFILE
-    face_width = gear.FACE_WIDTH
-    twist_per_mm = math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
-    native_points = []
-    for fraction in (0.25, 0.5, 0.75):
-        z = face_width * fraction
-        phase = phase_offset + twist_sign * (z - face_width / 2.0) * twist_per_mm
-        for side in (-1, 1):
-            for flank_fraction in (0.25, 0.75):
-                parameter = profile.flank_parameter_min + flank_fraction * (
-                    profile.flank_parameter_max - profile.flank_parameter_min
-                )
-                x, y = profile.flank_point(parameter, side=side)
-                angle = phase - side * math.pi / profile.teeth
-                cosine, sine = math.cos(angle), math.sin(angle)
-                native_points.append((x * cosine - y * sine, x * sine + y * cosine, z))
-    queries = []
-
-    def closest_point(x, y, z):
-        query = (x * 1000.0, y * 1000.0, z * 1000.0)
-        queries.append(query)
-        closest = min(native_points, key=lambda point: math.dist(query, point))
-        return (*(value / 1000.0 for value in closest), 0.0, 0.0)
-
-    native_face = SimpleNamespace(GetClosestPointOn=closest_point)
-    body = SimpleNamespace(GetFaces=lambda: [native_face])
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GetBodies2=lambda *_args: [body])
-    )
-    monkeypatch.setattr(_gear, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(_gear._telemetry, "info", lambda *_args: None)
-    if twist_sign == 1.0 and phase_offset == 0.0:
-        _gear.assert_stock_screw_sweep_phase(
-            adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+    assert adapter.create_sketch.await_args_list[1].args == ("ToothSpaceCutterPlane",)
+    assert adapter.create_extrusion.await_args.args[0].depth == face
+    cut = adapter.create_cut_extrude.await_args.args[0]
+    assert cut.both_directions and cut.depth == pytest.approx(2.0 * (face + 2.0))
+    assert planes == [
+        ("ToothSpaceRadialPlane", {
+            "base_plane": "Top Plane", "pivot_axis": "GearAxis",
+            "angle_deg": math.degrees(gash.azimuth_rad), "direction": gash.radial,
+        }),
+        ("ToothSpaceCrossingPlane", {"z_mm": gear.TOOTH_SPACE_CROSSING}),
+        ("ToothSpaceCutterPlane", {
+            "base_plane": "ToothSpaceCrossingPlane", "pivot_axis": "PivotAxis",
+            "angle_deg": gash.inclination_deg, "direction": gash.section_tangential,
+        }),
+    ]
+    assert curves == [
+        segment.name
+        for segment in form.cut_order_native_segments(
+            unit_scale=1.0 / _gear.IN,
+            clearance_radius_mm=max(_gear.R_CLEAR_IN * _gear.IN, form.blank_radius_mm + 1.0),
         )
-        for query, native in zip(queries, native_points, strict=True):
-            assert query == pytest.approx(native)
-    else:
-        with pytest.raises(RuntimeError, match="stock screw-sweep phase mismatch"):
-            _gear.assert_stock_screw_sweep_phase(
-                adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+    ]
+    for x, y in expressions:
+        assert not re.search(r"\d[eE][-+]?\d", x + y), (x, y)
+    first_x, first_y = expressions[0]
+    assert first_x.startswith("(0.000000000000)+(-1.000000000000)*(")
+    assert first_y.startswith(f"({0.39999645716715093 / _gear.IN:.12f})+(-1.000000000000)*(")
+    blank = math.pi * gash.blank_radius_mm**2 * face
+    removed = gash.removed_volume_mm3(form)
+    assert volumes["seeded tooth space"] == (pytest.approx(blank - removed), 1.0)
+    final = blank - gear.TEETH * removed
+    assert volumes["toothed disc"] == (pytest.approx(final), pytest.approx(0.01 * final))
+    assert events.index("seeded tooth space") < events.index("flank gate")
+    assert events.index("flank gate") < events.index("pattern") < events.index("toothed disc")
+    assert disc.volume == pytest.approx(final)
+    assert disc.tooth_features == ("ToothSpaceCut", "ToothSpacePattern")
+    # The screw-section model is the printed data's, never the cut's.
+    with pytest.raises(ValueError, match="own"):
+        asyncio.run(
+            _gear.build_straight_gash_gear(
+                adapter, gear.STOCK_PROFILE, gash, gear.TEETH,
+                flank_bound_mm=gear.NATIVE_FLANK_BOUND_MM,
             )
-    assert len(queries) == 12
-    assert sorted({point[2] for point in queries}) == pytest.approx(
-        [face_width / 4.0, face_width / 2.0, 3.0 * face_width / 4.0]
-    )
+        )
