@@ -91,7 +91,8 @@ that block SMB/445, with no VPN, private endpoint, or mounted drive. A cache ent
 is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. *Sidecars*
 (:func:`publish_sidecar`) are small create-only blobs published BESIDE the
 archives under their own registered prefixes (``com-replay/``: the shadow COM
-recordings, ``_replay_shadow``); they are never part of an archive or a key.
+recordings, ``_replay_shadow``), each blob with the cache epoch after its prefix
+(``com-replay/epoch-<epoch>/...``); they are never part of an archive or a key.
 Configure with:
 
 * ``HARMONIC_CACHE_ACCOUNT``   -- storage account name (e.g. ``stswbuildcache07aba2``)
@@ -545,10 +546,10 @@ _TRANSFER_CONCURRENCY = 8
 _SINGLE_PUT_MAX = 64 * 1024 * 1024
 _BLOCK_SIZE = 4 * 1024 * 1024
 # Sidecar blobs (publish_sidecar): the registered name prefixes -- never the
-# archives' 2-hex shards -- a size bound (one request each) and a listing bound.
+# archives' 2-hex shards -- and a size bound (one request each). The blob of a
+# sidecar carries the cache epoch after its prefix (_sidecar_blob).
 _SIDECAR_PREFIXES = ("com-replay/",)
 _SIDECAR_MAX = _SINGLE_PUT_MAX
-_SIDECAR_LIST_MAX = 1000
 
 # Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded
 # by this size; larger local hits discard that prefix and reuse verified disk
@@ -1065,7 +1066,9 @@ class _BlobBackend:
 
     def get_sidecar(self, name: str) -> bytes | None:
         """A sidecar's bytes, verified against the metadata committed with
-        them; None when absent."""
+        them; None when absent. The epoch is in the blob name too
+        (``_sidecar_blob``), so a mismatched epoch here is corruption, never
+        an older epoch's sidecar."""
         from azure.core.exceptions import ResourceNotFoundError
 
         try:
@@ -1087,13 +1090,13 @@ class _BlobBackend:
         return data
 
     def list_sidecars(self, prefix: str) -> list[tuple[str, float]]:
-        """``(name, last-modified epoch seconds)`` under ``prefix``."""
-        found: list[tuple[str, float]] = []
-        for blob in self._cc.list_blobs(name_starts_with=prefix):
-            found.append((blob.name, blob.last_modified.timestamp()))
-            if len(found) >= _SIDECAR_LIST_MAX:
-                break
-        return found
+        """``(name, last-modified epoch seconds)`` of EVERY blob under
+        ``prefix``: all pages. Azure lists in name order, so any cut taken
+        here would keep the lowest names, not the newest."""
+        return [
+            (blob.name, blob.last_modified.timestamp())
+            for blob in self._cc.list_blobs(name_starts_with=prefix)
+        ]
 
 
 # --------------------------------------------------------------------------- #
@@ -2036,6 +2039,21 @@ def _sidecar_name(name: str, *, prefix: bool = False) -> str:
     return name
 
 
+def _sidecar_blob(name: str, *, prefix: bool = False) -> str:
+    """The blob behind sidecar ``name`` (or a listing prefix): the cache epoch
+    right after the registered prefix, ``com-replay/<rest>`` ->
+    ``com-replay/epoch-<epoch>/<rest>``. An epoch bump therefore lists and
+    fetches none of the older sidecars, as it re-keys every archive."""
+    root, _, rest = _sidecar_name(name, prefix=prefix).partition("/")
+    return f"{root}/epoch-{_CACHE_EPOCH}/{rest}"
+
+
+def _sidecar_of(blob: str) -> str:
+    """The sidecar name of a listed blob (inverse of :func:`_sidecar_blob`)."""
+    root, _, rest = blob.partition("/")
+    return f"{root}/{rest.partition('/')[2]}"
+
+
 def publish_sidecar(name: str, data: bytes) -> str:
     """Create-only upload of ``data`` as sidecar ``name``. Published only in
     ``rw``, like an archive. RETURNS ``stored``, ``exists`` (another writer was
@@ -2043,17 +2061,17 @@ def publish_sidecar(name: str, data: bytes) -> str:
     if not writable():
         return "skip" if enabled() else "off"
     try:
-        name = _sidecar_name(name)
+        blob = _sidecar_blob(name)
         if len(data) > _SIDECAR_MAX:
             raise ValueError(f"{len(data)} bytes exceeds the sidecar bound")
         backend = _backend()
         if backend is None:
             return "off"
-        with _phase("cache.upload", bytes=len(data), sidecar=True):
+        with _phase("cache.sidecar.upload", bytes=len(data)):
             try:
-                backend.put_sidecar(name, data)
+                backend.put_sidecar(blob, data)
             except Exception:
-                if not backend.sidecar_exists(name):
+                if not backend.sidecar_exists(blob):
                     raise
                 return "exists"
         return "stored"
@@ -2068,32 +2086,40 @@ def fetch_sidecar(name: str) -> bytes | None:
     if not enabled():
         return None
     try:
-        name = _sidecar_name(name)
+        blob = _sidecar_blob(name)
         backend = _backend()
         if backend is None:
             return None
-        with _phase("cache.download", phase="sidecar"):
-            return backend.get_sidecar(name)
+        with _phase("cache.sidecar.download") as span:
+            data = backend.get_sidecar(blob)
+            span.set_attribute("bytes", 0 if data is None else len(data))
+            return data
     except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
         _warn(f"sidecar {name} not fetched: {exc!r}")
         return None
 
 
 def list_sidecars(prefix: str) -> list[tuple[str, float]]:
-    """``(name, last-modified epoch seconds)`` of the sidecars under
-    ``prefix``, newest first; empty when the cache is off or listing fails."""
+    """``(name, last-modified epoch seconds)`` of every sidecar under
+    ``prefix`` in this cache epoch, newest first; empty when the cache is off
+    or listing fails."""
     if not enabled():
         return []
     try:
         backend = _backend()
         if backend is None:
             return []
-        with _phase("cache.list", prefix=prefix):
-            found = backend.list_sidecars(_sidecar_name(prefix, prefix=True))
+        with _phase("cache.sidecar.list", prefix=prefix) as span:
+            found = backend.list_sidecars(_sidecar_blob(prefix, prefix=True))
+            span.set_attribute("count", len(found))
     except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
         _warn(f"sidecars under {prefix} not listed: {exc!r}")
         return []
-    return sorted(found, key=lambda item: item[1], reverse=True)
+    return sorted(
+        ((_sidecar_of(blob), modified) for blob, modified in found),
+        key=lambda item: item[1],
+        reverse=True,
+    )
 
 
 def record_event(event: str, label: str, key: str, **extra) -> None:

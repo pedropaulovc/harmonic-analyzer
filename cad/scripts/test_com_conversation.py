@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import dataclasses
 import importlib.util
 import json
 import math
@@ -358,6 +359,10 @@ async def scenario(
     return result
 
 
+# FakeServer's RevisionNumber: what record_build reads before the window.
+SW_REVISION = "34.3.0"
+
+
 def _record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kwargs: Any):
     out_root = tmp_path / "run1"
     monkeypatch.setattr(_paths, "OUT_SLDPRT", out_root / "sldprt")
@@ -369,6 +374,7 @@ def _record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **kwargs: Any):
         script=Path(__file__),
         log=log,
         roots=conv.Roots(out_root),
+        sw_revision=kwargs.pop("sw_revision", SW_REVISION),
         audit=kwargs.pop("audit", False),
         callers=kwargs.pop("callers", conv.CallerCapture.FULL),
     ):
@@ -464,6 +470,37 @@ def test_kinds_identity_and_write_back_are_recorded(tmp_path, monkeypatch):
     assert any(c.op == "GetIDsOfNames" for c in calls)  # late-bound CDispatch path
 
 
+def test_a_proxys_hash_is_the_same_in_inert_and_recipe_code(tmp_path, monkeypatch):
+    # hash() is a function of the COM object, not of whoever hashes it: a dict
+    # filled by recipe code and probed by inert code (or the reverse) hits.
+    inert_hash = conv._inert_entry(hash)
+    inert_get = conv._inert_entry(dict.get)
+    observed: list[tuple[Any, ...]] = []
+
+    def probe(app: Any) -> None:
+        plate = app.GetPart("plate")._oleobj_
+        arm = app.GetPart("arm")._oleobj_
+        first = inert_hash(arm)  # inert code meets arm first
+        table = {plate: "plate", arm: "arm"}  # then recipe code
+        observed.append(
+            (
+                first == hash(arm),
+                inert_hash(plate) == hash(plate),
+                inert_get(table, plate),
+                inert_get(table, arm),
+                table.get(app.GetPart("plate")._oleobj_),  # an equal new proxy
+            )
+        )
+
+    log, _, _, _ = _record(tmp_path, monkeypatch, probe=probe)
+    hashes = [c for c in conv.load(log).calls if c.op == "__hash__"]
+    assert {c.origin for c in hashes} == {conv.Origin.INERT, conv.Origin.RECIPE}
+    replayer, _, stop = _replay(log, tmp_path, monkeypatch, probe=probe)
+    verdict, divergence, _ = replayer.finish()
+    assert stop is None and verdict is conv.Verdict.NOOP and divergence is None
+    assert observed == [(True, True, "plate", "arm", "plate")] * 2
+
+
 def test_canonical_floats_are_bitwise():
     codec = conv.Codec(conv.Roots(Path("C:/nowhere")))
     assert codec.encode(0.0) != codec.encode(-0.0)
@@ -536,13 +573,19 @@ def test_changed_external_input_is_an_input_mismatch(tmp_path, monkeypatch):
     adapter = FakeAdapter(FakeServer())
     log = tmp_path / "L.jsonl.gz"
     with conv.recording(
-        adapter, script=Path(__file__), log=log, roots=conv.Roots(out_root), audit=False
+        adapter,
+        script=Path(__file__),
+        log=log,
+        roots=conv.Roots(out_root),
+        sw_revision=SW_REVISION,
+        audit=False,
     ):
         adapter.swApp.Open(str(template))
-    assert conv.check_inputs(conv.load(log)) == []
+    loaded = conv.load(log)
+    assert conv.check_inputs(loaded, loaded.header) == []
     template.write_bytes(b"template v2")
     monkeypatch.setenv("HARMONIC_FIT_GROUPS", "changed")
-    mismatched = {m["input"] for m in conv.check_inputs(conv.load(log))}
+    mismatched = {m["input"] for m in conv.check_inputs(loaded, loaded.header)}
     assert "env:HARMONIC_FIT_GROUPS" in mismatched
     assert any(name.endswith("template.prtdot") for name in mismatched)
 
@@ -559,12 +602,36 @@ def test_a_log_of_another_format_is_an_input_mismatch(tmp_path, monkeypatch):
             script=Path(__file__),
             log=log,
             roots=conv.Roots(tmp_path / "out"),
+            sw_revision=SW_REVISION,
             audit=False,
         ):
             adapter.swApp.Add(1.0, 2.0)
-    assert conv.check_inputs(conv.load(log)) == [
+    loaded = conv.load(log)
+    assert conv.check_inputs(loaded, loaded.header) == [
         {"input": "schema", "recorded": conv.SCHEMA - 1}
     ]
+
+
+def test_another_or_unknown_solidworks_revision_refuses_the_replay(
+    tmp_path, monkeypatch
+):
+    log, _, _, _ = _record(tmp_path / "base", monkeypatch)
+    seat, _, _, _ = _record(tmp_path / "seat", monkeypatch, sw_revision="34.4.0")
+    loaded = conv.load(log)
+    assert loaded.header.sw_revision == SW_REVISION
+    assert conv.check_inputs(loaded, conv.read_header(log)) == []
+    other = {"input": "sw_revision", "recorded": SW_REVISION, "replay": "34.4.0"}
+    assert conv.check_inputs(loaded, conv.read_header(seat)) == [other]
+    unknown = dataclasses.replace(loaded.header, sw_revision=None)
+    assert conv.check_inputs(dataclasses.replace(loaded, header=unknown), unknown) == [
+        {"input": "sw_revision", "recorded": None, "replay": None}
+    ]
+    # The whole replay refuses before it installs anything or runs a script.
+    scratch = tmp_path / "scratch"
+    result = conv.replay_build(Path(__file__), log, scratch, None, seat_log=seat)
+    assert result.verdict is conv.Verdict.INPUT_MISMATCH
+    assert result.details["input_mismatches"] == [other]
+    assert result.served == 0 and not scratch.exists()
 
 
 def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkeypatch):
@@ -620,6 +687,8 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
                 "replay",
                 str(script),
                 "--log",
+                str(log),
+                "--seat-log",
                 str(log),
                 "--base-outputs",
                 str(tmp_path / "run1"),
@@ -979,6 +1048,8 @@ def test_current_source_replays_against_an_older_recording(tmp_path, monkeypatch
                 "replay",
                 str(script),
                 "--log",
+                str(log),
+                "--seat-log",
                 str(log),
                 "--scratch",
                 str(tmp_path / f"scratch-{edit}"),

@@ -1417,6 +1417,15 @@ def _conversation(value: Path | Conversation) -> Conversation:
     return value if isinstance(value, Conversation) else load(Path(value))
 
 
+def read_header(log: Path) -> Header:
+    """A log's header (its first line) without reading the calls."""
+    with _ENGINE_IO, gzip.open(log, "rt", encoding="utf-8") as stream:
+        line = json.loads(stream.readline() or "{}")
+    if "header" not in line:
+        raise ValueError(f"{log}: no header line")
+    return Header.from_json(line["header"])
+
+
 # ---------------------------------------------------------------------------
 # Divergence analysis
 # ---------------------------------------------------------------------------
@@ -2070,7 +2079,11 @@ class Recorder:
         self.origins: Counter[Origin] = Counter()
         self.depth = 0
         self.types: dict[str, dict[str, Any]] = {}
-        self._identities: dict[Origin, dict[int, int]] = {o: {} for o in Origin}
+        # One identity table for the whole build, whoever hashes: a proxy's
+        # hash is a function of its COM object only (never of the caller's
+        # origin), so a dict filled by recipe code and probed by inert code
+        # (or the reverse) hits exactly as it would unrecorded.
+        self._identities: dict[int, int] = {}
         self.adopted_inside = 0
         self.adopted_outside = 0
         self.foreign_thread_calls = 0
@@ -2454,11 +2467,12 @@ class Recorder:
     @_contained
     def identity(self, proxy: RecordingProxy) -> int:
         """``hash()`` of a proxy: a small identity index, equal for equal COM
-        objects (recorded, so the replay answers the same index). The same
-        index once recording has stopped, so a dict or set filled before a
-        degraded fault still finds its keys after it."""
+        objects wherever and by whomever they are hashed (one table), recorded
+        so the replay answers the same index. The same index once recording
+        has stopped, so a dict or set filled before a degraded fault still
+        finds its keys after it."""
         origin = _origin()
-        identities = self._identities[origin]
+        identities = self._identities
         if self.closed:
             real_hash = self._real(hash, proxy._real)
             return identities.setdefault(real_hash, len(identities))
@@ -3378,11 +3392,14 @@ def run_script(script: Path) -> int:
     return 0
 
 
-def check_inputs(conversation: Conversation) -> list[dict[str, Any]]:
+def check_inputs(conversation: Conversation, seat: Header) -> list[dict[str, Any]]:
     """The replay's inputs equal the record's, except Python source.
 
     Pinned: the log format (:data:`SCHEMA`), the engine (it decides what a
-    request is and how a response is served), the declared environment keys
+    request is and how a response is served), the SolidWorks revision (``seat``
+    is the header of a recording made on the seat the replay stands for: the
+    same requests can be answered differently by another revision, so an
+    unknown or different one is a refusal), the declared environment keys
     (process inputs part closures read) and every file outside the output root
     a COM argument named (templates and the like: SolidWorks reads them, so new
     content would change its answers behind an unchanged request). Never
@@ -3395,6 +3412,14 @@ def check_inputs(conversation: Conversation) -> list[dict[str, Any]]:
         mismatches.append({"input": "schema", "recorded": header.schema})
     if header.engine != sha256_file(ENGINE_FILE):
         mismatches.append({"input": "engine", "recorded": header.engine})
+    if header.sw_revision is None or header.sw_revision != seat.sw_revision:
+        mismatches.append(
+            {
+                "input": "sw_revision",
+                "recorded": header.sw_revision,
+                "replay": seat.sw_revision,
+            }
+        )
     for key, value in header.environment.items():
         if os.environ.get(key) != value:
             mismatches.append(
@@ -3504,6 +3529,7 @@ def replay_build(
     scratch_out: Path,
     base_outputs: Path | None,
     *,
+    seat_log: Path,
     capture_dir: Path | None = None,
     mask: Sequence[MaskRule] = PROVENANCE_MASK,
 ) -> ReplayResult:
@@ -3511,17 +3537,22 @@ def replay_build(
 
     Process-global and one-shot: installs the sandbox and an audit hook that
     stay for the life of the process. Run it in a dedicated subprocess
-    (``com_replay.py replay``). ``base_outputs`` is an output root to compare
-    the Python-written outputs with, byte for byte, file by file (only the
-    files this replay wrote are read)."""
+    (``com_replay.py replay``). ``seat_log`` is a recording made on the seat
+    the replay stands for (the shadow passes the build's own fresh one): its
+    header's SolidWorks revision must be the log's (:func:`check_inputs`).
+    ``base_outputs`` is an output root to compare the Python-written outputs
+    with, byte for byte, file by file (only the files this replay wrote are
+    read)."""
     started = time.perf_counter()
     conversation = load(log)
+    seat = read_header(seat_log)
     if capture_dir is None:
         capture_dir = log.parent / conversation.trailer.get(
             "capture_dir", capture_dir_of(log).name
         )
     details: dict[str, Any] = {
         "log": str(log),
+        "seat_log": str(seat_log),
         "script": _repo_relative(script),
         "base_outputs": str(base_outputs) if base_outputs is not None else None,
         "capture_dir": str(capture_dir),
@@ -3529,7 +3560,7 @@ def replay_build(
         "base_status": conversation.trailer.get("status"),
         "base_outcome": conversation.trailer.get("outcome"),
     }
-    mismatches = check_inputs(conversation)
+    mismatches = check_inputs(conversation, seat)
     if mismatches:
         details["input_mismatches"] = mismatches
         details["reason"] = "inputs differ from the recording: " + ", ".join(

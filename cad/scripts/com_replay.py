@@ -15,12 +15,15 @@
     code is the build's, and the summary's ``faults`` mark the recording
     unusable.
 
-``replay <script> --log P --scratch DIR --result P [--base-outputs DIR] [--capture-dir DIR]``
+``replay <script> --log P --seat-log P --scratch DIR --result P [--base-outputs DIR] [--capture-dir DIR]``
     Run the script with SolidWorks absent, serving the log: no live COM, no
     write outside DIR (bar the temporary and telemetry directories), no
-    connection beyond loopback, no OTLP export. ``--base-outputs`` compares the
-    Python-written outputs with that output root, file by file. Exits 0 for a
-    no-op verdict, 91 for any other verdict, 1 for an infrastructure failure.
+    connection beyond loopback, no OTLP export. ``--seat-log`` is a recording
+    made on the seat the replay stands for (the shadow passes the build's own):
+    a SolidWorks revision other than the log's refuses the replay
+    (``input_mismatch``). ``--base-outputs`` compares the Python-written
+    outputs with that output root, file by file. Exits 0 for a no-op verdict,
+    91 for any other verdict, 1 for an infrastructure failure.
 
 ``diff <a> <b> [--result P]``
     Request divergence and per-member response differences between two logs
@@ -65,6 +68,12 @@ def _parser() -> argparse.ArgumentParser:
     replay = sub.add_parser("replay", help="replay a log with SolidWorks absent")
     replay.add_argument("script", type=Path)
     replay.add_argument("--log", type=Path, required=True)
+    replay.add_argument(
+        "--seat-log",
+        type=Path,
+        required=True,
+        help="a recording made on the seat the replay stands for (its revision)",
+    )
     replay.add_argument("--scratch", type=Path, required=True)
     replay.add_argument("--result", type=Path, required=True)
     replay.add_argument(
@@ -235,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         args.scratch.resolve(),
         args.base_outputs.resolve() if args.base_outputs else None,
         capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
+        seat_log=args.seat_log.resolve(),
     )
     _write_json(args.result, result.to_json())
     inert = result.details.get("inert") or {}

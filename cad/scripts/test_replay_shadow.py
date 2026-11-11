@@ -7,6 +7,7 @@ fake application, and every sink is under ``tmp_path``.
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import datetime
 import hashlib
@@ -318,11 +319,17 @@ def _part_action(dodo: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     return script, deps, order, runs, observed
 
 
+@pytest.mark.parametrize(
+    ("replay_mode", "cache_mode"),
+    [("off", "rw"), ("shadow", "ro")],
+    ids=["replay-off", "cache-read-only"],
+)
 def test_off_builds_with_the_unrecorded_command_and_records_nothing(
-    blob, tmp_path, monkeypatch
+    blob, tmp_path, monkeypatch, replay_mode, cache_mode
 ):
     dodo = _load_dodo()
-    monkeypatch.setenv(shadow.MODE_ENV, "off")
+    monkeypatch.setenv(shadow.MODE_ENV, replay_mode)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", cache_mode)
     script, deps, order, runs, observed = _part_action(dodo, monkeypatch, tmp_path)
     assert runs == [([sys.executable, str(script)], None)]
     assert observed == [(None, deps, dodo.ContentChecker._digest)]
@@ -371,9 +378,11 @@ def _exec_com_runs(
     runs: list[str] = []
     answers = iter(codes)
 
-    def run_subprocess(cmd, label, log_stem=None, *, task=None):
+    def run_subprocess(cmd, label, log_stem=None, *, task=None, env_pins=None):
         driver = recording is not None and cmd == recording.command
         runs.append("driver" if driver else "unrecorded")
+        # The driver, its unrecorded re-run and a plain build: one hash seed.
+        assert env_pins == {"PYTHONHASHSEED": "0"}
         rc = next(answers)
         rerun = rc == shadow.EXIT_RECORD_FAULT
         if driver and (rerun or degraded):
@@ -496,24 +505,34 @@ def test_exit_92_without_a_recording_is_an_ordinary_failure(blob, monkeypatch):
 # --------------------------------------------------------------------------- #
 # Publication: two create-only sidecars named from the part key
 # --------------------------------------------------------------------------- #
+def _blob_of(name: str) -> str:
+    """The container blob behind sidecar ``name``: epoch after the prefix."""
+    return name.replace("com-replay/", f"com-replay/epoch-{cache._CACHE_EPOCH}/", 1)
+
+
 def test_a_recording_publishes_beside_the_part_archive(
     blob, tmp_path, monkeypatch, spans, logged
 ):
     monkeypatch.setenv(shadow.MODE_ENV, "record")
     recording, deps = _built(tmp_path, "size: 1\n")
     shadow.after_build(recording, deps, _digest)
-    prefix = f"com-replay/{_ENGINE[:16]}/{_STEM}/"
+    root = f"com-replay/{_ENGINE[:16]}/{_STEM}"
     tar_name, manifest_name = (
-        f"{prefix}{recording.key}.tar",
-        f"{prefix}{recording.key}.json",
+        f"{root}/bundle/{recording.key}.tar",
+        f"{root}/manifest/{recording.key}.json",
     )
-    assert sorted(blob.committed) == [manifest_name, tar_name]
+    assert shadow.blob_names(_ENGINE, _STEM, recording.key) == (
+        tar_name,
+        manifest_name,
+    )
+    tar_blob, manifest_blob = _blob_of(tar_name), _blob_of(manifest_name)
+    assert sorted(blob.committed) == [tar_blob, manifest_blob]
     uploads = [call for call in blob.calls if call[0] == "upload"]
     assert [(name, options["overwrite"]) for _, name, options, _ in uploads] == [
-        (tar_name, False),
-        (manifest_name, False),
+        (tar_blob, False),
+        (manifest_blob, False),
     ]
-    published = json.loads(blob.content(manifest_name))
+    published = json.loads(blob.content(manifest_blob))
     _, pairs = cache.key_inputs(deps, _digest)
     assert (published["stem"], published["key"], published["engine"]) == (
         _STEM,
@@ -521,7 +540,13 @@ def test_a_recording_publishes_beside_the_part_archive(
         _ENGINE,
     )
     assert published["inputs"] == dict(pairs) and published["recipe_requests"] == 100
-    data = blob.content(tar_name)
+    settings = cache.config_summary()
+    assert (published["salt"], published["epoch"]) == (
+        settings["salt"],
+        settings["epoch"],
+    )
+    assert published["schema"] == shadow.MANIFEST_SCHEMA
+    data = blob.content(tar_blob)
     assert published["bundle"] == {
         "name": tar_name,
         "sha256": hashlib.sha256(data).hexdigest(),
@@ -552,30 +577,60 @@ def test_a_recording_publishes_beside_the_part_archive(
     ]
     published_spans = spans.named("replay.")
     assert [entry["name"] for entry in published_spans] == [
+        f"replay.after_build part:{_STEM}",
         f"replay.record_overhead part:{_STEM}",
         f"replay.publish part:{_STEM}",
     ]
+    assert published_spans[0]["replay.outcome"] == "recorded"
     assert {entry["service"] for entry in published_spans} == {
         _telemetry.BUILD_INFRA_SERVICE
     }
-    # A second writer of the same key: create-only, the first bytes stand.
+    # Sidecar transfers have their own spans, never the archives' cache.upload.
+    assert [(e["name"], e["bytes"]) for e in spans.named("cache.")] == [
+        ("cache.sidecar.upload", len(data)),
+        ("cache.sidecar.upload", len(blob.content(manifest_blob))),
+    ]
+    # A second writer of the same key: create-only, the first bytes stand, and
+    # its manifest (which describes ITS bytes) is never written.
+    manifest_bytes = blob.content(manifest_blob)
     again, deps = _built(tmp_path, "size: 1\n")
     again.log.write_bytes(b"another writer's log")
     shadow.after_build(again, deps, _digest)
     assert _events(tmp_path, "replay_shadow")[-1]["publish"] == "exists"
-    assert blob.content(tar_name) == data
+    assert blob.content(tar_blob) == data
+    assert blob.content(manifest_blob) == manifest_bytes
+    assert [c[1] for c in blob.calls if c[0] == "upload"][2:] == [tar_blob]
+
+
+def test_a_bundle_another_writer_stored_gets_no_manifest_of_ours(
+    blob, tmp_path, monkeypatch
+):
+    # The other writer stored its bundle and stopped before its manifest: a
+    # manifest now would name our digest over its bytes.
+    monkeypatch.setenv(shadow.MODE_ENV, "record")
+    recording, deps = _built(tmp_path, "size: 1\n")
+    tar_name, manifest_name = shadow.blob_names(_ENGINE, _STEM, recording.key)
+    assert cache.publish_sidecar(tar_name, b"their bundle") == "stored"
+    shadow.after_build(recording, deps, _digest)
+    assert _events(tmp_path, "replay_shadow")[-1]["publish"] == "exists"
+    assert sorted(blob.committed) == [_blob_of(tar_name)]
+    assert cache.list_sidecars(shadow.blob_prefix(_ENGINE, _STEM)) == []
 
 
 @pytest.mark.parametrize(("cache_mode", "outcome"), [("ro", "skip"), ("off", "off")])
-def test_only_rw_publishes(blob, tmp_path, monkeypatch, cache_mode, outcome):
+def test_only_a_cache_that_can_publish_records(
+    blob, tmp_path, monkeypatch, cache_mode, outcome
+):
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
-    recording, deps = _built(tmp_path, "size: 1\n")
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", cache_mode)
-    shadow.after_build(recording, deps, _digest)
+    # Nothing could be published, so nothing is recorded: the build runs
+    # exactly as unrecorded and pays no recording or shadow time.
+    assert shadow.plan(_STEM, tmp_path / f"build_{_STEM}.py", "k" * 64) is None
+    assert not shadow.RECORDINGS.exists()
+    # The sidecar layer itself publishes only in rw.
+    _, manifest_name = shadow.blob_names(_ENGINE, _STEM, "a" * 64)
+    assert cache.publish_sidecar(manifest_name, b"{}") == outcome
     assert blob.committed == {}
-    [record] = _events(tmp_path, "replay_shadow")
-    assert record["publish"] == outcome and record["outcome"] == "no_base"
-    assert record["lookup"] == ("none" if cache_mode == "ro" else "off")
 
 
 def test_a_publication_failure_is_soft(blob, tmp_path, monkeypatch, logged):
@@ -596,14 +651,40 @@ def test_sidecars_cannot_name_an_archive(blob):
     assert blob.calls == []
 
 
-def test_a_sidecar_is_served_only_as_published(blob):
+def test_a_sidecar_is_served_only_as_published(blob, spans):
     name = f"{shadow.blob_prefix(_ENGINE, _STEM)}{'a' * 64}.json"
     assert cache.fetch_sidecar(name) is None  # absent
     assert cache.publish_sidecar(name, b'{"schema": 1}') == "stored"
     assert cache.fetch_sidecar(name) == b'{"schema": 1}'
+    assert [(e["name"], e["bytes"]) for e in spans.named("cache.sidecar.")] == [
+        ("cache.sidecar.download", 0),
+        ("cache.sidecar.upload", 13),
+        ("cache.sidecar.download", 13),
+    ]
     # Bytes that are not the ones committed with the metadata: not served.
-    blob.committed[name] = [("single", b'{"schema": 2}')]
+    blob.committed[_blob_of(name)] = [("single", b'{"schema": 2}')]
     assert cache.fetch_sidecar(name) is None
+
+
+def test_an_epoch_bump_lists_and_fetches_no_older_sidecar(blob, logged, monkeypatch):
+    prefix = shadow.blob_prefix(_ENGINE, _STEM)
+    name = f"{prefix}{'a' * 64}.json"
+    assert cache.publish_sidecar(name, b"{}") == "stored"
+    before = _blob_of(prefix)
+    assert (
+        before
+        == f"com-replay/epoch-{cache._CACHE_EPOCH}/{_ENGINE[:16]}/{_STEM}/manifest/"
+    )
+    assert sorted(blob.committed) == [_blob_of(name)]
+    assert [listed for listed, _ in cache.list_sidecars(prefix)] == [name]
+    monkeypatch.setattr(cache, "_CACHE_EPOCH", f"{cache._CACHE_EPOCH}-next")
+    assert cache.list_sidecars(prefix) == []
+    assert cache.fetch_sidecar(name) is None
+    # Never listed and never read, so no integrity warning and no lookup
+    # budget spent on the older epoch's sidecars.
+    assert logged["warn"] == []
+    lists = [call[1] for call in blob.calls if call[0] == "list"]
+    assert lists == [before, _blob_of(prefix)] and before != _blob_of(prefix)
 
 
 @pytest.mark.parametrize(
@@ -639,13 +720,20 @@ def test_inputs_that_moved_during_the_build_publish_nothing(
 # --------------------------------------------------------------------------- #
 # Base selection
 # --------------------------------------------------------------------------- #
+_SALT = "test-salt"
+
+
 def _manifest(
-    inputs: dict[str, str], recording_id: str, schema: int = shadow.MANIFEST_SCHEMA
+    inputs: dict[str, str],
+    recording_id: str,
+    schema: int = shadow.MANIFEST_SCHEMA,
+    salt: str = _SALT,
 ) -> dict:
     return {
         "schema": schema,
         "recording_id": recording_id,
         "inputs": inputs,
+        "salt": salt,
         "key": recording_id,
     }
 
@@ -661,15 +749,32 @@ def test_the_nearest_base_differs_least_then_is_newest():
         (_manifest(now, "same-but-old-format", schema=1), 50.0),
         (_manifest(now, "this-recording"), 60.0),
     ]
-    base = shadow.nearest(candidates, now, "this-recording")
+    base = shadow.nearest(candidates, now, "this-recording", _SALT)
     assert base is not None and base.manifest["recording_id"] == "newer-one-off"
     assert base.differing == ("b",)
-    assert shadow.nearest([], now, None) is None
+    assert shadow.nearest([], now, None, _SALT) is None
     assert shadow.differing_inputs({"a": "1", "x": "1"}, {"a": "2", "y": "1"}) == (
         "a",
         "x",
         "y",
     )
+
+
+def test_another_cache_salt_is_one_differing_input_never_a_filter():
+    # Two throwaway salts (a native proof's two passes): the second still
+    # finds the first's recordings, one input away.
+    now = {"a": "1", "b": "1"}
+    first = (_manifest(now, "pass-1", salt="throwaway-1"), 10.0)
+    base = shadow.nearest([first], now, None, "throwaway-2")
+    assert base is not None and base.differing == (shadow.SALT_INPUT,)
+    assert base.classes == {"salt": 1}
+    # The salt counts like any one file: a tie goes to the newer.
+    one_file = (_manifest({"a": "2", "b": "1"}, "one-file", salt="throwaway-2"), 5.0)
+    base = shadow.nearest([first, one_file], now, None, "throwaway-2")
+    assert base is not None and base.manifest["recording_id"] == "pass-1"
+    exact = (_manifest(now, "exact", salt="throwaway-2"), 1.0)
+    base = shadow.nearest([first, one_file, exact], now, None, "throwaway-2")
+    assert base is not None and base.differing == ()
 
 
 def test_input_classes():
@@ -682,6 +787,7 @@ def test_input_classes():
             "cad/config/fasteners.yaml",
             "cad/templates/part.prtdot",
             "cad/out/reports/.solidworks-mcp-submodule-part.digest",
+            shadow.SALT_INPUT,
             "uv.lock",
         )
     } == {
@@ -691,47 +797,71 @@ def test_input_classes():
         "cad/config/fasteners.yaml": "config",
         "cad/templates/part.prtdot": "template",
         "cad/out/reports/.solidworks-mcp-submodule-part.digest": "adapter",
+        shadow.SALT_INPUT: "salt",
         "uv.lock": "other",
     }
 
 
 def _publish_manifests(count: int, best_at: int) -> str:
+    """``count`` recordings, published oldest first under names that sort
+    newest first (listing order is never recency order)."""
     prefix = shadow.blob_prefix(_ENGINE, _STEM)
     for index in range(count):
         inputs = {"a": "now" if index == best_at else f"old{index}"}
+        bundle_name, manifest_name = shadow.blob_names(
+            _ENGINE, _STEM, f"{count - index:064x}"
+        )
         record = _manifest(inputs, f"id{index}")
+        assert cache.publish_sidecar(bundle_name, b"bundle") == "stored"
         assert (
-            cache.publish_sidecar(
-                f"{prefix}{index:064x}.json", json.dumps(record).encode()
-            )
+            cache.publish_sidecar(manifest_name, json.dumps(record).encode())
             == "stored"
         )
-        assert cache.publish_sidecar(f"{prefix}{index:064x}.tar", b"bundle") == "stored"
     return prefix
 
 
 def test_the_lookup_reads_only_the_newest_manifests(blob):
     prefix = _publish_manifests(10, best_at=0)  # the exact match is the oldest
-    found = shadow.find_base(prefix, {"a": "now"}, None, limit=8)
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=8)
+    # The listing holds the manifests only (bundles live beside them).
     assert (found.outcome, found.listed, found.read) == (shadow.Lookup.FOUND, 10, 8)
     assert found.base is not None and found.base.manifest["recording_id"] == "id9"
-    found = shadow.find_base(prefix, {"a": "now"}, None, limit=10)
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=10)
     assert found.base is not None and found.base.manifest["recording_id"] == "id0"
-    assert [c for c in blob.calls if c[0] == "list"] == [("list", prefix)] * 2
+    assert [c for c in blob.calls if c[0] == "list"] == [("list", _blob_of(prefix))] * 2
+
+
+def test_the_lookup_lists_every_name_before_it_takes_the_newest(blob):
+    # A thousand older manifests whose names sort first: a listing cut in
+    # name order would never see the newest one.
+    prefix = shadow.blob_prefix(_ENGINE, _STEM)
+    for index in range(1000):
+        name = _blob_of(f"{prefix}{index:064x}.json")
+        blob.committed[name] = [("single", b"{}")]
+        blob.modified[name] = datetime.datetime.fromtimestamp(
+            1_700_000_000 + index, datetime.UTC
+        )
+    newest = _manifest({"a": "now"}, "newest")
+    _, manifest_name = shadow.blob_names(_ENGINE, _STEM, "f" * 64)
+    assert cache.publish_sidecar(manifest_name, json.dumps(newest).encode()) == "stored"
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=1)
+    assert (found.listed, found.read) == (1001, 1)
+    assert found.base is not None and found.base.manifest["recording_id"] == "newest"
 
 
 def test_the_lookup_gives_up_past_its_budget(blob):
     prefix = shadow.blob_prefix(_ENGINE, _STEM)
     blob.list_delay = 1.0
     started = time.monotonic()
-    found = shadow.find_base(prefix, {"a": "now"}, None, budget=0.2)
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, budget=0.2)
     assert found.outcome is shadow.Lookup.BUDGET and found.base is None
     assert time.monotonic() - started < 0.8  # never waits out the listing
 
 
 def test_no_lookup_with_the_cache_off(blob, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
-    assert shadow.find_base("com-replay/x/", {}, None).outcome is shadow.Lookup.OFF
+    found = shadow.find_base("com-replay/x/", {}, None, _SALT)
+    assert found.outcome is shadow.Lookup.OFF
     assert blob.calls == []
 
 
@@ -749,26 +879,69 @@ _SAME = {"request_divergence": None}
 _DIFFERENT = {"request_divergence": {"index": 4, "field": "args"}}
 
 
+def _verdict(name: str) -> dict[str, Any]:
+    return {"verdict": name, "recorded": 10, "served": 4}
+
+
 @pytest.mark.parametrize(
-    ("replay_rc", "replay", "diff", "verdict", "truth", "alarm", "false_divergence"),
+    ("replay_rc", "replay", "diff", "verdict", "truth", "kind", "alarm", "false"),
     [
-        (0, _NOOP, _SAME, "noop", "same", False, False),
-        (0, _NOOP, _DIFFERENT, "noop", "diverged", True, False),
-        (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", False, False),
-        (91, _DIVERGED, _SAME, "diverged", "same", False, True),
-        (None, None, _SAME, "timeout", "same", False, True),
-        (3, None, None, "error", "unknown", False, False),
+        (0, _NOOP, _SAME, "noop", "same", "noop", False, False),
+        (0, _NOOP, _DIFFERENT, "noop", "diverged", "noop", True, False),
+        (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", False, False),
+        (91, _DIVERGED, _SAME, "diverged", "same", "divergence", False, True),
+        (
+            91,
+            _verdict("exhausted"),
+            _SAME,
+            "exhausted",
+            "same",
+            "divergence",
+            False,
+            True,
+        ),
+        (
+            91,
+            _verdict("unconsumed"),
+            _SAME,
+            "unconsumed",
+            "same",
+            "divergence",
+            False,
+            True,
+        ),
+        # A refusal or a failure of the machinery is no judgement: never a
+        # false divergence, whatever the ground truth.
+        (
+            91,
+            _verdict("input_mismatch"),
+            _SAME,
+            "input_mismatch",
+            "same",
+            "refusal",
+            False,
+            False,
+        ),
+        (91, _verdict("sandbox"), _SAME, "sandbox", "same", "refusal", False, False),
+        (91, _verdict("error"), _SAME, "error", "same", "infrastructure", False, False),
+        (None, None, _SAME, "timeout", "same", "infrastructure", False, False),
+        (3, None, None, "error", "unknown", "infrastructure", False, False),
     ],
 )
 def test_a_shadow_folds_replay_and_ground_truth(
-    replay_rc, replay, diff, verdict, truth, alarm, false_divergence
+    replay_rc, replay, diff, verdict, truth, kind, alarm, false
 ):
     result = shadow.shadow_of(replay_rc, replay, 0 if diff else None, diff)
     assert (result.verdict, result.ground_truth) == (verdict, truth)
-    assert (result.soundness_alarm, result.false_divergence) == (
-        alarm,
-        false_divergence,
+    assert result.verdict_class is shadow.VerdictClass(kind)
+    assert (result.soundness_alarm, result.false_divergence) == (alarm, false)
+
+
+def test_every_verdict_has_a_class():
+    assert {v.value for v in conv.Verdict} | {"timeout", "unavailable"} == set(
+        shadow.VERDICT_CLASSES
     )
+    assert shadow.Shadow("garbled").verdict_class is shadow.VerdictClass.INFRASTRUCTURE
 
 
 def _two_builds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> shadow.Recording:
@@ -813,6 +986,7 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.soundness_alarm"] is True
     assert span["replay.base_key"] == base.key[:12]
+    assert span["replay.verdict_class"] == record["verdict_class"] == "noop"
     # One INFO line per recorded build; the evaluated one carries every step.
     assert len(logged["info"]) == 2
     line = logged["info"][-1]
@@ -826,8 +1000,10 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     assert line.endswith("| truth=diverged | SOUNDNESS ALARM")
     assert span["service"] == _telemetry.BUILD_INFRA_SERVICE
     assert [entry["name"].split()[0] for entry in spans.named("replay.")] == [
+        "replay.after_build",
         "replay.record_overhead",
         "replay.publish",
+        "replay.after_build",
         "replay.record_overhead",
         "replay.publish",
         "replay.base_lookup",
@@ -968,6 +1144,7 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
     )
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.ground_truth"] == "same"
+    assert span["replay.verdict_class"] == second_record["verdict_class"] == "noop"
     # A recorder fault once the build had its result (keeping SaveTo's file,
     # as on the farm on 2026-11-10): the build exits 0 and nothing of its
     # recording is published or evaluated.
@@ -980,6 +1157,161 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
         "record_fault",
         "Recorder.capture",
     )
+
+
+# --------------------------------------------------------------------------- #
+# The str hash seed: dodo._exec_com pins it for every COM subprocess
+# --------------------------------------------------------------------------- #
+# A build ordering its COM requests by iterating a set of str, as
+# _drawing_precision._named_dimensions and
+# _supplier_spring_reference.add_supplier_reference_configurations do.
+_SET_ORDER_SCRIPT = (
+    "import sys\n"
+    "from _session import run_build\n"
+    "import test_com_conversation  # noqa: F401 -- the fake seat's interfaces\n"
+    "PARTS = {'plate', 'arm', 'hub', 'pin', 'rib', 'web', 'boss', 'slot'}\n"
+    "async def build(adapter):\n"
+    "    for name in PARTS:\n"
+    "        adapter.swApp.GetPart(name).Volume\n"
+    "    return {}\n"
+    "if __name__ == '__main__':\n"
+    "    sys.exit(run_build(build))\n"
+)
+_ON_PATH = f"import os, sys\nsys.path.insert(0, {str(SCRIPTS)!r})\n"
+# A process as before the pin: a hash key of its own (the seed it started
+# with, fixed here so the control is deterministic) and no PYTHONHASHSEED in
+# its environment, so its recording names none.
+_UNPINNED = _ON_PATH + "os.environ.pop('PYTHONHASHSEED')\n"
+_REPLAY_DRIVER = "import com_replay\nsys.exit(com_replay.main(sys.argv[1:]))\n"
+
+
+def test_com_subprocesses_issue_set_ordered_requests_in_one_order(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    # Inherited from dodo's own environment: the pin still wins.
+    monkeypatch.setenv("PYTHONHASHSEED", "7")
+    dodo = _load_dodo()
+    launched: list[dict[str, str]] = []
+
+    def run(command: list[str], **options: Any) -> subprocess.CompletedProcess:
+        # dodo's command, working directory and environment, on the fake seat.
+        launched.append(options["env"])
+        return subprocess.run(command, **options)
+
+    runner = types.SimpleNamespace(**{**vars(subprocess), "run": run})
+    monkeypatch.setattr(dodo, "subprocess", runner)
+    script = tmp_path / "build_fake_sets.py"
+    script.write_text(_SET_ORDER_SCRIPT, encoding="utf-8")
+
+    def run_dir(name: str) -> Path:
+        (tmp_path / name).mkdir()
+        return tmp_path / name
+
+    def log(name: str) -> Path:
+        return tmp_path / name / "L.jsonl.gz"
+
+    def summary(name: str) -> dict[str, Any]:
+        return json.loads((tmp_path / name / "summary.json").read_text("utf-8"))
+
+    def record(name: str) -> list[str]:
+        run = run_dir(name)
+        return [
+            "record",
+            str(script),
+            "--log",
+            str(log(name)),
+            "--summary",
+            str(run / "summary.json"),
+            "--out-root",
+            str(run / "out"),
+        ]
+
+    def spawn(command: list[str], env: dict[str, str]) -> subprocess.Popen[str]:
+        return subprocess.Popen(
+            [sys.executable, "-c", *command],
+            cwd=SCRIPTS,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+    # Control: two fresh unpinned processes, as part builds ran until now.
+    unpinned = [
+        spawn(
+            [_UNPINNED + _RECORD_DRIVER, *record(f"unpinned-{seed}")],
+            dict(os.environ, PYTHONHASHSEED=seed),
+        )
+        for seed in ("1", "2")
+    ]
+    # Two fresh processes through the COM chokepoint.
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        recorded = [
+            pool.submit(
+                dodo._exec_com,
+                [sys.executable, "-c", _ON_PATH + _RECORD_DRIVER, *record(name)],
+                f"verify:{name}",
+            )
+            for name in ("pinned-1", "pinned-2")
+        ]
+    for future in recorded:
+        future.result()  # _exec_com raises on a failed build
+    assert [env["PYTHONHASHSEED"] for env in launched] == ["0", "0"]
+    for proc in unpinned:
+        output, _ = proc.communicate(timeout=120)
+        assert proc.returncode == 0, output
+    assert [
+        summary(name)["environment"]["PYTHONHASHSEED"]
+        for name in ("pinned-1", "pinned-2", "unpinned-1", "unpinned-2")
+    ] == ["0", "0", None, None]
+    pinned = conv.compare_conversations(log("pinned-1"), log("pinned-2"))
+    calls = pinned["recipe_calls"][0]
+    assert pinned["recipe_calls"] == [calls, calls] and calls >= 16
+    assert pinned["request_divergence"] is None
+    control = conv.compare_conversations(log("unpinned-1"), log("unpinned-2"))
+    assert control["request_divergence"] is not None
+
+    def replay(name: str, base: str, seat: str, seed: str | None = None):
+        run = run_dir(name)
+        (run / "tmp").mkdir()
+        # What _replay_shadow.evaluate gives a replay: the environment of
+        # the fresh recording (here the seat's).
+        env = shadow._child_env(summary(seat), run / "tmp")
+        driver = _ON_PATH
+        if seed is not None:
+            env["PYTHONHASHSEED"], driver = seed, _UNPINNED
+        logs = ["--log", str(log(base)), "--seat-log", str(log(seat))]
+        outputs = ["--scratch", str(run / "scratch"), "--result", str(run / "r.json")]
+        return spawn(
+            [driver + _REPLAY_DRIVER, "replay", str(script), *logs, *outputs], env
+        )
+
+    replays = {
+        "pinned": replay("pinned", "pinned-1", "pinned-2"),
+        "unpinned": replay("unpinned", "unpinned-1", "unpinned-2", seed="2"),
+        "unpinned base": replay("unpinned base", "unpinned-1", "pinned-2"),
+        "unpinned replay": replay("unpinned replay", "pinned-1", "unpinned-2", "2"),
+    }
+    results = {}
+    for name, proc in replays.items():
+        output, _ = proc.communicate(timeout=120)
+        result = tmp_path / name / "r.json"
+        assert result.is_file(), output
+        results[name] = json.loads(result.read_text("utf-8"))
+    assert results["pinned"]["verdict"] == "noop", results["pinned"]
+    assert results["pinned"]["served"] == results["pinned"]["recorded"] == calls
+    assert results["unpinned"]["verdict"] == "diverged", results["unpinned"]
+    # One recording pinned and the other not: a refusal, never a divergence.
+    for name in ("unpinned base", "unpinned replay"):
+        verdict = results[name]["verdict"]
+        assert shadow.VERDICT_CLASSES[verdict] is shadow.VerdictClass.REFUSAL
+        assert verdict == "input_mismatch", results[name]
+        assert [m["input"] for m in results[name]["input_mismatches"]] == [
+            "env:PYTHONHASHSEED"
+        ]
 
 
 # --------------------------------------------------------------------------- #
@@ -1079,6 +1411,15 @@ def test_every_part_recording_fits_the_windows_path_limit(monkeypatch):
         tightest.append((need.headroom, stem, need.path))
     headroom, stem, path = min(tightest)
     assert headroom >= _FARM_HEADROOM, (stem, len(path), path)
+
+
+def test_a_replayed_output_path_is_the_builds_own_plus_14_characters():
+    out = PureWindowsPath("C:/w/cad/out")
+    output = "sldprt/sh_widget.SLDPRT"
+    assert shadow.SCRATCH == shadow.OUT_ROOT / "rs"
+    needs = shadow.path_needs(_STEM, out / "replay", out / "rs", [output])
+    [need] = [n for n in needs if n.purpose == f"replay output {output}"]
+    assert len(need.path) - len(str(out / output)) == 14  # \rs\<8>\o
 
 
 def test_a_checkout_too_deep_for_the_recording_builds_unrecorded(

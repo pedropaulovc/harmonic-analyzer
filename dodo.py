@@ -705,8 +705,26 @@ def _external_console_level() -> str:
     return _EXTERNAL_LOG_LEVELS.get(raw, "WARNING")
 
 
+# Every COM subprocess (:func:`_exec_com`: a part build, its recording driver
+# and its unrecorded re-run, assembly/drawing/hook runs) hashes str with seed
+# 0. Two shared helpers order COM requests by iterating a set of str
+# (_drawing_precision.py:40 ``_named_dimensions``; _supplier_spring_reference.py:376
+# ``add_supplier_reference_configurations``), so under per-process hash
+# randomisation a build's request order was random: 5 of 10 identical-source
+# part rebuilds diverged on it on 2026-11-11 (COM-replay native pass 2). Seed 0
+# is one of the orders builds already took, so no artefact's semantics change
+# and no cache key moves (dodo.py is in no recipe closure). Applied last, so an
+# inherited PYTHONHASHSEED cannot override it.
+_COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
+
+
 def _run_subprocess(
-    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+    cmd: list[str],
+    label: str,
+    log_stem: str | None = None,
+    *,
+    task: str | None = None,
+    env_pins: dict[str, str] | None = None,
 ) -> int:
     """Run the subprocess (span-less) and return its exit code (the raise-on-failure
     part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
@@ -715,7 +733,8 @@ def _run_subprocess(
     ``label`` is the display name; ``task`` is the doit task the subprocess works
     for (default: ``label``, which already is one for most callers). The fastener
     and fit-group guards are keyed on ``task``, so a FULL/REFRESH/hook subprocess
-    with a display label still gets its assembly's read sets."""
+    with a display label still gets its assembly's read sets. ``env_pins`` are
+    set over everything else (:data:`_COM_ENV_PINS` for COM subprocesses)."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
@@ -731,6 +750,7 @@ def _run_subprocess(
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
+    env.update(env_pins or {})
     if log_stem is None:
         return subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -979,12 +999,13 @@ def _exec_com(
     def run() -> tuple[int, float]:
         nonlocal cmd, recording
         started = time.time()
-        rc = _run_subprocess(cmd, label, log_stem, task=task)
+        rc = _run_subprocess(cmd, label, log_stem, task=task, env_pins=_COM_ENV_PINS)
         if recording is None or not recording.exited(rc):
             return rc, started
         cmd, recording = recording.unrecorded, None
         started = time.time()
-        return _run_subprocess(cmd, label, log_stem, task=task), started
+        rc = _run_subprocess(cmd, label, log_stem, task=task, env_pins=_COM_ENV_PINS)
+        return rc, started
 
     if not _sw_autostart_enabled():
         rc, started = run()
@@ -2640,9 +2661,10 @@ def _cached_part_action(stem: str, script: Path) -> None:
                     key_full=key,
                     **{"cache.key": key[:12]},
                 )
-            # HARMONIC_COM_REPLAY=off: None, and the build runs exactly as
-            # before (same command, no engine). Otherwise the build runs under
-            # the recording driver; see _replay_shadow.
+            # HARMONIC_COM_REPLAY=off or a cache role that cannot publish
+            # (ro/off): None, and the build runs exactly as before (same
+            # command, no engine). Otherwise the build runs under the
+            # recording driver; see _replay_shadow.
             recording = _replay_shadow.plan(stem, script, key)
             command = [sys.executable, str(script)]
             if recording is not None:

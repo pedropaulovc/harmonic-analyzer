@@ -9,8 +9,10 @@ One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
   same seat, same outputs, same exit codes, its COM conversation recorded under
   ``cad/out/replay/<stem>/``. Once the seat is released the recording is
   published BESIDE the part archive as two cache sidecars named from the part
-  key (``com-replay/<engine>/<stem>/<key>.tar`` and ``.json``): create-only,
-  ``rw`` only, never fatal (``_artifact_cache.publish_sidecar``).
+  key (``com-replay/<engine>/<stem>/bundle/<key>.tar`` and
+  ``.../manifest/<key>.json``): create-only, never fatal
+  (``_artifact_cache.publish_sidecar``). Only a cache role that can publish
+  (``rw``) records at all: in ``ro`` or ``off`` the build runs unrecorded.
 * ``shadow``: ``record``, then, still off the seat, the nearest earlier
   recording of the stem (fewest differing key inputs) is replayed against the
   CURRENT source in a sandboxed subprocess and compared with this build's
@@ -66,14 +68,16 @@ RECORDINGS = OUT_ROOT / "replay"
 # Shadow evaluations' work directories: ``<SCRATCH>/<8 random chars>/`` with
 # the base bundle in ``b``, the replay's output root in ``o`` and its temporary
 # files in ``t``. Short on purpose: a replay writes every output of the build
-# under ``o``, so its paths are the build's own plus SCRATCH_OVERHEAD.
+# under ``o``, so its paths are the build's own (under OUT_ROOT) plus 14
+# characters, ``\rs\<8 random chars>\o`` (pinned by test).
 SCRATCH = OUT_ROOT / "rs"
 SCRATCH_NAME_CHARS = 8  # tempfile.mkdtemp(prefix="")
 WORK_BASE, WORK_OUTPUT, WORK_TMP = "b", "o", "t"
 DRIVER = SCRIPTS_DIR / "com_replay.py"
 BLOB_ROOT = "com-replay"
-# 2: bundles of engine log schema 2 (flat captures).
-MANIFEST_SCHEMA = 2
+# 3: manifests carry the cache salt and epoch; bundles of engine log schema 2
+# (flat captures).
+MANIFEST_SCHEMA = 3
 LOG_NAME = "conversation.jsonl.gz"
 CAPTURE_NAME = f"{LOG_NAME}.files"  # _com_conversation.capture_dir_of
 # _com_conversation.capture_name(i) for any i < 10**6 (pinned by test).
@@ -146,11 +150,21 @@ class InputClass(StrEnum):
     RELEASE = "release"
     TEMPLATE = "template"
     ADAPTER = "adapter"
+    SALT = "salt"
     OTHER = "other"
+
+
+# The cache salt is a key input but no file (``_artifact_cache.key_inputs``
+# folds it into the key, not into the per-file pairs): a base recorded under
+# another salt differs by this one pseudo-input. Never a filter: a throwaway
+# salt must still find the recordings made under the default one.
+SALT_INPUT = "(cache salt)"
 
 
 def input_class(tag: str) -> InputClass:
     """Classify one repo-relative key-input tag (``_artifact_cache.key_inputs``)."""
+    if tag == SALT_INPUT:
+        return InputClass.SALT
     name = tag.rsplit("/", 1)[-1]
     if tag.startswith("cad/scripts/"):
         if name.startswith("build_") and name.endswith(".py"):
@@ -352,11 +366,13 @@ def path_needs(
 
 def plan(stem: str, script: Path, key: str) -> Recording | None:
     """The recording of this part build, or None: mode ``off`` (the build runs
-    exactly as before), a checkout too deep for the recording's own paths, or
-    a recording directory that cannot be prepared (the build runs unrecorded;
+    exactly as before), a cache role that cannot publish (``ro``/``off``: a
+    recording nobody can publish is pure cost, so the build runs exactly as
+    unrecorded), a checkout too deep for the recording's own paths, or a
+    recording directory that cannot be prepared (the build runs unrecorded;
     recording never costs a build)."""
     current = mode()
-    if current is ReplayMode.OFF:
+    if current is ReplayMode.OFF or not _cache.writable():
         return None
     too_long = [
         need for need in path_needs(stem, RECORDINGS, SCRATCH) if need.headroom < 0
@@ -390,16 +406,18 @@ def plan(stem: str, script: Path, key: str) -> Recording | None:
 
 
 def blob_prefix(engine: str, stem: str) -> str:
-    """Every recording of ``stem`` by this engine: what the base lookup lists.
-    A log only replays under the engine that wrote it, so the engine digest
-    scopes the listing."""
-    return f"{BLOB_ROOT}/{engine[:16]}/{stem}/"
+    """The manifests of every recording of ``stem`` by this engine: what the
+    base lookup lists. A log only replays under the engine that wrote it, so
+    the engine digest scopes the listing, and bundles live under a sibling
+    prefix, so it lists manifests only. (The cache layer adds the epoch:
+    ``_artifact_cache._sidecar_blob``.)"""
+    return f"{BLOB_ROOT}/{engine[:16]}/{stem}/manifest/"
 
 
 def blob_names(engine: str, stem: str, key: str) -> tuple[str, str]:
     """``(bundle, manifest)`` sidecar names of the recording of part ``key``."""
-    prefix = blob_prefix(engine, stem)
-    return f"{prefix}{key}.tar", f"{prefix}{key}.json"
+    root = f"{BLOB_ROOT}/{engine[:16]}/{stem}"
+    return f"{root}/bundle/{key}.tar", f"{blob_prefix(engine, stem)}{key}.json"
 
 
 def bundle(recording: Recording) -> bytes:
@@ -432,7 +450,10 @@ def manifest(
     bundle_name: str,
     bundle_bytes: bytes,
 ) -> dict[str, Any]:
-    """The small record a later build's base lookup reads instead of a bundle."""
+    """The small record a later build's base lookup reads instead of a bundle.
+    ``salt`` and ``epoch`` are the cache's (``_artifact_cache.config_summary``):
+    the two key inputs that are not files."""
+    settings = _cache.config_summary()
     return {
         "schema": MANIFEST_SCHEMA,
         "recording_id": uuid.uuid4().hex,
@@ -440,6 +461,8 @@ def manifest(
         "stem": recording.stem,
         "key": recording.key,
         "inputs": inputs,
+        "salt": settings["salt"],
+        "epoch": settings["epoch"],
         "engine": summary["engine"],
         "recipe_requests": summary.get("recipe_requests"),
         "calls": summary.get("calls"),
@@ -457,10 +480,14 @@ def manifest(
 
 
 def publish(recording: Recording, record: dict[str, Any], data: bytes) -> str:
-    """Bundle first, then the manifest (a manifest never names a missing
-    bundle). The manifest's outcome is the publication's."""
+    """Bundle first, then the manifest, so a manifest never names a missing
+    bundle. Only the writer whose bundle was stored writes the manifest: a
+    bundle that already ``exists`` is another writer's bytes (a recording is
+    never byte-identical twice), which this manifest's digest and counts do
+    not describe, so the publication ends there. The manifest's outcome is
+    the publication's."""
     bundle_outcome = _cache.publish_sidecar(record["bundle"]["name"], data)
-    if bundle_outcome not in ("stored", "exists"):
+    if bundle_outcome != "stored":
         return bundle_outcome
     _, manifest_name = blob_names(record["engine"], recording.stem, recording.key)
     return _cache.publish_sidecar(
@@ -503,18 +530,22 @@ def nearest(
     candidates: Iterable[tuple[dict[str, Any], float]],
     inputs: dict[str, str],
     exclude_id: str | None,
+    salt: str,
 ) -> Base | None:
     """The candidate with the fewest differing inputs; a tie goes to the most
-    recently published. Never the recording being evaluated."""
+    recently published. Never the recording being evaluated. A base recorded
+    under another cache ``salt`` differs by one more input
+    (:data:`SALT_INPUT`); it is never excluded for it."""
     best: Base | None = None
     for record, modified in candidates:
         if record.get("schema") != MANIFEST_SCHEMA:
             continue
         if exclude_id is not None and record.get("recording_id") == exclude_id:
             continue
-        candidate = Base(
-            record, differing_inputs(record.get("inputs") or {}, inputs), modified
-        )
+        differing = differing_inputs(record.get("inputs") or {}, inputs)
+        if record.get("salt") != salt:
+            differing = (SALT_INPUT, *differing)
+        candidate = Base(record, differing, modified)
         if best is None or (len(candidate.differing), -candidate.modified) < (
             len(best.differing),
             -best.modified,
@@ -542,12 +573,14 @@ def find_base(
     prefix: str,
     inputs: dict[str, str],
     exclude_id: str | None,
+    salt: str,
     *,
     budget: float = LOOKUP_SECONDS,
     limit: int = LOOKUP_MANIFESTS,
 ) -> LookupResult:
     """One listing of ``prefix`` and at most ``limit`` manifest reads, newest
-    first, inside ``budget`` seconds of wall time; past it, no base."""
+    first, inside ``budget`` seconds of wall time; past it, no base. ``salt``
+    is the current cache salt (:func:`nearest`)."""
     if not _cache.enabled():
         return LookupResult(Lookup.OFF)
     result = LookupResult(Lookup.NONE)
@@ -573,7 +606,7 @@ def find_base(
 
     if not within(budget, work):
         return LookupResult(Lookup.BUDGET, None, result.listed, result.read)
-    base = nearest(candidates, inputs, exclude_id)
+    base = nearest(candidates, inputs, exclude_id, salt)
     result.base = base
     result.outcome = Lookup.FOUND if base is not None else Lookup.NONE
     return result
@@ -609,6 +642,37 @@ def within(seconds: float, work: Callable[[], None]) -> bool:
 # ---------------------------------------------------------------------------
 
 
+class VerdictClass(StrEnum):
+    """What a shadow verdict says about the replay's judgement."""
+
+    NOOP = "noop"
+    # The replay judged the current source's requests against the base and
+    # found them different: diverged, exhausted or unconsumed.
+    DIVERGENCE = "divergence"
+    # The replay declined to judge, by design: inputs other than source
+    # differ from the base (input_mismatch), or the script did what a replay
+    # never serves (sandbox).
+    REFUSAL = "refusal"
+    # No judgement for a reason of the machinery's own: error, timeout,
+    # unavailable base, or anything unknown.
+    INFRASTRUCTURE = "infrastructure"
+
+
+# The engine's Verdict values (_com_conversation.Verdict; dodo never imports
+# the engine) plus this module's own; pinned complete by test.
+VERDICT_CLASSES: dict[str, VerdictClass] = {
+    "noop": VerdictClass.NOOP,
+    "diverged": VerdictClass.DIVERGENCE,
+    "exhausted": VerdictClass.DIVERGENCE,
+    "unconsumed": VerdictClass.DIVERGENCE,
+    "input_mismatch": VerdictClass.REFUSAL,
+    "sandbox": VerdictClass.REFUSAL,
+    "error": VerdictClass.INFRASTRUCTURE,
+    "timeout": VerdictClass.INFRASTRUCTURE,
+    "unavailable": VerdictClass.INFRASTRUCTURE,
+}
+
+
 @dataclass
 class Shadow:
     """What a shadow replay of the current source against a base found."""
@@ -624,6 +688,10 @@ class Shadow:
     request_divergence: dict[str, Any] | None = None
 
     @property
+    def verdict_class(self) -> VerdictClass:
+        return VERDICT_CLASSES.get(self.verdict, VerdictClass.INFRASTRUCTURE)
+
+    @property
     def soundness_alarm(self) -> bool:
         """A replay NOOP although the fresh recording's requests diverged
         from the base: the replay would have reused a wrong artefact."""
@@ -631,9 +699,14 @@ class Shadow:
 
     @property
     def false_divergence(self) -> bool:
-        """The replay stopped although the fresh recording issued the base's
-        exact requests (a missed reuse, never an unsound one)."""
-        return self.verdict != "noop" and self.ground_truth == "same"
+        """The replay judged a divergence although the fresh recording issued
+        the base's exact requests (a missed reuse, never an unsound one).
+        Refusals and infrastructure verdicts are no judgement, so never one:
+        they are counted by :attr:`verdict_class`."""
+        return (
+            self.verdict_class is VerdictClass.DIVERGENCE
+            and self.ground_truth == "same"
+        )
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -723,6 +796,8 @@ def evaluate(
                 str(recording.script),
                 "--log",
                 str(base_dir / LOG_NAME),
+                "--seat-log",
+                str(recording.log),
                 "--capture-dir",
                 str(base_dir / CAPTURE_NAME),
                 "--scratch",
@@ -800,34 +875,40 @@ def after_build(
 ) -> None:
     """Publish this build's recording and (``shadow``) evaluate a replay of
     it. Runs after the seat is released; never raises, never touches an
-    output. ``recording`` None (mode ``off``) is a no-op; a faulted recording
-    (:meth:`Recording.exited`) publishes nothing. Every recorded build ends
-    with one ``replay_shadow`` cache.jsonl record and one INFO line
-    (:func:`report_line`)."""
+    output. ``recording`` None (no recording: :func:`plan`) is a no-op; a
+    faulted recording (:meth:`Recording.exited`) publishes nothing. Every
+    recorded build ends with one ``replay_shadow`` cache.jsonl record and one
+    INFO line (:func:`report_line`), all inside one ``replay.after_build``
+    span: the wall time this step adds to the task, every part of it."""
     if recording is None:
         return
+    label = recording.label
     record: dict[str, Any] = {"mode": recording.mode.value}
-    if recording.recovery is not None:
-        record.update(
-            outcome="record_fault",
-            recovery=recording.recovery.value,
-            where=recording.fault_where,
-        )
-    else:
-        try:
-            _after_build(recording, file_deps, digest, record)
-        except Exception as exc:  # noqa: BLE001 - observation never costs a build
-            _telemetry.warn(
-                f"[com-replay] {recording.label}: shadow step failed: {exc!r}",
-                label=recording.label,
+    with _telemetry.span(
+        f"replay.after_build {label}",
+        service=_telemetry.BUILD_INFRA_SERVICE,
+        label=label,
+    ) as sp:
+        if recording.recovery is not None:
+            record.update(
+                outcome="record_fault",
+                recovery=recording.recovery.value,
+                where=recording.fault_where,
             )
-            record.update(outcome="error", error=repr(exc)[:EVIDENCE_CHARS])
-    _cache.record_event("replay_shadow", recording.label, recording.key, **record)
-    _telemetry.info(
-        report_line(recording.label, record),
-        label=recording.label,
-        outcome=record["outcome"],
-    )
+        else:
+            try:
+                _after_build(recording, file_deps, digest, record)
+            except Exception as exc:  # noqa: BLE001 - observation never costs a build
+                _telemetry.warn(
+                    f"[com-replay] {label}: shadow step failed: {exc!r}",
+                    label=label,
+                )
+                record.update(outcome="error", error=repr(exc)[:EVIDENCE_CHARS])
+        sp.set_attribute("replay.outcome", record["outcome"])
+        _cache.record_event("replay_shadow", label, recording.key, **record)
+        _telemetry.info(
+            report_line(label, record), label=label, outcome=record["outcome"]
+        )
 
 
 def report_line(label: str, record: dict[str, Any]) -> str:
@@ -941,6 +1022,7 @@ def _after_build(
             blob_prefix(summary["engine"], recording.stem),
             inputs,
             published["recording_id"],
+            published["salt"],
         )
         sp.set_attribute("replay.lookup", found.outcome.value)
         sp.set_attribute("replay.listed", found.listed)
@@ -972,6 +1054,7 @@ def _after_build(
         divergence = shadow.divergence or {}
         fields = {
             "verdict": shadow.verdict,
+            "verdict_class": shadow.verdict_class.value,
             "recorded": shadow.recorded,
             "served": shadow.served,
             "divergence_member": divergence.get("member_actual")
