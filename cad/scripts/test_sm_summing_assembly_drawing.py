@@ -309,8 +309,8 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     # bolt is run in by hand to its washer before it draws the mount's top
     # seat flat to the crossbar underside.  Owner ruling 2026-11-08 (Pedro),
     # #2144 item 11.3: with both bolts finger-tight the gauge bar through
-    # both bores sets the mounts' yaw before they are tightened, and it must
-    # slide back out (check 5).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
+    # both bores sets the front mount's yaw before its bolt is tightened, and
+    # it must slide back out (check 5).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
     # the tool is an 8.0 in bar that spans both mounts, not a class ZZ pin,
     # with a fit route (rule 4): a matched fit to the bores it gauges, whose
     # maximum is the clearance the rock budget charges.
@@ -339,6 +339,26 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert any(
         check.startswith("5. AFTER STEP 5 THE GAUGE BAR SLIDES OUT")
         for check in notes.ASSEMBLY_CHECKS
+    )
+
+
+def test_rear_mount_bolt_is_first_tightened_after_its_rock_swing() -> None:
+    # #2400: step 6 lifts the rear mount off and 6G sets it by the rock
+    # gauge, so step 5 tightens only the front mount; a rear bolt tightened
+    # at step 5 would be undone at step 6.
+    tightens = [
+        line for line in notes.ASSEMBLY_STEPS if "TIGHTEN" in line and "MOUNT" in line
+    ]
+    step_five = [line for line in tightens if drawing._step_group(line) == "5"]
+    assert len(step_five) == 1
+    action = step_five[0].partition("(")[0]
+    assert "FRONT MOUNT" in action
+    assert "REAR" not in action and "BOTH" not in action and "EACH" not in action
+    rear = [line for line in tightens if "TIGHTEN THE REAR" in line]
+    assert len(rear) == 1 and drawing._step_group(rear[0]) == "6"
+    steps = notes.ASSEMBLY_STEPS
+    assert steps.index(rear[0]) > next(
+        i for i, line in enumerate(steps) if "SWING THE REAR MOUNT" in line
     )
 
 
