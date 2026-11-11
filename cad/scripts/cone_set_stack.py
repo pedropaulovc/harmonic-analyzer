@@ -4,10 +4,10 @@ Owner direction 2026-11-11 (#2365), superseding the feeler sets of user
 ruling 2026-10-10 and owner ruling 2026-11-08 for this setting: the cone set
 is swung in and out by the operator many times and is locked by feel where
 the gears do not bind. Assembly order (the assembly drawing's CHECKS note):
-arbor-pedestal screws snug-loose, swing in and tap the pedestals until the
-gears at both ends of the set mesh without binding, tighten the pedestals,
-then swing in until the gears mesh without binding through a full turn and
-lock the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
+arbor-pedestal screws snug-loose, hold the set swung in and tap each pedestal
+in until the gears at its end just bind, tighten the pedestals, then swing in
+until a gear just binds, ease out only until the gears turn freely, and lock
+the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
 The swing stops where the first pair binds: its backlash closes, a tip
@@ -139,9 +139,12 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
     )
 
 
-# The highest first bind of any pair: check 4 lays the arbor line on the
-# binds at both ends of the set, so every pair lies between the pairs that
-# hold the swing, none above this at its tightest phase.
+# The highest first bind of any pair: check 4 taps each pedestal in to the
+# first bind at its end and swings the set in to the first bind, easing out
+# only until the gears turn, so the arbor line lies on the binds at both ends
+# and every pair lies between the pairs that hold the swing, none above this
+# at its tightest phase.  The ease is felt, not booked: past the ceiling the
+# loosest-meshing T012 keeps a contact ratio above 1.0 for a further 0.04 mm.
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
 # The far phase of the running runout: the set is felt at the tightest phase
 # of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)
@@ -175,8 +178,10 @@ def cone_centre(teeth: int) -> ConeCentre:
 
 
 # The T120 centre's largest departure from the CAD placement under a feel
-# set, at its tightest phase: the swing's angle error at T120.
+# set: the swing's angle error at T120.  The bore centres sit at the
+# effective (tooth-contact) bind on the tight side and up to one TIR above it
+# on the loose side, where the two eccentricities point at each other.
 SWING_SET_FROM_PLACEMENT_MM = max(
     abs(min(first_bind_offsets_mm(120)) - SET_ABOVE_STANDARD_MM),
-    abs(SET_OFFSET_MAX_MM - SET_ABOVE_STANDARD_MM),
+    abs(SET_OFFSET_MAX_MM + TOOTH_RUNOUT_TIR_MM - SET_ABOVE_STANDARD_MM),
 )

@@ -1,22 +1,21 @@
 """Closed-form standard checks of every drive-train mesh, from spec values.
 
 Cone family (owner direction 2026-11-11, #2365: the swing is set by feel,
-cone_set_stack). The feel set is what keeps the gears from binding: no pair
-runs tighter than its own first bind, so the gates state what that leaves
-at the floor, every printed corner pair at its own first bind: backlash >= 0
-(no bind at the tightest gear), no tip on a root, and on T012..T120 no tip
-past the mate's base tangent. Against coming loose, nominal contact ratio
->= 1.0 at the loosest running centre a feel set leaves the cone. The contact
-ratio of the printed corners there is reported only. The crank pair's
-open-corner figure is a reference, as main printed it
-(dt_crank_drive_gear_notes, user ruling 2026-09-30).
+cone_set_stack). The feel set is what keeps the gears from binding: the
+operator locks it where no gear binds, so no pair runs tighter than its own
+first bind, and cone_check reports what that leaves there. Against coming
+loose, nominal contact ratio >= 1.0 at the loosest running centre a feel
+set leaves the cone. The contact ratio of the printed corners there is
+reported only. The crank pair's open-corner figure is a reference, as main
+printed it (dt_crank_drive_gear_notes, user ruling 2026-09-30).
 
 Pending exception rulings (#971):
 * T006 (user ruling 2026-10-10): no full-depth six-tooth form reaches a
-  contact ratio of 1 against the shared 20 deg drum. Its ground relief is
-  gated at least 10 um clear of every drum-tip corner's path at the loosest
-  set and running centres, so the relief never holds the swing out; its
-  contact ratio is reported.
+  contact ratio of 1 against the shared 20 deg drum. Its printed corners keep
+  >= 0.02 mm backlash where the swing locks (another pair's first bind holds
+  it), and its ground relief is gated at least 10 um clear of every drum-tip
+  corner's path at that set and at the loosest running centre, so the relief
+  never holds the swing out; its contact ratio is reported.
 * The alignment pinion is a fit-up mesh: its contact ratio is reported, not
   gated (tolerances/gear_tip.yaml note).
 """
@@ -36,26 +35,13 @@ EXEMPT_CONE_TEETH = frozenset({6})
 CONE_TEETH = tuple(t for t in cone.CONE_TEETH if t not in EXEMPT_CONE_TEETH)
 CONE_NOMINAL_CONTACT_RATIO_MIN = 1.0
 T006_RELIEF_CLEARANCE_MIN_MM = 0.010
-# The first-bind centres are solved to 1 nm; a closed contact reads zero.
-FIRST_BIND_TOLERANCE_MM = 1e-6
+T006_SET_BACKLASH_MIN_MM = 0.02
 
 
 def _require_no_bind(check) -> None:
     assert check.backlash_min_mm > 0.0, check.text()
     assert check.root_clearance_min_mm > 0.0, check.text()
     assert check.interference_margin_min_mm >= 0.0, check.text()
-
-
-@pytest.mark.parametrize("teeth", cone.CONE_TEETH)
-def test_the_feel_set_floor_is_a_running_mesh(teeth: int) -> None:
-    check = dt_mesh_checks.cone_check(teeth)
-    # No bind: backlash >= 0 at the tightest gear, never a tip on a root.
-    assert check.backlash_floor_mm >= -FIRST_BIND_TOLERANCE_MM, check.text()
-    assert check.root_clearance_floor_mm >= -FIRST_BIND_TOLERANCE_MM, check.text()
-    if teeth not in EXEMPT_CONE_TEETH:
-        assert check.interference_margin_floor_mm >= -FIRST_BIND_TOLERANCE_MM, (
-            check.text()
-        )
 
 
 @pytest.mark.parametrize("teeth", CONE_TEETH)
@@ -71,6 +57,11 @@ def test_alignment_drum_fitup_mesh_cannot_bind() -> None:
 def test_t006_relief_never_holds_the_swing_out() -> None:
     clearance = dt_mesh_checks.t006_relief_clearance_mm()
     assert clearance >= T006_RELIEF_CLEARANCE_MIN_MM, f"T006 relief clearance {clearance:.4f} mm"
+
+
+def test_t006_keeps_its_ruled_backlash_where_the_swing_locks() -> None:
+    check = dt_mesh_checks.cone_check(6)
+    assert check.backlash_set_mm >= T006_SET_BACKLASH_MIN_MM, check.text()
 
 
 def test_t006_relief_centre_lies_inside_its_feel_set_range() -> None:

@@ -593,17 +593,19 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set by
     feel at assembly (owner direction 2026-11-11, #2365; cone_set_stack):
-    pedestals snug-loose and tapped until both ends mesh without binding,
-    pedestals tightened, then swung in until nothing binds and locked with
-    MHA-DT-VN-51 -- never the stop, and nothing gauged."""
+    each pedestal tapped in to the first bind at its end and tightened,
+    then the swing brought in to the first bind, eased out only until the
+    gears turn, and locked with MHA-DT-VN-51 -- never the stop, and nothing
+    gauged."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
-        check.index("TAP EACH MHA-DT-02 UNTIL THE GEARS AT ITS END MESH WITHOUT BINDING"),
+        check.index("TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND"),
         check.index("TIGHTEN MHA-DT-VN-62"),
         check.index("SWING THE CONE SET OUT"),
-        check.index("SWING IN UNTIL THE GEARS MESH WITHOUT BINDING"),
+        check.index("SWING IN UNTIL A GEAR JUST BINDS"),
+        check.index("EASE OUT UNTIL THE GEARS TURN FREELY"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
     assert order == sorted(order), check
@@ -625,6 +627,24 @@ def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
     turns = re.search(r"TURN THE CRANK (\d+) TURNS\b[^.]*\bBIND", check)
     assert turns is not None, check
     assert int(turns.group(1)) == crank_per_cone_turn * slowest_drum_turn
+
+
+def test_zeroing_re_sets_the_swing_and_cranks_back_to_the_zero() -> None:
+    """Re-setting the swing turns the crank; the acceptance's crank turns
+    turn every MHA-DT-12 a whole number of times, so cranking on until the
+    notches return restores the zero just set."""
+    import dt_cone_gear_spec as cone
+    import dt_crank_drive_gear_spec as gear64
+    import dt_crank_pinion_spec as pinion
+    import dt_cylinder_gear_spec as drum
+    from fractions import Fraction
+
+    cone_turns = Fraction(drawing.CHECK_RUN_CRANK_TURNS * pinion.TEETH, gear64.TEETH)
+    for teeth in cone.CONE_TEETH:
+        assert (cone_turns * Fraction(teeth, drum.TEETH)).denominator == 1, teeth
+    zeroing = " ".join(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0].split())
+    reset = zeroing.index("RE-SET THE CONE SET SWING")
+    assert zeroing.index("UNTIL EVERY NOTCH IS BACK") > reset > zeroing.index("NOTCHES")
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:

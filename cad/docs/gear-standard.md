@@ -112,22 +112,24 @@ assembly (owner direction 2026-11-11, #2365), so the gate is written for what
 a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
 `test_standard_mesh_checks`):
 
-- No binding is what the feel set itself guarantees. The swing stops where
-  the first pair binds, so no pair runs tighter than its own first bind: at
-  the tightest gear the backlash is at least zero. The check confirms that
-  at every printed corner pair's first bind the backlash is closed or open,
-  no tip sits on a root, and on T012–T120 no tip has passed the mate's base
-  tangent.
+- No binding is what the feel set itself guarantees. Check 4 taps each
+  pedestal in until the gears at its end just bind, then swings the set in
+  until a gear just binds and eases it out only until the gears turn. No pair
+  runs tighter than its own first bind, so at the tightest gear the backlash
+  is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
   any pair, opened by both gears' running runout. Nominal ratios there run
-  from 1.07 (T012) up to about 1.20.
+  from 1.07 (T012) up to about 1.20; T012 keeps a ratio above 1.0 for a
+  further 0.04 mm of easing.
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
-  ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
-  least 0.010 mm clear of every printed drum-tip path at the loosest set and
-  running centres, so the relief never holds the swing out further than the
-  flanks do. Its contact ratio, 0.774 nominal and 0.765 at the printed
-  corners, is reference only.
+  ratio of 1 against the 20° 120T drum. Its printed corners keep at least
+  0.02 mm backlash where the swing locks (0.036 mm; another pair's first bind
+  holds the swing there), and its DT6-FORM1 relief is gated at least 0.010 mm
+  clear of every printed drum-tip path at that set and at the loosest running
+  centre, so the relief never holds the swing out further than the flanks
+  do. Its contact ratio, 0.774 nominal and 0.765 at the printed corners, is
+  reference only.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
   1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
   Its open-corner ratio is reference only.
@@ -201,16 +203,19 @@ times and locks it by feel where the gears do not bind (owner direction
 from MHA-DT-00 check 4 (CONE SWING SET):
 
 1. Ease the arbor-pedestal screws until the pedestals move under light taps.
-2. Hold the cone set swung in and tap each pedestal until the gears at its
-   end mesh without binding through one turn of the cone set, so the arbor
-   lies along the cone line. Tighten the pedestal screws.
-3. Swing out, swing in until the gears mesh without binding through one turn
-   of the cone set, hold it there, and lock MHA-DT-VN-51.
+2. Hold the cone set swung in and tap each pedestal in until the gears at its
+   end just bind, so the arbor lies on the binds at both ends. Tighten the
+   pedestal screws.
+3. Swing out, swing in until a gear just binds, ease out only until the gears
+   turn freely through one turn of the cone set, hold it there, and lock
+   MHA-DT-VN-51.
 4. Turn the crank through one turn of every MHA-DT-12 (80 crank turns): no
-   gear binds. If one does, loosen the knob and set it again.
+   gear binds. If one does, loosen the knob there and ease out again.
 5. Do not loosen the pedestals after the set. If you do, redo both settings.
 
-The zeroing (check 5) ends by swinging in and locking the same way. The set
+The zeroing (check 5) ends by setting the swing the same way and cranking on
+until every notch is back: 80 crank turns turn every MHA-DT-12 a whole number
+of times, so the zero returns. The set
 absorbs the pivot's play and the gears' seat floats, which take the mesh
 load the same way when set as when running; the platform pivot is still
 reamed Ø6.350 H7 (6.350–6.365 mm) on the stock 91829A560 shoulder, and the

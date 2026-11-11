@@ -957,7 +957,7 @@ STACK_WINDOW = inch_window(
 # but it owns the Mitutoyo 81-piece inch gauge blocks and a test indicator
 # (shop-equipment.toml): the indicator is zeroed on a wrung stack of the
 # bank's nominal length standing on the stop gear 0's cam face sits on, and
-# the stack is the blocks plus its reading at gear 19 (as check 4F adds an
+# the stack is the blocks plus its reading at gear 19 (as check 4G adds an
 # indicator reading to a recorded value).  The blocks print at the model leg's own
 # places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo review of #2532).
 STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
@@ -1571,6 +1571,11 @@ DRO_ZERO_STEP = "8P"
 BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
+        # Owner ruling 2026-11-11 (#2362, option g): the 20 gears are made as a
+        # matched set, each faced to the running shortfall, so the stack meets
+        # 8E's window with the band, window and guards unchanged; 8F-8G stay
+        # the fallback.  The full rule is the MHA-DT-12 process record.
+        "FACE GEARS 0-19 IN ORDER, EACH CANCELLING THE EARLIER GEARS' EXCESS.",
         # Owner ruling 2026-11-08 (Pedro): GEAR 0-19 are defined in the sheet 7
         # code key (code_key_text), not by a prose line here.
         "8. WRITE DOWN EACH MHA-DT-12'S MICED THICKNESS, CAM FACE TO BACK FACE.",
@@ -1897,7 +1902,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # Check 4 then sets the swing and clamps it.  PR 2 machinist review
         # round 6 (clarity): a seated screw's engagement cannot be read, so
         # each blind seat's full-thread depth and its screw's thread length
-        # are recorded before the screw goes in; checks 4V and 4X take the
+        # are recorded before the screw goes in; checks 4W and 4Y take the
         # lesser of the two.
         (
             "other-base-mounting",
@@ -1963,7 +1968,7 @@ CHECKS = _note_text(
         "   TURN.",
         "2A. MHA-DT-07 CLEARS THE UNRELIEVED MHA-DT-20 TOP THROUGH THAT TURN.",
         # Round 17 (#3): the mesh is set and accepted in check 4.
-        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER CHECKS 4E, 4M AND 4Q.",
+        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER CHECKS 4E, 4M AND 4R.",
         "3. EACH MHA-DT-12 TURNS FREELY ON MHA-DT-13 WITHOUT AXIAL BINDING.",
         # Prove the reversed preload seats on the front disc.
         "3A. PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE: THE BANK SPRINGS",
@@ -1974,19 +1979,22 @@ CHECKS = _note_text(
         # Owner direction 2026-11-11 (#2365), superseding the feeler sets of
         # user ruling 2026-10-10 and owner ruling 2026-11-08: the operator
         # swings the cone set in and out many times and locks it by feel where
-        # the gears do not bind (cone_set_stack).  The pedestals are first
-        # tapped until both ends of the set mesh without binding, so the arbor
-        # lies along the cone line; they may move only inside their
-        # setting-table ranges (#1691 review r4).  A bind is cleared by easing
-        # the swing, not by stoning a tip.  One turn of every MHA-DT-12 is one
-        # turn of the slowest, CHECK_RUN_CRANK_TURNS crank turns.
+        # the gears do not bind (cone_set_stack).  Each pedestal is first
+        # tapped in until the gears at its end just bind, so the arbor lies on
+        # the binds at both ends; the swing then comes in to the first bind
+        # and eases out only until the gears turn, which bounds the loosest
+        # centre (cone_set_stack.SET_OFFSET_MAX_MM).  The pedestals may move
+        # only inside their setting-table ranges (#1691 review r4).  A bind is
+        # cleared by easing the swing at the binding phase, not by stoning a
+        # tip.  One turn of every MHA-DT-12 is one turn of the slowest,
+        # CHECK_RUN_CRANK_TURNS crank turns; each drum then makes whole turns,
+        # so zeroing (5H) can crank on until the notches return.
         "4. CONE SWING SET: LOOSEN MHA-DT-VN-51.",
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 OUT TO THE MHA-SH-VN-52 STOP.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
         "4C. EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES UNDER LIGHT TAPS.",
         "4D. HOLD THE CONE SET SWUNG IN.",
-        "4E. TAP EACH MHA-DT-02 UNTIL THE GEARS AT ITS END MESH WITHOUT BINDING THROUGH "
-        f"{CONE_TURN_CRANK_TURNS} CRANK TURNS.",
+        "4E. TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. TIGHTEN MHA-DT-VN-62.",
         "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
         f"{SETTING_SHEET}): EACH RECORDED VALUE PLUS ITS INDICATOR READING MUST BE IN "
@@ -1995,26 +2003,26 @@ CHECKS = _note_text(
         "4J. RESET IT INTO ITS ACCEPT RANGE ON ITS INDICATORS.",
         "4K. TIGHTEN ITS MHA-DT-VN-62.",
         "4L. SWING THE CONE SET OUT.",
-        "4M. SWING IN UNTIL THE GEARS MESH WITHOUT BINDING THROUGH "
-        f"{CONE_TURN_CRANK_TURNS} CRANK TURNS.",
-        "4N. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
+        "4M. SWING IN UNTIL A GEAR JUST BINDS.",
+        f"4N. EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} CRANK TURNS.",
+        "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
-        "4P. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
-        f"4Q. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND.",
+        "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
+        f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND.",
         # Rubric sample round 9 (rule 22): the check, its remedy, the hold and
         # the redo are one step each.
-        "4R. IF ONE BINDS, LOOSEN MHA-DT-VN-51.",
-        "4S. REDO 4M-4Q.",
-        "4T. LEAVE MHA-DT-02 AS THEY ARE FROM HERE ON.",
-        "4U. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
-        "4V. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
+        "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE.",
+        "4T. REDO 4N-4R.",
+        "4U. LEAVE MHA-DT-02 AS THEY ARE FROM HERE ON.",
+        "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
+        "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
         f"{_step_ref('other-base-mounting', 'F')}-{_step_ref('other-base-mounting', 'G')}.",
-        "4W. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
-        "4X. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
+        "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
+        "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
         f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')}.",
-        "4Y. CHECK THAT ITS HEAD IS FULLY SEATED.",
+        "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
         # turned 90° = sine mode (book pp. 66-67; dimensions.yaml ch14).
@@ -2038,9 +2046,11 @@ CHECKS = _note_text(
         "5E. SINES: AS 5D, BUT STOP ALL NOTCHES LEVEL ON THE MHA-DT-01 SIDE "
         "(LEFT IN THE FRONT VIEW), A QUARTER TURN SHORT OF THE TOP.",
         # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES):
-        # zeroing ends by re-setting the swing by feel as check 4 does.
+        # zeroing ends by re-setting the swing by feel as check 4 does, then
+        # cranks on to whole turns of every drum, so the zero just set returns.
         "5F. RETURN MHA-DT-16 TO PARK.",
-        "5G. RE-SET THE CONE SET SWING AS 4M-4P.",
+        "5G. RE-SET THE CONE SET SWING AS 4M-4T.",
+        "5H. TURN THE CRANK ON UNTIL EVERY NOTCH IS BACK AS 5D OR 5E.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
         f"   AT GEAR 0 AND AT GEAR 19, {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
@@ -2161,8 +2171,10 @@ _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-BANK_CONTINUED_FROM = str(steps.step_number("cylinder-bank-located"))
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}W"
+# #2362's matched-set line moved the bank's 8Z and 9U-9V and the rig's 16B on
+# a field.
+BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-bank-located') - 1}Z"
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}U"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
@@ -2170,10 +2182,10 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
 )
 # Rounds 19-20: step 23's pivot-seat transfer moved each rig split on; #2470
 # moved step 6 to sheet 8, so the bank and rig splits moved on to refill
-# sheets 9-11 (16C, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
+# sheets 9-11 (16B, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
 # the checks' tip-gap reset cites it.
 RIG_SPLITS = (
-    (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
+    (f"{steps.step_number('straps-pinned-to-torque-shaft')}B", RIG_SEQUENCE_HEADING),
     (
         f"{steps.step_number('rig-located')}E",
         f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
@@ -2183,9 +2195,9 @@ RIG_SPLITS = (
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )
-# The one-thing check lines (rubric sample round 4) run checks 1-5 down
-# sheet 13's left field; 5A heads its right field, over the saved pose.
-CHECKS_CONTINUED_FROM = "5B"
+# The one-thing check lines (rubric sample round 4) run checks 1-5B down
+# sheet 13's left field; 5C heads its right field, over the saved pose.
+CHECKS_CONTINUED_FROM = "5C"
 CHECKS_PRIMARY, CHECKS_CONTINUED = _split_sequence_notes(
     CHECKS,
     CHECKS_CONTINUED_FROM,

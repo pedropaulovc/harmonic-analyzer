@@ -2,9 +2,9 @@ cone_drum_oblique_mesh:  # the inclined cone partial engagement
   # The engaged centre is SET BY FEEL AT ASSEMBLY (owner direction 2026-11-11, #2365,
   #   superseding the feeler sets of user ruling 2026-10-10 and owner ruling
   #   2026-11-08): the operator swings the cone set in and out many times and locks
-  #   the cone-lock-knob (MHA-DT-VN-51) where the gears mesh without binding through
-  #   a full turn; check 4 first taps the arbor pedestals until both ends of the set
-  #   mesh without binding. No feeler, gauge or engaged stop. cone_set_stack books the
+  #   the cone-lock-knob (MHA-DT-VN-51) just out from the first bind, where the gears
+  #   turn freely; check 4 first taps the arbor pedestals in to the first bind at both
+  #   ends of the set. No feeler, gauge or engaged stop. cone_set_stack books the
   #   centres a feel set can leave each cone at; dt_mesh_checks states what it
   #   guarantees (backlash >= 0 at the tightest gear) and gates nominal CR >= 1.0 at
   #   the loosest. The swing stop (the shared MHA-SH-VN-52) only limits the

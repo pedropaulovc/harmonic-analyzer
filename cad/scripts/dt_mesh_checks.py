@@ -11,10 +11,12 @@ Every value comes from the part specs and config:
   not come loose: nominal contact ratio >= 1.0 at the loosest centre a feel
   set leaves a cone (test_standard_mesh_checks). The contact ratio of the
   printed corners there is reported only;
-* the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief
-  must stay clear of every printed drum-tip corner's path at the loosest set
-  and at the loosest running centre (``t006_relief_clearance_mm``), so the
-  relief never holds the swing out further than the flanks do.
+* the T006 shortfall (pending exception ruling #971): its printed corners keep
+  >= 0.02 mm backlash where the swing locks (``backlash_set_mm`` at the
+  highest first bind of any pair, which another pair holds), and its
+  DT6-FORM1 relief must stay clear of every printed drum-tip corner's path
+  there and at the loosest running centre (``t006_relief_clearance_mm``), so
+  the relief never holds the swing out further than the flanks do.
 
 The 32T alignment check lives in alignment_mesh_check, the crossed 16T:64T
 crank check with its stack in crank_mesh_stack.
@@ -51,6 +53,7 @@ class ConeMeshCheck:
     backlash_max_mm: float  # REF: every printed corner pair at the ceiling
     interference_margin_floor_mm: float
     root_clearance_floor_mm: float
+    backlash_set_mm: float  # every printed corner pair where the swing locks
 
     def text(self) -> str:
         lo, hi = self.centre.range_mm
@@ -61,7 +64,8 @@ class ConeMeshCheck:
             f"backlash {self.backlash_floor_mm:.3f} at the first bind, "
             f"{self.backlash_max_mm:.3f} loosest (REF); "
             f"interference margin {self.interference_margin_floor_mm:.3f} and "
-            f"root clearance {self.root_clearance_floor_mm:.3f} at the first bind"
+            f"root clearance {self.root_clearance_floor_mm:.3f} at the first bind; "
+            f"backlash {self.backlash_set_mm:.3f} where the swing locks"
         )
 
 
@@ -95,6 +99,7 @@ def cone_check(teeth: int) -> ConeMeshCheck:
         max(backlash(a, b, loosest, alpha) for a, b in pairs),
         min(interference_margin(a, b, c, alpha) for a, b, c in binds),
         min(root_clearance(a, b, c) for a, b, c in binds),
+        min(backlash(a, b, centre.set_max_mm, alpha) for a, b in pairs),
     )
 
 

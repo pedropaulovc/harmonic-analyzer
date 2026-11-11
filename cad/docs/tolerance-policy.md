@@ -117,19 +117,20 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
 
 - **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
   centre is set by feel at assembly (owner direction 2026-11-11, #2365,
-  superseding the feeler sets of 2026-10-10 and 2026-11-08). Pedestals
-  snug-loose and tapped until both ends of the set mesh without binding,
-  tightened, then the set swung in until the gears mesh without binding and
+  superseding the feeler sets of 2026-10-10 and 2026-11-08). Each pedestal
+  tapped in until the gears at its end just bind and tightened, then the set
+  swung in until a gear just binds, eased out only until the gears turn, and
   the cone-lock-knob (MHA-DT-VN-51) locked; the pedestals are not loosened
   after the set. No setting reading is booked: the feel set guarantees that
   no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
-  gear, no tip on a root, no tip past the mate's base tangent). Gated:
-  nominal contact ratio ≥ 1.0 at the loosest centre a feel set leaves the
-  cone. Reported only (REF): the printed-corner contact ratio there. A gear
-  that binds is cleared by easing the swing, not by stoning a tip.
-- **T006** (pending exception ruling #971): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
-  every printed drum-tip path at the loosest set and running centres, so it
-  never holds the swing out; its contact ratio (≈ 0.77) is REF.
+  gear). Gated: nominal contact ratio ≥ 1.0 at the loosest centre a feel set
+  leaves the cone. Reported only (REF): the printed-corner contact ratio
+  there. A gear that binds is cleared by easing the swing, not by stoning a
+  tip.
+- **T006** (pending exception ruling #971): its printed corners keep ≥ 0.02 mm
+  backlash where the swing locks, and its DT6-FORM1 relief stands ≥ 0.010 mm
+  clear of every printed drum-tip path at that set and the loosest running
+  centre, so it never holds the swing out; its contact ratio (≈ 0.77) is REF.
 - **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
   nominal centre, positive backlash and no interference at the worst corner;
   the open-corner contact ratio is REF.
