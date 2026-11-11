@@ -335,9 +335,15 @@ HANGER_PIN_XS = (HANGER_PIN_X,)
 # (build_sm_summing_assembly); each station's ream.  The knife line and the
 # summing stations are the summing subsystem's: they flow through unsnapped.
 HANGER_X = -15.0
-HEX_Z_MID = 87.06
-STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
-STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
+# Owner ruling 2026-11-11 (#1038, question 4, option S-F): the MHA-SM-03
+# plate grows .25 at its FRONT end only (6.00 -> 6.25), so the front knife
+# mount stands 6.35 further out and the rear one stays: each station is its
+# trunnion's mid-length off the summing axis, 82.55 + 10.86 and
+# 76.20 + 10.86.  The crossbar's cast pockets do not move.
+HEX_Z_MID_FRONT = 93.41
+HEX_Z_MID_REAR = 87.06
+STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID_FRONT  # -90.322
+STUD_Z_REAR = SUMMING_Z + HEX_Z_MID_REAR  # +90.148
 PIN_HOLE_X = HANGER_X + HANGER_PIN_X  # -7.38
 HANGER_PIN_X_PLACES = KNIFE_DOWEL.HANGER_OFFSET_PLACES
 # Each ream's station from its #10 axis along the dowel line, and its
@@ -846,6 +852,10 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # over the .080 target to the cap recess at every printed corner
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
+    # The two west bosses' keeper relief step (owner ruling 2026-11-11,
+    # #1038, K5), from its socket axis: the .XX the keeper foot margin is
+    # proved at (build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS).
+    "keeper relief step from socket axis": KEEPER_BOSS_RELIEF_PLACES,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # removed set-screw boss section K-K (spot face, thread run; the boss
     # face prints its as-cast .95 on sheet 6's DETAIL J).

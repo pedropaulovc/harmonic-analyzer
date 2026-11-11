@@ -37,7 +37,8 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   spanning the window along Z, flush with BOTH faces at its junctions (the
   faced underside 999.6932 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
-  junctions and, at z 3.088 -/+ 87.06, a plain #10 through-hole (C drill) per
+  junctions and, at z 3.088 - 93.41 (front; #1038, the summing plate's .25
+  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (C drill) per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
   washer on the faced top; each unchanged 98381A473 dowel presses into a
   blind flat-floor underside ream with a #51 knockout drilled up from its
@@ -1199,10 +1200,10 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # (Pedro), #2144 item 11.3: one dowel, so the block fits one way round
 # only, its round hole (datum B) on the ream's pin.
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
-# The front hull overhangs the crossbar's side bottoms short of the gusset
-# legs (the 25.4-wide block on the 25.146-wide bar); the model leaves those
-# unbroken at .06 and the title block's .010 break applies
-# (TITLE_BLOCK_EDGE_BREAK_MAX, inside the 0.5 clearance).
+# The crossbar's front side bottoms short of the gusset legs stay unbroken
+# at .06 and take the title block's .010 break (TITLE_BLOCK_EDGE_BREAK_MAX):
+# the front hull overhung them until #1038 moved the front station .25 out
+# (owner ruling 4), and the cast edge is kept so the pattern does not change.
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Counter-clockwise convex hull (monotone chain) of plan points."""
     ordered = sorted(set(points))

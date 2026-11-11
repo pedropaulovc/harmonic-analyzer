@@ -190,6 +190,7 @@ from fr_top_frame_spec import (
     HUB_SET_SPOT_FROM_AXIS,
     HUB_SET_SPOT_PLACES,
     IN,
+    KEEPER_BOSS_RELIEF_FROM_SOCKET,
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_X,
     SCREW_AXIS_BELOW_RAIL_TOP,
@@ -499,6 +500,21 @@ A_A_WITNESS_STANDOFF = 0.0012
 # Separate the chamfer's three-row text from its native dimension shelf and
 # witness overrun. Keep its attached dimension line at the creation point.
 BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
+# A-A cuts the two west bosses, so it shows each keeper relief as a step in
+# the boss top (owner ruling 2026-11-11, #1038, K5).  The rear one's station
+# from its socket axis reads over the boss top, under the mouth chamfer's
+# parked text; 8.5 mm of paper cannot hold the value and its words, so they
+# park left of the step over the rail.
+KEEPER_RELIEF_CALLOUT = "2X KEEPER\nFOOT RELIEF"
+KEEPER_RELIEF_LINE_XY = (
+    DETAIL_SECTION_CENTER[0]
+    + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
+    * DETAIL_SECTION_SCALE[0]
+    / DETAIL_SECTION_SCALE[1]
+    / 1000.0,
+    0.1535,
+)
+KEEPER_RELIEF_TEXT_XY = (0.316, 0.1555)
 
 
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).
@@ -1046,8 +1062,8 @@ UNDERSIDE_CALLOUTS = {
 
 # Sheet 2, Sections E-E and M-M: the left side rail and the crossbar T, cut
 # on one station inside the crossbar pockets (|z| <= 69, where the crossbar
-# is a T) and clear of every hole station (keeper taps at z -83.5 / 82.5,
-# hangers at -84.0 / 90.1, corner bosses at z +/-112), so each section
+# is a T) and clear of every hole station (keeper taps at z -89.2 / 88.1,
+# hangers at -90.3 / 90.1, corner bosses at z +/-112), so each section
 # carries rail or T stock only: fr_top_frame_spec.SIDE_SECTION_Z, where the
 # model stands the widths these sections import.
 # Removed sections are centred on the cut span, so each centre puts the
@@ -5424,6 +5440,43 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(opposed_floors[0][0], opposed_floors[1][0]),
         reference=True,
     )
+
+    def keeper_relief_station() -> None:
+        """The rear west boss's keeper relief step from its socket axis
+        (KEEPER_RELIEF_LINE_XY): the step is the one cut-face line standing
+        from the faced rail top to the boss top at that station."""
+        label = "keeper relief step from socket axis"
+        step_z = REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET
+        steps = [
+            item.edge
+            for item in detail_section_edges.lines
+            if all(
+                abs(end[0] - COLUMN_X) < 1e-6 and abs(end[2] - step_z) < 1e-6
+                for end in item.line
+            )
+            and abs(min(end[1] for end in item.line) - HALF_H) < 1e-6
+            and abs(max(end[1] for end in item.line) - HALF_H - BOSS_ABOVE) < 1e-6
+        ]
+        if len(steps) != 1:
+            raise RuntimeError(
+                f"A-A: expected one keeper relief step at z {step_z:g}, got {len(steps)}"
+            )
+        _checked_dimension(
+            adapter,
+            detail_section,
+            p0=(COLUMN_X, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
+            p1=(COLUMN_X, HALF_H + BOSS_ABOVE / 2.0, step_z),
+            text_xy=KEEPER_RELIEF_LINE_XY,
+            label=label,
+            expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET,
+            orientation="horizontal",
+            entity_types=("SKETCHSEGMENT", "EDGE"),
+            entities=(bore_axes[1], steps[0]),
+            suffix=KEEPER_RELIEF_CALLOUT,
+            offset_text=KEEPER_RELIEF_TEXT_XY,
+        )
+
+    keeper_relief_station()
     cross_tap_callout = add_native_hole_callout(
         adapter,
         detail_front,
