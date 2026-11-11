@@ -198,10 +198,10 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
             dt_cone_gear_shaft_spec.SECTION_DIAS[land]
         )
     # The keyway takes cone_land_key's bands: the milled-width row's
-    # +.0020/-.0000 width and the milled-step row's +/-.0020 on T, plain
-    # inch steps.
+    # +.0020/-.0000 width and +/-.0035 on T (the one-pass broach's reach, no
+    # tighter than the milled-step row), plain inch steps.
     assert cone_land_key.KEYWAY_WIDTH_BAND == (0.0508, 0.0)
-    assert cone_land_key.KEYWAY_T_BAND == (0.0508, -0.0508)
+    assert cone_land_key.KEYWAY_T_BAND == (0.0889, -0.0889)
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
 
 

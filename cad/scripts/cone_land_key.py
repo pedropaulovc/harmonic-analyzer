@@ -11,7 +11,11 @@ leaves T030 a .052 web, under rule 17's floor, so the owner took the 1/16 key.
 
 Dimensioning follows ANSI B17.1: the keyseat by its width and S (keyseat floor
 to the far side of the land), each hub keyway by its width and T (keyway top
-to the far side of the bore), both sizes a micrometer reads across the part.
+to the far side of the bore).  Neither is a micrometer reading: the anvils do
+not enter a .0625 slot.  S is read with calipers over the key laid in the
+keyseat, less the key's own height; T as .375 plus the largest pin gauge that
+passes between the keyway's top and a .375 pin held on the bore's far side
+(the shop's .001-step pin set, cad/process/shop.toml).
 The key, keyseat and keyways are centred on each part's local +X (its Right
 Plane normal), the clock the land-1 D-flat held, so the gears keep their tooth
 phase to the shaft.
@@ -30,6 +34,8 @@ from __future__ import annotations
 
 import math
 
+import gear_seat_fit
+
 MM_PER_IN = 25.4
 
 # Land 1: the Ø.375 seat of the 64T and T030..T120.  The shaft spec's
@@ -47,40 +53,83 @@ KEY_STOCK_BAND = (0.0, -0.0508)  # +.000/-.002
 # Shaft keyseat: milled with a 1/16 end mill, width +.0020/-.0000 (the shop
 # table's milled-width row, .002 wide: the key slides in any keyseat a 1/16
 # end mill cuts, so the width needs no tighter band and no fit route), floor
-# at S = .3385 +.0000/-.0040, the row for a milled step located from its
-# datum (.004 wide).  S and T are both printed at their rows, so their
-# nominals are set from the limits that matter: T's largest keeps the gears'
-# webs where the owner ruled them, and S's largest keeps half the key below
-# the land's surface at the keyseat's edge on the smallest land (the guard
-# below; .3391 left .7898 against the key's .7938 half, Codjiflo review of
-# PR #2331) and the key's top under T's smallest.  .0365 deep at the
-# keyseat's centreline (the research's square-key seat).
+# at S = .3355 +.0000/-.0040, the row for a milled step located from its
+# datum (.004 wide).  S follows the broached keyway below: its largest is
+# T's smallest less the largest key and the .0015 top clearance PR #2331 set
+# (.3995 - .0625 - .0015 = .3355).  .0395 deep at the keyseat's centreline,
+# .0044 deeper than ANSI B17.1's S for this key and land (ANSI_KEYSEAT_S_MM,
+# .3411): B17.1 keeps the standard shaft keyseat under a shallow hub, but
+# here .3411 + .0625 = .4036 stands over the broach's shallowest cut.
 KEYSEAT_WIDTH_MM = KEY_SIZE_MM
 KEYSEAT_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
-KEYSEAT_S_MM = 8.5979  # .3385
+KEYSEAT_S_MM = 8.5217  # .3355
 KEYSEAT_S_BAND = (0.0, -0.1016)  # +.0000/-.0040
 KEYSEAT_PLACES = 4
 # Distance of the keyseat floor from the land's axis, on +X.
 KEYSEAT_FLOOR_OFFSET_MM = KEYSEAT_S_MM - LAND_DIA_MM / 2.0
-KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .0365 at the centreline
+KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .0395 at the centreline
 
 # Hub keyway: one pass of a 1/16 A broach, width +.0020/-.0000 (the shop
 # table's milled-width row, .002 wide; machinist review of PR #2331 at
-# 5994f29: a .001 band named no fit route), its top at T = .4045 +/-.0020
-# from the bore's far side, the milled-step row (machinist review of PR
-# #2331's follow-on run 20261110T001845485Z: +/-.0010 named no fit route):
-# T's largest, .4065, is the one the keyed webs were ruled at; .0035 over
-# the key at the nominals, never under zero at the limits.
+# 5994f29: a .001 band named no fit route), its top at T = .4030 +/-.0035
+# from the bore's far side.  The broach sets T; the band holds every T one
+# pass can leave (ONE_PASS_T_MM, .3996-.4046) and stops at .4065, the T the
+# keyed webs were ruled at (cad/config/parts/dt-cone-gear.yaml RV-07).  A
+# one-pass broach cannot be set shallower, only deeper over a shim, so the
+# band's room is above the deepest reading (.0019).  ANSI B17.1's T for this
+# key and land, .4087 (ANSI_KEYWAY_T_MM), would take T030's web under rule
+# 17's floor.
 KEYWAY_WIDTH_MM = KEY_SIZE_MM
 KEYWAY_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
-KEYWAY_T_MM = 10.2743  # .4045
-KEYWAY_T_BAND = (0.0508, -0.0508)  # +/-.0020
+KEYWAY_T_MM = 10.2362  # .4030
+KEYWAY_T_BAND = (0.0889, -0.0889)  # +/-.0035
 KEYWAY_PLACES = 4
 
 
 def limits(nominal_mm: float, band: tuple[float, float]) -> tuple[float, float]:
     """(minimum, maximum) of ``nominal_mm`` under an (upper, lower) band."""
     return nominal_mm + band[1], nominal_mm + band[0]
+
+
+def chord_height_mm(dia_mm: float, width_mm: float) -> float:
+    """ANSI B17.1's Y: how far a ``dia_mm`` circle drops below its top at a
+    ``width_mm`` slot's walls."""
+    return (dia_mm - math.sqrt(dia_mm**2 - width_mm**2)) / 2.0
+
+
+# ANSI B17.1-1967 (R1998) depth control values for this key on this land:
+# S = D - Y - H/2 and T = D - Y + H/2 + C, C = .005 for a parallel key (the
+# formulas reproduce B17.1 Table 2, reprinted in Machinery's Handbook 26th
+# ed. p. 2343: Ø1/2 with a 1/8 key gives S .430 and T .560).  For a 1/16 key
+# on Ø.375: Y .0026, S .3411, T .4087.  Neither is printed (see above).
+_ANSI_Y_MM = chord_height_mm(LAND_DIA_MM, KEY_SIZE_MM)
+ANSI_KEYSEAT_S_MM = LAND_DIA_MM - _ANSI_Y_MM - KEY_SIZE_MM / 2.0
+ANSI_KEYWAY_T_MM = LAND_DIA_MM - _ANSI_Y_MM + KEY_SIZE_MM / 2.0 + 0.127
+
+# Where one pass puts T.  A 1/16 A broach in its 3/8 A bushing cuts its full
+# depth in one pass with no shim (duMONT catalogue, one shim-free cut); the
+# published depth is 0.70 mm (Rev Broaching Tool's duMONT table, "Standard
+# broaches for keyway - inch sizes", 1/16"-A row, read live 2026-11-10),
+# taken here across its 0.01 mm rounding.  The table names no reference, so
+# the band holds every reading of it: from the bore, or from the bushing's
+# 3/8 circle when the cut pushes the bushing onto the far side; at the
+# keyway's centreline, or at its walls, where B17.1 takes depth and the
+# circle stands Y below the centreline.  Shallowest: the bushing's circle at
+# the widest cut's wall; deepest: the largest bore at the centreline.
+BROACH_DEPTH_MM = (0.695, 0.705)
+_LAND_BAND_MM = (0.0, -0.0508)  # cone_shaft_land_bands.GEAR_SEAT_BAND, mirrored
+ONE_PASS_T_MM = (
+    LAND_DIA_MM
+    + BROACH_DEPTH_MM[0]
+    - chord_height_mm(LAND_DIA_MM, limits(KEYWAY_WIDTH_MM, KEYWAY_WIDTH_BAND)[1]),
+    LAND_DIA_MM + gear_seat_fit.seat_bore_band(_LAND_BAND_MM)[0] + BROACH_DEPTH_MM[1],
+)
+_T_MIN_MM, _T_MAX_MM = limits(KEYWAY_T_MM, KEYWAY_T_BAND)
+if not _T_MIN_MM <= ONE_PASS_T_MM[0] < ONE_PASS_T_MM[1] <= _T_MAX_MM:
+    raise AssertionError(
+        f"one broach pass leaves T at {ONE_PASS_T_MM[0]:.4f}-{ONE_PASS_T_MM[1]:.4f} mm, "
+        f"outside the printed {_T_MIN_MM:.4f}-{_T_MAX_MM:.4f}"
+    )
 
 
 def keyway_top_offset_mm(bore_dia_mm: float) -> float:
@@ -98,16 +147,17 @@ def hub_keyway_corner_radius_max_mm(bore_dia_min_mm: float) -> float:
 
 
 # The key's top under a keyway's top, worst case: T at its minimum, S and the
-# key at their maximum.  Positive: a gear always slides over the key.
+# key at their maximum.  At least .0015: a gear always slides over the key.
+KEY_TOP_RADIAL_CLEARANCE_FLOOR_MM = 0.0381  # .0015
 KEY_TOP_RADIAL_CLEARANCE_MIN_MM = (
     limits(KEYWAY_T_MM, KEYWAY_T_BAND)[0]
     - limits(KEYSEAT_S_MM, KEYSEAT_S_BAND)[1]
     - limits(KEY_SIZE_MM, KEY_STOCK_BAND)[1]
 )
-if KEY_TOP_RADIAL_CLEARANCE_MIN_MM <= 0.0:
+if KEY_TOP_RADIAL_CLEARANCE_MIN_MM < KEY_TOP_RADIAL_CLEARANCE_FLOOR_MM - 1e-9:
     raise AssertionError(
-        f"the key's top reaches a keyway's top at the limits: "
-        f"{KEY_TOP_RADIAL_CLEARANCE_MIN_MM:.4f} mm"
+        f"the key's top comes within {KEY_TOP_RADIAL_CLEARANCE_MIN_MM:.4f} mm "
+        "of a keyway's top at the limits"
     )
 # Side clearances (minimum, maximum), each width against the key's.
 KEYSEAT_SIDE_CLEARANCE_MM = (

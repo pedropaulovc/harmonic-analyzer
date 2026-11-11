@@ -691,7 +691,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # sits right of its dimension line, on the shelf the line turns into
     # (farm proof of #2331 at 7f1dedc: line at the keep x, shelf to the right).
     keyway_t = _text_box(
-        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4045 \N{PLUS-MINUS SIGN}0.0020"
+        drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4030 \N{PLUS-MINUS SIGN}0.0035"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
     centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")
