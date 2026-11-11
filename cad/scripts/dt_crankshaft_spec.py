@@ -86,13 +86,14 @@ SHAFT_LENGTH_BAND = (0.00, -SHAFT_LENGTH_SHORT_MM)
 # build_dt_drive_train_assembly asserts from both sides), and the collar from
 # it back to the boss's south face, floored to its two-place print so the
 # model's rear face stands at most .001 in short of the boss (the fitter
-# pulls it hard on).  Both collar faces print from the far end at +/-.004
-# (.XXX); the seat face is the chain plane's, not an inch grid value, so its
-# far-end station prints rounded and every stack reads it at its printed
-# limits.
+# pulls it hard on).  Both collar faces print from the far end at three
+# places under the title block's .XXX +/-.005 (#2314: the hub air, the shaft
+# end's stand past the 16T and the bore-mouth land all hold at that row);
+# the seat face is the chain plane's, not an inch grid value, so its far-end
+# station prints rounded and every stack reads it at its printed limits.
 SEAT_COLLAR = 28.7
 COLLAR_STATION_PLACES = 3
-COLLAR_STATION_TOL = 0.1016
+COLLAR_STATION_TOL = printed_band_mm(COLLAR_STATION_PLACES, unit=UNIT)
 COLLAR_LENGTH = _floor(
     POST_BOSS_SOUTH - SEAT_COLLAR, COLLAR_STATION_PLACES, UNIT
 )  # seat face to rear face, spigot included
@@ -113,8 +114,7 @@ def shaft_end_proud_links(shaft_length: float) -> dict[str, tuple[float, float, 
     boss = dt_cone_pivot_post_spec.CRANK_BOSS_LENGTH
     overall = dt_crank_pinion_spec.OVERALL_LENGTH
     station_lower, station_upper = printed_deviations(
-        station, COLLAR_STATION_PLACES, (-COLLAR_STATION_TOL, COLLAR_STATION_TOL),
-        unit=UNIT,
+        station, COLLAR_STATION_PLACES, unit=UNIT
     )
     boss_lower, boss_upper = printed_deviations(
         boss, dt_cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["CrankBossLen"],
@@ -198,7 +198,7 @@ def local_station(far_end_station: float) -> float:
 
 
 # The outboard journal starts a bare Ø.375 land behind the collar's rear
-# face, inside the post bore: at print-worst (rear face .004 north, journal
+# face, inside the post bore: at print-worst (rear face .005 north, journal
 # start a row south) the land still spans the bore mouth's edge break, so the
 # collar's inside corner never rides the bore edge and the rear face seats
 # flat on the boss.
@@ -349,18 +349,19 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
     raise AssertionError("the spigot must enclose the pin holes, inside the body")
 
 # Functional bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), each at the places that print it:
-# - The two collar faces print from the far end like every station, but at
-#   the title block's rows the seat face could come toward the crank and
-#   close the contracted air between the hub's rear face and the wheel, and
-#   the rear face's station is a link of the shaft end's stand past the 16T
-#   (SHAFT_END_PROUD_RANGE).  +/-.004 (COLLAR_STATION_TOL) at .XXX.
+# - The two collar faces print from the far end like every station, at three
+#   places: the seat face's station moves it against the hub's rear face (the
+#   contracted air between the hub and the wheel), and the rear face's
+#   station is a link of the shaft end's stand past the 16T
+#   (SHAFT_END_PROUD_RANGE).  Both hold at the title block's .XXX +/-.005
+#   (COLLAR_STATION_TOL; #2314).
 # - The spigot diameter is held under nominal, +.000/-.004 at .XXX: over it
 #   the ANSI #25 plates wrapping the T12, floated off-centre by
 #   WHEEL_SEAT_FLOAT, lose their worst-case radial air; under it the rim to
 #   the pin holes thins (DRIVE_PIN_SPIGOT_RIM_WORST).
 # - The spigot's length prints from the seat face, not the far end, so the
-#   body's front face rides with the wheel and the chain: +/-.002 at .XXX
-#   keeps a bought chain's envelope clear of it.
+#   body's front face rides with the wheel and the chain: the title block's
+#   .XXX +/-.005 keeps a bought chain's envelope clear of it (#2314).
 # - The collar body OD is not a seat and meets no mate (machinist review of
 #   5a219a81904f): it prints at two places under the title block's .XX band,
 #   and the bearing ring it gives the post boss holds at either limit.
@@ -369,18 +370,20 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   location band spends half of it here, leaving the wheel the same share.
 # - Pressed to the floor, the pin stands PROUD = LENGTH - depth: the depth
 #   band plus the dowel's +/-.010 in length grade must keep the tip clear
-#   of the crank hub and engaged in the wheel.  +/-.004, printed at the
-#   hole callout's places.
+#   of the crank hub and engaged in the wheel.  The .XXX row's +/-.005,
+#   printed at the hole callout's places (#2314).
 SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH_PLACES = 3
-SPIGOT_LENGTH_TOL = 0.0508
+SPIGOT_LENGTH_TOL = printed_band_mm(SPIGOT_LENGTH_PLACES, unit=UNIT)
 # The drive-pin holes print through a native callout on their cut-extrude
 # (size and depth stay the model's), not as marked dimensions.  The shared
 # .0930 REAM_H7 hole needs four inch places to print its limits truthfully
 # (.0930 +.0005/.0000); a cut-extrude callout takes the sheet's document
 # places, so draw_dt_crankshaft opens the sheet at these.
 HOLE_CALLOUT_PLACES = 4
-DRIVE_PIN_DEPTH_TOL = 0.1016
+# The title block has no four-place row, so the callout types the .XXX row's
+# band after the shared press depth's four places (RV-05).
+DRIVE_PIN_DEPTH_TOL = printed_band_mm(3, unit=UNIT)
 # The shared hole's band: .0930 REAM_H7 (#290 fit row D14).
 DRIVE_PIN_HOLE_BAND = seat_geometry.DRIVE_PIN_HOLE_BAND  # +.0005/-.0000
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
@@ -388,10 +391,7 @@ DRIVE_PIN_HOLE_BAND = seat_geometry.DRIVE_PIN_HOLE_BAND  # +.0005/-.0000
 # the chain plane's, so it prints rounded) plus the Depth's.  The drive
 # train's hub-air stack reads it.
 _SEAT_STATION_LOWER, _SEAT_STATION_UPPER = printed_deviations(
-    SHAFT_LENGTH - SEAT_COLLAR,
-    COLLAR_STATION_PLACES,
-    (-COLLAR_STATION_TOL, COLLAR_STATION_TOL),
-    unit=UNIT,
+    SHAFT_LENGTH - SEAT_COLLAR, COLLAR_STATION_PLACES, unit=UNIT
 )
 SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[0] - _SEAT_STATION_LOWER,
@@ -547,7 +547,7 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     hub_rear=HUB_LENGTH,
     hub_rear_band=HUB_LENGTH_BAND,
     plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
-)  # 0.138, 0.631
+)  # 0.140, 0.782
 # The bare land behind the collar keeps the bore mouth's edge break at both
 # print limits (JOURNAL_START above).
 if (

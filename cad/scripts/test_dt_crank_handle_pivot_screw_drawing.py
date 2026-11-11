@@ -90,11 +90,10 @@ def test_model_owns_places_and_bands() -> None:
     # the bonded handle, so its length is a reference.
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "ShoulderLength"}
     # Every band comes from a named spec constant, never a typed number; the
-    # head, slot and relief hold the title block's bands.
+    # head, slot, relief, relief lead and thread length hold the title
+    # block's bands.
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
-        ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
-        ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
     }
     # The F12 running fit (#290): .156 0/-.0020 in a .161 +.0005/0 ream.
     assert spec.SHOULDER_DIA == pytest.approx(0.156 * 25.4)
@@ -103,7 +102,6 @@ def test_model_owns_places_and_bands() -> None:
         spec.HANDLE_STACK_NOMINAL + spec.END_PLAY_NOMINAL
     )
     assert not hasattr(spec, "SHOULDER_LENGTH_TOL")
-    assert spec.THREAD_LENGTH_BAND[0] == 0.0 > spec.THREAD_LENGTH_BAND[1]
 
 
 def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
@@ -233,15 +231,12 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * spec.RELIEF_DIA**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.64, abs=0.01)
-    # The lead's band is model-owned and prints on its imported dimension
-    # (#2172: a note typed the limits), and the tip chamfer carries its own
-    # band (MHA-DT-32 re-review: at .X either could print as nothing).  The
-    # relief width (.XX) and diameter (.XXX) are routine: the floor past the
-    # longest lead keeps 1.5 #4-40 pitches (machinist review of crank-v4-16;
-    # local review of 20dac9d3f).
+    # The lead prints its three-place model dimension under the title block's
+    # .XXX band (#2314), as do the relief width (.XX) and diameter (.XXX):
+    # the floor past the longest lead keeps 1.5 #4-40 pitches (machinist
+    # review of crank-v4-16; local review of 20dac9d3f).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert "ReliefLead" in toleranced
-    assert not {"ReliefWidth", "ReliefDia"} & toleranced
+    assert not {"ReliefLead", "ReliefWidth", "ReliefDia"} & toleranced
     xx = printed_band_mm(2, unit=spec.UNIT)
     assert spec.RELIEF_WIDTH_MIN == pytest.approx(spec.RELIEF_WIDTH - xx)
     assert spec.RELIEF_FLOOR_MIN == pytest.approx(
