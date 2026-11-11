@@ -135,19 +135,27 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
             configuration = identity.get("configuration")
             if stem in families:
                 family = families[stem]
-                if (number != family["number"] or configuration not in family["configurations"]
-                        or not identity.get("prior_number") or not identity.get("role")):
-                    raise ValueError(f"conflicting configured member identity: {identity!r}")
                 prior = identity.get("prior_stem")
-                _check_stems(prior)
-                prior_number, role = identity["prior_number"], identity["role"]
-                contract = (prior_number, stem, configuration, role)
-                if ((prior in prior_identities and prior_identities[prior] != contract)
-                        or (prior_number in prior_numbers and prior_numbers[prior_number] != prior)):
-                    raise ValueError(f"conflicting prior configured identity: {identity!r}")
-                prior_identities[prior], prior_numbers[prior_number] = contract, prior
+                # A family allocated after the consolidation has no prior native
+                # identity: its members come only in the family's own row (#2339).
+                introduced = prior is None and old == stem and old_number is None
+                if (number != family["number"] or configuration not in family["configurations"]
+                        or not identity.get("role")
+                        or (introduced and ("prior_number" in identity
+                                            or configuration in members.get(stem, ())))
+                        or (not introduced and not identity.get("prior_number"))):
+                    raise ValueError(f"conflicting configured member identity: {identity!r}")
                 members.setdefault(stem, set()).add(configuration)
-                assign(prior, (MeshTarget(stem, configuration),), "prior-current", (prior,))
+                if not introduced:
+                    _check_stems(prior)
+                    prior_number, role = identity["prior_number"], identity["role"]
+                    contract = (prior_number, stem, configuration, role)
+                    if ((prior in prior_identities and prior_identities[prior] != contract)
+                            or (prior_number in prior_numbers
+                                and prior_numbers[prior_number] != prior)):
+                        raise ValueError(f"conflicting prior configured identity: {identity!r}")
+                    prior_identities[prior], prior_numbers[prior_number] = contract, prior
+                    assign(prior, (MeshTarget(stem, configuration),), "prior-current", (prior,))
             elif configuration is not None:
                 raise ValueError(f"configured identity outside a configured family: {identity!r}")
             elif stem in identities:
@@ -157,7 +165,10 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
                 numbers[number] = stem
             targets.append(MeshTarget(stem, configuration))
             lineages.append(identity.get("prior_stem", stem))
-        assign(old, targets, "category", lineages)
+        # A configured family's own row aliases nothing: its bare stem already
+        # resolves through the family (canonical_keys).
+        if old not in families:
+            assign(old, targets, "category", lineages)
     if any(set(family["configurations"]) != members.get(stem, set())
            for stem, family in families.items()):
         raise ValueError("a configured family member has no current identity")

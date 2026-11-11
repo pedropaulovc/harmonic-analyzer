@@ -92,8 +92,6 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_pd_platen.py",
         "draw_pd_platen_clip.py",
         "draw_pd_rack_pinion.py",
-        "draw_ch_bar_pivot_pin.py",
-        "draw_ch_rod_pivot_pin.py",
         "draw_ch_rocker_hub.py",
         "draw_ch_rocker_strap.py",
         "draw_ch_anchor_jam_nut.py",

@@ -45,7 +45,7 @@ ARM_THICKNESS = 2.4892  # .098
 # Milled strap faces either side of the integral hub, micrometer-checked
 # (process plan op 20), printed 3-place natively on the strap's thickness
 # (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
-# neighbouring rod fork (ch_rod_pivot_pin_spec.joint_budget).
+# neighbouring rod fork (sh_vn_pivot_pin_rod_spec.joint_budget).
 ARM_THICKNESS_BAND = (0.0254, -0.0254)  # (upper, lower) deviations, +/-.001
 # The book outline (ch. 30 back view): an 11.5" top arc on R800, a 10.5"
 # bottom arc on R816, and a .22 tip land square to the top edge at each end.

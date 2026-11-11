@@ -115,10 +115,10 @@ _INSERTED_SOURCES = {
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
     "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw "
     "dt_vn_locating_pin dt_vn_cone_shaft_key",
-    "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever ch_vn_channel_spring_installed ch_connecting_rod "
+    "ch_channel": "ch_amplitude_bar ch_channel_lever ch_vn_channel_spring_installed ch_connecting_rod "
     "ch_vn_frame_side_screw ch_fulcrum_keeper ch_vn_fulcrum_set_screw ch_fulcrum_shaft ch_vn_bracket_hold_down_screw ch_pivot_bracket "
-    "ch_pivot_shaft ch_rocker_arm ch_vn_rocker_bank_spring ch_vn_rocker_thrust_washer ch_rod_pivot_pin ch_vn_spring_hook "
-    "ch_anchor_jam_nut sh_vn_arbor_set_screw",
+    "ch_pivot_shaft ch_rocker_arm ch_vn_rocker_bank_spring ch_vn_rocker_thrust_washer ch_vn_spring_hook "
+    "ch_anchor_jam_nut sh_vn_arbor_set_screw sh_vn_pivot_pin",
     "sm_summing": "sm_vn_boss_hook sm_vn_boss_hook_jam_nut sm_vn_counter_spring sm_gooseneck sm_gooseneck_end_plug sm_vn_gooseneck_shoulder_screw sm_vn_knife_hanger_stud sm_vn_knife_hanger_washer sm_vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "sh_vn_clamp_screw sh_column_clamp_back sh_column_clamp_front sh_vn_music_wire "
     "mg_magnifying_bracket mg_vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
@@ -178,6 +178,7 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
         ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),
+        ("sh_vn_pivot_pin", {"ch_channel"}),
         # Parent-scoped kits (owner exception, #2187): one producer, two
         # configured members each, one direct consumer.
         ("ch_rocker_arm_tl_vn_oblique_rail_kit", {"ch_rocker_arm_tl_oblique_jig"}),

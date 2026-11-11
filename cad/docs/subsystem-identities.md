@@ -27,7 +27,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | Prefix | Category | Fabricated parts | Vendor parts |
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
-| `ch` / `CH` | Channel | 13 | 7 |
+| `ch` / `CH` | Channel | 11 | 7 |
 | `dt` / `DT` | Drive train | 37 | 14 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
@@ -35,9 +35,9 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `pn` / `PN` | Pen | 5 | 7 |
 | `ms` / `MS` | Measuring stick | 3 | 1 |
 | `sm` / `SM` | Summing | 4 | 6 |
-| `sh` / `SH` | Shared parts | 2 | 7 (+1 tooling-only kit family) |
+| `sh` / `SH` | Shared parts | 2 | 8 (+1 tooling-only kit family) |
 
-The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15.
+The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15. The 2026-11-11 bought-pin change (#2339) retired the shop-made MHA-CH-10 rod and MHA-CH-11 bar pivot pins into the `RodPin` and `BarPin` members of one purchased dowel, `sh-vn-pivot-pin` (MHA-SH-VN-58, McMaster 90145A299): CH fabricated parts went from 13 to 11 and SH machine vendor families from 7 to 8.
 
 SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
@@ -287,8 +287,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `fulcrum-keeper` | MHA-120 | `ch-fulcrum-keeper` | MHA-CH-007 | `ch-fulcrum-keeper` | MHA-CH-07 |
 | part | `pivot-bracket` | MHA-123 | `ch-pivot-bracket` | MHA-CH-008 | `ch-pivot-bracket` | MHA-CH-08 |
 | retired part | `rocker-thrust-washer` | MHA-148 | `ch-rocker-thrust-washer` | MHA-CH-009 | — | MHA-CH-09 (retired; never reissued) |
-| part | — | — | `ch-rod-pivot-pin` | MHA-CH-010 | `ch-rod-pivot-pin` | MHA-CH-10 |
-| part | — | — | `ch-bar-pivot-pin` | MHA-CH-011 | `ch-bar-pivot-pin` | MHA-CH-11 |
+| retired part | — | — | `ch-rod-pivot-pin` | MHA-CH-010 | — (replaced by the purchased dowel `sh-vn-pivot-pin` `RodPin`, MHA-SH-VN-58) | MHA-CH-10 (retired 2026-11-11; never reissued) |
+| retired part | — | — | `ch-bar-pivot-pin` | MHA-CH-011 | — (replaced by the purchased dowel `sh-vn-pivot-pin` `BarPin`, MHA-SH-VN-58) | MHA-CH-11 (retired 2026-11-11; never reissued) |
 | part | — | — | `ch-anchor-jam-nut` | MHA-CH-014 | `ch-anchor-jam-nut` | MHA-CH-14 |
 | part | — | — | `ch-rocker-hub` | MHA-CH-012 | `ch-rocker-hub` | MHA-CH-12 |
 | part | — | — | `ch-rocker-strap` | MHA-CH-013 | `ch-rocker-strap` | MHA-CH-13 |
@@ -552,7 +552,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 
 ### Shared vendor families
 
-At the 2026-10-19 cutover, four category vendor families were in direct use by more than one assembly, and each consuming assembly received its own parent-scoped identity. On 2026-10-20 that duplication was reversed: every supplier-qualified SKU in repeated use became one shared SH vendor identity, and heterogeneous members of one SKU became named configurations of it. The eight current shared families are, in stable allocation order (sorted by supplier and SKU):
+At the 2026-10-19 cutover, four category vendor families were in direct use by more than one assembly, and each consuming assembly received its own parent-scoped identity. On 2026-10-20 that duplication was reversed: every supplier-qualified SKU in repeated use became one shared SH vendor identity, and heterogeneous members of one SKU became named configurations of it. The nine current shared families are, in stable allocation order (the first eight sorted by supplier and SKU on 2026-10-20, later ones in the order allocated):
 
 | Current stem | Current Number | Supplier and SKU | Configurations (installed members) | Direct consumers |
 |---|---|---|---|---|
@@ -564,8 +564,9 @@ At the 2026-10-19 cutover, four category vendor families were in direct use by m
 | `sh-vn-thumb-screw` | MHA-SH-VN-55 | McMaster-Carr 91882A221 | `Default` | `mg-magnifier`, `ms-measuring-stick` |
 | `sh-vn-music-wire` | MHA-SH-VN-56 | McMaster-Carr 9666K56, one 1/4 lb coil | `LeverWire` 1; `PenWire` 1 (one-sheet purchase drawing: supplier wire Ø and SKU only; terminations, wraps and cut lengths are not modelled) | `mg-magnifier` (lever wire), `pn-pen` (pen wire) |
 | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Precision Matthews 52PCCK-9/16-14mm, one kit | `HoldDownStud` 4; `TNut` 4; `FlangeNut` 4 | `ch-rocker-arm-tl-oblique-jig` only; `usage_scope: tooling`, no machine assembly or BOM, excluded from machine counts |
+| `sh-vn-pivot-pin` | MHA-SH-VN-58 | McMaster-Carr 90145A299, 18-8 stainless 5/64 x 5/16 dowel, sold in packs | `RodPin` 20; `BarPin` 20 (each pressed through its fork or bar and dressed flush to the installed length at MHA-CH-00) | `ch-channel` only (rod fork and bar notch joints, 2026-11-11, #2339) |
 
-The registry `quantity` is the sum of the installed member counts (65 links, 2 wire forms, 12 kit members), never the purchase units (one chain cut from 2 ft, one coil, one kit). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
+The registry `quantity` is the sum of the installed member counts (65 links, 2 wire forms, 12 kit members, 40 pins), never the purchase units (one chain cut from 2 ft, one coil, one kit, pin packs). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
 
 Configured chain and clamping-kit reference sheets place each member caption from its measured native text extent and annotation position, centering the text box within its reserved panel-header band. After the final rebuild, strict containment checks require the actual note extent to remain inside both that band and the drawable sheet border. An insertion coordinate or a successful positioning call alone is not proof of fit. This placement contract does not change supplier dimensions, member geometry or installed quantities.
 
@@ -775,3 +776,6 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `dt-cone-tip-end-screw` | MHA-DT-39 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 x 5/8 with a drilled and reamed pivot hole in its threaded end; real machining, so it carries the subsystem prefix, not a vendor Number; threads into MHA-DT-21 and sets the cone shaft's end play |
 | retired | `dt-vn-cone-tip-collar` | MHA-DT-VN-54 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): the bonded T024 and the end screw replace the set-screw collar on the terminal D-flat; no registry, builder or drawing; Number never reissued |
 | retired | `dt-vn-cone-tip-adjuster` | MHA-DT-VN-55 | Owner decision C1 keyed, 2026-11-09 ([PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992)): the MHA-DT-39 end screw replaces the #10-32 cup-point adjuster (McMaster-Carr 94025A164); no registry, builder or drawing; Number never reissued |
+| retired | `ch-rod-pivot-pin` | MHA-CH-10 | 2026-11-11 (#2339): the shop-made drill-rod pin is replaced by the purchased MHA-SH-VN-58 `RodPin` member; no registry, builder or drawing; Number never reissued |
+| retired | `ch-bar-pivot-pin` | MHA-CH-11 | 2026-11-11 (#2339): the shop-made drill-rod pin is replaced by the purchased MHA-SH-VN-58 `BarPin` member; no registry, builder or drawing; Number never reissued |
+| shared | `sh-vn-pivot-pin` | MHA-SH-VN-58 | 2026-11-11 (#2339): McMaster-Carr 90145A299 18-8 stainless 5/64 x 5/16 dowel (0/+.0002 in diameter), one SKU in two installed members, `RodPin` x20 (rod fork, .240 long installed) and `BarPin` x20 (bar notch, .250 long installed), each pressed through and dressed flush at MHA-CH-00; replaces MHA-CH-10 and MHA-CH-11 |

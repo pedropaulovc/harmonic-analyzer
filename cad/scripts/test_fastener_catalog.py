@@ -112,6 +112,10 @@ _SHARED_MEMBERS = {
         "Precision Matthews", "52PCCK-9/16-14mm", "MHA-SH-VN-57",
         {"HoldDownStud": 4, "TNut": 4, "FlangeNut": 4},
     ),
+    "sh-vn-pivot-pin": (
+        "McMaster-Carr", "90145A299", "MHA-SH-VN-58",
+        {"RodPin": 20, "BarPin": 20},
+    ),
 }
 
 _SHARED_PROPERTIES = {
@@ -147,6 +151,10 @@ _SHARED_PROPERTIES = {
     "sh-vn-clamping-kit-hardware": (
         "Plain Carbon Steel",
         "BLACK OXIDE AS SUPPLIED", "visual_noncritical", None,
+    ),
+    "sh-vn-pivot-pin": (
+        "18-8 Stainless Steel",
+        "passivated, as supplied", "machined_block", None,
     ),
 }
 
