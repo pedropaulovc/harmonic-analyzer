@@ -78,8 +78,8 @@ GEAR_DATA = gear_data_note(
         # govern both numbers. The hand is the one fact a mirrored part would
         # get wrong, and the crossed axes are why a straight 16T meshes
         # inclined teeth (machinist review of PR 2 round 4 read the 64T as a
-        # spur). The station is where each tooth space is centred on the
-        # axis, from the face the bore chamfer marks. High in the block: on
+        # spur). The station is where the form cutter's central plane crosses
+        # the gear axis, from the face the bore chamfer marks. High in the block: on
         # MATES WITH, the last row, it ran into the tooth tips (layout audit
         # of PR 2 round 5, struck at x 120.8 mm).
         (
@@ -88,7 +88,7 @@ GEAR_DATA = gear_data_note(
             f"{spec.TOOTH_HAND} FROM AXIS; AXES CROSSED WITH MHA-DT-10",
         ),
         (
-            "TOOTH SPACES CENTRED ON AXIS AT",
+            "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT",
             f"{inch_text(spec.TOOTH_SPACE_CROSSING, spec.TOOTH_SPACE_CROSSING_PLACES)} "
             "FROM CHAMFERED BORE FACE",
         ),

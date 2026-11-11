@@ -304,7 +304,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "ROOT DIAMETER (REF)",
         "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
         "TOOTH LINE:  STRAIGHT, 13.0 DEG RIGHT HAND FROM AXIS",
-        "TOOTH SPACES CENTRED ON AXIS AT:  .07 FROM CHAMFERED BORE FACE",
+        "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
         "TOOTH FORM",
@@ -435,7 +435,7 @@ def test_the_data_block_states_the_tooth_line_as_it_stated_the_helix() -> None:
         "AXES CROSSED WITH MHA-DT-10"
     ) in data
     assert (
-        f"TOOTH SPACES CENTRED ON AXIS AT:  "
+        f"FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  "
         f"{spec.inch_text(spec.TOOTH_SPACE_CROSSING, 2)} FROM CHAMFERED BORE FACE"
     ) in data
     for retired in ("HELIX", "LEAD", "SCREW SWEEP", "SECTION A-A"):
