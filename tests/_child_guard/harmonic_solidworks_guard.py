@@ -519,7 +519,7 @@ def _guard_dodo(module, refuse):
         return
 
     @functools.wraps(exec_com)
-    def guarded_exec_com(cmd, label, log_stem=None, *, task=None):
+    def guarded_exec_com(cmd, label, log_stem=None, **options):
         runner = getattr(module, "subprocess", None)
         real_runner = runner is None or (
             getattr(runner, "Popen", None) is _REAL_POPEN
@@ -527,7 +527,7 @@ def _guard_dodo(module, refuse):
         )
         if getattr(module, "_run_subprocess", None) is run_subprocess and real_runner:
             refuse("dodo._exec_com", f"{label}: {cmd}")
-        return exec_com(cmd, label, log_stem, task=task)
+        return exec_com(cmd, label, log_stem, **options)
 
     module._exec_com = guarded_exec_com
 

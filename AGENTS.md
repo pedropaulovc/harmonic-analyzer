@@ -1001,6 +1001,22 @@ unconditional writers: **every leaf key changes once, with no epoch-3 fallback**
 Use fresh build snapshots for cutover; do not mix persistent old native outputs
 with epoch-4 identities. A cold full build requires separate authorization.
 
+**COM conversation recording (shadow).** Every part build that runs under a
+cache role that can publish (`rw`) is recorded through
+`cad/scripts/com_replay.py` and published beside its archive as
+`com-replay/epoch-<epoch>/...` sidecars; in `ro`/`off` the build runs
+unrecorded. Off the seat, it is then replayed against the nearest
+earlier recording, purely as telemetry: nothing is reused, and no output, exit
+code or cache key changes. `HARMONIC_COM_REPLAY=off` is the kill switch; the
+other values are `record` and `shadow` (the default). A recorder fault after a
+call's result is in hand stops recording and the build finishes as its own
+(nothing published); one that leaves the build's results untrustworthy exits
+92, and the build is then re-run once unrecorded. Every COM subprocess runs
+with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`): `_drawing_precision.py:40`
+and `_supplier_spring_reference.py:376` order COM requests by iterating sets
+of str, and are left unchanged because fixing them re-keys 147 part leaves.
+See DEVELOPING.md "COM conversation recording (shadow)".
+
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the
 scheduler is free. Two seats cold-building in the *same* order march in lock-step,
@@ -1609,7 +1625,10 @@ scripts that `from _check import log, check` are instrumented unchanged.
       local-store operations and eviction have separate `cache.verify`,
       `cache.local_store` and `cache.local_eviction` timing spans.
       `cache.unpack`, `cache.record` (miss provenance), `cache.pack` and
-      `cache.upload` retain their existing units. Never use total archive bytes
+      `cache.upload` retain their existing units. Sidecar blobs (never
+      archives) have their own spans: `cache.sidecar.upload` and
+      `cache.sidecar.download` (`bytes`: the sidecar's payload) and
+      `cache.sidecar.list` (`prefix`, `count`). Never use total archive bytes
       or the enclosing fetch duration as network-throughput measurements.
       A farm leaf execution in rw mode (`farm.execution` in
       `OTEL_RESOURCE_ATTRIBUTES`) opens the connection at dodo import on a daemon

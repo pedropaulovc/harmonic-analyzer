@@ -158,6 +158,7 @@ import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+import _replay_shadow  # noqa: E402  (shadow COM recording of part builds; no engine import)
 import _local_check  # noqa: E402  (host-wide local check admission)
 from _yaml_digest import yaml_digest as _yaml_content_digest  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
@@ -704,8 +705,26 @@ def _external_console_level() -> str:
     return _EXTERNAL_LOG_LEVELS.get(raw, "WARNING")
 
 
+# Every COM subprocess (:func:`_exec_com`: a part build, its recording driver
+# and its unrecorded re-run, assembly/drawing/hook runs) hashes str with seed
+# 0. Two shared helpers order COM requests by iterating a set of str
+# (_drawing_precision.py:40 ``_named_dimensions``; _supplier_spring_reference.py:376
+# ``add_supplier_reference_configurations``), so under per-process hash
+# randomisation a build's request order was random: 5 of 10 identical-source
+# part rebuilds diverged on it on 2026-11-11 (COM-replay native pass 2). Seed 0
+# is one of the orders builds already took, so no artefact's semantics change
+# and no cache key moves (dodo.py is in no recipe closure). Applied last, so an
+# inherited PYTHONHASHSEED cannot override it.
+_COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
+
+
 def _run_subprocess(
-    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+    cmd: list[str],
+    label: str,
+    log_stem: str | None = None,
+    *,
+    task: str | None = None,
+    env_pins: dict[str, str] | None = None,
 ) -> int:
     """Run the subprocess (span-less) and return its exit code (the raise-on-failure
     part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
@@ -714,7 +733,8 @@ def _run_subprocess(
     ``label`` is the display name; ``task`` is the doit task the subprocess works
     for (default: ``label``, which already is one for most callers). The fastener
     and fit-group guards are keyed on ``task``, so a FULL/REFRESH/hook subprocess
-    with a display label still gets its assembly's read sets."""
+    with a display label still gets its assembly's read sets. ``env_pins`` are
+    set over everything else (:data:`_COM_ENV_PINS` for COM subprocesses)."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
@@ -730,6 +750,7 @@ def _run_subprocess(
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
+    env.update(env_pins or {})
     if log_stem is None:
         return subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -939,7 +960,12 @@ def _sw_ensure_once() -> None:
 
 
 def _exec_com(
-    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+    cmd: list[str],
+    label: str,
+    log_stem: str | None = None,
+    *,
+    task: str | None = None,
+    recording: _replay_shadow.Recording | None = None,
 ) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
@@ -960,10 +986,29 @@ def _exec_com(
     is no recovery loop -- except that exit 89 (the seat had not finished
     starting within the gate's bound) re-runs ONCE, untouched: a seat still
     loading add-ins is the one unhealthy state that heals by waiting, and the
-    re-run's own gate waits again."""
-    if not _sw_autostart_enabled():
+    re-run's own gate waits again.
+
+    ``recording`` (``cmd`` runs a part build under the COM-recording driver,
+    :mod:`_replay_shadow`): the driver's exit ``EXIT_RECORD_FAULT`` -- the
+    recorder failed where the build's results cannot be trusted, not the script
+    or SolidWorks -- re-runs the build at once, unrecorded, on the same seat,
+    and only that re-run's exit code reaches the handling above. Every other
+    exit code is the build's own (a recorder fault after the build had its
+    results only stops the recording: ``Recording.exited``)."""
+
+    def run() -> tuple[int, float]:
+        nonlocal cmd, recording
         started = time.time()
-        rc = _run_subprocess(cmd, label, log_stem, task=task)
+        rc = _run_subprocess(cmd, label, log_stem, task=task, env_pins=_COM_ENV_PINS)
+        if recording is None or not recording.exited(rc):
+            return rc, started
+        cmd, recording = recording.unrecorded, None
+        started = time.time()
+        rc = _run_subprocess(cmd, label, log_stem, task=task, env_pins=_COM_ENV_PINS)
+        return rc, started
+
+    if not _sw_autostart_enabled():
+        rc, started = run()
         if rc == _EXIT_SEAT_NOT_READY:
             _telemetry.warn(
                 f"[sw] {label}: seat still starting (exit {rc}); re-running once "
@@ -971,8 +1016,7 @@ def _exec_com(
                 exit_code=rc,
                 attempt=1,
             )
-            started = time.time()
-            rc = _run_subprocess(cmd, label, log_stem, task=task)
+            rc, started = run()
         if rc:
             _fail_task(label, rc, started=started)
         return
@@ -983,8 +1027,7 @@ def _exec_com(
         # Per ATTEMPT, not per task: a retry that fails must name its own
         # capture, not the previous attempt's (they differ by exactly the seat
         # state this evidence exists to compare).
-        started = time.time()
-        rc = _run_subprocess(cmd, label, log_stem, task=task)
+        rc, started = run()
         if rc == 0:
             return
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
@@ -2581,7 +2624,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
-        key = _cache_key(_part_file_deps(script, stem), label)
+        file_deps = _part_file_deps(script, stem)
+        key = _cache_key(file_deps, label)
         probed = _probe_cache(key, outputs, label, probe)
         if probed == "hit":
             _stamp_part_execution(stem)
@@ -2617,7 +2661,15 @@ def _cached_part_action(stem: str, script: Path) -> None:
                     key_full=key,
                     **{"cache.key": key[:12]},
                 )
-            _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+            # HARMONIC_COM_REPLAY=off or a cache role that cannot publish
+            # (ro/off): None, and the build runs exactly as before (same
+            # command, no engine). Otherwise the build runs under the
+            # recording driver; see _replay_shadow.
+            recording = _replay_shadow.plan(stem, script, key)
+            command = [sys.executable, str(script)]
+            if recording is not None:
+                command = recording.command
+            _exec_com(command, label, log_stem=f"part-{stem}", recording=recording)
             _stamp_part_execution(stem)
             _validate_part_configuration_outputs(stem, key)
 
@@ -2635,6 +2687,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
         _adopt_canonical(key, outputs, label)
         _stamp_part_execution(stem)
         _validate_part_configuration_outputs(stem, key)
+    # Off the seat and after the part's own publication: publish the recording
+    # and evaluate the shadow replay. Telemetry only; never raises.
+    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -3697,6 +3752,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
         # and the missing-source-property census (2026-09-28 crank_hub).
         SCRIPTS_DIR / "test_seat_startup_gate.py",
+        # Shadow COM-conversation recording of part builds: the recorder and
+        # sandboxed replay engine against a fake application (no SolidWorks),
+        # and dodo's side -- the mode switch, the recorder-fault re-run, sidecar
+        # publication, base lookup and shadow verdicts (in-memory blob fake).
+        SCRIPTS_DIR / "test_com_conversation.py",
+        SCRIPTS_DIR / "test_replay_shadow.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",

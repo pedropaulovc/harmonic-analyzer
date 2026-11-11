@@ -2131,7 +2131,10 @@ remaining network body separately; their `bytes`/`network_bytes` count network
 payload, not the whole archive on a local hit. Failed transfers whose partial
 body count is unknown are marked `network_bytes_known=false`. The enclosing
 `cache.fetch` reports archive bytes and total fetch work; local-store operations
-and verification have separate timing spans.
+and verification have separate timing spans. `cache.download` and
+`cache.upload` are archive transfers only: sidecar blobs (the shadow COM
+recordings) use `cache.sidecar.download` / `cache.sidecar.upload` (`bytes`) and
+`cache.sidecar.list` (`prefix`, `count`).
 The archive summary keeps lookup and final outcomes, but no aggregate
 `local_reason`: reasons belong to the phase-specific `cache.local_store` spans.
 For example, a corrupt lookup retains its integrity reason without labeling
@@ -2304,6 +2307,347 @@ subscription.
   `.gitattributes` normalizing line endings, a `.py` re-materialized with
   different EOLs hashes differently → a miss (never a wrong artefact). Add
   `*.py text eol=lf` if hit rate disappoints.
+
+## COM conversation recording (shadow)
+
+Every part build that runs (a cache miss or a forced refresh, on a local seat or
+a farm leaf) under a cache role that can publish (`rw`) is recorded, and the
+recording is replayed in the shadow of the build. In `ro` or `off` a part builds
+exactly as unrecorded (`_replay_shadow.plan`): a recording nobody can publish
+would be pure cost. **Nothing is reused yet**: every output, exit code and cache
+key is what an unrecorded build produces, and no recording or replay verdict is
+restored, published as a part archive, or consulted by any task. The results are
+telemetry, collected to decide whether a replay can later prove that a changed
+recipe issues the same SolidWorks conversation as an earlier build.
+
+### What is recorded
+
+`_cached_part_action` runs the part script through
+`cad/scripts/com_replay.py record` instead of directly: the same script as
+`__main__` (same `argv[0]` and `sys.path[0]`), on the same seat, under the same
+seat lock, trace, log tee and exit codes. The recorder
+(`_com_conversation.py`) logs every request and response crossing pywin32's
+`_oleobj_` boundary, plus the files SolidWorks wrote, into
+`cad/out/replay/<stem>/`:
+
+| file | content |
+| --- | --- |
+| `conversation.jsonl.gz` | the request/response log |
+| `conversation.jsonl.gz.files/` | gzip captures of the files SolidWorks saved, flat as `000000.gz`, `000001.gz`, ...; the log's trailer maps each to its call, output path, SHA-256 and size |
+| `summary.json` | exit code, faults (with `recovery`), engine SHA-256, request counts, engine and audit clock |
+| `shadow.json`, `shadow-replay.log`, `shadow-diff.log` | the last shadow evaluation (`shadow` mode) |
+
+Captures never mirror the output's own path: the recording directory is
+deeper than `cad/out`, and on 2026-11-10 a mirrored capture of a PNG's
+`.capture.bmp` reached 271 characters on a farm worker, past Windows' 260
+(workers and SolidWorks have no long-path support). Every path a recording
+and its shadow replay create is budgeted (`_replay_shadow.path_needs`);
+`test_every_part_recording_fits_the_windows_path_limit` checks every part
+under the farm's checkout root and requires 32 characters of headroom (41 at
+worst today), and a
+checkout too deep for a recording's own paths builds unrecorded with a WARN.
+
+Every COM subprocess (`dodo._exec_com`: the recording driver, its unrecorded
+re-run, an unrecorded part build, and assembly, drawing and hook runs) hashes
+str with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`, applied over any inherited
+value). Two shared helpers order COM requests by iterating a set of str:
+`_drawing_precision.py:40` (`_named_dimensions`) and
+`_supplier_spring_reference.py:376` (`add_supplier_reference_configurations`).
+Under per-process hash randomisation their request order changed from build to
+build: on 2026-11-11, 5 of 10 identical-source part rebuilds diverged on it.
+The helpers stay as they are, because making them order-independent would
+re-key 147 part leaves. The pin re-keys none, since `dodo.py` is in no recipe
+closure, and seed 0 is one of the orders builds already took. The seed is in
+the log's environment. A replay runs with the fresh recording's environment
+and refuses (`input_mismatch`) a base recorded under another seed or none.
+
+Assemblies, drawings and gates are not recorded. Nothing under
+`cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
+input, and the three modules (`_replay_shadow.py`, `_com_conversation.py`,
+`com_replay.py`) are in no recipe closure
+(`test_recording_modules_stay_out_of_every_recipe_closure`,
+`test_recordings_are_no_task_input_or_output`).
+
+### The switch
+
+`HARMONIC_COM_REPLAY` is read in one place (`_replay_shadow.mode`):
+
+| value | effect |
+| --- | --- |
+| `shadow` (default, also unset or empty) | record, publish, then evaluate a shadow replay |
+| `record` | record and publish; no lookup or replay |
+| `off` | the kill switch: the build runs the command it ran before recording existed, and the engine is never imported |
+
+Any other value is treated as `off` with one warning. A farm leaf takes the mode
+from the worker's environment, not the submitter's. To switch recording off for
+the whole fleet without touching workers, change `DEFAULT_MODE` in
+`_replay_shadow.py` to `ReplayMode.OFF` and launch from that commit; because
+the module is in no recipe closure, no cache key moves.
+
+### Failure handling
+
+A failure of the recorder's own code (never the script's or SolidWorks') is
+classed by where it happened (`_com_conversation.Recovery`):
+
+| site | recovery |
+| --- | --- |
+| keeping the files a call wrote, encoding its response, writing its log line (calls, adoptions, comparisons, hashes) | `degraded` |
+| file-access accounting (the audit hook) | `degraded` |
+| closing the recording window after the build | `degraded` |
+| anything before or while the call is forwarded (request encoding, path accounting, argument preparation) | `rerun` |
+| building the proxy of a returned object; applying a byref write-back | `rerun` |
+| opening the recording window; reading the seat's revision | `rerun` |
+
+- **`degraded`.** The real call has completed and the build has its result:
+  recording stops there, the result is returned, and the build finishes
+  through the pass-through recorder with its own exit code and outputs.
+  The recording is unusable: `dodo` logs a WARN, adds a `replay.record_fault`
+  event (`recovery=degraded`) to the task span and a `replay_record_fault`
+  record to `cad/out/reports/cache.jsonl`, and publishes nothing. No re-run.
+- **`rerun`.** The script's result cannot be guaranteed: the build aborts
+  (`RecordFault`, which no `except Exception` can swallow) and the driver
+  exits `92` (`EXIT_RECORD_FAULT`). `dodo._exec_com` reports it the same way
+  (`recovery=rerun`), then re-runs the build **once, unrecorded**, on the same
+  seat. That re-run's exit code is the task's.
+- **Script or SolidWorks failure.** Exit codes, including the watchdog's 86–89,
+  pass through the driver unchanged and get today's handling. This mechanism
+  never retries them.
+- **Observation.** Publication, lookup and replay run after the seat is
+  released and the part archive is stored. Each is best-effort; none can fail
+  the build or change an output.
+
+### Publication and base selection
+
+The recording is published beside the part archive as two create-only sidecar
+blobs in the build cache container, named from the part key:
+
+```text
+com-replay/epoch-<cache epoch>/<engine sha[:16]>/<stem>/bundle/<part key>.tar      log + captures
+com-replay/epoch-<cache epoch>/<engine sha[:16]>/<stem>/manifest/<part key>.json   manifest
+```
+
+The cache layer puts the epoch after the registered prefix
+(`_artifact_cache._sidecar_blob`; callers name `com-replay/<engine>/...`), so
+an epoch bump lists and fetches none of the older sidecars, which age out under
+retention without a warning. Manifests and bundles live under sibling
+prefixes, so the base lookup lists manifests only, every page of them, and
+then takes the newest: no cut is ever made in the listing's name order.
+
+The manifest holds the stem, key, per-input digests (the cache's
+`key_inputs`), the cache salt and epoch (the two key inputs that are not
+files), the engine SHA-256, the SolidWorks revision, request counts and the
+bundle's SHA-256. The bundle is published first; only the writer whose bundle
+was stored then writes the manifest. A bundle that already `exists` is another
+writer's bytes, which this manifest's digest and counts do not describe, so
+that publication ends at the bundle (`publish=exists`). Failing to publish is
+a soft outcome. If an input changed while the part built, the inputs no longer
+match the key and nothing is published. Sidecars follow the container's 7-day
+last-access retention.
+
+Known limit: a lookup reads up to 8 manifests and downloads at most one
+bundle, so a manifest's last access stays fresher than its bundle's and it can
+outlive it. A base whose bundle has expired yields `unavailable` (class
+`infrastructure`).
+
+In `shadow` mode, the base is the earlier recording of the same stem and engine
+with the fewest differing key inputs; a tie goes to the newest. A base recorded
+under another cache salt differs by one more input, `(cache salt)` (class
+`salt`); the salt is never a filter, so a build under a throwaway salt still
+finds the recordings made under another. The SolidWorks revision is not a
+selection criterion: the replay refuses a base of another revision (below). The
+lookup makes one listing and at most 8 manifest reads, newest first, within
+3 s. Past that budget, the shadow step is skipped (`lookup=budget`).
+
+### The shadow replay
+
+The base bundle is downloaded and verified into a fresh work directory
+`cad/out/rs/<8 random characters>/` (`b` the bundle, `o` the replay's output
+root, `t` its temporary files), short so that a replayed output's path is the
+build's own plus 14 characters (`\rs\<8 random characters>\o`). Old-format
+bundles (captures mirrored under their output paths) are never a base: the
+manifest schema, the log schema and the engine digest in the blob prefix all
+exclude them.
+Then the CURRENT part script is replayed against the base log in a subprocess
+with SolidWorks absent. Before it runs a line of the script, the replay checks
+the inputs that are not Python source and refuses (`input_mismatch`) on any
+difference: the log schema, the engine, the declared environment keys, every
+file outside the output root a COM argument named, and the SolidWorks revision.
+The revision is compared header to header: the base log's against this build's
+own fresh recording (`--seat-log`), both read by the recorder from
+`ISldWorks.RevisionNumber` before its window (also in `summary.json`
+`sw_revision`). An unknown revision on either side refuses too. The replay
+serves recorded responses and refuses live COM, writes outside its scratch,
+and non-loopback network. The worker slot gets a hard 120 s budget; the seat is
+not held. Next, the base log is compared with this build's own fresh recording,
+which is the ground truth:
+
+- `ground_truth=same`: the fresh build issued exactly the base's requests.
+- `ground_truth=diverged`: it did not.
+
+Every verdict has a `verdict_class`:
+
+| class | verdicts | meaning |
+| --- | --- | --- |
+| `noop` | `noop` | the replay found the base's requests |
+| `divergence` | `diverged`, `exhausted`, `unconsumed` | the replay judged the requests different |
+| `refusal` | `input_mismatch`, `sandbox` | the replay declined to judge, by design |
+| `infrastructure` | `error`, `timeout`, `unavailable` | no judgement, for a reason of the machinery's own |
+
+A replay `noop` whose ground truth is `diverged` is a **soundness alarm**: if
+recordings had been reused, a wrong artefact would have been reused. It is
+logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence) and never
+fails the build. A `divergence`-class verdict with `ground_truth=same` is a
+`false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
+infrastructure verdicts are never false divergences; count them by
+`verdict_class`. The work directory is removed afterwards.
+
+### What it costs a task
+
+A recorded part task pays on its own wall clock in two places:
+
+1. **On the seat**, inside the `task part:<stem>` span. The recorder's time
+   inside the recording window is `replay.engine_s` + `replay.escape_audit_s`
+   on the `replay.record_overhead` span (`replay.overhead_pct` relates it to
+   the rest of the window). The driver's start before the window and its
+   summary after it are seat-held as well and are not in those attributes:
+   the whole seat-held difference is the `task` span's duration against an
+   unrecorded build of the same part on the same seat.
+2. **Off the seat**, after the part archive is stored: the
+   `replay.after_build <label>` span encloses every part of the step (key
+   re-hash, bundle, uploads, lookup, bundle download, replay and comparison
+   subprocesses, the `cache.jsonl` record and the INFO line). The lookup is
+   bounded by 3 s and the evaluation by 120 s; publication only by the
+   cache's transfer timeouts; `record` mode ends after publication. A farm
+   leaf's process runs this one task, so the step lengthens the leaf by its
+   whole duration, with the seat idle.
+
+Per build, the added task time is the sum of both over the part tasks that
+actually build under `rw` (part cache misses and forced refreshes): their count
+times the mean seat-held overhead plus the mean `replay.after_build` duration.
+Part cache hits, assemblies, drawings, gates and every task under `ro`/`off`
+add nothing. How much of that sum reaches a build's wall clock depends on how
+many part leaves run at once and which of them are on the critical path; the
+farm's slot time grows by the whole sum.
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.after_build "
+| extend outcome=tostring(customDimensions["replay.outcome"]), s=duration / 1000.0
+| summarize tasks=count(), p50_s=percentile(s, 50), p95_s=percentile(s, 95),
+            max_s=max(s), total_s=sum(s) by outcome
+```
+
+### Where results land
+
+All spans are on service `build-infra` and carry `label=part:<stem>`:
+
+| span | attributes |
+| --- | --- |
+| `replay.after_build <label>` | `replay.outcome`; encloses every span below and the whole off-seat step |
+| `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
+| `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`), `replay.bundle_bytes` |
+| `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
+| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.soundness_alarm`, `replay.false_divergence`, `replay.wall_s` |
+
+The sidecar transfers inside them are `cache.sidecar.upload`,
+`cache.sidecar.download` and `cache.sidecar.list`.
+
+Each recorded build also appends one `replay_shadow` record to
+`cad/out/reports/cache.jsonl`, whose `outcome` is one of:
+
+- `record_fault` (with `recovery` and `where`): nothing published
+- `no_recording`
+- `inputs_moved`
+- `recorded`
+- `no_base`
+- `evaluated`, which also carries the verdict fields
+- `error`
+
+and ends with one INFO line in the task log, for example:
+
+```text
+[com-replay] part:pd_transgear_arm_plate: evaluated | publish=stored bytes=412160 | lookup=found base=f1016ee56b74 differing=1 listed=3 read=3 0.412s | shadow=noop served=1874/1874 9.84s | truth=same
+```
+
+(`-` marks a step the build never reached). On a farm leaf `cache.jsonl` stays
+on the worker, so use Application Insights for fleet-wide results.
+
+Verdict classes, alarms and false divergences per stem (drop `by stem` for the
+fleet total):
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.shadow "
+| extend stem=tostring(customDimensions.label),
+         kind=tostring(customDimensions["replay.verdict_class"]),
+         alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
+         false_divergence=tolower(tostring(customDimensions["replay.false_divergence"])) == "true",
+         wall=todouble(customDimensions["replay.wall_s"])
+| summarize evaluated=count(), noop=countif(kind == "noop"),
+            divergence=countif(kind == "divergence"),
+            refusal=countif(kind == "refusal"),
+            infrastructure=countif(kind == "infrastructure"),
+            alarms=countif(alarm), false_divergences=countif(false_divergence),
+            p50_wall_s=percentile(wall, 50), p95_wall_s=percentile(wall, 95)
+            by stem
+| order by alarms desc, evaluated desc
+```
+
+Recording overhead percentiles:
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.record_overhead "
+| extend stem=tostring(customDimensions.label),
+         pct=todouble(customDimensions["replay.overhead_pct"]),
+         engine=todouble(customDimensions["replay.engine_s"])
+| summarize builds=count(), p50_pct=percentile(pct, 50), p95_pct=percentile(pct, 95),
+            max_pct=max(pct), p95_engine_s=percentile(engine, 95) by stem
+```
+
+Recorder faults and soundness alarms (log records):
+
+```kusto
+traces
+| where timestamp > ago(7d) and message startswith "[com-replay]"
+| extend label=tostring(customDimensions.label),
+         recovery=tostring(customDimensions.recovery),
+         kind=case(message has "SOUNDNESS ALARM", "alarm",
+                   message has "recorder fault", "record_fault", "other")
+| summarize count(), last=max(timestamp), example=take_any(message)
+            by kind, recovery, label
+```
+
+The same from a local `cache.jsonl` (bash or PowerShell 7.3+):
+
+```sh
+jq -s '
+  [.[] | select(.event == "replay_shadow")] as $s
+  | [.[] | select(.event == "replay_record_fault")] as $f
+  | def pct(p): sort | if length == 0 then null else .[((length - 1) * p | floor)] end;
+  {
+    overall: ($s | group_by(.verdict // .outcome)
+              | map({key: (.[0].verdict // .[0].outcome), value: length}) | from_entries),
+    classes: ([$s[] | select(.verdict_class)] | group_by(.verdict_class)
+              | map({key: .[0].verdict_class, value: length}) | from_entries),
+    false_divergences: [$s[] | select(.false_divergence == true)] | length,
+    per_stem: ($s | group_by(.label) | map({
+      label: .[0].label,
+      verdicts: (group_by(.verdict // .outcome)
+                 | map({key: (.[0].verdict // .[0].outcome), value: length}) | from_entries),
+      alarms: map(select(.soundness_alarm == true)) | length,
+      overhead_pct_p50: ([.[].overhead.overhead_pct // empty] | pct(0.5)),
+      overhead_pct_p95: ([.[].overhead.overhead_pct // empty] | pct(0.95))
+    })),
+    alarms: [$s[] | select(.soundness_alarm == true) | {label, key, base_key, alarm_evidence}],
+    record_faults: [$f[] | {label, key, recovery, where, fault_type, message}],
+    overhead_pct_p95: ([$s[].overhead.overhead_pct // empty] | pct(0.95))
+  }' cad/out/reports/cache.jsonl
+```
+
+Only part builds that actually run under `rw` produce records, so a target
+restored from the cache records nothing. To exercise specific parts, force a
+refresh of them (see "Refreshing one unchanged leaf").
 
 ## Native projected geometric-control zones
 
