@@ -2573,17 +2573,33 @@ _OUTER_MARKS = _layout_chain(blank.LAYOUT_MARKS["outer"])
 _SAW_CORRIDOR = _bound(blank.SAW_EDGE_TOLERANCE, 3, up=False)
 _BLANK_LENGTH = _length(trammel.BLANK_LENGTH, 2)
 # The end-clamp pilot runs up through the carrier's #8-32 CL/CR taps from
-# below, as step 11C spots the riser: the riser's own #30 drill passes under
-# the tap's minor diameter (UNC-2B minimum .130, ASME B1.1), so it guides on
-# the thread crests without cutting them. The 7/32 opening is blank_spec's.
+# below, as step 11C spots the riser: the riser's #30 drill, at its drilled
+# oversize, passes inside the taps' own tap drill, so it never cuts their
+# thread. The 7/32 opening is blank_spec's.
 _PILOT_DRILL = riser.SCREW_DRILL
-if not riser.SCREW_DRILL_DIA < 0.130 * trammel.INCH or fasteners.END_CLAMP.thread != "#8-32":
+if not (
+    riser.SCREW_DRILL_DIA + riser.DRILLED_BAND[0] < carrier.CLAMP_TAP_DRILL
+    and fasteners.END_CLAMP.thread == carrier.CLAMP_THREAD
+):
     raise AssertionError("the end-clamp pilot no longer clears the carrier's tap")
+# The 7/32 point breaks through the .098 strap into the riser's #9 CL/CR
+# mouths, opening them to the 7/32 at the riser top: charged on the riser's
+# band walls, which keep the .080 wall.
+_RISER_MOUTH_LOSS = (blank.CLAMP_HOLE_LIMITS[1] - riser.CLAMP_DIA - riser.DRILLED_BAND[0]) / 2.0
+if min(riser.CLAMP_BAND_WALLS) - max(_RISER_MOUTH_LOSS, 0.0) < riser.WALL_TARGET_MM:
+    raise AssertionError("opening the clamp pilots thins the riser's CL/CR walls under .080")
 # The hub hole is drilled in steps to the pre-ream size (#2444): only the
 # last drill cuts at the full radius, so the carrier, supported only at A1
-# and B1, takes a fraction of a full-size drill's thrust. 25/64 leaves .0094
-# on diameter for the .4000 reamer (Machinery's Handbook 27th ed. p.833).
+# and B1, takes a fraction of a full-size drill's thrust. The last drill at
+# its drilled oversize stays under the strap's hub hole and leaves at most
+# .015 on diameter for the reamer (Machinery's Handbook 27th ed. p.833).
 HUB_DRILL_STEPS = ("1/8", "1/4", "25/64")
+_PRE_REAM_DIA = 25.0 / 64.0 * trammel.INCH
+if not (
+    _PRE_REAM_DIA + riser.DRILLED_BAND[0] < holding.PRODUCT_HOLE_LIMITS[0]
+    and holding.PRODUCT_HOLE_LIMITS[1] - _PRE_REAM_DIA <= 0.015 * trammel.INCH
+):
+    raise AssertionError("the 25/64 pre-ream drill no longer suits the strap's hub hole")
 _HUB_DRILLS = ", THEN ".join(HUB_DRILL_STEPS)
 
 OPERATION_STEPS = (
@@ -2627,12 +2643,13 @@ OPERATION_STEPS = (
     "SQUARE ENDS, ON THE BLANK ONLY.",
     "19E. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
     f"CHAIN, KERF ON THE WASTE SIDE: EACH EDGE WITHIN {_SAW_CORRIDOR} OF ITS LINE.",
-    "19F. SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
+    "19F. WITH THE CARRIER ON A1 AND B1 AT THE SYMMETRIC ROW AS IN STEPS 10 AND "
+    "15-15H, SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
     "STOP PINS, ITS X 0 MARK UNDER THE SPINDLE AT THE STEP 10E SETTING.",
     f"19G. CLAMPED AS IN STEP 11B, DRILL A {_PILOT_DRILL} PILOT THRU THE BLANK "
     "FROM BELOW THROUGH EACH OF THE CARRIER'S 2 END-CLAMP TAPS.",
     f"19H. OPEN EACH PILOT TO {blank.CLAMP_DRILL} FROM ABOVE, SPINDLE-GUIDED, "
-    "THRU THE BLANK ONLY: NEVER INTO THE CARRIER.",
+    "THRU THE BLANK INTO THE RISER'S HOLE: NEVER INTO THE CARRIER.",
     f"19J. REPLACE THE CLAMP WITH 2 {_STRAP_CLAMPS} TIGHTENED DIRECTLY ON THE "
     "STRAP INTO THE CARRIER'S 2 END-CLAMP TAPS.",
     "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10E.",

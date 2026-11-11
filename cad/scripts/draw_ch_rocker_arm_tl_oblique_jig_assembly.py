@@ -108,7 +108,8 @@ FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
 HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
 # The fifth instruction sheet: the greedy flow carries the sequence's tail
-# (today steps 19J-21G, the strap's hub and cuts; #2443) onto it.
+# (today the end of the strap's preparation, its hub and its cuts; #2443)
+# onto it.
 CUTTING_SHEET = "STRAP CUTTING"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 LINEAR_MOTION_SHEET = "LINEAR MOTION FROM ABOVE"
