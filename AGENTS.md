@@ -528,9 +528,9 @@ nominal), not prechips example values. Only exit 0 from both profiles passes; ex
 either is a prechips refusal (bad input or a failed enforced check) and leaves neither
 file nor a stamp. The task is not cache-keyed and always runs when asked
 (`uptodate: [False]`), because its generator version floats. A stem without a
-plan fails only its own task. Under prechips 0.9 the base bar and end bracket
-pass both profiles on the v48 manifests. The feed lever's
-plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
+plan fails only its own task. Under prechips 0.10 the base bar and end bracket
+pass both profiles, including `vise_holding`, on the v48 manifests. The feed
+lever's plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
 `cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.

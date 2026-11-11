@@ -353,7 +353,9 @@ def test_base_bar_stock_fits_the_vise_with_its_column_edge_three_and_a_half_out(
     inventory = tomllib.loads(
         (CAD_ROOT / "config" / "shop-equipment.toml").read_bytes().decode()
     )
-    vise_opening = inventory["fixtures"]["vise-pm-6"]["opening_in"]["value"] * 25.4
+    # The opening is a prechips shop fact (cad/process/shop.toml), in mm.
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_bytes().decode())
+    vise_opening = shop["workholding"]["vise-pm-6"]["opening_mm"]
     assert trammel.BASE_BAR_WIDTH <= vise_opening
     (stock,) = [
         row for row in inventory["stock"] if "OnlineMetals 1173," in row.get("note", "")

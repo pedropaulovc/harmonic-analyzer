@@ -178,15 +178,12 @@ teeth = 72
 
 # --- workholding ------------------------------------------------------------
 
+# Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
+# height are prechips shop facts in cad/process/shop.toml workholding.vise-pm-6.
 [fixtures.vise-pm-6]
-kind = "vise"
 make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
 source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
-# Largest workpiece the stock hard jaws clamp. Vendor page: 6 in; vendor drawing
-# L1 = 150 mm; the bare jaw-to-jaw caliper reading was 6.135 in (2026-10-05), but
-# the owner reports (2026-10-30) only 5 3/4 in pieces fit with the stock hard jaws.
-opening_in = { value = 5.75, measured = { status = "measured", by = "Pedro Paulo Vezza Campos", date = "2026-10-30", instrument = "owner-reported fit with stock hard jaws" } }
 
 # Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
 # setups name (plan text and diagrams; prechips has no parallel or jack record).

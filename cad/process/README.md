@@ -40,21 +40,36 @@ them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
 The base bar, end bracket and feed lever have plans, ported from the prechips
-0.9 examples; each header names its sources. Each plan's `adapter` is a prechips
+0.10 examples; each header names its sources. Each plan's `adapter` is a prechips
 adapter written against that part's manifest contents, so a drawing change that
 alters the manifest's requirements needs a prechips adapter release before the
 traveler passes again.
 
+Plan parameters that size envelopes and pictures (vise jaw width, jaw height
+and bed height) repeat `shop.toml` `workholding.vise-pm-6`, because prechips
+plan bindings cannot read shop records; each such parameter names the shop
+field it repeats, and the two must be changed together.
+
 ## Shop records
 
-`shop.toml` is the prechips shop file: machines, gauges, limits, tools and
-cutting settings, in prechips' schema and units. It holds only records an HA
-plan or an HA spec/test reads (no example tooling from other projects); a fact
-that schema can express lives here. Its records include the rocker DTI's range and
-resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`; the
-PM-30MV X DRO scale (`gauges.mill-x-dro`), whose resolution the paper-drive
-tests read; and the rocker profile cutter (`tools.rocker-profile-cutter`) with
-its HSS cutting setting (`settings.rocker-profile-hss-low-carbon-steel`).
+`shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
+tools and cutting settings, in prechips' schema and units. It holds only records
+an HA plan or an HA spec/test reads (no example tooling from other projects); a
+fact that schema can express lives here. Its records include the rocker DTI's
+range and resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`;
+the PM-30MV X DRO scale (`gauges.mill-x-dro`), whose resolution the paper-drive
+tests read; the rocker profile cutter (`tools.rocker-profile-cutter`) with its
+HSS cutting setting (`settings.rocker-profile-hss-low-carbon-steel`); and the
+PM 6-in vise (`workholding.vise-pm-6`: jaw width, opening, jaw height and bed
+height), whose 5 3/4 in opening the trammel spec test reads. The opening is
+the owner-reported fit with the stock hard jaws (2026-10-30), not the bare
+6.135 in jaw-to-jaw reading.
+
+The `[limits]` table carries the three `vise_holding` limits: grip at least
+`vise_grip_min_mm` 6 mm (Pedro's house choice) and `vise_grip_fraction_min`
+one-third of the part's height (a rule of thumb, not a standard), and a
+`"centred"` hold's gripped-span midpoint within `vise_centre_fraction_max`
+one-third of the half jaw width (Pedro's house rule). Each is cited beside it.
 
 Facts prechips has no field for, but which CAD specs and tests read, live in
 [`cad/config/shop-equipment.toml`](../config/shop-equipment.toml):
@@ -68,7 +83,7 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
 - the cylinder gear's alignment-notch saw (TTC 10-215-014, .014 in), not
   owned, read by `test_dt_cylinder_gear_drawing.py` against the printed
   .016 MAX (#2364);
-- the PM 6-in vise's make, SKU, source and opening;
+- the PM 6-in vise's make, SKU and source;
 - the base-bar plan's vise workholding (1-3/8 in parallels, HHIP 3901-0079
   screw jack), with the ownership status Pedro's 2026-11-05 hand sheet gives
   (PR #2218): neither owned on that date;
@@ -119,14 +134,47 @@ Owner rulings (Pedro), recorded for the cutover:
 and `release` do not run it, and releases carry no travelers while prechips
 stabilises. Each run renders two travelers from the same plan: `traveler.html`
 (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
-`<stem>/diagrams/`). Under prechips 0.9 the base bar and end bracket pass both
+`<stem>/diagrams/`). Under prechips 0.10 the base bar and end bracket pass both
 on the v48 manifests.
 
+prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
+`vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
+hold is checked against `workholding.vise-pm-6` and the three vise limits
+(opening, parallels below the jaw top, grip depth, centring or a declared
+balance, and a rod against an unmachined moving-jaw face). Overhang rigidity
+is not judged. All three plans pass it with HA's 5 3/4 in opening.
+
+What the 0.10 port changed on the sheets:
+
+- Base bar: bar 2 is the opposite hand of bar 1 (rail and table faces
+  swapped), so Setup 4 marks bar 1 C'BORE SIDE and bar 2 RAIL SIDE, and Setup
+  6 pictures bar 1 turned over (C'BORE SIDE down on the table, rail up) and a
+  bar 2 section. The table setups use three 1-2-3 blocks, one at mid-length
+  under the long-edge straps. Vise setups print the bar's stand-out above the
+  jaws, keep the 1-3/8 in parallels and two screw jacks (touch only; Setup 5
+  gives their DRO positions). Facing runs full length at 850 rpm, 6.8 in/min
+  (owner ruling 2026-11-11, `settings.basebar-face-6061-t6511`). Only R1 is
+  measured on the bar's own rail; the row is drilled from it at the REF pitch.
+  The 1/2 in end mill alone cuts both slots, tracing a cutter-centre
+  rectangle printed per slot, and `tool_sizing` checks it against the slot
+  width band less the path offset (the 3/8 in slot drill and 17/32 in
+  slot-finish cutter are gone). Position checks are added: X on the DRO before
+  unclamping, rows from ZERO EDGE with calipers. The saw is the 14 in Evolution
+  metal-cutting miter saw (`tools.saw-evolution-14`, both logbook entries; no
+  blade is recorded, #2084).
+- End bracket: both brackets share each vise clamping, one at each jaw end
+  (`balance = "twin_part"`), Pedro's 2026-11-10 ruling. Each operation runs on
+  both before the next tool; X0 is the left part's INNER END and XR the right
+  part's. The two blanks are sawn adjacent from the same bar so their as-bought
+  widths match in the jaws. This route differs from the 2026-11-02 hand sheet
+  (`hand-travelers/`), which holds and re-zeroes one bracket at a time.
+
 The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
-in the repository but not enrolled. prechips refuses it on `tool_sizing`: the
-plan's 11/32 drill (8.73125 mm) is below the drawing's hole band
-(8.7376–8.8392 mm). That is a finding for the owner (a different drill, or a
-drawing change), not a check to opt out of; enroll the part once its plan passes.
+in the repository but not enrolled. It declares its vise holds and passes
+`vise_holding`; prechips refuses it only on `tool_sizing`: the plan's 11/32
+drill (8.73125 mm) is below the drawing's hole band (8.7376–8.8392 mm). That is
+a finding for the owner (a different drill, or a drawing change), not a check
+to opt out of; enroll the part once its plan passes.
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
@@ -154,9 +202,10 @@ stderr); it is never a finding about the plan. A nonzero prechips exit from
 either is returned and removes both files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`,
-`gauge_capability`, `lathe_holding`, `machine_capacity`, or `hobby`'s missing
-setup picture). A missing plan fails only that part's task. A refusal is a
-finding about the plan or shop data; correct the source, not the check.
+`gauge_capability`, `lathe_holding`, `vise_holding`, `machine_capacity`, or
+`hobby`'s missing setup picture). A missing plan fails only that part's task.
+A refusal is a finding about the plan or shop data; correct the source, not
+the check.
 
 A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
