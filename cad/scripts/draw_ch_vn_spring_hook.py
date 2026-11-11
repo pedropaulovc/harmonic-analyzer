@@ -72,7 +72,7 @@ SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 30.7 x 12.7 mm (1.21 in overall) since its shank carries
+# The finished part is 31.2 x 12.7 mm (1.23 in overall) since its shank carries
 # the MHA-CH-14 jam nut under the coefficient plate: 5:1 keeps the front view
 # inside the counter anchor's 4:1 sheet band, raised so the cut end's deburr
 # dimensions clear the notes.  The deburr is dimensioned on the front view
@@ -92,26 +92,43 @@ ISO_CENTER = (0.310, 0.209)
 # The settled isometric outline is 0.0543 half-height about its centre (run
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
 # centred at 0.209 its top is 0.2633 and its bottom 0.1547.
-# Deburr texts. The 45 deg angle's vertex is where the chamfer meets the cut
-# end, (106.5, 103.2) mm; SolidWorks runs the angle's arc through its text and
-# breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray it
-# sat on its own chamfer extension line and arc arrowhead (machinist b344192,
-# rule 14), so the text is centred on the bisector (22.5 deg) at radius 26.
-# Settled native ink (runs fa43a1a5, ae121732; run boxes at SolidWorks'
-# widths): the 45 deg's arrowheads stand 3.6 and 4.8 mm off its text, its
-# extension lines 6.0 and 7.2 mm, its lower arrowhead 4.5 mm off the width
-# block, and no own line runs inside any control's text. The width block
-# drops 2 mm (its MIN row stood 1.5 mm under that arrowhead) and still stands
-# right of the shank, clear of its own extension lines (review r8: centred
-# under the 2.3 mm leg they were struck) and ~6 mm above the notes. The
-# shared layout audit, not a sheet check, guards the settled ink.
+# Deburr texts, settled on the 30.734 mm part with its .018 leg (FRONT_CENTER
+# keeps its cut end where runs fa43a1a5, ae121732 read it, above), whose 45
+# deg vertex -- where the chamfer meets the cut end -- stood at (106.5, 103.2)
+# mm; SolidWorks runs the angle's arc through its text
+# and breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray
+# it sat on its own chamfer extension line and arc arrowhead (machinist
+# b344192, rule 14), so the text is centred on the bisector (22.5 deg) at
+# radius 26. Settled native ink (run boxes at SolidWorks' widths): the 45
+# deg's arrowheads stand 3.6 and 4.8 mm off its text, its extension lines 6.0
+# and 7.2 mm, its lower arrowhead 4.5 mm off the width block, and no own line
+# runs inside any control's text. The width block stands right of the shank,
+# clear of its own extension lines (review r8: centred under the 2.3 mm leg
+# they were struck) and ~6 mm above the notes. A longer trim grows the
+# centred outline at the cut end, which drops by half the growth, and a
+# longer leg moves the vertex inboard; the deburr texts follow the vertex so
+# that settled ink keeps its clearances. The shared layout audit, not a sheet
+# check, guards the ink.
+_SETTLED_OVERALL_MM = 30.734
+_SETTLED_CUT_END_Y = 0.1032
+_SHEET_PER_MODEL_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+_CUT_END_DROP = (FINISHED_OVERALL_MM - _SETTLED_OVERALL_MM) * _SHEET_PER_MODEL_MM / 2.0
+CHAMFER_VERTEX = (
+    FRONT_CENTER[0] + (SUPPLIER_THREAD_MAJOR_MM / 2.0 - CHAMFER_WIDTH_MM) * _SHEET_PER_MODEL_MM,
+    _SETTLED_CUT_END_Y - _CUT_END_DROP,
+)
+_ANGLE_TEXT_RADIUS = 0.026
+_ANGLE_TEXT_BEARING = math.radians(CHAMFER_ANGLE_DEG / 2.0)
 FRONT_KEEP = {
     "FinishedOverall": (0.042, FRONT_CENTER[1]),
-    "ChamferWidth": (0.168, 0.098),
-    "ChamferAngle": (0.1305, 0.1132),
+    "ChamferWidth": (0.168, 0.098 - _CUT_END_DROP),
+    "ChamferAngle": (
+        CHAMFER_VERTEX[0] + _ANGLE_TEXT_RADIUS * math.cos(_ANGLE_TEXT_BEARING),
+        CHAMFER_VERTEX[1] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_BEARING),
+    ),
 }
-# The deburr prints three places under the title block's .XXX (#2314), so it
-# names what it serves (rule 3): its short leg brings the cut end under the
+# The deburr prints under the title block's .XX (#2314) and names what it
+# serves (rule 4): its short leg brings the cut end under the
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its long
 # leg, at the steepest angle, is charged to the full threads the shank keeps
 # past the jam nut.  Rule 7 allows one reason line per feature, so the

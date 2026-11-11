@@ -66,13 +66,14 @@ FINISHED_OVERALL_TOLERANCE_MM = printed_band_mm(OVERALL_PLACES, unit=UNIT)
 # Owner ruling (C10): one more step of the printed overall's grid (.01) as
 # thread over the floor at that worst corner.
 PAST_NUT_MARGIN_MM = 0.254  # .01
-# The restored factory deburr on the .XXX grid, at the title block's .XXX
-# (#2314): at its short limit (.020) the cut end's flat (major radius -
-# chamfer) still passes the #6-32 tap drill it enters (MIN_CHAMFER_WIDTH_MM,
-# .0158), so the deburr needs no band of its own. The longer leg costs the
-# past-nut budget a little more axial run, which the trim takes.
-CHAMFER_WIDTH_PLACES = 3
-CHAMFER_WIDTH_MM = 0.635  # .025
+# The restored factory deburr on the .XX grid, at the title block's .XX
+# (#2314; rule 4: the loosest band that serves a chamfer): at its short limit
+# (.02) the cut end's flat (major radius - chamfer) still passes the #6-32 tap
+# drill it enters (MIN_CHAMFER_WIDTH_MM, .0158), so the deburr needs no band
+# of its own. The longer leg costs the past-nut budget more axial run, which
+# the trim takes (the counter anchor's and the knife hanger stud's pattern).
+CHAMFER_WIDTH_PLACES = 2
+CHAMFER_WIDTH_MM = 0.762  # .03
 CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(CHAMFER_WIDTH_PLACES, unit=UNIT)
 MIN_CHAMFER_WIDTH_MM = (
     ANCHOR_9489T111.thread_major_dia_mm - blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC)
@@ -186,7 +187,7 @@ DIMENSION_TOLERANCE_TYPES = {
     "ChamferAngle": 11,
 }
 _NUT_NUMBER = _config.parts("ch-anchor-jam-nut")["number"]
-# Rule 7: the 1.21 overall takes the title block's band, so it carries no
+# Rule 7: the 1.23 overall takes the title block's band, so it carries no
 # reason; the nut's omission is the stock name's, its jam nut the MHA-HA-00
 # step's (ANCHOR_INSTALL_STEP).
 DRAWING_NOTES = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
