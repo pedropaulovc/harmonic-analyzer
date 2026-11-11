@@ -258,8 +258,9 @@ PROFILE_KEEP = {
     # sharp corner under the corner's own station from the pivot axis.
     "SouthEastX": _planned(0.045, 0.2650),
     "CornerSERun": _planned(0.045, 0.2590),
-    # Left of the east edge, its text under the chamfer's lower witness.
-    "CornerSERise": _planned(0.048, 0.2455),
+    # Left of the east edge and of the two rows' text, which its outside
+    # arrows would otherwise cross.
+    "CornerSERise": _planned(0.038, 0.2455),
     # Radial rays must meet actual trimmed corners, not circle extensions.
     # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Keep
     # their shelves down/outward from the fillet centres so native radius
