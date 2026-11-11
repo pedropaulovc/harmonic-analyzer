@@ -176,6 +176,28 @@ thickness_in = 0.014
 bore_in = 1.0
 teeth = 72
 
+# Engraving bit for every MHA-MS-01 (ms-stick) graduation and numeral (#2433):
+# a 30-degree included V cuts the printed .016 MIN / .024 MAX tick at its face
+# plunged .021-.033 deep (.020 MIN deep, .080 MIN stock under at the .113
+# thinnest bar), and the .016 MIN-deep numerals. Its cutting setting is
+# cad/process/shop.toml settings.ms-stick-engrave-brass. Graduation stations
+# are dialled on the X DRO (dro.pm-30mv, .0002 in): its readings are the
+# record of the sheet's +/-.002 stations, finer than any loupe check. Note 3
+# leaves the numeral font to the shop: a single-stroke font of straight
+# horizontal and vertical strokes cuts each stroke with one handwheel.
+[tools.ms-stick-engraver]
+name = "2L Profiler P-125x2.0-30-.005-S, 30 deg included V, .005 in tip, solid carbide, soft-materials (brass) grade"
+kind = "engraving_bit"
+make = "2L Inc."
+sku = "P-125x2.0-30-.005-S"
+source = "https://www.2linc.com/product/profiler-engraving-tools/"
+purchase = "2L P-125x2.0-30-.005-S, $18.40 each (2L listing read live 2026-11-11); buy two, a broken tip stops the job"
+present = false
+status = "not owned: to buy"
+use = "MHA-MS-01 graduations (101 ticks) and numerals 0-10"
+included_angle_deg = 30.0
+tip_width_in = 0.005
+
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
