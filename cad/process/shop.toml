@@ -21,6 +21,14 @@ travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
 spindle_to_table_mm = [62.484, 431.8]
 
+# HA: the shop's installed lathe (Pedro 2026-10-15), from the deleted inventory
+# (45952b66bc:cad/process/shop/inventory.toml machines.PM-1127VF-LB), its two
+# spindle ranges as archived. MHA-PD-00 turns a stub mandrel in place in its
+# chuck (cad/scripts/ha_assembly_package.py, #2392).
+[machines.pm-1127vf-lb]
+kind = "lathe"
+rpm_ranges = [[70, 380], [380, 2000]]
+
 # HA: fixtures.vise-pm-6 (Precision Matthews VISE-6in-HIGHPREC; make, SKU and
 # source stay in cad/config/shop-equipment.toml), from the deleted inventory
 # (45952b66bc:cad/process/shop/inventory.toml), × 25.4. Measured by Pedro on
