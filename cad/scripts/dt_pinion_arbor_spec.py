@@ -21,6 +21,10 @@ from dt_pinion_arbor_geometry import (
     BACK_JOURNAL_FROM_HEAD_REAR as BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z as BACK_JOURNAL_Z,
     BACK_RIM_FROM_HEAD_REAR as BACK_RIM_FROM_HEAD_REAR,
+    BOND_RELIEF_DIA as BOND_RELIEF_DIA,
+    BOND_RELIEF_FROM_HEAD_REAR as BOND_RELIEF_FROM_HEAD_REAR,
+    BOND_RELIEF_LEN as BOND_RELIEF_LEN,
+    BOND_RELIEF_Z as BOND_RELIEF_Z,
     BOND_ZONE_DIA_FROM_HEAD_REAR as BOND_ZONE_DIA_FROM_HEAD_REAR,
     BOND_ZONE_DIA_Z as BOND_ZONE_DIA_Z,
     BOND_ZONE_LAND_CLEARANCE as BOND_ZONE_LAND_CLEARANCE,
@@ -47,6 +51,7 @@ from dt_pinion_arbor_geometry import (
     END_PLAY as END_PLAY,
     END_PLAY_SET_ERROR as END_PLAY_SET_ERROR,
     EXPOSED_SHAFT_LEN as EXPOSED_SHAFT_LEN,
+    FRONT_BOND_LAND_LEN as FRONT_BOND_LAND_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR as FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z as FRONT_JOURNAL_Z,
     HEAD_CAP_R as HEAD_CAP_R,
@@ -145,6 +150,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BackJournalLen",
         "BackJournalDia",
     },
+    # #2360: the relief between the two MHA-DT-01 bond lands, chained off the
+    # front land's crown end (dt_pinion_arbor_geometry: no room for another
+    # row of stations from the head rear face).
+    "BondReliefProfile": {"FrontBondLandLen", "BondReliefLen", "BondReliefDia"},
 }
 
 # The construction-only sketches that carry printed dimensions: the part saves
@@ -193,6 +202,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BackJournalFromHeadRear": 2,
         "BackJournalLen": 2,
         "BackJournalDia": 4,
+    },
+    "BondReliefProfile": {
+        "FrontBondLandLen": 2,
+        "BondReliefLen": 2,
+        "BondReliefDia": 2,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

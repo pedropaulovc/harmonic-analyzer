@@ -56,6 +56,8 @@ from dt_pinion_arbor_pin_spec import PIN_NUMBER as _PIN_NUMBER
 from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
+    BOND_RELIEF_LEN,
+    BOND_RELIEF_Z,
     BOND_ZONE_DIA_Z,
     CROSSROD_NUMBER,
     DRUM_NUMBER,
@@ -106,10 +108,11 @@ JOURNAL_CLEARANCE = (
 )
 JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
-# drum's span between the journals (the drum, 2.40-8.04 from the head rear
-# face, rests on both lands' inner ends:
-# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) is its bonded fit, reason
-# once at its callout.  The two spans outside the journals (the collar's, by
+# drum's two bond lands either side of the relief (#2360; the drum, 2.40-8.04
+# from the head rear face, rests on both journals' inner ends:
+# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) are its bonded fit, sized
+# by one 2X diameter with its reason once at its callout.  The two spans
+# outside the journals (the collar's, by
 # the head, with its pin hole; the back stub) take the same -.0004/-.0038:
 # MHA-DT-33 slides over both from the back crown to its pin station, the
 # band's upper limit its slide-on clearance
@@ -414,6 +417,19 @@ PIN_HOLE_CALLOUT_X = (
 # set inside, where its span has room (the bond zone's 8 mm takes its two
 # 3.6 mm arrowheads).
 ARROWS_INSIDE = ("PinStationFromHeadRear", "FrontJournalLen", "BondZoneDia")
+# #2360: the relief between the bond lands.  Its two lengths chain off the
+# front land's crown end in one row just above the shaft, under detail A's
+# label and left of the front land's length (the rows below the shaft would
+# cross the front Ra symbol or run through the front land's diameter block).
+# Its plain .XX diameter stands on the relief just aft of its front shoulder
+# and hangs below the shaft, between the bond-zone and front-land blocks and
+# over the 7.83 row.
+RELIEF_CHAIN_Y = 0.178
+RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
+RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
+FRONT_LAND_END_X = _sheet_x(FRONT_JOURNAL_Z + JOURNAL_LEN)
+RELIEF_DIA_FROM_FRONT_SHOULDER = 6.0
+RELIEF_DIA_XY = (_sheet_x(BOND_RELIEF_Z + RELIEF_DIA_FROM_FRONT_SHOULDER), 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # Below the shaft, under the back Ra symbol and its leader.
@@ -424,6 +440,9 @@ PRINCIPAL_KEEP = {
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
+    "FrontBondLandLen": ((FRONT_LAND_END_X + RELIEF_FRONT_X) / 2.0, RELIEF_CHAIN_Y),
+    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_CHAIN_Y),
+    "BondReliefDia": RELIEF_DIA_XY,
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
     # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.

@@ -27,6 +27,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
     ensure_fully_defined,
@@ -52,12 +53,16 @@ from dt_pinion_arbor_spec import (
     BACK_CAP_SAG,
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
+    BOND_RELIEF_DIA,
+    BOND_RELIEF_LEN,
+    BOND_RELIEF_Z,
     CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
     CROSS_HOLE_STATION,
     DRAWING_NOTES,
     DRUM_STATION,
     EXPOSED_SHAFT_LEN,
+    FRONT_BOND_LAND_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
     HEAD_CAP_R,
@@ -86,6 +91,7 @@ from dt_pinion_arbor_spec import (
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
 from dt_pinion_arbor_notes import (
     BACK_STUB_DIA_PREFIX,
+    BOND_ZONE_DIA_PREFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     REFERENCE_SKETCHES,
@@ -113,6 +119,9 @@ V_NECK = math.pi * NECK_R**2 * NECK_LEN
 V_HEAD = math.pi * HEAD_R**2 * HEAD_LEN
 V_FRONT_CAP = math.pi * HEAD_CAP_SAG**2 * (3.0 * HEAD_CAP_R - HEAD_CAP_SAG) / 3.0
 V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
+# #2360: the turned relief between the MHA-DT-01 bond lands.
+BOND_RELIEF_R = BOND_RELIEF_DIA / 2.0
+V_BOND_RELIEF = math.pi * (SHAFT_R**2 - BOND_RELIEF_R**2) * BOND_RELIEF_LEN
 # Split lines reach this far past the shaft flank so the projection crosses
 # the whole Ø5/16 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
@@ -161,7 +170,14 @@ def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float)
 V_CROSS_HOLE = _perpendicular_cylinder_intersection(CROSS_HOLE_R, HEAD_R)
 V_PIN_HOLE = _perpendicular_cylinder_intersection(PIN_HOLE_R, SHAFT_R)
 V_TOTAL = (
-    V_NECK + V_SHAFT + V_HEAD + V_FRONT_CAP + V_BACK_CAP - V_CROSS_HOLE - V_PIN_HOLE
+    V_NECK
+    + V_SHAFT
+    + V_HEAD
+    + V_FRONT_CAP
+    + V_BACK_CAP
+    - V_CROSS_HOLE
+    - V_PIN_HOLE
+    - V_BOND_RELIEF
 )
 
 
@@ -523,6 +539,101 @@ async def _add_span_reference(
     return dims.apply(adapter, feature_name)
 
 
+async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
+    """Turn the relief between the MHA-DT-01 bond lands (#2360).
+
+    One Top-plane profile, revolved as a cut about its own axis line: a
+    rectangle from the relief's diameter out past the shaft flank, on the
+    sketch's -x side (the sheet's upper flank, so the chained lengths above
+    the shaft stand on short extension lines).  The axis starts at the front
+    land's crown end, so the relief's front shoulder is the printed bond-land
+    length from that edge, and the relief's length and diameter follow.
+    """
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    feature_name = "BondReliefProfile"
+    land_end_v = -(FRONT_JOURNAL_Z + JOURNAL_LEN)
+    front_v = -BOND_RELIEF_Z
+    back_v = -(BOND_RELIEF_Z + BOND_RELIEF_LEN)
+    reach = SHAFT_R + SPLIT_OVERHANG
+    dims = SketchDims()
+    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        f"{feature_name} axis",
+        await adapter.add_centerline(0.0, land_end_v, 0.0, back_v),
+    )
+    set_sketch_direct_db(adapter, False)
+    inner, back, outer, front = await add_line_chain(
+        adapter,
+        [
+            (-BOND_RELIEF_R, front_v),
+            (-BOND_RELIEF_R, back_v),
+            (-reach, back_v),
+            (-reach, front_v),
+        ],
+    )
+    for line, relation in (
+        (axis, "vertical"),
+        (inner, "vertical"),
+        (outer, "vertical"),
+        (back, "horizontal"),
+        (front, "horizontal"),
+    ):
+        check(
+            f"{feature_name} {line} {relation}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    check(
+        f"{feature_name} axis ends level with the back shoulder",
+        await adapter.add_sketch_constraint(f"{axis}.end", f"{inner}.end", "horizontal_points"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, land_end_v, f"{feature_name} front land end"
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} front bond land",
+        await adapter.add_sketch_dimension(
+            f"{axis}.start", f"{inner}.start", "vertical_distance", FRONT_BOND_LAND_LEN
+        ),
+    )
+    dims.record("FrontBondLandLen", '"FrontBondLandLen"')
+    check(
+        f"{feature_name} length",
+        await adapter.add_sketch_dimension(
+            f"{inner}.start", f"{inner}.end", "vertical_distance", BOND_RELIEF_LEN
+        ),
+    )
+    dims.record("BondReliefLen", '"BondReliefLen"')
+    check(
+        f"{feature_name} outer reach",
+        await adapter.add_sketch_dimension(
+            f"{axis}.end", f"{outer}.start", "horizontal_distance", reach
+        ),
+    )
+    dims.record(None, None)
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        inner,
+        (-(SHAFT_R + 5.0), (front_v + back_v) / 2.0),
+        "BondReliefDia",
+    )
+    dims.record("BondReliefDia", '"BondReliefDia"')
+    await ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    drive_jobs = dims.apply(adapter, feature_name)
+    check(
+        "revolve-cut bond relief",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "BondRelief")
+    return drive_jobs
+
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
@@ -552,6 +663,9 @@ async def build(adapter) -> dict[str, str]:
         "DrumStationFromHeadRear": DRUM_STATION,
         "PinStationFromHeadRear": PIN_STATION_FROM_HEAD_REAR,
         "PinHoleDia": PIN_HOLE_DIA,
+        "FrontBondLandLen": FRONT_BOND_LAND_LEN,
+        "BondReliefLen": BOND_RELIEF_LEN,
+        "BondReliefDia": BOND_RELIEF_DIA,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -833,6 +947,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PinHole")
     expected -= V_PIN_HOLE
     await volume_check(adapter, "collar pin hole", expected, 0.05 * V_PIN_HOLE)
+    drive_jobs += await _add_bond_relief(adapter)
+    expected -= V_BOND_RELIEF
+    await volume_check(adapter, "bond relief", expected, 0.01 * V_BOND_RELIEF)
     _require_one_solid_body(adapter, label="integral pinion arbor")
 
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "arbor axis")
@@ -893,8 +1010,11 @@ async def build(adapter) -> dict[str, str]:
         journal_z=BACK_JOURNAL_Z,
         station_expression='"BackJournalFromHeadRear"',
     )
-    if len(_shaft_faces(adapter)) != 5:
-        raise RuntimeError("the Ø5/16 shaft must read as two journal lands and three plain zones")
+    if len(_shaft_faces(adapter)) != 6:
+        raise RuntimeError(
+            "the Ø5/16 shaft must read as two journal lands and four plain spans "
+            "(the collar's, two bond lands either side of the relief, the back stub)"
+        )
     for feature_name, dimension_name, station, witness_len in SPAN_REFERENCES:
         drive_jobs += await _add_span_reference(
             adapter,
@@ -951,8 +1071,11 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
-    for prefix in ("FrontJournal", "BackJournal", "BondZone"):
+    for prefix in ("FrontJournal", "BackJournal"):
         set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
+    # One size for both MHA-DT-01 bond lands (dt_pinion_arbor_notes).
+    set_dimension_prefix(adapter, "BondZoneReference", "BondZoneDia", BOND_ZONE_DIA_PREFIX)
+    set_dimension_prefix(adapter, "BondReliefProfile", "BondReliefDia", "<MOD-DIAM>")
     # One size for both spans outside the journals (dt_pinion_arbor_notes).
     set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
