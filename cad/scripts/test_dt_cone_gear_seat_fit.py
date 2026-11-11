@@ -121,7 +121,8 @@ def test_one_broach_pass_lands_in_t_and_the_keyseat_clears_the_key_under_it() ->
     widths = _limits(cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND)
     land = cone_land_key.LAND_DIA_MM
     bores = _limits(land, seat_bore_band(lands.GEAR_SEAT_BAND))
-    for depth in (0.695, 0.705):
+    assert cone_land_key.BROACH_DEPTH_MM == pytest.approx((0.695, 0.705))
+    for depth in cone_land_key.BROACH_DEPTH_MM:
         for reference in (land, *bores):
             for drop in (0.0, *(_chord_height(reference, w) for w in widths)):
                 assert t_min <= reference + depth - drop <= t_max, reference
