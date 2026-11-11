@@ -1997,18 +1997,18 @@ def test_rail_setting_baseline_answers_the_rail_angle_sensitivity() -> None:
 
 
 def test_every_printed_table_setting_is_inside_the_mill_x_travel(report) -> None:
-    """#2336: the travel is the inventory's PM-30MV X, less a stated half-inch
+    """#2336: the travel is shop.toml's PM-30MV X, less a stated half-inch
     margin each side of step 6's centred origin; A3's S 12.00 and 15.00 and
     the far limits (X 14.72, 15.17) were past it."""
     import tomllib
     from _paths import CAD_ROOT
 
     inch = spec.trammel.INCH
-    inventory = tomllib.loads((CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8"))
-    travel_in = inventory["machines"]["PM-30MV"]["envelope"]["travel_in"]["x"]["value"]
-    assert spec.TABLE_TRAVEL_X == pytest.approx(travel_in * inch)
+    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
+    travel = shop["machines"]["pm-30mv"]["travel_mm"]["x"]
+    assert spec.TABLE_TRAVEL_X == travel
     assert spec.TABLE_TRAVEL_MARGIN == pytest.approx(0.5 * inch)
-    assert spec.TABLE_REACH_X == pytest.approx(travel_in * inch / 2.0 - 0.5 * inch)
+    assert spec.TABLE_REACH_X == pytest.approx(travel / 2.0 - 0.5 * inch)
     margins = report.table_travel_margins
     assert set(margins) == set(spec.table_settings())
     assert {"rail 1 S 11.00", "rail 2 S 11.00", "rail 1 SYMMETRIC", "hub", "stop pin 1"} <= set(margins)
