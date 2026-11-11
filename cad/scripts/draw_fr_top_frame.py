@@ -783,9 +783,11 @@ HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 # top edge is the boss's outer line (x 251.7 at 2:1, the bore at 300.0).
 # The line runs through the boss at y 180, 6 mm over the bore axis, and the
 # text parks out left of the fence, in the free band between it and the
-# underside locator (the fence crosses y 200 at x 228.6).
+# underside locator: the fence crosses y 200 at x 228.6 and the rows end
+# 4.4 mm short of it, 4.6 off the locator's rail (at x 212 "AT FACED TOP"
+# touched the fence, farm run 20261111T023438415Z).
 SET_BOSS_FACE_LINE_XY = (0.276, 0.180)
-SET_BOSS_FACE_TEXT_XY = (0.212, 0.200)
+SET_BOSS_FACE_TEXT_XY = (0.208, 0.200)
 HUB_BOTTOM_KEEP = {
     "HubDia": HUB_BOSS_DIA_TEXT_XY,
     "RibWidth": RIB_WIDTH_LINE_XY,
@@ -1265,26 +1267,21 @@ GEOMETRY_TOP_KEEP = {
 # The front view carries the rail's web depth -- the web ring's own driving
 # extrude depth, the same finished top-to-underside thickness F-F prints as
 # HangerGrip, so it prints as a reference with no band of its own
-# (_reference_model_rail_height) -- and the casting's draft and root
-# radius, which SolidWorks shows on an elevation only (farm run
-# 20261111T004615500Z: no removed section took them).  Owner ruling D4
-# (#2333): the faces B1 adds draft to print 2° +1°/-0, the faces D1 takes
-# it out of 2° ±1°; each band is the model dimension's own.
+# (_reference_model_rail_height) -- and the web root radius, which
+# SolidWorks shows on an elevation only (farm run 20261111T004615500Z: no
+# removed section took it).  The radius's rows stand under the view's west
+# end, 7.7 mm under the boss bottom and 8 mm left of the title block, on a
+# short leader from the root.  The draft angles print on sheet 7's
+# elevation (DATUM_FRONT_KEEP).
 GEOMETRY_FRONT_KEEP = {
     "RingHeight": (0.238, 0.091),
-    "WebRingDraft": (0.060, 0.060),
-    "TopFlangeDraft": (0.125, 0.060),
-    "BossesUpperDraft": (0.190, 0.060),
-    "RootR": (0.060, 0.040),
+    "RootR": (0.190, 0.071),
 }
 GEOMETRY_CALLOUTS = {
     "Width": "RAIL FLANGE EXTENT",
     "Depth": "RAIL FLANGE EXTENT",
     "SideFlangeWidth": "2X SIDE FLANGE",
     "RingHeight": "RAIL HEIGHT",
-    "WebRingDraft": "DRAFT, WEBS, CROSSBAR, POCKETS,\nGUSSETS, PADS, SET-BOSS SIDES",
-    "TopFlangeDraft": "DRAFT, FLANGE RIMS\nAND SET-BOSS FACE",
-    "BossesUpperDraft": "DRAFT, 4X BOSS\nAND HUB BARRELS",
     "RootR": "TYP WEB ROOT",
 }
 RAIL_SECTION_KEEP = {
@@ -1316,7 +1313,10 @@ PLAN_REFERENCE_DIMENSIONS = ("Width", "Depth")
 WEB_POSITION_LANDING_Y = -5.0
 WEB_POSITION_QUANTITY = "2X"
 RAIL_WEB_POSITION_FRAME_XY = (0.297, 0.194)
-SIDE_WEB_POSITION_FRAME_XY = (0.3065, 0.097)
+# E-E's frame stands 8.5 mm under the web's foot, so its "2X" row clears the
+# section's caption under it by 2.5 mm (1.0 at y 97, farm run
+# 20261111T023438415Z).
+SIDE_WEB_POSITION_FRAME_XY = (0.3065, 0.0985)
 
 # The boss/socket diameters leave the socket they qualify in opposite
 # directions so neither leader crosses the other's text.  The hole STATIONS
@@ -1373,10 +1373,11 @@ SOCKET_TABLE_MATES = "MHA-FR-03, MHA-FR-01"
 TABLE_ORIGIN_XZ = CAST_DATUM_ORIGIN_XZ
 # The origin mark's arrows about the corner, (length, offset) in sheet m:
 # the X arrow runs left 16 mm on a line 7.3 mm under the corner, over the
-# table; the Y arrow up 10 mm on a line 5 mm right of it, short of the
-# keeper callout's leader, which crosses 16 mm over the corner there.
+# table; the Y arrow up 6 mm on a line 5 mm right of it, its "Y" under the
+# keeper callout's leader, which crosses 16 mm over the corner there (at
+# 10 mm the leader ran through the letter, farm run 20261111T023438415Z).
 TABLE_ORIGIN_X_ARROW = (0.016, 0.0073)
-TABLE_ORIGIN_Y_ARROW = (0.010, 0.0050)
+TABLE_ORIGIN_Y_ARROW = (0.006, 0.0050)
 # The F and G planes' traces, thin phantom (swLineStyles_e.swLinePHANTOM,
 # swLW_THIN): F from the corner to the rear-east boss's tangent point, G
 # from the corner past G1's tangent point on the rear-west boss, 5 mm short
@@ -1393,9 +1394,11 @@ TABLE_HOLES: tuple[tuple[float, float, float, str], ...] = tuple(
 )
 # Each hanger hole's Z station from the front-left socket's axis, in the
 # left window: the front one's line 36 mm left of the crossbar, the rear
-# one's 12 mm left of that.
+# one's 12 mm left of that.  The front station is 14 mm of paper with the
+# rail's inner edge through it (y 207.7), so its value stands outside the
+# run, in the window 2.3 mm under the hole's extension line (y 202.5).
 HANGER_Z_TEXT_XY = {
-    "front hanger z from upper sockets": (0.150, 0.2095),
+    "front hanger z from upper sockets": (0.150, 0.1985),
     "rear hanger z from upper sockets": (0.138, 0.166),
 }
 # The sockets' composite position frame (owner rulings D2 and D6): Ø.06 to
@@ -1437,9 +1440,11 @@ DATUM_BOTTOM_KEEP = {
 # line's right end to the value passes under it.
 DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR AT UNDERSIDE"}
 DATUM_BOTTOM_CALLOUTS = {"GussetRunE": "4X 45° GUSSET"}
+# The gusset run's rows stand 5.5 mm under the width's, whose underline
+# (y 122.4) the higher offset of farm run 20261111T023438415Z touched.
 DATUM_BOTTOM_TEXT_OFFSETS = {
     "BarWidth": (0.179, 0.128),
-    "GussetRunE": (0.180, 0.1185),
+    "GussetRunE": (0.180, 0.1130),
 }
 # Each target symbol's centre from its point, sheet m: on the underside E1
 # in the west window, G1 and E2 beside the view, E3 under its front-east
@@ -1468,6 +1473,51 @@ DATUM_E_RADIUS_TEXT_XY = (0.048, 0.106)
 DATUM_HEIGHT_LINE_REACH = (30.0, 32.0)
 DATUM_HEIGHT_LINE_XY = (0.230, 0.2143)
 DATUM_HEIGHT_TEXT_XY = (0.250, 0.226)
+
+
+def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
+    """Sheet point (m) of model ``(x, y)`` mm on sheet 7's elevation.
+
+    The view's outline centres on the casting's own extremes: the set-screw
+    boss face to the west barrels, the hub boss's bottom to the boss tops.
+    """
+    scale = GEOMETRY_VIEW_SCALE / 1000.0
+    return (
+        DATUM_FRONT_CENTER[0] + (x - (PLAN_HALF_X + SET_BOSS_FACE_X) / 2.0) * scale,
+        DATUM_FRONT_CENTER[1] + (y - (BOSS_ABOVE - HUB_BOSS_DROP) / 2.0) * scale,
+    )
+
+
+# Owner ruling D4 (#2333): the faces B1 adds draft to print 2° +1°/-0, the
+# faces B1 and D1 take it out of 2° ±1°, each band its model dimension's
+# own.  One angle prints per band, on this elevation's west end, where
+# SolidWorks stands both wedges on the Top plane's trace (y 222.6): the web
+# ring's on the web's outer face, opening outward, and the upper barrels'
+# on the barrel's crest 5.3 mm of paper west of it, closing inward.  A 2°
+# wedge is 0.5 mm of arc, so each arc stands its own rise over its vertex
+# -- the web's 15 mm, 7 over the boss top, the barrel's 22 -- (model x of
+# the vertex, lean, rise in sheet m), and each value parks off its arc on a
+# leader with the faces it governs: the added draft's rows left over the
+# view, the taken-out draft's right of it, both inside the border (y 266.7).
+DATUM_DRAFT_WEDGES = {
+    "WebRingDraft": (WEB_OUT_X, 1.0, 0.015),
+    "BossesUpperDraft": (PLAN_HALF_X, -1.0, 0.022),
+}
+DATUM_FRONT_KEEP = {
+    name: (
+        round(_datum_elevation_xy(x, 0.0)[0] + lean * rise * DRAFT_T / 2.0, 5),
+        round(_datum_elevation_xy(x, 0.0)[1] + rise, 5),
+    )
+    for name, (x, lean, rise) in DATUM_DRAFT_WEDGES.items()
+}
+DATUM_FRONT_CALLOUTS = {
+    "WebRingDraft": "DRAFT, WEBS, CROSSBAR, POCKETS,\nGUSSETS, PADS, SET-BOSS SIDES",
+    "BossesUpperDraft": "DRAFT, FLANGE RIMS, SET-BOSS FACE,\n4X BOSS AND HUB BARRELS",
+}
+DATUM_FRONT_TEXT_OFFSETS = {
+    "WebRingDraft": (0.1722, 0.2541),
+    "BossesUpperDraft": (0.2731, 0.2568),
+}
 
 
 def bind_hole_table_rows(
@@ -1578,9 +1628,11 @@ HUB_LEFT_CALLOUTS = {
     "HubBossDrop": "",
 }
 # The spot face reads in the Y14.5 form, its depth a reference off the
-# cast boss face (.95 - .83, sheet 6's DETAIL J), the spot's own .83 from the
-# bore axis the control (drawing-guidelines.md rule 26).
-SET_SPOT_DEPTH_TEXT = f"({render_number((HUB_SET_BOSS_FROM_AXIS - HUB_SET_SPOT_FROM_AXIS) / IN, UNIT, HUB_SET_SPOT_PLACES)})"
+# cast boss face on the tap's axis -- .95 on the faced top (sheet 6's
+# DETAIL J), leaning in under it with the draft taken out (owner ruling D1,
+# #2333) -- the spot's own .83 from the bore axis the control
+# (drawing-guidelines.md rule 26).
+SET_SPOT_DEPTH_TEXT = f"({render_number(round((HUB_SET_BOSS_FROM_AXIS - SCREW_AXIS_BELOW_RAIL_TOP * DRAFT_T - HUB_SET_SPOT_FROM_AXIS) / IN, HUB_SET_SPOT_PLACES), UNIT, HUB_SET_SPOT_PLACES)})"
 # The bore sits on the left sockets' drawn centreline (rule 26: holes in
 # line share a drawn centreline); its size callout carries the reason its
 # 4.532 station serves (rule 7).
@@ -1593,7 +1645,10 @@ HUB_TOP_CALLOUTS = {"GnDia": "DRILL THRU\nON MHA-SM-00\nSUMMING AXIS"}
 # the lower left (machinist review at rubric 848e03f, rule 14, 2 of 3 runs).
 DETAIL_FRONT_KEEP = {"CB1Dia": (0.205, 0.256)}
 DETAIL_SECTION_KEEP = {
-    "CapRecessDia": (0.140, 0.170),
+    # The callout's shoulder (y 164.6) stands 3 mm over the boss-top finish
+    # symbol's rows (BOSS_TOP_FINISH_SYMBOL_XY), which it ran through at
+    # y 170 (farm run 20261111T023438415Z).
+    "CapRecessDia": (0.140, 0.173),
     # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
@@ -4110,6 +4165,16 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
         dimensions,
         DATUM_BOTTOM_TEXT_OFFSETS,
     )
+    # The two printed draft angles (owner ruling D4), on the elevation.
+    draft_dimensions = curate_view_dimensions(
+        adapter,
+        front,
+        keep=DATUM_FRONT_KEEP,
+        view_label="cast datum elevation",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, draft_dimensions, DATUM_FRONT_CALLOUTS)
+    offset_dimension_text(adapter, draft_dimensions, DATUM_FRONT_TEXT_OFFSETS)
     edges = scan_view_edges(bottom, label="cast datum underside")
 
     def sheet(x: float, y: float, z: float) -> tuple[float, float]:
@@ -4278,7 +4343,7 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
         _basic_target_location(adapter, display, DATUM_HEIGHT_TEXT_XY, label=label)
 
     height()
-    return dimensions
+    return [*dimensions, *draft_dimensions]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -4612,8 +4677,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, crossbar_section, label="crossbar section", cut_surface_only=True, removed=True
     )
     # The plan carries the flange's extents and the side flange's width; the
-    # front view the rail height, the three printed draft angles and the
-    # root radius.
+    # front view the rail height and the root radius.
     geometry_top_dimensions = curate_view_dimensions(
         adapter,
         geometry_top,

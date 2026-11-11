@@ -19,11 +19,15 @@ summing axis, the keeper fit-up) flow through unsnapped.
 
 Owner ruling 2026-11-10 (#2333, option a): the frame is a one-off gray-iron
 sand casting (ASTM A48 CLASS 25B) poured from a 3D-printed pattern and
-machined on its seats only.  Machined: the faced top and underside planes,
-the four corner-boss tops, the tube sockets, cap recesses and their mouth
-chamfers, the gooseneck bore, the set-screw spot face, the cross-screw
-counterbores, and the drilled, tapped and reamed holes.  Every other face
-stays as cast.  The registry row (``cad/config/parts/fr-top-frame.yaml``)
+machined on its seats only.  Machined: the faced top and underside planes;
+the four corner-boss tops; the edge breaks bordering those faced planes (cut
+after facing, the stock covers the edge on the pattern); the tube sockets,
+cap recesses and their mouth chamfers; the gooseneck bore and its mouth
+chamfer; the set-screw tap and its spot face; the cross-screw counterbores,
+clearance holes and far-wall taps; the hanger holes, dowel reams and
+knockouts; and the keeper taps transferred at assembly.  The drafted walls,
+rims, barrels and boss bottoms, and the edge breaks between two of them,
+stay as cast.  The registry row (``cad/config/parts/fr-top-frame.yaml``)
 carries the material and process.
 
 Owner rulings B1-B6 and D1-D6 (#2333, 2026-11-10) make the model the casting:
@@ -127,8 +131,10 @@ BOSS_DIA = (
 )
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
-# MHA-CH-00 draws the west rail's web faces from it).  .XX: the keeper and
-# cross-tap walls keep the .060 floor at its ±.01 (build_fr_top_frame).
+# MHA-CH-00 draws the west rail's web faces from it).  As cast it prints
+# .51 ±.03 on the faced underside, its median held to the socket axes by
+# RAIL_WEB_POSITION_ZONE (owner rulings B2 and D3, #2333); the keeper and
+# cross-tap walls are proved at those limits (build_fr_top_frame).
 WEB_T = 12.954  # .51 user ruling: retain loose bands plus realistic deep-drill wander
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.5151
 # The cross-screw and set-screw taps share one axis plane, the attachment's
@@ -527,7 +533,8 @@ SET_SCREW_TORQUE_MAX_NM = 1.0
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These four faces own native finish controls. The top plane between the
+# The four socket bores and the four boss tops own native finish controls
+# (SURFACE_FINISHES). The top plane between the
 # corner bosses, which seats both MHA-CH-07 keepers on the right (west) rail
 # and both MHA-SM-VN-54 washers on the crossbar, and the underside plane between
 # the bosses, which seats both MHA-SM-02 knife mounts, carry SEAT_UM in the
@@ -593,8 +600,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WebProfile": {"SideWebT", "FrWebT"},
     # The rail height is the same finished thickness as the grip: the web
     # ring's own depth, printed in the geometry front view as a reference.
+    # One draft angle prints per owner-ruling-D4 band, on sheet 7's elevation:
+    # the web ring's for the faces B1 adds draft to, the upper boss barrels'
+    # for the faces B1/D1 take it out of (the top flange's own angle, the
+    # same 2° ±1°, is not printed a second time).
     "WebRing": {"RingHeight", "WebRingDraft"},
-    "TopFlange": {"FlangeT", "TopFlangeDraft"},
+    "TopFlange": {"FlangeT"},
     "Crossbar": {"HangerGrip"},
     # DStation: datum D's median from the G plane (owner ruling D2).
     "BarProfile": {"BarWidth", "GussetRunE", "LandEnd", "DStation"},
@@ -698,10 +709,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "WebProfile": {"SideWebT": 2, "FrWebT": 2},
     "WebRing": {"RingHeight": HANGER_GRIP_PLACES, "WebRingDraft": DRAFT_ANGLE_PLACES},
-    "TopFlange": {
-        "FlangeT": FLANGE_THICKNESS_PLACES,
-        "TopFlangeDraft": DRAFT_ANGLE_PLACES,
-    },
+    "TopFlange": {"FlangeT": FLANGE_THICKNESS_PLACES},
     "Crossbar": {"HangerGrip": HANGER_GRIP_PLACES},
     "BossUpProfile": {"C0Dia": 2},
     "BossesUpper": {"BossesUpperDraft": DRAFT_ANGLE_PLACES},
@@ -773,13 +781,10 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "overall casting depth": 2,
     "top rim chamfer": 2,
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
-    # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
-    # column plan is drilled from, stated as MHA-FR-01 states them.
-    "socket horizontal pitch": 3,
-    "socket vertical pitch": 2,
-    # Hole stations baseline from socket axes (X from the left pair, Z from
-    # the upper pair).  The knife line, summing axis and keeper fit-up are
-    # other subsystems' stations: they print .XXX as they flow through.
+    # Sheet 3, HOLES-SOCKETS: hole stations baseline from the socket axes (X
+    # from the left pair, Z from the upper pair).  The knife line, summing
+    # axis and keeper fit-up are other subsystems' stations: they print .XXX
+    # as they flow through.
     # The position frame holds the hanger axes BASIC zero on D (sheet 7
     # carries D's width and station); keeper coordinates are reference-only
     # guides to assembly-transferred taps.
@@ -788,7 +793,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "keeper x from left sockets": 3,
     "front keeper z from upper sockets": 3,
     "rear keeper z from upper sockets": 3,
-    # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed counterbore
+    # Sheet 4, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed counterbore
     # floors and the tap axis below the boss top, all on the .XX grid (the
     # cap ligament and keeper cross-tap wall read their ±.01).
     "socket boss overall height": 2,
@@ -796,12 +801,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top bore mouth chamfer": 2,
     "opposed counterbore floor separation": 2,
     "cross screw axis from boss top": 2,
-    # .XX, the floor at .65 (fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
+    # .XX, the floor at .62 (owner ruling D5, #2333;
+    # fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
     # over the .080 target to the cap recess at every printed corner
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
-    # removed set-screw boss section K-K (spot face, boss face, thread run).
+    # removed set-screw boss section K-K (spot face, thread run; the boss
+    # face prints its as-cast .95 on sheet 6's DETAIL J).
     # The hub station is the summing axis's (SUMMING_Z): it flows through.
     "hub from left front socket": 3,
     "set screw axis from rail top": 2,
@@ -901,10 +908,13 @@ HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 # the title-block break (the counterbore and tap walls are proved without a
 # chamfer).  Owner ruling 2026-11-07 rescopes the note to the convex cast
 # edges where the .06 break fits, the ones the views show chamfered.  The
-# edges under a knife seat or beside the hub boss
+# edges under a knife seat, beside the hub boss or on a shelf too narrow at
+# the as-cast limits
 # (build_fr_top_frame._external_edge_breaks: the front crossbar side
-# bottoms, the four gusset hypotenuse bottoms, the hub rib's inner bottom
-# and the V-gusset ramp edges): the model leaves these unbroken at .06; the
+# bottoms, the four gusset hypotenuse bottoms, the crossbar flange's
+# underside edges, the hub rib's inner bottom, the V-gusset ramp edges and
+# the set-screw boss's edges on the faced top): the model leaves these
+# unbroken at .06; the
 # title block's .010 break applies, so no edge reads SHARP anywhere and
 # nothing is noted.  Each row stays within the 64 characters the unnumbered
 # first row printed on sheet 3 (EDGE_NOTE_XY).
