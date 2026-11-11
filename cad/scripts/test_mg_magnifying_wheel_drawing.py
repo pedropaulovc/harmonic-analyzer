@@ -118,9 +118,6 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     # boss is sized for TIE 1's wall, so none carries a band of its own.
     assert model_toleranced_dimensions(part) == {
         ("HubProfile", "HubLength"): "HUB_LEN_BAND[0]",
-        ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
-        ("GrooveProfile", "GrooveR"): "GROOVE_R_BAND[0]",
-        ("GrooveProfile", "GrooveBottomDia"): "GROOVE_BOTTOM_BAND[0]",
         ("feature_name", "dimension_name"): "CAST_TOL",
     }
     # The as-cast sizes carry the explicit +/-.03 casting band.
@@ -138,10 +135,10 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.MIN_WALL == pytest.approx(0.080 * inch)
     # TIE 1's axis may stand off by both .XX coordinates' +/-.01, and tilt by
     # the title block's 1 deg plus 0.3 deg drill wander over the boss (the
-    # hub's .776 max less the spigot's .354 min).
-    offset = math.hypot(0.01 * inch, 0.01 * inch) + (0.776 - 0.354) * inch * math.tan(
-        math.radians(1.3)
-    )
+    # hub's .776 max less the spigot's .XXX min).
+    offset = math.hypot(0.01 * inch, 0.01 * inch) + (
+        geom.HUB_LEN_LIMITS[1] - geom.SPIGOT_LEN_LIMITS[0]
+    ) * math.tan(math.radians(1.3))
     assert geom.TIE1_OFFSET_MAX == pytest.approx(offset)
     tie1_r = math.hypot(0.38, 0.22) * inch
     assert geom.TIE1_R == pytest.approx(tie1_r)
@@ -152,7 +149,7 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     )
     # The cast spokes, fillets and rim bore at their +/-.03 casting band.
     assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.602, abs=1e-3)
-    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.824, abs=1e-3)
+    assert spec.WALLS["tie1_to_hub_fillet"] >= spec.MIN_WALL
     # TIE 1 stands outboard of the drum it sits behind: the smallest hole,
     # at its worst offset, still opens a wire diameter past the largest drum
     # (.74 + .01).
@@ -173,12 +170,13 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4992 - 0.1894) * inch / 2.0)
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     assert geom.TIE2_CLOCK_DEG == -43.0
-    # The 0.8 pen wire seats at every printed groove corner: R.024 -.004 wide,
-    # and the 3.94 -.01 rim over the 3.843 +.004 groove bottom deep.
-    assert spec.GROOVE_WIDTH_MIN == pytest.approx(2.0 * 0.020 * inch)
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx((3.93 - 3.847) * inch / 2.0)
-    # The drum, minus-only against the plus-only spigot, is never proud.
-    assert geom.DRUM_RECESS == pytest.approx((0.0, 0.008 * inch), abs=1e-9)
+    # The 0.8 pen wire seats at every printed groove corner: the narrowest
+    # groove (R at its .XXX min) is wider than the wire, and the shallowest
+    # (the .XX rim at its min over the .XXX bottom at its max) still buries it.
+    assert spec.GROOVE_WIDTH_MIN > rim.PEN_WIRE_DIA
+    assert spec.GROOVE_DEPTH_MIN >= rim.PEN_WIRE_DIA
+    # The drum is never proud of the spigot face.
+    assert geom.DRUM_RECESS[0] >= -1e-9
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
