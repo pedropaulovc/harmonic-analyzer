@@ -243,6 +243,7 @@ win32com.client.CLSIDToClass.RegisterCLSID(PART_CLSID, IPart)
 SHAPE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A003}"
 FACE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A004}"
 MASS_CLSID = "{0BADC0DE-0000-4000-8000-00000000A005}"
+FEATURE_CLSID = "{0BADC0DE-0000-4000-8000-00000000A006}"
 
 
 class ShapeServer(FakeServer):
@@ -290,6 +291,8 @@ class ShapeServer(FakeServer):
             # A symmetric plate: its centre of mass is noise around zero.
             noise = 1e-19 * self.order.index("face:bottom")
             return (noise, -noise, 0.0)
+        if dispid == 28:
+            return FakeDispatch(self, "feature:plate")
         return True  # 27: IFace2.Select
 
     def _stl(self) -> bytes:
@@ -327,6 +330,20 @@ class IShapeApp(IApp):
     def ExportSTL(self, path=""):  # noqa: N802
         return self._oleobj_.InvokeTypes(23, LCID, 1, (11, 0), ((8, 1),), path)
 
+    def CreateFeature(self):  # noqa: N802
+        ret = self._oleobj_.InvokeTypes(28, LCID, 1, (9, 0), ())
+        if ret is not None:
+            ret = Dispatch(ret, "CreateFeature", FEATURE_CLSID)
+        return ret
+
+
+class IFeature(DispatchBaseClass):
+    CLSID = pywintypes.IID(FEATURE_CLSID)
+    coclass_clsid = None
+
+    _prop_map_get_ = {"Name": (6, 2, (8, 0), (), "Name", None)}
+    _prop_map_put_ = {"Name": ((6, LCID, 4, 0), ())}
+
 
 class IFace2(DispatchBaseClass):
     CLSID = pywintypes.IID(FACE_CLSID)
@@ -350,6 +367,7 @@ class IMassProperty(DispatchBaseClass):
 
 win32com.client.CLSIDToClass.RegisterCLSID(SHAPE_CLSID, IShapeApp)
 win32com.client.CLSIDToClass.RegisterCLSID(FACE_CLSID, IFace2)
+win32com.client.CLSIDToClass.RegisterCLSID(FEATURE_CLSID, IFeature)
 win32com.client.CLSIDToClass.RegisterCLSID(MASS_CLSID, IMassProperty)
 
 
@@ -481,11 +499,13 @@ async def shaped(
     sha: str = "0123abc",
     measure: bool = True,
     export: bool = True,
+    feature: str = "Plate",
 ) -> None:
-    """A build that finds its plate's -Y face the way
-    ``_holes.find_planar_face`` does (every face's normal, in the order the
-    seat lists them), then writes properties, measures and exports."""
+    """A build that names its plate feature, then finds the plate's -Y face
+    the way ``_holes.find_planar_face`` does (every face's normal, in the
+    order the seat lists them), then writes properties, measures and exports."""
     app = IShapeApp(adapter.swApp._oleobj_)
+    app.CreateFeature().Name = feature
     app.SetDepth(depth)
     chosen = None
     for raw in app.GetFaces():
@@ -1164,15 +1184,71 @@ def test_outcome_noise_is_title_counters_provenance_and_last_bits():
     )
 
 
-def test_a_divergence_is_labelled_after_the_last_named_feature():
-    divergence = {"feature": "PostMountHoles", "feature_basis": "engine"}
-    _com_outcome.label_after_feature(divergence)
-    assert divergence["feature"] == "after PostMountHoles"
-    assert "after the last IFeature.Name" in divergence["feature_basis"]
+def test_a_divergence_is_labelled_at_or_after_the_last_named_feature(
+    tmp_path, monkeypatch
+):
+    base = _shaped(tmp_path / "a", monkeypatch)
+    # The divergence is the naming itself: at the feature.
+    renamed = _shaped(tmp_path / "b", monkeypatch, feature="PlateBlank")
+    divergence = _diff(base, renamed, tmp_path / "b.json")["request_divergence"]
+    assert divergence["member_expected"] == "IFeature.Name"
+    assert divergence["feature"] == "at Plate"
+    assert "lies at the last IFeature.Name" in divergence["feature_basis"]
+    # A later request: after it.
+    deeper = _shaped(tmp_path / "c", monkeypatch, depth=1.5)
+    divergence = _diff(base, deeper, tmp_path / "c.json")["request_divergence"]
+    assert divergence["member_expected"] == "IShapeApp.SetDepth"
+    assert divergence["feature"] == "after Plate"
     unnamed = {"feature": None}
-    _com_outcome.label_after_feature(unnamed)
-    _com_outcome.label_after_feature(None)
+    _com_outcome.label_feature(unnamed)
+    _com_outcome.label_feature(None)
     assert unnamed == {"feature": None}
+
+
+_SOLID = (0.002, 0.003, -0.125, 6.1e-05, 0.0231, 0.48)
+_INERTIA = (2.46e-07, 2.57e-07, 1.14e-08, 1.5e-24, -3.0e-25, 2.0e-25)
+
+
+def _body_mass(*values: float) -> conv.Call:
+    """An ``IBody2.GetMassProperties`` answer: CenterOfMassX..Z, volume,
+    area, mass, MomXX, MomYY, MomZZ, MomXY, MomZX, MomYZ (API reference)."""
+    result = {"t": [{"f": float(v).hex()} for v in values]}
+    return conv.Call(0, 1, "InvokeTypes", [], "IBody2.GetMassProperties", result=result)
+
+
+def test_a_mass_property_array_is_judged_quantity_by_quantity():
+    base = _body_mass(*_SOLID, *_INERTIA)
+
+    def judged(*values: float) -> str:
+        return _com_outcome._mass_signal([base], [_body_mass(*values)])[0].value
+
+    volume, area, mass = _SOLID[3:]
+    # Last-bit noise in every quantity, near-zero products of inertia
+    # included: the same body.
+    noisy = [math.nextafter(v, math.inf) for v in (*_SOLID, *_INERTIA)]
+    assert judged(*noisy) == "same"
+    assert judged(*_SOLID, *_INERTIA[:3], 3.0e-24, -1.0e-25, 0.0) == "same"
+    # A 1e-6 relative change of any one quantity: another body. The volume's
+    # (6e-11 m^3) is below 1e-9 of the array's largest element (the mass).
+    for index, value in ((3, volume), (4, area), (5, mass)):
+        changed = list(_SOLID)
+        changed[index] = value * (1 + 1e-6)
+        assert judged(*changed, *_INERTIA) == "different", index
+    assert judged(*_SOLID, _INERTIA[0] * (1 + 1e-6), *_INERTIA[1:]) == "different"
+    # A symmetric body's centre is noise around zero: judged on its length.
+    centred = _body_mass(1e-19, -2e-19, 0.0, *_SOLID[3:], *_INERTIA)
+    shifted = _body_mass(-3e-19, 0.0, 1e-19, *_SOLID[3:], *_INERTIA)
+    assert _com_outcome._mass_signal([centred], [shifted])[0].value == "same"
+    # The 13-element forms end with the accuracy, compared on its own.
+    accurate = _body_mass(*noisy, 1.0)
+    assert (
+        _com_outcome._mass_signal([accurate], [_body_mass(*_SOLID, *_INERTIA, 1.0)])[
+            0
+        ].value
+        == "same"
+    )
+    coarse = _body_mass(*_SOLID, *_INERTIA, 2.0)
+    assert _com_outcome._mass_signal([accurate], [coarse])[0].value == "different"
 
 
 def test_caller_capture_modes(tmp_path, monkeypatch):

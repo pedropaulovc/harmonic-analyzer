@@ -52,6 +52,22 @@ _TITLE_COUNTER = re.compile(r"\b(Part|Assem|Draw)\d+\b")
 # The members answering mass properties: compared in order and within
 # tolerance (:func:`_mass_signal`), never as exact multiset members.
 _MASS_SITE = re.compile(r"^IMassProperty\d*\.|\.GetMassProperties\d*$")
+# The array the GetMassProperties family answers (SolidWorks API reference:
+# IBody2.GetMassProperties, IModelDocExtension.GetMassProperties and
+# GetMassProperties2, ISldWorks.GetMassProperties2): CenterOfMassX..Z, then
+# volume, area, mass (a sheet body: area, circumference, mass; a wire body:
+# length, 0, mass), then MomXX, MomYY, MomZZ, MomXY, MomZX, MomYZ, and in
+# the 13-element forms the accuracy. Mixed units: each quantity gets its own
+# tolerance, the centre of mass the part's length as well.
+_MASS_ARRAY = re.compile(r"\.GetMassProperties\d*$")
+_MASS_ARRAY_QUANTITIES = (
+    slice(0, 3),
+    slice(3, 4),
+    slice(4, 5),
+    slice(5, 6),
+    slice(6, 12),
+    slice(12, 13),
+)
 # Members whose answers describe the session, not the part: the clock
 # (SummaryInfo's create and save dates differ on every rebuild) and the seat's
 # application preferences (one toggle differed between two request-identical
@@ -178,17 +194,24 @@ def outcome(
     }
 
 
-def label_after_feature(divergence: dict[str, Any] | None) -> None:
+def label_feature(divergence: dict[str, Any] | None) -> None:
     """Relabel the engine's ``feature`` of a request divergence in place.
 
-    It is the last feature named at or before the divergence, which lies after
-    that feature: on 2026-11-11 the face search of the hole that followed
-    PostMountHoles was reported as PostMountHoles."""
+    It is the last feature named at or before the divergence. When the
+    diverging base call is that naming (an ``IFeature.Name`` put) the
+    divergence is AT the feature; otherwise it lies AFTER it: on 2026-11-11
+    the face search of the hole that followed PostMountHoles was reported as
+    PostMountHoles."""
     if not divergence or not divergence.get("feature"):
         return
-    divergence["feature"] = f"after {divergence['feature']}"
+    expected = divergence.get("expected") or {}
+    naming = expected.get("kind") == "put" and str(expected.get("site") or "").endswith(
+        "IFeature.Name"
+    )
+    where = "at" if naming else "after"
+    divergence["feature"] = f"{where} {divergence['feature']}"
     divergence["feature_basis"] = (
-        "the divergence lies after the last IFeature.Name put at or before "
+        f"the divergence lies {where} the last IFeature.Name put at or before "
         "its index in the base"
     )
 
@@ -213,19 +236,11 @@ def _mass_signal(
     unequal = {site: pair for site, pair in counts.items() if pair[0] != pair[1]}
     if unequal:
         return Signal.DIFFERENT, {"counts": unequal}
-    volumes = [
-        abs(float.fromhex(call.result["f"]))
-        for calls in (*left.values(), *right.values())
-        for call in calls
-        if call.site.endswith(".Volume") and _is_float(call.result)
-    ]
-    length = max(volumes, default=0.0) ** (1 / 3)
+    calls = [call for group in (*left.values(), *right.values()) for call in group]
+    length = _part_length(calls)
     for site in sorted(left):
-        floor = length if site.endswith(".CenterOfMass") else 0.0
         for ordinal, (x, y) in enumerate(zip(left[site], right[site], strict=True)):
-            if _close(
-                [x.result, x.raised, x.outs], [y.result, y.raised, y.outs], floor
-            ):
+            if _mass_close(site, x, y, length):
                 continue
             return Signal.DIFFERENT, {
                 "member": site,
@@ -234,6 +249,42 @@ def _mass_signal(
                 "b": conv.clip(y.result),
             }
     return Signal.SAME, None
+
+
+def _part_length(calls: Sequence[conv.Call]) -> float:
+    """The cube root of the largest volume any mass answer reports."""
+    volumes = []
+    for call in calls:
+        if call.site.endswith(".Volume") and _is_float(call.result):
+            volumes.append(abs(float.fromhex(call.result["f"])))
+        items = _mass_array(call)
+        if items is not None:
+            volumes.append(abs(float.fromhex(items[3]["f"])))
+    return max(volumes, default=0.0) ** (1 / 3)
+
+
+def _mass_array(call: conv.Call) -> list[Any] | None:
+    """The answer of a GetMassProperties-family call in the documented
+    layout (12 or 13 floats), else ``None``."""
+    if not _MASS_ARRAY.search(call.site) or not isinstance(call.result, dict):
+        return None
+    items = call.result.get("t") or call.result.get("l")
+    if not isinstance(items, list) or len(items) not in (12, 13):
+        return None
+    return items if all(_is_float(item) for item in items) else None
+
+
+def _mass_close(site: str, x: conv.Call, y: conv.Call, length: float) -> bool:
+    left, right = _mass_array(x), _mass_array(y)
+    if left is None or right is None or len(left) != len(right):
+        floor = length if site.endswith(".CenterOfMass") else 0.0
+        return _close([x.result, x.raised, x.outs], [y.result, y.raised, y.outs], floor)
+    if not _close([x.raised, x.outs], [y.raised, y.outs]):
+        return False
+    return all(
+        _close(left[part], right[part], length if part.start == 0 else 0.0)
+        for part in _MASS_ARRAY_QUANTITIES
+    )
 
 
 def _by_site(calls: Sequence[conv.Call]) -> dict[str, list[conv.Call]]:

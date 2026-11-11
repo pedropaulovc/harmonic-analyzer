@@ -2509,7 +2509,7 @@ not held. Next, the base log is compared with this build's own fresh recording
 
   | signal | compared |
   | --- | --- |
-  | `mass` | every mass-property answer, matched by order per member, within 1e-9 of the quantity's largest component; a centre of mass also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
+  | `mass` | every mass-property answer, matched by order per member. A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero |
   | `requests` | the multiset of recipe requests, handles erased, noise normalised |
   | `answers` | the multiset of (request, answer) pairs, but for mass properties and answers about the session (`IModelDoc2.SummaryInfo` dates, `ISldWorks.GetUserPreference*`) |
   | `stl` | each exported STL's triangles as a multiset: corners rotated to start at the least (winding kept), facet normals and header dropped |
@@ -2541,22 +2541,34 @@ What a `noop` proves, and what it does not:
 Because Python's inputs are pinned, a fresh build whose requests diverge from
 the base after a `noop` was steered by SolidWorks, not by the source. Request
 equality therefore measures the seat and stays telemetry; the outcome is the
-oracle:
+oracle. Every `noop` gets exactly one `noop_judgement`; each but `confirmed`
+(the base's exact requests and the base's part) is also a marker:
 
-- A **soundness alarm** is a `noop` whose `artefact_outcome` is `different`:
-  if recordings had been reused, another part would have been reused. It is
-  logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence with
-  the signals) and never fails the build.
+- A **soundness alarm** (`soundness_alarm`) is a `noop` whose
+  `artefact_outcome` is `different`: if recordings had been reused, another
+  part would have been reused. It is logged at ERROR
+  (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence with the signals) and
+  never fails the build.
 - `seat_nondeterminism` is a `noop` with `ground_truth=diverged`,
   `truth_cause=response:<member>` and `artefact_outcome=same`: SolidWorks
   answered differently and the part is the same. It is counted (a marker on
   the INFO line, a field in the record and span), never an alarm.
+- `noop_unexplained_divergence` is a `noop` with `ground_truth=diverged`,
+  `artefact_outcome=same` and no earlier answer differing
+  (`truth_cause=request`): neither the source nor SolidWorks explains the
+  divergence, which contradicts the premise above (an input the replay does
+  not pin). It is counted and logged at WARN with the same bounded evidence.
 - `noop_outcome_unknown` is a `noop` whose outcome is `unknown` or was never
   compared: neither an alarm nor evidence of soundness, counted apart.
 - A `divergence`-class verdict with `ground_truth=same` is a
   `false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
   infrastructure verdicts are never false divergences; count them by
   `verdict_class`.
+
+The bounded evidence lists the short fields first (verdict, served and
+recorded counts, ground truth, truth cause, outcome and signals, where the
+requests diverged, the differing inputs) and the outcome details last, clipped
+to what is left of 4000 characters.
 
 The work directory is removed afterwards.
 
@@ -2622,7 +2634,7 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`), `replay.bundle_bytes` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
-| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.wall_s` |
+| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.wall_s` |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -2645,13 +2657,15 @@ and ends with one INFO line in the task log, for example:
 ```
 
 (`-` marks a step the build never reached). A `SOUNDNESS ALARM`,
-`seat_nondeterminism` or `noop_outcome_unknown` marker ends the line when it
-applies. On a farm leaf `cache.jsonl` stays on the worker, so use Application
-Insights for fleet-wide results. The `replay_shadow` record's outcome fields
-are `artefact_outcome` and `truth_cause`: `outcome` is the step's.
+`seat_nondeterminism`, `noop_unexplained_divergence` or `noop_outcome_unknown`
+marker ends the line when it applies. On a farm leaf `cache.jsonl` stays on
+the worker, so use Application Insights for fleet-wide results. The
+`replay_shadow` record's outcome fields are `artefact_outcome` and
+`truth_cause`: `outcome` is the step's.
 
-Verdict classes, alarms, seat nondeterminism, unconfirmed no-ops and false
-divergences per stem (drop `by stem` for the fleet total):
+Verdict classes, alarms, seat nondeterminism, unexplained divergences,
+unconfirmed no-ops and false divergences per stem (drop `by stem` for the
+fleet total):
 
 ```kusto
 dependencies
@@ -2661,6 +2675,7 @@ dependencies
          alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
          seat=tolower(tostring(customDimensions["replay.seat_nondeterminism"])) == "true",
          unknown=tolower(tostring(customDimensions["replay.noop_outcome_unknown"])) == "true",
+         unexplained=tolower(tostring(customDimensions["replay.noop_unexplained_divergence"])) == "true",
          false_divergence=tolower(tostring(customDimensions["replay.false_divergence"])) == "true",
          wall=todouble(customDimensions["replay.wall_s"])
 | summarize evaluated=count(), noop=countif(kind == "noop"),
@@ -2668,6 +2683,7 @@ dependencies
             refusal=countif(kind == "refusal"),
             infrastructure=countif(kind == "infrastructure"),
             alarms=countif(alarm), seat_nondeterminism=countif(seat),
+            noop_unexplained_divergence=countif(unexplained),
             noop_outcome_unknown=countif(unknown),
             false_divergences=countif(false_divergence),
             p50_wall_s=percentile(wall, 50), p95_wall_s=percentile(wall, 95)
@@ -2687,7 +2703,7 @@ dependencies
             max_pct=max(pct), p95_engine_s=percentile(engine, 95) by stem
 ```
 
-Recorder faults and soundness alarms (log records):
+Recorder faults, soundness alarms and unexplained divergences (log records):
 
 ```kusto
 traces
@@ -2695,6 +2711,7 @@ traces
 | extend label=tostring(customDimensions.label),
          recovery=tostring(customDimensions.recovery),
          kind=case(message has "SOUNDNESS ALARM", "alarm",
+                   message has "noop_unexplained_divergence", "unexplained",
                    message has "recorder fault", "record_fault", "other")
 | summarize count(), last=max(timestamp), example=take_any(message)
             by kind, recovery, label
@@ -2714,6 +2731,7 @@ jq -s '
               | map({key: .[0].verdict_class, value: length}) | from_entries),
     false_divergences: [$s[] | select(.false_divergence == true)] | length,
     seat_nondeterminism: [$s[] | select(.seat_nondeterminism == true)] | length,
+    noop_unexplained_divergence: [$s[] | select(.noop_unexplained_divergence == true)] | length,
     noop_outcome_unknown: [$s[] | select(.noop_outcome_unknown == true)] | length,
     per_stem: ($s | group_by(.label) | map({
       label: .[0].label,

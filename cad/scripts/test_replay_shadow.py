@@ -12,9 +12,9 @@ import contextlib
 import datetime
 import hashlib
 import importlib.util
+import itertools
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -892,6 +892,13 @@ _REORDERED = {
 _UNMEASURED = {"request_divergence": None, "truth_cause": None, "outcome": "unknown"}
 # The base's exact requests, another part: the seat changed the geometry.
 _RESHAPED = {"request_divergence": None, "truth_cause": None, "outcome": "different"}
+# The base's part, but requests that diverged with every earlier answer alike:
+# neither the source (a noop) nor SolidWorks explains it.
+_UNEXPLAINED = {
+    "request_divergence": {"index": 9, "field": "args"},
+    "truth_cause": "request",
+    "outcome": "same",
+}
 
 
 def _verdict(name: str) -> dict[str, Any]:
@@ -906,8 +913,10 @@ def _verdict(name: str) -> dict[str, Any]:
         (0, _NOOP, _RESHAPED, "noop", "same", "noop", "alarm"),
         (0, _NOOP, _REORDERED, "noop", "diverged", "noop", "seat"),
         (0, _NOOP, _UNMEASURED, "noop", "same", "noop", "unknown"),
+        (0, _NOOP, _UNEXPLAINED, "noop", "diverged", "noop", "unexplained"),
         # No comparison at all: a noop nothing confirms.
         (0, _NOOP, None, "noop", "unknown", "noop", "unknown"),
+        (91, _DIVERGED, _UNEXPLAINED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _REORDERED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _SAME, "diverged", "same", "divergence", "false"),
@@ -946,12 +955,51 @@ def test_a_shadow_folds_replay_ground_truth_and_outcome(
     assert result.verdict_class is shadow.VerdictClass(kind)
     assert result.outcome == (diff or {}).get("outcome", "unknown")
     assert result.truth_cause == (diff or {}).get("truth_cause")
-    assert {
+    flags_of = {
         "alarm": result.soundness_alarm,
         "seat": result.seat_nondeterminism,
+        "unexplained": result.noop_unexplained_divergence,
         "unknown": result.noop_outcome_unknown,
         "false": result.false_divergence,
-    } == {name: name == flags for name in ("alarm", "seat", "unknown", "false")}
+    }
+    assert flags_of == {name: name == flags for name in flags_of}
+
+
+_NOOP_MARKERS = {
+    shadow.NoopJudgement.SOUNDNESS_ALARM: "soundness_alarm",
+    shadow.NoopJudgement.SEAT_NONDETERMINISM: "seat_nondeterminism",
+    shadow.NoopJudgement.UNEXPLAINED_DIVERGENCE: "noop_unexplained_divergence",
+    shadow.NoopJudgement.OUTCOME_UNKNOWN: "noop_outcome_unknown",
+}
+
+
+def test_every_noop_is_judged_exactly_once():
+    # Every verdict x ground truth x cause x outcome: a noop has exactly one
+    # judgement, each but CONFIRMED with exactly its own marker; any other
+    # verdict has none.
+    judged = set()
+    for verdict, truth, cause, outcome in itertools.product(
+        [*shadow.VERDICT_CLASSES, "garbled"],
+        ("same", "diverged", "unknown"),
+        (None, "request", "response:IFace2.Normal"),
+        ("same", "different", "unknown"),
+    ):
+        found = shadow.Shadow(
+            verdict, ground_truth=truth, truth_cause=cause, outcome=outcome
+        )
+        markers = {name for name in _NOOP_MARKERS.values() if getattr(found, name)}
+        judgement = found.noop_judgement
+        if verdict != "noop":
+            assert judgement is None and markers == set()
+            continue
+        judged.add(judgement)
+        expected = {_NOOP_MARKERS[judgement]} if judgement in _NOOP_MARKERS else set()
+        assert markers == expected, (truth, cause, outcome)
+    assert judged == set(shadow.NoopJudgement)
+    judgement = shadow.Shadow(
+        "noop", ground_truth="diverged", truth_cause="request", outcome="same"
+    ).noop_judgement
+    assert judgement is shadow.NoopJudgement.UNEXPLAINED_DIVERGENCE
 
 
 def test_every_verdict_has_a_class():
@@ -975,7 +1023,7 @@ def _two_builds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> shadow.Recor
 def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     blob, tmp_path, monkeypatch, spans, logged
 ):
-    divergence = {"index": 7, "field": "args", "detail": "x" * 10_000}
+    divergence = {"index": 7, "field": "args", "context": ["x" * 10_000]}
 
     def evaluate(recording, base, summary):
         return shadow.Shadow(
@@ -988,6 +1036,7 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
             truth_cause="request",
             outcome="different",
             outcome_signals={"mass": "different", "stl": "same"},
+            outcome_details={"answers": {"x" * 10_000: [1, 1]}},
         )
 
     monkeypatch.setattr(shadow, "evaluate", evaluate)
@@ -1000,9 +1049,21 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
         "noop",
         True,
     )
+    assert record["noop_judgement"] == "soundness_alarm"
     assert record["base_key"] == base.key and record["differing_count"] == 1
     assert record["differing_classes"] == {"other": 1}
-    assert len(record["alarm_evidence"]) == shadow.EVIDENCE_CHARS
+    # Oversized details and context are clipped; the short fields survive.
+    evidence = record["alarm_evidence"]
+    assert len(evidence) == shadow.EVIDENCE_CHARS and evidence in message
+    for field in (
+        '"served": 10',
+        '"truth_cause": "request"',
+        '"outcome_signals": {"mass": "different", "stl": "same"}',
+        '"request_divergence": {"index": 7, "field": "args"',
+        '"outcome_details": "{\\"answers\\": {\\"xxx',
+    ):
+        assert field in evidence, field
+    assert "context" not in evidence
     [span] = spans.named("replay.shadow ")
     assert span["replay.verdict"] == "noop" and span["replay.soundness_alarm"] is True
     assert span["replay.artefact_outcome"] == record["artefact_outcome"] == "different"
@@ -1035,10 +1096,6 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
     ]
 
 
-# The hourly fleet report's parser of the INFO line.
-_REPORT_LINE = re.compile(r"shadow=(\S+) served=(\S+).*?truth=(\S+)")
-
-
 @pytest.mark.parametrize(
     ("found", "marker", "line_end"),
     [
@@ -1051,6 +1108,12 @@ _REPORT_LINE = re.compile(r"shadow=(\S+) served=(\S+).*?truth=(\S+)")
             "seat_nondeterminism",
             "| truth=diverged | outcome=same cause=response:IFace2.Normal "
             "| seat_nondeterminism",
+        ),
+        (
+            {"ground_truth": "diverged", "truth_cause": "request", "outcome": "same"},
+            "noop_unexplained_divergence",
+            "| truth=diverged | outcome=same cause=request "
+            "| noop_unexplained_divergence",
         ),
         (
             {"ground_truth": "same", "outcome": "unknown"},
@@ -1066,22 +1129,23 @@ def test_a_noop_the_outcome_does_not_contradict_is_counted_never_an_alarm(
         return shadow.Shadow("noop", recorded=10, served=10, **found)
 
     monkeypatch.setattr(shadow, "evaluate", evaluate)
-    _two_builds(tmp_path, monkeypatch)
+    base = _two_builds(tmp_path, monkeypatch)
     assert logged["error"] == []
+    # Only an unexplained divergence warns: it contradicts the premise that a
+    # noop's live divergence can only come from SolidWorks.
+    warned = [m for m in logged["warn"] if "noop_unexplained_divergence" in m]
+    assert len(warned) == (marker == "noop_unexplained_divergence")
+    assert all(base.key[:12] in m and '"truth_cause": "request"' in m for m in warned)
     record = _events(tmp_path, "replay_shadow")[-1]
-    flags = ("soundness_alarm", "seat_nondeterminism", "noop_outcome_unknown")
+    flags = tuple(_NOOP_MARKERS.values())
     assert {name: record[name] for name in flags} == {
         name: name == marker for name in flags
     }
+    assert record["noop_judgement"] == marker
     [span] = spans.named("replay.shadow ")
     assert span[f"replay.{marker}"] is True and span["replay.soundness_alarm"] is False
-    line = logged["info"][-1]
-    assert line.endswith(line_end)
-    assert _REPORT_LINE.search(line).groups() == (
-        "noop",
-        "10/10",
-        found["ground_truth"],
-    )
+    assert span["replay.noop_judgement"] == marker
+    assert logged["info"][-1].endswith(line_end)
 
 
 def test_a_failed_evaluation_is_a_verdict_not_a_failure(

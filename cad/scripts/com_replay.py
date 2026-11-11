@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
 
         base, new = conversation.load(args.base), conversation.load(args.new)
         payload = conversation.compare_conversations(base, new)
-        _com_outcome.label_after_feature(payload["request_divergence"])
+        _com_outcome.label_feature(payload["request_divergence"])
         payload.update(
             _com_outcome.judge(
                 base,
