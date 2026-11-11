@@ -495,10 +495,10 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     assert shaft_top + 0.003 <= len_y <= label_bottom - 0.004
     assert drawing.RELIEF_BACK_X < len_x < drawing.RELIEF_FRONT_X
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
-    # The relief's dimension line drops between the bond-zone block and the
-    # station's shoulder witness, its shelf clear of that witness.
-    assert drawing.BOND_ZONE_UNDERLINE_END_X + 0.002 <= dia_x
-    assert dia_x + drawing.RELIEF_DIA_SHELF <= drawing.RELIEF_FRONT_X - 0.004
+    # The relief's dimension line stands aft of the station's shoulder
+    # witness and its text hangs away from it, inside the relief's span.
+    assert drawing.RELIEF_FRONT_X - dia_x >= 0.004
+    assert drawing.RELIEF_BACK_X + 0.010 <= dia_x - drawing.RELIEF_DIA_TEXT_WIDTH
     journal_width, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
     bond_width, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
     bond_x, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]

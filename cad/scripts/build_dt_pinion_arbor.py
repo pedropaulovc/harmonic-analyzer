@@ -637,17 +637,21 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     )
     dims.record(None, None)
     check(
-        f"{feature_name} station witness on the relief floor",
+        f"{feature_name} relief floor",
         await adapter.add_sketch_dimension(
-            f"{axis}.end", f"{witness}.end", "horizontal_distance", BOND_RELIEF_R
+            f"{axis}.end", f"{inner}.end", "horizontal_distance", BOND_RELIEF_R
         ),
     )
-    dims.record(None, None)
+    dims.record("BondReliefFloorR", '"BondReliefDia" / 2')
+    # The printed diameter runs from the axis to the station witness's
+    # shoulder point on the lower floor, so its extension comes from the
+    # shoulder side and the sheet hangs its text away from it (as the
+    # journals' diameters do), clear of the station's shoulder witness.
     await add_diametric_linear_dimension(
         adapter,
         axis,
-        inner,
-        (-(SHAFT_R + 5.0), (front_v + back_v) / 2.0),
+        f"{witness}.start",
+        (SHAFT_R + 5.0, front_v - 6.0),
         "BondReliefDia",
     )
     dims.record("BondReliefDia", '"BondReliefDia"')

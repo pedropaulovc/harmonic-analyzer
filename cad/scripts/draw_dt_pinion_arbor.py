@@ -434,18 +434,19 @@ ARROWS_INSIDE = (
 # in the open run under the front land's diameter block.  The relief's
 # length stands above the shaft, under detail A's label, as the journals'
 # lengths do.  Its plain .XX diameter hangs below the shaft, over the
-# station row, its line and text right of the bond-zone block (underline
-# ends at x 0.1786 on the r1 sheet of 7454ba6d) and its shelf left of the
-# station's shoulder witness: the r1 text began 2 mm right of its line and
-# its shelf ran 14.2 mm.
+# station row: measured from the axis to the station witness's shoulder
+# point, its line stands 6 mm aft of that shoulder and its text hangs away
+# from the shoulder (as the front land's does), so the station's shoulder
+# witness stays clear of it.  At 7454ba6d (r1) the text ran 14.2 mm.
+# Measured to the relief floor line instead (850d2ba9, r3), SolidWorks
+# spread the text over 25 mm across that witness.
 RELIEF_LEN_Y = 0.178
 RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
-BOND_ZONE_UNDERLINE_END_X = 0.1786
-RELIEF_DIA_SHELF = 0.0142
-RELIEF_DIA_FROM_FRONT_SHOULDER = 19.0
-RELIEF_DIA_XY = (_sheet_x(BOND_RELIEF_Z + RELIEF_DIA_FROM_FRONT_SHOULDER), 0.127)
+RELIEF_DIA_TEXT_WIDTH = 0.0142
+RELIEF_DIA_LINE_OFFSET = 0.006
+RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # Below the shaft, under the back Ra symbol and its leader.
