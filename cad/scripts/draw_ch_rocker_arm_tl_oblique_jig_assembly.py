@@ -1106,12 +1106,13 @@ def _first_index(lines: Sequence[str], head: str) -> int:
 _OPERATION_START = _first_index(spec.OPERATION_STEPS, "15")
 _CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
 # The one sequence, in print order: the general torque note, the pivot-hole
-# key, the assembly, then the pass change and service and the tooling and
+# and station keys, the assembly, then the pass change and service and the tooling and
 # cutting groups, each under its heading; the reference heights stand under
 # the cutting heading.
 INSTRUCTION_LINES = (
     spec.GENERAL_TORQUE_NOTE,
     spec.PIVOT_HOLE_KEY,
+    spec.STATION_KEY,
     *spec.ASSEMBLY_STEPS,
     "PASS CHANGE AND SERVICE:",
     *spec.OPERATION_STEPS[_OPERATION_START:_CUTTING_START],

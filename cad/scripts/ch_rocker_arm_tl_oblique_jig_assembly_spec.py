@@ -1577,6 +1577,11 @@ PIVOT_HOLE_KEY = (
     "CARRIER PIVOT HOLES (SHEET 1): A1 AND B1 FOR THE INNER PASS, A2 AND B2 FOR "
     "THE OUTER PASS."
 )
+# The setting tables' and steps' S, defined with the other keys ahead of step
+# 6 (rules 22 and 26; #2490 machinist review r6: S was never defined). One
+# printed line: sheets 7-10 have no spare line. trammel.rail_point(rail, 0)
+# is the spindle origin, so S runs along the rail's pin line from it.
+STATION_KEY = "S: DISTANCE ALONG ITS RAIL, SPINDLE ORIGIN TO SHOULDER-SCREW AXIS."
 
 
 # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,

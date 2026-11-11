@@ -452,6 +452,17 @@ def test_every_instruction_prints_once_in_order_across_sheets_7_to_10() -> None:
                 assert not line.startswith(" ")
 
 
+def test_station_s_is_defined_in_one_line_before_the_steps_use_it() -> None:
+    key = drawing._wrapped((spec.STATION_KEY,), width=drawing.STEPS_LINE_WIDTH)
+    assert spec.STATION_KEY.startswith("S: ") and "\n" not in key
+    assert spec.STATION_KEY in drawing.STEPS_SHEETS[0].left
+    assert drawing.INSTRUCTION_LINES.index(spec.STATION_KEY) < drawing.INSTRUCTION_LINES.index(
+        spec.ASSEMBLY_STEPS[0]
+    )
+    # S 0 is the spindle origin on both rails.
+    assert spec.trammel.rail_point(1, 0.0) == spec.trammel.rail_point(2, 0.0) == (0.0, 0.0)
+
+
 def _setting_table_boxes() -> list[tuple[float, float, float, float]]:
     """Each setting table's title and native table at the BOM row height,
     stacked down the setting sheet's right column (sheet metres)."""
