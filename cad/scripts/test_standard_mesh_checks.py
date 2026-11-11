@@ -103,3 +103,35 @@ def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None
     assert crank_mesh_stack.straight_root_rise(crossing) == pytest.approx(0.0, abs=1e-12)
     assert rows[-1].tooth_thickening_mm > rows[0].tooth_thickening_mm > 0.0
     assert "REPORTED, not gated; #2481" in crank_mesh_stack.stack_text()
+
+
+# Backlash the straight tooth takes beyond its thickening, south face to north
+# face, from the direct 3D evaluation recorded on #2481 (v3 comment,
+# issue_margin_v3.py, "lean check": as-cut straight spaces against the 16T
+# with the 64T slid to the axes' common perpendicular, ideal involutes, less
+# the same run with the retired screw form and less the thickening).
+STRAIGHT_TOOTH_LEAN_3D_MM = (0.0153, 0.0000, 0.0137, 0.0255, 0.0366)
+
+
+def test_crank_mesh_station_report_resolves_the_straight_tooth_lean() -> None:
+    """Reported, not gated (#2481): off the pitch circle a straight tooth
+    space leans against the screw form, so drive and coast contact at
+    different radii lose backlash the pitch-circle thickening does not show."""
+    import dt_crank_drive_gear_spec as gear64
+
+    rows = crank_mesh_stack.station_checks()
+    for row, direct in zip(rows, STRAIGHT_TOOTH_LEAN_3D_MM, strict=True):
+        # Control: with the lean off, the sampled mesh is the closed form.
+        assert crank_mesh_stack.sampled_station_backlash(
+            row.station_mm, lean=False
+        ) == pytest.approx(row.backlash_min_mm, abs=2e-4)
+        assert row.tooth_lean_mm == pytest.approx(direct, rel=0.12, abs=5e-4)
+    crossing = gear64.TOOTH_SPACE_CROSSING - gear64.FACE_WIDTH / 2.0
+    assert crank_mesh_stack.straight_tooth_lean(crossing) == pytest.approx(
+        0.0, abs=1e-4
+    )
+    assert rows[-1].tooth_lean_mm > rows[0].tooth_lean_mm > rows[1].tooth_lean_mm >= 0.0
+    assert all(
+        "lean takes" in line
+        for line in crank_mesh_stack.station_text().splitlines()[1:]
+    )
