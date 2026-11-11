@@ -445,7 +445,7 @@ such build:
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
-| `prechips:<stem>` (enrolled process travelers) | **no** (stdlib-only prechips CLI) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
+| `prechips:<stem>` (enrolled process travelers; opt-in — NOT in build/release) | **no** (latest PyPI prechips via `uv tool run`) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -490,17 +490,33 @@ table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
 Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and
-end bracket) has a `prechips:<stem>` task. It runs
-`cad/scripts/prechips_traveler.py <stem>`, which runs
-`python -m prechips traveler cad/process/<stem>/plan.toml` twice from the same
-plan: `--profile pro` writes `cad/out/travelers/<stem>/traveler.html` and
-`--profile hobby` writes `traveler-hobby.html` with the plan's setup pictures
-(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). prechips is a
-stdlib-only PyPI dependency (`prechips>=0.9`; the lock resolves the latest
-release, bump it with `uv lock --upgrade-package prechips`): no FreeCAD, no
-geometry kernel, no report or hash certificate. The plan reads its CAD values
-from the part's `features.toml` and its machines, tools, settings and gauges
-from `cad/process/shop.toml`. Owner rulings (Pedro): the prechips cutover is a
+end bracket) has an opt-in `prechips:<stem>` task. `build` and `release` do not
+run it, and releases carry no travelers while prechips stabilises (owner ruling
+2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502):
+prechips stays out of `uv.lock`, because every prechips release changed the lock
+and re-keyed every `check:machinist_review:*`). The plans, `cad/process/shop.toml`
+and the setup pictures stay in HA. The task runs
+`cad/scripts/prechips_traveler.py <stem>`, which runs prechips outside the
+project environment with uv's tool runner, always the latest PyPI release:
+`uv tool run --from prechips@latest` resolves that release (`@latest` revalidates
+uv's cached index and ignores a `uv tool install`-ed copy; a bare
+`--from prechips` may reuse either), whose version the wrapper logs once and
+records on its spans as `prechips.version`. Then
+`uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml`
+runs twice from the same plan: `--profile pro` writes
+`cad/out/travelers/<stem>/traveler.html` and `--profile hobby` writes
+`traveler-hobby.html` with the plan's setup pictures
+(`cad/process/<stem>/diagrams/*.svg`, which are task inputs). Without `uv` or
+network access to PyPI the wrapper fails with exit 1 before writing a sheet.
+prechips itself is stdlib-only: no FreeCAD, no geometry kernel, no report or
+hash certificate. The plan reads its CAD values from the part's
+`features.toml`, which must exist under `cad/out/features/<stem>/` (from a
+build's `package:features:<stem>` leaf, the task's only dependency, or copied
+from a release asset's `features/<stem>/`), and its machines, tools, settings
+and gauges from `cad/process/shop.toml`. Run `uv run doit prechips:<stem>` for
+an enrolled part, or by hand
+`uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>`.
+Owner rulings (Pedro): the prechips cutover is a
 clean cutover that deleted the legacy machinery, including the #1413
 placeholder release refusal and the PROVISIONAL sheet stamp; and for prechips
 shop data, "no pedantism of not measured value inferred; if it is in the
@@ -509,20 +525,15 @@ written, with no measured/placeholder provenance, and they are HA's own
 recorded values (the deleted inventory's, where it had one; tool diameters stay
 nominal), not prechips example values. Only exit 0 from both profiles passes; exit 2 from
 either is a refusal (bad input or a failed enforced check) and leaves neither
-file nor a stamp. Each task depends only on its own
-`package:features:<stem>` leaf, is not cache-keyed, and `build` and `release`
-require every enrolled stem. A stem without a plan fails only its own task.
-Under prechips 0.9 the base bar and end bracket pass both profiles on the v48
-manifests. The feed lever's
+file nor a stamp. The task is not cache-keyed and always runs when asked
+(`uptodate: [False]`), because its generator version floats. A stem without a
+plan fails only its own task. Under prechips 0.9 the base bar and end bracket
+pass both profiles on the v48 manifests. The feed lever's
 plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
 `cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
-A generated traveler is not machining approval. Release staging refuses a
-traveler whose sheet header does not print the drawing number and revision of
-the manifest staged beside it.
-Releases ship each part's `travelers/<stem>/traveler.html` and
-`traveler-hobby.html` and list them in the notes.
+A generated traveler is not machining approval.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.

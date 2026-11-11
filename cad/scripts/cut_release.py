@@ -32,17 +32,14 @@ What it does, in order:
      so the comparison gallery renders from the bundle with no SolidWorks.
      The independently produced feature bundles are checked for the same face
      labels and patch counts as the full STEPs, then copied intact under
-     ``features/<stem>/`` with their own digest-bound adjacent STEP, and verified
-     travelers for every enrolled plan under ``travelers/<stem>/`` (the strict
-     ``pro`` ``traveler.html`` and the ``hobby`` ``traveler-hobby.html`` with
-     setup pictures).
+     ``features/<stem>/`` with their own digest-bound adjacent STEP.
      Every DXF a drawing note names by bundle path (``_release_artwork``, e.g.
      ``pdf/fr-nameplate-outline.dxf``) is copied from its tracked source to that
      path, beside the PDFs; an unresolved or ambiguous name fails the cut.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/``). Records the SW revision.
+     ``pdf/`` + ``diff/`` + ``features/``). Records the SW revision.
      (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
@@ -103,7 +100,6 @@ from typing import Any
 from _check import log
 from _paths import CAD_ROOT, OUT_SLDASM
 import _config
-import _process_plans
 from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
 from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
@@ -1093,10 +1089,6 @@ def bundle(
         path.relative_to(stage).as_posix()
         for path in stage_bound_features(CAD_ROOT / "out", stage)
     ]
-    facts["travelers"] = [
-        path.relative_to(stage).as_posix()
-        for path in _process_plans.stage_travelers(CAD_ROOT / "out", stage)
-    ]
     facts["drawings"] = stage_drawings(stage)
     facts["drawings"].update(native_drawings)
     # Artwork the sheets name by bundle path (e.g. the nameplate's contours),
@@ -1248,15 +1240,6 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `cad/comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
-        + (
-            "- `travelers/` -- standalone HTML prechips travelers, each part's "
-            "`traveler.html` (pro) and `traveler-hobby.html` (hobby, with setup "
-            "pictures): "
-            + ", ".join(f"`{path}`" for path in facts["travelers"])
-            + "\n"
-            if facts.get("travelers")
-            else ""
-        )
         + (
             f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
             f"({facts['comparisons']['pairs']} pairs"

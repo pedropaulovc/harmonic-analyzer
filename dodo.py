@@ -22,7 +22,7 @@ Task groups (the prefix says whether SolidWorks is required):
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
-  prechips:<stem>    pro + hobby HTML manufacturing travelers (NO SolidWorks)
+  prechips:<stem>    pro + hobby HTML travelers, latest PyPI prechips (opt-in; NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -4682,12 +4682,13 @@ def _prechips_task(stem: str) -> dict[str, Any]:
             *(str(path.resolve()) for path in plan.parent.rglob("*") if path.is_file()),
             str(_process_plans.SHOP_PATH.resolve()),
             str(manifest.resolve()),
-            str((REPO_ROOT / "pyproject.toml").resolve()),
-            str((REPO_ROOT / "uv.lock").resolve()),
             *_executed_closure(cmd),
         }),
         "task_dep": [f"package:features:{stem}"],
         "targets": targets,
+        # The wrapper runs the latest prechips release from PyPI (not a locked
+        # dependency, #2502), so no local input pins the generator: always run.
+        "uptodate": [False],
         # A refusal must not leave a previous success's stamp beside no HTML;
         # the wrapper removes both HTML files itself.
         "actions": [
@@ -4700,7 +4701,8 @@ def _prechips_task(stem: str) -> dict[str, Any]:
 
 
 def task_prechips():
-    """SolidWorks-free prechips travelers for enrolled parts (pro and hobby HTML each)."""
+    """Opt-in prechips travelers for enrolled parts (pro and hobby HTML each), rendered
+    by the latest PyPI release; ``build`` and ``release`` do not run them."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
@@ -4948,11 +4950,10 @@ def task_release():
     parts/assemblies + the ``verify:*`` gates), ``gallery``, ``package:release``
     (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
     ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
-    ``check:*`` and enrolled ``prechips:*`` travelers -- so a release cannot publish
-    past a stale/failing gate or package a missing/stale drawing or traveler.
+    ``check:*`` -- so a release cannot publish past a stale/failing gate or
+    package a missing/stale drawing. Releases ship no travelers while prechips
+    stabilises (owner ruling 2026-11-11, #2502); ``prechips:<stem>`` is opt-in.
     """
-    import _process_plans
-
     return {
         "task_dep": [
             "export",
@@ -4964,7 +4965,6 @@ def task_release():
             *(f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
-            *(f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS),
         ],
         "uptodate": [False],
         "pos_arg": "relargs",
@@ -4975,11 +4975,11 @@ def task_release():
 
 def task_build():
     """THE fully-safe entry point (also ``default_tasks``): every part + assembly
-    + every gate (SolidWorks ``verify:*``, offline ``check:*``, strict travelers).
+    + every gate (SolidWorks ``verify:*``, offline ``check:*``). The opt-in
+    ``prechips:<stem>`` travelers are not part of it.
 
-    Enrolled travelers pull isolated feature bundles, not the full neutral export
-    or Pack-and-Go. Use ``doit -n N`` to fan out SolidWorks-free work alongside
-    the COM stream (serialized by the seat lock, not a spine).
+    Use ``doit -n N`` to fan out SolidWorks-free work alongside the COM stream
+    (serialized by the seat lock, not a spine).
 
     Ordering here is a SCHEDULING HINT only (real deps drive correctness): the
     offline ``check:*`` gates are listed FIRST so workers burn through that ~1 min of
@@ -4987,10 +4987,8 @@ def task_build():
     per-seat order so two cold builders diverge and split the fleet cache.
 
     Every COM gate is farm-dispatchable: under ``--executor farm`` each cache-missing
-    gate runs on a worker. Offline checks and travelers run on the submitter.
+    gate runs on a worker. Offline checks run on the submitter.
     """
-    import _process_plans
-
     return {
         "actions": None,
         "task_dep": (
@@ -5000,7 +4998,6 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
-            + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
     }
 

@@ -260,6 +260,8 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     monkeypatch.setattr(wrapper._telemetry, "set_service", lambda *args: None)
     monkeypatch.setattr(wrapper._process_plans, "plan_path", lambda *args: plan)
     monkeypatch.setattr(wrapper._process_plans, "traveler_paths", lambda *args: (html, hobby))
+    monkeypatch.setenv("UV", "uv")
+    monkeypatch.setattr(wrapper, "latest_version", lambda _uv: "9.9.9")
     calls = []
 
     def run(cmd, **kwargs):
@@ -273,7 +275,7 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     with pytest.raises(SystemExit) as caught:
         raise SystemExit(wrapper.main(["ch_rocker_arm", "--out", str(tmp_path)]))
     assert caught.value.code == code
-    assert calls[0][1:4] == ["-m", "prechips", "traveler"]
+    assert calls[0][4:7] == ["prechips==9.9.9", "prechips", "traveler"]
     assert not html.exists() and not hobby.exists()
 
 

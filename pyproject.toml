@@ -67,11 +67,6 @@ dependencies = [
     # Farm executor (cad/scripts/_farm.py): dispatches cache-missing part/assembly/
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
-    # Drawing-bound manufacturing travelers (SolidWorks-free prechips:<stem> tasks).
-    # 0.9 adds the adapters for the enrolled parts' current manifests; no upper
-    # bound. The lock resolves the latest release; bump it deliberately with
-    # `uv lock --upgrade-package prechips`.
-    "prechips>=0.9",
 ]
 
 [dependency-groups]
