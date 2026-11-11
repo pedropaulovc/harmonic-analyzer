@@ -12,15 +12,15 @@ tooth root and bore. `cad/docs/machining-dfm.md` calls it the single hardest par
 first articles fail, the book documents the failure and the fallback (outsourced
 wire-EDM), which is itself useful to a reader. **The book ships either way.**
 
-**Two gears need tooling I don't have yet.** The gear train uses standard 20°
+**One gear needs a cutter I have to make.** The gear train uses standard 20°
 inch pitches, so stock cutters cover almost every gear
 (`cad/docs/gear-standard.md`). The six-tooth cone gear falls outside every
 stock cutter range, so it needs a form tool I grind myself
-(DT6-FORM1), a skill I have not learned yet. The 64-tooth
-crank gear is helical and needs a dividing head that can cut spirals; the head
-in the shop is sold as semi-universal. *Mitigation:* cutter-making is scheduled
-early in the curriculum, and the spiral head is a budget line (cost TBD) with
-outsourcing that one gear as the fallback.
+(DT6-FORM1), a skill I have not learned yet. The 64-tooth crank gear's teeth
+are straight but inclined 13° to its axis; the dividing head in the shop cuts
+them tilted, with plain indexing, and I have not cut one yet
+(`cad/docs/machining-dfm.md`). *Mitigation:* cutter-making is scheduled early
+in the curriculum, and gear cutting has its own module with practice blanks.
 
 **The summing lever's knife edge is a casting-shaped organic part with a
 delicate precision ridge.** Current thinking is a hardened tool-steel insert

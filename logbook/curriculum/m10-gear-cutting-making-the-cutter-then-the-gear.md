@@ -36,7 +36,7 @@ hours_actual: 0
 - Blank prep: the bore is the datum
 - Mandrels, depth of cut, full tooth depth
 - Inspection: over-pins, runout on a mandrel, meshing a pair
-- The helical 64T crank gear: why it needs a spiral-capable universal head geared to the table (`cad/docs/machining-dfm.md`, cutter plan)
+- The 64T crank gear's straight teeth inclined 13°: tilting the dividing head, which tilt cuts the right hand, and setting where the cutter crosses the axis (`cad/docs/machining-dfm.md`, cutter plan)
 
 ## Controlled mistakes
 
