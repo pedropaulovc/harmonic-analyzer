@@ -19,14 +19,14 @@ Drawing-only: no assembly builder imports it. No SolidWorks or live proof.
 
 from __future__ import annotations
 
+import math
+
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-import pd_rack_pinion_spec as rack_pinion
 
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
 import pd_transgear_feed_pinion_spec as feed_pinion
-import transgear_cluster_fit as cluster_fit
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
@@ -211,38 +211,34 @@ RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.0508  # .002
 # The feed rack's datum setup band and its gates are the builder's design
 # proofs (paper_drive_rack_setup). The sheet prints no backlash window for that
-# mesh: the fitter sets the arm on the disc's rim rock below and accepts it on
+# mesh: the fitter sets the arm on a feeler leaf in the mesh and accepts it on
 # function, no tight spot, no skipped tooth, a steady feed (owner direction
 # 2026-11-11, #2416).
 RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
-# The feel is read where it is large: with the platen held, the MHA-PD-06 disc
-# is rocked by hand and its rim moves the feed mesh's backlash times its tip
-# radius over the feed pinion's pitch radius (about 8.4), with the reducer out
-# of the reading. Platen shake with the knob held hid the mesh under the
-# sleeve's play and the reducer's (codjiflo P1 on e690ffe). The sleeve's
-# running clearance on the pin can add up to its diametral clearance at the
-# feed pitch line, so the window's tight end is charged with it and its loose
-# end with none. Both ends stay clear of the interference point and at or above
-# the continuous-action contact ratio the reducer's runout extreme takes.
-FEED_DISC_ROCK_MM = (0.04 * 25.4, 0.06 * 25.4)
-_DISC_TIP_RADII = [profile.blank_radius_mm for profile in rack_pinion.manufactured_profiles()]
-FEED_DISC_ROCK_BACKLASH_MM = (
-    FEED_DISC_ROCK_MM[0] * feed_pinion.PITCH_DIA / 2.0 / max(_DISC_TIP_RADII)
-    - max(cluster_fit.BORE_DIAMETRAL_CLEARANCE),
-    FEED_DISC_ROCK_MM[1] * feed_pinion.PITCH_DIA / 2.0 / min(_DISC_TIP_RADII),
+# The arm is swung up until the feed teeth wedge a feeler leaf of thickness t
+# into the rack and clamped there; drawn out, the leaf leaves t of normal gap
+# on each flank of the tooth-centred mesh, a datum backlash of 2t/cos(PA)
+# along the rack, whatever play lies behind the pinion (codjiflo P1 on
+# e690ffe and 5972cc9: platen shake with the knob held, and the disc's rim
+# rock through the hub's D-flat, could both pass with the teeth at
+# interference). The first leaf meets every rack-mesh gate. The second, used
+# once if the first leaves a tight spot, keeps the teeth clear of interference
+# and the contact ratio at the continuous-action floor: the owner's option C
+# on #2416 (2026-11-11) gives up the 1.2 guarantee at the loose end.
+FEED_MESH_LEAVES_MM = (0.002 * 25.4, 0.003 * 25.4)
+FEED_MESH_LEAF_BACKLASH_MM = tuple(
+    2.0 * leaf / math.cos(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
+    for leaf in FEED_MESH_LEAVES_MM
 )
-_FEED_DISC_ROCK_MESH = mesh_check.feed_rack_mesh(FEED_DISC_ROCK_BACKLASH_MM)
-if not (
-    _FEED_DISC_ROCK_MESH.backlash_mm[0] > 0.0
-    and _FEED_DISC_ROCK_MESH.interference_margin_min_mm >= 0.0
-    and _FEED_DISC_ROCK_MESH.root_clearance_min_mm >= RACK_ROOT_CLEARANCE_FLOOR
-    and _FEED_DISC_ROCK_MESH.contact_ratio_min >= mesh_check.RUNOUT_CONTACT_RATIO_FLOOR
-):
-    raise AssertionError(
-        f"the disc rim rock window leaves the feed mesh: {_FEED_DISC_ROCK_MESH.summary}"
-    )
-FEED_DISC_ROCK_TEXT = " TO ".join(inch_text(rock, 2) for rock in FEED_DISC_ROCK_MM)
-FEED_DISC_ROCK_MIN_TEXT = f"{inch_text(FEED_DISC_ROCK_MM[0], 2)} MIN"
+mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[0],) * 2).require()
+_LOOSE_LEAF_MESH = mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[1],) * 2)
+if [
+    problem
+    for problem in _LOOSE_LEAF_MESH.failures()
+    if not problem.startswith("contact ratio ")
+] or not _LOOSE_LEAF_MESH.contact_ratio_min >= mesh_check.RUNOUT_CONTACT_RATIO_FLOOR:
+    raise AssertionError(f"the second feeler leaf leaves the feed mesh: {_LOOSE_LEAF_MESH.summary}")
+FEED_MESH_LEAF_TEXTS = tuple(inch_text(leaf, 3) for leaf in FEED_MESH_LEAVES_MM)
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
