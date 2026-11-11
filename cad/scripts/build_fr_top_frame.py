@@ -590,8 +590,8 @@ SIDE_CLEARANCE_SPEC = HoleSpec(
 # #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
 # lead at the sheet's general .X depth band. No assembly recipe dependency.
 KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
-KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -83.435
-KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.427
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -89.150
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +88.142
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
