@@ -62,8 +62,8 @@ FINISH_STOCK_MIN = 4.0  # inner R800 only
 FINISH_STOCK_MIN_BY_PASS = {"inner": FINISH_STOCK_MIN, "outer": 0.30}
 
 # Transfer from the ACTUAL carrier taps after edge registration: a pilot run
-# up through each tap from below, opened from above in place (TL-00 steps
-# 19F-19H; #2443). Predrilling nominal stations from a separately displaced
+# up through each tap from the lifted carrier's underside, opened from above (TL-00 steps
+# 19F-19L; #2443). Predrilling nominal stations from a separately displaced
 # raw blank would add an invalid stack.
 CLAMP_TRANSFER_POINTS = (trammel.CL, trammel.CR)
 CLAMP_TRANSFER_BAND = printed_band_mm(2, unit=riser.UNIT)

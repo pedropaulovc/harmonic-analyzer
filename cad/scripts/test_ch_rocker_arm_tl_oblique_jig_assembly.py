@@ -2078,10 +2078,14 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19D"]
     # The clamp holes are piloted from the carrier's own taps (a pilot under
     # the tap drill), then opened to the clearance drill.
-    assert spec.riser.SCREW_DRILL in steps["19F"] and spec.blank.CLAMP_DRILL in steps["19G"]
-    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19H"]
+    assert spec.riser.SCREW_DRILL in steps["19H"] and spec.blank.CLAMP_DRILL in steps["19K"]
+    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19L"]
     order = list(steps)
-    assert order.index("19D") < order.index("19E") < order.index("19F") < order.index("19G") < order.index("19H")
+    # The pilot is drilled with the carrier lifted (19G) and opened after
+    # it is refitted (19J), before the clamp screws replace the clamp.
+    assert [order.index(k) for k in ("19D", "19E", "19F", "19G", "19H", "19J", "19K", "19L")] == sorted(
+        order.index(k) for k in ("19D", "19E", "19F", "19G", "19H", "19J", "19K", "19L")
+    )
     # #2444: the hub hole is opened in steps, the last one the pre-ream drill,
     # then reamed to the strap's hub hole.
     assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
