@@ -612,7 +612,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   #749; this preload correction changes neither limitation.
   Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
   trimmed to **12.700 mm** (**25.400 mm**, 1.00 in, overall to eye crown, with
-  the .03 title-block deburr of #2564) and
+  the .03 title-block deburr of #2314) and
   left bare in the coefficient-plate tap: nothing torques the hooks, so no jam
   nut (owner, #2326). The neck seats on the plate top; one turn maximum
   back-out is retained for preload trim while holding eye clocking. The

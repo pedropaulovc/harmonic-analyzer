@@ -84,10 +84,12 @@ ISO_SCALE = (3.0, 1.0)
 # The view centres on its outline. The settled 31.3 mm part (run 0c4519c5
 # read y 0.1014..0.2711 at centre 0.18625, a 0.0848 half-height) stood centred
 # at 0.1805 with its cut end at 0.1023; each shorter part drops the centre by
-# half its on-sheet shortening to keep the cut end, and every deburr placement
-# below, where it was: the 30.480 mm part centred at 0.1791, so the 25.400 mm
-# part, 25.40 mm shorter on the sheet, centres at 0.1664 and spans about
-# 0.1023..0.2293, clear of the 0.0651 notes band.
+# half its on-sheet shortening to keep the cut end there. The deburr ink below
+# was settled on the 30.734 mm part centred at 0.1791 (cut end 0.1032). The
+# 25.400 mm part, 26.67 mm shorter on the sheet than that one, centres at
+# 0.1664, 0.6 mm above the strict half-shortening (0.16577), so its cut end
+# stands about 0.1038 and the outline spans about 0.1038..0.2308, clear of the
+# 0.0651 notes band; CHAMFER_VERTEX carries that 0.6 mm to the deburr texts.
 FRONT_CENTER = (0.100, 0.1664)
 ISO_CENTER = (0.310, 0.209)
 # The settled isometric outline is 0.0543 half-height about its centre (run
