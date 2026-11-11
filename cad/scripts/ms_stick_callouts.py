@@ -62,14 +62,19 @@ CALLOUTS: dict[str, str] = {
     "BodyThickness": REBATE_LINK,
     "ScaleStartX": STATION_LINK,
     "Tick0Width": f"ALL GRADUATIONS\n{part.GRADUATION_WIDTH_CALLOUT}",
-    "TickDepth": f"GRADUATIONS, SQUARE BOTTOM\n{part.GRADUATION_FLOOR_CALLOUT}",
+    # Delegated ruling 2026-11-11 (#2433, pending owner confirmation, #2144):
+    # the graduations' V angle prints from the spec as NumeralDepth's does,
+    # following the 2026-10-23 owner ruling on the numeral V (one bit cuts
+    # both); the model drafts each wall half of it.
+    "TickDepth": (f"GRADUATIONS: {part.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
+                  f"{part.GRADUATION_FLOOR_CALLOUT}"),
     "FullTickLength": "FULL TICKS",
     "MinorTickLength": "MINOR TICKS",
     "HalfTickLength": "HALF-DIVISION TICK",
     "NumeralHeight": "NUMERAL HEIGHT",
     # Section G-G cuts the zero, so the callout names the numerals and their V
     # (rule 9), then the stock under it; the block fits between detail F and G-G.
-    "NumeralDepth": (f"NUMERALS: {part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
+    "NumeralDepth": (f"NUMERALS: {part.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
                      f"{part.NUMERAL_FLOOR_CALLOUT}"),
 }
 # dimension name -> its prefix: detail A's pitches open their reference

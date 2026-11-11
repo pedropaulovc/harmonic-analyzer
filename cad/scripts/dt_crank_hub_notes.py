@@ -179,7 +179,7 @@ HUB_LENGTH_CALLOUT = "SETS CLEARANCE TO\nSPROCKET MHA-PD-09"
 #                                                                    4.064 +/-0.254
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
-#                                                                    -154.3 +0.1/-0.5
+#                                                                    -154.3 +0.129/-0.531
 #     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
@@ -190,8 +190,8 @@ HUB_LENGTH_CALLOUT = "SETS CLEARANCE TO\nSPROCKET MHA-PD-09"
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.2476 - 3.81)
-#        = -161.0865 - (-161.5624)                = 0.4759  (nominal 1.3315)
+#        = (-154.3 - 0.5314 - 6.2865) - (-183 + 25.2476 - 3.81)
+#        = -161.1179 - (-161.5624)                = 0.4445  (nominal 1.3315)
 #      floated, the wheel walked forward off its pins onto the hub rear face
 #      (the hub and seat stations cancel):
 #        (RELIEF_LENGTH - RELIEF_LENGTH_TOL) + (PLATE + min(PLATE_BAND))
@@ -201,8 +201,8 @@ HUB_LENGTH_CALLOUT = "SETS CLEARANCE TO\nSPROCKET MHA-PD-09"
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
-#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.2476)
-#        = -157.6 - (-157.7524)                   = 0.1524  (nominal 0.754)
+#        = (-154.3 - 0.5314 - 2.8) - (-183 + 25.2476)
+#        = -157.6314 - (-157.7524)                = 0.1210  (nominal 0.754)
 #   Worst case: A seated and B with the seat collar at its forward limit and
 #   the hub long, A with the relief short, B with the plate thick; A floated
 #   with the relief short and the plate thin.
