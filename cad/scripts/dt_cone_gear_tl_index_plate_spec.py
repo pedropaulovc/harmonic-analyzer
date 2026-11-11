@@ -32,9 +32,8 @@ bolt-circle drill holds the zone, and the 40:1 worm divides what is left.
 The pin holes are reamed to a sliding fit on the head's index pin (delegated
 ruling 2026-11-07, owner review #2144, pending owner confirmation): a drilled
 hole holds only the drilled-hole row, not the Ø.004 zone. The bore pilots the
-plate on the head's hub at the title block's .XXX (``HUB_DIA`` is its least
-limit, the measured stock bore), so the hole circles stay concentric with the
-crank; the 40:1 worm divides what eccentricity is left.
+plate on the head's hub (+.003/0 over the measured stock bore) so the hole
+circles stay concentric with the crank.
 
 Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
 part's machinist_exceptions, provisional until #2157): Ø.1570
@@ -69,11 +68,10 @@ TRACKING_ISSUE = "https://github.com/pedropaulovc/harmonic-analyzer/issues/2157"
 
 # --- Plate envelope ------------------------------------------------------------
 PLATE_DIA = 3.94 * INCH  # GUESS (#2157): forum 3.938 OD on the .XX grid
-HUB_DIA = 0.829 * INCH  # GUESS (#2157): forum .829 ID, the stock plate's bore
+BORE_DIA = 0.829 * INCH  # GUESS (#2157): forum .829 ID
 THICKNESS = 0.22 * INCH  # GUESS (#2157): forum .218 on the .XX grid
-# The bore pilots on the head's plate hub at the title block's .XXX: its
-# least limit is the stock plate's bore (asserted below).
-BORE_DIA = 0.834 * INCH
+# The bore pilots on the head's plate hub: never under the stock plate's bore.
+BORE_DEVIATIONS = (0.0, 0.003 * INCH)
 
 # --- Worm and the gears this plate indexes ------------------------------------
 WORM_RATIO = 40  # BS-0 dividing head
@@ -125,15 +123,12 @@ MOUNT_SEED = (
 )
 
 # --- Printed precision --------------------------------------------------------
-# Places: OD, thickness and the countersink at .XX; the bore (the hub pilot),
-# the bolt circles (index arm reach, head taps) and the drill size at .XXX
-# (rule 3: drill diameters print three places), every one at the title
-# block's band; the reamed index holes at .XXXX with their band.
+# Places: OD, thickness and the countersink at .XX; the bore (banded, the
+# hub pilot), the bolt circles (index arm reach, head taps) and the drill
+# size at .XXX (rule 3: drill diameters print three places); the reamed index
+# holes at .XXXX with their band.
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
-
-if BORE_DIA - _XXX < HUB_DIA - 1e-9:
-    raise AssertionError("the bore's least printed limit does not pass the head's hub")
 
 # The three-place print rounds the wizard table's 4.978 mm.
 if abs(CLEARANCE_MM[(MOUNT_SCREW, "normal")] - MOUNT_HOLE_DIA) > 0.0005 * INCH:
@@ -188,7 +183,7 @@ WEBS_MM: dict[str, float] = {
     - _CSK_R_MAX,
     "countersinks to bore": (MOUNT_PCD - _XXX) / 2.0
     - _CSK_R_MAX
-    - (BORE_DIA + _XXX) / 2.0,
+    - (BORE_DIA + BORE_DEVIATIONS[1]) / 2.0,
 }
 # The two fine circles fall short of rule 17's floor (owner ruling RV-01);
 # every other wall meets the .080 target.

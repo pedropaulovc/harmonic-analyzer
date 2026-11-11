@@ -666,10 +666,14 @@ if SOCKET_WALL_MIN_MM < WALL_TARGET_MM:
 # The key's north end at the far printed limits of the keyseat end's .XX
 # location and the key's .XX length stays south of T024 (gear 16), bonded on
 # land 2 one feeler north of T030: the key sits between the keyseat's end and
-# T024.
+# T024, whose south face stands at its modelled (feeler-set) station less
+# the stack's shortfall with the stack pushed onto the collar
+# (dt_cone_gear_stack.face_band), as in the setback proof.
 KEY_NORTH_MARGIN_MM = (
     FRONT_STUB
-    + gear_faces(16)[0]
+    + gear_faces(T024_SEAT)[0]
+    + cone_tip_cluster.TIP_SET_SHIFT_MM
+    + face_band(T024_SEAT, "south")[1]
     - (
         COLLAR_END_STATION
         + cone_land_key.KEY_END_SET_MM

@@ -363,10 +363,13 @@ BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip 
 # band.  Every gear grew SOUTH: its north face stays on the station layout
 # (cone_line).  The 20-gear stack is accepted at +/-0.20 mm (the cylinder
 # bank's L20 d' rule, dt_cone_gear_stack); each gear's own band is +/-.002 in
-# (#2314): the stack's partial bands book it, and the land step
-# (dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET) and the tip recess
-# (TIP_END_RECESS_LIMITS_MM) keep their margins at it.  The 64T (MHA-DT-07)
-# keeps gear_face_band's +/-.001, which its own stacks read.
+# (#2314, the owner's 2026-11-11 loosening pass): the stack's partial bands
+# book it, and the land step (dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET), the
+# tip recess (TIP_END_RECESS_LIMITS_MM) and the key's north margin keep their
+# margins at it.  The 2026-09-28 ruling asked only that the gears touch; the
+# +/-.001 it shipped with was the implementer's cylinder-bank precedent
+# (13e941c941), not a ruled band.  The 64T (MHA-DT-07) keeps
+# gear_face_band's +/-.001, which its own stacks read.
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = (0.0508, -0.0508)  # (upper, lower), +/-.002 in
 # Keyway clock: on the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR

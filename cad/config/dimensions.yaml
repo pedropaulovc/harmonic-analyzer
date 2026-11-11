@@ -312,13 +312,13 @@ sections:
       - - Gear face width
         - 7 mm
         - '0.276'
-        - photo callout p.18 — historical 7 mm; the selected touching stack instead uses 6.8756 ±0.025 mm faced gears (`dt_cone_gear_spec.FACE_WIDTH`), derived from the 6.875611681880 mm axial seat pitch
+        - photo callout p.18 — historical 7 mm; the selected touching stack instead uses 6.8756 ±0.051 mm faced gears (`dt_cone_gear_spec.FACE_WIDTH`), derived from the 6.875611681880 mm axial seat pitch
         - annotated
         - high
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18 — historical 150 mm; the selected model has twenty touching 6.8756 ±0.025 mm faces, with stack acceptance 137.512 ±0.20 mm (`dt_cone_gear_stack.STACK_L20`); the adjacent 64T face is 7.2244 ±0.025 mm and bears on the shaft collar. The photographed arrow is retained as historical evidence, not silently rewritten to the current stack.
+        - photo callout p.18 — historical 150 mm; the selected model has twenty touching 6.8756 ±0.051 mm faces, with stack acceptance 137.512 ±0.20 mm (`dt_cone_gear_stack.STACK_L20`); the adjacent 64T face is 7.2244 ±0.025 mm and bears on the shaft collar. The photographed arrow is retained as historical evidence, not silently rewritten to the current stack.
         - annotated
         - high
       - - Gear count
@@ -388,7 +388,7 @@ sections:
       T024 is bonded with LOCTITE 638 on round land 2, one 0.45 mm feeler off
       T030, for 0.35–0.55 mm stack float; T018 and T012 are bonded on the
       integral spigot of T006 (MHA-DT-37), whose spigot is bonded in the
-      shaft's end socket. Their 6.8756 ±0.025 faces touch from the
+      shaft's end socket. Their 6.8756 ±0.051 faces touch from the
       collar-supported 64T to T030 and from T024 to T006. The MHA-DT-38
       bushing on T006's pivot bears on the MHA-DT-39 end screw in MHA-DT-21,
       which sets shaft end play; tip-to-drum air belongs to the assembly's
@@ -729,7 +729,7 @@ sections:
         - 'sh_vn_fillister_screw_90280a108_spec owns the shared nominal 90280A108 row; dt_swing_stop_screw_spec owns the ASME slotted-fillister/length/thread application limits with its recorded supplier/table provenance. Stop, spring-foot and latch-hook bracket occurrences use the same canonical native stock part; the stop retains its application placement and static lock. Base receiver is build_fr_harmonic_base-owned. v4 preserves the small-screw stop role; sourced bounds are not proof of a measured installed screw or raw shank-profile grade.'
         - high stock identity and sourced limits; nominal depiction and installed acceptance separate
       - - '`dt-cone-tip-gear` (MHA-DT-37, T006 with integral spigot and pivot)'
-        - 'C67500 solid: six DT6-FORM1 leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.025; integral Ø1.5875 (.0625 in) spigot × 18.034 (.71 in) to the south, bonded with LOCTITE 638 in the reamed MHA-DT-04 socket (5.08, .20 in deep) and through T018/T012; integral Ø1.5875 pivot × 6.35 (.25 in) to the north, made to the measured MHA-DT-38 bore. cone_tip_cluster owns the stems; dt_cone_gear_spec owns the T006 tooth form.'
+        - 'C67500 solid: six DT6-FORM1 leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.051; integral Ø1.5875 (.0625 in) spigot × 18.034 (.71 in) to the south, bonded with LOCTITE 638 in the reamed MHA-DT-04 socket (5.08, .20 in deep) and through T018/T012; integral Ø1.5875 pivot × 6.35 (.25 in) to the north, made to the measured MHA-DT-38 bore. cone_tip_cluster owns the stems; dt_cone_gear_spec owns the T006 tooth form.'
         - 'Leaves at the T006 layout station plus STACK_FEELER 0.45 (cone_tip_cluster.TIP_SET_SHIFT_MM); phased to the keyed T030 at bonding by the MHA-DT-03-TL-02 phasing comb (owner ruling 2026-11-09). (owner decision C1 keyed, 2026-11-09, PR #1992)'
         - 'cone_tip_cluster / dt_cone_tip_gear_spec; replaces the T006 configuration of MHA-DT-03 and the former Ø.031 in terminal land.'
         - selected design; native realization pending farm proof
@@ -744,7 +744,7 @@ sections:
         - 'cone_tip_cluster / dt_cone_tip_end_screw_spec / dt_cone_tip_block_spec (owner decision C1 keyed, 2026-11-09, PR #1992). The MHA-DT-VN-54 set-screw collar and the MHA-DT-VN-55 #10-32 cup adjuster (McMaster 94025A164) are retired, never reissued.'
         - high stock identity; med derived fit
       - - '`dt-vn-cone-tip-pinch-screw` (locks the end screw)'
-        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: model nominal head Ø4.6482 ×2.7178, #4-40 shank Ø2.8448 ×15.875. Retained drawing-guidelines.md rule 18 (thread engagement) E1 printed-jaw stack: 6.48 = 2.28D far-jaw thread from slit wall, tip 0.635 inside −X face at width minimum; this is not a supplier-exact screw-size grade.'
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: model nominal head Ø4.6482 ×2.7178, #4-40 shank Ø2.8448 ×15.875. Retained drawing-guidelines.md rule 18 (thread engagement) E1 printed-jaw stack: 6.22 = 2.19D far-jaw thread from slit wall, tip 0.889 inside −X face at width minimum; this is not a supplier-exact screw-size grade.'
         - 'Across block slit, head on +X west; current nominal machine y = 104.14 from platform top 57.15 and dt_cone_tip_block_spec.PINCH_HEIGHT 46.99. Near jaw normal-clearance / far jaw native #4-40 UNC-2B; tightening locks the 1/4-28 MHA-DT-39 end screw. Former y = 110.35 was an earlier placement, not the raised reader.'
         - 'McMaster 91794A112 nominal recipe, dt_cone_tip_block_spec and v4_t00471 / 7:49 perpendicular top-screw observation; printed receiver acceptance remains separate from supplied screw limits.'
         - high stock identity; nominal model and photo-derived function separate

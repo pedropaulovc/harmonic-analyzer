@@ -21,10 +21,11 @@ cone_tip_cluster, cone_stack_end_play):
   (= STACK_FEELER) north of their layout stations (cone_tip_cluster), so
   their faces carry the feeler's set band on top of the faces south of them.
 * Every cone gear face prints +/-0.051 (+/-.002 in, #2314), T006's leaves
-  included; the 64T's prints +/-0.025.  A fit-up acceptance on the measured
-  twenty cone faces (STACK_L20_ACCEPT, +/-0.20, the cylinder bank's L20 d'
-  rule, user ruling 2026-09-28) caps the cumulative deviation; a part of the
-  stack is capped by partial_stack_band, not by the acceptance alone.
+  included; the 64T's prints +/-0.025 (dt_cone_gear_spec records the
+  per-gear band's provenance).  A fit-up acceptance on the measured twenty
+  cone faces (STACK_L20_ACCEPT, +/-0.20, the cylinder bank's L20 d'
+  precedent) caps the cumulative deviation; a part of the stack is capped by
+  partial_stack_band, not by the acceptance alone.
 
 "South" is toward the pivot post (cone station decreasing), "north" toward
 the tip.

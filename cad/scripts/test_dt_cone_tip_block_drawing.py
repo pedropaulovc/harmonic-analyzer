@@ -806,8 +806,8 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     }
     three_place.discard("DowelX")
     assert "DowelX" not in texts
-    # The width prints the title block's .XX; its reason still names the edge.
-    assert "MHA-DT-20" in texts["Width"]
+    # The width prints the title block's .XX: no band of its own, no reason.
+    assert "Width" not in texts
     for name in three_place:
         assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
     # SolidWorks drops multi-line text placed above a dimension.
@@ -1265,8 +1265,8 @@ def test_dowel_leader_crosses_no_text_and_no_dimension_line() -> None:
     """Round 6, #4: on the r6 render the ream's leader ran through the
     ".228" value and its dimension line.  The REF station's value now hangs
     left of the view, the ream's block stands right of the hold-down tap's
-    callout (the width's value and row, dt-fab-4, fill the space right of
-    the view), and its leader runs midway between the width's row and the
+    callout (the width's value, dt-fab-4, fills the space right of the
+    view), and its leader runs midway between the width's value and the
     tap callout's shoulder to the rim right of the station's dowel witness;
     the note it flags stands in the open field over the title block."""
     texts = drawing.sheet_text_boxes()

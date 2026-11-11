@@ -1323,7 +1323,13 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
         + key.KEY_LENGTH_MM
         + key_band
     )
-    t024_south = spec.FRONT_STUB + spec.gear_faces(16)[0]
+    # T024's south face with the stack pushed onto the collar at its shortest.
+    t024_south = (
+        spec.FRONT_STUB
+        + spec.gear_faces(16)[0]
+        + cone_tip_cluster.TIP_SET_SHIFT_MM
+        + dt_cone_gear_stack.face_band(16, "south")[1]
+    )
     assert spec.KEY_NORTH_MARGIN_MM == pytest.approx(t024_south - north)
     assert spec.KEY_NORTH_MARGIN_MM > 0.0
     # Its text sits right of the web's and left of its own left arrow, its
