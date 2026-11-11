@@ -665,7 +665,10 @@ def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> 
     assert y1 == pytest.approx(
         drawing.ISO_NOTE_XY[1] - 2.0 * 0.005 - drawing.NOTE_TEXT_GAP
     )
-    assert drawing.CENTRES_NOTE_XY == (0.372, 0.093)
+    # Two rows at most (rule 7), a caption's height and more under the
+    # isometric caption's field so it does not read as part of it.
+    assert len(notes.CENTRES_NOTE.splitlines()) == 2
+    assert y1 - drawing.CENTRES_NOTE_XY[1] >= 0.005
     assert drawing._inside(drawing.CENTRES_NOTE_XY, field)
     assert len(notes.CENTRES_NOTE.splitlines()) <= TEXT_ROW_LIMIT
     # The whole text field and landing window stay below MATCH DRILL's

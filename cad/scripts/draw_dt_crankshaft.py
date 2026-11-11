@@ -446,10 +446,11 @@ FAR_END_FRONT_RIM_WINDOW = (
     FAR_END_FRONT_RIM_PICK[0] + 0.0005,
     FAR_END_FRONT_RIM_PICK[1] + 0.0005,
 )
-# The unchanged four-row note sits below the isometric caption, above the
-# title block. Its leader rises in the corridor RIGHT of the FRONT station
-# witnesses and LEFT of the pictorial/caption, directly to the plain end.
-CENTRES_NOTE_XY = (0.372, 0.093)
+# The two-row note sits well below the isometric caption, so it does not
+# read as part of it, above the title block. Its leader rises in the corridor
+# RIGHT of the FRONT station witnesses and LEFT of the pictorial/caption,
+# directly to the plain end.
+CENTRES_NOTE_XY = (0.370, 0.085)
 NOTE_TEXT_GAP = 0.0035  # one 3.5 mm note-text height
 ISO_NOTE_XY = (0.376, 0.108)
 

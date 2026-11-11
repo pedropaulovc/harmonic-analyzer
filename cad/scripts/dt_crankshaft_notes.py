@@ -204,7 +204,7 @@ PINION_PIN_CALLOUT = "\n".join(
 # unleadered "AT PLAIN END" row named an end the sheet never identified.  The
 # restriction is on the centre hole, a turning location: the dome's punched
 # witness (FIDUCIAL_NOTE) is a separate, required mark on the finished
-# sphere, which a centre hole would destroy. Keep the four-row text
-# unchanged when relocating its native leader: the drawing identifies the
-# plain end in FRONT, not by the isometric's apparent top/bottom orientation.
-CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNOT IN\nDOME"
+# sphere, which a centre hole would destroy. Two rows of words at most (rule
+# 7); the drawing identifies the plain end in FRONT, not by the isometric's
+# apparent top/bottom orientation.
+CENTRES_NOTE = "LATHE CENTRE OK,\nNOT IN DOME"
