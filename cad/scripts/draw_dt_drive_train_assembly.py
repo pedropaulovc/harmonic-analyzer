@@ -1571,11 +1571,6 @@ DRO_ZERO_STEP = "8P"
 BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
-        # Owner ruling 2026-11-11 (#2362, option g): the 20 gears are made as a
-        # matched set, each faced to the running shortfall, so the stack meets
-        # 8E's window with the band, window and guards unchanged; 8F-8G stay
-        # the fallback.  The full rule is the MHA-DT-12 process record.
-        "FACE GEARS 0-19 IN ORDER, EACH TO NOMINAL LESS THE EARLIER DEVIATIONS.",
         # Owner ruling 2026-11-08 (Pedro): GEAR 0-19 are defined in the sheet 7
         # code key (code_key_text), not by a prose line here.
         "8. WRITE DOWN EACH MHA-DT-12'S MICED THICKNESS, CAM FACE TO BACK FACE.",
@@ -2174,10 +2169,8 @@ _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-# #2362's matched-set line moved the bank's 8Z and 9U-9V and the rig's 16B on
-# a field.
-BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-bank-located') - 1}Z"
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}U"
+BANK_CONTINUED_FROM = str(steps.step_number("cylinder-bank-located"))
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}W"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
@@ -2185,10 +2178,10 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
 )
 # Rounds 19-20: step 23's pivot-seat transfer moved each rig split on; #2470
 # moved step 6 to sheet 8, so the bank and rig splits moved on to refill
-# sheets 9-11 (16B, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
+# sheets 9-11 (16C, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
 # the checks' tip-gap reset cites it.
 RIG_SPLITS = (
-    (f"{steps.step_number('straps-pinned-to-torque-shaft')}B", RIG_SEQUENCE_HEADING),
+    (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
     (
         f"{steps.step_number('rig-located')}E",
         f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
