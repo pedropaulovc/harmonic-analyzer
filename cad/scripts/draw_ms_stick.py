@@ -98,8 +98,9 @@ NUMERAL_PARENT_CENTER = (0.130, 0.210)
 # Third-angle bottom view of sheet 4's front copy: straight below it (rule
 # 15; run 20261111T180258983Z-3467590b flagged it beside the front copy), its
 # B letter under the front copy's label and its own label above detail F's
-# NUMERAL HEIGHT dimension line.
-DEPTH_PARENT_CENTER = (NUMERAL_PARENT_CENTER[0], 0.192)
+# NUMERAL HEIGHT dimension line. At 0.192 the letter sat 1.33 mm under that
+# label (layout audit needs 1.78; run 20261111T185346013Z-fd4d7b02).
+DEPTH_PARENT_CENTER = (NUMERAL_PARENT_CENTER[0], 0.1895)
 # r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
 # The detail/dimension group sits as far left as its 10X/11X texts allow, so
 # the NUMERALS V callout fits between its circle and G-G.
