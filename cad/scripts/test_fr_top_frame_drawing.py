@@ -263,32 +263,77 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
         keeper.FULCRUM_KEEPER_CENTRE_Z + keeper.KEEPER_SCREW_Z_OFF
     )
     # Contract stations are displayed to three places; do not round the bank.
-    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(-83.4349, abs=0.0005)
-    assert part.KEEPER_TAP_Z_REAR == pytest.approx(82.4271, abs=0.0005)
-    assert part.KEEPER_FOOT_TIP_Z_FRONT == pytest.approx(-88.0069, abs=0.0005)
-    assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(86.9991, abs=0.0005)
-    # The keeper stations are ch's; the bosses move with the frame's column Z.
-    dz = abs(part.FRONT_COLUMN_Z) - 112.0
+    # #1038: the .300 pitch stands each keeper 5.715 further out.
+    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(-89.1499, abs=0.0005)
+    assert part.KEEPER_TAP_Z_REAR == pytest.approx(88.1421, abs=0.0005)
+    assert part.KEEPER_FOOT_TIP_Z_FRONT == pytest.approx(-93.7219, abs=0.0005)
+    assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(92.7141, abs=0.0005)
+    # Owner ruling K5 (#1038): the feet end past the unrelieved barrels'
+    # inboard edges, on the faced top the two west reliefs carry into them;
+    # each margin runs to its relief's step, a chord off the socket axis.
+    unrelieved = (
+        part.KEEPER_FOOT_TIP_Z_FRONT - (part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0),
+        (part.REAR_COLUMN_Z - part.BOSS_DIA / 2.0) - part.KEEPER_FOOT_TIP_Z_REAR,
+    )
+    assert max(unrelieved) < 0.0
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx(
-        (1.5141 + dz, 2.5219 + dz), abs=0.0005
+        tuple(margin + spec.KEEPER_BOSS_RELIEF_DEPTH for margin in unrelieved)
     )
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.016
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
-    assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx(
-        (4.9431 + dz, 5.9509 + dz), abs=0.0005
-    )
     stock_major = FILLISTER_SIZE[0]
+    half_major = stock_major / 2.0
     assert part.KEEPER_TAP_BOSS_MARGINS == pytest.approx(
-        tuple(
-            math.hypot(part.KEEPER_TAP_X - part.COLUMN_X, boss_z - tap_z)
-            - part.BOSS_DIA / 2.0
-            - stock_major / 2.0
-            for boss_z, tap_z in (
-                (part.FRONT_COLUMN_Z, part.KEEPER_TAP_Z_FRONT),
-                (part.REAR_COLUMN_Z, part.KEEPER_TAP_Z_REAR),
-            )
+        (
+            part.KEEPER_TAP_Z_FRONT - part.KEEPER_RELIEF_STEP_Z_FRONT - half_major,
+            part.KEEPER_RELIEF_STEP_Z_REAR - part.KEEPER_TAP_Z_REAR - half_major,
         )
     )
+    assert min(part.KEEPER_TAP_BOSS_MARGINS) > 0.0
+
+
+def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> None:
+    """Owner ruling 2026-11-11 (#1038, K5): the two west barrels' proud .18
+    is machined off inboard of a chord .67 from the socket axis.  The step
+    lies inside every printed barrel, outside the cap recess by the wall
+    target at the print's limits, and the cut stays over the faced top."""
+    chord = spec.KEEPER_BOSS_RELIEF_FROM_SOCKET
+    assert chord / spec.IN == pytest.approx(0.67)
+    assert spec.KEEPER_BOSS_RELIEF_DEPTH == pytest.approx(part.BOSS_DIA / 2.0 - chord)
+    assert 5.0 <= spec.KEEPER_BOSS_RELIEF_DEPTH <= 6.0  # the owner's "about 5 mm"
+    assert math.hypot(chord, spec.KEEPER_BOSS_RELIEF_HALF_CHORD) == pytest.approx(
+        part.BOSS_DIA / 2.0
+    )
+    assert (part.KEEPER_RELIEF_STEP_Z_FRONT, part.KEEPER_RELIEF_STEP_Z_REAR) == (
+        pytest.approx(part.FRONT_COLUMN_Z + chord),
+        pytest.approx(part.REAR_COLUMN_Z - chord),
+    )
+    band = spec.PRINTED_LINEAR_BAND_MM[spec.KEEPER_BOSS_RELIEF_PLACES]
+    # The smallest barrel, off its socket by the bosses' position, still
+    # reaches past the farthest printed chord.
+    least_barrel = (part.BOSS_DIA - spec.AS_CAST_BAND - spec.BOSS_POSITION_ZONE) / 2.0
+    assert part.KEEPER_RELIEF_BARREL_OVERLAP == pytest.approx(
+        least_barrel - chord - band
+    )
+    assert part.KEEPER_RELIEF_BARREL_OVERLAP > 0.0
+    # The nearest printed chord against the largest printed recess, its axis
+    # the title block's .XXX off the socket's.
+    wall = (
+        chord
+        - band
+        - part.CAP_RECESS_DIAMETER_MAX / 2.0
+        - spec.PRINTED_LINEAR_BAND_MM[3]
+    )
+    assert part.KEEPER_RELIEF_CAP_RECESS_WALL == pytest.approx(wall)
+    assert wall >= part.WALL_TARGET_MM
+    assert chord - part.CAP_RECESS_DIAMETER / 2.0 == pytest.approx(3.2639)
+    # The relief removes only the band over the faced top: the cross screws
+    # and the cast datum targets lie under it.
+    assert part.SCREW_AXIS_Y + part.COUNTERBORE_MAX_RADIUS < part.HALF_H
+    assert part.DATUM_TARGET_Y < -part.HALF_H
+    # Two caps of the proud band, less its taken-out draft and rim break.
+    prism = 2.0 * part._circle_cap_area(part.BOSS_DIA / 2.0, chord) * part.BOSS_ABOVE
+    assert 0.85 * prism < part._keeper_relief_removal() < prism
 
 
 @pytest.mark.parametrize("front_station_direction", (-1, 1))
@@ -312,15 +357,14 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
     overall_length = part._keeper_printed(
         keeper.OVERALL_LENGTH, overall_places, overall_direction
     )
-    # Owner rulings B2, D2 and D6 (#2333) and Main's delegated ruling
-    # 2026-11-11: the barrel prints Ø1.77 ±.03 on the faced top the feet sit
-    # on, its axis within the bosses' own ⌖Ø.06|A|B of its socket's (the
-    # sockets' Ø.06 to the cast targets does not hold it); the sockets hold
-    # Ø.010 to each other, so the pitch the feet are located across closes
-    # by that much.
-    boss_radius = (
-        part.BOSS_DIA + boss_direction * spec.AS_CAST_BAND
-    ) / 2.0 + boss_direction * spec.BOSS_POSITION_ZONE / 2.0
+    # Owner ruling K5 (#1038): the foot's limit is the relief step, machined
+    # .67 from its own socket axis at the title block's .XX; the as-cast
+    # barrel's size, position and draft no longer reach it.  The sockets
+    # hold Ø.010 to each other, so the pitch the feet are located across
+    # closes by that much.
+    boss_radius = spec.KEEPER_BOSS_RELIEF_FROM_SOCKET + (
+        boss_direction * spec.PRINTED_LINEAR_BAND_MM[spec.KEEPER_BOSS_RELIEF_PLACES]
+    )
     socket_pitch = (
         part.REAR_COLUMN_Z - part.FRONT_COLUMN_Z
     ) + pitch_direction * spec.SOCKET_PATTERN_REFINEMENT_ZONE
@@ -351,7 +395,7 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
         boss_direction,
     ) == (-1, 1, -1, 1, 1):
         assert margins == pytest.approx(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
-        assert margins == pytest.approx((0.2286, 0.7366), abs=5e-4)
+        assert margins == pytest.approx((0.7366, 1.4986), abs=5e-4)
 
 
 def _in_corner_crop(dx: float, dz: float, triangle=part.CORNER_CROP_TRIANGLE) -> bool:
@@ -1565,39 +1609,64 @@ def _plan_detour(start, tip):
 
 
 def _shoulder_end(callout, tip):
-    left, down, right, _up = drawing.KEEPER_CALLOUT_EXTENT
+    """The native leader shoulder's end nearest the tap: the underline
+    KEEPER_CALLOUT_SHOULDER_DROP under the block's point."""
+    left, _down, right, _up = drawing.KEEPER_CALLOUT_EXTENT
     x = callout[0] - left if tip[0] < callout[0] else callout[0] + right
-    return (x, callout[1] - down)
+    return (x, callout[1] - drawing.KEEPER_CALLOUT_SHOULDER_DROP)
+
+
+def _relieved_boss_gap(start, end, boss, boss_r) -> float:
+    """Least sheet distance from the segment to the rear-west barrel as the
+    plan draws it: the disc below its relief chord (owner ruling K5)."""
+    chord_y = boss[1] + spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * _S
+    gap = math.inf
+    for i in range(181):
+        t = i / 180.0
+        x, y = start[0] + t * (end[0] - start[0]), start[1] + t * (end[1] - start[1])
+        for j in range(0, 361, 2):
+            a = math.radians(j)
+            px, py = boss[0] + boss_r * math.cos(a), boss[1] + boss_r * math.sin(a)
+            gap = min(gap, math.hypot(x - px, y - min(py, chord_y)))
+    return gap
 
 
 def test_keeper_callout_leader_takes_the_short_way_to_its_tap() -> None:
     """#946 / b49e1: RD4 stood above the front keeper tap's boss and its
     leader crossed the boss and bore rings: 29.6 mm over the part, 18.3 mm
-    past the tap's approach.  It now reads off the rear tap from the rail's
-    outer side, under REAR KEEPER Z's extension line, clear of the boss."""
+    past the tap's approach.  It reads off the rear tap from the rail's
+    outer side.  #1038: the tap now stands 3.4 mm of paper over the rear
+    barrel's relief step, so the callout stands over the tap's level and
+    its leader climbs to it clear of the relieved barrel."""
     hole, hole_r, boss, boss_r = _keeper_geometry()
-    callout, tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
+    callout, tip = drawing.keeper_callout_placement(hole, hole_r)
     assert math.dist(tip, hole) == pytest.approx(hole_r)
     start = _shoulder_end(callout, tip)
+    assert start == pytest.approx(
+        (hole[0] + drawing.KEEPER_LEADER_RUN[0], hole[1] + drawing.KEEPER_LEADER_RUN[1])
+    )
     over, approach, detour = _plan_detour(start, tip)
     assert detour <= LEADER_DETOUR_TARGET, (over, approach, detour)
-    # The leader passes the rear boss an ink clearance off, and lands under
-    # the tap's centre, so it never crosses the extension line through it.
-    (x0, y0), (x1, y1) = start, tip
-    run = ((boss[0] - x0) * (x1 - x0) + (boss[1] - y0) * (y1 - y0)) / math.dist(start, tip) ** 2
-    t = max(0.0, min(1.0, run))
-    nearest = (x0 + t * (x1 - x0), y0 + t * (y1 - y0))
-    assert math.dist(nearest, boss) >= boss_r + drawing.INK_CLEARANCE
-    assert tip[1] < hole[1]
-    # The callout stands clear under that extension line, inside the frame
-    # and off the title block.
-    left, down, right, up = drawing.KEEPER_CALLOUT_EXTENT
-    box = (callout[0] - left, callout[1] - down, callout[0] + right, callout[1] + up)
-    assert hole[1] - box[3] >= drawing.INK_CLEARANCE + drawing.ARROW_HALF_WIDTH
+    # The tap stands inside an ink clearance of where the unrelieved barrel
+    # was drawn; no leader from below reaches it.  The leader from above
+    # passes the relieved barrel well clear, wherever the native block lands
+    # within 3 mm of its estimate.
+    assert math.dist(hole, boss) - boss_r < drawing.INK_CLEARANCE
+    for dx in (-0.003, 0.0, 0.003):
+        for dy in (-0.003, 0.0, 0.003):
+            moved = (start[0] + dx, start[1] + dy)
+            assert _relieved_boss_gap(moved, tip, boss, boss_r) >= drawing.INK_CLEARANCE
+            assert moved[1] > hole[1] + drawing.INK_CLEARANCE
+    assert tip[0] > hole[0] and tip[1] > hole[1]
+    # The callout stands right of the rail and the barrel, inside the frame.
+    left, _down, right, up = drawing.KEEPER_CALLOUT_EXTENT
+    box = (callout[0] - left, start[1], callout[0] + right, callout[1] + up)
     frame = drawing.SHEET_FRAME
     assert frame[0] <= box[0] and box[2] <= frame[2] - drawing.INK_CLEARANCE
+    assert box[3] <= frame[3] - drawing.INK_CLEARANCE
     assert box[1] > TITLE_BLOCK[3]
-    assert box[0] > boss[0] + boss_r
+    assert box[0] > boss[0] + boss_r + drawing.INK_CLEARANCE
+    assert box[0] > _plan(part.OUTER_X, 0.0)[0] + drawing.INK_CLEARANCE
 
 
 def test_b49e1_keeper_callout_is_what_ran_over_the_boss() -> None:
@@ -6852,29 +6921,30 @@ def test_sheet_three_tabulates_its_sockets_basic_from_the_cast_datum_corner() ->
     assert arrows["X arrow"][3] < oy and arrows["Y arrow"][0] > ox
 
 
-def test_keeper_callout_leader_passes_over_the_table_origin_mark() -> None:
+def test_keeper_callout_leader_stands_clear_of_the_table_origin_mark() -> None:
     """Farm run 20261111T023438415Z: with the table's origin on the F|G
-    corner (owner ruling D2, #2333) the keeper callout's leader, climbing
-    from its shoulder over that corner to the rear tap, ran through the
-    origin mark's "Y", whose arrow then stood 10 mm up the corner's right.
-    The arrow is shorter: the leader passes an ink clearance over its
-    letter, over the G trace's end and clear of the X arrow."""
+    corner (owner ruling D2, #2333) the keeper callout's leader, then
+    climbing from under the rear tap over that corner, ran through the
+    origin mark's "Y".  #1038: the callout stands over the tap's level, so
+    its leader and the whole block stand above the mark and the G trace."""
     from _layout_geometry import Segment
 
-    hole, hole_r, boss, boss_r = _keeper_geometry()
-    callout, tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
+    hole, hole_r, _boss, _boss_r = _keeper_geometry()
+    callout, tip = drawing.keeper_callout_placement(hole, hole_r)
     leader = (_shoulder_end(callout, tip), tip)
     (ox, oy), arrows = _table_origin_mark()
     ink = drawing.INK_CLEARANCE
     for name, box in arrows.items():
         assert _box_segment_gap(box, leader) >= ink, name
-    y_arrow = arrows["Y arrow"]
-    that_run = (*y_arrow[:3], y_arrow[3] - drawing.TABLE_ORIGIN_Y_ARROW[0] + 0.010)
-    assert _box_segment_gap(that_run, leader) < ink
+        assert box[3] < tip[1] - ink, name
     # The G trace climbs the corner's own x to TABLE_G_LINE_FRONT_Z.
     g_end = _plan(drawing.TABLE_ORIGIN_XZ[0], drawing.TABLE_G_LINE_FRONT_Z)
     assert g_end[0] == ox and oy < g_end[1] < leader[1][1]
     assert _segment_gap(Segment(ox, oy, *g_end), Segment(*leader[0], *leader[1])) >= ink
+    # The facing note hangs under the shoulder, right of the mark's column.
+    note_x, note_y = drawing.keeper_facing_note_xy(callout)
+    assert note_x == pytest.approx(leader[0][0])
+    assert note_x > max(box[2] for box in arrows.values()) + ink
 
 
 def test_hole_table_locations_drop_the_leading_zero() -> None:
@@ -7119,29 +7189,18 @@ def test_transfer_rows_rederive_the_keeper_envelope_and_plan_clearance() -> None
     assert right == pytest.approx(old_right + drawing.KEEPER_TRANSFER_EXTRA_WIDTH)
     assert up == pytest.approx(old_up + extra)
     hole, hole_r, boss, boss_r = _keeper_geometry()
-    angle = drawing._keeper_leader_angle(hole, boss, boss_r)
-    assert drawing.KEEPER_TRANSFER_PLAN_SHIFT == pytest.approx(
-        extra / math.tan(angle) + drawing.KEEPER_TRANSFER_EXTRA_WIDTH
-    )
-    callout, tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
-    box = (callout[0] - left, callout[1] - down, callout[0] + right, callout[1] + up)
+    callout, tip = drawing.keeper_callout_placement(hole, hole_r)
+    shoulder_y = callout[1] - drawing.KEEPER_CALLOUT_SHOULDER_DROP
+    box = (callout[0] - left, shoulder_y, callout[0] + right, callout[1] + up)
     assert box[2] <= drawing.SHEET_FRAME[2] - drawing.INK_CLEARANCE
     assert box[1] > TITLE_BLOCK[3]
-    assert hole[1] - box[3] >= drawing.INK_CLEARANCE + drawing.ARROW_HALF_WIDTH
+    # #1038: the block stands over the tap's level, right of the barrel.
+    assert shoulder_y - hole[1] == pytest.approx(drawing.KEEPER_LEADER_RUN[1])
+    assert box[0] - hole[0] == pytest.approx(drawing.KEEPER_LEADER_RUN[0])
     assert box[0] > boss[0] + boss_r
-    # Shifting the plan cancels the extra height's horizontal advance along
-    # the tangent, retaining the historical right-frame allowance.
-    old_hole = (hole[0] + drawing.KEEPER_TRANSFER_PLAN_SHIFT, hole[1])
-    old_shoulder_y = old_hole[1] - (
-        drawing.INK_CLEARANCE
-        + drawing.ARROW_HALF_WIDTH
-        + drawing.ROUND_OUT
-        + old_up
-        + old_down
-    )
-    old_shoulder_x = old_hole[0] + (old_hole[1] - old_shoulder_y) / math.tan(angle)
-    assert box[2] == pytest.approx(old_shoulder_x + old_left + old_right)
     assert math.dist(tip, hole) == pytest.approx(hole_r)
+    # The plan keeps the centre the former lower-right callout gave it.
+    assert drawing.DETAIL_TOP_CENTER == pytest.approx((0.19323, 0.1605))
 
 
 def _hole_table_box():
@@ -7159,12 +7218,12 @@ def _hole_table_box():
 
 def _keeper_callout_placed():
     """RD4's (callout point, sheet box) as the build places it."""
-    hole, hole_r, boss, boss_r = _keeper_geometry()
-    callout, _tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
-    left, down, right, up = drawing.KEEPER_CALLOUT_EXTENT
+    hole, hole_r, _boss, _boss_r = _keeper_geometry()
+    callout, _tip = drawing.keeper_callout_placement(hole, hole_r)
+    left, _down, right, up = drawing.KEEPER_CALLOUT_EXTENT
     return callout, (
         callout[0] - left,
-        callout[1] - down,
+        callout[1] - drawing.KEEPER_CALLOUT_SHOULDER_DROP,
         callout[0] + right,
         callout[1] + up,
     )
@@ -7411,7 +7470,12 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
-    assert min(part.KEEPER_FOOT_RAIL_MARGINS) > 0.0
+    # Owner ruling K5 (#1038): the feet end past the end rails' window faces,
+    # in the corners, where the end rail's own faced flange carries on under
+    # them to the relief step at every printed limit.
+    assert abs(part.KEEPER_FOOT_TIP_Z_FRONT) > part.INNER_Z
+    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN == pytest.approx(1.397)
+    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN > 0.0
     # Across it the widest printed foot (on the keeper's own sheet), at the
     # farthest printed fit-up offset from the web's median, stays inside the
     # narrowest as-cast flange less the largest printed top-rim break leg
