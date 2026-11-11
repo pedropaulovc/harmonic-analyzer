@@ -134,8 +134,12 @@ Owner rulings (Pedro), recorded for the cutover:
 and `release` do not run it, and releases carry no travelers while prechips
 stabilises. Each run renders two travelers from the same plan: `traveler.html`
 (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
-`<stem>/diagrams/`). Under prechips 0.10 the base bar and end bracket pass both
-on the v48 manifests.
+`<stem>/diagrams/`). Under prechips 0.10.1 the base bar and end bracket pass both
+on the v48 manifests. The base-bar and feed-lever plans need 0.10.1: they read
+its adapter bindings `cad.vise_centred_overhang_mm` (centred overhang from the
+CAD length and `vise_jaw_width_mm`) and `cad.overhang_mm` (from the lever's one
+`overhang_in`), and the base-bar adapter refuses a Setup 5 jack centre off the
+bar or inside a rail-hole, counterbore or slot outline.
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
@@ -153,8 +157,10 @@ What the 0.10 port changed on the sheets:
   under the long-edge straps. Vise setups print the bar's stand-out above the
   jaws, keep the 1-3/8 in parallels and two screw jacks (touch only; Setup 5
   gives their DRO positions). Facing runs full length at 850 rpm, 6.8 in/min
-  (owner ruling 2026-11-11, `settings.basebar-face-6061-t6511`). Only R1 is
-  measured on the bar's own rail; the row is drilled from it at the REF pitch.
+  (owner ruling 2026-11-11, `settings.basebar-face-6061-t6511`). The rail
+  stations are REF only, never drill targets (spec; owner R4 ruling, restated
+  2026-11-11): all eight hole centres are measured on the bar's own rail,
+  trimmed flush, the rail comes off, and each hole is drilled at its measured X.
   The 1/2 in end mill alone cuts both slots, tracing a cutter-centre
   rectangle printed per slot, and `tool_sizing` checks it against the slot
   width band less the path offset (the 3/8 in slot drill and 17/32 in
