@@ -76,7 +76,7 @@ def test_crossed_crank_mesh_passes_the_standard_checks() -> None:
 
 
 def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None:
-    """Reported, not gated (#2481): the axes cross in plan, so the centre
+    """Reported (#2481; the gate is crank_mesh_free_play): the axes cross in plan, so the centre
     closes toward the 64T's south face. Mid-face is standard_check's centre.
     The straight tooth thickens away from the cutter's crossing station."""
     import dt_crank_drive_gear_spec as gear64
@@ -102,19 +102,20 @@ def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None
     assert crank_mesh_stack.straight_tooth_thickening(crossing) == pytest.approx(0.0, abs=1e-12)
     assert crank_mesh_stack.straight_root_rise(crossing) == pytest.approx(0.0, abs=1e-12)
     assert rows[-1].tooth_thickening_mm > rows[0].tooth_thickening_mm > 0.0
-    assert "REPORTED, not gated; #2481" in crank_mesh_stack.stack_text()
+    assert "gated in 3D by crank_mesh_free_play, #2481" in crank_mesh_stack.stack_text()
 
 
 # Backlash the straight tooth takes beyond its thickening, south face to north
-# face, from the direct 3D evaluation recorded on #2481 (v3 comment,
-# issue_margin_v3.py, "lean check": as-cut straight spaces against the 16T
-# with the 64T slid to the axes' common perpendicular, ideal involutes, less
-# the same run with the retired screw form and less the thickening).
+# face, from the direct 3D evaluation
+# (crank_mesh_free_play.straight_tooth_lean_3d, #2562): as-cut straight
+# spaces against the 16T with the 64T slid to the axes' common perpendicular,
+# ideal involutes, less the same run with the retired screw form and less the
+# thickening. Regenerate with `python cad/scripts/crank_mesh_free_play.py`.
 STRAIGHT_TOOTH_LEAN_3D_MM = (0.0153, 0.0000, 0.0137, 0.0255, 0.0366)
 
 
 def test_crank_mesh_station_report_resolves_the_straight_tooth_lean() -> None:
-    """Reported, not gated (#2481): off the pitch circle a straight tooth
+    """Reported (#2481): off the pitch circle a straight tooth
     space leans against the screw form, so drive and coast contact at
     different radii lose backlash the pitch-circle thickening does not show."""
     import dt_crank_drive_gear_spec as gear64
