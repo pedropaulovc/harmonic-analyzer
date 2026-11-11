@@ -102,7 +102,8 @@ pieces = 1
 # OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
 # identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
 # They are owned only where that inventory recorded possession: the gauges of
-# the shop's first inventory and the bench and hand tools Pedro listed as kept
+# the shop's first inventory, the parallels it sourced by photo and LMS
+# package, the bench and hand tools Pedro listed as kept
 # (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
 # recorded only as approved to buy, as a trial assumption or as an
 # illustrative example is present = false, as is every new record: nothing
@@ -154,9 +155,10 @@ kind = "protractor"
 present = false
 
 [tools.edge-finder]
-name = "Mechanical edge finder (archived inventory)"
+name = "Mechanical edge finder"
 kind = "edge_finder"
-present = true
+present = false
+note = "The archived inventory gave only an illustrative example identity (Starrett 827A), with no possession evidence."
 
 [tools.setting-mandrel-375]
 name = "3/8 in ground setting mandrel, long enough to pass both MHA-DT-02 pedestals"
@@ -280,6 +282,7 @@ kind = "parallels_set"
 make = "LittleMachineShop"
 sku = "6745"
 present = true
+note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
 
 [fixtures.v-blocks]
 name = "Matched V-block pair with clamps"
