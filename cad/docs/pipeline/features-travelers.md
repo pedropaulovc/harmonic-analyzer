@@ -341,7 +341,7 @@ pipeline and per-profile spans carry the resolved `prechips.version`.
 A missing plan, an unresolved version or a nonzero exit marks the pipeline span
 as failed.
 
-Current state: under prechips 0.10 the base bar and end bracket pass both
+Current state: under prechips 0.10.1 the base bar and end bracket pass both
 profiles on the v48 manifests, including the new `vise_holding` check against
 `cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever's plan passes
 `vise_holding` but refuses on `tool_sizing` (its 11/32 drill is below the
