@@ -17,22 +17,24 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _interference_common import numbered_pairs, smooth_annulus_limit_mm3
 from sh_vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 
-# The MHA-CH-11 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.984375 drill rod
-# pressed into each MHA-CH-01 bar's Ø1.9558 (.077 in) top-pin ream through both
-# top-notch cheeks: 6.35 bar less the .124 (3.1496) notch (inch #290).
-# Channel j's pin and bar are both its (j + 1)th instance (build_ch_channel_assembly
-# inserts one pin per channel in channel order; _copied_chain_instances pins the
-# bar's number).
+# The MHA-SH-VN-58 BarPin members (sh_vn_pivot_pin_bar_spec), the Ø1.984375
+# (5/64 nominal) dowel pressed into each MHA-CH-01 bar's Ø1.9558 (.077 in)
+# top-pin ream through both top-notch cheeks: 6.35 bar less the .124 (3.1496)
+# notch (inch #290).
 # Literals, so this table does not re-key on the pin spec;
-# test_ch_bar_pivot_fit pins them to it.
+# test_sh_vn_pivot_pin_bar_fit pins them to it.
 BAR_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.35 - 3.1496)
-# The MHA-CH-10 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
+# The MHA-SH-VN-58 RodPin members (sh_vn_pivot_pin_rod_spec), the same dowel
 # pressed into each MHA-CH-03 rod's Ø1.9558 fork ream through both tines:
 # .240 (6.096) fork less the .106 (2.6924) slot (user ruling 2026-10-09, PR
-# #1292 review F1; slot widened #982; inch #290).
-# Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
-# are; test_ch_rod_pivot_fit pins the literals to the pin spec.
+# #1292 review F1; slot widened #982; inch #290);
+# test_sh_vn_pivot_pin_rod_fit pins the literals to the pin spec.
 ROD_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.096 - 2.6924)
+# build_ch_channel_assembly inserts both members of channel j's pins in
+# channel order, the RodPin then the BarPin: instances 2j + 1 and 2j + 2, while
+# channel j's rod and bar are each its (j + 1)th instance
+# (_copied_chain_instances pins the bar's number).
+_PIVOT_PIN = "sh-vn-pivot-pin"
 # The MHA-CH-VN-53 #4-40 apex set screws (user, 2026-10-10), one down through
 # each MHA-CH-08 ear's arch (apex .388 (9.852) over the bore since #1371,
 # #290) into its Ø.256 bore, the tap cut at its drill. The thread's major envelope crosses no
@@ -56,20 +58,18 @@ PIVOT_EAR_SET_SCREW_LIMIT = smooth_annulus_limit_mm3(
 )
 FULCRUM_SET_SCREW_THREAD = (1.854, 1.511, 3.96875)
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
-    **numbered_pairs(
-        "ch-bar-pivot-pin",
-        range(1, 21),
-        "ch-amplitude-bar",
-        smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS),
-        second_number=None,
-    ),
-    **numbered_pairs(
-        "ch-rod-pivot-pin",
-        range(1, 21),
-        "ch-connecting-rod",
-        smooth_annulus_limit_mm3(*ROD_PIVOT_PIN_PRESS),
-        second_number=None,
-    ),
+    **{
+        frozenset((f"{_PIVOT_PIN}-{2 * n - 1}", f"ch-connecting-rod-{n}")): (
+            smooth_annulus_limit_mm3(*ROD_PIVOT_PIN_PRESS)
+        )
+        for n in range(1, 21)
+    },
+    **{
+        frozenset((f"{_PIVOT_PIN}-{2 * n}", f"ch-amplitude-bar-{n}")): (
+            smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS)
+        )
+        for n in range(1, 21)
+    },
     **numbered_pairs(
         "sh-vn-arbor-set-screw",
         range(1, 3),

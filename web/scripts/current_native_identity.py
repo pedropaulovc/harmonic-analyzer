@@ -14,7 +14,7 @@ from types import MappingProxyType
 
 SOURCE_MAP_SHA256 = "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd"
 TABLE_PATH = Path(__file__).resolve().parents[1] / "content/current-native-identities.json"
-CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "5c64b170fac6025f2f9fd66d67b417b5b128bf5352daad33616be6d7ad2f0bef"
+CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "7c83a11dfb1472f23e23b67b9ff8e964866c9d6c3c313d048997ff2014749f7b"
 CURRENT_NATIVE_OCCURRENCE_NAMESPACE = "archive-role-local"
 CURRENT_NATIVE_IDENTITY_PROJECTION = MappingProxyType({
     "kind": "current-native-identity-projection",
@@ -113,7 +113,9 @@ class CurrentNativeIdentity:
         source = self.aliases.get(stem, stem)
         if source in self.sources:
             records = [(source, identity) for identity in self.sources[source]["identities"]]
-            current = False
+            # An identity introduced after the migration is its own source: a
+            # member of such a shared part still resolves by role or configuration.
+            current = source == stem and any(identity["stem"] == stem for _, identity in records)
         elif stem in self.prior_targets:
             records, current = self.prior_targets[stem], False
         else:

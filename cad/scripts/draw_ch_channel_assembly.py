@@ -38,7 +38,6 @@ import math
 import re
 import sys
 import textwrap
-from pathlib import Path
 from typing import Any, Callable, Literal
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -61,6 +60,7 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
+from _component_references import component_identity
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -80,7 +80,11 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -341,12 +345,20 @@ BOM_QUANTITIES = {
     explode.ROD: CHANNELS,
     explode.BAR: CHANNELS,
     "ch-channel-lever": CHANNELS,
-    "ch-rod-pivot-pin": CHANNELS,
+    explode.ROD_PIN: CHANNELS,
     explode.BAR_PIN: CHANNELS,
     SPRING_STEM: CHANNELS,
     explode.HOOK: CHANNELS,
 }
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
+# Rows bind to native (file, member) identities, never displayed Number: the
+# purchased pivot pin's RodPin and BarPin members share MHA-SH-VN-58.
+BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    key: (explode.PIVOT_PIN, key.removeprefix(f"{explode.PIVOT_PIN}--"))
+    if key in (explode.ROD_PIN, explode.BAR_PIN)
+    else (key, None)
+    for key in BOM_COMPONENTS
+}
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
     "ch-pivot-shaft": _config.parts("ch-pivot-shaft"),
@@ -363,8 +375,8 @@ PART_ROWS = {
     "ch-connecting-rod": _config.parts("ch-connecting-rod"),
     "ch-amplitude-bar": _config.parts("ch-amplitude-bar"),
     "ch-channel-lever": _config.parts("ch-channel-lever"),
-    "ch-rod-pivot-pin": _config.parts("ch-rod-pivot-pin"),
-    "ch-bar-pivot-pin": _config.parts("ch-bar-pivot-pin"),
+    explode.ROD_PIN: _config.parts("sh-vn-pivot-pin"),
+    explode.BAR_PIN: _config.parts("sh-vn-pivot-pin"),
     SPRING_STEM: _config.parts("ch-vn-channel-spring-installed"),
     "ch-vn-spring-hook": _config.parts("ch-vn-spring-hook"),
 }
@@ -381,10 +393,6 @@ BOM_DESCRIPTIONS = {
         "ch-vn-channel-spring-installed" if stem == SPRING_STEM else stem
     ]
     for stem in BOM_COMPONENTS
-}
-BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
-BOM_NORMALIZED_ALIASES = {
-    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # The BOM's item numbers: the native table numbers the families in component
 # order, which is BOM_COMPONENTS (_validate_bom proves the table prints
@@ -1078,7 +1086,7 @@ def _fitup_text() -> dict[str, str]:
     foot_screw = item(explode.KEEPER_FOOT_SCREW)
     fulcrum_set_screw = item(explode.KEEPER_SET_SCREW)
     arm, rod, bar = item("ch-rocker-arm"), item(explode.ROD), item(explode.BAR)
-    lever, pin = item("ch-channel-lever"), item("ch-rod-pivot-pin")
+    lever, pin = item("ch-channel-lever"), item(explode.ROD_PIN)
     bar_pin, channel_spring = item(explode.BAR_PIN), item(SPRING_STEM)
     anchor = item(explode.HOOK)
     rocker_view, lever_view = ROCKER_BANK.title, LEVER_BANK.title
@@ -1170,11 +1178,13 @@ def _fitup_text() -> dict[str, str]:
         "rod-arms-swing": (
             f"CHECK EACH {arm} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
         ),
-        # A press whose part slides in by hand is a slip fit (rule 23): the
-        # press-fit ruling (ch_rod_pivot_pin_spec) is kept by a new pin.
+        # A press whose part slides in by hand is a slip fit (rule 23). The pin
+        # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
+        # by a new rod, its fork hole reamed to the measured pin.
         "rod-pin-remade": (
-            f"IF AN {pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE PRESS "
-            f"SIZE ON ITS DRAWING AND RETURN TO STEP {n(steps.RODS_PINNED_KEY)}."
+            f"IF AN {pin} SLID IN BY HAND, ITS FORK HOLE IS OVER SIZE: PRESS THE "
+            f"PIN OUT, REPLACE THE {rod} AND RETURN TO STEP "
+            f"{n(steps.RODS_PINNED_KEY)}."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1334,8 +1344,8 @@ def _fitup_text() -> dict[str, str]:
         "bar-pins-held": f"CHECK EACH {bar_pin} DOES NOT SLIDE IN ITS BAR BY HAND.",
         "bars-swing": f"CHECK EACH {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT.",
         "bar-pin-remade": (
-            f"IF AN {bar_pin} SLID IN BY HAND, PRESS IT OUT, REMAKE IT TO THE "
-            "PRESS SIZE ON ITS DRAWING AND RETURN TO STEP "
+            f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
+            f"THE PIN OUT, REPLACE THE {bar} AND RETURN TO STEP "
             f"{n(steps.BARS_PINNED_KEY)}."
         ),
         "fulcrum-shaft-withdrawn": (
@@ -1474,12 +1484,10 @@ def _center_view_outline(
         raise RuntimeError(f"{label}: measured outline did not centre at {center!r}")
 
 
-def _component_stem(component: Any) -> str:
-    component = _early_bound(component, "IComponent2")
-    path = str(component.GetPathName() or "")
-    if not path:
-        raise RuntimeError(f"component {component.Name2!r} has no referenced path")
-    return Path(path).stem.casefold()
+def _component_family(component: Any) -> str:
+    """The BOM row a component counts toward: its file stem, or each pivot pin
+    member's ``stem--member`` key."""
+    return explode.member_family(*component_identity(component))
 
 
 def _validate_source(source_model: Any) -> dict[str, str]:
@@ -1501,7 +1509,7 @@ def _validate_source(source_model: Any) -> dict[str, str]:
     north: dict[str, tuple[float, str]] = {}
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
-        stem = _component_stem(component)
+        stem = _component_family(component)
         counts[stem] += 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
@@ -1548,10 +1556,13 @@ def _bom_column(
     return matches[0]
 
 
-def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers, prove identities/descriptions/quantities, add the
-    registry's VENDOR SKU column after DESCRIPTION; return (stem, item number)
-    in BOM order. Material and finish remain on component drawings."""
+def _validate_bom(
+    adapter: Any, table: Any, configuration: str
+) -> tuple[tuple[str, str], ...]:
+    """Prove associative Numbers, native identities, descriptions, quantities and
+    the item numbers the steps cite; add the registry's VENDOR SKU column after
+    DESCRIPTION and return (row key, item number) in BOM order. Material and
+    finish remain on component drawings."""
     table = _early_bound(table, "ITableAnnotation")
     contents = _bom_cells(table)
     rows = len(contents)
@@ -1575,11 +1586,13 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     quantity_column = _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY.")
 
     actual: dict[str, tuple[int, str, str, str]] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[part_column].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in actual:
-            raise RuntimeError(f"channel BOM repeats component family {stem!r}")
+    identities = bom_row_identities(
+        table,
+        configuration=configuration,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    )
+    for stem, row_index in identities.items():
+        row = contents[row_index]
         actual[stem] = (
             row_index,
             row[item_column],
@@ -1608,11 +1621,10 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
-            if not table.IsCellTextEditable(row_index, part_column):
-                raise RuntimeError(
-                    f"channel BOM part-number cell for {stem!r} is locked"
-                )
-            table.SetText2(row_index, part_column, False, number)
+            raise RuntimeError(
+                f"channel BOM Number for {stem!r} is "
+                f"{contents[row_index][part_column]!r}, expected {number!r}"
+            )
         if description != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(f"channel BOM description mismatch for {stem!r}")
         if quantity != str(BOM_QUANTITIES[stem]):
@@ -1657,6 +1669,13 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             raise RuntimeError(f"channel BOM {key} column width did not persist")
     for row in range(rows):
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    before_rebuild = validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="channel",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("channel BOM rebuild failed")
     settled = _bom_cells(table)
@@ -1667,6 +1686,19 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
                 raise RuntimeError(
                     f"channel BOM {key} for {stem!r} reads {applied!r}, expected {text!r}"
                 )
+    if (
+        validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label="channel",
+            expected_rows=rows,
+            occurrence_quantities=True,
+        )
+        != before_rebuild
+    ):
+        raise RuntimeError(
+            "channel native BOM membership/quantities changed during rebuild"
+        )
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
@@ -1842,11 +1874,19 @@ def _place_exploded_sheet(
         anchor_xy=BOM_ANCHOR,
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
-        identity_aliases=BOM_IDENTITY_ALIASES,
-        configuration_grouping="same-part",
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        configuration_grouping="same-name",
         label="channel",
     )
-    items = _validate_bom(adapter, table)
+    items = _validate_bom(adapter, table, configuration)
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="channel",
+        expected_rows=1 + len(BOM_COMPONENTS),
+        occurrence_quantities=True,
+    )
     anchors = {
         stem: BalloonAnchor(
             point_mm=BALLOON_POINTS_MM.get(stem), instance=north_instances[stem]
@@ -1911,6 +1951,17 @@ def _place_exploded_sheet(
     _assert_exploded_caption(adapter, table, caption)
 
     def settled() -> None:
+        retained = validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label="channel",
+            expected_rows=1 + len(BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        if retained != bom_snapshot:
+            raise RuntimeError(
+                "channel native BOM membership/quantities changed after placement"
+            )
         assert_balloon_landings(adapter, landings)
         _assert_exploded_caption(adapter, table, caption)
 

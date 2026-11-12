@@ -3992,11 +3992,11 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Threaded MG cutover: all direct adapter calls bind to the pinned SDK,
         # without importing or executing a recipe, SDK implementation or COM.
         SCRIPTS_DIR / "test_mg_threaded_adapter_contract.py",
-        # The amplitude bar's pressed MHA-CH-11 pin: its worst-case press,
-        # running fit and flush-end gap budget, pinned to their sources.
-        SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
-        # The rod fork / peened MHA-CH-10 pin joint's worst-case budget.
-        SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
+        # The pressed MHA-SH-VN-58 pivot pin's two joints (bar cheeks, rod
+        # fork): worst-case press, running fit and dressing-stock budgets,
+        # pinned to their sources.
+        SCRIPTS_DIR / "test_sh_vn_pivot_pin_bar_fit.py",
+        SCRIPTS_DIR / "test_sh_vn_pivot_pin_rod_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-guidelines.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

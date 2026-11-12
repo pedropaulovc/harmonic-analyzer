@@ -1,0 +1,22 @@
+sh-vn-pivot-pin:
+  title: Pivot Pin
+  number: MHA-SH-VN-58
+  stock_name: 18-8 Stainless Steel Dowel Pin, 5/64 in x 5/16 in
+  supplier: McMaster-Carr
+  supplier_skus: [90145A299]
+  material: 18-8 Stainless Steel
+  material_specification: "18-8 stainless dowel pin, 5/64 x 5/16; McMaster-Carr 90145A299"
+  finish: passivated, as supplied
+  # https://www.mcmaster.com/90145A299/ read live 2026-11-11: 5/64 dia
+  # 0/+.0002, 5/16 long (no length band printed), chamfered both ends,
+  # hardness not rated, $10.80 per pack of 5. Installed members, not purchased
+  # pins: each is pressed through its fork or bar and both ends are dressed
+  # flush at assembly (MHA-CH-00's steps).
+  quantity: 40
+  default_configuration: RodPin
+  configuration_quantities:
+    RodPin: 20
+    BarPin: 20
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in
