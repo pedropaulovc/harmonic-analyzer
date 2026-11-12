@@ -453,7 +453,10 @@ NOTE_LINE_PITCH = 0.0045
 # A step is at most six printed lines (drawing-guidelines.md rule 22).
 STEP_MAX_LINES = 6
 STEPS_LEFT_X = 0.018
-STEPS_RIGHT_X = 0.214
+# Point B at the .300 pitch: view D's outline grew to 0.2013 wide at 1:1 (the
+# 6.85 pivot shaft), exactly the 0.2013 between the border and a column at
+# 0.214. At 0.222 the 64-character column ends at 0.399, inside the border.
+STEPS_RIGHT_X = 0.222
 STEPS_TOP_Y = 0.258
 # Columns stop this far above the title block or the bottom border.
 STEPS_FOOT_CLEARANCE = 0.005
@@ -537,11 +540,12 @@ ROCKER_BANK = BankView(
     "VIEW D",
     (1, 1),
     (_PIVOT_X, _PIVOT_Y, STACK_MID_Z),
-    # 188 mm wide at 1:1 (r5 outline 0.0111-0.1995 about x 0.105): centred
-    # between the left border and the steps column, and low enough that the
-    # view and its label sit in the middle of the sheet's left half (round 1
-    # review: no empty field beside a short column).
-    (0.111, 0.165),
+    # 201 mm wide at 1:1 at the .300 pitch (point B outline 0.0106-0.2120
+    # about x 0.111; 188 at 7.0565): centred between the left border and the
+    # steps column, and low enough that the view and its label sit in the
+    # middle of the sheet's left half (round 1 review: no empty field beside a
+    # short column).
+    (0.117, 0.165),
     frozenset(
         {
             "ch-pivot-shaft",
@@ -611,7 +615,9 @@ LEVER_BANK = BankView(
     "VIEW E",
     (1, 1),
     (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z),
-    (0.111, 0.195),
+    # Over view D's centre line, between the border and the steps column;
+    # 3 mm higher than at 7.0565 with view F below it (see KEEPER_PLAN_SOCKET_Y).
+    (0.117, 0.198),
     frozenset(
         {
             "ch-fulcrum-shaft",
@@ -635,10 +641,12 @@ LEVER_BANK = BankView(
 # phantom a face reads as a hidden line through it; the outer face lies
 # under the keeper from the boss on). It carries
 # the three settings (owner rulings X1+B1, X-A). Placed under the lever bank:
-# the socket line 0.120 up. The farm-measured outline (c80bb08be) ran 0.1051
-# below the socket line, so its bottom clears the border by 2.2 mm; the boss
-# now tops it 0.0113 above.
-KEEPER_PLAN_SOCKET_Y = 0.120
+# the socket line 0.123 up. The farm-measured outline (c80bb08be) ran 0.1051
+# below the socket line at 7.0565; at the .300 pitch the rear lug face moved
+# 7.1852 -> 7.4102 (+5.715, 2.86 at 1:2), so at 0.120 its bottom would cross
+# the border by 0.7 mm. At 0.123 it clears it by about 2.3 mm, and view E
+# rises 3 mm with it; the boss tops the outline 0.0113 above.
+KEEPER_PLAN_SOCKET_Y = 0.123
 _PLAN_CENTRE_Y = 0.070
 _TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 KEEPER_PLAN = BankView(
