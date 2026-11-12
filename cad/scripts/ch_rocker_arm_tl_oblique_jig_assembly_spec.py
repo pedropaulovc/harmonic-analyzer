@@ -127,6 +127,8 @@ import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_blank_spec as blank
+import ch_rocker_strap_spec as strap
 import ch_rocker_arm_tl_oblique_holding_spec as holding
 
 holding.require_clearance()
@@ -1499,6 +1501,25 @@ if not (
     and "largest block 4 in" in _GAUGE_SET["note"]
 ):
     raise AssertionError("the shop's gauge-block set moved; recheck the rail-setting stacks")
+# Step 1's rail trim tool (#2446; shop-equipment tools.rail-trim-grinder):
+# no owned saw cuts the hardened HGR15 rail, so each end is cut long with an
+# abrasive cut-off wheel and ground square to its mark. Owner ruling #2144
+# item 13.1 A (2026-11-08) keeps the trimmed ends flush with the bars.
+_RAIL_TRIM_GRINDER = tomllib.loads(
+    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+)["tools"]["rail-trim-grinder"]
+if not (
+    _RAIL_TRIM_GRINDER["kind"] == "angle_grinder"
+    and {"cut-off", "grinding"} <= set(_RAIL_TRIM_GRINDER["wheels"])
+    # Every wheel's rating is required and over the grinder's speed: an
+    # under-rated abrasive wheel bursts.
+    and all(
+        wheel["max_rpm"] >= _RAIL_TRIM_GRINDER["max_rpm"]
+        for wheel in _RAIL_TRIM_GRINDER["wheels"].values()
+    )
+):
+    raise AssertionError("the rail-trim grinder record moved; recheck step 1's trim")
+RAIL_CUT_OFF_ALLOWANCE_IN = ".06"
 # The PM-30MV's X travel (cad/process/shop.toml machines.pm-30mv, the
 # catalogue 23 in) is not a measurement of the installed mill: the travel
 # with the DRO scale fitted can only be smaller, and step 6's origin is the
@@ -1563,8 +1584,10 @@ if LONG_TRAVEL_BAND >= trammel.RUN_OUT:
     raise AssertionError("a pass-limit mark within its band can stop short of the land")
 ALIGNMENT_PLACES = 4
 ALIGNMENT_INDICATOR = ".0001 SPINDLE TEST INDICATOR"
-# The tables print on the last instruction sheet (the drawing asserts it).
+# The tables print on sheet 10, the strap holding sheet (the drawing asserts it).
 SETTING_SHEET_NUMBER = 10
+# The strap blank layout table prints on sheet 11, the strap cutting sheet.
+LAYOUT_SHEET_NUMBER = 11
 ASSEMBLED_CAPTION = (
     "SHOWN: INNER PASS, SHOULDER SCREWS IN A1/B1, AT THE SYMMETRIC POSITION "
     f"(PASS TABLE, SHEET {SETTING_SHEET_NUMBER}). OUTER PASS: A2/B2. MACHINE "
@@ -1582,6 +1605,9 @@ PIVOT_HOLE_KEY = (
 # printed line: sheets 7-10 have no spare line. trammel.rail_point(rail, 0)
 # is the spindle origin, so S runs along the rail's pin line from it.
 STATION_KEY = "S: DISTANCE ALONG ITS RAIL, SPINDLE ORIGIN TO SHOULDER-SCREW AXIS."
+# NEAR and FAR (steps 2A-8S) defined once, before the steps use them
+# (TL-00 machinist review, #2559).
+NEAR_FAR_KEY = "NEAR, FAR: TOWARD, AWAY FROM THE SPINDLE ALONG THE BARS (SHEET 1)."
 
 
 # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
@@ -2028,12 +2054,6 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# The rocker-arm process plan (the held MHA-CH-06 route for the arm and its
-# MHA-CH-13 strap; its 0.3-format plan.toml was retired in the prechips cutover,
-# last at 45952b66bc:cad/process/ch_rocker_arm/plan.toml) owns the blank, its
-# chords, its loose CL/CR holes and the strap hub's drill/ream with its tool
-# envelope; TL-00 cites its operations and repeats none of its numbers.
-PROCESS_PLAN = "MHA-CH-06 PLAN"
 # The in-situ HUB position (owner ruling 3, 2026-11-07): step 10 taps the
 # carrier's HUB there and every strap's hub hole is drilled and reamed at the
 # same DRO setting, so their relative eccentricity is the DRO's repeatability,
@@ -2280,6 +2300,11 @@ if (
 # number. Top-level numbers 1-13 keep their former meaning (MHA-CH-06-TL-21
 # and the carriage screw's sheet cite steps 5 and 10); the former P, F, HD
 # and O series are folded in where they are done.
+# The strap cut's depth (TL-00 machinist review of afe1018: the retired
+# MHA-CH-06 plan carried it): the cutter's end goes past the strap's
+# underside by more than the breakthrough budget and stays well clear of the
+# step 18 groove floor (checked against RISER_GROOVE_DEPTH below).
+STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.10 * trammel.INCH)
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
@@ -2287,15 +2312,24 @@ ASSEMBLY_STEPS = (
     f"1B. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
     "1C. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
     "THE KIT.",
-    f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
-    "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
-    "1E. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
+    f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR'S LENGTH, THE SAME "
+    "AMOUNT OFF EACH END, AS IN STEPS 1E-1F.",
+    f"1E. CUT EACH RAIL END {RAIL_CUT_OFF_ALLOWANCE_IN} LONG WITH AN ANGLE "
+    "GRINDER'S CUT-OFF WHEEL, CARRIAGES OFF AS IN STEP 1C.",
+    "1F. GRIND EACH CUT END SQUARE WITH THE GRINDER'S GRINDING WHEEL UNTIL "
+    "FLUSH WITH ITS BAR'S END.",
+    "1G. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
     f"{RAIL_RECEIPT_REFERENCE} NOTE 1.",
-    "1F. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THAT PLAN: RAIL AND BAR "
-    "MARKED AS A PAIR.",
-    f"1G. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
+    f"1H. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THE {BASE_BAR_NUMBER} "
+    "PROCESS PLAN: RAIL AND BAR MARKED AS A PAIR.",
+    f"1J. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
     "BY HAND WITHOUT MOVING THE RAIL.",
-    "1H. CLEAN ALL CUTTING GRIT FROM THE RAILS AND BARS.",
+    "1K. CLEAN ALL CUTTING AND GRINDING GRIT FROM THE RAILS AND BARS.",
+    "1L. SLIDE EACH RAIL'S KEPT CARRIAGE FROM ITS ARBOR ONTO THAT RAIL, THE "
+    "SAME WAY ROUND AS SUPPLIED.",
+    f"1M. CUT EACH STRAP BLANK SQUARE TO {_length(trammel.BLANK_LENGTH, 2)} LONG.",
+    f"1N. FACE EACH STRAP BLANK TO THE {strap.NUMBER} THICKNESS BEFORE STEP 3C "
+    "SETS THE BARS ON THE TABLE.",
     f"2. LAY BASE BAR 1 {_item(BASE_BAR_1)} AS DRAWN AND BASE BAR 2 "
     f"{_item(BASE_BAR_2)} TURNED OVER, AS SHOWN ON SHEET 1.",
     "2A. FIT RAIL 1 ON BAR 1 AND RAIL 2 ON BAR 2, EACH WITH "
@@ -2318,8 +2352,8 @@ ASSEMBLY_STEPS = (
     "THE SPINDLE: THE MIDDLE T-SLOT EMPTY.",
     f"3D. FIT A FLANGE NUT {_item(FLANGE_NUT)} ON EACH STUD FINGER-TIGHT.",
     f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE AND THE "
-    f"PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S: PIVOT COUNTERBORES TOWARD "
-    "THE SPINDLE, FEED LUG TOWARD THE COLUMN.",
+    f"PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S: PIVOT COUNTERBORES UP, FEED "
+    "LUG TOWARD THE COLUMN.",
     # Owner ruling 2026-11-01 (option A): each carriage screw is cut to its own
     # counterbore (rule 19); the jig's RV-05 accepts the reach it leaves.
     "5. MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO .001.",
@@ -2372,9 +2406,10 @@ ASSEMBLY_STEPS = (
     f"7B. MEASURE THE FEED NUT {_item(FEED_NUT)} TO THE RECEIPT LIMITS ON "
     f"{feed_nut.REWORK_SHEET_REFERENCE}.",
     "7C. IF IT IS OUTSIDE THEM, REJECT THE NUT.",
-    "7D. FACE AND COUNTERSINK THE NUT PER THAT SHEET.",
-    "7E. CHECK ITS FACED LENGTH TO THAT SHEET.",
-    "7F. IF IT IS OUTSIDE THAT LENGTH, REJECT THE NUT.",
+    "7D. FACE THE NUT PER THAT SHEET.",
+    "7E. COUNTERSINK THE NUT PER THAT SHEET.",
+    "7F. CHECK ITS FACED LENGTH TO THAT SHEET.",
+    "7G. IF IT IS OUTSIDE THAT LENGTH, REJECT THE NUT.",
     f"8. OIL THE LEADSCREW {_item(LEADSCREW)} WITH ISO VG 32.",
     "8A. THREAD THE LEADSCREW THROUGH THE PILLOW BLOCKS, THE LUG CLEARANCE AND "
     f"THE FEED NUT, NUT FLANGE TOWARD THE LUG: {_NEAR_STUB} PAST THE NEAR "
@@ -2394,14 +2429,14 @@ ASSEMBLY_STEPS = (
     "8G. WITH THE NUT HELD AT THAT CLOCKING, TURN THE LEADSCREW UNTIL THE NUT "
     "SEATS FLAT ON THE LUG FACE AWAY FROM THE SPINDLE: NEVER SLIDE THE NUT.",
     "8H. CLAMP THE NUT TO THE LUG.",
-    f"8J. SPOT THE {feed_nut.SCREW_COUNT} TAPS THROUGH THE NUT'S HOLES WITH A "
-    f"{_SPOT_DRILL} DRILL.",
-    f"8K. DRILL {_TAP_DRILL} AND TAP {feed_nut.SCREW_THREAD} THRU AT EACH SPOT.",
+    f"8J. DRILL THE {feed_nut.SCREW_COUNT} TAPS {_TAP_DRILL} THRU THROUGH THE NUT'S "
+    f"HOLES, SPOTTED FIRST WITH A {_SPOT_DRILL} DRILL.",
+    f"8K. TAP {feed_nut.SCREW_THREAD} THRU AT EACH HOLE.",
     f"8L. MEASURE THE HEAD OF EACH OF THE {feed_nut.SCREW_COUNT} FLAT HEAD SCREWS "
     f"{_item(RISER_SCREW)} WITH A CALIPER: Ø{_HEAD_LIMIT} MAX.",
     "8M. IF A HEAD IS OVER, USE A SCREW THAT PASSES: NEVER MACHINE THE NUT BODY.",
-    f"8N. TIGHTEN THE {feed_nut.SCREW_COUNT} SCREWS CROSSWISE IN 2 STAGES TO "
-    f"{_NUT_TORQUE} WITH THE LEADSCREW A FEW TURNS INTO THE NUT.",
+    f"8N. REPLACE THE 8H CLAMP WITH THE {feed_nut.SCREW_COUNT} SCREWS, TIGHTENED CROSSWISE IN 2 STAGES TO "
+    f"{_NUT_TORQUE}, LEADSCREW A FEW TURNS INTO THE NUT.",
     "8P. CHECK THAT THE LEADSCREW TURNS WITHOUT BINDING.",
     "8Q. IF IT BINDS, REDO STEP 8N, THE NUT RE-CENTRED ON LOOSE SCREWS.",
     "8R. IF IT STILL BINDS, OPEN THE NUT'S COUNTERSINKS PER "
@@ -2415,7 +2450,7 @@ ASSEMBLY_STEPS = (
     "8V. IF EITHER SLIPS, REDO STEP 8T.",
     "8W. CHECK THE FEED END TO END BY HANDWHEEL: NO BINDING, NO NUT OR LUG "
     "CONTACT WITH A PILLOW BLOCK, NO OTHER MOVING-PART CONTACT.",
-    "8X. IF IT BINDS, REDO STEPS 8B-8R.",
+    "8X. IF IT BINDS, REDO STEPS 8B-8C AND 8N-8R.",
     f"9. REMOVE THE TEMPORARY SHOULDER SCREWS {_item(PIVOT_SCREW)}.",
     f"9A. SET A SPACER {_item(PIVOT_SPACER)} ON EACH BLOCK WITH NO SHIMS.",
     f"9B. LOWER THE CARRIER {_item(CARRIER)} ONTO THE SPACERS WITH A1 AND B1 OVER "
@@ -2450,9 +2485,10 @@ ASSEMBLY_STEPS = (
     "10C. RETURN THE TABLE TO THE ORIGIN AS IN STEP 6F.",
     f"10D. MOVE THE TABLE TO {_HUB_DRO} BY A {_HUB_Y_TEXT} GAUGE STACK IN Y, AS "
     "THE RAIL SETTING TABLE'S TITLE STATES.",
-    "10E. RECORD THIS DRO SETTING FOR STEP 20.",
-    f"10F. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
-    "SETTING, SPOT FIRST, SPINDLE-GUIDED, NO COUNTERBORE.",
+    "10E. RECORD THIS DRO SETTING FOR STEPS 19E AND 20.",
+    "10F. DRILL THE CARRIER'S HUB TAP DRILL THRU AT THIS SETTING, SPOT FIRST, "
+    "SPINDLE-GUIDED, NO COUNTERBORE.",
+    f"10G. TAP THE HUB {carrier.HUB_THREAD} THRU AT THE SAME SETTING, SPINDLE-GUIDED.",
     f"11. STAND THE {QUANTITIES[STOP_PIN]} STOP PINS {_item(STOP_PIN)} CHAMFERED "
     f"END DOWN IN THE STOP HOLES OF THE RISER {_item(RISER)} (DRILLED FIRST TO "
     f"{carrier.RISER_NUMBER}).",
@@ -2524,10 +2560,83 @@ if _GROOVE_MAX >= riser.THICKNESS - riser.THICKNESS_BAND:
     raise AssertionError("the riser groove can cut through to the carrier")
 if _GROOVE_MIN <= holding.TOOL_OVERTRAVEL_BUDGET:
     raise AssertionError("the riser groove leaves no breakthrough room")
+if not holding.TOOL_OVERTRAVEL_BUDGET < STRAP_CUT_OVERTRAVEL[0] < STRAP_CUT_OVERTRAVEL[1] <= _GROOVE_MIN / 2:
+    raise AssertionError("the strap cut misses breakthrough or nears the groove floor")
 _GROOVE = (
     f"{_length(RISER_GROOVE_DEPTH, 3)} DEEP",
     f"{_length(_GROOVE_MIN, 3)}-{_length(_GROOVE_MAX, 3)}",
 )
+
+
+# Strap blank preparation and drilling on the jig (#2443): the retired
+# MHA-CH-06 plan's S0-S3 printed here, so TL-00 cites no unreleased document.
+# The layout marks are blank_spec.LAYOUT_MARKS (inches from the end midpoint
+# and the lower raw edge, on the .XXX grid its proof charges); the saw corridor
+# is blank_spec.SAW_EDGE_TOLERANCE, rounded down to the printed places.
+# The blanks are cut and faced at steps 1M-1N, before the jig fills the table.
+_BLANK_LENGTH = _length(trammel.BLANK_LENGTH, 2)
+
+
+def _layout_rows(name: str, marks: tuple[tuple[float, float], ...]) -> tuple[tuple[str, str, str], ...]:
+    """A chain's marks in X order from 0, one row per mirror pair (the table
+    title says each X is marked at -X and +X): never ``±``, which the
+    sequence keeps for tolerances."""
+    pairs: dict[float, float] = {}
+    for x, y in marks:
+        if pairs.setdefault(abs(x), y) != y:
+            raise AssertionError("a layout chain is no longer symmetric about X 0")
+    return tuple(
+        (name, _length(x, blank.LAYOUT_PLACES) if x else "0", _length(y, blank.LAYOUT_PLACES))
+        for x, y in sorted(pairs.items())
+    )
+
+
+# The strap blank layout table, atop sheet 11's right column
+# (machinist review: a location is a table row, not a sentence).
+BLANK_LAYOUT_TITLE = (
+    "STRAP BLANK LAYOUT (STEPS 19-19C): X FROM X 0 MIDWAY BETWEEN THE SQUARE "
+    "ENDS, Y FROM THE LOWER RAW EDGE; EACH NONZERO X MARKED AT -X AND +X."
+)
+BLANK_LAYOUT_HEADER = ("CHAIN", "X", "Y")
+BLANK_LAYOUT_ROWS = (
+    *_layout_rows("INNER", blank.LAYOUT_MARKS["inner"]),
+    *_layout_rows("OUTER", blank.LAYOUT_MARKS["outer"]),
+)
+# A plain inch step (rule 4) inside the 0.5 mm proof corridor.
+_SAW_CORRIDOR = ".015"
+if not 0.015 * trammel.INCH <= blank.SAW_EDGE_TOLERANCE:
+    raise AssertionError("the printed saw corridor exceeds the blank proof's")
+# The end-clamp pilot runs up through the carrier's #8-32 CL/CR taps from
+# its underside, the carrier lifted off with the blank clamped (step 19G):
+# the riser's #30 drill, at its drilled
+# oversize, passes inside the taps' own tap drill, so it never cuts their
+# thread. The 7/32 opening is blank_spec's.
+_PILOT_DRILL = riser.SCREW_DRILL
+if not (
+    riser.SCREW_DRILL_DIA + riser.DRILLED_BAND[0] < carrier.CLAMP_TAP_DRILL
+    and fasteners.END_CLAMP.thread == carrier.CLAMP_THREAD
+):
+    raise AssertionError("the end-clamp pilot no longer clears the carrier's tap")
+# The 7/32 point breaks through the .098 strap into the riser's #9 CL/CR
+# mouths, opening them to the 7/32 at the riser top: charged on the riser's
+# band walls, which keep the .080 wall.
+_RISER_MOUTH_LOSS = (blank.CLAMP_HOLE_LIMITS[1] - riser.CLAMP_DIA - riser.DRILLED_BAND[0]) / 2.0
+if min(riser.CLAMP_BAND_WALLS) - max(_RISER_MOUTH_LOSS, 0.0) < riser.WALL_TARGET_MM:
+    raise AssertionError("opening the clamp pilots thins the riser's CL/CR walls under .080")
+# The hub hole is drilled in steps to the pre-ream size (#2444): only the
+# last drill cuts at the full radius, so the carrier, supported only at A1
+# and B1, takes a fraction of a full-size drill's thrust. The last drill at
+# its drilled oversize stays under the strap's hub hole and leaves at most
+# .015 on diameter for the reamer (Machinery's Handbook 27th ed. p.833).
+HUB_DRILL_STEPS = ("1/8", "1/4", "25/64")
+_PRE_REAM_DIA = 25.0 / 64.0 * trammel.INCH
+if not (
+    _PRE_REAM_DIA + riser.DRILLED_BAND[0] < holding.PRODUCT_HOLE_LIMITS[0]
+    and holding.PRODUCT_HOLE_LIMITS[1] - _PRE_REAM_DIA <= 0.015 * trammel.INCH
+):
+    raise AssertionError("the 25/64 pre-ream drill no longer suits the strap's hub hole")
+_HUB_DRILLS = ", THEN ".join(HUB_DRILL_STEPS)
+
 OPERATION_STEPS = (
     "15. ISOLATE THE SPINDLE.",
     "15A. WITHDRAW THE CUTTER AND ITS HOLDER.",
@@ -2551,22 +2660,45 @@ OPERATION_STEPS = (
     "17B. REPEAT STEPS 17-17A AFTER ANY TOOL, DEPTH OR SETUP CHANGE.",
     "17C. REDO STEP 6 AFTER ANY CHANGE TO THE TABLE SETUP.",
     f"18. CUT A GROOVE {_GROOVE[0]} FROM THE RISER TOP WITH THE "
-    f"{trammel.RISER_CUTTER_IN} CUTTER OVER BOTH PASSES, MARK TO MARK, BEFORE "
-    "THE FIRST STRAP: WASHER AND CLAMP SCREWS OUT, RISER SCREWS AND STOP PINS IN.",
-    "18A. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP WITH A DEPTH MICROMETER "
+    f"{trammel.RISER_CUTTER_IN} CUTTER OVER THE INNER PASS, "
+    "MARK TO MARK, BEFORE THE FIRST STRAP: WASHER AND CLAMP SCREWS OUT, RISER "
+    "SCREWS AND STOP PINS IN.",
+    "18A. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
+    "18B. CUT THE OUTER PASS'S GROOVE AS IN STEP 18.",
+    "18C. MOVE THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
+    "18D. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP WITH A DEPTH MICROMETER "
     f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
-    f"18B. IF A GROOVE IS SHALLOW, DEEPEN IT TO {_GROOVE[0]} AS IN STEP 18.",
-    "18C. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18 ON A NEW RISER.",
-    f"19. LOAD ONLY A STRAP BLANK FINISHED PER {PROCESS_PLAN} S0-S1 AND S2 "
-    "OP20: FACED, LAID OUT, BANDSAWN, END-CLAMP HOLES DRILLED, NO HUB HOLE.",
-    "19A. SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
-    "STOP PINS, ALONG THE STRAP TO ITS END MARK.",
-    f"19B. TIGHTEN 2 {_STRAP_CLAMPS} DIRECTLY ON THE STRAP INTO THE CARRIER'S "
-    "2 END-CLAMP TAPS.",
+    "18E. IF A GROOVE IS SHALLOW, DEEPEN IT AS IN STEPS 18-18C.",
+    "18F. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18-18C, NEW RISER.",
+    "19. MARK X 0 ON EACH STEP 1N BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 "
+    "ALONG ITS LOWER RAW EDGE.",
+    "19A. MARK THE INNER CHAIN'S POINTS FROM THE STRAP BLANK LAYOUT TABLE (SHEET "
+    f"{LAYOUT_SHEET_NUMBER}), ANY POINT OFF THE BLANK ON THE LAYOUT SURFACE BESIDE IT.",
+    "19B. MARK THE OUTER CHAIN'S POINTS FROM THE SAME TABLE IN THE SAME WAY.",
+    "19C. JOIN EACH CHAIN'S MARKS IN X ORDER WITH STRAIGHT LINES TO BOTH "
+    "SQUARE ENDS, ON THE BLANK ONLY.",
+    "19D. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
+    f"CHAIN, KERF ON THE WASTE SIDE: EACH EDGE WITHIN {_SAW_CORRIDOR} OF ITS LINE.",
+    "19E. WITH THE CARRIER ON A1 AND B1 AT THE SYMMETRIC ROW AS IN STEPS 10 AND "
+    "15-15H, SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
+    "STOP PINS, ITS X 0 MARK UNDER THE SPINDLE AT THE STEP 10E SETTING.",
+    "19F. CLAMP THE BLANK TO THE CARRIER AS IN STEP 11B.",
+    "19G. LIFT THE CARRIER OFF AS IN STEPS 15-15C WITH THE BLANK CLAMPED, "
+    "UNDERSIDE UP ON THE BENCH.",
+    f"19H. DRILL A {_PILOT_DRILL} PILOT THRU THE BLANK THROUGH EACH OF THE "
+    "CARRIER'S 2 END-CLAMP TAPS.",
+    "19J. REFIT THE CARRIER ON A1 AND B1 AS IN STEPS 15E-15H.",
+    f"19K. OPEN EACH PILOT TO {blank.CLAMP_DRILL} FROM ABOVE, SPINDLE-GUIDED, "
+    "THRU THE BLANK INTO THE RISER'S HOLE: NEVER INTO THE CARRIER.",
+    f"19L. REPLACE THE CLAMP WITH 2 {_STRAP_CLAMPS} TIGHTENED DIRECTLY ON THE "
+    "STRAP INTO THE CARRIER'S 2 END-CLAMP TAPS.",
     "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10E.",
-    f"20A. DRILL AND REAM THE STRAP'S HUB HOLE THRU PER {PROCESS_PLAN} S2 "
-    "OP30-OP40, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE "
-    "CARRIER.",
+    f"20A. DRILL THE STRAP'S HUB HOLE THRU {_HUB_DRILLS} WITH A LIGHT HAND "
+    "FEED, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE CARRIER.",
+    f"20B. REAM IT THRU AT THE SAME SETTING TO THE {strap.NUMBER} HUB HOLE, "
+    "INTO THE RISER'S RELIEF.",
+    "20C. RETURN THE TABLE TO THE ORIGIN AS IN STEP 6F: BOTH ORIGIN-STOP "
+    "INDICATORS AT 0.",
     f"21. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
     "HOLE: FLANGE FLAT ON THE STRAP.",
     f"21A. TORQUE THE HUB CLAMP SCREW, A {_STRAP_CLAMPS}, TO "
@@ -2576,12 +2708,16 @@ OPERATION_STEPS = (
     "21C. REPEAT STEPS 17-17A WITH THE WASHER AND 3 CLAMP SCREWS FITTED.",
     "21D. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
     f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
-    "21E. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
+    f"21E. SET THE CUTTER'S END {_length(STRAP_CUT_OVERTRAVEL[0], 2)}-"
+    f"{_length(STRAP_CUT_OVERTRAVEL[1], 2)} BELOW THE SEATED STRAP'S UNDERSIDE, "
+    "GAUGED FROM ITS TOP AND MEASURED THICKNESS, NOT FROM THE "
     "REFERENCE HEIGHTS.",
-    f"21F. CUT THE STRAP PER {PROCESS_PLAN} S3 OP10-OP20 OVER BOTH PASSES WITH "
-    "ALL 3 CLAMP SCREWS IN PLACE.",
+    "21F. CUT THE STRAP'S INNER EDGE OVER THE INNER PASS, ALL 3 CLAMP SCREWS "
+    "IN PLACE.",
     "21G. START EACH CUT AT AN EDGE WITH CLEARANCE BESIDE THE CUTTER, NEVER AS "
     "A FULL-WIDTH SLOT OR A PLUNGE.",
+    "21H. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
+    "21J. CUT THE OUTER EDGE OVER THE OUTER PASS AS IN STEPS 21E-21G.",
 )
 # The fixture's highest point over the strap: the uncut stock stop pins at
 # full length and tilt (holding.TOOLING_TOP_Z_MAX), above every clamp head.
@@ -2594,6 +2730,14 @@ if not TOOLING_TOP_Z_MAX >= _STOP_PIN_TOP_MAX > max(_HUB_HEAD_TOP_MAX, *holding.
     raise AssertionError("the stop pins no longer stand tallest over the strap")
 if holding.CLAMP_TOP_Z["CL"] != holding.CLAMP_TOP_Z["CR"]:
     raise AssertionError("the CL and CR heads no longer stand at one height")
+# The feed-lever screw heads, on the lever at the carrier's -Y edge, stand
+# above the stop pins but off the strap: the note names both so the clearance
+# steps read the true fixture top (TL-00 machinist review, #2559).
+LEVER_HEAD_TOP_Z = LEVER_SCREW_PLACEMENTS[0][0][2] + lever_screw.DIMS.head_h
+if not all(abs(p[0][2] - LEVER_SCREW_PLACEMENTS[0][0][2]) < 1e-9 for p in LEVER_SCREW_PLACEMENTS):
+    raise AssertionError("the feed-lever screw heads no longer stand at one height")
+if not LEVER_HEAD_TOP_Z > TOOLING_TOP_Z_MAX:
+    raise AssertionError("the feed-lever heads no longer stand above the stop pins")
 # The heights from the table top the tooling-clearance and depth steps
 # read as references only.
 REFERENCE_HEIGHTS = (
@@ -2601,8 +2745,9 @@ REFERENCE_HEIGHTS = (
     f"STRAP TOP {_length(PART_TOP_Z, 3)}, SHOULDER-SCREW HEADS "
     f"{_length(PIVOT_HEAD_TOP_Z, 3)}, END-CLAMP HEADS "
     f"{_length(holding.CLAMP_TOP_Z['CL'], 3)}, HUB CLAMP HEAD "
-    f"{_length(holding.CLAMP_TOP_Z['hub'], 3)}. THE STOP PIN TOPS STAND "
-    f"TALLEST: FIXTURE TOP {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX."
+    f"{_length(holding.CLAMP_TOP_Z['hub'], 3)}, FEED-LEVER SCREW HEADS "
+    f"{_length(LEVER_HEAD_TOP_Z, 3)} (FIXTURE TOP). OVER THE STRAP THE STOP PIN "
+    f"TOPS STAND TALLEST: {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX."
 )
 # Sheet 2, under the BOM: what item 8's QTY counts and the fitting stock to
 # buy (owner ruling 2026-10-27), the rail kit's acceptance (#2177; its

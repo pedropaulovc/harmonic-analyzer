@@ -432,6 +432,40 @@ use = "MHA-MS-01 graduations (101 ticks) and numerals 0-10"
 included_angle_deg = 30.0
 tip_width_in = 0.005
 
+# HGR15 rail trim for MHA-CH-06-TL-00 step 1 (#2446). The kit rails are
+# hardened bearing steel; the band saw, hacksaw and the carbide-tipped
+# Evolution miter saw do not cut them, so the shop adds an abrasive cut-off.
+# Owner ruling #2144 item 13.1 A (2026-11-08) keeps the rail ends flush with
+# the base bars: each end is cut long with the cut-off wheel and ground square
+# to its mark with the grinding wheel. Prices read live 2026-11-11, $43.97 for
+# all three before tax. The grinder's Type 27 guard takes both Type 27 wheels;
+# their 13,580 rpm rating is over the grinder's 11,000 rpm.
+[tools.rail-trim-grinder]
+name = "BAUER 7 A, 4-1/2 in slide-switch angle grinder, Type 27 guard, 5/8-11 spindle with 7/8 in adapter"
+kind = "angle_grinder"
+make = "BAUER (Harbor Freight)"
+sku = "64856"
+source = "https://www.harborfreight.com/7-amp-4-12-in-slide-switch-angle-grinder-64856.html"
+purchase = "Harbor Freight 64856, $29.99 (listing read live 2026-11-11)"
+present = false
+status = "not owned: to buy"
+use = "MHA-CH-06-TL-00 steps 1E-1F: cut each HGR15 rail end long, then grind it square to its mark"
+max_rpm = 11000
+
+[tools.rail-trim-grinder.wheels.cut-off]
+name = "4-1/2 x 1/16 x 7/8 in Type 27/42 metal cut-off wheel"
+sku = "71007"
+source = "https://www.harborfreight.com/4-12-in-x-116-in-x-78-in-type-2742-metal-cut-off-wheels-10-pack-71007.html"
+purchase = "Harbor Freight 71007, BAUER 10-pack, $8.99 (listing read live 2026-11-11)"
+max_rpm = 13580
+
+[tools.rail-trim-grinder.wheels.grinding]
+name = "4-1/2 x 1/4 x 7/8 in Type 27 metal grinding wheel"
+sku = "57245"
+source = "https://www.harborfreight.com/4-12-in-x-14-in-x-78-in-type-27-metal-grinding-wheel-57245.html"
+purchase = "Harbor Freight 57245, HERCULES, $4.99 (listing read live 2026-11-11)"
+max_rpm = 13580
+
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed

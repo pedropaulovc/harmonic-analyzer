@@ -412,7 +412,7 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
     assert printed['CarriageCounterbores3Dia'] == {
         'prefix': '4X <HOLE-SPOT><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
     assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
-    assert printed['BoreDia']['suffix'] == ' REAM <HOLE-DEPTH> (.359)'
+    assert printed['BoreDia']['suffix'] == ' BORE <HOLE-DEPTH> (.359)'
     assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)
     assert printed['TapDrillDia'] == {'suffix': ' DRILL THRU', 'above': '', 'below': '5/16-18 UNC THRU'}
     assert printed['CarriageDrills1Dia']['prefix'] == '4X <MOD-DIAM>'
@@ -466,9 +466,9 @@ def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
 
 
 _PIVOT_GENERATED_TEXT = (
-    'REAM <MOD-DIAM>.3750 +.0015/+.0010 <HOLE-DEPTH>.359\n'
+    '<MOD-DIAM>.3750 +.0015/+.0005 BORE <HOLE-DEPTH>.359\n'
     '  LOCATING FIT, TL-VN-77 SHOULDER\n'
-    'DRILL <MOD-DIAM>.257 THRU\n'
+    '<MOD-DIAM>.257 DRILL THRU\n'
     '5/16-18 UNC TAP THRU BELOW SEAT'
 )
 
@@ -494,7 +494,7 @@ def test_compact_pivot_text_is_four_spec_generated_rows_at_normal_height():
 
 @pytest.mark.parametrize('change,printed', (
     ('BoreDia', '<MOD-DIAM>.5000'), ('TopBoreDepth', '<HOLE-DEPTH>.400'),
-    ('TapDrillDia', '<MOD-DIAM>.250'), ('band', '+.0020/+.0010'),
+    ('TapDrillDia', '<MOD-DIAM>.250'), ('band', '+.0030/+.0020'),
     ('precision', '<MOD-DIAM>.375'), ('thread', '3/8-16 UNC TAP'),
 ))
 def test_generated_pivot_text_tracks_spec_values_bands_places_and_thread(change, printed):
@@ -505,7 +505,7 @@ def test_generated_pivot_text_tracks_spec_values_bands_places_and_thread(change,
     if change in ('BoreDia', 'TopBoreDepth', 'TapDrillDia'):
         contract.DRAWING_VALUES[change] = {'BoreDia': .5, 'TopBoreDepth': .4, 'TapDrillDia': .25}[change] * MM_PER_INCH
     elif change == 'band':
-        contract.BORE_BAND = (.002 * MM_PER_INCH, .001 * MM_PER_INCH)
+        contract.BORE_BAND = (.003 * MM_PER_INCH, .002 * MM_PER_INCH)
     elif change == 'precision':
         contract.DRAWING_PRECISION_BY_NAME['BoreDia'] = 3
     else:
@@ -756,17 +756,17 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
     elif fault == 'duplicate_captions':
-        case.note.text = case.note.text.replace('REAM', 'REAM REAM')
+        case.note.text = case.note.text.replace('BORE', 'BORE BORE')
     elif fault == 'drill_value':
         case.note.text = case.note.text.replace('.257', '.258')
     elif fault == 'depth_value':
         case.note.text = case.note.text.replace('.359', '.360')
     elif fault == 'missing_band':
-        case.note.text = case.note.text.replace('+.0015/+.0010', '')
+        case.note.text = case.note.text.replace('+.0015/+.0005', '')
     elif fault == 'rounded_band':
         case.note.text = case.note.text.replace('.0015', '.002')
     elif fault == 'negative_band':
-        case.note.text = case.note.text.replace('+.0010', '-.0010')
+        case.note.text = case.note.text.replace('+.0005', '-.0005')
     elif fault == 'printed_places':
         case.note.text = case.note.text.replace('.3750', '.375')
     elif fault == 'missing_diameter':
@@ -962,8 +962,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     if fault == 'split_symbols':
         first = spans.pop(0)
         spans[:0] = [
-            replace(first, text='REAM', xmax=.199),
-            replace(first, text='.3750+.0015/+.0010', xmin=.202, xmax=.248),
+            replace(first, text='.3750+.0015/+.0005BORE', xmin=.193, xmax=.248),
             replace(first, text='.359', xmin=.251, xmax=.263),
         ]
     elif fault == 'unordered_display':
