@@ -246,6 +246,12 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    # #2467: printed on Sec1KeyseatWidth through the builder's keyseat loop
+    # (its `band` row variable resolves to SECTION_DIA_BANDS above).
+    ("build_dt_cone_gear_shaft", "KEYSEAT_WIDTH_PRINT_BAND"): (
+        "the keyseat's printed width band, cone_land_key's with .0010 under "
+        "for a stock end mill; fed to set_dimension_bilateral_tolerance by the loop"
+    ),
     ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
         "assumed shoulder-length envelope (the page states none), indexed for "
         "the jig's PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
