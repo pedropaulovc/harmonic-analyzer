@@ -1135,7 +1135,7 @@ PEDESTAL_RECHECK_ROWS = (
         _step_ref("cylinder-stack-accepted", "Z"),
         "", "", "",
         FRONT_STRAP_Y_WINDOW,
-        "IT SLID: TAP IT BACK IN Y TO ITS INDICATOR ZERO",
+        "OFF ITS Y ZERO: TAP IT BACK IN Y TO THE INDICATOR ZERO",
     ),
     # Both X ends' parts in print: the remaining one-end causes are the
     # cone-line seats on the swing platform (DtFeel2365, check 4's author;
@@ -1942,17 +1942,20 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # lesser of the two.  The transfer pose is check 4's feel set (4M-4N:
         # in to the first bind, eased out until the gears turn freely), so
         # the permanent pivot is punched where check 4 will set the swing.
-        # With no pivot yet the plate is free in the base plane, so the gears
-        # bind at both ends (fixing its yaw and offset) with each cone gear
-        # centred on its MHA-DT-12 (fixing its slide along the axis).
+        # With no pivot yet the plate is free in the base plane: gears 0 and
+        # 19 sitting fully on their cone gears' faces fixes its slide along
+        # the axis (the 7.4528 cone face leaves (7.4528 - 2.9972) / 2 =
+        # 2.2278 each side of the MHA-DT-12 toothed face, checked by eye),
+        # and the bind at both ends fixes its yaw and offset.
         # Delegated ruling 2026-11-12 (Repitch1038, #2144); precedent: the
         # owner's by-feel direction of 2026-11-11 (#2365).  #1038 re-pitch,
         # on machinist review of point A ("WHERE NO GEAR BINDS" gave no pose
         # and no check).
         (
             "other-base-mounting",
-            "CONE SET ON THE BASE: CENTRE THE CONE GEARS ON THEIR MHA-DT-12.\n"
-            "SWING MHA-DT-20 IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
+            "CONE SET ON THE BASE: SLIDE MHA-DT-20 UNTIL GEARS 0 AND 19 SIT FULLY ON THEIR "
+            "CONE GEARS' FACES (LOOK FROM ABOVE).\n"
+            "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
             f"EASE IT OUT SQUARE UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
             "CRANK TURNS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
