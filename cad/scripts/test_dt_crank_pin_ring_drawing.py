@@ -194,6 +194,20 @@ def test_views_are_in_projection_and_clear_of_the_title_block() -> None:
     assert wire_x < drawing.FRONT_CENTER[0] - drawing.HALF_OD
 
 
+def test_joint_note_is_flagged_at_the_butt_joint() -> None:
+    # Rule 7: note 1 governs the butt joint, so a SEE NOTE flag on a leader
+    # lands at the gap (bottom of the top view), from outside the ring.
+    assert notes.DRAWING_NOTES.startswith(f"{drawing.JOINT_NOTE_NUMBER}. BUTT JOINT")
+    assert drawing.JOINT_FLAG == f"SEE NOTE {drawing.JOINT_NOTE_NUMBER}"
+    tip_x, tip_y = drawing.JOINT_TIP
+    assert abs(tip_x - drawing.TOP_CENTER[0]) <= spec.BUTT_GAP * drawing._S
+    assert tip_y == pytest.approx(drawing.TOP_CENTER[1] - drawing.HALF_OD)
+    flag_x, flag_y = drawing.JOINT_FLAG_XY
+    assert math.dist((flag_x, flag_y), drawing.TOP_CENTER) > drawing.HALF_OD
+    assert flag_y < tip_y and flag_y > drawing.FRONT_CENTER[1] + 0.020
+    assert "add_leader_note(" in _source() and "view=top" in _source()
+
+
 def test_part_registry_row() -> None:
     config = _config.parts("dt-crank-pin-ring")
     assert config["number"] == "MHA-DT-27"
