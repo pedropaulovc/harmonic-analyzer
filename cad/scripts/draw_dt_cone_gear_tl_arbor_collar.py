@@ -1,0 +1,187 @@
+r"""Create the drawing for MHA-DT-03-TL-04, the keyed arbor's backing collars.
+
+Shop tooling (issue #2465). One sheet per member (the base bar's recipe,
+``draw_ch_rocker_arm_tl_oblique_base_bar``): the end view prints the outside
+diameter (stock) and the drilled bore, the side view the length, and one note
+names the blanks the member backs on MHA-DT-03-TL-03.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+
+import _telemetry
+import dt_cone_gear_tl_arbor_collar_spec as spec
+from _check import check
+from _com import _early_bound
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
+from _paths import CAD_ROOT
+from _purchased_variant_drawing import configure_reference_views
+from _session import run_build
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
+SPEC = DRAWINGS_BY_NAME["dt_cone_gear_tl_arbor_collar"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+MEMBER_SHEETS = dict(zip(spec.SHEET_NAMES, spec.CONFIGURATIONS, strict=True))
+
+# Every sheet at 2:1: the Ø1.75 end view spans 89 mm, the side view stands
+# right of it in line, the isometric under the side view.
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = (2, 1)
+ISO_SCALE = (1, 1)
+END_CENTER = (0.110, 0.165)
+SIDE_CENTER = (0.240, 0.165)
+ISO_CENTER = (0.330, 0.095)
+NOTE_XY = (0.030, 0.060)
+ISO_NOTE_XY = (0.290, 0.065)
+OD_RISE = 0.012
+BORE_RUN = 0.030
+LENGTH_DROP = 0.014
+
+
+def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} view {name!r}")
+
+
+def _draw_member_sheet(adapter: Any, configuration: str) -> None:
+    """One member's sheet on the active sheet."""
+    od = spec.OD_BY_CONFIGURATION[configuration]
+    half = od * VIEW_SCALE[0] / 2000.0
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=VIEW_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (end, side, iso):
+        set_hidden_lines_removed(adapter, view)
+    configure_reference_views(adapter, configuration, [end, side, iso])
+    end_keep = {
+        spec.od_name(configuration): (END_CENTER[0], END_CENTER[1] + half + OD_RISE),
+        spec.bore_name(configuration): (
+            END_CENTER[0] + half + BORE_RUN,
+            END_CENTER[1] + half / 2.0,
+        ),
+    }
+    side_keep = {
+        spec.length_name(configuration): (
+            SIDE_CENTER[0],
+            SIDE_CENTER[1] - half - LENGTH_DROP,
+        ),
+    }
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            end,
+            keep=end_keep,
+            view_label=f"{configuration} end",
+            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            side,
+            keep=side_keep,
+            view_label=f"{configuration} side",
+            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+        ),
+    ]
+    printed = set(end_keep) | set(side_keep)
+    assert_imported_precision(
+        adapter,
+        annotations,
+        {n: p for n, p in spec.DRAWING_PRECISION_BY_NAME.items() if n in printed},
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {
+            spec.od_name(configuration): spec.STOCK_CALLOUT,
+            spec.bore_name(configuration): spec.BORE_CALLOUT,
+        },
+    )
+    _activate_view(adapter, end, label=f"{configuration} end")
+    text = spec.member_note(configuration)
+    if add_note(adapter, text, *NOTE_XY) is None:
+        raise RuntimeError(f"failed to add the {configuration} member note")
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open arbor collar source", await adapter.open_model(str(SOURCE)))
+    required = ("Number", "Material Specification", "Finish", "Quantity")
+    read_required_properties(
+        adapter.currentModel,
+        ("Revision", "Title", *required, "Isometric View Note"),
+        required=required,
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Keyed Cutting Arbor Backing Collar Drawing",
+            1: "Harmonic Analyzer shop tooling drawing",
+            2: "Harmonic Analyzer Project",
+            3: f"keyed arbor backing collars; low-carbon steel; {spec.PART_NUMBER}",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    create_blank_drawing_sheets(adapter, spec.SHEET_NAMES, label="arbor collar members")
+    for sheet_name, configuration in MEMBER_SHEETS.items():
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"cannot activate the collar sheet {sheet_name!r}")
+        _draw_member_sheet(adapter, configuration)
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Keyed Cutting Arbor Backing Collar Drawing",
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        expected_sheet_names=spec.SHEET_NAMES,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

@@ -1,0 +1,16 @@
+dt-cone-gear-tl-keyed-arbor:
+  title: Keyed Cone Gear Cutting Arbor
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2465: carries the keyed blanks T030..T120 (MHA-DT-03) and the 64T
+  # (MHA-DT-07) on their finished bore and keyway while the teeth are cut, so
+  # the teeth are clocked to the keyway. Between centres for the cones, gripped
+  # on its Ø.62 in the BS-0 3-jaw for the 64T on the tilted head. Never in a
+  # machine assembly or BOM; assembled in MHA-DT-03-TL-05.
+  number: MHA-DT-03-TL-03
+  material: LOW-CARBON STEEL, E.G. 12L14 CF
+  material_specification: low-carbon cold-finished steel round, 5/8 in, ASTM A108 (12L14 or 1018)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "turn between centres from 5/8 in round: centre both ends, turn the seat, pilot and thread relief and the standoff to the shoulder in one setup; single-point or die the 1/4-28 thread; mill the keyseat with a 1/16 end mill; break edges, not the shoulder root"
