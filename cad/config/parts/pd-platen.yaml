@@ -5,7 +5,7 @@ pd-platen:
   finish: machined; chemically blackened (brass black)
   quantity: 1
   tolerance_class: plate_profile
-  process: "machined (brass)"
+  process: "machined (brass): 1/4 in plate thinned to .152 by equal cuts from both faces (about .049 a side), turned over between passes so the skins relieve evenly"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

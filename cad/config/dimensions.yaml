@@ -1615,7 +1615,7 @@ sections:
       - - Plate thickness
         - 3.85 mm
         - '0.152'
-        - 'p.55 top edge-on photo read ~4; thinned to 3.85 (R9-68) with the back face held on the bar front, opening the disc-to-platen air 0.15; four Ø7 × 1.70 clip-screw bosses on the back face'
+        - 'p.55 top edge-on photo read ~4; thinned to 3.85 (R9-68) with the back face held on the bar front, opening the disc-to-platen air 0.15; flat back face, no clip-screw bosses (#2411)'
         - scaled
         - low
       - - Rack and backer (current model)
@@ -1667,7 +1667,7 @@ sections:
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 92446A077 #2-56 × 1/4 brass slotted pan head `pd-vn-platen-clip-screw` (MHA-PD-VN-65; Ø4.2418 × 1.3462 head, Ø3.937 least (ASME B18.6.3), 6.35 shank; user ruling 2026-10-15 — the 90114A124 fillister's least head left 0.05 bearing land over the clip's largest drilled #2 loose hole, the pan head 0.44; the head lies wholly on the 7.0 screw rail, its hole row 3.3 from the rail's outer edge (owner ruling 2026-10-15, default D adjusted per rule 21)) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 92446A077 #2-56 × 1/4 brass slotted pan head `pd-vn-platen-clip-screw` (MHA-PD-VN-65; Ø4.2418 × 1.3462 head, Ø3.937 least (ASME B18.6.3), 6.35 shank; user ruling 2026-10-15 — the 90114A124 fillister's least head left 0.05 bearing land over the clip's largest drilled #2 loose hole, the pan head 0.44; the head lies wholly on the 7.0 screw rail, its hole row 3.3 from the rail's outer edge (owner ruling 2026-10-15, default D adjusted per rule 21)) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen alone (#2411: no rear bosses; 3.53 full thread at the worst case, 1.62D, with both tap mouths broken .004 MAX; tips 1.69 proud of the back face, 0.74…1.85 at the worst case); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws); McMaster 92446A077 product page and technical drawing read live 2026-10-15; head band Olander 2C25SPMBP (B18.6.3), read 2026-10-15
         - scaled + derived

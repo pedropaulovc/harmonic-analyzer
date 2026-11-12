@@ -1,14 +1,13 @@
 r"""Create the curated machinist drawing for the platen plate (MHA-PD-02).
 
-The platen is a 10.62 x 5.31 brass plate, .152 thick, with four Ø.30 bosses
-standing proud of its back face round the #2-56 clip-screw through taps and
-ten counterbored #4 loose through holes for the guide screws.  The sheet
-prints decimal inch (the part's ``drawing_unit: in``) and runs at 1:2: the
-front view carries the outline, the bosses, one native callout per hole size
-and a tag at every hole; a native hole table right of VIEW B locates all
+The platen is a 10.62 x 5.31 brass plate, .152 thick, with four #2-56
+clip-screw through taps and ten counterbored #4 loose through holes for the
+guide screws.  The sheet prints decimal inch (the part's ``drawing_unit: in``)
+and runs at 1:2: the front view carries the outline, one native callout per
+hole size and a tag at every hole; a native hole table right of VIEW B locates all
 fourteen holes from the plate's lower-left corner and names each group's mate
 (rule 10).  VIEW B, the 1:1 right side its lettered arrow looks at, carries the
-thickness on a native text shelf clear of its witnesses and the boss height,
+thickness on a native text shelf clear of its witnesses,
 a 2:1 partial section A-A through one counterbore the user-accepted
 counterbore floor as a reference dimension with its worst case, and a 1:4
 isometric the form.  The counterbores' far side is named in their callout.
@@ -79,7 +78,7 @@ from _drawing_sections import create_section_view
 from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -103,8 +102,7 @@ from pd_platen_spec import (
     PLATE_THICKNESS,
     PLATE_WIDTH,
     POSITION_PLACES,
-    SOCKET_BOSS_DIA,
-    SOCKET_BOSS_H,
+    SOCKET_MOUTH_BREAK_MAX,
     SOCKET_SPEC,
     SOCKET_XY,
 )
@@ -167,9 +165,8 @@ ISO_NOTE_XY = (ISO_CENTER[0] - 0.032, ISO_CENTER[1] - 0.034)
 # swDetailingSectionViewLineStyleDisplay = StandardWithConnector.
 _SECTION_LINE_STYLE_PREFERENCE = 542
 _SECTION_LINE_WITH_CONNECTOR = 0
-# The cut stays symmetric about the hole: run from 14.7 below to 5.3 above
-# (to stop short of the clip-screw boss seen beyond), the section imported
-# no CboreFloorReference sketch (farm fail8, round 4).
+# The cut stays symmetric about the hole: run from 14.7 below to 5.3 above,
+# the section imported no CboreFloorReference sketch (farm fail8, round 4).
 # The floor reference stands
 # mid-annulus below the hole (pd_platen_spec), so its value hangs below the
 # cut's lower end, where the dimension line runs under the text: the text
@@ -179,8 +176,7 @@ _SECTION_LINE_WITH_CONNECTOR = 0
 # Machinist review v47: the cut's ends printed as solid object lines and read
 # as the plate's own edges (it is 5.31 tall).  A Crop2 fence trims the cut to
 # SECTION_CROP_HALF either side of the hole with no outline
-# (draw_ch_rocker_arm_tl_oblique_carrier's _crop_section), short of the
-# clip-screw boss's fillet root seen beyond (the cut's upper end printed it),
+# (draw_ch_rocker_arm_tl_oblique_carrier's _crop_section),
 # and a thin long-break line with one Z stands on each trimmed end across the
 # thickness, past both faces by _SECTION_BREAK_OVERRUN (inside the fence's
 # margin).  The Z keeps 0.3 clear of the floor's extension line at the
@@ -250,8 +246,8 @@ SECTION_TEXT_MODEL_MM = {
         / _SECTION_S,
     ),
 }
-# The right view's bbox spans the plate and the bosses behind it (model Z).
-_DEPTH_SPAN = PLATE_THICKNESS + SOCKET_BOSS_H
+# The right view's bbox spans the plate (model Z).
+_DEPTH_SPAN = PLATE_THICKNESS
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -283,47 +279,36 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  The hole table locates every hole (HOLE_TABLE_LOCATED), so the
-# front view keeps the overall size and the bosses: the width 8 mm under the
-# plate, clear above the isometric and section A-A; the height right of it,
-# beyond VIEW B's arrow; the upper left boss carries the bosses' Ø up-left
-# over the plate's corner.
-# VIEW B carries the plate's thickness above it and the boss height beside
-# the lower boss (the dimension attaches there, so its extension lines stay on
-# the boss); section A-A the counterbore floor (SECTION_TEXT_MODEL_MM, placed
-# by projection once the cut stands).
+# front view keeps the overall size: the width 8 mm under the plate, clear
+# above the isometric and section A-A; the height right of it, beyond VIEW B's
+# arrow.
+# VIEW B carries the plate's thickness above it; section A-A the counterbore
+# floor (SECTION_TEXT_MODEL_MM, placed by projection once the cut stands).
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], BOTTOM_EDGE_Y - 0.008),
     "Height": (0.272, FRONT_CENTER[1]),
-    "Boss2Dia": (0.035, 0.238),
 }
 RIGHT_KEEP = {
     "Depth": (_right_x(PLATE_THICKNESS / 2.0), 0.251),
-    "BossH": (0.284, _right_y(_SOCKET_LOW_Y)),
 }
 SECTION_KEEP_NAMES = frozenset(SECTION_TEXT_MODEL_MM)
 # The thickness states what its .XXX is spent on (the clearance to the
 # reducer disc, by number: r7 review; rule 26 retired the shop-private
 # "AIR"); the floor is a reference dimension (the user-accepted exception)
-# that also states its printed worst case (pd_platen_spec.CBORE_FLOOR_CALLOUT);
-# the bosses say what they are.
+# that also states its printed worst case (pd_platen_spec.CBORE_FLOOR_CALLOUT).
 DISC_NUMBER = "MHA-PD-06"
 DIMENSION_CALLOUTS_ABOVE = {"Depth": f"SETS CLEARANCE TO {DISC_NUMBER} DISC"}
 DIMENSION_CALLOUTS_BELOW = {
     "CboreFloor": CBORE_FLOOR_CALLOUT,  # pd-platen RV-02
-    "Boss2Dia": "BOSS",
-    "BossH": "TAP BOSS",
 }
 REFERENCE_DIMENSION = "CboreFloor"
-# A custom prefix replaces SolidWorks' own diameter symbol, so the boss's
-# carries it.
-DIMENSION_PREFIXES = {"Boss2Dia": "4X Ø"}
 
 # The mates whose patterns the two hole groups match, by released number.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
 GUIDE_SCREW_NUMBER = _config.parts("sh-vn-brass-fillister-screw")["number"]
 CLIP_NUMBER = _config.parts("pd-platen-clip")["number"]
 # The guide-hole callout rides the top row's first hole, its leader up to
-# text above the plate's left half, right of the upper left boss; the socket
+# text above the plate's left half, right of the upper left socket; the socket
 # callout rides the upper right socket's tap drill, its leader up to text above
 # the plate's right end.  Each is its group's one size callout (rule 10: the
 # hole table carries no SIZE) and names the part whose pattern the table's
@@ -361,7 +346,13 @@ SOCKET_EDGE_XY = (
 )
 SOCKET_CALLOUT_HALF_WIDTH = 0.035
 SOCKET_CALLOUT_XY = (0.226, 0.252)
-SOCKET_CALLOUT_PROCESS = f"PATTERN MATCHES {CLIP_NUMBER}\nTAP"  # pd-platen RV-01
+# Both tap mouths break SOCKET_MOUTH_BREAK_MAX at most, not the title block's
+# .010: the clip screws' rule-18 engagement is the plate less both breaks
+# (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN, #2411).
+_SOCKET_MOUTH_BREAK_TEXT = f"{SOCKET_MOUTH_BREAK_MAX / 25.4:.3f}".lstrip("0")
+SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01
+    f"PATTERN MATCHES {CLIP_NUMBER}\nBREAK EDGES {_SOCKET_MOUTH_BREAK_TEXT} MAX\nTAP"
+)
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view
 # proves exactly one mark per hole.
@@ -439,8 +430,8 @@ _HOLE_TABLE_LOC_COLUMNS = (1, 2)
 # the top row's below-right, except the cut hole's, below-left, off section
 # A-A's arrows (they point right); each socket's toward mid-height, inboard.
 # The tag box's near corner stands on the 45-degree diagonal, _TAG_GAP_M past
-# the hole's rim (a socket's: its Ø.30 boss rim), so it clears the hole and
-# both arms of its centre mark.
+# the hole's rim (a socket's: its thread's major Ø, the cosmetic thread's
+# circle), so it clears the hole and both arms of its centre mark.
 _TAG_GAP_M = 0.001
 _TAG_LANDED_M = 5e-4
 _SECTION_HOLE = (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y)
@@ -452,7 +443,7 @@ def hole_tag_corner(
     """A station's tag box near corner (sheet m) and the quadrant it opens to."""
     x, y = station
     if station in SOCKET_XY:
-        rim = SOCKET_BOSS_DIA / 2.0
+        rim = THREAD_MAJOR_MM[SOCKET_SPEC.size] / 2.0
         sx = 1 if x < PLATE_WIDTH / 2.0 else -1
         sy = 1 if y < PLATE_HEIGHT / 2.0 else -1
     else:
@@ -497,7 +488,7 @@ def _name_counterbore_side(display: Any) -> None:
 # VIEW B (rules 9, 26): the 1:1 right side is not projected at the sheet's
 # 1:2, so it carries a letter and its scale, and a lettered viewing arrow on
 # the front view's right edge looks at it (_oblique_block_drawing._view_arrow).
-# The arrow's tip lands on the edge midway between the right-hand bosses, its
+# The arrow's tip lands on the edge midway between the right-hand sockets, its
 # letter 15 mm out, left of the height's dimension line (x 0.272).  The
 # caption is the sheet's own (the part's "Right View Note" is no longer
 # printed) and stands under the view as the old prose caption did.
@@ -531,24 +522,6 @@ if {DRAWING_PRECISION_BY_NAME[name] for name in HOLE_TABLE_LOCATED} != {
 PRINTED_PRECISION = {
     name: DRAWING_PRECISION_BY_NAME[name] for name in PRINTED_DIMENSIONS
 }
-
-
-def _set_dimension_prefixes(
-    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
-) -> None:
-    """Write a native prefix on named imported dimensions and read it back."""
-    remaining = dict(prefixes)
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        prefix = remaining.pop(dimension_name(adapter, annotation), None)
-        if prefix is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(1, prefix)  # swDimensionTextPrefix
-        if str(display.GetText(1) or "") != prefix:
-            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
-    if remaining:
-        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
 def _place_thickness_text(adapter: Any, annotations: list[Any]) -> Box:
@@ -614,8 +587,8 @@ def _set_whole_cutting_lines(drawing_model: Any) -> None:
 def _front_hole_rims(view: Any) -> dict[tuple[float, float], Any]:
     """Each hole station's visible rim in the front view, by centre and radius.
 
-    A pick at SOCKET_EDGE_XY alone selected the Ø7 boss's rim at 1:2 (r2), so
-    the callout printed the boss as a Ø7.00 x 1.70 "tap".  Every rim is found
+    A coordinate pick alone selected a neighbouring circle at 1:2 (r2: the
+    since-removed boss's rim printed as a "tap"), so every rim is found
     among the view's visible circles instead (*Front: model +X right, +Y up):
     a guide hole's drill circle (its counterbore is on the hidden far side)
     and a socket's tap-drill circle, exactly one per station.
@@ -1261,7 +1234,6 @@ async def build(adapter: Any) -> dict[str, str]:
     section_annotations = _floor_section(adapter, source_model, front)
     annotations = [*front_annotations, *right_annotations, *section_annotations]
     assert_imported_precision(adapter, annotations, PRINTED_PRECISION)
-    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     floor = [
         a
         for a in section_annotations

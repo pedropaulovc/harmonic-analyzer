@@ -101,13 +101,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "sh-column-clamp-back",
         smooth_annulus_limit_mm3(4.1656, 3.454, 8.5124),
     ),
-    # MHA-PD-VN-65 #2-56 clip screws: 6.35 shank - 0.8 clip sheet = 5.55 in the
-    # platen's through tap (3.85 plate + 1.70 rear boss).
+    # MHA-PD-VN-65 #2-56 clip screws: the 6.35 shank passes the 0.8 clip sheet
+    # and the 3.85 platen's through tap, its tip proud of the back (#2411).
     **numbered_pairs(
         "pd-vn-platen-clip-screw",
         range(1, 5),
         "pd-platen",
-        smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 5.55),
+        smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 3.85),
     ),
     # MHA-PD-VN-52 guide screws: seed -1, then the grid -2..-10, alternating
     # between the two guide rails.

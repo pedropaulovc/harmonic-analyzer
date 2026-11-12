@@ -187,13 +187,22 @@ def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> Non
     assert (platen.SOCKET_SPEC.kind, platen.SOCKET_SPEC.size) == ("tapped", "#2-56")
     assert clip.HOLE_DIA == clip.CLEARANCE_MM[("#2", "loose")]
     assert clip_screw.HEAD_DIA < clip.SCREW_RAIL_WIDTH
-    assert clip.CLIP_THICKNESS + platen.SOCKET_THREAD_ENGAGEMENT == pytest.approx(
-        clip_screw.SHANK_LEN
+    # #2411: no rear boss. The stock 1/4 shank passes the sheet and the plate
+    # and its tip stands proud of the back face, its incomplete lead clear of
+    # the plate even for the shortest screw through the thickest stack.
+    assert (
+        clip.CLIP_THICKNESS + platen.PLATE_THICKNESS + clip.CLIP_SCREW_TIP_PROUD
+        == pytest.approx(clip_screw.SHANK_LEN)
     )
-    assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#2-56"]
-    assert platen.SOCKET_BOSS_H == pytest.approx(
-        clip_screw.SHANK_LEN - clip.SHEET_T - platen.PLATE_THICKNESS
+    shortest = clip_screw.SHANK_LEN - 0.03 * 25.4
+    assert clip.CLIP_SCREW_TIP_PROUD_MIN == pytest.approx(
+        shortest - clip.SHEET_T_MAX - platen.PLATE_THICKNESS_MAX
     )
+    assert clip.CLIP_SCREW_TIP_PROUD_MAX == pytest.approx(
+        clip_screw.SHANK_LEN - clip.SHEET_T_MIN - platen.PLATE_THICKNESS_MIN
+    )
+    assert clip.CLIP_SCREW_TIP_PROUD_MIN >= 1.5 * clip_screw.PITCH
+    assert platen.SOCKET_THREAD_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
@@ -329,12 +338,12 @@ def test_outboard_clip_sockets_hold_their_edges_at_the_printed_worst_case() -> N
         assert distance - tap_r >= WALL_TARGET_MM, side
         # The clip's outer edge stays on the plate.
         assert distance - clip_hole_y_max > 0.0, side
-    # The station moves nothing along the screw: the engagement is the plate
-    # and boss, at least 1.5D at the worst case.
-    assert (
-        platen.SOCKET_THREAD_ENGAGEMENT == platen.PLATE_THICKNESS + platen.SOCKET_BOSS_H
+    # The station moves nothing along the screw: the engagement is the
+    # thinnest plate less both tap mouth breaks, at least 1.5D.
+    assert platen.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(
+        platen.PLATE_THICKNESS_MIN - 2.0 * platen.SOCKET_MOUTH_BREAK_MAX
     )
-    assert clip.CLIP_SCREW_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
+    assert platen.SOCKET_THREAD_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
 
 
 def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:
@@ -411,21 +420,22 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
         assembly._assert_lock_station_sweep()
 
 
-def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
+def test_clip_screw_tips_sweep_clear_of_the_bar_and_hanger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The rear clip-screw bosses ride the platen back across its whole feed:
-    # they pass above the bar's top edge and clear every fixed hanger section.
+    # The clip-screw tips stand proud of the platen back (#2411) and ride it
+    # across its whole feed: they pass above the bar's top edge and clear
+    # every fixed hanger section.
     lines: list[str] = []
     monkeypatch.setattr(assembly, "log", lines.append)
     assembly._assert_lock_station_sweep()
     (line,) = lines
-    assert "clip-screw bosses " in line
-    assert "clip-screw bosses on the bar " in line
-    # Negative control: a boss station dropped onto the bar's top edge.
+    assert "clip-screw tips " in line
+    assert "clip-screw tips on the bar " in line
+    # Negative control: a tip station dropped onto the bar's top edge.
     x, _ = assembly.CLIP_SCREW_XY[0]
     monkeypatch.setattr(assembly, "CLIP_SCREW_XY", ((x, assembly.BAR_TOP_Y),))
-    with pytest.raises(AssertionError, match="clip-screw boss"):
+    with pytest.raises(AssertionError, match="clip-screw tip"):
         assembly._assert_lock_station_sweep()
 
 

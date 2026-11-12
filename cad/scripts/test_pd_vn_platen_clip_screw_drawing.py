@@ -75,24 +75,28 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     assert (0.124 * IN - clip.HOLE_DIA_MAX) / 2.0 == pytest.approx(0.0508, abs=1e-4)
     # A bearing circle as small as 90 % of the least head still covers it.
     assert 0.9 * spec.HEAD_DIA_MIN > clip.HOLE_DIA_MAX
-    # Engagement: the shortest screw (B18.6.3: +0/-0.03 in to 1 in long)
-    # through the thickest stock sheet, less a pitch and the tap mouth break.
-    engaged = (
+    # Engagement (#2411): the shortest screw (B18.6.3: +0/-0.03 in to 1 in
+    # long) through the thickest sheet and plate still stands its incomplete
+    # lead out of the platen's back face, so the platen's tap holds the
+    # thinnest plate less both .004 mouth breaks of full thread.
+    proud_min = (
         spec.SHANK_LEN
         - 0.03 * IN
         - clip.SHEET_T_MAX
-        - spec.PITCH
-        - clip.TAP_MOUTH_BREAK
+        - pd_platen_spec.PLATE_THICKNESS_MAX
     )
-    assert clip.CLIP_SCREW_ENGAGEMENT_MIN == pytest.approx(engaged)
-    assert engaged == pytest.approx(4.0168, abs=1e-4)
+    assert clip.CLIP_SCREW_TIP_PROUD_MIN == pytest.approx(proud_min)
+    assert proud_min >= 1.5 * spec.PITCH
+    engaged = pd_platen_spec.PLATE_THICKNESS_MIN - 2.0 * 0.004 * IN
+    assert pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(engaged)
+    assert engaged == pytest.approx(0.139 * IN, abs=1e-4)
     assert engaged >= 1.5 * THREAD_MAJOR_MM[spec.THREAD]
-    # Tip: the nominal screw through the nominal sheet ends flush with the
-    # platen's rear socket-boss face.
-    reach = spec.SHANK_LEN - clip.SHEET_T
-    assert reach == pytest.approx(
-        pd_platen_spec.PLATE_THICKNESS + pd_platen_spec.SOCKET_BOSS_H
-    )
+    # Tip: the nominal screw through the nominal sheet and plate stands
+    # .066 proud of the platen's back face, .073 at most.
+    proud = spec.SHANK_LEN - clip.SHEET_T - pd_platen_spec.PLATE_THICKNESS
+    assert clip.CLIP_SCREW_TIP_PROUD == pytest.approx(proud)
+    assert proud == pytest.approx(0.0664 * IN, abs=1e-4 * IN)
+    assert clip.CLIP_SCREW_TIP_PROUD_MAX == pytest.approx(0.073 * IN)
     # Rail clearance: the largest head stays on the .30 screw rail, nearer
     # its outer edge than the slit, its edge inside the rail's ends.
     assert clip.HEAD_RAIL_MARGIN == pytest.approx(clip.HOLE_Y - spec.HEAD_DIA / 2.0)

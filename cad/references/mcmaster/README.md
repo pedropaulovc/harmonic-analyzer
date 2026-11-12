@@ -585,7 +585,10 @@ Live catalog verification on October 11, 2026:
   bearing circle of 90 % of it); the Ø4.24 head stays 1.18 mm inside the
   6.6 mm screw rail. Length and thread are 90114A124's, so the engagement
   (5.55 mm nominal, 4.02 mm worst case, at least 1.5D) and the flush tip are
-  unchanged. The drawing shows a domed pan crown but sizes no crown, slot or
+  unchanged. Since #2411 the platen has no rear bosses: the plate alone
+  engages 3.53 mm at the worst case (1.62D, both tap mouths broken .004 MAX)
+  and the tip stands 1.69 mm proud of its back face (0.74 to 1.85 mm at the
+  worst case). The drawing shows a domed pan crown but sizes no crown, slot or
   tip, so `diag_build_92446A077.py` builds it on the shared slotted-head laws
   of `diag_mcmaster_fillister.py`, as 91792A108 does [INFERENCE]. It is
   catalogue-only: the SLDPRT download is not harvested, so it has no replica

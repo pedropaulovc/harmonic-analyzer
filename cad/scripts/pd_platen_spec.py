@@ -20,14 +20,8 @@ import math
 
 import _config
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
-from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import (
-    edge_break_chamfer_mm,
-    edge_break_radius_mm,
-    inside_corner_radius_mm,
-    printed_deviations,
-)
+from _printed_tolerance import printed_deviations
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 UNIT = drawing_unit("parts/pd-platen", _config.parts("pd-platen"))
@@ -41,32 +35,16 @@ PLATE_THICKNESS = 3.85  # prints .152
 
 # Clip-screw receivers: the stock 92446A077 brass #2-56 slotted pan head
 # (pd-vn-platen-clip-screw) sits directly on the clip's flat .032 brass sheet
-# (ch22 img03: no raised seat, small heads), and its shank reaches through a
-# #2-56 tap through the plate and a boss standing SOCKET_BOSS_H proud of the
-# back face at each station, so the thread engages >= 1.5D (drawing-guidelines.md rule 18 (thread engagement)) and the
-# screw tip finishes flush with the boss's rear face. These must be through
-# taps: no blind receiver here can accept the exact 1/4-in under-head length
-# without bottoming. The bosses stand above the top guide rail's band, where
-# nothing but the clip-screw tips rides the back.
+# (ch22 img03: no raised seat, small heads), and its shank runs through a
+# #2-56 tap through the plate alone (#2411: no back-face boss, so the back
+# face stays one flat skim). The 1/4-in shank is longer than clip plus plate,
+# so its tip stands proud of the back face, above the top guide rail's band,
+# where nothing else rides the back; build_pd_platen_clip bounds that
+# protrusion and proves the tip's incomplete thread stays outside the plate,
+# so the whole plate less both mouth breaks is full thread (rule 18). These
+# must be through taps: no blind receiver here can accept the exact 1/4-in
+# under-head length without bottoming.
 SOCKET_SPEC = HoleSpec("tapped", "#2-56")
-SOCKET_BOSS_DIA = (
-    7.62  # .30: finished wall round the #2-56 major (rule 17, SOCKET_BOSS_WALL_MIN)
-)
-# 1/4 shank - .032 clip sheet - 3.85 plate: the boss closes the stack so the
-# tip finishes flush (a closure on the kept plate thickness, so it prints
-# .07 rounded). build_pd_platen_clip asserts it against the live screw and sheet.
-SOCKET_BOSS_H = 1.6872
-SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
-# Each boss meets the back face in a root round. Nothing seats on that corner
-# (only the clip-screw tips ride the back there), so the title block's INSIDE
-# CORNERS limit governs it unprinted (machinist review round 2: a tighter
-# printed R.020 MAX only narrowed the cutter choice). The model carries a
-# round inside that limit; the paper-drive assembly's lock-station sweep grows
-# each boss by the limit, not the model's round.
-SOCKET_BOSS_FILLET_R = 0.508  # .020, modelled
-SOCKET_BOSS_ROOT_R_MAX = inside_corner_radius_mm(unit=UNIT)
-if SOCKET_BOSS_FILLET_R > SOCKET_BOSS_ROOT_R_MAX:
-    raise AssertionError("modelled boss root round exceeds the title block's limit")
 # Each socket's distance in from its side edge, on both sides: the clip's
 # hole row (.145 from its outer edge, build_pd_platen_clip) plus .025, so the
 # clip's outer edge stays on the plate at the printed worst case and its
@@ -144,8 +122,6 @@ CBORE_FLOOR_REFERENCE_Y = CBORE_SECTION_HOLE_Y - (GUIDE_HOLE_DIA + CBORE_DIA) / 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"Width", "Height"},
     "Plate": {"Depth"},
-    "SocketBossProfile": {"Boss2Dia"},
-    "SocketBosses": {"BossH"},
     "Sockets": {"Socket1X", "Socket1Y", "Socket2Y", "Socket3X"},
     "GuideHoles": {
         "Guide1X",
@@ -161,10 +137,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Places.  The outline prints .XX: the right-hand sockets locate from the left
 # edge, so the width's band reaches their edge ligament.  The thickness prints
 # .XXX: it is spent by the paper-drive assembly's disc-to-platen air budget
-# (the back face rides the bar, so the thickness sets the front face).  The
-# boss Ø prints .XX (its wall round the tap, SOCKET_BOSS_WALL_MIN), its height
-# .XX (no mate: the flush tip is nominal and the engagement minimum reads the
-# shortest screw, not the boss); its root round is the title block's.
+# (the back face rides the bar, so the thickness sets the front face).  No
+# flatness frame (#2411): the thickness is a feature of size, so its Rule #1
+# envelope (ASME Y14.5, perfect form at the .157 maximum) already holds each
+# face flat within the .010 size band; the two steel guides pull it flat
+# along X besides.
 # Every hole coordinate is spent by the fixed-screw float over the clip's and
 # the guides' patterns (test_pd_platen_refit): all .XXX.  The counterbore
 # floor is a reference dimension.
@@ -172,8 +149,6 @@ POSITION_PLACES = 3
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"Width": 2, "Height": 2},
     "Plate": {"Depth": 3},
-    "SocketBossProfile": {"Boss2Dia": 2},
-    "SocketBosses": {"BossH": 2},
     "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
     "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
     "CboreFloorReference": {"CboreFloor": 3},
@@ -200,6 +175,10 @@ _CBORE_DEPTH_LOWER, _CBORE_DEPTH_UPPER = printed_deviations(
 _THICKNESS_LOWER, _THICKNESS_UPPER = printed_deviations(
     PLATE_THICKNESS, DRAWING_PRECISION_BY_NAME["Depth"], unit=UNIT
 )
+# The printed thickness's limits: the clip screw's tip protrusion
+# (build_pd_platen_clip) and the paper-drive assembly's sweep read them.
+PLATE_THICKNESS_MIN = PLATE_THICKNESS + _THICKNESS_LOWER
+PLATE_THICKNESS_MAX = PLATE_THICKNESS + _THICKNESS_UPPER
 # The shallowest printed counterbore still sinks the stock fillister head.
 HEAD_RECESS_MIN = CBORE_DEPTH + _CBORE_DEPTH_LOWER - FILLISTER_HEAD_H
 if HEAD_RECESS_MIN <= 0.0:
@@ -221,24 +200,19 @@ _FLOOR_MIN_IN = math.floor(CBORE_FLOOR_MIN / 25.4 * 1000.0 + 1e-9) / 1000.0
 CBORE_FLOOR_CALLOUT = (
     f"C'BORE FLOOR\n{f'{_FLOOR_MIN_IN:.3f}'.lstrip('0')} MIN WORST CASE"
 )
-# The smallest printed boss round the #2-56 major, concentric with its tap,
-# finished: the boss rim's edge break and the tap's mouth break both come off
-# it at the boss face (Codjiflo, #2124: Ø.28 held .080 only before them).
-_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
-SOCKET_BOSS_WALL_MIN = (
-    (
-        SOCKET_BOSS_DIA
-        + printed_deviations(
-            SOCKET_BOSS_DIA, DRAWING_PRECISION_BY_NAME["Boss2Dia"], unit=UNIT
-        )[0]
-    )
-    / 2.0
-    - THREAD_MAJOR_MM[SOCKET_SPEC.size] / 2.0
-    - 2.0 * _EDGE_BREAK
-)
-if SOCKET_BOSS_WALL_MIN < WALL_TARGET_MM:
+# Socket thread engagement (rule 18).  The clip screw's tip stands out of the
+# back face with its incomplete lead beyond the plate (build_pd_platen_clip
+# asserts it at the worst case), so the thinnest printed plate less both tap
+# mouths' breaks is all full thread.  The title block's .010 break at both
+# mouths would leave .127, under 1.5D (.129), so the socket callout limits
+# both to SOCKET_MOUTH_BREAK_MAX (MHA-PD-06's BREAK EDGES .004 MAX on its
+# #0-80 taps is the precedent): .139, 1.62D.
+SOCKET_MOUTH_BREAK_MAX = 0.1016  # .004
+SOCKET_THREAD_ENGAGEMENT_MIN = PLATE_THICKNESS_MIN - 2.0 * SOCKET_MOUTH_BREAK_MAX
+if SOCKET_THREAD_ENGAGEMENT_MIN < 1.5 * THREAD_MAJOR_MM[SOCKET_SPEC.size]:
     raise AssertionError(
-        f"socket boss wall {SOCKET_BOSS_WALL_MIN:.3f} under the rule-17 .080 target"
+        f"clip-screw socket engagement {SOCKET_THREAD_ENGAGEMENT_MIN:.3f} < 1.5D "
+        "(drawing-guidelines.md rule 18 (thread engagement))"
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
