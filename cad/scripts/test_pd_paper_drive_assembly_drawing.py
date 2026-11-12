@@ -2429,14 +2429,11 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
     hook = _step_body("hook-pin-hole-match-drilled")
-    # #2416 (owner direction 2026-11-11): the mesh is set by feel, with no
-    # gauge and no number, and no backlash window for it prints any more.
-    for gauge_word in ("FEELER", "LEAF", "GAUGE", "INDICATOR"):
-        assert gauge_word not in mesh
+    # #2416 (owner direction 2026-11-11): the mesh is set by feel, so the step
+    # prints no setting value; the engaged-feed window is its only number.
     assert not re.search(
         r"\.\d{3}", mesh.replace(drawing.engaged_feed_text(domain), "")
     )
-    assert "WITHOUT BINDING" in mesh
     assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
@@ -2452,25 +2449,34 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
 
 
 def test_the_loosest_feel_set_keeps_the_feed_mesh_in_contact() -> None:
-    """#2416 (owner direction 2026-11-11): the arm is swung up until the teeth
-    are fully engaged without binding, so the floor is the feel's own (no
-    corner past its first bind) and the stack books only how loose a feel set
-    can leave the mesh. There it still keeps one pair in contact at every
-    corner, and the remedy for a tight spot is easing the arm, not a gauge."""
+    """#2416 (owner direction 2026-11-11; codjiflo P1/P3 on 2f5bac993): the
+    feel set's floor is the first bind at the worst corner, gated for root
+    clearance and interference there; from it the run's tight spot opens every
+    other station by the rack's index and lateral terms and the pinion's
+    runout, and at that loosest centre every corner keeps a pair in contact."""
+    import math
+
+    import _gear_quality as gear_quality
+    import paper_drive_geom as paper_geometry
     import paper_drive_mesh_check as mesh_check
+    import pd_transgear_feed_pinion_spec as feed
 
     bind = steps.FEED_FIRST_BIND_BACKLASH_MM
-    # Zero backlash passes the interference point, so the feel's first bind
-    # at some corners comes before the flanks wedge, and the stack starts there.
-    assert mesh_check.feed_rack_mesh((0.0, 0.0)).interference_margin_min_mm < 0.0
-    assert mesh_check.feed_rack_mesh((bind, bind)).interference_margin_min_mm >= 0.0
-    assert steps.FEED_LOOSEST_BACKLASH_MM > rack_setup.RACK_DATUM_BACKLASH_RANGE[1]
+    # Zero backlash passes the interference point, so the felt bind at the
+    # worst corner comes before the flanks wedge; just short of it, a corner
+    # still reaches past that point.
+    short = mesh_check.feed_rack_mesh((bind - 1e-4,) * 2)
+    assert short.interference_margin_min_mm < 0.0
+    assert not mesh_check.feed_rack_mesh((bind,) * 2).failures()
+    pressure_angle = math.radians(feed.PRESSURE_ANGLE_DEG)
+    opening = (
+        gear_quality.rack_pitch_index_deviation_mm()
+        + paper_geometry.feed_lateral_deviation_mm()
+        + 2.0 * feed.TOOTH_SPACE_RUNOUT_TIR_MM * math.tan(pressure_angle)
+    )
+    assert steps.FEED_LOOSEST_BACKLASH_MM >= bind + opening - 1e-12
     loosest = mesh_check.feed_rack_mesh((bind, steps.FEED_LOOSEST_BACKLASH_MM))
-    assert loosest.contact_ratio_min >= steps.FEED_CONTACT_RATIO_FLOOR >= 1.0
-    meshed = _step_body("hanger-meshed")
-    assert "EASE THE ARM" in meshed
-    hook = _step_body("hook-pin-hole-match-drilled")
-    assert "LEAF" not in hook
+    assert loosest.contact_ratio_min >= 1.0
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:

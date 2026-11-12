@@ -217,19 +217,17 @@ RACK_CREST_TOL = 0.0508  # .002
 # must not bind, must not come loose and must feed at constant speed;
 # backlash is not a function). As on the original, the arm is swung up until
 # the teeth are fully engaged without binding and latched there; a tight spot
-# is cleared by easing the arm off and re-locking it. No feeler, gauge or
-# stop is used.
-# What the feel set guarantees is the floor: the arm locks short of the first
-# bind, the flanks wedging at zero tooth-centred backlash or, at the corners
-# where it comes first, a rack crest on the pinion's flank below its base
-# circle (the interference point). It does not fix how loose the mesh runs.
-# The loosest feel set books, from the later of those two binds: the run's
-# tight spot, where the set is felt, against its loosest station (the rack's
-# relative index error and the feed's lateral terms, along the rack), the
-# pinion's toothspace runout over a turn, and the felt ease, both radial.
-# The ease is the same allowance the cone set books for a felt set
-# (cone_set_stack.FEEL_EASE_MM, #2365).
-FEED_FEEL_EASE_MM = 0.04
+# is cleared by easing the arm off at it. No feeler, gauge or stop is used.
+# What the feel set guarantees is the floor: the arm sits at the first bind,
+# the flanks wedging at zero tooth-centred backlash or, at the corners where it
+# comes first, a rack crest on the pinion's flank below its base circle (the
+# interference point). The run's tight spot sets it, so every other station
+# runs looser by at most the rack's relative index error and the feed's
+# lateral terms (along the rack) and the pinion's toothspace runout over a
+# turn (radial). The loosest feel set books those from the later of the two
+# binds. Easing past the bind is not booked: the no-skip check that follows
+# the ease is what catches an over-eased arm (draw_pd_paper_drive_assembly,
+# "hanger-meshed"), and it sends the fitter to the parts.
 
 
 def _feed_first_bind_backlash_mm() -> float:
@@ -251,18 +249,23 @@ def _feed_first_bind_backlash_mm() -> float:
 
 
 FEED_FIRST_BIND_BACKLASH_MM = _feed_first_bind_backlash_mm()
+# At the bind every printed corner keeps the rack's root clearance, positive
+# backlash and its crests clear of the interference point.
+mesh_check.feed_rack_mesh((FEED_FIRST_BIND_BACKLASH_MM,) * 2).require()
 FEED_LOOSEST_BACKLASH_MM = (
     FEED_FIRST_BIND_BACKLASH_MM
     + gear_quality.rack_pitch_index_deviation_mm()
     + paper_geometry.feed_lateral_deviation_mm()
     + 2.0
-    * (feed_pinion.TOOTH_SPACE_RUNOUT_TIR_MM + FEED_FEEL_EASE_MM)
+    * feed_pinion.TOOTH_SPACE_RUNOUT_TIR_MM
     * math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
 )
-# Against coming loose and for a steady feed: a contact ratio of at least 1.0
-# at the loosest feel set, at every printed corner, keeps one tooth pair in
-# conjugate contact at every handover, the floor the cone set gates at its
-# loosest (#2365).
+# Against coming loose and for a feed at constant speed: a contact ratio of at
+# least 1.0 at the loosest feel set, at every printed corner, keeps one tooth
+# pair in conjugate contact through every handover. Delegated ruling (Main,
+# 2026-11-11, under the owner direction on #2416; no precedent at a loose
+# extreme): it replaces the 1.1 the removed .003 leaf fallback held under
+# option C, which only a gauged set could hold.
 FEED_CONTACT_RATIO_FLOOR = 1.0
 FEED_LOOSEST_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_LOOSEST_BACKLASH_MM)
