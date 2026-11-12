@@ -564,10 +564,8 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     rectangle from the relief's diameter out past the shaft flank, on the
     sketch's -x side (the sheet's upper flank).  The axis starts at the head
     rear face, the sheet's station datum, so both relief shoulders are
-    printed from it like every other station (#1038 ruling): the front one
-    on the construction witness below the shaft, the back one on the relief
-    floor above it (below, its extension would cross the bond-zone callout),
-    and the diameter follows.
+    printed from it like every other station (#1038 ruling), on the
+    construction witness below the shaft, and the diameter follows.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -646,7 +644,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
         f"{feature_name} back shoulder station",
         await adapter.add_sketch_dimension(
             f"{axis}.start",
-            f"{inner}.end",
+            f"{witness}.end",
             "vertical_distance",
             BOND_RELIEF_BACK_FROM_HEAD_REAR,
         ),

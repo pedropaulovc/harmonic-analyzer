@@ -323,19 +323,22 @@ def _diameter_block_size(callout: str) -> tuple[float, float]:
 # measuring point.
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
 FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
-# The bond-zone diameter stands over the part's witness and hangs its text
-# right of its line BELOW the shaft, in the open run between the back land's
-# head end and the front land's.  Above the shaft (r1 of #1685) the callout
-# no longer fit under detail A.  Its arrows sit inside the flanks
-# (ARROWS_INSIDE): an outside tail would rise into the back Ra symbol over
-# the shaft.  Two callout rows now (r3 had three): one pitch up keeps the
-# block's top, so its witnesses stay short.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
-# The block's widest row starts at its line: on the r2 sheet of #2360
+# The bond-zone diameter (#1038 ruling: its witness now on the front bond
+# land, BOND_ZONE_DIA_FROM_HEAD_REAR) hangs ABOVE the shaft, its line 1 mm
+# crown side of its measuring point so its text hangs LEFT of the line, as
+# the front journal's does: in the open run between detail A's label and the
+# front land's length witnesses, 5 mm over the shaft and well under the
+# collar pin hole's callout.  Below the shaft (r1 of #1685 to r3 of #1038) it
+# sat over the back bond land, where the relief's back-shoulder station must
+# now drop.  Its arrows sit inside the flanks (ARROWS_INSIDE): an outside
+# tail would drop into the front journal's diameter block under the shaft.
+BOND_ZONE_LINE_X = _sheet_x(BOND_ZONE_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
+BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1893)
+# The block's widest row ends at its line: on the r2 sheet of #2360
 # (755e192b) "BONDED FIT IN MHA-DT-01," ran 59.3 mm, 2.47 mm a character, so
-# the 20-character "BONDED IN MHA-DT-01," ends ~49.4 mm right of the line.
+# the 20-character "BONDED IN MHA-DT-01," starts ~49.4 mm left of the line.
 BOND_ZONE_CHAR_ADVANCE = 0.00247
-BOND_ZONE_BLOCK_RIGHT_X = BOND_ZONE_TEXT_XY[0] + BOND_ZONE_CHAR_ADVANCE * max(
+BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - BOND_ZONE_CHAR_ADVANCE * max(
     map(len, BOND_ZONE_CALLOUT.split("\n"))
 )
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
@@ -452,18 +455,16 @@ ARROWS_INSIDE = (
 # position runs at ~0.1185, 6 mm over the 8.25's, its text left of the Ra
 # in the open run under the front land's diameter block.  Its back
 # shoulder's station (#1038 ruling: the 2.60 length chained off the 4.20,
-# machinist review of 057ffb6) stands ABOVE the shaft: below, its extension
-# would drop through the bond-zone block.  Its line runs ~5.7 mm over the
-# shaft (a 1.2 mm run would read as the outline) and its text stands
-# between detail A's label (bottom ~0.1844, right ~0.1776) and the front
-# land's length witnesses (x 0.2427).  Its plain .XX diameter hangs below
-# the shaft, over the station row, measured from the axis to the station
-# witness's shoulder point, its line in the run between the bond-zone block
-# and that shoulder witness.  SolidWorks has set its text 14.3 mm right of
-# the line (r2, 755e192b) and spread over 25.3 mm about it (r5, b6a90da7:
-# x-13.1..+12.2 mm); the line stands where either extent clears both
-# neighbours.
-RELIEF_BACK_STATION_TEXT_XY = (0.215, 0.1825)
+# machinist review of 057ffb6) runs in the next row down, where the 8.25
+# stood: above the shaft the collar pin hole's leader crossed it (review of
+# 7c26893, rule 14), so the bond-zone callout moved above instead.  Its
+# plain .XX diameter hangs below the shaft, over the station row, measured
+# from the axis to the station witness's shoulder point, its line in the run
+# between the back shoulder's witness and the front one's.  SolidWorks has
+# set its text 14.3 mm right of the line (r2, 755e192b) and spread over 25.3
+# mm about it (r5, b6a90da7: x-13.1..+12.2 mm); the line stands where either
+# extent clears both neighbours.
+RELIEF_BACK_STATION_TEXT_XY = (0.160, 0.115)
 RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
@@ -473,9 +474,9 @@ RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # #1038 ruling: the back land's crown-side end, its own station from the
-    # head rear face, in a row under the 8.25 (its line ~0.106, 9 mm over the
-    # 9.35 text), its text clear of every witness that drops below the shaft.
-    "BackJournalEndFromHeadRear": (0.125, 0.1087),
+    # head rear face, in the row under the 8.25 (its line ~0.0996, 2.8 mm
+    # over the 9.35 text), its text clear of every witness below the shaft.
+    "BackJournalEndFromHeadRear": (0.125, 0.1024),
     # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
@@ -489,7 +490,7 @@ PRINCIPAL_KEEP = {
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
     # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.
     "FrontJournalFromHeadRear": (0.283, 0.140),
-    "BackJournalFromHeadRear": (0.160, 0.115),
+    "BackJournalFromHeadRear": (0.160, 0.1087),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),

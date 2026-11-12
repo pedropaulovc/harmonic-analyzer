@@ -440,33 +440,37 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
-def test_bond_zone_callout_hangs_below_the_shaft_clear_of_its_neighbours() -> None:
+def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> None:
     """At 63468ee9 the BOND ZONE shelf ended 1 mm short of the front JOURNAL
     shelf below the shaft, so a novice could read -0.01/-0.10 as the
-    journal's (Main, Fable).  Machinist review r1 of #1685: its callout now
-    names every Ø8 span but the lands and the drum, too tall for the gap
-    above the shaft, so it hangs below between the back land and the drum
-    station's text, well short of the front JOURNAL block."""
-    width, height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
+    journal's (Main, Fable).  #1038 ruling: below the shaft the relief's
+    back-shoulder station must drop through where the callout hung, so its
+    witness moves to the front bond land and the callout hangs above, left of
+    its line, between detail A's label and the front land's length witnesses
+    and under the collar pin hole's callout."""
+    _width, height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    assert x == pytest.approx(drawing.BOND_ZONE_LINE_X)
     centre = y - 0.0005
-    left, right, bottom, top = x, x + width, centre - height / 2.0, centre + height / 2.0
-    shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
-    # Short witnesses: the block ends a few mm under the silhouette.
-    assert 0.003 <= shaft_bottom - top <= 0.008
-    # Right of the back land's head-end witness, clear of it.
-    assert left - drawing._sheet_x(spec.BACK_JOURNAL_Z) >= 0.010
-    # 10 mm short of the front JOURNAL block.
-    journal_width, _ = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
-    front_x = drawing.PRINCIPAL_KEEP["FrontJournalDia"][0]
-    assert front_x - journal_width - right >= 0.008
-    assert bottom >= 0.125
-    # Its arrows sit between the flanks: an outside tail would rise into the
-    # back Ra symbol over the shaft.
+    bottom, top = centre - height / 2.0, centre + height / 2.0
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    # Short witnesses: the block starts a few mm over the silhouette.
+    assert 0.003 <= bottom - shaft_top <= 0.008
+    # The text hangs left of its line: the line stands crown side of the
+    # measuring point, as the front journal's does.
+    assert x < drawing._sheet_x(spec.BOND_ZONE_DIA_Z)
+    label_text_right = (
+        drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH - 0.0049
+    )
+    assert drawing.BOND_ZONE_BLOCK_LEFT_X - label_text_right >= 0.003
+    front_land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
+    assert front_land_crown_end - (x + drawing.JOURNAL_DIA_TEXT_OVERHANG) >= 0.005
+    # Under the collar pin hole's two-row callout (underline ~3 mm under its
+    # text position).
+    assert drawing.PRINCIPAL_KEEP["PinHoleDia"][1] - 0.006 - top >= 0.004
+    # Its arrows sit between the flanks: an outside tail would drop into the
+    # front journal's diameter block under the shaft.
     assert "BondZoneDia" in drawing.ARROWS_INSIDE
-    ra_x = drawing.BACK_RA_XY[0]
-    ra_left, ra_right, _top = drawing.RA_SYMBOL_EXTENT
-    assert ra_x + ra_left - 0.008 < x < ra_x + ra_right
 
 
 def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
@@ -503,10 +507,10 @@ def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
 def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     """The relief's front station runs in the station rows below the shaft,
     between the 1.82 and 8.25 rows and under the front Ra symbol; its back
-    station stands above the shaft (below, its witness would cross the
-    bond-zone block), its text between detail A's label and the front land's
-    length witnesses; its diameter hangs below, clear of both diameter blocks
-    and of the station's shoulder witness."""
+    station (#1038 ruling) runs in the next row down, where nothing hangs
+    under the shaft across its witness now that the bond-zone callout stands
+    above; its diameter hangs below, clear of the front journal's block and of
+    both shoulder witnesses."""
     x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
     front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
     back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
@@ -514,31 +518,28 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     ra_x, ra_y = drawing.FRONT_RA_XY
     assert y < ra_y
     assert drawing.RELIEF_FRONT_X + 0.010 < x < ra_x + drawing.RA_SYMBOL_EXTENT[0] - 0.020
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     back_x, back_y = drawing.PRINCIPAL_KEEP["BondReliefBackFromHeadRear"]
-    # Its line (~2.8 mm under the text) runs clear of the outline.
-    assert back_y - 0.0028 >= shaft_top + 0.004
-    label_right = drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH
-    front_land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
-    assert label_right + 0.020 <= back_x <= front_land_crown_end - 0.020
-    assert drawing.RELIEF_BACK_X < back_x < drawing._sheet_x(spec.HEAD_REAR_Z)
-    # Below the shaft the bond-zone block spans the back shoulder.
-    block_left = drawing.BOND_ZONE_TEXT_XY[0]
-    assert block_left < drawing.RELIEF_BACK_X < drawing.BOND_ZONE_BLOCK_RIGHT_X
+    assert back_row_y + 0.006 <= back_y <= y - 0.006
+    assert drawing.RELIEF_BACK_X + 0.010 < back_x < drawing.RELIEF_FRONT_X
+    # Above the shaft the collar pin hole's leader would cross it (rule 14):
+    # the hole sits inside every head-rear station's span.
+    pin_x = drawing._sheet_x(spec.PIN_Z)
+    assert drawing.RELIEF_BACK_X < pin_x < drawing._sheet_x(spec.HEAD_REAR_Z)
+    # No callout hangs under the shaft across the back shoulder's witness.
+    assert drawing.PRINCIPAL_KEEP["BondZoneDia"][1] > drawing.PRINCIPAL_CENTER[1]
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
     text_left, text_right = (dia_x + d for d in drawing.RELIEF_DIA_TEXT_EXTENT)
     # Either way SolidWorks sets the relief diameter's text, it stands between
-    # the bond-zone block's right end and the station's shoulder witness.
-    assert drawing.BOND_ZONE_BLOCK_RIGHT_X + 0.002 <= text_left
+    # the two shoulders' witnesses.
+    assert drawing.RELIEF_BACK_X + 0.002 <= text_left
     assert text_right <= drawing.RELIEF_FRONT_X - 0.001
     # Rule 7: at most two word rows under the size line.
     assert drawing.BOND_ZONE_CALLOUT.count("\n") <= 1
     _, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
-    _, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
-    _, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     _, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
-    # Its text sits under both blocks, over the station row's line.
-    assert dia_y + 0.004 <= min(bond_y - bond_height / 2.0, front_y - journal_height / 2.0)
+    # Its text sits under the front journal's block, over the station row's
+    # line.
+    assert dia_y + 0.004 <= front_y - journal_height / 2.0
     assert dia_y - 0.004 >= y
 
 
@@ -832,7 +833,9 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert station <= spec.BACK_JOURNAL_FROM_HEAD_REAR - clear
     assert spec.DRUM_STATION < station < spec.DRUM_STATION + geometry.DRUM_LEN
     text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
-    assert text_x == pytest.approx(drawing._sheet_x(spec.BOND_ZONE_DIA_Z))
+    assert text_x == pytest.approx(
+        drawing._sheet_x(spec.BOND_ZONE_DIA_Z) - drawing.JOURNAL_DIA_LINE_OFFSET
+    )
     fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
     assert fence_x - text_x > drawing.DETAIL_RADIUS_MM / 1000.0 + 0.050
 
@@ -1019,9 +1022,11 @@ def test_front_journal_diameter_text_clears_the_drum_station_witness() -> None:
     assert land_crown_end + 0.0008 <= x < land_head_end  # on the land
     width, _height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
     left = x - width
-    # Clear of the bond-zone block (below the shaft, text right of its line).
-    bond_width, _ = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
-    assert left - (drawing.PRINCIPAL_KEEP["BondZoneDia"][0] + bond_width) >= 0.008
+    # The bond-zone block now hangs above the shaft (#1038 ruling), so the
+    # front journal's block below has the run to itself.
+    assert drawing.PRINCIPAL_KEEP["BondZoneDia"][1] > drawing.PRINCIPAL_CENTER[1]
+    assert drawing.PRINCIPAL_KEEP["FrontJournalDia"][1] < drawing.PRINCIPAL_CENTER[1]
+    assert left > drawing.RELIEF_FRONT_X
 
 
 def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:

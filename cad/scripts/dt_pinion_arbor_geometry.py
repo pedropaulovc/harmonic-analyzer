@@ -384,9 +384,8 @@ if (
 # 2.60 length chained off the 4.20; Repitch1038 ruling, #1038).  Both at .XX,
 # so the relief's length is the difference, 2.60 -.02/+.02.  The front land
 # is the longer: the operator's torque enters at the head and reaches the
-# drum through it.  The back shoulder stands 25.78 mm ahead of the bond-zone
-# diameter's witness (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the
-# back land.
+# drum through it; it also carries the bond-zone diameter's witness
+# (BOND_ZONE_DIA_FROM_HEAD_REAR).
 BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
 BOND_RELIEF_BACK_FROM_HEAD_REAR = 172.72  # 6.80
 BOND_RELIEF_LEN = BOND_RELIEF_BACK_FROM_HEAD_REAR - BOND_RELIEF_FROM_HEAD_REAR
@@ -470,25 +469,29 @@ if (
 # a Top-plane reference sketch like the lands', not off the end-on shaft
 # circle: that circle sits in the neck face on the Front plane, so its
 # witnesses ran along the neck and out through the detail-A fence (run
-# 492a7be5).  The witness station lies on the back bond land, clear of the
-# relief and the back journal, so the diameter reads as the bond lands'.
-# Machinist review r1 of #1685: the callout hangs below the shaft in the open
-# run between the back land and the front land's diameter block, its line
-# under the back Ra symbol.  #1038 re-pitch: 188.0 -> 198.5, 11.05 ahead of
-# the back land as at the 5.64 in drum (10.88), since that land and its Ra
-# symbol moved .42 in aft.
-BOND_ZONE_DIA_FROM_HEAD_REAR = 198.5
+# 492a7be5).  The witness station lies on a bond land, clear of the relief
+# and the journal, so the diameter reads as the bond lands'.  Machinist
+# review r1 of #1685 hung the callout below the shaft over the back bond
+# land.  #1038 ruling (machinist review of 057ffb6 and 7c26893): the relief's
+# back shoulder prints as a station from the head rear face, which can stand
+# neither above the shaft (the collar pin hole's leader would cross it) nor
+# below with the callout there (its extension would drop through the block).
+# So the witness moves to the front bond land and the callout hangs above
+# the shaft, left of its line, between detail A's label and the front land's
+# length witnesses; 8.0 off the front land keeps the block 4 mm clear of the
+# label.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 75.0
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
-BOND_ZONE_LAND_CLEARANCE = 10.0
+BOND_ZONE_LAND_CLEARANCE = 8.0
 if not (
-    BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + BOND_ZONE_LAND_CLEARANCE
+    FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN + BOND_ZONE_LAND_CLEARANCE
     <= BOND_ZONE_DIA_FROM_HEAD_REAR
-    <= min(BACK_JOURNAL_FROM_HEAD_REAR, DRUM_STATION + DRUM_LEN)
-    - BOND_ZONE_LAND_CLEARANCE
+    <= BOND_RELIEF_FROM_HEAD_REAR - BOND_ZONE_LAND_CLEARANCE
+    and BOND_ZONE_DIA_FROM_HEAD_REAR > DRUM_STATION + DRUM_STATION_BAND
 ):
     raise AssertionError(
-        "the bond-zone diameter must sit on the back bond land, clear of the "
-        "relief and the back journal"
+        "the bond-zone diameter must sit on the front bond land, clear of the "
+        "front journal and the relief"
     )
 
 # R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-33
