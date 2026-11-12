@@ -441,6 +441,7 @@ def test_configuration_creators_have_explicit_saved_cache_coverage() -> None:
         "build_ch_vn_spring_hook",
         "build_dt_vn_post_mount_screw",
         "build_pd_vn_transgear_pivot_screw",
+        "build_pd_vn_transgear_collar_flat_pin",
         "build_sm_vn_boss_hook",
         "build_sm_vn_knife_hanger_stud",
     }

@@ -592,6 +592,28 @@
       ]
     },
     {
+      "sourceStem": "pd-vn-transgear-hub-key-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-hub-key-pin",
+          "number": "MHA-PD-VN-69"
+        }
+      ]
+    },
+    {
+      "sourceStem": "pd-vn-transgear-collar-flat-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-collar-flat-pin",
+          "number": "MHA-PD-VN-70"
+        }
+      ]
+    },
+    {
       "sourceStem": "sm-vn-gooseneck-shoulder-screw",
       "sourceNumber": null,
       "identities": [
@@ -1083,7 +1105,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "4d1a5e2c02e8504564ea26241613772a6f78a8ef614ddb97b467234daf13b916",
+  "currentRegistryMapSha256": "ad4d89f067d1dbc6ba18a964aee829af7adba0ae4a8615de3f2c011ab5ddd570",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

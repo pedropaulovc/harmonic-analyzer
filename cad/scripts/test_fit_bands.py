@@ -216,10 +216,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("pd_transgear_knob_shaft_spec", "RADIAL_SETTING_BAND"): (
         "the cutter radial setting implied by the printed span limits (a machine setting)"
     ),
-    ("pd_transgear_drive_collar_spec", "FLAT_BAND"): (
-        "the D-flat's FLAT_LIMITS as deviations for the flat-to-core clearance "
-        "corners; the sheet prints the native LIMIT"
-    ),
     ("pd_vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
@@ -276,6 +272,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"
+    ),
+    ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
+        "equal band indexed into the native symmetric (+/-) tolerance and the "
+        "hub key pin's air to the flat"
     ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"

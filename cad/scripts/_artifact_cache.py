@@ -199,6 +199,9 @@ _KEY_MANIFESTS: dict[tuple[str, str], tuple[dict, str, dict]] = {}
 # seat wait, and never recaptured by an under-seat probe or upload. Alias entries
 # use their root label with their own key. None means the entry was absent.
 _REFRESH_ETAGS: dict[tuple[str, str], str | None] = {}
+# This process's archive publications (:func:`publication`): key -> the last
+# store's outcome and, when ``stored``, the identity it committed.
+_PUBLISHED: dict[str, tuple[str, tuple[str, int] | None]] = {}
 
 # Azure customDimensions values allow 8192 characters. ASCII JSON fragments keep
 # both the character and UTF-8 byte size below that limit, including escaped paths.
@@ -458,6 +461,20 @@ def _restore_path(path: Path) -> Path:
     return _CACHE_OUTPUT_ROOT.joinpath(*Path(os.path.abspath(path)).parts[-len(target.relative_to(root).parts):])
 
 
+def _safe_member(member: tarfile.TarInfo) -> Path:
+    """The output path of an archive member, or raise: links/special files,
+    traversal and Windows path aliases (including alternate data streams)
+    are rejected, even on non-Windows readers."""
+    if (
+        not (member.isreg() or member.isdir())
+        or "\\" in member.name
+        or ":" in member.name
+        or ".." in Path(member.name).parts
+    ):
+        raise RuntimeError(f"unsafe cache archive member: {member.name}")
+    return _restore_path(REPO_ROOT / member.name)
+
+
 def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
     # Validate EVERY deletion target before touching any of them. Collapsing
     # overlaps preserves directory ownership without deleting shared parents.
@@ -472,16 +489,7 @@ def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
         if not members:
             raise RuntimeError("empty cache archive has no canonical outputs")
         for member in members:
-            # Reject links/special files, traversal and Windows path aliases
-            # (including alternate data streams), even on non-Windows readers.
-            if (
-                not (member.isreg() or member.isdir())
-                or "\\" in member.name
-                or ":" in member.name
-                or ".." in Path(member.name).parts
-            ):
-                raise RuntimeError(f"unsafe cache archive member: {member.name}")
-            _restore_path(REPO_ROOT / member.name)
+            _safe_member(member)
 
         # Parse/extract the complete payload BEFORE deleting local outputs. A bad
         # member or truncated archive must leave the producer's tree untouched.
@@ -999,7 +1007,11 @@ class _BlobBackend:
         except ResourceNotFoundError:
             return None
 
-    def put(self, key: str, blob: BinaryIO, *, replace_etag: str | None = None) -> None:
+    def put(
+        self, key: str, blob: BinaryIO, *, replace_etag: str | None = None
+    ) -> tuple[str, int]:
+        """Commit ``blob`` as ``key``'s archive; returns the identity committed
+        with it (``archive_sha256``, ``archive_size``)."""
         # Input identity does not imply identical native bytes. Ordinary writers
         # create only; explicit refresh is the sole CAS replacement. Writer-unique
         # blocks also prevent interleaved uploads from committing a torn archive.
@@ -1022,7 +1034,7 @@ class _BlobBackend:
                 blob, length=size, overwrite=replace_etag is not None, metadata=metadata,
                 **(condition if replace_etag is not None else {}),
             )
-            return
+            return digest, size
         from azure.storage.blob import BlobBlock
 
         writer = secrets.token_hex(16)
@@ -1045,6 +1057,7 @@ class _BlobBackend:
             [BlobBlock(block_id=block_id) for block_id in ids],
             metadata=metadata, **condition,
         )
+        return digest, size
 
     def put_sidecar(self, name: str, data: bytes) -> None:
         """Create-only upload of one small named blob; raises when it exists.
@@ -1988,6 +2001,7 @@ def _store(
             _warn(f"nothing to store for {label} (no outputs on disk)")
             _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
+            _PUBLISHED[key] = ("empty", None)
             return "empty"
         with _phase("cache.pack", outputs=len(present)) as pack:
             blob = _pack(present)
@@ -1995,7 +2009,7 @@ def _store(
             pack.set_attribute("bytes", size)
         with _phase("cache.upload", bytes=size):
             try:
-                backend.put(key, blob, replace_etag=replace_etag)
+                committed = backend.put(key, blob, replace_etag=replace_etag)
             except Exception:
                 # Includes ambiguous success/timeouts and InvalidBlockList after
                 # a competing commit discarded our staged blocks. The canonical
@@ -2005,20 +2019,99 @@ def _store(
                 _log(f"lost  {label} ({key[:12]}): canonical entry present")
                 _event("cache.store_lost", label, key)
                 _record("store_lost", label, key)
+                _PUBLISHED[key] = ("lost", None)
                 return "lost"
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)
         _record("store", label, key)
+        _PUBLISHED[key] = ("stored", committed)
         return "stored"
     except Exception as exc:  # noqa: BLE001
         _warn(f"store error for {label}: {exc!r}")
         _event("cache.store_error", label, key)
         _record("store_error", label, key)
+        _PUBLISHED[key] = ("error", None)
         return "error"
     finally:
         if blob is not None:
             blob.close()
+
+
+def publication(key: str) -> tuple[str, tuple[str, int] | None] | None:
+    """How this process's last :func:`store` of ``key`` ended (``stored``,
+    ``lost``, ``empty`` or ``error``) and, when ``stored``, the identity
+    (``archive_sha256``, ``archive_size``) it committed: what a recording of
+    that build can be bound to (``_replay_shadow``). None: no store of ``key``
+    here, or one that could not publish (``skip``/``off``)."""
+    return _PUBLISHED.get(key)
+
+
+def fetch_archive(key: str) -> BinaryIO | None:
+    """``key``'s canonical archive, verified against the identity committed
+    with it exactly as :func:`restore` reads it, for inspection before
+    :func:`install_archive`; None when it is absent, the cache is off, or the
+    download or its verification fails. The caller closes it."""
+    if not enabled():
+        return None
+    try:
+        backend = _backend()
+        if backend is None:
+            return None
+        with _phase("cache.fetch") as fetch:
+            blob = backend.get(key)
+            fetch.set_attribute("found", blob is not None)
+            fetch.set_attribute(
+                "archive_bytes", 0 if blob is None else _archive_size(blob)
+            )
+        return blob
+    except Exception as exc:  # noqa: BLE001 -- the caller treats it as absent
+        _warn(f"archive {key[:12]} not fetched: {exc!r}")
+        return None
+
+
+def archive_identity(archive: BinaryIO) -> tuple[str, int]:
+    """``(sha256, size)`` of an archive's bytes: the identity :func:`store`
+    commits with it."""
+    return _archive_identity(archive)
+
+
+def archive_members(archive: BinaryIO) -> dict[str, str]:
+    """Every regular file of an archive (:func:`fetch_archive`): its path
+    under the output root, ``/``-separated, -> the SHA-256 of its bytes.
+    Raises on any member :func:`restore` would refuse."""
+    archive.seek(0)
+    found: dict[str, str] = {}
+    with tarfile.open(fileobj=archive, mode="r:gz") as tar:
+        for member in tar:
+            target = _safe_member(member)
+            if member.isdir():
+                continue
+            digest = hashlib.sha256()
+            stream = tar.extractfile(member)
+            if stream is None:
+                raise RuntimeError(f"unreadable cache archive member: {member.name}")
+            while chunk := stream.read(_BLOCK_SIZE):
+                digest.update(chunk)
+            found[target.relative_to(_CACHE_OUTPUT_ROOT).as_posix()] = (
+                digest.hexdigest()
+            )
+    archive.seek(0)
+    return found
+
+
+def install_archive(
+    archive: BinaryIO, outputs: list[Path], label: str, key: str
+) -> None:
+    """Install ``key``'s archive (:func:`fetch_archive`) as ``outputs`` exactly
+    as a HIT restores it (:func:`_unpack`: staged first, owned roots replaced,
+    mtimes now). Raises :class:`RestoreLocked` on a share lock, anything else
+    as raised."""
+    try:
+        with _phase("cache.unpack", bytes=_archive_size(archive)):
+            _unpack(archive, outputs)
+    except PermissionError as exc:
+        raise RestoreLocked(label, key, exc) from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -2097,6 +2190,20 @@ def fetch_sidecar(name: str) -> bytes | None:
     except Exception as exc:  # noqa: BLE001 -- a sidecar never costs a build
         _warn(f"sidecar {name} not fetched: {exc!r}")
         return None
+
+
+def read_sidecar(name: str) -> bytes | None:
+    """Sidecar ``name``'s verified bytes; None when it is absent. RAISES when
+    the cache is off or the answer is unknown (a failed download or
+    verification), for a caller that must fail closed: :func:`fetch_sidecar`
+    reads any failure as absence."""
+    backend = _backend() if enabled() else None
+    if backend is None:
+        raise RuntimeError(f"sidecar {name}: the remote cache is off")
+    with _phase("cache.sidecar.download") as span:
+        data = backend.get_sidecar(_sidecar_blob(name))
+        span.set_attribute("bytes", 0 if data is None else len(data))
+        return data
 
 
 def list_sidecars(prefix: str) -> list[tuple[str, float]]:

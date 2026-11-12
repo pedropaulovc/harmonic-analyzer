@@ -111,6 +111,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
     "pd-transgear-disc-hub": 1,
+    "pd-vn-transgear-hub-key-pin": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
     "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
@@ -119,6 +120,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
     "pd-vn-transgear-knob-drive-pin": 2,
+    "pd-vn-transgear-collar-flat-pin": 1,
     "pd-transgear-removable": 3,
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
@@ -1073,6 +1075,9 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-front-bushing",
     "pd-vn-transgear-retaining-ring",
     "pd-vn-transgear-cluster-shim",
+    # #2409: inside their hosts.
+    "pd-vn-transgear-collar-flat-pin",
+    "pd-vn-transgear-hub-key-pin",
 }
 # Hidden in the arm's counterbore from the isometric; Section A-A balloons it.
 BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring"}
@@ -1632,7 +1637,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
         f"WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
     ) in faced
     seated = _step_body("collar-shoulder-seated")
-    assert "D-BORE ON THE SHAFT D-FLAT" in seated
+    assert "COLLAR ON THE SHAFT, ITS PIN ON THE D-FLAT" in seated
     assert f"{_number('pd-transgear-knob-shaft')} 15T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
@@ -2105,9 +2110,14 @@ def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() ->
     assert stems <= set(CONTRACT_TRANSGEAR_QUANTITIES)
     assert "pd-transgear-arm-1" not in moved
     # Every part moves along one machine axis, so it stays on its own axis
-    # seen from above; the cup pin alone leaves along X, out of its cross hole.
+    # seen from above; the cup pin leaves along X, out of its cross hole, and
+    # the hub's key pin along X too, out of its chord ream (#2409).
+    radial = {
+        ("pd-vn-transgear-knob-cup-pin",): "x",
+        ("pd-vn-transgear-hub-key-pin",): "x",
+    }
     for step, _names in transgear:
-        assert step.axis == ("x" if step.stems == ("pd-vn-transgear-knob-cup-pin",) else "z")
+        assert step.axis == radial.get(step.stems, "z")
 
 
 def test_the_cluster_explode_spreads_pin_shims_bushing_and_sleeve_in_order() -> None:
@@ -2593,11 +2603,14 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
         f"{steps.step_number('disc-cluster-assembled')}-"
-        f"{steps.step_number('disc-taps-transferred')} AND REPEAT FROM {trial}.",
+        f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN LEFT IN AND RIDING THE FLAT, "
+        f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
-        f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE.",
+        f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
         f"WITH THE {_number('pd-vn-transgear-disc-screw')} SCREWS SLACKENED, REPEAT "
-        f"{drawing.sub_step('disc-cluster-assembled', 1)}, "
+        f"{drawing.sub_step('disc-cluster-assembled', 3)}-"
+        f"{drawing.sub_step('disc-cluster-assembled', 4)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
         f"{drawing.sub_step('disc-taps-transferred', 2)}, "
         f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
@@ -2646,12 +2659,76 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # The turn only finds the period; the fresh stake rides on the rebuild.
     assert "TURN THE DISC ONE FULL TURN BY THE COLLAR, NOTING WHERE THE FAULT RECURS." in pose
     assert f"STAKING FRESH METAL AT {drawing.sub_step('hanger-pivoted', 8)}" in pose[rebuild:]
-    # A new disc takes new screws, cut again to its own rear face.
+    # A new disc takes new screws, cut again to its own rear face, on the
+    # same hub, its key pin left in (#2409).
     assert (
         f"A NEW {_number('pd-rack-pinion')} DISC AND NEW "
-        f"{_number('pd-vn-transgear-disc-screw')} SCREWS ON THE SAME HUB, THEN STEPS "
-        f"{steps.step_number('disc-screws-cut')}, "
+        f"{_number('pd-vn-transgear-disc-screw')} SCREWS ON THE SAME HUB, ITS PIN LEFT "
+        f"IN AND RIDING THE FLAT, THEN STEPS {steps.step_number('disc-screws-cut')}, "
     ) in pose
+
+
+def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
+    """#2409: the hub is keyed by a pin pressed along a chord of it to its
+    stop before the hub is fitted, its side over the sleeve's flat; every
+    remedy slides hub and disc off the nose and back with the pin riding the
+    flat, the pin never out of the hub; the collar's flat pin is pressed with
+    the drive dowels, one permanent unit with the collar, and its crest is
+    broken with the collar's rear bore mouth after facing."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    key_pin = _number("pd-vn-transgear-hub-key-pin")
+    assert key_pin == drawing.hub.KEY_PIN_NUMBER
+    assembled = texts["disc-cluster-assembled"]
+    press = next(
+        i for i, row in enumerate(assembled) if row.startswith(f"PRESS THE {key_pin} PIN")
+    )
+    fit = next(
+        i
+        for i, row in enumerate(assembled)
+        if f"BORE ON THE {_number('pd-transgear-feed-pinion')} BOSS" in row
+    )
+    assert press < fit
+    assert "CROSS HOLE" in assembled[press] and assembled[press].endswith("UNTIL IT STOPS.")
+    assert assembled[press + 1].startswith("IF THE PIN SLIDES IN BY HAND, MAKE A NEW")
+    assert "FROM THE NOSE, THE PIN OVER THE FLAT" in assembled[fit]
+    assert assembled[-1].startswith("CHECK:")
+    assert "HUB DRIVES THE SLEEVE" in assembled[-1]
+    every_row = [row for rows in texts.values() for row in rows]
+    assert not any("DRIVEN INWARD" in row or "NEW PIN" in row for row in every_row)
+    assert len(texts["oil-hole-drilled"]) == 1
+    for key in ("fitup-mesh-remedied", "collar-disc-air-inspected"):
+        rows = texts[key]
+        slide = next(i for i, row in enumerate(rows) if row.startswith("SLIDE THE HUB AND DISC"))
+        assert "NOSE AS ONE" in rows[slide] and "PIN RIDING THE FLAT" in rows[slide], key
+        assert not any("BACK THE" in row or "SET SCREW" in row for row in rows), key
+        assert not any("STAKING FRESH METAL AS" in row for row in rows), key
+    refit = texts["collar-disc-air-inspected"]
+    assert any(
+        row.startswith("SLIDE THE HUB'S BORE BACK ON THE BOSS") and "PIN RIDING THE FLAT" in row
+        for row in refit
+    )
+    pressed = texts["collar-pins-pressed"]
+    pin = _number("pd-vn-transgear-collar-flat-pin")
+    assert pin == collar.FLAT_PIN_NUMBER
+    assert any(
+        row.startswith(f"PRESS THE {pin} PIN")
+        and row.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
+        for row in pressed
+    )
+    assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
+    # The pin rides the collar off the shaft; it never leaves its ream.
+    assert not any(
+        step.stems == ("pd-vn-transgear-collar-flat-pin",) for step in explode.TRANSGEAR_STEPS
+    )
+    faced = texts["collar-rear-faced-to-fit"]
+    face = next(i for i, row in enumerate(faced) if row.startswith("FACE THE COLLAR'S REAR"))
+    assert faced[face + 1].startswith("BREAK THE COLLAR'S REAR BORE MOUTH 45°")
+    assert f"THROUGH THE {pin} PIN'S CREST" in faced[face + 1]
+    bom = dict(drawing.BOM_PART_NUMBERS)
+    assert bom["pd-vn-transgear-hub-key-pin"] == key_pin
+    assert bom["pd-vn-transgear-collar-flat-pin"] == pin
+    assert drawing.TRANSGEAR_QUANTITIES["pd-vn-transgear-hub-key-pin"] == 1
+    assert drawing.TRANSGEAR_QUANTITIES["pd-vn-transgear-collar-flat-pin"] == 1
 
 
 def test_the_trial_stack_goes_together_at_the_located_step() -> None:

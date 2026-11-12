@@ -9,10 +9,10 @@ support bar, two-piece column clamps, the hanging platen (guides + locks), the
 swinging transgear hanger behind the bar, and the REAL power train:
 
     selected crank wheel --(belt/chain, tooth ratio)--> selected knob wheel
-      --(drive collar: two pressed drive pins + D-flat, LOCK)--> knob shaft
+      --(drive collar: two pressed drive pins + pressed flat pin on the D-flat, LOCK)--> knob shaft
       with its source-selected stock-form 15T 48DP PA20 reducer pinion
       --(GEAR mate 15:150)--> 150T 48DP PA20 disc
-      --(LOCK: brass hub + feed sleeve)--> stock-form 12T 32DP PA20 feed pinion
+      --(LOCK: brass hub, pressed key pin on the flat + feed sleeve)--> stock-form 12T 32DP PA20 feed pinion
       --(RACK-PINION mate, reference pitch circumference)--> rack --(LOCK)--> platen
 
 Operational kinematics: the crank-end sprocket spin is the ONE free
@@ -41,10 +41,12 @@ real receiving and loaded-inspection data remain separately required.
 * Transgear hanger (behind the bar): the arm stands on the pivot spacer and
   swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
   arm carries the feed sleeve (12T 32DP PA20), the 150T disc and its brass hub,
-  closed by the hub cap. The arm plate, screwed to the arm, bores the knob
-  shaft, whose integral 15T meshes the disc; the thrust ring and the knob cup
-  (set on a feeler, cross-pinned to the journal) set its end float. On the
-  shaft's front D-core the drive collar (pressed drive pins, matching D-bore) carries
+  whose plain bore slides on the sleeve's boss and whose pressed MHA-PD-VN-69
+  chord key pin lies over the sleeve's flat, closed by the hub cap. The arm plate, screwed to
+  the arm, bores the knob shaft, whose integral 15T meshes the disc; the thrust
+  ring and the knob cup (set on a feeler, cross-pinned to the journal) set its
+  end float. On the shaft's front D-core the drive collar (pressed drive pins; a
+  plain bore whose pressed MHA-PD-VN-70 pin bears on the D-flat) carries
   selected knob removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
   knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
   retains it free (ch23 p.58/59; R9-70).
@@ -525,8 +527,8 @@ if abs(_pin_hole_n - _pin_hole_offset) > 1e-9 or (
 # arm, its head on the arm's rear face (Ry180: its stations run to machine
 # -Z).  On it, rear to front: the MHA-PD-VN-68 shims on the arm's front face,
 # the MHA-PD-24 rear bushing on them, the MHA-PD-10 feed sleeve (the disc on
-# its round boss, its front face at the D-flat's end wall where the hub's
-# D-bore bears, screwed together), the MHA-PD-25 front bushing on the sleeve's
+# its round boss, its front face at the flat's end wall, the hub's plain
+# bore on the boss and its key pin over the flat, screwed together), the MHA-PD-25 front bushing on the sleeve's
 # nose and the MHA-PD-VN-61 ring in the pin's groove.  The end float is shimmed
 # at assembly (owner ruling 2026-11-01, #2124): the model carries every
 # printed length at its nominal and the nominal cluster's shim count
@@ -570,7 +572,57 @@ if abs(HUB_FRONT_Z - FRONT_BUSHING_Z0 - CLUSTER.RECESS_NOMINAL) > 1e-9:
 if abs(CLUSTER.RING_FRONT_Z - (PIN_Z0 - PIN.GROOVE_STATION)) > 1e-9:
     raise AssertionError("the ring is off the pin groove's load wall")
 
+import pd_vn_transgear_hub_key_pin_spec as HUB_KEY_PIN  # noqa: E402
+
+# #2409 (round 3): the MHA-PD-VN-69 key pin pressed along the hub's local X
+# into its chord ream, KEY_PIN_CHORD_OFFSET below the axis on local -Y, where
+# the sleeve's flat faces (hub identity and sleeve Ry180 both keep machine
+# X and Y), KEY_PIN_Z in the hub frame. Pressed from +X, its lead end bottoms
+# on the ream's stop at KEY_PIN_STOP_X; its side lies along the flat, which
+# bears across it under torque. Its part frame has the lead end face at the
+# origin and +Y along the axis, so Rz(-90) runs it along machine +X.
+HUB_KEY_PIN_ROT = rot_z_rows(-90.0)
+HUB_KEY_PIN_Z = DISC_Z0 + DISC_HUB.KEY_PIN_Z
+HUB_KEY_PIN_ORIGIN = (
+    STUD_XY[0] + DISC_HUB.KEY_PIN_STOP_X,
+    STUD_XY[1] - DISC_HUB.KEY_PIN_CHORD_OFFSET,
+    HUB_KEY_PIN_Z,
+)
+_HUB_KEY_PIN_X_SPAN = (
+    DISC_HUB.KEY_PIN_STOP_X,
+    DISC_HUB.KEY_PIN_STOP_X + HUB_KEY_PIN.LENGTH,
+)
+# The modelled pin's side stands off the modelled flat inside the hub spec's
+# band (no contact row). Beyond the flat's width the boss's round falls away
+# from the pin faster than the flat's plane, so the same air clears it too.
+HUB_KEY_PIN_FLAT_AIR = (
+    DISC_HUB.KEY_PIN_CHORD_OFFSET - HUB_KEY_PIN.DIA / 2.0 - FEED.FLAT_TO_AXIS
+)
+if not 0.0 < HUB_KEY_PIN_FLAT_AIR <= max(DISC_HUB.KEY_PIN_FLAT_AIR):
+    raise AssertionError(
+        f"the hub key pin's side does not stand off the sleeve flat: {HUB_KEY_PIN_FLAT_AIR:.4f}"
+    )
+# Sleeve stations run forward (machine -Z) from its rear face at FEED_Z0: the
+# pin's whole section lies over the flat, ahead of its end wall and short of
+# the nose.
+_HUB_KEY_PIN_SLEEVE_STATION = FEED_Z0 - HUB_KEY_PIN_Z
+if not (
+    FEED.FLAT_END_STATION + HUB_KEY_PIN.DIA / 2.0
+    < _HUB_KEY_PIN_SLEEVE_STATION
+    < FEED.OVERALL_LENGTH - HUB_KEY_PIN.DIA / 2.0
+):
+    raise AssertionError("the hub key pin is off the sleeve's flat")
+# Both ends' outer corners stay under the hub's O.D.
+if max(
+    math.hypot(x, DISC_HUB.KEY_PIN_CHORD_OFFSET + HUB_KEY_PIN.DIA / 2.0)
+    for x in _HUB_KEY_PIN_X_SPAN
+) >= DISC_HUB.HUB_DIA / 2.0:
+    raise AssertionError("a hub key pin end stands proud of the hub body")
+if not HUB_FRONT_Z < HUB_KEY_PIN_Z < DISC_Z0 - DISC_HUB.FLANGE_THICK:
+    raise AssertionError("the hub key pin is off the hub body")
+
 import pd_vn_transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
+import pd_vn_transgear_collar_flat_pin_spec as FLAT_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 import _sprocket_seat_geometry as seat_geometry  # noqa: E402
 import pd_transgear_knob_shaft_spec as KNOB_SPEC  # noqa: E402
@@ -999,6 +1051,25 @@ KNOB_DRIVE_PIN_XY = tuple(
     )
     for side in (1.0, -1.0)
 )  # local +Y first: DrivePinAxis1, even after the actual assembly spin
+# #2409: the MHA-PD-VN-70 pin pressed from the collar's rear to the floor of its
+# blind ream at collar-local (0, -FLAT_PIN_CENTRE), its front end FLAT_PIN_FLOOR
+# behind the collar's front face. Part frame: axis +Y from the end face at the
+# origin, so Rx+90 runs it rearward (+Z); its faced default configuration is
+# FLAT_PIN_LENGTH long, flush with the model collar's rear on F. Its crest,
+# the side nearest the axis, stands clear of the shaft's D-flat.
+KNOB_FLAT_PIN_ROT = compose_rows(ROT_X_POS90, KNOB_FRONT_STACK_ROT)
+KNOB_FLAT_PIN_XY = (
+    KNOB_SHAFT_XY[0] - COLLAR.FLAT_PIN_CENTRE * KNOB_FRONT_STACK_ROT[1][0],
+    KNOB_SHAFT_XY[1] - COLLAR.FLAT_PIN_CENTRE * KNOB_FRONT_STACK_ROT[1][1],
+)
+KNOB_FLAT_PIN_Z0 = KNOB_COLLAR_Z0 + COLLAR.FLAT_PIN_FLOOR
+if abs(KNOB_FLAT_PIN_Z0 + COLLAR.FLAT_PIN_LENGTH - KNOB_COLLAR_REAR_Z) > 1e-9:
+    raise AssertionError("the faced flat pin is not flush with the model collar's rear")
+KNOB_FLAT_PIN_CREST_AIR = (
+    COLLAR.FLAT_PIN_CENTRE - FLAT_PIN.DIA / 2.0 - KNOB_SPEC.CORE_FLAT_FROM_AXIS
+)
+if KNOB_FLAT_PIN_CREST_AIR <= 0.0:
+    raise AssertionError("the collar's flat pin crest reaches the knob shaft's D-flat")
 # The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), so a
 # rack GAP centre must sit exactly on the stud's x. The rack is soldered with
 # its ends flush with the platen's (MHA-PD-00 "rack-soldered"), so its gaps
@@ -2798,11 +2869,13 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 
 def _assert_knob_collar_capture(adapter, collar: str, shaft: str, wheel: str) -> None:
-    """Observe native fitted metal on F and D-clock; lock mates cannot stand in.
+    """Observe native fitted metal on F and the flat-pin clock; lock mates
+    cannot stand in.
 
     The collar's rear must touch gear front F (the thumbnut's clamp reacts
     there), and the facing's remainder must stand at its front, off the
-    knob wheel's rear face."""
+    knob wheel's rear face. The collar's local -Y, where its pressed
+    MHA-PD-VN-70 pin bears on the D-flat, must be the shaft's flat side."""
     from _gtol_planar import PlanarFace
     from _gtol_face_resolve import resolve_faces
 
@@ -2828,7 +2901,6 @@ def _assert_knob_collar_capture(adapter, collar: str, shaft: str, wheel: str) ->
         raise RuntimeError("knob collar: native body differs from this fitted source version")
     resolve_faces(parts["collar"], {
         "actual collar rear": PlanarFace((0.0, 0.0, 1.0), length, tolerance_mm=1e-5),
-        "actual internal D-flat": PlanarFace((0.0, 1.0, 0.0), -COLLAR.FLAT_TO_AXIS, tolerance_mm=1e-5),
     })
     resolve_faces(parts["shaft"], {
         "actual gear front F": PlanarFace((0.0, 0.0, -1.0), 0.0, tolerance_mm=1e-5),
@@ -2852,7 +2924,7 @@ def _assert_knob_collar_capture(adapter, collar: str, shaft: str, wheel: str) ->
         tuple(collar_flat[i] - collar_o[i] for i in range(3)),
         tuple(shaft_flat[i] - front[i] for i in range(3)),
     ) > 1e-8:
-        raise RuntimeError("knob collar native D-flat is not clocked to the shaft")
+        raise RuntimeError("knob collar's flat-pin side is not clocked to the shaft's D-flat")
 
 
 def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
@@ -3481,7 +3553,7 @@ async def build(adapter) -> dict[str, str]:
     await _sprocket_revolute(adapter, disc, "reducer disc")
     # The shifted 12T 32DP PA20 feed sleeve runs on the pin, rear face on the rear
     # bushing (Ry180, teeth forward to the disc seat) and meshes the teeth-down
-    # rack; the hub keyed on its D-flat and the three disc
+    # rack; the hub (its key pin over the sleeve's flat) and the three disc
     # screws make one cluster with the disc, so each is LOCKED to it (net DOF
     # unchanged).
     feed = await place_component(
@@ -3511,6 +3583,24 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{hub}", "PLANE"),
         named_ref(f"Front Plane@{disc}", "PLANE"),
         label="disc hub locked to the disc",
+    )
+    # #2409: the MHA-PD-VN-69 key pin in the hub's chord ream (Rz(-90): lead
+    # end on the ream's stop at -X, the pin along +X with its side over the
+    # sleeve's flat), locked to the hub.
+    hub_key_pin = await place_component(
+        adapter,
+        "pd-vn-transgear-hub-key-pin",
+        list(HUB_KEY_PIN_ORIGIN),
+        euler_from_rows(HUB_KEY_PIN_ROT),
+        HUB_KEY_PIN_ROT,
+        ground=False,
+        label="transgear-hub-key-pin (chord ream, side over the feed sleeve flat, -Y)",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{hub_key_pin}", "PLANE"),
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        label="hub key pin locked to the disc hub",
     )
     # Rx(-90): heads on the flange's front face, shanks to +Z through the disc.
     for angle, (x, y) in zip(
@@ -3637,6 +3727,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"MHA-PD-VN-54 knob drive pin #{k} (y{y:.1f})",
         )
         await _lock_to_collar(knob_pin, f"drive pin #{k}")
+    # #2409: the MHA-PD-VN-70 pin pressed to the floor of the collar's blind
+    # ream on its -Y side (Rx+90: rearward along +Z), its faced default flush
+    # with the collar's rear; its crest is the collar's drive flat.
+    flat_pin = await place_component(
+        adapter,
+        "pd-vn-transgear-collar-flat-pin",
+        [KNOB_FLAT_PIN_XY[0], KNOB_FLAT_PIN_XY[1], KNOB_FLAT_PIN_Z0],
+        euler_from_rows(KNOB_FLAT_PIN_ROT),
+        KNOB_FLAT_PIN_ROT,
+        ground=False,
+        label=f"MHA-PD-VN-70 collar flat pin (crest air {KNOB_FLAT_PIN_CREST_AIR:.3f})",
+    )
+    await _lock_to_collar(flat_pin, "flat pin")
     # Knob shaft MHA-PD-08 on its datum F (the 15T's front face), spun so a gap
     # of its 15T faces the disc's tooth on the S -> K line.
     knob_shaft = await place_component(
@@ -3664,7 +3767,7 @@ async def build(adapter) -> dict[str, str]:
     await parallel_mate(
         adapter, named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
         named_ref(f"Right Plane@{collar}", "PLANE"),
-        label="integral knob D-flat clocked to actual collar flat",
+        label="integral knob D-flat clocked to the collar's flat-pin side",
         verify=(knob_shaft, shaft_o), witness_local=[0.0, -1.0, 0.0],
     )
     _assert_knob_collar_capture(adapter, collar, knob_shaft, knob_wheel)

@@ -77,20 +77,18 @@ BOSS_CALLOUT = "\n".join(
         f"TURN TO BORE {_clearance(HUB.BOSS_CLEARANCE_LIMITS)}",
     )
 )
-# The flat drives the hub's D-bore flat.  Its clearance is plane to plane,
-# which "CLEARANCE" alone leaves ambiguous against the boss's diametral one,
-# so the fit is accepted on the bench against the hub (2026-11-07 screen).
-FLAT_CALLOUT = "\n".join(("SLIDING FIT IN", f"{HUB_NUMBER}, NO ROCK"))
+# #2409: the flat takes the side of the hub's MHA-PD-VN-69 chord key pin,
+# which keys hub and disc to the sleeve; the hub's plain bore fits the boss
+# only.  The pin bears across the flat, so the pin is the mate it names.
+FLAT_CALLOUT = "\n".join(("KEYS PIN", HUB.KEY_PIN_NUMBER))
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its
-# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL).
-FACE_WIDTH_CALLOUT = "\n".join((f"SEATS {HUB_NUMBER} SPIGOT", STACK_NAME))
+# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL),
+# named once, on the overall (r8 machinist review, rule 7: a second reason).
+FACE_WIDTH_CALLOUT = f"SEATS {HUB_NUMBER} SPIGOT"
 # The overall sets the hub's recess behind the nose and carries the front
 # bushing's thrust: a term of the disc cluster's printed stack
 # (transgear_cluster_fit.OL).
 OVERALL_CALLOUT = "\n".join((f"SETS {HUB_NUMBER}, {FRONT_BUSHING_NUMBER}", STACK_NAME))
-# The flat's end wall stands clear behind the hub's flat
-# (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
-FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"
 # The cutter stations name themselves under their values: neither ends at an
 # edge of the section, which cuts through teeth, so they print on view C.
 # The full depth's teeth cover the rack's whole reach
@@ -116,10 +114,9 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
         ("SleeveProfile", "OutsideDia"): MESH_CALLOUT,
         ("SpanProfile", "ToothSpan"): SPAN_CALLOUT,
         ("SleeveProfile", "BossDia"): BOSS_CALLOUT,
-        ("FlatProfile", "FlatToAxis"): FLAT_CALLOUT,
+        ("FlatReference", "FlatToAxis"): FLAT_CALLOUT,
         ("GearBlank", "FaceWidth"): FACE_WIDTH_CALLOUT,
         ("SleeveProfile", "OverallLength"): OVERALL_CALLOUT,
-        ("FlatProfile", "FlatEnd"): FLAT_END_CALLOUT,
         ("SleeveProfile", "FullDepth"): FULL_DEPTH_CALLOUT,
         ("SleeveProfile", "CutterRunout"): CUTTER_RUNOUT_CALLOUT,
     },

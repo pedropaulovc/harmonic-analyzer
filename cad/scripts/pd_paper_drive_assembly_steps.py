@@ -61,7 +61,8 @@ SEQUENCE: tuple[str, ...] = (
     "lock-seats-faced",
     # Disc cluster, on the bench, before anything is fixed on the arm, so the
     # reducer's trial mesh can run on it (R9-68: the disc on the sleeve's seat
-    # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). Hub and bushings
+    # shoulder, the hub's bore on its boss, its key pin over the flat (#2409);
+    # R9-8, R9-9). Hub and bushings
     # are printed lengths (transgear_cluster_fit); nothing is faced: the float
     # is shimmed at assembly (owner ruling 2026-11-01, #2124).
     # Centre and seat the disc to the sleeve's actual running-bore datum
@@ -123,7 +124,7 @@ SEQUENCE: tuple[str, ...] = (
     # The reducer's confirmation remedies, one action each, take more
     # sub-steps than one step's letters (machinist review, #2417).
     "fitup-mesh-remedied",
-    # The D-collar's rear face is fitted on the actual gear front F; the
+    # The drive collar's rear face is fitted on the actual gear front F; the
     # thumbnut reacts through pilot, collar and F.
     "collar-rear-faced-to-fit",
     "collar-shoulder-seated",

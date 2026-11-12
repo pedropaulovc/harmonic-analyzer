@@ -837,8 +837,22 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
         "    sys.exit(run_build(scenario))\n",
         encoding="utf-8",
     )
-    # The log names the recording's script; the replay runs this one.
+    # The log names the recording's script; the replay runs this one. The
+    # driver counts every parse of a log.
+    counting = (
+        "import sys\n"
+        f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+        "import _com_conversation as conv\n"
+        "load = conv.load\n"
+        "def counted(path):\n"
+        "    sys.stderr.write(f'parsed {path}\\n')\n"
+        "    return load(path)\n"
+        "conv.load = counted\n"
+        "import com_replay\n"
+        "sys.exit(com_replay.main(sys.argv[1:]))\n"
+    )
     results = {}
+    parsed = {}
     # Writes outside scratch anywhere else: test_a_replay_refuses_writes_outside_its_roots.
     escapes = ("", "dispatch", "write", "network")
     for escape in escapes:
@@ -848,7 +862,8 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
         proc = subprocess.run(
             [
                 sys.executable,
-                str(SCRIPTS / "com_replay.py"),
+                "-c",
+                counting,
                 "replay",
                 str(script),
                 "--log",
@@ -872,8 +887,14 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
             proc.returncode,
             json.loads(result.read_text(encoding="utf-8")),
         )
+        parsed[escape] = [
+            line for line in proc.stderr.splitlines() if line.startswith("parsed ")
+        ]
     rc, clean = results[""]
     assert rc == 0 and clean["verdict"] == "noop", clean
+    # One parse of the base log serves the replay and the fields read after it.
+    assert parsed[""] == [f"parsed {log.resolve()}"]
+    assert clean["solidworks_inputs"] == [] and clean["title_echoes"]["count"] == 0
     assert clean["com_outputs"] == captured
     assert (
         "py-output.json" in clean["py_outputs"] and clean["py_output_mismatches"] == {}
@@ -1186,6 +1207,225 @@ def test_outcome_noise_is_title_counters_provenance_and_last_bits():
     assert _com_outcome._keyed({"h": 3, "p": "X"}) == _com_outcome._keyed(
         {"h": 4, "p": "X"}
     )
+
+
+# dt_crank_drive_gear's audit, 2026-11-12: one planar face's closest point to
+# one query point, on an edge of the face, in two builds of the same part.
+_QUERY = (0.03469681472658223, 0.0011400111338435352, 0.0049854)
+_CLOSEST = (
+    0.03440920666204291,
+    0.0017941457814243432,
+    1.3010426069826053e-18,
+    0.03440920666204291,
+    0.0017941457814243432,
+)
+_NOISY = (
+    0.03440920659643762,
+    0.0017941457525791945,
+    0.0,
+    0.03440920659643762,
+    0.0017941457525791945,
+)
+
+
+def _closest(handle: int, *point: float, query=_QUERY) -> conv.Call:
+    return conv.Call(
+        0,
+        handle,
+        "InvokeTypes",
+        [{"f": v.hex()} for v in query],
+        "IFace2.GetClosestPointOn",
+        result={"t": [{"f": v.hex()} for v in point]},
+    )
+
+
+def _answers(a: list[conv.Call], b: list[conv.Call]) -> tuple[str, Any]:
+    keyed_a, keyed_b = _com_outcome._keyed_calls(a), _com_outcome._keyed_calls(b)
+    signal, detail = _com_outcome._answers_signal(keyed_a, keyed_b, a, b)
+    return signal.value, detail
+
+
+def test_answers_to_one_request_within_float_noise_are_one_answer():
+    noise = "1 answers within 33554432 ulps of the other build's"
+    # 6.6e-11 m apart (9.5e6 ulps): beyond REL_TOL, so the aligned rule calls
+    # them different, but one answer to the answers signal. Handles are erased.
+    base, noisy = _closest(4, *_CLOSEST), _closest(9, *_NOISY)
+    assert not _com_outcome._close(base.result, noisy.result)
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(9, *_NOISY)]) == (
+        "same",
+        {"IFace2.GetClosestPointOn": noise},
+    )
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(9, *_CLOSEST)]) == (
+        "same",
+        None,
+    )
+    # Paired by assignment within one request, in any order.
+    other = (0.0335, *_CLOSEST[1:])
+    assert _answers(
+        [_closest(4, *_CLOSEST), _closest(4, *other)],
+        [_closest(9, *other), _closest(9, *_NOISY)],
+    ) == ("same", {"IFace2.GetClosestPointOn": noise})
+    # Just past the bound, or noise-close to another request's answer only,
+    # or once more in one build: different.
+    scale = _CLOSEST[0]
+    past = (scale + 1.01 * 2**25 * math.ulp(scale), *_CLOSEST[1:])
+    elsewhere = (0.03, *_QUERY[1:])
+    for new in (
+        [_closest(9, *past)],
+        [_closest(9, *_NOISY, query=elsewhere)],
+        [_closest(9, *_NOISY), _closest(9, *_NOISY)],
+    ):
+        signal, detail = _answers([_closest(4, *_CLOSEST)], new)
+        assert signal == "different" and "IFace2.GetClosestPointOn" in detail
+    # Only floats are noise: another string or structure is another answer.
+    named = conv.Call(0, 4, "InvokeTypes", [], "IBody2.Name", result="Boss1")
+    renamed = conv.Call(0, 4, "InvokeTypes", [], "IBody2.Name", result="Boss2")
+    assert _answers([named], [renamed])[0] == "different"
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(4, *_CLOSEST[:3])])[0] == (
+        "different"
+    )
+
+
+def _cylinder(*values: str) -> conv.Call:
+    """``ISurface.CylinderParams`` answering ``values`` (float hex)."""
+    return conv.Call(
+        0,
+        315,
+        "InvokeTypes",
+        [2, 0, 2, {"t": [12, 0]}, {"t": []}],
+        "ISurface.CylinderParams",
+        result={"t": [{"f": value} for value in values]},
+    )
+
+
+def test_subnormal_answers_are_no_measurement():
+    # pn_vn_pen_set_screw (2026-11-12): CylinderParams of a face that is no
+    # cylinder, on two workers. Only the high half of a module address in
+    # the first double differs: 6.95e-310 against 6.95e-310, 2.6e10 ulps.
+    zero, junk = (0.0).hex(), "0x0.0000043e97a1cp-1022"
+    base = ("0x0.07ff900000002p-1022", *[zero] * 5, junk)
+    new = ("0x0.07fff00000002p-1022", *[zero] * 5, junk)
+    radius = (0.0037729).hex()
+    real = (zero, (0.00635).hex(), zero, zero, (-1.0).hex(), zero, radius)
+    assert _answers(
+        [_cylinder(*base), _cylinder(*real)], [_cylinder(*new), _cylinder(*real)]
+    ) == (
+        "same",
+        {
+            "ISurface.CylinderParams": "1 answers within 33554432 ulps of the other build's"
+        },
+    )
+    # A normal float that differs in the same answer still differs.
+    axis = (*new[:4], (-1.0).hex(), *new[5:])
+    flipped = (*base[:4], (1.0).hex(), *base[5:])
+    assert _answers([_cylinder(*axis)], [_cylinder(*flipped)])[0] == "different"
+    # An answer of zeros is not one with a normal float where it has zero.
+    zeros = (zero,) * 7
+    assert _answers([_cylinder(*zeros)], [_cylinder(*zeros[:6], radius)])[0] == (
+        "different"
+    )
+
+
+def test_answers_pairing_works_only_on_the_answers_that_differ(monkeypatch):
+    # One request (a face's area) answered 50,000 times, faces listed in
+    # another order, five answers moved by float noise beyond REL_TOL: the
+    # exact answers cancel and only those five are paired.
+    def area(handle: int, value: float) -> conv.Call:
+        return conv.Call(
+            0,
+            handle,
+            "InvokeTypes",
+            [],
+            "IFace2.GetArea",
+            result={"t": [{"f": value.hex()}, {"f": (1.0).hex()}]},
+        )
+
+    areas = [i * 1e-5 for i in range(50_000)]
+    noisy = {7, 4_321, 20_000, 33_333, 49_999}
+    base = [area(i, v) for i, v in enumerate(areas)]
+    new = [area(i, v + 3e-9 if i in noisy else v) for i, v in enumerate(areas)][::-1]
+    compared = 0
+    close = _com_outcome._answer_close
+
+    def counted(a: Any, b: Any) -> bool:
+        nonlocal compared
+        compared += 1
+        return close(a, b)
+
+    monkeypatch.setattr(_com_outcome, "_answer_close", counted)
+    assert _answers(base, new) == (
+        "same",
+        {"IFace2.GetArea": "5 answers within 33554432 ulps of the other build's"},
+    )
+    assert compared <= len(noisy) ** 2 + len(noisy)
+    # One of them past the bound: different, with the same bounded work.
+    compared = 0
+    new[0] = area(0, areas[-1] + 1e-8)
+    assert _answers(base, new)[0] == "different"
+    assert compared <= len(noisy) ** 2 + len(noisy)
+
+
+def _echoing(title: str, equation: str = "DivisionSpacing", handle: int = 4):
+    """ms_stick's shape (2026-11-12): the document's title and a dimension's
+    full name, both carrying the seat's document counter, then that full name
+    written into an equation."""
+    name = f"D3@MinorPattern@{title}.Part"
+    return [
+        conv.Call(0, 1, "InvokeTypes", [], "IModelDoc2.GetTitle", result=title),
+        conv.Call(1, 2, "InvokeTypes", [], "IDimension.FullName", result=name),
+        conv.Call(2, 3, "InvokeTypes", ["Count"], "IApp.Get", result=0),
+        conv.Call(
+            3,
+            handle,
+            "InvokeTypes",
+            [-1, f'"{name}" = "{equation}"', True],
+            "IEquationMgr.Add2",
+            result=0,
+        ),
+    ]
+
+
+def test_a_request_echoing_a_title_counter_is_caused_by_the_seat():
+    cause = _com_outcome.truth_cause
+    at = {"index": 3, "field": "args"}
+    base = _echoing("Part13")
+    assert cause(base, _echoing("Part24"), at) == _com_outcome.TITLE_COUNTER_CAUSE
+    # Anything else in the request differing is the script's own.
+    assert cause(base, _echoing("Part24", "ScaleEndMargin"), at) == "request"
+    assert cause(base, _echoing("Part24", handle=5), at) == "request"
+    # A counter the script made up, with every answer the same.
+    made_up = [*base[:3], _echoing("Part14")[3]]
+    assert cause(base, made_up, at) == "request"
+    # An earlier answer beyond noise is still named first.
+    counted = [
+        *_echoing("Part24")[:2],
+        conv.Call(2, 3, "InvokeTypes", ["Count"], "IApp.Get", result=1),
+        _echoing("Part24")[3],
+    ]
+    assert cause(base, counted, at) == "response:IApp.Get"
+    # A missing request is no echo.
+    assert cause(base, base[:3], {"index": 3, "field": "length"}) == "request"
+    assert _com_outcome.carries_title_counter([{"t": ["D1@Sketch1@Assem3.Assembly"]}])
+    assert not _com_outcome.carries_title_counter(["Partial11", 11, {"f": "0x1p0"}])
+
+
+def test_a_replay_reports_the_requests_that_carry_a_title_counter():
+    import types
+
+    import com_replay
+
+    inert = conv.Call(
+        4, 1, "InvokeTypes", ["Part9"], "IApp.Note", origin=conv.Origin.INERT
+    )
+    echoes = com_replay._title_echoes(
+        types.SimpleNamespace(calls=[*_echoing("Part24"), inert])
+    )
+    assert echoes == {"count": 1, "first": ["3 IEquationMgr.Add2"]}
+    plain = [call for call in _echoing("Part24") if call.site != "IEquationMgr.Add2"]
+    assert com_replay._title_echoes(types.SimpleNamespace(calls=plain)) == {
+        "count": 0,
+        "first": [],
+    }
 
 
 def test_a_divergence_is_labelled_at_or_after_the_last_named_feature(

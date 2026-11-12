@@ -7,10 +7,11 @@ ring on the groove's front (load) wall.  The hub and disc are trapped
 axially between the sleeve's step face (rearward: the hub's spigot seats on
 it and passes the disc's bore; the hub's flange clamps the disc's front face,
 the spigot's length ahead of the step) and the front bushing (forward); the
-D-flat carries the torque.  The hub's front face stands RECESS behind the
-nose, so hub and disc slide forward off the step by that recess,
-independently of the sleeve, before the hub meets the front bushing: the
-disc's end float is the sleeve's float plus the recess.
+hub's MHA-PD-VN-69 chord key pin over the sleeve's flat, which runs out at the nose,
+carries the torque (#2409).  The hub's front face stands RECESS behind the
+nose, so hub and disc slide forward off the step by that recess, the pin
+riding the flat, independently of the sleeve, before the hub meets the front
+bushing: the disc's end float is the sleeve's float plus the recess.
 
 Owner ruling 2026-11-01 (#2124, reversing #2038 option A): the float is set at
 assembly with as many shims as it takes; nothing is faced.  The fitter sets
