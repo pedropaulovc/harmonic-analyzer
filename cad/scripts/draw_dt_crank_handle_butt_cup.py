@@ -11,6 +11,8 @@ callout states the fit), and the floor hole carries its drill callout.  Every
 band names its mate at the callout (MHA-DT-35 machinist ENFORCE, r1).
 The local radial MAX callout also names the MHA-DT-32 head and its floor
 seating function; it does not change the model's corner or clearance.
+DETAIL B, a 20:1 native detail of section A-A, carries the floor hole's
+pocket-side mouth break, which takes the MHA-DT-32 under-head radius (#1757).
 Owner ruling B on #1375 restores the pocket-wall floor in the model, so its
 former shortfall note and property are not part of the sheet.
 
@@ -27,15 +29,17 @@ import re
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -52,6 +56,7 @@ from _drawing_dimensions import (
 )
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -64,6 +69,7 @@ import _telemetry
 from dt_crank_handle_butt_cup_notes import (
     BODY_CHAMFER_CALLOUT,
     FLOOR_HOLE_CALLOUT,
+    FLOOR_HOLE_CHAMFER_CALLOUT,
     HANDLE_NUMBER,
     POCKET_FIT_CALLOUT,
     POCKET_FLAG,
@@ -72,14 +78,20 @@ from dt_crank_handle_butt_cup_notes import (
 )
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
+    FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
     REFERENCE_DIMENSIONS,
+)
+from dt_crank_handle_head_seat_spec import (
+    CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
+    CUP_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
+    FLOOR_HOLE_CHAMFER,
+    FLOOR_HOLE_CHAMFER_LIMITS,
+    LIMIT_TOL_TYPE,
 )
 from _fit_deviations import deviations
 from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
@@ -195,11 +207,196 @@ DIMENSION_CALLOUTS = {
     "PocketDepth": POCKET_FLAG,
     "PocketDia": POCKET_FIT_CALLOUT,
     "PocketFloorRadius": POCKET_FLAG,
+    "FloorHoleChamfer": FLOOR_HOLE_CHAMFER_CALLOUT,
 }
 # *Left reverses *Right's horizontal basis.  Reverse the cut as well to
 # retain the section's physical viewing direction and +X-right orientation.
 CUT_START = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
+
+# DETAIL B (#1757): the floor hole's pocket-side mouth break is under 1 mm of
+# sheet at 5:1, inside the section, so a 20:1 native detail of section A-A
+# carries its model dimension.  The fence takes in both ends of the break.
+DETAIL_LETTER = "B"
+DETAIL_SCALE = (20, 1)
+_DS = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+_MOUTH_ON_HOLE = (-(POCKET_DEPTH + FLOOR_HOLE_CHAMFER), FLOOR_HOLE_DIA / 2.0)
+_MOUTH_ON_FLOOR = (-POCKET_DEPTH, FLOOR_HOLE_DIA / 2.0 + FLOOR_HOLE_CHAMFER)
+# (model x, y): just inside the pocket, a little above the hole wall.
+DETAIL_FOCUS_MM = (-POCKET_DEPTH + 0.15, FLOOR_HOLE_DIA / 2.0 + 0.1)
+DETAIL_RADIUS_MM = 0.6
+_FENCE_MARGIN_MM = 0.2
+if any(
+    math.dist(DETAIL_FOCUS_MM, point) > DETAIL_RADIUS_MM - _FENCE_MARGIN_MM
+    for point in (_MOUTH_ON_HOLE, _MOUTH_ON_FLOOR)
+):
+    raise AssertionError("detail B's fence must take in both ends of the mouth break")
+# Right of the section, under the isometric's label: the circle spans
+# x 0.333..0.357, y 0.103..0.127.
+DETAIL_CENTER = (0.345, 0.115)
+DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS
+DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - 0.005)
+# The circle's letter on section A-A stands in the open pocket, up-right of
+# the mouth corner and under the pocket-floor radius's leader.
+DETAIL_LETTER_XY = (FACE_X - POCKET_DEPTH * _S + 0.007, SECTION_CENTER[1] + 0.011)
+
+
+def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
+    """Sheet point of a model point in detail B (as the section: +X right)."""
+    return (
+        DETAIL_CENTER[0] + (model_x_mm - DETAIL_FOCUS_MM[0]) * _DS,
+        DETAIL_CENTER[1] + (model_y_mm - DETAIL_FOCUS_MM[1]) * _DS,
+    )
+
+
+# The break's radial leg: a vertical dimension whose extension lines run
+# right over the open pocket, its line 10 mm right of the circle, centred on
+# the break, with its two limits and callout rows beside it.
+DETAIL_KEEP = {
+    "FloorHoleChamfer": (
+        DETAIL_CENTER[0] + DETAIL_CROP_RADIUS + 0.010,
+        (_detail_xy(*_MOUTH_ON_HOLE)[1] + _detail_xy(*_MOUTH_ON_FLOOR)[1]) / 2.0,
+    ),
+}
+
+
+def _dress_floor_hole_chamfer(annotation: Any) -> None:
+    """Prove the imported mouth break prints the model's two native limits."""
+    label = "MHA-DT-35 FloorHoleChamfer"
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    nominal = float(dimension.SystemValue) * 1000.0
+    limits = (
+        nominal + float(tolerance.GetMinValue()) * 1000.0,
+        nominal + float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if (
+        not math.isclose(nominal, FLOOR_HOLE_CHAMFER, abs_tol=1e-6)
+        or int(tolerance.Type) != LIMIT_TOL_TYPE
+        or any(
+            not math.isclose(actual, expected, abs_tol=1e-6)
+            for actual, expected in zip(limits, FLOOR_HOLE_CHAMFER_LIMITS, strict=True)
+        )
+        or bool(dimension.IsReference())
+    ):
+        raise RuntimeError(f"{label}: imported break lost its model limits: {limits}")
+
+
+def _mouth_break_detail(adapter: Any, section: Any) -> Any:
+    """Native 20:1 detail B of the floor hole's mouth in section A-A
+    (draw_dt_crank_handle._ferrule_seat_detail): fence, scale, outline, label
+    and letter each read back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(section, "IView")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate detail B's parent section")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        section,
+        (DETAIL_FOCUS_MM[0] / 1000.0, DETAIL_FOCUS_MM[1] / 1000.0, 0.0),
+        label="detail B fence centre",
+    )
+    sheet_xy = [center[:2], (center[0] + DETAIL_RADIUS_MM * _S, center[1])]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_xy:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    # Straight to the database: an inferred circle snaps onto nearby section
+    # edges (draw_dt_pinion_lever r2), so the fence is read back before use.
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create detail B's fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("detail B's fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select detail B's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no detail B")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]
+    ):
+        raise RuntimeError(f"detail B scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("detail B has invalid bounds")
+    span = 2.0 * DETAIL_CROP_RADIUS
+    _telemetry.info(
+        f"detail B outline {outline[2] - outline[0]:.5f} x "
+        f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
+    )
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"detail B is smaller than its fence: {outline}")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail B")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail B label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position detail B's label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail B's label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on section A-A, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"detail B's letter did not persist: {letter}")
+    return detail
 
 
 def _dress_pocket_floor_radius(annotation: Any) -> None:
@@ -349,13 +546,27 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (end, section, iso):
         set_hidden_lines_removed(adapter, view)
 
-    annotations = curate_view_dimensions(
+    # Detail B first (draw_dt_crank_handle): a native detail imports nothing
+    # after its parent's import and deletions, and a dimension already on the
+    # sheet is never imported again, so the section's import then skips the
+    # mouth break the detail holds.
+    detail = _mouth_break_detail(adapter, section)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="floor-hole mouth detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section_annotations = curate_view_dimensions(
         adapter,
         section,
         keep=SECTION_KEEP,
         view_label="longitudinal section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    annotations = [*section_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     by_name = {dimension_name(adapter, a): a for a in annotations}
@@ -364,6 +575,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, by_name[name], label=f"MHA-DT-35 {name}", diameter=True
         )
     _dress_pocket_floor_radius(by_name["PocketFloorRadius"])
+    _dress_floor_hole_chamfer(by_name["FloorHoleChamfer"])
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the cup end view")
     create_section_axis_centerline(
