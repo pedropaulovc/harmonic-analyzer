@@ -606,18 +606,17 @@ HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
 GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
-# The .61 locates the groove: it runs from the spigot face to the centre
-# plane the groove, web and rim share, its extension line ending on the
-# lower groove's bottom.  Two machinist reviews still read the groove as
-# unlocated (integration proofs 20261109T105251629Z, 20261112T153723793Z).
-# Rule 7 keeps the location dimension bare, so the groove's own size callout
-# names the plane (delegated ruling: Repitch1038, 2026-11-12, #2144).  It
-# stands on the groove's R, whose block has open sheet to its right: the
-# groove bottom's Ø has about 33 mm between the rim's two Ø lines, too narrow
-# for this line.  The ".61" is the dimension's own value at its printed
-# places, so the words cannot drift from it.
-_PLANE_TEXT = f"{abs(HUB_FRONT_Z) / 25.4:.{DRAWING_PRECISION_BY_NAME['HubFrontZ']}f}"
-GROOVE_R_CALLOUT = f"{GROOVE_CALLOUT}\nCENTRED ON {_PLANE_TEXT.removeprefix('0')} PLANE"
+# The .61 locates the groove: it runs from the spigot face to the web's
+# centre plane (WEB_CENTRELINES), which the groove and rim share, its
+# extension line ending on the lower groove's bottom.  Two machinist reviews
+# still read the groove as unlocated (integration proofs
+# 20261109T105251629Z, 20261112T153723793Z).  Rule 7 keeps the location
+# dimension bare and puts what it serves on the feature's size callout, so
+# the groove's R says the groove is centred on the web, the plane the .61
+# dimensions, with no second value (rule 26: no number in a sentence).  It
+# stands on the R, whose block has open sheet to its right: the groove
+# bottom's Ø has about 33 mm between the rim's two Ø lines.
+GROOVE_R_CALLOUT = f"{GROOVE_CALLOUT}\nCENTRED ON WEB"
 # The web plane's value is ".61 ±.03": its text is centred this many
 # characters (with the margin) right of the spigot face.
 _PLANE_VALUE_CHARS = 8

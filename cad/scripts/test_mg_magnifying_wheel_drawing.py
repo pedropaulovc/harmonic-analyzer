@@ -344,16 +344,15 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "REAM THRU\nSEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == "SEE NOTE 2"
     assert drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "SEE NOTE 3"
-    # The groove's R links the same note and names the plane the .61
-    # locates the groove on, by the value the .61 prints; the location
-    # itself stays bare (rule 7; two reviews read the groove as unlocated:
-    # integration proofs 20261109T105251629Z, 20261112T153723793Z).
-    groove_r = drawing.DIMENSION_CALLOUTS["GrooveR"].split("\n")
-    places = drawing.DRAWING_PRECISION_BY_NAME["HubFrontZ"]
-    printed = f"{abs(geom.HUB_FRONT_Z) / 25.4:.{places}f}".lstrip("0")
-    assert groove_r == ["SEE NOTE 3", f"CENTRED ON {printed} PLANE"]
-    assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
-    assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
+    # The groove's R links the same note and says the groove is centred on
+    # the web, whose centre plane (the drawn centrelines at z = 0) the bare
+    # .61 dimensions: two reviews read the groove as unlocated (integration
+    # proofs 20261109T105251629Z, 20261112T153723793Z).  Rule 7: the reason
+    # sits on the size callout, at most two lines of words, no second value.
+    note_link, relation = drawing.DIMENSION_CALLOUTS["GrooveR"].split("\n")
+    assert note_link == drawing.GROOVE_CALLOUT
+    assert relation.startswith("CENTRED ON") and "WEB" in relation.split()
+    assert not any(c.isdigit() for c in relation)
     assert "GrooveR" not in drawing.CALLOUTS_ABOVE
     # The literal mate numbers keep the axle, drum and wire out of the part's
     # recipe; they are the config rows' numbers.
