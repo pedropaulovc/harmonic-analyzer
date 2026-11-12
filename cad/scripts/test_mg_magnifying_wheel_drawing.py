@@ -345,13 +345,15 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == "SEE NOTE 2"
     assert drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "SEE NOTE 3"
     # The groove's R links the same note and says the groove is centred on
-    # the web, whose centre plane (the drawn centrelines at z = 0) the bare
-    # .61 dimensions: two reviews read the groove as unlocated (integration
-    # proofs 20261109T105251629Z, 20261112T153723793Z).  Rule 7: the reason
-    # sits on the size callout, at most two lines of words, no second value.
+    # the rim, which stands symmetric about the plane (the drawn centrelines
+    # at z = 0) the bare .61 dimensions: two reviews read the groove as
+    # unlocated (integration proofs 20261109T105251629Z,
+    # 20261112T153723793Z).  Rule 7: the reason sits on the size callout, at
+    # most two lines of words, no second value; rule 26: a feature the sheet
+    # draws, by its plain name.
     note_link, relation = drawing.DIMENSION_CALLOUTS["GrooveR"].split("\n")
     assert note_link == drawing.GROOVE_CALLOUT
-    assert relation.startswith("CENTRED ON") and "WEB" in relation.split()
+    assert relation.startswith("CENTRED ON") and "RIM" in relation.split()
     assert not any(c.isdigit() for c in relation)
     assert "GrooveR" not in drawing.CALLOUTS_ABOVE
     # The literal mate numbers keep the axle, drum and wire out of the part's
