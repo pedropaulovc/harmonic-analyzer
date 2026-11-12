@@ -1112,7 +1112,7 @@ PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
 PEDESTAL_RECHECK_HEADER = (
     "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
 )
-_RELOCATE_STEPS = (
+_RELOCATE_REFS = (
     f"{_step_ref('cylinder-stack-accepted', 'X')}-"
     f"{_step_ref('cylinder-stack-accepted', 'Z')}"
 )
@@ -1136,7 +1136,7 @@ PEDESTAL_RECHECK_ROWS = (
         _step_ref("cylinder-stack-accepted", "Z"),
         "", "", "",
         FRONT_STRAP_Y_WINDOW,
-        f"IT CREPT: RE-LOCATE IT AS STEPS {_RELOCATE_STEPS}",
+        f"IT CREPT: RE-LOCATE IT AS STEPS {_RELOCATE_REFS}",
     ),
 )
 
