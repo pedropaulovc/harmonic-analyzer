@@ -357,21 +357,26 @@ def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() ->
     assert drawing.FOOT_Y > 0.066
 
 
-def test_bend_acceptance_leader_lands_on_the_bend_clear_of_the_tube() -> None:
+def test_bend_acceptance_leader_lands_on_the_bend_clear_of_the_radius_line() -> None:
     tip_x, tip_y = drawing.BEND_NOTE_TIP
     centre = (drawing._front_x(-geom.BEND_R), drawing._front_y(geom.LEG_TOP))
     inner_r = (geom.BEND_R - geom.TUBE_DIA / 2.0) * drawing._S
     assert math.dist((tip_x, tip_y), centre) == pytest.approx(inner_r)
     assert tip_x > centre[0] and tip_y > centre[1]
-    # The two-row block (~2.42 mm a character, ~9 mm tall) stands inside
-    # the bend: left of the leg's inner edge, under the arm, over the tube
-    # Ø's text and right of the sheet's left border.
+    # The two-row block (farm run 20261112T194827228Z: "OVALITY 5% MAX,"
+    # printed 39.4 mm wide, the leader leaving its right end ~6 mm under the
+    # block's top) stands left of the faced arm end and under the arm.
     left, top = drawing.BEND_NOTE_XY
-    right = left + 0.00242 * max(map(len, drawing.BEND_ACCEPTANCE.splitlines()))
-    leg_inner = drawing.LEG_AXIS_X - geom.TUBE_DIA / 2.0 * drawing._S
-    assert 0.016 < left and right + 0.005 < leg_inner
-    assert top < drawing.ARM_AXIS_Y - geom.TUBE_DIA / 2.0 * drawing._S - 0.020
-    assert top - 0.009 > drawing.FRONT_KEEP["TubeOdRef"][1] + 0.010
+    right = left + 0.00265 * max(map(len, drawing.BEND_ACCEPTANCE.splitlines()))
+    arm_inner = drawing.ARM_AXIS_Y - geom.TUBE_DIA / 2.0 * drawing._S
+    assert 0.016 < left and right + 0.003 < drawing.ARM_END_X
+    assert top + 0.004 < arm_inner
+    assert top - 0.010 > drawing.FRONT_KEEP["TubeOdRef"][1] + 0.010
+    # The R3.0 dimension's line runs in from the leg's tangent toward the
+    # bend's centre (the run's leader 35° up crossed it, machinist review
+    # r1-r3): the leader, from its start to the tip, stays well above it.
+    start_y = top - 0.006
+    assert min(start_y, tip_y) > centre[1] + 0.010
 
 
 def _mass_adapter(volume: float):

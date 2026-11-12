@@ -157,23 +157,27 @@ if set(FRONT_KEEP) != {
 # The bend's acceptance is short, so it prints at its own leader on the bend,
 # not as a numbered note in the corner (drawing-guidelines.md rule 7, "flag
 # it where it applies"; machinist review of the v49 release, acd9e8f84d: note
-# 1 stood alone with no flag at the R3.0 callout).  Two rows, ~36 mm wide,
-# inside the bend: its upper-left corner left of and just under the bend's
-# centre, so the block ends 7 mm left of the leg's inner edge and 30 mm under
-# the arm, well over the tube Ø's text; its leader rises to the bend's inner
-# arc 35° up from the leg, crossing no dimension.  The text is the part's
-# Manufacturing Notes property (spec DRAWING_NOTES) without its number and
-# "BEND:", which the leader now says.  The elevation is a projected principal
-# view at the sheet's scale, so it carries no label (drawing-guidelines.md
-# rule 9).  The isometric's note sits under it, over the title block.
+# 1 stood alone with no flag at the R3.0 callout).  Two rows, ~39 mm wide at
+# ~2.62 mm a glyph (farm run 20261112T194827228Z), left of the faced arm end
+# and just under the arm: the block ends 4.7 mm left of the arm end and its
+# top 5.5 mm under the arm's inner edge, far over the tube Ø's text.  Its
+# leader runs right, under the arm, to the bend's inner arc 55° up from the
+# leg, so it stays well above the bend's centre: the R3.0 dimension's line
+# runs in from the leg's tangent toward that centre, and the leader of the
+# first placement (block under the centre, tip 35° up) crossed it (machinist
+# review of that run, r1-r3).  The text is the part's Manufacturing Notes
+# property (spec DRAWING_NOTES) without its number and "BEND:", which the
+# leader now says.  The elevation is a projected principal view at the
+# sheet's scale, so it carries no label (drawing-guidelines.md rule 9).  The
+# isometric's note sits under it, over the title block.
 BEND_ACCEPTANCE = "OVALITY 5% MAX,\nNO KINKS"
 _BEND_INNER_R = BEND_R - _TUBE_R
-_BEND_TIP_ANGLE = math.radians(35.0)
+_BEND_TIP_ANGLE = math.radians(55.0)
 BEND_NOTE_TIP = (
     _front_x(-BEND_R + _BEND_INNER_R * math.cos(_BEND_TIP_ANGLE)),
     _front_y(LEG_TOP + _BEND_INNER_R * math.sin(_BEND_TIP_ANGLE)),
 )
-BEND_NOTE_XY = (_front_x(-BEND_R) - 0.020, _front_y(LEG_TOP) - 0.001)
+BEND_NOTE_XY = (ARM_END_X - 0.044, _front_y(ARM_Y - _TUBE_R) - 0.0055)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.085)
 
 
