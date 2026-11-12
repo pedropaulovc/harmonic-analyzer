@@ -393,13 +393,13 @@ SIDE_KEEP = {
     # serial's Y reference text (SERIAL_Y_TEXT_XY).
     "DeckEdgeChamfer": (0.218, 0.134),
 }
-# D1 shows no view offsets. Delegated ruling 2026-11-07 (Main), no precedent;
-# owner review #2144 (pending owner confirmation): D1 is transferred from the
-# MHA-DT-20 pivot bore, so its spec-owned .002 offsets from the MHA-DT-02 seat
-# (PivotSeatReference, booked in cone_set_stack) are an MHA-DT-00 assembly
-# check, not a print location. Run 20261107T191011860Z (2/3): the two banded
-# dimensions ran from an untagged transferred hole beside a hole table that
-# already locates D1, and read as cut-to values against the transfer.
+# D1 shows no view offsets: it is transfer-punched through the MHA-DT-20
+# pivot bore at MHA-DT-00 step 23 (owner ruling 2026-11-08), so the model's
+# nominal PivotSeatReference offsets from the MHA-DT-02 seat are unbanded
+# references and cone_set_stack books the transfer instead (#2366). Run
+# 20261107T191011860Z (2/3): the two dimensions ran from an untagged
+# transferred hole beside a hole table that already locates D1, and read as
+# cut-to values against the transfer.
 SHOWN_PRECISION_BY_NAME = {
     name: places
     for name, places in DRAWING_PRECISION_BY_NAME.items()
@@ -1234,18 +1234,14 @@ TRANSFER_NAMEPLATE_CALLOUT = "TRANSFER FROM MHA-FR-04\nAT ASSEMBLY;"
 TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
-# The cone swing set is made against the arbor carried by MHA-DT-02.
-# Both native banded offsets and the physical pivot's hole-table row cite
-# numbered note 1 in the B4 notes lane. Delegated ruling 2026-11-07 (Main), no
-# precedent; owner review #2144 (pending owner confirmation): D1 is spotted
-# through the MHA-DT-20 platform's reamed pivot bore at assembly (rule 4's
-# transfer route; the MHA-DT-00 step that sets the platform is the drive-train
-# slice's). The .002 offsets from the MHA-DT-02 seat stay as the native banded
-# dimensions, booked unchanged in cone_set_stack, with no sentence repeating
-# them: run 20261107T171816615Z (2/3) counted that line over rule 7's
-# four-line note block. The note is the sheet's own:
-# fr_harmonic_base_spec.pivot_seat_step is in the part builder's closure and
-# would re-key the base and every assembly over presentation text.
+# The cone swing set is made against the arbor carried by MHA-DT-02. The
+# physical pivot's hole-table row cites numbered note 1 in the B4 notes lane:
+# D1 is transfer-punched through the MHA-DT-20 platform's reamed pivot bore at
+# MHA-DT-00 step 23 (rule 4's transfer route; owner ruling 2026-11-08), and
+# its table X/Y are reference. No sentence repeats an offset: run
+# 20261107T171816615Z (2/3) counted that line over rule 7's four-line note
+# block. The note is the sheet's own, kept out of fr_harmonic_base_spec so
+# presentation text does not re-key the base and every assembly.
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 

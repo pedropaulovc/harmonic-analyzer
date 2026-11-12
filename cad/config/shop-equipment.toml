@@ -207,6 +207,7 @@ present = false
 name = "Transfer punch set, fractional and number sizes"
 kind = "transfer_punch_set"
 present = false
+note = "Buy a set ground no more than .003 in under nominal (e.g. Precise spotters, .0025 ±.0005 under from 2.5 mm to 17/32 in, Penn Tool listing read 2026-11-12): cone_set_stack.PIVOT_SEAT_TRANSFER_MM books the 1/4 in punch's radial play in the MHA-DT-20 pivot bore at that grind (#2366)."
 
 [tools.taper-pin-reamer]
 name = "Taper-pin reamer, 1:48, for the MHA-DT-09 pin"
@@ -476,7 +477,6 @@ purchase = "FM Carbide DC-11 (EDP 17537), $13.11 each (listing read live 2026-11
 present = false
 status = "not owned: to buy"
 use = "MHA-FR-01 4X Ø.35 spotfaces and MHA-FR-02 4X Ø.35 counterbores"
-dia_in = 0.34375
 
 # The near-wall Ø.206 #10 close clearance on the same paths: a jobber #5 from
 # the owned 115-piece index stands too proud in the chuck with the base on
@@ -491,8 +491,6 @@ purchase = "Travers 01-071-005, $2.40 each, 61 in stock (listing read live 2026-
 present = false
 status = "not owned: to buy"
 use = "MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge"
-dia_in = 0.2055
-overall_length_in = 2.375
 
 # --- workholding ------------------------------------------------------------
 

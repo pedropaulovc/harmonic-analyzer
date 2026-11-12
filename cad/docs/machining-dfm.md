@@ -69,8 +69,8 @@ its first-root position; no second general note restates that location.
      air minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent printed
      manufacturing and set tolerances, minus the swing-interval arc allowance. Fastener and running
      clearances, thread centring, shaft swing in the post journal and G19 cock can all be taken up
-     together; never put them in the RSS. The current calculated least air is 0.125 mm at the bushing,
-     3.985 mm at the end screw and 5.045 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
+     together; never put them in the RSS. The current calculated least air is 0.080 mm at the bushing,
+     3.940 mm at the end screw and 5.001 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
      clearance; `_native_cone_tip_air` checks the saved bodies against it.
      The shaft drawing (one sheet, **Shaft Controls**) dimensions each chucking
      from its own collar face (rule 11): the journal and the collar web from the
