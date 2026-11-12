@@ -9187,6 +9187,39 @@ def test_washer_bore_line_still_through_the_centre_fails_the_build(monkeypatch):
         case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
 
 
+def test_washer_source_checks_read_labels_in_sorted_order(monkeypatch):
+    # Each label's source checks are COM reads: they run in sorted label
+    # order, never the set's (string hashing is salted per process).
+    case = _washer_import_native(monkeypatch)
+    helpers = case.source_helper
+    labels, named = helpers._model_reference_labels, helpers._named_dimensions
+    asked = []
+
+    class Reversed(frozenset):
+        def __iter__(self):
+            return iter(sorted(frozenset.__iter__(self), reverse=True))
+
+    monkeypatch.setattr(
+        helpers,
+        "_model_reference_labels",
+        lambda references: Reversed(labels(references)),
+    )
+    monkeypatch.setattr(
+        helpers,
+        "_named_dimensions",
+        lambda adapter, owner, names, **kwargs: (
+            asked.extend(names) or named(adapter, owner, names, **kwargs)
+        ),
+    )
+    case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    by_name = {
+        name: label for label, (_feature, name) in helpers.SOURCE_DIMENSIONS.items()
+    }
+    assert list(dict.fromkeys(by_name[name] for name in asked)) == sorted(
+        case.model_references
+    )
+
+
 @pytest.mark.parametrize("label", (
     "supplier outer diameter", "supplier bore diameter", "supplier thickness",
 ))

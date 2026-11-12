@@ -251,6 +251,27 @@ def test_two_diagrams_have_no_scratch_or_body_copy_path(monkeypatch):
     assert model.FeatureByName("MaximumGauge").suppressed[states[0].name]
 
 
+def test_diagram_census_reads_added_features_in_name_order(monkeypatch):
+    # Each GetTypeName2 of the census is a COM call: it runs in sorted name
+    # order, never the set's (string hashing is salted per process).
+    adapter, model = _adapter(monkeypatch)
+    names = ("ZetaGauge", "MuGauge", "AlphaGauge", "KappaGauge", "EtaGauge")
+    read = []
+    type_name = _Feature.GetTypeName2
+
+    def typed(feature):
+        read.append(feature.Name)
+        return type_name(feature)
+
+    monkeypatch.setattr(_Feature, "GetTypeName2", typed)
+
+    async def references(target):
+        return tuple(_sketch(model, name).Name for name in names)
+
+    _run(adapter, _diagram(references))
+    assert [name for name in read if name in names][: len(names)] == sorted(names)
+
+
 @pytest.mark.parametrize("corruption", ["shown", "unmarked", "wrong_owner", "continuous", "duplicate", "empty"])
 def test_diagrams_require_new_hidden_construction_dimension_owners(monkeypatch, corruption):
     adapter, model = _adapter(monkeypatch)

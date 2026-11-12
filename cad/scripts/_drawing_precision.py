@@ -34,10 +34,15 @@ def _named_dimensions(
     matched against the name of the feature that actually owns it, and a name
     that resolves twice inside the tree is still rejected rather than guessed.
     ``feature`` is ``feature_name``'s dispatch when the caller already has it.
+    The result is in sorted name order, never the set's (string hashing is
+    salted per process), so its bindings and every caller's walk of it issue
+    their COM calls in the same order on every run.
     """
     if feature is None:
         feature = _feature_by_name(adapter, feature_name)
-    found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in dimension_names}
+    found: dict[str, list[tuple[Any, Any]]] = {
+        name: [] for name in sorted(dimension_names)
+    }
     for current in _feature_tree(feature):
         current_name = str(_com_invoke(current, "IFeature", "Name"))
         for display in _feature_display_dimensions(current):
@@ -142,7 +147,10 @@ def apply_drawing_precision(adapter: Any, precision: dict[str, dict[str, int]]) 
                 if len(features) == len(wanted):
                     break
         span.set_attribute("features_visited", visited)
-    for feature_name, dimensions in precision.items():
+    # Sorted: specs build these mappings from sets of str (string hashing is
+    # salted per process), and each step below is a COM call.
+    for feature_name in sorted(precision):
+        dimensions = precision[feature_name]
         with _telemetry.span(
             "dim.precision_lookup", label=feature_name, dimensions=len(dimensions)
         ):
@@ -152,11 +160,11 @@ def apply_drawing_precision(adapter: Any, precision: dict[str, dict[str, int]]) 
                 set(dimensions),
                 feature=features.get(feature_name),
             )
-        for dimension_name, decimals in dimensions.items():
+        for dimension_name in sorted(dimensions):
             set_dimension_display_precision(
                 adapter,
                 feature_name,
                 dimension_name,
-                decimals,
+                dimensions[dimension_name],
                 display=resolved[dimension_name][0],
             )

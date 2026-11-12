@@ -347,20 +347,26 @@ def _has_conversion_source(adapter: Any, segment: Any, source: Any) -> bool:
 
 
 def _convert_location_source(adapter: Any, source: Any, interface: str) -> Any:
+    """Convert ``source`` and return the one segment natively bound to it.
+
+    The converted segment is found by its relation to ``source``, never as
+    "the segment not listed before": a segment dispatch read before
+    ``SketchUseEdge3`` can go stale across it (``ISldWorks.IsSame`` then
+    answers 0 for the same, earlier-converted circle)."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
-    application = _early_bound(adapter.swApp, "ISldWorks")
-    previous = tuple(sketch.GetSketchSegments() or ())
+    before = len(sketch.GetSketchSegments() or ())
     model.ClearSelection2(True)
     _native_select(adapter, source, interface, append=False)
     manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
     if manager.SketchUseEdge3(False, False) is not True:
         raise RuntimeError("clamp location: native edge conversion failed")
     model.ClearSelection2(True)
-    added = [candidate for candidate in sketch.GetSketchSegments() or () if not any(int(application.IsSame(candidate, old)) == 1 for old in previous)]
-    if len(added) != 1 or not _has_conversion_source(adapter, added[0], source):
+    after = tuple(sketch.GetSketchSegments() or ())
+    linked = [segment for segment in after if _has_conversion_source(adapter, segment, source)]
+    if len(after) != before + 1 or len(linked) != 1:
         raise RuntimeError("clamp location: conversion did not retain exactly one actual source entity")
-    converted = _early_bound(added[0], "ISketchSegment")
+    converted = _early_bound(linked[0], "ISketchSegment")
     converted.ConstructionGeometry = True
     if converted.ConstructionGeometry is not True:
         raise RuntimeError("clamp location: converted geometry is not construction")

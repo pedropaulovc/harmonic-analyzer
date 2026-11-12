@@ -20,7 +20,15 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+import _paths
+
 _SCHEMA = "harmonic-analyzer/part-member-neutral@1"
+
+
+def _out_root() -> Path:
+    """The build's output root, read from ``_paths`` at call time, so a replay
+    that redirects ``_paths.OUT_*`` into its scratch root redirects these too."""
+    return _paths.OUT_SLDPRT.parent
 
 
 def step_export_preferences():
@@ -59,7 +67,7 @@ def member_export_paths(
     explicit per-format association, not permission to use the bare file for any
     other member. Historical resolvers supply their own declared default member.
     """
-    root = Path(out) if out is not None else Path(__file__).resolve().parents[1] / "out"
+    root = Path(out) if out is not None else _out_root()
     dashed = stem.replace("_", "-")
     mesh = mesh_key(dashed, configuration)
     neutral = dashed if configuration == default_configuration else mesh
@@ -131,7 +139,7 @@ def configuration_producer_paths(
 
 
 def configuration_manifest_path(stem: str, out: Path | None = None) -> Path:
-    root = Path(out) if out is not None else Path(__file__).resolve().parents[1] / "out"
+    root = Path(out) if out is not None else _out_root()
     return root / "reports" / "part-neutral" / f"{stem.replace('_', '-')}.json"
 
 
@@ -304,7 +312,7 @@ async def export_member_configurations(
     root = (
         next(iter(members.values()))["step"].parents[2]
         if members
-        else Path(__file__).resolve().parents[1] / "out"
+        else _out_root()
     )
     manifest = configuration_manifest_path(part_name, root)
     manifest.unlink(missing_ok=True)

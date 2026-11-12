@@ -2361,16 +2361,25 @@ checkout too deep for a recording's own paths builds unrecorded with a WARN.
 Every COM subprocess (`dodo._exec_com`: the recording driver, its unrecorded
 re-run, an unrecorded part build, and assembly, drawing and hook runs) hashes
 str with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`, applied over any inherited
-value). Two shared helpers order COM requests by iterating a set of str:
-`_drawing_precision.py:40` (`_named_dimensions`) and
-`_supplier_spring_reference.py:376` (`add_supplier_reference_configurations`).
-Under per-process hash randomisation their request order changed from build to
-build: on 2026-11-11, 5 of 10 identical-source part rebuilds diverged on it.
-The helpers stay as they are, because making them order-independent would
-re-key 147 part leaves. The pin re-keys none, since `dodo.py` is in no recipe
-closure, and seed 0 is one of the orders builds already took. The seed is in
-the log's environment. A replay runs with the fresh recording's environment
-and refuses (`input_mismatch`) a base recorded under another seed or none.
+value). Under per-process hash randomisation, a build that orders COM
+requests by iterating a set of str issues them in another order from build to
+build: on 2026-11-11, 5 of 10 identical-source part rebuilds diverged on
+`_drawing_precision._named_dimensions` and
+`_supplier_spring_reference.add_supplier_reference_configurations`. Since
+#2514 those, `_drawing_precision.apply_drawing_precision` (specs build
+`DRAWING_PRECISION` from sets),
+`_supplier_washer_model.assert_supplier_washer_references`,
+`_assembly_patterns.assert_pattern_targets` and `build_pd_platen_rack`'s
+reference-dimension loop iterate sorted names. The pin stays: the vendored
+`sw_type_info.flag_methods` still flags an
+interface's methods (one `GetIDsOfNames` request each) in set order, reached
+through `_com._flag` (`part:dt_cylinder_gear`), `segment_point_objects`
+(`part:pd_transgear_thumbnut`) and `dimension_full_name`
+(`drawing:mg_magnifying_lever`), and the seed is a process input the replay
+pins. It re-keys nothing, since `dodo.py` is in no recipe closure. The seed is
+in the log's environment. A replay runs with the fresh recording's
+environment and refuses (`input_mismatch`) a base recorded under another seed
+or none.
 
 Assemblies, drawings and gates are not recorded. Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
@@ -2528,9 +2537,10 @@ not held. Next, the base log is compared with this build's own fresh recording
   their value's largest float. The named answer need not have steered the
   request: when a source edit follows a reordering, the reordering is named.
   `response:title_counter` means the diverging request is the base's but for
-  a title counter an earlier answer carried (ms_stick, 2026-11-12: a
-  dimension's full name, `D3@MinorPattern@Part24.Part`, written into an
-  equation), so on a `noop` it is `seat_nondeterminism`.
+  a title counter an earlier answer carried (ms_stick before #2514,
+  2026-11-12: a dimension's full name, `D3@MinorPattern@Part24.Part`, written
+  into an equation; the build now writes `D3@MinorPattern`, as SolidWorks
+  accepts for `D3@TickPattern`), so on a `noop` it is `seat_nondeterminism`.
   `error:<type>` means judging the cause raised (message in
   `outcome_details.truth_cause`); on a `noop` that is `noop_outcome_unknown`,
   never `noop_unexplained_divergence`.
@@ -2656,7 +2666,9 @@ Observed SolidWorks variation (2026-11-11): `IBody2.GetFaces` listed the same
 faces of one body in another order between builds, including two consecutive
 documents of one SolidWorks session. Every reordering moved a -Y planar face,
 right after a Hole Wizard feature was finalised, and
-`_holes.find_planar_face` measured the faces in the order listed. On
+`_holes.find_planar_face` measured the faces in the order listed (it still
+does, but since #2514 it ranks faces on rounded values with the bounding box
+as the last key, so the order no longer decides which face it picks). On
 `part:dt_cone_swing_platform` this raised the fleet's first alarm under the
 earlier request-equality rule: the replay was a `noop` and the fresh build's
 requests diverged at the face search, yet its mass properties, request and

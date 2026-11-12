@@ -1528,8 +1528,7 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
 # The str hash seed: dodo._exec_com pins it for every COM subprocess
 # --------------------------------------------------------------------------- #
 # A build ordering its COM requests by iterating a set of str, as
-# _drawing_precision._named_dimensions and
-# _supplier_spring_reference.add_supplier_reference_configurations do.
+# _drawing_precision._named_dimensions did before #2514.
 _SET_ORDER_SCRIPT = (
     "import sys\n"
     "from _session import run_build\n"

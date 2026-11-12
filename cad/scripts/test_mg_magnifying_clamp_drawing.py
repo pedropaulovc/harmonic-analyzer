@@ -876,9 +876,9 @@ def test_location_selection_uses_actual_native_entity_and_zero_mark(monkeypatch,
             part._native_select(adapter, entity, interface, append=False)
 
 
-@pytest.mark.parametrize("mode", ("linked", "unlinked-copy", "refused", "duplicate", "nonconstruction"))
+@pytest.mark.parametrize("mode", ("linked", "stale-previous", "unlinked-copy", "refused", "duplicate", "nonconstruction"))
 def test_converted_location_geometry_requires_actual_source_identity(monkeypatch, mode) -> None:
-    source, same_coordinate_copy = object(), object()
+    source, same_coordinate_copy, earlier_source = object(), object(), object()
     segments, selected = [], []
 
     class Converted:
@@ -898,7 +898,17 @@ def test_converted_location_geometry_requires_actual_source_identity(monkeypatch
             if mode != "nonconstruction":
                 self.construction = value
 
-    sketch = SimpleNamespace(GetSketchSegments=lambda: tuple(segments))
+    class EarlierConversion:
+        # Every listing hands back a fresh dispatch, as SolidWorks did across
+        # SketchUseEdge3 on 2026-11-12: IsSame(listed, listed-before) == 0.
+        def GetRelations(self):
+            return (SimpleNamespace(GetDefinitionEntities2=lambda: (earlier_source,)),)
+
+    def listing():
+        earlier = (EarlierConversion(),) if mode == "stale-previous" else ()
+        return earlier + tuple(segments)
+
+    sketch = SimpleNamespace(GetSketchSegments=listing)
     model = SimpleNamespace(GetActiveSketch2=lambda: sketch, ClearSelection2=lambda _all: None)
 
     def convert(chain, loops):
@@ -912,7 +922,7 @@ def test_converted_location_geometry_requires_actual_source_identity(monkeypatch
     adapter = SimpleNamespace(currentModel=model, currentSketchManager=SimpleNamespace(SketchUseEdge3=convert), swApp=application)
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selected.append((entity, interface, append)))
-    if mode == "linked":
+    if mode in ("linked", "stale-previous"):
         converted = part._convert_location_source(adapter, source, "IEntity")
         assert converted is segments[0] and converted.ConstructionGeometry
         assert selected == [(source, "IEntity", False)]

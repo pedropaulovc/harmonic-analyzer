@@ -321,6 +321,10 @@ async def build_99607A213(adapter, truth=None):
         for f in _all_body_faces(adapter):
             f2 = _raw.bind(f, "IFace2")
             surf = _early_bound(f2.GetSurface(), "ISurface")
+            # CylinderParams of a surface that is no cylinder is uninitialised
+            # memory (half a module address, different on every worker).
+            if not surf.IsCylinder():
+                continue
             try:
                 cp = list(_read_member(surf, "CylinderParams") or [])
             except Exception:

@@ -349,7 +349,7 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        for dimension_name in dimension_names & DRAWING_REFERENCE_DIMENSIONS:
+        for dimension_name in sorted(dimension_names & DRAWING_REFERENCE_DIMENSIONS):
             display, _dimension = _named_dimension(
                 adapter, feature_name, dimension_name
             )

@@ -134,7 +134,11 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     the requested point's plane outranks face area. This matters after a shallow
     spotface: its small exact floor and the much larger original face can both
     fall inside the tolerance, yet Hole Wizard depth must start at the floor.
-    Equal-plane ambiguity falls back to the largest spanning face.
+    Equal-plane ambiguity falls back to the largest spanning face. The rank is
+    rounded (1e-6 mm, 1e-6 mm^2), so float noise cannot order two faces, and an
+    exact tie goes to the lowest rounded bounding box: SolidWorks may list a
+    body's faces in another order from run to run (``IBody2.GetFaces``), so
+    enumeration order must never decide.
 
     Coordinate ``SelectByID2`` is unreliable for this (a point on the target
     plane can resolve to a side face that merely touches the plane), so the
@@ -175,7 +179,11 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
         if plane_error > tol_mm:
             continue
         area = float(f.GetArea())
-        rank = (plane_error, -area)
+        rank = (
+            round(plane_error, 6),
+            -round(area * 1e6, 6),
+            tuple(round(v, 6) for v in box),
+        )
         spans = all(
             box[k] - tol_mm <= p[k] <= box[k + 3] + tol_mm
             for p in points_mm

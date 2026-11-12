@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import pytest
 
 import _part_save
+import _paths
 import export_models
 
 
@@ -176,8 +177,9 @@ def _shared_release_fixture(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: {})
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
-    # Redirect the helper's default root without replacing its path/validation API.
-    monkeypatch.setattr(members, "__file__", str(tmp_path / "cad/scripts/_part_configuration_exports.py"))
+    # Redirect the helper's default root (``_paths``) without replacing its
+    # path/validation API.
+    monkeypatch.setattr(_paths, "OUT_SLDPRT", root / "sldprt")
     expected = {}
     owned = {}
     for stem, configurations in _SHARED_MEMBERS.items():

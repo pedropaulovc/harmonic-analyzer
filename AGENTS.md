@@ -1025,9 +1025,8 @@ reused) and `reuse` (the default). A recorder fault after a
 call's result is in hand stops recording and the build finishes as its own
 (nothing published); one that leaves the build's results untrustworthy exits
 92, and the build is then re-run once unrecorded. Every COM subprocess runs
-with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`): `_drawing_precision.py:40`
-and `_supplier_spring_reference.py:376` order COM requests by iterating sets
-of str, and are left unchanged because fixing them re-keys 147 part leaves.
+with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`; why: DEVELOPING.md, "What is
+recorded"); never order COM requests by iterating a set of str.
 The soundness alarm is a replay `noop` whose build made another part than the
 base (`outcome=different`: mass-property measurements in any order, request
 and answer multisets, STL geometry whatever its triangulation, vertices within
