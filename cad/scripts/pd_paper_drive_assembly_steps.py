@@ -304,7 +304,8 @@ if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
     )
 # If every term stacks, the contact ratio falls just under 1.0: a slight hitch
 # in the feed at that station, which the steady-advance check
-# ("loaded-rack-geometry-checked") catches.
+# ("loaded-rack-geometry-checked") catches; its remedy sets the mesh again by
+# feel on a new hook (from "hanger-meshed").
 FEED_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_WORST_CASE_BACKLASH_MM)
 )

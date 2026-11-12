@@ -2514,10 +2514,16 @@ def _step_text(
             "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",
-            "IF A CHECK FAILS, RE-SEAT THE RACK OR GUIDES (STEPS "
+            # Codjiflo P2 on 6abe1aa7f: a re-seat moves the rack against the
+            # match-drilled latch, and a hitch with every part in its sheet is
+            # the feel set's own; either way the mesh is set again by feel on a
+            # new hook.
+            "IF A CHECK FAILS, RE-SEAT ANY LOOSE RACK OR GUIDE (STEPS "
             f"{steps.step_number('rack-soldered')} AND "
-            f"{steps.step_number('guides-screwed')}) AND REPEAT "
-            f"{s('loaded-rack-geometry-checked', 1)}-"
+            f"{steps.step_number('guides-screwed')}).",
+            f"THEN FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
+            f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)}.",
+            f"WITH THE NEW HOOK, REPEAT {s('hanger-meshed', 0)}-"
             f"{s('loaded-rack-geometry-checked', 4)}.",
         ),
         "fitup-pose-set": (
