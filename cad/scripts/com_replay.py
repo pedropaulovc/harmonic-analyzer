@@ -19,11 +19,17 @@
     Run the script with SolidWorks absent, serving the log: no live COM, no
     write outside DIR (bar the temporary and telemetry directories), no
     connection beyond loopback, no OTLP export. ``--seat-log`` is a recording
-    made on the seat the replay stands for (the shadow passes the build's own):
-    a SolidWorks revision other than the log's refuses the replay
+    made on the seat the replay stands for (the shadow passes the build's own;
+    a reuse attempt, which stands for the base's seat, the base's): a
+    SolidWorks revision other than the log's refuses the replay
     (``input_mismatch``). ``--base-outputs`` compares the Python-written
-    outputs with that output root, file by file. Exits 0 for a no-op verdict,
-    91 for any other verdict, 1 for an infrastructure failure.
+    outputs with that output root, file by file. The result also names the
+    repository files this process executed or opened for reading
+    (``python_files``) and those the log's COM arguments name, which
+    SolidWorks opens itself (``solidworks_inputs``; output-root paths that
+    are not the log's captured outputs: ``solidworks_out_inputs``). Exits 0
+    for a no-op verdict, 91 for any other verdict, 1 for an infrastructure
+    failure.
 
 ``diff <a> <b> [--result P]``
     Request divergence and per-member response differences between two logs
@@ -31,9 +37,10 @@
     builds made the same part (``_com_outcome``: ``truth_cause``,
     ``outcome``); exit 0 when the recipe requests are identical.
 
-dodo records every part build through ``record`` and evaluates the shadow
-replay through ``replay`` and ``diff`` (``_replay_shadow``). Nothing here is
-imported by a recipe; ``--help`` imports neither pywin32 nor the build modules.
+dodo records every part build through ``record``, and before a build tries
+to reuse a base's part, or after it evaluates the shadow replay, through
+``replay`` and ``diff`` (``_replay_shadow``). Nothing here is imported by a
+recipe; ``--help`` imports neither pywin32 nor the build modules.
 """
 
 from __future__ import annotations
@@ -46,6 +53,10 @@ from pathlib import Path
 from typing import Any
 
 SUMMARY_SCHEMA = 1
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# Repository files that are never a build's input: the environment and the
+# outputs (the replay's own scratch included).
+_NOT_INPUTS = (".venv", "cad/out")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -108,6 +119,82 @@ def _offline_telemetry() -> None:
         if name.startswith("OTEL_EXPORTER_OTLP_") and name.endswith("_ENDPOINT"):
             del os.environ[name]
     os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+
+
+def _repo_relative(raw: str) -> str | None:
+    """``raw`` as a ``/``-separated path under the repository, or None
+    outside it (or under :data:`_NOT_INPUTS`)."""
+    absolute = os.path.abspath(raw)
+    root = os.path.normcase(str(REPO_ROOT)) + os.sep
+    if not os.path.normcase(absolute).startswith(root):
+        return None
+    relative = absolute[len(root) :].replace(os.sep, "/")
+    if any(
+        os.path.normcase(relative + "/").startswith(os.path.normcase(prefix + "/"))
+        for prefix in _NOT_INPUTS
+    ):
+        return None
+    return relative
+
+
+def _python_files() -> Any:
+    """Start noting every file this process opens for reading; the returned
+    callable lists them, with every loaded module's source (an import served
+    from bytecode opens no source), as repository-relative paths: what the
+    replayed build's Python executed or read."""
+    opened: set[str] = set()
+    writing = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT
+
+    def hook(event: str, args: tuple[Any, ...]) -> None:
+        if event != "open" or not args:
+            return
+        try:
+            path, mode = args[0], args[1] if len(args) > 1 else None
+            flags = args[2] if len(args) > 2 else 0
+            if isinstance(mode, str) and any(c in mode for c in "wax+"):
+                return
+            if mode is None and isinstance(flags, int) and flags & writing:
+                return
+            if isinstance(path, (str, bytes, os.PathLike)):
+                opened.add(os.fsdecode(path))
+        except Exception:  # noqa: BLE001 - an audit hook must never fail an open
+            return
+
+    sys.addaudithook(hook)
+
+    def files() -> list[str]:
+        sources = [getattr(m, "__file__", None) for m in list(sys.modules.values())]
+        found = {
+            relative
+            for raw in (*opened, *(s for s in sources if isinstance(s, str)))
+            if (relative := _repo_relative(raw)) is not None and os.path.isfile(raw)
+        }
+        return sorted(found)
+
+    return files
+
+
+def _solidworks_inputs(conversation: Any) -> tuple[list[str], list[str]]:
+    """Files the log's COM arguments name that SolidWorks opens itself:
+    ``(repository-relative paths outside the output root, output-root paths
+    that are not the log's captured outputs)``. A path outside the repository
+    is no build input and is left out."""
+    trailer = conversation.trailer
+    named = []
+    for canonical in trailer.get("external", {}):
+        for placeholder in ("<REPO>", "<REPO/>"):
+            if canonical.startswith(placeholder):
+                rest = canonical[len(placeholder) :].lstrip("\\/")
+                named.append(rest.replace("\\", "/"))
+    captured = {rel for files in trailer.get("captured", {}).values() for rel in files}
+    inside = []
+    for canonical in trailer.get("internal_paths", []):
+        for placeholder in ("<OUT>", "<OUT/>"):
+            if canonical.startswith(placeholder):
+                rest = canonical[len(placeholder) :].lstrip("\\/").replace("\\", "/")
+                if rest and rest not in captured:
+                    inside.append(rest)
+    return sorted(set(named)), sorted(set(inside))
 
 
 def _summary(
@@ -253,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     # Telemetry creates cad/out/reports/telemetry on first use: do it before the
     # replay's audit hook starts refusing writes outside the scratch root.
     _telemetry.info(f"com_replay replay {script.name} <- {args.log}")
+    python_files = _python_files()
     result = conversation.replay_build(
         script,
         args.log.resolve(),
@@ -261,7 +349,18 @@ def main(argv: list[str] | None = None) -> int:
         capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
         seat_log=args.seat_log.resolve(),
     )
-    _write_json(args.result, result.to_json())
+    solidworks_inputs, solidworks_out_inputs = _solidworks_inputs(
+        conversation.load(args.log.resolve())
+    )
+    _write_json(
+        args.result,
+        {
+            **result.to_json(),
+            "python_files": python_files(),
+            "solidworks_inputs": solidworks_inputs,
+            "solidworks_out_inputs": solidworks_out_inputs,
+        },
+    )
     inert = result.details.get("inert") or {}
     summary = (
         f"replay {script.name}: {result.verdict.value} "

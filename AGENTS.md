@@ -1014,14 +1014,14 @@ unconditional writers: **every leaf key changes once, with no epoch-3 fallback**
 Use fresh build snapshots for cutover; do not mix persistent old native outputs
 with epoch-4 identities. A cold full build requires separate authorization.
 
-**COM conversation recording (shadow).** Every part build that runs under a
+**COM conversation recording (shadow, reuse).** Every part build that runs under a
 cache role that can publish (`rw`) is recorded through
 `cad/scripts/com_replay.py` and published beside its archive as
 `com-replay/epoch-<epoch>/...` sidecars; in `ro`/`off` the build runs
 unrecorded. Off the seat, it is then replayed against the nearest
-earlier recording, purely as telemetry: nothing is reused, and no output, exit
-code or cache key changes. `HARMONIC_COM_REPLAY=off` is the kill switch; the
-other values are `record` and `shadow` (the default). A recorder fault after a
+earlier recording and judged, as telemetry. `HARMONIC_COM_REPLAY=off` is the
+kill switch; the other values are `record`, `shadow` (observe only: nothing is
+reused) and `reuse` (the default). A recorder fault after a
 call's result is in hand stops recording and the build finishes as its own
 (nothing published); one that leaves the build's results untrustworthy exits
 92, and the build is then re-run once unrecorded. Every COM subprocess runs
@@ -1043,6 +1043,31 @@ that diverged with no earlier answer differing is
 not be judged (`truth_cause=error:<type>`) is `noop_outcome_unknown`. A judge
 that raised, on any verdict, is also `judge_fault` (counted, logged at WARN).
 See DEVELOPING.md "COM conversation recording (shadow)".
+
+**Part reuse (`reuse`, the default).** On a part key miss under `rw`, before the
+seat, `_replay_shadow.reuse_attempt` replays the current source with SolidWorks
+absent against the nearest recording of the stem that is bound to the archive
+its build stored (manifest `archive`; a lost store publishes no recording,
+older manifests are `unbound_base`), recorded under this cache salt on this
+machine's SolidWorks file version (`sw_build`). It reuses only when the replay
+is a clean `noop`, every differing key input is one the replayed Python executed
+or read (none SolidWorks opens itself: templates, models, DXF/STEP and other
+imports, anything a COM argument names; not `_session.py`/`_seat_forensics.py`,
+which act outside the recorded window), the replay wrote exactly the base
+archive's files inside the task's declared outputs with every Python-written one
+byte-identical, and the leaf is no forced refresh. The archive is then installed
+as this key's outputs with no COM at all (`task` span `cache=reuse`,
+`com=none`), the `.execution` token must equal the base's, the outputs are
+stored under the new key through the create-only store, and a manifest for the
+new key (`reused_from`, `origin_key`) lets the next key reuse from it. One would-be
+reuse in eight (`AUDIT_ONE_IN`, by key hash) builds anyway and is judged, so the
+soundness alarm stays live. Every other outcome, and any exception in the attempt
+(`declined:fault`, WARN), builds on the seat as before; no cache key moves.
+Decisions are `replay_reuse` records, `replay.reuse` spans and
+`[com-replay] part:<stem>: reuse=<decision>` lines. Environment variables are not
+forwarded to farm workers: to turn reuse off fleet-wide, set
+`_replay_shadow.DEFAULT_MODE = ReplayMode.SHADOW` and launch from that commit;
+locally `HARMONIC_COM_REPLAY=shadow`. See DEVELOPING.md "Reuse".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the
