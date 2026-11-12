@@ -1038,6 +1038,7 @@ from dt_cone_swing_platform_geometry import (  # noqa: E402
     # the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
+    PLATE_OUTLINE as PLAT_OUTLINE,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
     SLOT_E_X as PLAT_SLOT_E_X,
@@ -1748,17 +1749,13 @@ if PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM < 1.5 * THREAD_MAJOR_MM[PINCH_T
 # for the merged column's crank bore and the platform's "crank axis":
 _PPIVOT = cone_station(PIVOT_STATION)
 # The centered legacy harmonic base is the installation envelope. The engaged
-# platform's four sharp plan vertices must all remain on its top plate; the
-# filleted outline is contained by that convex polygon. This catches a plate
-# length regression before SolidWorks inserts an off-base rider.
+# platform's sharp plan vertices (the south-east corner as chamfered) must
+# all remain on its top plate; the rounded outline is contained by that
+# convex polygon. This catches a plate length regression before SolidWorks
+# inserts an off-base rider.
 _BASE_X_LIMIT = BASE_TOP_LENGTH / 2.0
 _BASE_Z_LIMIT = BASE_TOP_WIDTH / 2.0
-_PLATFORM_VERTICES = (
-    (-PLAT_EAST_N, PLAT_OVERHANG),
-    (PLAT_WEST_N, PLAT_OVERHANG),
-    (PLAT_WEST_S, PLAT_OVERHANG - PLAT_LEN),
-    (-PLAT_EAST_S, PLAT_OVERHANG - PLAT_LEN),
-)
+_PLATFORM_VERTICES = tuple((_x, _z) for _label, _x, _z in PLAT_OUTLINE)
 for _x_local, _z_local in _PLATFORM_VERTICES:
     _x_machine = _PPIVOT[0] + _x_local * COS_I + _z_local * SIN_I
     _z_machine = _PPIVOT[2] - _x_local * SIN_I + _z_local * COS_I
@@ -2949,8 +2946,9 @@ def west_edge_arbor_gaps(swing_deg: float) -> tuple[float, ...]:
 
 
 def plate_vertices_machine(swing_deg: float) -> tuple[tuple[float, float], ...]:
-    """The plate's four sharp plan vertices in machine (x, z), swung
-    ``swing_deg`` past the engaged incline about the pivot."""
+    """The plate's sharp plan vertices (dt_cone_swing_platform_geometry's
+    PLATE_OUTLINE) in machine (x, z), swung ``swing_deg`` past the engaged
+    incline about the pivot."""
     angle = math.radians(INCLINE_DEG + swing_deg)
     c, s = math.cos(angle), math.sin(angle)
     return tuple(
@@ -3040,8 +3038,8 @@ for _k, _swing in enumerate(SWING_ANGLES):
                 f"swing-plate west edge within {_gap:.3f} mm of the {_name} "
                 f"block at swing {_swing:.3f} deg (needs >= {_floor})"
             )
-    for _label, (_vx, _vz) in zip(
-        ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
+    for (_label, *_local_xz), (_vx, _vz) in zip(
+        PLAT_OUTLINE, plate_vertices_machine(_swing), strict=True
     ):
         _margin = min(_BASE_X_LIMIT - abs(_vx), _BASE_Z_LIMIT - abs(_vz))
         _key = f"{_label} corner over the base"

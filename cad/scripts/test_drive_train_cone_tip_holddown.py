@@ -13,6 +13,8 @@ block, owner decision C1 keyed 2026-11-09, PR #1992) is proved here too.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 
@@ -361,6 +363,34 @@ def test_swing_sweep_catches_a_footprint_the_engaged_pose_misses() -> None:
     # And a round occupant is held off by its radius plus the clearance.
     with pytest.raises(AssertionError, match="synthetic post"):
         bdt.require_swing_clearance({}, {"synthetic post": ((cx, cz), 0.5)})
+
+
+def test_south_east_chamfer_is_what_clears_column_socket_0(monkeypatch) -> None:
+    """#1038 conflict 4: with the bank centred the swung plate's south end
+    passes the front column.  The swept outline is the plate's own
+    (south-east corner chamfered); the sharp corner it replaces is the
+    fail-first control and fires the same import-time assertion."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_geometry as geometry
+
+    assert bdt._PLATFORM_VERTICES == tuple((x, z) for _label, x, z in geometry.PLATE_OUTLINE)
+    gap, swing = bdt.SWING_OCCUPANT_CLEARANCE["column socket 0"]
+    assert gap >= bdt.SWING_SEAT_RUNNING_CLEARANCE
+    # The nearest pass is at the end of the certified swing, where the column
+    # stands almost on the plate's axis: the south edge passes it, not only
+    # the corner.
+    assert swing == pytest.approx(bdt.P1_SWEEP_DEG[1])
+    pivot = (bdt._PPIVOT[0], bdt._PPIVOT[2])
+    socket, radius = bdt.SWING_ROUND_OCCUPANTS["column socket 0"]
+    keep_out = math.dist(pivot, socket) - radius - bdt.SWING_SEAT_RUNNING_CLEARANCE
+    post_foot_rim = -geometry.POST_LOCAL_Z + geometry.POST_MAIN_DIA / 2.0
+    assert 0.0 < keep_out - post_foot_rim < 1.0
+    assert -geometry.PLATE_SOUTH_Z > keep_out
+
+    sharp = tuple((x, z) for _label, x, z, _radius in geometry.PLATE_CORNERS)
+    monkeypatch.setattr(bdt, "_PLATFORM_VERTICES", sharp)
+    with pytest.raises(AssertionError, match="column socket 0"):
+        bdt.require_swing_clearance({}, bdt.SWING_ROUND_OCCUPANTS)
 
 
 def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
