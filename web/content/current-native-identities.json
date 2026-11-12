@@ -1027,6 +1027,34 @@
       "role": "FeedNut",
       "priorStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
       "priorNumber": "MHA-CH-06-TL-VN-82"
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-vn-cam-stub",
+      "sourceNumber": null,
+      "parent": "dt-cylinder-gear-tl-cam-turning",
+      "stem": "dt-cylinder-gear-tl-vn-cam-stub",
+      "number": "MHA-DT-12-TL-VN-50"
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-vn-cam-clock-pin",
+      "sourceNumber": null,
+      "parent": "dt-cylinder-gear-tl-cam-turning",
+      "stem": "dt-cylinder-gear-tl-vn-cam-clock-pin",
+      "number": "MHA-DT-12-TL-VN-51"
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-vn-cam-clamp-screw",
+      "sourceNumber": null,
+      "parent": "dt-cylinder-gear-tl-cam-turning",
+      "stem": "dt-cylinder-gear-tl-vn-cam-clamp-screw",
+      "number": "MHA-DT-12-TL-VN-52"
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-vn-cam-clamp-washer",
+      "sourceNumber": null,
+      "parent": "dt-cylinder-gear-tl-cam-turning",
+      "stem": "dt-cylinder-gear-tl-vn-cam-clamp-washer",
+      "number": "MHA-DT-12-TL-VN-53"
     }
   ],
   "archivedAliases": [
@@ -1105,7 +1133,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "ad4d89f067d1dbc6ba18a964aee829af7adba0ae4a8615de3f2c011ab5ddd570",
+  "currentRegistryMapSha256": "1fc950c25c13ef737fadeddefb5181c1dd5d17c5c766bd3f2081f78d1e31e26b",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2366,6 +2394,27 @@
         {
           "stem": "dt-cone-gear-tl-arbor",
           "number": "MHA-DT-03-TL-05"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-cam-fixture",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cylinder-gear-tl-cam-fixture",
+          "number": "MHA-DT-12-TL-01"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cylinder-gear-tl-cam-turning",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cylinder-gear-tl-cam-turning",
+          "number": "MHA-DT-12-TL-00"
         }
       ],
       "kind": "assembly"
