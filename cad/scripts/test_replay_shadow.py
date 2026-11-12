@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
+import dataclasses
 import datetime
 import hashlib
 import importlib.util
@@ -3482,7 +3483,9 @@ def test_a_dependent_record_names_its_seat_path_and_unreadable_children(
     def judged(token: str) -> dict[str, Any]:
         recording = _planned(_drawing(tmp_path / "draw.py", token), "k" * 64)
         record: dict[str, Any] = {}
-        shadow._judge_dependent(recording, {"engine": _ENGINE}, {}, published, record)
+        shadow._judge_dependent(
+            recording, {"engine": _ENGINE}, {}, published, record, b""
+        )
         return record
 
     record = judged("a" * 64)
@@ -3500,6 +3503,170 @@ def test_a_dependent_record_names_its_seat_path_and_unreadable_children(
     assert shadow.report_line(f"drawing:{_STEM}", record).endswith(
         "| children_unreadable"
     )
+
+
+_SEAT_WINDOWS = {
+    # ms_stop_plate, 2026-11-12: the two seats' drawing windows.
+    "base": {"view_window": [1010, 678], "px_per_mm": 2.325},
+    "new": {"view_window": [1010, 598], "px_per_mm": 2.098},
+}
+
+
+def _judged_noop(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    found: shadow.Shadow,
+    displays: tuple[Any, Any] = (None, None),
+    publish: str = "stored",
+    data: bytes = b"bundle",
+) -> tuple[shadow.Recording, dict[str, Any], dict[str, Any]]:
+    """``found`` as the comparison of a drawing against its one base on the
+    same children, whose two logs held ``displays`` (base, new): the base's
+    manifest predates ``display``, as pass 1's do. RETURNS the recording,
+    its published manifest and the record."""
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    other = {"schema": shadow.MANIFEST_SCHEMA, "salt": "s", "kind": "drawing"}
+    base = shadow.Base(
+        {**other, "key": "b" * 64, "children": {_CHILD: "a" * 64}}, (), 0
+    )
+    found = dataclasses.replace(
+        found, display={"base": displays[0], "new": displays[1]}
+    )
+
+    def lookup(*_args: Any, usable: Any, **_kwargs: Any) -> shadow.LookupResult:
+        usable({**base.manifest, "recording_id": "old"})
+        return shadow.LookupResult(shadow.Lookup.FOUND, base, 1, 1)
+
+    monkeypatch.setattr(shadow, "find_base", lookup)
+    monkeypatch.setattr(shadow, "_compare_dependent", lambda *_a: found)
+    recording = _planned(_drawing(tmp_path / "draw.py", "a" * 64), "k" * 64)
+    published = {
+        "salt": "s",
+        "recording_id": "fresh",
+        "engine": _ENGINE,
+        "bundle": {"name": "bundle.tar", "sha256": "0" * 64, "size": len(data)},
+    }
+    record: dict[str, Any] = {"publish": publish}
+    summary = {"engine": _ENGINE, "display": displays[1]}
+    shadow._judge_dependent(recording, summary, {}, published, record, data)
+    return recording, published, record
+
+
+def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Shadow:
+    return shadow.Shadow(
+        "noop",
+        ground_truth=ground_truth,
+        truth_cause=None
+        if ground_truth == "same"
+        else _com_outcome.TITLE_COUNTER_CAUSE,
+        outcome=outcome,
+        outcome_signals={"requests": "same", "answers": "same", **signals},
+        outcome_details={"pdf": {"moved": "LOCATING EDGE 0.451 mm"}},
+        kind=shadow.BuildKind.DRAWING,
+    )
+
+
+@pytest.mark.parametrize(
+    ("found", "displays", "judgement", "line_end"),
+    [
+        (
+            _noop("different", answers="different", pdf="different"),
+            (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["new"]),
+            "output_nondeterminism",
+            "| output_nondeterminism cause=seat_display",
+        ),
+        (
+            _noop("different", answers="different", pdf="different"),
+            (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
+            "output_nondeterminism",
+            "| output_nondeterminism cause=answers",
+        ),
+        (
+            _noop("different", pdf="different"),
+            (_SEAT_WINDOWS["base"], None),
+            "unexplained_output_divergence",
+            "| unexplained_output_divergence",
+        ),
+        (
+            _noop("same", "diverged", pdf="same"),
+            (None, None),
+            "confirmed",
+            "| title_echo",
+        ),
+    ],
+    ids=["seat_display", "answers", "unexplained", "title_echo"],
+)
+def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
+    blob, tmp_path, monkeypatch, spans, logged, found, displays, judgement, line_end
+):
+    _, _, record = _judged_noop(tmp_path, monkeypatch, found, displays)
+    assert (record["split"], record["noop_judgement"]) == ("noop", judgement)
+    assert "soundness_alarm" not in record and logged["error"] == []
+    line = shadow.report_line(f"drawing:{_STEM}", record)
+    assert line.endswith(line_end) and "SOUNDNESS" not in line
+    [span] = spans.named("replay.split ")
+    assert span["replay.noop_judgement"] == judgement
+    assert span.get("replay.output_cause") == record["output_cause"]
+    assert record["display"] == shadow._display_text(displays[1])
+    if judgement == "confirmed":
+        # The echoed title kept as the ground truth and its cause.
+        assert record["title_echo"] and record["ground_truth"] == "diverged"
+        assert record["truth_cause"] == _com_outcome.TITLE_COUNTER_CAUSE
+        assert logged["warn"] == [] and "output_evidence" not in record
+        return
+    [warned] = logged["warn"]
+    assert warned.startswith(f"[com-replay] {judgement} drawing:{_STEM}: ")
+    # Each signal's detail, for the investigation.
+    assert "LOCATING EDGE 0.451 mm" in warned and record["output_evidence"] in warned
+    if record["output_cause"] == "seat_display":
+        assert record["base_display"] == "1010x678 px/mm=2.325"
+        assert "this build's 1010x598 px/mm=2.098" in warned
+
+
+def test_a_dependent_recording_whose_key_exists_is_kept_as_evidence(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    moved = _noop("different", answers="different", pdf="different")
+    displays = (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["new"])
+    recording, published, record = _judged_noop(
+        tmp_path, monkeypatch, moved, displays, publish="exists"
+    )
+    assert record["evidence"] == "stored"
+    bundle_name, manifest_name = shadow.evidence_names(
+        _ENGINE, recording.name, recording.key, "fresh"
+    )
+    assert cache.fetch_sidecar(bundle_name) == b"bundle"
+    kept = json.loads(cache.fetch_sidecar(manifest_name))
+    assert kept["bundle"]["name"] == bundle_name and kept["recording_id"] == "fresh"
+    assert kept["evidence_of"] == {
+        "split": "noop",
+        "noop_judgement": "output_nondeterminism",
+        "output_cause": "seat_display",
+        "base_key": "b" * 64,
+    }
+    # Never a base: no lookup lists it.
+    prefix = shadow.blob_prefix(_ENGINE, recording.name)
+    assert not manifest_name.startswith(prefix) and not bundle_name.startswith(prefix)
+    [span] = spans.named("replay.evidence ")
+    assert span["replay.evidence"] == "stored"
+    line = shadow.report_line(f"drawing:{_STEM}", record)
+    assert " | publish=exists bytes=- evidence=stored | " in line
+    # Create-only: the same recording again finds its copy.
+    _, _, record = _judged_noop(
+        tmp_path, monkeypatch, moved, displays, publish="exists"
+    )
+    assert record["evidence"] == "exists"
+    # A confirmed no-op needs no evidence, nor does a published recording.
+    same = _noop("same", pdf="same")
+    _, _, record = _judged_noop(tmp_path, monkeypatch, same, publish="exists")
+    assert "evidence" not in record
+    _, _, record = _judged_noop(tmp_path, monkeypatch, moved, publish="stored")
+    assert "evidence" not in record
+    # Bounded like the key's own publication.
+    monkeypatch.setattr(shadow, "BUNDLE_LIMIT", 3)
+    _, _, record = _judged_noop(tmp_path, monkeypatch, moved, publish="exists")
+    assert record["evidence"] == "oversize"
+    assert len(spans.named("replay.evidence ")) == 2
 
 
 def _run_dependent(recording: shadow.Recording, deps: list[str]) -> None:
@@ -3573,7 +3740,8 @@ def test_a_drawing_is_judged_against_the_nearest_base_on_its_children(
     assert (
         record["differing"] == [cache._rel(settings)] and record["own_differing"] == 1
     )
-    assert record["noop_judgement"] == "confirmed" and not record["soundness_alarm"]
+    assert record["noop_judgement"] == "confirmed" and "soundness_alarm" not in record
+    assert not record["title_echo"] and record["display"] is None
     line = [m for m in logged["info"] if m.startswith(f"[com-replay] {second.label}")][
         -1
     ]
@@ -3587,6 +3755,7 @@ def test_a_drawing_is_judged_against_the_nearest_base_on_its_children(
     assert published["replay_gaps"]["out_inputs"]["first"] == [
         "sldprt/sh-widget.SLDPRT"
     ]
+    assert published["display"] is None  # the fake seat probes no display
     # A change SolidWorks sees: the source asked something else, another sheet.
     third, record = build(120, "b", "a" * 64)
     assert (record["split"], record["truth_cause"], record["artefact_outcome"]) == (
@@ -3636,7 +3805,7 @@ _ASSEMBLY_SCRIPT = (
 )
 
 
-def test_an_assembly_noop_whose_sidecar_differs_is_a_soundness_alarm(
+def test_an_assembly_noop_whose_sidecar_differs_is_an_unexplained_divergence(
     blob, tmp_path, monkeypatch, spans, logged
 ):
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
@@ -3671,8 +3840,18 @@ def test_an_assembly_noop_whose_sidecar_differs_is_a_soundness_alarm(
     record = build("y", "b")
     assert (record["split"], record["artefact_outcome"]) == ("noop", "different")
     assert "sidecars:different" in record["outcome_signals"]
-    assert record["soundness_alarm"] and record["outcome"] == "evaluated"
-    [alarm] = logged["error"]
-    assert alarm.startswith(f"[com-replay] SOUNDNESS ALARM assembly:{_STEM}: ")
-    # Nothing of it is ever reused, so nothing is revoked.
+    assert record["unexplained_output_divergence"] and record["outcome"] == "evaluated"
+    assert record["noop_judgement"] == "unexplained_output_divergence"
+    assert "soundness_alarm" not in record and not record["output_nondeterminism"]
+    # Nothing of it is ever reused: a WARN with the signals' detail, never an
+    # alarm, and nothing is revoked.
+    assert logged["error"] == []
+    [warned] = [m for m in logged["warn"] if "unexplained_output_divergence" in m]
+    assert warned.startswith(
+        f"[com-replay] unexplained_output_divergence assembly:{_STEM}: "
+    )
+    assert '"sidecars": "different"' in warned
+    assert record["output_evidence"] in warned
     assert not [name for name in blob.committed if "/revoked/" in name]
+    [span] = spans.named("replay.split ")[-1:]
+    assert span["replay.unexplained_output_divergence"] is True

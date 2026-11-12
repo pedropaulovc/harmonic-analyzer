@@ -2988,3 +2988,116 @@ def test_a_dependents_seat_path_needs_its_own_geometry(monkeypatch):
     assert judged("assembly", mass="same", sidecars="different")["seat_path"] is None
     # A part's geometry is mass and STL: a sheet's ink is no evidence of it.
     assert judged("part", pdf="same")["seat_path"] is None
+
+
+def test_a_stream_that_differs_only_by_echoed_titles_is_a_title_echo(monkeypatch):
+    echo = _com_outcome.title_echo
+    base = _echoing("Part13")
+    assert echo(base, _echoing("Part24"))
+    # Anything else differing is no echo: a request, a missing request...
+    assert not echo(base, _echoing("Part24", "ScaleEndMargin"))
+    assert not echo(base, _echoing("Part24", handle=5))
+    assert not echo(base, _echoing("Part24")[:3])
+    # ... or an answer beyond noise, however late after the echo.
+    count = conv.Call(4, 3, "InvokeTypes", ["Count"], "IApp.Get", result=0)
+    later = [*base, count]
+    answered = [*_echoing("Part24"), dataclasses.replace(count, result=1)]
+    assert echo(later, [*_echoing("Part24"), count]) and not echo(later, answered)
+
+    def judged(a: list[conv.Call], b: list[conv.Call]) -> dict[str, Any]:
+        return _com_outcome.judge(
+            types.SimpleNamespace(calls=a, trailer={}),
+            types.SimpleNamespace(calls=b, trailer={}),
+            {"index": 3, "field": "args"},
+            Path(),
+            Path(),
+            kind="drawing",
+        )
+
+    found = judged(base, _echoing("Part24"))
+    assert found["truth_cause"] == _com_outcome.TITLE_COUNTER_CAUSE
+    assert found["title_echo"] is True and found["judge_faults"] == []
+    assert judged(later, answered)["title_echo"] is False
+    # Judged only after an echo was the first difference.
+    assert judged(base, _echoing("Part24", "ScaleEndMargin"))["title_echo"] is None
+
+    def broken(*_args: Any) -> bool:
+        raise RuntimeError("injected")
+
+    monkeypatch.setattr(_com_outcome, "title_echo", broken)
+    found = judged(base, _echoing("Part24"))
+    assert found["title_echo"] is None
+    assert found["judge_faults"] == [
+        {"step": "title_echo", "error": "RuntimeError: injected"}
+    ]
+
+
+def _display_probe(site: str, *values: Any, result: Any) -> conv.Call:
+    """An inert IModelView read of ``_seat_forensics.display_geometry``, as
+    the 2026-11-12 ms_stop_plate recording logged it."""
+    header = [54, 0, 1, {"t": [24, 0]}, {"t": [{"t": [5, 1]}, {"t": [16389, 2]}]}]
+    return conv.Call(
+        0, -5, "InvokeTypes", [*header, *values], site, result, origin=conv.Origin.INERT
+    )
+
+
+def _projected(point: tuple[float, ...], x: str, y: str) -> conv.Call:
+    return _display_probe(
+        "IModelView.ProjectModelPoint",
+        *map(_f, point),
+        *[{"s": "Missing"}] * 3,
+        result={"t": [{"f": x}, {"f": y}, _f(0.0)]},
+    )
+
+
+def test_the_seats_drawing_display_is_read_from_the_logs_own_answers():
+    import com_replay
+
+    left, bottom = "0x1.f414141414143p+7", "0x1.4be629edb1754p+9"
+
+    def probe(box: list[Any], x_axis: str) -> list[conv.Call]:
+        return [
+            _display_probe("IModelView.GetVisibleBox", result={"t": box}),
+            _projected((0.0, 0.0, 0.0), left, bottom),
+            _projected((1e-3, 0.0, 0.0), x_axis, bottom),
+            _projected((0.0, 1e-3, 0.0), left, "0x1.4abc9159067f9p+9"),
+            _projected((0.0, 0.0, 1e-3), left, bottom),
+        ]
+
+    def display(*calls: conv.Call) -> Any:
+        return com_replay._display(types.SimpleNamespace(calls=list(calls)))
+
+    # ms_stop_plate's pass 1 (its seat logged view_window=1010x678 px/mm=2.325).
+    first = probe([253, 36, 1263, 714], "0x1.f8ba7666bfeadp+7")
+    assert display(*first) == {"view_window": [1010, 678], "px_per_mm": 2.325}
+    # The last probe is the display the build ended on.
+    narrower = probe([253, 36, 1263, 634], "0x1.f8ba7666bfeadp+7")
+    assert display(*first, *narrower)["view_window"] == [1010, 598]
+    # An answer that cannot be read leaves its key out; no probe, no display.
+    assert display(*probe([253.0, 36, 1263, 714], left)) == {"px_per_mm": 2.325}
+    assert display(*_echoing("Part24")) is None
+
+
+def test_a_diff_reports_each_logs_own_display(tmp_path, monkeypatch):
+    import com_replay
+
+    base = _shaped(tmp_path / "a", monkeypatch)
+    new = _shaped(tmp_path / "b", monkeypatch, _REORDERED)
+    # A shaped part probes no display.
+    assert _diff(base, new, tmp_path / "none.json")["display"] == {
+        "base": None,
+        "new": None,
+    }
+    counted = {"base": {"calls": len(conv.load(base).calls)}}
+    counted["new"] = {"calls": len(conv.load(new).calls)}
+    monkeypatch.setattr(com_replay, "_display", lambda log: {"calls": len(log.calls)})
+    assert _diff(base, new, tmp_path / "counted.json")["display"] == counted
+
+    def broken(_log: Any) -> None:
+        raise ValueError("injected")
+
+    # A display that cannot be read costs the display, never the diff.
+    monkeypatch.setattr(com_replay, "_display", broken)
+    diff = _diff(base, new, tmp_path / "broken.json")
+    assert diff["display"] == {"error": "ValueError: injected"}
+    assert diff["truth_cause"] == "response:IFace2.Normal"

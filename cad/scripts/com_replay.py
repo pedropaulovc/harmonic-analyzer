@@ -6,8 +6,9 @@
     recording its build window into ``P``. ``ARG...`` are the script's own
     arguments (a drawing's artifact stem), kept in ``sys.argv`` around the
     engine, whose ``run_script`` passes none. ``--summary`` writes the
-    recording's facts as JSON for dodo, with ``replay_gaps``: what a replay of
-    this recording would need that the engine's replay lacks. ``--out-root``
+    recording's facts as JSON for dodo, with ``replay_gaps`` (what a replay of
+    this recording would need that the engine's replay lacks) and ``display``
+    (the window the build's sheet picks hit-tested in). ``--out-root``
     redirects the outputs (side-by-side diagnostic runs only; dodo's builds
     never pass it). ``--callers`` keeps the Python caller of every call
     (``full``), none (``divergence``: a replay names its own at a divergence)
@@ -40,9 +41,9 @@
     Request divergence and per-member response differences between two logs
     (JSON on stdout), plus what caused the divergence and whether the two
     builds made the same part, assembly or drawing (``_com_outcome``, on
-    ``--kind``'s signals: ``truth_cause``, ``outcome``; an assembly's sidecar
-    files are compared from the two directories); exit 0 when the recipe
-    requests are identical.
+    ``--kind``'s signals: ``truth_cause``, ``outcome``, ``title_echo``; an
+    assembly's sidecar files are compared from the two directories) and each
+    log's ``display``; exit 0 when the recipe requests are identical.
 
 dodo records every part, FULL assembly and drawing build through ``record``;
 before a part build tries to reuse a base's part, or after it evaluates the
@@ -57,6 +58,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import math
 import os
 import sys
 from collections.abc import Iterator
@@ -78,6 +80,15 @@ _ECHOES_LISTED = 10
 _REDIRECTED = ("sldprt", "sldasm", "png", "stl")
 # Bound on the paths each ``replay_gaps`` list names (all are counted).
 _GAPS_LISTED = 10
+# The inert reads _seat_forensics.display_geometry makes (a drawing's
+# record_drawing_display): the document window a sheet-coordinate pick
+# hit-tests in, four screen pixels (IModelView.GetVisibleBox), and the pixels
+# one model millimetre spans, from the projections of the origin and of 1 mm
+# along each axis (IModelView.ProjectModelPoint). Their answers are in the log,
+# so ``display`` costs no COM call of its own.
+_VISIBLE_BOX = "IModelView.GetVisibleBox"
+_PROJECT = "IModelView.ProjectModelPoint"
+_AXIS_MM = 1e-3
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -339,6 +350,51 @@ def _replay_gaps(trailer: dict[str, Any], argv: list[str]) -> dict[str, Any]:
     }
 
 
+def _display(log: Any) -> dict[str, Any] | None:
+    """The seat's drawing display at the log's last probe, from its answers:
+    ``view_window`` (``[width, height]`` pixels) and ``px_per_mm`` (as
+    ``_seat_forensics._projected_px_per_mm`` measures it: the largest of the
+    three axes' projected millimetre, to 3 decimals). None for a log without
+    one; a probe whose answers cannot be read leaves its key out."""
+    found: dict[str, Any] = {}
+    origin: tuple[float, float] | None = None
+    axes: list[float] = []
+    for call in log.calls:
+        if call.site == _VISIBLE_BOX:
+            box = call.result.get("t") if isinstance(call.result, dict) else None
+            if (
+                isinstance(box, list)
+                and len(box) == 4
+                and all(type(value) is int for value in box)
+            ):
+                left, top, right, bottom = box
+                found["view_window"] = [abs(right - left), abs(bottom - top)]
+            continue
+        if call.site != _PROJECT:
+            continue
+        point = _hex_floats(call.args)[:3]
+        screen = _hex_floats(call.result)[:2]
+        if len(point) != 3 or len(screen) != 2:
+            continue
+        if point == [0.0, 0.0, 0.0]:
+            origin, axes = (screen[0], screen[1]), []
+        elif origin is not None and sorted(point) == [0.0, 0.0, _AXIS_MM]:
+            axes.append(round(math.dist(origin, screen), 3))
+            found["px_per_mm"] = max(axes)
+    return found or None
+
+
+def _hex_floats(value: Any) -> list[float]:
+    """Every logged float in ``value`` (``{"f": <hex>}``), in order."""
+    if isinstance(value, dict):
+        if set(value) == {"f"}:
+            return [float.fromhex(value["f"])]
+        return [f for item in value.values() for f in _hex_floats(item)]
+    if isinstance(value, list):
+        return [f for item in value for f in _hex_floats(item)]
+    return []
+
+
 def _title_echoes(log: Any) -> dict[str, Any]:
     """The log's recipe requests whose arguments carry a SolidWorks
     new-document title counter (``Part24``): the script echoed the seat's
@@ -362,8 +418,10 @@ def _summary(
     faults: list[dict[str, str]],
     exit_code: int,
     argv: list[str],
+    display: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """What dodo publishes and measures about one recorded build."""
+    """What dodo publishes and measures about one recorded build; ``display``
+    is :func:`_display` of its log."""
     timing = timing or {}
     trailer = timing.get("trailer") or {}
     calls = trailer.get("calls")
@@ -398,6 +456,7 @@ def _summary(
         "capture_stored_bytes": trailer.get("capture_stored_bytes"),
         "argv": argv,
         "replay_gaps": _replay_gaps(trailer, argv),
+        "display": display,
     }
 
 
@@ -478,10 +537,17 @@ def _record(args: argparse.Namespace, script: Path) -> int:
             recovery=recovery.value,
         )
     if args.summary is not None:
+        display = None
+        if timing is not None and not faults:
+            # About 6 µs a call, on the seat: well under 0.1% of a build window.
+            try:
+                display = _display(conversation.load(args.log.resolve()))
+            except Exception as exc:  # noqa: BLE001 - never the summary's
+                _telemetry.warn(f"[com-replay] display not read from the log: {exc!r}")
         try:
             _write_json(
                 args.summary,
-                _summary(conversation, timing, faults, exit_code, args.argv),
+                _summary(conversation, timing, faults, exit_code, args.argv, display),
             )
         except Exception as exc:  # noqa: BLE001 - the recording's, never the build's
             # No summary means dodo publishes nothing; the build itself stands.
@@ -526,6 +592,12 @@ def main(argv: list[str] | None = None) -> int:
                 new_sidecars=args.new_sidecars,
             )
         )
+        try:
+            # Each recording's own drawing display, for a base whose manifest
+            # predates ``display``.
+            payload["display"] = {"base": _display(base), "new": _display(new)}
+        except Exception as exc:  # noqa: BLE001 - costs the display only
+            payload["display"] = {"error": f"{type(exc).__name__}: {exc}"}
         if args.result is not None:
             _write_json(args.result, payload)
         sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")

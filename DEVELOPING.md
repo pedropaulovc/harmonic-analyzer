@@ -3018,7 +3018,8 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read`; an assembly or drawing also `replay.candidates` and `replay.same_children` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
-| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement`, `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
+| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.output_nondeterminism`, `replay.output_cause` (`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
+| `replay.evidence <label>` | an assembly's or drawing's evidence copy ("Evidence copies"): `replay.evidence` (`stored`/`exists`/`skip`/`off`/`error`) |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -3042,7 +3043,9 @@ and ends with one INFO line in the task log, for example:
 
 (`-` marks a step the build never reached). A `SOUNDNESS ALARM`,
 `seat_nondeterminism`, `seat_path_divergence`, `noop_unexplained_divergence`,
-`noop_outcome_unknown` or `judge_fault` marker ends the line when it applies;
+(an assembly or drawing) `output_nondeterminism cause=<cause>`,
+`unexplained_output_divergence` or `title_echo`, `noop_outcome_unknown`,
+`judge_fault` or `children_unreadable` marker ends the line when it applies;
 in mode `reuse` a `reuse=<decision>` segment follows the outcome. On a farm
 leaf `cache.jsonl` stays on the worker, so use Application Insights for
 fleet-wide results. The `replay_shadow` record's outcome fields are
@@ -3115,6 +3118,8 @@ traces
          recovery=tostring(customDimensions.recovery),
          kind=case(message has "SOUNDNESS ALARM", "alarm",
                    message has "noop_unexplained_divergence", "unexplained",
+                   message startswith "[com-replay] output_nondeterminism ", "output_nondeterminism",
+                   message startswith "[com-replay] unexplained_output_divergence ", "unexplained_output",
                    message startswith "[com-replay] judge_fault ", "judge_fault",
                    message has "recorder fault", "record_fault", "other")
 | summarize count(), last=max(timestamp), example=take_any(message)
@@ -3197,11 +3202,11 @@ the SHA-256 in its `.execution` token: an assembly's references, transitively
 through subassemblies; a drawing's part, or its assembly plus that assembly's
 children. A token that holds none names why instead: `missing`, `unreadable:
 <error>` or `malformed: <content>`. The manifest carries them as `children`,
-with `kind`, `argv` and `replay_gaps`. A build with such a child can match no
-base: the judgement logs one WARN naming each child and its reason, and the
-record (`children_unreadable`), the `replay.split` span and the INFO line's
-`children_unreadable` marker carry it, so a worker that lacks a token is told
-from one that cannot read it.
+with `kind`, `argv`, `replay_gaps` and `display`. A build with such a child
+can match no base: the judgement logs one WARN naming each child and its
+reason, and the record (`children_unreadable`), the `replay.split` span and
+the INFO line's `children_unreadable` marker carry it, so a worker that lacks
+a token is told from one that cannot read it.
 
 **Judgement** (`_replay_shadow._judge_dependent`, after the store, off the
 seat). Nothing is replayed. The lookup reads at most 16 manifests of the stem,
@@ -3213,7 +3218,7 @@ against the base's (`com_replay.py diff --kind <kind>`):
 
 | `split` | meaning |
 | --- | --- |
-| `noop` | same children, the base's exact requests: the own-closure change was a no-op for SolidWorks |
+| `noop` | same children, the base's exact requests, or the same requests but for the title counters the script echoed (`title_echo`): the own-closure change was a no-op for SolidWorks |
 | `diverged` | same children, other requests; `truth_cause` says what preceded the first difference: `request` (the source asked something else) or `response:<member>` (SolidWorks answered differently first; `seat_nondeterminism` when it also made the same model, `seat_path_divergence` when the requests differ only by detours of reads and selections on the same geometry) |
 | `children_changed` | candidates were read, none made on these children: not comparable |
 | `children_unknown` | a child's token held no SHA-256 (`children_unreadable` names which and why) |
@@ -3224,16 +3229,56 @@ No candidate at all (or the lookup's budget spent) is the record outcome
 assembly on `mass`, `requests`, `answers` and `sidecars` (byte for byte); a
 drawing on `requests`, `answers` and `pdf`, the ink of every PDF SolidWorks
 wrote (text runs and path pieces per page, coordinates to 1 um), never its
-bytes, which carry the export's date. A `noop` whose outcome is `different`
-is a `SOUNDNESS ALARM` (ERROR, never fatal, nothing revoked: no base is ever
-reused). `own_differing` counts the differing key inputs that are not child
+bytes, which carry the export's date. Nothing of these kinds is reused, so a
+`noop` is never an alarm; its `noop_judgement` (`OutputJudgement`) is one of:
+
+| `noop_judgement` | meaning |
+| --- | --- |
+| `confirmed` | the base's assembly or drawing |
+| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
+| `unexplained_output_divergence` | another output, though SolidWorks answered alike: nothing recorded explains it; WARN |
+| `noop_outcome_unknown` | a signal absent, or no comparison |
+
+Both WARNs (`[com-replay] output_nondeterminism <label>: ...`, `[com-replay]
+unexplained_output_divergence <label>: ...`) carry bounded evidence with each
+signal's detail (`output_evidence` in the record). 2026-11-12,
+`ms_stop_plate`: one seat's 1010x678 pixel drawing window against another's
+1010x598 moved two leader tips 0.45 and 0.17 mm with every request the same.
+
+`display` is the window a drawing's sheet picks hit-test in, read from the
+recording's own answers to `_seat_forensics.display_geometry`'s inert probes
+(`com_replay._display`: `view_window` from `IModelView.GetVisibleBox`,
+`px_per_mm` from `IModelView.ProjectModelPoint`), so it costs no COM call; the
+summary and the manifest carry it, and `com_replay.py diff` reads it from both
+logs (`display`: `base`, `new`), so a base whose manifest predates it is
+judged too; the record carries the two (`display`, `base_display`:
+`<w>x<h> px/mm=<p>`). A log without a probe (an assembly's) has none.
+
+`title_echo` (`_com_outcome.title_echo`): the first difference was a title
+counter the script echoed (`truth_cause=response:title_counter`), and the
+whole streams are the same requests once title counters are masked, every
+answer the same but for noise. The split is `noop`; `ground_truth=diverged`
+and the cause are kept, and the INFO line ends with `title_echo`.
+
+**Evidence copies.** A recording whose key's names already held another
+writer's (`publish=exists`: a forced refresh, a rebuild of the same key) is
+the only copy of that build's conversation. Unless its split is a `confirmed`
+`noop`, it is stored create-only under
+`com-replay/<engine 16>/<kind>-<stem>/evidence/<key>/<recording id>.tar` and
+`.json` (`_replay_shadow.evidence_names`; the manifest names that bundle and
+carries `evidence_of`: split, judgement, cause, base key), outside
+`manifest/`, so no lookup ever lists it as a base, and within the same
+512 MiB bound. The record, the `replay.evidence` span and the INFO line
+(`publish=exists bytes=<n> evidence=<outcome>`) carry the outcome (`stored`,
+`exists`, `error`, the cache's `skip`/`off`, or `oversize`).
+
+`own_differing` counts the differing key inputs that are not child
 identities. The seat path (`_com_outcome.seat_path`) is judged for these kinds
 as for a part, since the same vendored selection fallback runs in their
 scripts, on their own geometry (`_com_outcome.GEOMETRY`): an assembly's mass
-and sidecars, a drawing's PDF ink. A `noop` issued the base's exact requests,
-so it never has a seat path; a `diverged` one whose requests differ only by
-detours on the same geometry is `seat_path_divergence` (counted, never an
-alarm).
+and sidecars, a drawing's PDF ink. A `noop` never has a seat path; a
+`diverged` one whose requests differ only by detours on the same geometry is
+`seat_path_divergence` (counted, never an alarm).
 
 **What a replay would need.** Each summary and manifest carries
 `replay_gaps`, measured on the recording (`com_replay._replay_gaps`): `argv`
@@ -3272,7 +3317,9 @@ dependencies
          kind=tostring(split(tostring(customDimensions.label), ":")[0]),
          split=tostring(customDimensions["replay.split"]),
          cause=tostring(customDimensions["replay.truth_cause"]),
-         alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
+         nondeterminism=tostring(customDimensions["replay.output_cause"]),
+         unexplained=tolower(tostring(customDimensions["replay.unexplained_output_divergence"])) == "true",
+         echo=tolower(tostring(customDimensions["replay.title_echo"])) == "true",
          detour=tolower(tostring(customDimensions["replay.seat_path_divergence"])) == "true"
 | summarize judged=count(), noop=countif(split == "noop"),
             diverged_request=countif(split == "diverged" and cause == "request"),
@@ -3282,7 +3329,10 @@ dependencies
             children_unknown=countif(split == "children_unknown"),
             no_judgement=countif(split !in ("noop", "diverged", "children_changed",
                                             "children_unknown")),
-            alarms=countif(alarm)
+            title_echo=countif(echo),
+            seat_display=countif(nondeterminism == "seat_display"),
+            answers=countif(nondeterminism == "answers"),
+            unexplained_output=countif(unexplained)
             by kind, label
 | extend noop_share=round(1.0 * noop / max_of(noop + diverged_request, 1), 3)
 | order by kind asc, judged desc

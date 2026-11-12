@@ -45,8 +45,9 @@ the last one is what differs for assemblies and drawings.
   (every model opened, by its ``.execution`` token): :class:`Split`
   ``children_changed`` | ``noop`` | ``diverged``, ``truth_cause`` saying what
   preceded a divergence, and the outcome judged per kind (span
-  ``replay.split <label>``). A no-op whose outcome differs is a soundness
-  alarm, logged and never fatal.
+  ``replay.split <label>``). A no-op whose outcome differs is never an alarm:
+  an :class:`OutputJudgement` logged at WARN. A recording whose key already
+  existed is kept as evidence unless confirmed (:func:`_keep_evidence`).
 
 A driver exit of :data:`EXIT_RECORD_FAULT` (the recorder failed where the
 build's results cannot be trusted, not the script or SolidWorks) re-runs the
@@ -657,6 +658,17 @@ def blob_names(engine: str, stem: str, key: str) -> tuple[str, str]:
     return f"{root}/bundle/{key}.tar", f"{blob_prefix(engine, stem)}{key}.json"
 
 
+def evidence_names(
+    engine: str, stem: str, key: str, recording_id: str
+) -> tuple[str, str]:
+    """``(bundle, manifest)`` names of an assembly's or drawing's evidence
+    copy: a recording of ``key`` made after another writer's was published
+    under the key's names (:func:`_keep_evidence`). Outside ``manifest/``, so
+    no base lookup lists it; one per recording, so a second never collides."""
+    root = f"{BLOB_ROOT}/{engine[:16]}/{stem}/evidence/{key}/{recording_id}"
+    return f"{root}.tar", f"{root}.json"
+
+
 def bundle(recording: Recording) -> bytes:
     """The log, its captures and (an assembly's or drawing's) sidecar copies
     as one uncompressed tar (log and captures are gzip already): sorted
@@ -1076,6 +1088,9 @@ class Shadow:
     judge_faults: list[dict[str, Any]] = field(default_factory=list)
     seat_path: dict[str, Any] | None = None
     kind: BuildKind = BuildKind.PART
+    # An assembly's or drawing's comparison: each recording's drawing display
+    # (``com_replay.py diff`` ``display``: ``base``, ``new``).
+    display: dict[str, Any] | None = None
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -2335,9 +2350,12 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     truth from this build's own requests; the outcome against the base's and
     the truth's cause; an assembly's or drawing's recording cost on the seat;
     then the markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
-    ``seat_path_divergence``, ``noop_unexplained_divergence``,
-    ``noop_outcome_unknown``, ``judge_fault``, ``children_unreadable``). ``-``
-    marks a step the build never reached."""
+    ``seat_path_divergence``, ``noop_unexplained_divergence``, an assembly's
+    or drawing's ``output_nondeterminism cause=<cause>``,
+    ``unexplained_output_divergence`` and ``title_echo``,
+    ``noop_outcome_unknown``, ``judge_fault``, ``children_unreadable``). An
+    assembly's or drawing's evidence copy reads ``evidence=<outcome>`` after
+    its bundle bytes. ``-`` marks a step the build never reached."""
 
     def shown(name: str, unit: str = "") -> str:
         value = record.get(name)
@@ -2375,7 +2393,8 @@ def report_line(label: str, record: dict[str, Any]) -> str:
             if record.get("reuse_decision")
             else []
         ),
-        f"publish={shown('publish')} bytes={shown('bundle_bytes')}",
+        f"publish={shown('publish')} bytes={shown('bundle_bytes')}"
+        + (f" evidence={record['evidence']}" if record.get("evidence") else ""),
         *judged,
         f"truth={shown('ground_truth')}",
         f"outcome={shown('artefact_outcome')} cause={shown('truth_cause')}",
@@ -2389,6 +2408,12 @@ def report_line(label: str, record: dict[str, Any]) -> str:
         segments.append("seat_path_divergence")
     if record.get("noop_unexplained_divergence"):
         segments.append("noop_unexplained_divergence")
+    if record.get("output_nondeterminism"):
+        segments.append(f"output_nondeterminism cause={shown('output_cause')}")
+    if record.get("unexplained_output_divergence"):
+        segments.append("unexplained_output_divergence")
+    if record.get("title_echo"):
+        segments.append("title_echo")
     if record.get("noop_outcome_unknown"):
         segments.append("noop_outcome_unknown")
     if record.get("judge_fault"):
@@ -2533,6 +2558,9 @@ def _after_build(
             # What a replay of this recording would need that the engine's
             # replay lacks (com_replay._replay_gaps), to size that change.
             replay_gaps=summary.get("replay_gaps"),
+            # The window a drawing's sheet picks hit-tested in (com_replay
+            # _display), to count seat windows without opening a bundle.
+            display=summary.get("display"),
         )
     record["bundle_bytes"] = len(data)
     record["bound"] = bound_archive(published) is not None
@@ -2556,7 +2584,7 @@ def _after_build(
         record["outcome"] = "recorded"
         return
     if recording.kind is not BuildKind.PART:
-        _judge_dependent(recording, summary, inputs, published, record)
+        _judge_dependent(recording, summary, inputs, published, record, data)
         return
     reuse = recording.reuse
     replayed = reuse is not None and reuse.replayed and reuse.lookup is not None
@@ -2706,7 +2734,10 @@ class Split(StrEnum):
     # No candidate read was made on this build's children: not comparable.
     CHILDREN_CHANGED = "children_changed"
     # The nearest base made on the same children issued exactly these
-    # requests: the own-source change was a no-op for SolidWorks.
+    # requests, or the same requests but for the title counters the script
+    # echoed (``title_echo``: _com_outcome.title_echo; the ground truth stays
+    # ``diverged``, the cause ``response:title_counter``): the own-source
+    # change was a no-op for SolidWorks.
     NOOP = "noop"
     # It issued others. ``truth_cause`` says what preceded the first
     # difference: ``request`` (the source asked something else) or
@@ -2719,6 +2750,65 @@ class Split(StrEnum):
     TIMEOUT = "timeout"
     UNAVAILABLE = "unavailable"
     ERROR = "error"
+
+
+class OutputJudgement(StrEnum):
+    """What an assembly's or drawing's NOOP split says about its output:
+    exactly one per no-op. Nothing of an assembly's or drawing's recording is
+    reused, so none is an alarm: an output that differs after the base's
+    requests is evidence of what a reuse would have to pin or tolerate."""
+
+    # The base's requests and the base's assembly or drawing.
+    CONFIRMED = "confirmed"
+    # The base's requests and another output, with the seat seen to differ
+    # (:class:`OutputCause`). 2026-11-12, ms_stop_plate: one seat's 1010x678
+    # pixel drawing window against another's 1010x598 moved two leader tips
+    # 0.45 and 0.17 mm, with every request the same.
+    OUTPUT_NONDETERMINISM = "output_nondeterminism"
+    # The base's requests, SolidWorks' answers the same but for noise, and
+    # another output: nothing recorded explains it.
+    UNEXPLAINED_OUTPUT_DIVERGENCE = "unexplained_output_divergence"
+    # Nothing to judge the output by (a signal absent, no comparison).
+    OUTCOME_UNKNOWN = "noop_outcome_unknown"
+
+
+class OutputCause(StrEnum):
+    """How the seat differed for an :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`."""
+
+    # The drawing display the sheet picks hit-tested in (com_replay._display:
+    # view window or px/mm), as the two recordings' answers report it.
+    SEAT_DISPLAY = "seat_display"
+    # Otherwise, SolidWorks answered some request differently.
+    ANSWERS = "answers"
+
+
+def _output_judgement(
+    shadow: Shadow, display: Any, base_display: Any
+) -> tuple[OutputJudgement | None, OutputCause | None]:
+    """The judgement of a NOOP split (``None`` for any other) and, for an
+    output nondeterminism, its cause: the display first, which explains
+    answers that differ with it."""
+    if shadow.verdict != Split.NOOP:
+        return None, None
+    if shadow.outcome == "same":
+        return OutputJudgement.CONFIRMED, None
+    if shadow.outcome != "different":
+        return OutputJudgement.OUTCOME_UNKNOWN, None
+    if display is not None and base_display is not None and display != base_display:
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.SEAT_DISPLAY
+    if shadow.outcome_signals.get("answers") == "different":
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.ANSWERS
+    return OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE, None
+
+
+def _display_text(display: Any) -> str | None:
+    """``<width>x<height> px/mm=<p>`` of a :func:`com_replay._display`, as
+    the seat's own ``drawing display`` line reads (``?`` for a value missing)."""
+    if not isinstance(display, dict):
+        return None
+    window = display.get("view_window")
+    size = "x".join(map(str, window)) if isinstance(window, list) else "?"
+    return f"{size} px/mm={display.get('px_per_mm', '?')}"
 
 
 def _keep_sidecars(recording: Recording) -> None:
@@ -2764,12 +2854,15 @@ def _judge_dependent(
     inputs: dict[str, str],
     published: dict[str, Any],
     record: dict[str, Any],
+    data: bytes,
 ) -> None:
     """Mode ``shadow``, an assembly or drawing: find the nearest earlier
     recording of the stem under this cache salt made on the same children
-    and compare this build's recording with it (:class:`Split`). No replay
-    stands in: the fresh recording is the ground truth of what the current
-    source asked. Fills ``record`` (``outcome`` last)."""
+    and compare this build's recording with it (:class:`Split`; a NOOP's
+    :class:`OutputJudgement`). No replay stands in: the fresh recording is
+    the ground truth of what the current source asked. ``data``: this
+    recording's bundle, for :func:`_keep_evidence`. Fills ``record``
+    (``outcome`` last)."""
     label, infra = recording.label, _telemetry.BUILD_INFRA_SERVICE
     children = recording.children
     tally: Counter[str] = Counter()
@@ -2828,6 +2921,7 @@ def _judge_dependent(
     )
     base = found.base
     if base is None and (found.outcome is Lookup.BUDGET or not tally["candidates"]):
+        _keep_evidence(recording, published, data, record)
         record["outcome"] = "no_base"
         return
     started = time.monotonic()
@@ -2854,6 +2948,12 @@ def _judge_dependent(
                 shadow = _compare_dependent(recording, base, summary)
             except Exception as exc:  # noqa: BLE001 - a failed comparison is a split
                 shadow = Shadow(Split.ERROR.value, reason=repr(exc)[:EVIDENCE_CHARS])
+        # Both from the two logs when they were compared (a base's manifest
+        # may predate ``display``), else this build's summary alone.
+        compared = shadow.display or {}
+        display = compared.get("new", summary.get("display"))
+        base_display = compared.get("base")
+        judgement, cause = _output_judgement(shadow, display, base_display)
         fields = {
             "split": shadow.verdict,
             "candidates": tally["candidates"],
@@ -2878,8 +2978,17 @@ def _judge_dependent(
                 for name, signal in sorted(shadow.outcome_signals.items())
             )
             or None,
-            "noop_judgement": shadow.noop_judgement,
-            "soundness_alarm": shadow.soundness_alarm,
+            "noop_judgement": judgement,
+            # The base's requests but for the title counters the script echoed
+            # (_compare_dependent).
+            "title_echo": shadow.verdict == Split.NOOP
+            and shadow.ground_truth == "diverged",
+            "output_nondeterminism": judgement is OutputJudgement.OUTPUT_NONDETERMINISM,
+            "output_cause": cause,
+            "unexplained_output_divergence": judgement
+            is OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE,
+            "display": _display_text(display),
+            "base_display": _display_text(base_display),
             # SolidWorks answered differently first, and made the same model.
             "seat_nondeterminism": shadow.verdict == Split.DIVERGED
             and (shadow.truth_cause or "").startswith("response:")
@@ -2890,7 +2999,7 @@ def _judge_dependent(
             "seat_path_divergence": shadow.verdict == Split.DIVERGED
             and shadow.seat_path_detour,
             "seat_path": (shadow.seat_path or {}).get("path"),
-            "noop_outcome_unknown": shadow.noop_outcome_unknown,
+            "noop_outcome_unknown": judgement is OutputJudgement.OUTCOME_UNKNOWN,
             "judge_fault": shadow.judge_fault,
             "judge_faults": ",".join(
                 str(fault.get("step")) for fault in shadow.judge_faults
@@ -2909,15 +3018,32 @@ def _judge_dependent(
         reason=shadow.reason,
     )
     key = str(record.get("base_key") or "")
-    if base is not None and shadow.soundness_alarm:
+    kind = recording.kind.value
+    if base is not None and judgement is OutputJudgement.OUTPUT_NONDETERMINISM:
         evidence = _evidence(base, shadow)
-        record["alarm_evidence"] = evidence
-        # Nothing of an assembly's or drawing's recording is ever reused, so
-        # no base is revoked: the alarm is for investigation.
-        _telemetry.error(
-            f"[com-replay] SOUNDNESS ALARM {label}: this build issued base "
-            f"{key[:12]}'s exact requests on the same children, but made another "
-            f"{recording.kind.value} than that base: {evidence}",
+        record["output_evidence"] = evidence
+        seat = (
+            f"the base's display {fields['base_display']}, this build's "
+            f"{fields['display']}"
+            if cause is OutputCause.SEAT_DISPLAY
+            else "SolidWorks answered some request otherwise"
+        )
+        # Nothing of an assembly's or drawing's recording is reused, so no
+        # base is revoked: what a reuse would have to pin or tolerate.
+        _telemetry.warn(
+            f"[com-replay] output_nondeterminism {label}: this build issued base "
+            f"{key[:12]}'s requests on the same children but made another {kind} "
+            f"({cause}: {seat}): {evidence}",
+            label=label,
+            base_key=key,
+        )
+    if base is not None and judgement is OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE:
+        evidence = _evidence(base, shadow)
+        record["output_evidence"] = evidence
+        _telemetry.warn(
+            f"[com-replay] unexplained_output_divergence {label}: this build "
+            f"issued base {key[:12]}'s requests on the same children and "
+            f"SolidWorks answered alike, but it made another {kind}: {evidence}",
             label=label,
             base_key=key,
         )
@@ -2929,6 +3055,7 @@ def _judge_dependent(
             label=label,
             base_key=key,
         )
+    _keep_evidence(recording, published, data, record)
     record["outcome"] = "evaluated"
     _write_shadow(recording, record)
 
@@ -2942,7 +3069,9 @@ def _compare_dependent(
 ) -> Shadow:
     """This build's recording against ``base``'s (``com_replay.py diff`` of
     the recording's kind), within ``seconds`` of wall time, as a Shadow
-    whose verdict is the :class:`Split`. Everything lives in a fresh work
+    whose verdict is the :class:`Split`: NOOP for no request divergence or
+    one that is only the title counters the script echoed (``title_echo``),
+    whose ground truth stays ``diverged``. Everything lives in a fresh work
     directory under :data:`SCRATCH`, removed afterwards."""
     calls = [summary.get("calls"), base.manifest.get("calls")]
     if any(isinstance(count, int) and count > DIFF_CALLS_LIMIT for count in calls):
@@ -2964,8 +3093,9 @@ def _compare_dependent(
     if diff is None or "request_divergence" not in diff:
         return Shadow(Split.ERROR.value, reason=f"diff exited {diff_rc} with no result")
     divergence = diff["request_divergence"]
+    noop = divergence is None or diff.get("title_echo") is True
     return Shadow(
-        (Split.NOOP if divergence is None else Split.DIVERGED).value,
+        (Split.NOOP if noop else Split.DIVERGED).value,
         ground_truth="same" if divergence is None else "diverged",
         request_divergence=divergence,
         truth_cause=diff.get("truth_cause"),
@@ -2975,7 +3105,54 @@ def _compare_dependent(
         judge_faults=list(diff.get("judge_faults") or []),
         seat_path=diff.get("seat_path"),
         kind=recording.kind,
+        display=diff.get("display"),
     )
+
+
+def _keep_evidence(
+    recording: Recording,
+    published: dict[str, Any],
+    data: bytes,
+    record: dict[str, Any],
+) -> None:
+    """An assembly's or drawing's recording that is not published because
+    the key's archive or recording names already held another writer's
+    (``publish`` ``exists``: a forced refresh, a rebuild of the same key) is
+    the only copy of what this build asked and answered: unless its split is
+    a confirmed NOOP, keep it create-only under :func:`evidence_names`
+    (bundle first, then the manifest naming it), for a judgement only the
+    pair can settle. ``record["evidence"]``: the outcome (``stored``,
+    ``exists``, ``error``, the cache's ``skip``/``off``, or ``oversize``
+    past BUNDLE_LIMIT, which is not stored)."""
+    if record.get("publish") != "exists":
+        return
+    if record.get("noop_judgement") == OutputJudgement.CONFIRMED:
+        return
+    if len(data) > BUNDLE_LIMIT:
+        record["evidence"] = "oversize"
+        return
+    label = recording.label
+    bundle_name, manifest_name = evidence_names(
+        published["engine"], recording.name, recording.key, published["recording_id"]
+    )
+    kept = {
+        **published,
+        "bundle": {**published["bundle"], "name": bundle_name},
+        "evidence_of": {
+            name: record.get(name)
+            for name in ("split", "noop_judgement", "output_cause", "base_key")
+        },
+    }
+    with _telemetry.span(
+        f"replay.evidence {label}", service=_telemetry.BUILD_INFRA_SERVICE, label=label
+    ) as sp:
+        outcome = _cache.publish_sidecar(bundle_name, data)
+        if outcome == "stored":
+            outcome = _cache.publish_sidecar(
+                manifest_name, json.dumps(kept, sort_keys=True).encode("utf-8")
+            )
+        sp.set_attribute("replay.evidence", outcome)
+    record["evidence"] = outcome
 
 
 def _revoke_alarmed(engine: str, stem: str, base: dict[str, Any]) -> str:

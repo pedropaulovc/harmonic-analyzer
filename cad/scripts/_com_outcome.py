@@ -23,6 +23,10 @@ diff``:
   cause) that made the same geometry (:data:`GEOMETRY`) but not the same
   requests, whether the requests differ only by detours of reads and
   selections (:class:`SeatPath`).
+* :func:`title_echo`: for two builds whose first difference was an echoed
+  title counter, whether the whole streams are the same requests but for the
+  title counters the script echoed: what a replay serving the base's answers
+  would have issued.
 
 Noise, everywhere here: SolidWorks' new-document title counters (``Part11``
 against ``Part12``), the masked provenance value
@@ -240,9 +244,10 @@ def judge(
     ``outcome_details`` (the seat path's in its own ``detail``). The diff's
     result, whose request divergence is the ground truth, is kept.
     ``judge_faults`` lists every fault (``step``: ``truth_cause``, a signal,
-    ``outcome`` for all of them, or ``seat_path``; ``error``), so a signal
-    absent because its judgement raised is told from one absent from both
-    logs."""
+    ``outcome`` for all of them, ``seat_path`` or ``title_echo``; ``error``),
+    so a signal absent because its judgement raised is told from one absent
+    from both logs. ``title_echo`` (:func:`title_echo`, ``None`` when not
+    judged) is judged only for a :data:`TITLE_COUNTER_CAUSE`."""
     streams, streams_error = _attempt(lambda: _streams(base, new))
     cause, cause_error = (None, streams_error)
     found, error = (None, streams_error)
@@ -286,7 +291,12 @@ def judge(
         if path_error is not None:
             path = {"path": "error", "detail": path_error}
             found["judge_faults"].append({"step": "seat_path", "error": path_error})
-    return {"truth_cause": cause, **found, "seat_path": path}
+    echo = None
+    if cause == TITLE_COUNTER_CAUSE:
+        echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b))
+        if echo_error is not None:
+            found["judge_faults"].append({"step": "title_echo", "error": echo_error})
+    return {"truth_cause": cause, **found, "seat_path": path, "title_echo": echo}
 
 
 def truth_cause(
@@ -351,6 +361,26 @@ def _title_only(a: Any, b: Any) -> bool:
     return exact != _exact(b) and _exact(_mapped(a, _counterless)) == _exact(
         _mapped(b, _counterless)
     )
+
+
+def title_echo(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> bool:
+    """Whether two recipe streams are the same requests but for the title
+    counters the script echoed: as many calls, each the same member on the same
+    object with the same arguments once title counters (and the provenance
+    value) are masked, and every answer the same but for noise (title
+    counters included). A replay serving the base's answers would have issued
+    the base's requests exactly. A difference anywhere else, a request or an
+    answer, is no echo, however late in the streams."""
+    if len(a) != len(b):
+        return False
+    for x, y in zip(a, b, strict=True):
+        if (x.handle, x.op, x.site) != (y.handle, y.op, y.site):
+            return False
+        if _exact(_mapped(x.args, _text)) != _exact(_mapped(y.args, _text)):
+            return False
+        if not _close(_answer(x), _answer(y)):
+            return False
+    return True
 
 
 def _exact(value: Any) -> str:
