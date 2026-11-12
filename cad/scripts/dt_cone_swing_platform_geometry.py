@@ -74,7 +74,7 @@ ROUNDED_CORNERS = tuple(corner for corner in PLATE_CORNERS if corner[3] > 0.0)
 # owner review #2144).  With the
 # bank centred the post stands 5.07 nearer the front, and the swung plate's
 # south end passes frame column socket 0: the pivot is 247.305 from the
-# socket's centre, so past the column nothing on the plate may reach beyond
+# socket's centre, so past the column the plate's outline may not reach beyond
 # 247.305 - 12.751 (socket radius) - 2.0 (running clearance) = 232.55 from
 # the pivot, while the post foot's rim already stands 231.85 out.  At the
 # end of the certified swing the column is 2 deg off the plate's axis, so the
@@ -83,7 +83,8 @@ ROUNDED_CORNERS = tuple(corner for corner in PLATE_CORNERS if corner[3] > 0.0)
 # legs from the sharp corner: the run along the south edge and the rise
 # square to it up the east edge.  build_dt_drive_train_assembly sweeps the
 # cut outline against the socket; dt_cone_swing_platform_checks keeps the
-# post foot on the plate.
+# post foot on the plate.  This is the PLATE's clearance only: the crank
+# column the post carries is not in that sweep (#2616).
 SE_CHAMFER_RUN = 26.416  # 1.04
 SE_CHAMFER_RISE = 8.636  # .34
 _EAST_EDGE_DX_PER_DZ = (EAST_HALF_S - HALF_WIDTH_N) / PLATE_LEN
