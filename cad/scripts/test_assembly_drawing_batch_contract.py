@@ -22,6 +22,7 @@ import draw_dt_drive_train_assembly
 import draw_ch_rocker_arm_tl_oblique_jig_assembly
 import draw_dt_cone_gear_tl_indexing_assembly
 import draw_dt_cone_tip_gear_tl_cutter_assembly
+import draw_dt_cone_gear_tl_arbor_assembly
 import draw_fr_frame_assembly
 import draw_ha_harmonic_analyzer_assembly
 import draw_mg_magnifier_assembly
@@ -55,6 +56,7 @@ ASSEMBLY_DRAWINGS = (
     draw_ch_rocker_arm_tl_oblique_jig_assembly,
     draw_dt_cone_gear_tl_indexing_assembly,
     draw_dt_cone_tip_gear_tl_cutter_assembly,
+    draw_dt_cone_gear_tl_arbor_assembly,
     draw_ha_harmonic_analyzer_assembly,
 )
 
@@ -68,7 +70,8 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # is the rocker's oblique-trammel jig (TL-00, a shop fixture) and the cone
     # gear's one-sheet indexing kit (TL-00: BOM, balloon, steps), as is the
     # cone tip gear's one-sheet fly cutter (TL-00: BOM, balloons, references,
-    # steps); the
+    # steps) and the cone gear's keyed arbor kit (TL-05: BOM, balloons,
+    # settings, steps); the
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
     # now a four-sheet fitter package (BOM, explode, steps); the pen sheet is a
     # full fitter package (settings details, BOM, explode, steps); the summing
@@ -85,6 +88,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ch_rocker_arm_tl_oblique_jig_assembly,
         draw_dt_cone_gear_tl_indexing_assembly,
         draw_dt_cone_tip_gear_tl_cutter_assembly,
+        draw_dt_cone_gear_tl_arbor_assembly,
         draw_mg_magnifier_assembly,
         draw_pn_pen_assembly,
         draw_sm_summing_assembly,
@@ -281,6 +285,11 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "dt_cone_tip_gear_tl_form_cutter_spec.py",
                 )
             } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_dt_cone_gear_tl_arbor_assembly:
+            scripts_dir = Path(drawing.__file__).resolve().parent
+            # The kit spec whose BOM order, poses and steps the sheet prints.
+            assert str(scripts_dir / "dt_cone_gear_tl_arbor_assembly_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
