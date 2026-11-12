@@ -11,20 +11,23 @@ rolling diameter. The collar rear-face fit, wheel/pilot float and stud cut
 come from MHA-PD-22 (its sheet shares the fit phrases, R9-30). Its actual
 loaded overlap inspection precedes final platen installation and does not
 turn the static F-to-disc setting into a clearance certificate.
-The feed rack's datum setup and its closed-form gates live in
-``paper_drive_rack_setup`` (the builder gates on them); this module only
-prints them. Drawing-only: no assembly builder imports it. No SolidWorks or
-live proof.
+The feed rack's datum setup band and its closed-form gates live in
+``paper_drive_rack_setup`` (the builder gates on them) as design proofs; the
+sheet sets and accepts that mesh by function, not on the band (#2416).
+Drawing-only: no assembly builder imports it. No SolidWorks or live proof.
 """
 
 from __future__ import annotations
+
+import math
 
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
-import paper_drive_rack_setup as rack_setup
+import pd_transgear_feed_pinion_spec as feed_pinion
+import _gear_quality as gear_quality
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
@@ -207,9 +210,47 @@ BAR_TOP_ABOVE_DECK_TEXT = inch_text(BAR_TOP_ABOVE_DECK, 2)
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
 RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.0508  # .002
-# The feed rack's datum setup band and its gates are the builder's too:
-# paper_drive_rack_setup owns them; this module only prints them.
+# The feed rack's datum setup band and its gates are the builder's design
+# proofs (paper_drive_rack_setup). The sheet prints no backlash window for that
+# mesh: the fitter sets the arm on a feeler leaf in the mesh and accepts it on
+# function, no tight spot, no skipped tooth, a steady feed (owner direction
+# 2026-11-11, #2416).
 RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
+# The arm is swung up until the feed teeth wedge a feeler leaf of thickness t
+# into the rack and clamped there; drawn out, the leaf leaves t of normal gap
+# on each flank of the tooth-centred mesh, a datum backlash of 2t/cos(PA)
+# along the rack, whatever play lies behind the pinion (codjiflo P1 on
+# e690ffe and 5972cc9: platen shake with the knob held, and the disc's rim
+# rock through the hub's D-flat, could both pass with the teeth at
+# interference). The first leaf, .0025 (a standard leaf in 26- and 32-leaf
+# inch sets), lands inside the builder's design band: every rack-mesh gate
+# and the opposite-flank budget (rack index and face lead plus the feed's
+# lateral terms, codjiflo P2 on 2ba1416: .002 fell 0.012 mm short of it). The
+# second, used once if the first leaves a tight spot, keeps the teeth clear
+# of interference and the contact ratio at the continuous-action floor
+# below: the owner's option C on #2416 (2026-11-11) gives up the 1.2
+# guarantee at the loose end. It is this mesh's own floor; the same 1.1 is
+# the reducer's runout floor only by the same AGMA reasoning.
+FEED_FALLBACK_CONTACT_RATIO_FLOOR = 1.1
+FEED_MESH_LEAVES_MM = (0.0025 * 25.4, 0.003 * 25.4)
+FEED_MESH_LEAF_BACKLASH_MM = tuple(
+    2.0 * leaf / math.cos(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
+    for leaf in FEED_MESH_LEAVES_MM
+)
+mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[0],) * 2).require()
+if not (
+    gear_quality.rack_pitch_index_deviation_mm() + paper_geometry.feed_lateral_deviation_mm()
+    <= FEED_MESH_LEAF_BACKLASH_MM[0]
+):
+    raise AssertionError("the first feeler leaf leaves the feed mesh's opposite-flank budget")
+_LOOSE_LEAF_MESH = mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[1],) * 2)
+if [
+    problem
+    for problem in _LOOSE_LEAF_MESH.failures()
+    if not problem.startswith("contact ratio ")
+] or not _LOOSE_LEAF_MESH.contact_ratio_min >= FEED_FALLBACK_CONTACT_RATIO_FLOOR:
+    raise AssertionError(f"the second feeler leaf leaves the feed mesh: {_LOOSE_LEAF_MESH.summary}")
+FEED_MESH_LEAF_TEXTS = tuple(inch_text(leaf, 4).rstrip("0") for leaf in FEED_MESH_LEAVES_MM)
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
@@ -249,4 +290,3 @@ OFFSET_ACCEPT_TEXT = (
 )
 COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
 RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
-RACK_DATUM_BACKLASH_TEXT = inch_window(rack_setup.RACK_DATUM_BACKLASH_RANGE, 4, " TO ")
