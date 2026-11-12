@@ -354,8 +354,9 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
 def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> None:
     """The step prints .67, 2X, on A-A (the cut through the two west
     bosses), native between the rear socket's axis and the step's cut-face
-    line; its line stands over the boss top and its text parks over the
-    rail, both under the mouth chamfer's parked text."""
+    line, and nothing else rides on that location; the step's mate, floor
+    and root limit are its own leader callout on the front boss's step,
+    over the rail and under the mouth chamfer's parked text."""
     label = "keeper relief step from socket axis"
     places = spec.DRAWING_REFERENCE_PRECISION[label]
     assert places == spec.KEEPER_BOSS_RELIEF_PLACES == 2
@@ -369,13 +370,18 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     body = body[: body.index("    keeper_relief_station()")]
     assert "entities=(bore_axes[1], steps[0])" in body
     assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
-    assert "suffix=KEEPER_RELIEF_CALLOUT," in body
+    assert 'suffix="2X",' in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
-    # The words: the floor is the faced top itself (the plane the 4X .18
-    # locates), the mate by its drawing number (rule 4), the root's limit.
+    # The step's callout: the mate by its drawing number (rule 4), the floor
+    # the faced top's plane (the feet's outboard ends rest on it), the
+    # root's limit.  A leader note, so the location carries no requirement
+    # (machinist review, farm run 20261112T014216327Z).
     assert drawing.KEEPER_RELIEF_CALLOUT == (
-        "2X FACED TOP TO STEP FOR\nMHA-CH-07 FOOT, ROOT R.02 MAX"
+        "2X STEP FOR MHA-CH-07 FOOT,\nFLOOR FLUSH WITH FACED TOP,\nROOT R.02 MAX"
     )
+    assert "KEEPER_RELIEF_CALLOUT,\n            text_xy=KEEPER_RELIEF_NOTE_XY," in body
+    assert "HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
+    assert "view=detail_section," in body
     scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
     axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
     step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
@@ -389,20 +395,31 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert line_y - boss_top_y > 0.005
     assert 0.162 - line_y > 0.005
     text_x, text_y = drawing.KEEPER_RELIEF_TEXT_XY
-    # Three rows of .12 text about the centre (29 characters at 2.45 mm):
-    # left of the step, right of the front boss's recess witnesses, over the
-    # rail top, under the chamfer's parked rows.
-    half_w, half_h = 0.0355, 0.0075
-    assert text_x + half_w < step_x - 0.005
-    front_recess_x = (
-        drawing.DETAIL_SECTION_CENTER[0]
-        + (part.FRONT_COLUMN_Z + part.CAP_RECESS_DIAMETER / 2.0) * scale
-    )
-    assert text_x - half_w > front_recess_x + 0.010
     rail_top_y = drawing.DETAIL_SECTION_CENTER[1] + part.HALF_H * scale
-    assert text_y - half_h > rail_top_y + 0.003
     chamfer_rows_bottom = drawing.BORE_CHAMFER_TEXT_OFFSET_XY[1] - 0.008
-    assert text_y + half_h < chamfer_rows_bottom
+    # Printed .12 text measures 2.7 mm a character, rows 5.3 mm apart (farm
+    # run 20261112T014216327Z).  The station's two rows (".67", "2X") stand
+    # about their centre just left of the step, under the chamfer's rows.
+    char_w, row_h = 0.0027, 0.0053
+    half_w = 3 * char_w / 2.0
+    assert text_x + half_w < step_x - 0.002
+    assert text_y - row_h > boss_top_y + 0.003
+    assert text_y + row_h < chamfer_rows_bottom
+    # The callout's three rows hang from its upper-left corner: clear of the
+    # station's text on the right and the front boss's recess witnesses on
+    # the left, over the rail top, under the chamfer's rows.
+    note_x, note_y = drawing.KEEPER_RELIEF_NOTE_XY
+    rows = drawing.KEEPER_RELIEF_CALLOUT.split("\n")
+    assert len(rows) == 3
+    note_w = max(map(len, rows)) * char_w
+    assert note_x + note_w < text_x - half_w - 0.003
+    front_axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.FRONT_COLUMN_Z * scale
+    front_step_x = front_axis_x + spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
+    assert front_step_x - front_axis_x > part.CAP_RECESS_DIAMETER / 2.0 * scale
+    # The leader runs down-left to the front step's root from past it.
+    assert note_x - front_step_x > 0.005
+    assert note_y - 3 * row_h > rail_top_y + 0.002
+    assert note_y < chamfer_rows_bottom - 0.002
 
 
 @pytest.mark.parametrize("front_station_direction", (-1, 1))

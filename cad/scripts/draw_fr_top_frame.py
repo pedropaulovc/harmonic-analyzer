@@ -504,9 +504,13 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # A-A cuts the two west bosses, so it shows each keeper relief as a step in
 # the boss top (owner ruling 2026-11-11, #1038, K5).  The rear one's station
 # from its socket axis reads over the boss top, under the mouth chamfer's
-# parked text; 8.5 mm of paper cannot hold the value and its words, so they
-# park left of the step over the rail (the rows are the spec's: the faced
-# top carried to the step, the mate's number, the root's limit).
+# parked text; 8.5 mm of paper cannot hold its two rows, so they park just
+# left of the step.  The step's own callout (the spec's rows) stands over
+# the rail, upper-left at KEEPER_RELIEF_NOTE_XY: three .12 rows, 73 x 16 mm
+# as printed (2.7 mm a character, rows 5.3 apart, measured on farm run
+# 20261112T014216327Z), its foot 3 over the rail top and its head 2.7 under
+# the chamfer text's underline, pointing at the FRONT boss's step root so
+# its leader crosses neither the station nor its text.
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
@@ -515,7 +519,8 @@ KEEPER_RELIEF_LINE_XY = (
     / 1000.0,
     0.1535,
 )
-KEEPER_RELIEF_TEXT_XY = (0.2965, 0.1555)
+KEEPER_RELIEF_TEXT_XY = (0.331, 0.1575)
+KEEPER_RELIEF_NOTE_XY = (0.250, 0.163)
 
 
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).
@@ -5473,8 +5478,18 @@ async def build(adapter: Any) -> dict[str, str]:
             orientation="horizontal",
             entity_types=("SKETCHSEGMENT", "EDGE"),
             entities=(bore_axes[1], steps[0]),
-            suffix=KEEPER_RELIEF_CALLOUT,
+            suffix="2X",
             offset_text=KEEPER_RELIEF_TEXT_XY,
+        )
+        add_leader_note(
+            adapter,
+            KEEPER_RELIEF_CALLOUT,
+            text_xy=KEEPER_RELIEF_NOTE_XY,
+            attach_xy=a_a_sheet(
+                HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET
+            ),
+            view=detail_section,
+            label="keeper relief step callout",
         )
 
     keeper_relief_station()
