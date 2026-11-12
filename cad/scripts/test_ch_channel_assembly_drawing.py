@@ -1232,7 +1232,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
     checked = _step_body("keeper-bores-checked")
     assert drawing.item("ch-fulcrum-shaft") in checked
     assert drawing.item("ch-fulcrum-keeper") in checked
-    for part_data in (".2540", "6.4", "REAM"):
+    for part_data in (".2550", "6.4", "REAM"):
         assert part_data not in checked
     import ch_fulcrum_shaft_spec as shaft
 

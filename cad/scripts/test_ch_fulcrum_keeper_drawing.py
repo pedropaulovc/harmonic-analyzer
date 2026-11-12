@@ -65,9 +65,9 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(spec.KEEPER_Z_OFF + spec.SCREW_X)
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(88.646)
     # Plain reamed bore on the plain Ø.2500 shaft, each keeper reamed alone
-    # (#2338) with a stock .2540 chucking reamer: a slip band whose least
+    # (#2338) with a stock .2550 chucking reamer: a slip band whose least
     # clearance covers both keepers' bore heights, tilts and the rail seats.
-    assert spec.BORE_DIA == pytest.approx(0.2540 * 25.4)
+    assert spec.BORE_DIA == pytest.approx(0.2550 * 25.4)
     assert spec.BORE_DIA_BAND == (0.0254, 0.0)  # (upper, lower)
     # The stock reamer's ANSI cutting band lies inside the bore band.
     low, high = spec.BORE_REAMER_DIA_RANGE_MM
@@ -101,7 +101,7 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     # Owner ruling Q10-B: the bore stands within +-.012 of the width's centre
     # plane, so each side wall is half the least .XX width less that band.
     assert spec.BORE_SIDE_WALL_MM >= WALL_TARGET_MM
-    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.315
+    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.302
     assert round(spec.SET_SCREW_WEB_MM, 3) == 2.629
     assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.362
     # Owner ruling 2026-10-28: the outer lug face sits .65 - .32 off the
@@ -197,7 +197,7 @@ def test_each_keeper_is_reamed_alone_and_the_pair_still_lines_up() -> None:
     # .XX LugRise bands plus the rail seats' budget apart in height; the shaft
     # through both spends the thickest printed lug x (seat pitch + that
     # slope) of each bore's clearance, plus each bore's own tilt to its seat
-    # at the shop's routine .001 squareness, and the slip minimum must remain
+    # at the repo's 0.3 deg drill run-off, and the slip minimum must remain
     # (ch_fulcrum_shaft_spec.ALIGNED_MIN_CLEARANCE_MM holds the guard).
     spec = ch_fulcrum_keeper_spec
     assert spec.DRAWING_PRECISION["LugProfile"]["LugRise"] == 2
@@ -209,7 +209,7 @@ def test_each_keeper_is_reamed_alone_and_the_pair_still_lines_up() -> None:
     allowance = lug_max * (
         spec.KEEPER_SEAT_FLATNESS_BUDGET_MM / spec.KEEPER_SEAT_LENGTH_MM
         + mismatch / (2.0 * spec.KEEPER_Z_OFF)
-    ) + 0.0254
+    ) + lug_max * math.tan(math.radians(0.3))
     assert spec.BORE_ALIGNMENT_ALLOWANCE_MM == pytest.approx(allowance)
     least = spec.BORE_DIA + spec.BORE_DIA_BAND[1] - (6.35 + SHAFT_H[0])
     assert least >= spec.BORE_RUNNING_MIN_CLEARANCE_MM + allowance
@@ -264,7 +264,7 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
     assert terms["least crown over the bore axis"] + terms[
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.629
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.622
     source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert 'names=("CrownCz", "ShaftAxisH", "CrownRadius")' in source
     assert 'size_dimension="radius"' in source

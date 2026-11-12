@@ -105,18 +105,18 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # keeper is finished alone, as a detail, to its own print (#2338: the
 # at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
 # setup). Two bores reamed apart sit out of line by their bore-height bands
-# and each bore's own tilt to its seat, so the bore is a stock .2540
-# chucking reamer's size (shop-equipment.toml tools.reamer-2540),
+# and each bore's own tilt to its seat, so the bore is a stock .2550
+# chucking reamer's size (shop-equipment.toml tools.reamer-2550),
 # BORE_DIA_BAND +.0010/.0000: its least clearance on the shaft covers the
 # slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
 # The crown is a full round tangent to both side faces, centred on the bore
 # (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
 # BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's
 # worst case below spends that offset under the round.
-BORE_DIA = 0.2540 * 25.4  # 6.4516
+BORE_DIA = 0.2550 * 25.4  # 6.477
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2540 +.0010/.0000 in
-# The reamer that cuts it: TTC 06-002-540, ANSI B94.2 diameter tolerance
+BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2550 +.0010/.0000 in
+# The reamer that cuts it: TTC 06-002-550, ANSI B94.2 diameter tolerance
 # +.0001/+.0005 in over 1/4 in (Machinery's Handbook, chucking reamers); the
 # hole it cuts lies inside the bore band.
 BORE_REAMER_DIA_RANGE_MM = (BORE_DIA + 0.0001 * 25.4, BORE_DIA + 0.0005 * 25.4)
@@ -522,8 +522,10 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 # each lug, at the thick end of its printed LugThickness band, spends its
 # thickness x (its seat's pitch + that line's slope) of diametral
 # clearance. Each bore, reamed in its own setup, may also tilt to its seat:
-# BORE_TILT_MM, the shop table's routine squareness (.001 per inch, never
-# under .001 total) over the under-1-in bore. Together they make
+# BORE_TILT_MM, the repo's 0.3 deg drill run-off (the reamer follows its
+# drilled hole; the frame's keeper taps charge the same) over the
+# thickest lug, since the print sets no bore-to-seat orientation. Together
+# they make
 # BORE_ALIGNMENT_ALLOWANCE_MM; ch_fulcrum_shaft_spec checks the bore band's
 # least clearance on the largest shaft keeps the slip minimum on top of it
 # (ALIGNED_MIN_CLEARANCE_MM).
@@ -534,7 +536,7 @@ BORE_HEIGHT_MISMATCH_MM = (
 LUG_THICKNESS_MAX_MM = (
     2.0 * LUG_HALF_T + _BAND_BY_PLACES[DRAWING_PRECISION["LugBody"]["LugThickness"]]
 )  # 8.382
-BORE_TILT_MM = 0.001 * 25.4
+BORE_TILT_MM = LUG_THICKNESS_MAX_MM * tan(radians(0.3))  # 0.0439
 BORE_ALIGNMENT_ALLOWANCE_MM = (
     LUG_THICKNESS_MAX_MM
     * (
@@ -542,5 +544,5 @@ BORE_ALIGNMENT_ALLOWANCE_MM = (
         + BORE_HEIGHT_MISMATCH_MM / (2.0 * KEEPER_Z_OFF)
     )
     + BORE_TILT_MM
-)  # 0.0741
+)  # 0.0926
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

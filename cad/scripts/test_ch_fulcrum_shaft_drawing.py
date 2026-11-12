@@ -37,8 +37,8 @@ def test_shaft_carries_no_frames_or_datums() -> None:
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
-    # #2338: the keeper bore is a .2540 reamer's size over the .2500 shaft.
-    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0040
+    # #2338: the keeper bore is a .2550 reamer's size over the .2500 shaft.
+    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0050
     assert math.isclose(
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
@@ -241,8 +241,8 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     # takes with the shaft through both); each seat may also pitch its zone
     # over its .65 length. The shaft runs through both lug centres 6.360
     # apart and each lug, at its thickest printed .33, spends its thickness x
-    # (pitch + slope); each bore, reamed in its own setup, may tilt .001 to
-    # its seat (the shop's routine squareness). The .2540 bore keeps the slip
+    # (pitch + slope); each bore, reamed in its own setup, may run off 0.3 deg
+    # from its seat (the drill it follows). The .2550 bore keeps the slip
     # minimum after all of that.
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
@@ -254,17 +254,17 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     assert math.isclose(span, 161.544)
     slope = (2.0 * 0.254 + flatness) / span
     pitch = flatness / keeper.KEEPER_SEAT_LENGTH_MM
-    allowance = lug_t * (pitch + slope) + 0.0254
+    allowance = lug_t * (pitch + slope + math.tan(math.radians(0.3)))
     assert math.isclose(keeper.BORE_ALIGNMENT_ALLOWANCE_MM, allowance)
-    assert round(allowance, 4) == 0.0741
+    assert round(allowance, 4) == 0.0926
     least = keeper.BORE_DIA + keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA - spec.SHAFT_DIA_BAND[0]
-    assert round(least / 25.4, 4) == 0.0040
+    assert round(least / 25.4, 4) == 0.0050
     assert math.isclose(spec.ALIGNED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0275
+    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0344
     assert spec.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
-    # Neither the owned .2510 reamer nor a .2525 one would do it: each one's
+    # Neither the owned .2510 reamer nor a .2540 one would do it: each one's
     # least clearance is under the slip minimum plus the allowance.
-    for reamer_in in (0.2510, 0.2525):
+    for reamer_in in (0.2510, 0.2540):
         assert (reamer_in - 0.2500) * 25.4 < keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance
 
 

@@ -304,7 +304,7 @@ ALIGNED_MIN_CLEARANCE_MM = (
     - SHAFT_DIA
     - SHAFT_DIA_BAND[0]
     - BORE_ALIGNMENT_ALLOWANCE_MM
-)  # 0.0275
+)  # 0.0344
 if ALIGNED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
     raise AssertionError(
         f"the keeper bores keep {ALIGNED_MIN_CLEARANCE_MM:.4f} on the shaft "

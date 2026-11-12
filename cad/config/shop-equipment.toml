@@ -379,22 +379,22 @@ present = false
 purchase = "One 12 mm H7 HSS (or HSS-Co) straight-flute chucking reamer, DIN 212 proportions; catalogue cutting band 12.004-12.015 mm (.4726-.4730 in), inside the bore's .4720-.4735 band. Order with the knife-mount 4140 HT bar."
 note = "Cuts the MHA-SM-02 knife mount's Ø.4720 +.0015/0 REAM THRU bore in pre-hardened 4140/4142 HT at 28-32 HRC (slow speed, cutting oil). Trial-cut a scrap of the same bar and pin-check before the parts. The bore is the knife-edge bearing seat for the MHA-SM-03 trunnion."
 
-# MHA-CH-07 fulcrum-keeper bore reamer (#2338): each keeper's Ø.2540 +.0010/0
+# MHA-CH-07 fulcrum-keeper bore reamer (#2338): each keeper's Ø.2550 +.0010/0
 # bore is reamed on the keeper alone, replacing the retired at-assembly pair
 # ream through both keepers (made-to-order 12 in reamer). To purchase: not owned;
-# price and stock read live on travers.com 2026-11-12 ($33.96, 16 in stock).
+# price and stock read live on travers.com 2026-11-12 ($33.96, 32 in stock).
 # Cutting band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005
-# over 1/4 in, so it cuts .2541-.2545, inside the bore's .2540-.2550 band
+# over 1/4 in, so it cuts .2551-.2555, inside the bore's .2550-.2560 band
 # (ch_fulcrum_keeper_spec.BORE_REAMER_DIA_RANGE_MM).
-[tools.reamer-2540]
-name = "TTC PRODUCTION HP 06-002-540 .2540 in HSS straight-flute chucking reamer"
+[tools.reamer-2550]
+name = "TTC PRODUCTION HP 06-002-550 .2550 in HSS straight-flute chucking reamer"
 kind = "reamer"
 make = "TTC"
-sku = "06-002-540"
-source = "https://www.travers.com/product/ttc-production-hp-06-002-540-straight-shank-chucking-reamer-06-002-540"
+sku = "06-002-550"
+source = "https://www.travers.com/product/ttc-production-hp-06-002-550-straight-shank-chucking-reamer-06-002-550"
 present = false
-purchase = "One TTC 06-002-540 .2540 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; ANSI B94.2 cutting band .2541-.2545, inside the bore's .2540-.2550 band."
-note = "Cuts both MHA-CH-07 keepers' Ø.2540 +.0010/.0000 REAM THRU bores in 1018, each keeper on its own: a slip fit on the Ø.2500 h ground MHA-CH-04 shaft that also covers both keepers' bore-height bands, each bore's tilt and the rail seats (ch_fulcrum_keeper_spec.BORE_ALIGNMENT_ALLOWANCE_MM). Pin-check the first bore."
+purchase = "One TTC 06-002-550 .2550 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; ANSI B94.2 cutting band .2551-.2555, inside the bore's .2550-.2560 band."
+note = "Cuts both MHA-CH-07 keepers' Ø.2550 +.0010/.0000 REAM THRU bores in 1018, each keeper on its own: a slip fit on the Ø.2500 h ground MHA-CH-04 shaft that also covers both keepers' bore-height bands, each bore's tilt and the rail seats (ch_fulcrum_keeper_spec.BORE_ALIGNMENT_ALLOWANCE_MM). Pin-check the first bore."
 
 # Screw-slotting saw for the MHA-DT-12 (dt-cylinder-gear) alignment notch, x20
 # (#2364). The sheet prints the kerf .016 MAX: wider, it cuts the flanks of the

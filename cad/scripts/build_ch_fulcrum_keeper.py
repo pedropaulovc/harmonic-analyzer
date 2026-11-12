@@ -424,7 +424,7 @@ async def build(adapter) -> dict[str, str]:
     v_crown = 0.5 * math.pi * r_c * r_c * LUG_T
     volume = await volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
 
-    # --- Shaft bore: plain reamed Ø.2540 through the lug on the axis ------
+    # --- Shaft bore: plain reamed Ø.2550 through the lug on the axis ------
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Right"))
     await define_circle(
