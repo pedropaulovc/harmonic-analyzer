@@ -150,7 +150,12 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # balloon joined the lever-bank cluster at the top of the view and the ring
     # crossed leaders 2/17 and 8/10 (r6 layout audit); south it attaches out at
     # the right, which a replay of the r6 ring places clear of every leader.
-    ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
+    # 100, not 120: at the .300 pitch the shaft is 11.45 longer, and its south
+    # end sets the box's south (top-of-sheet) corner; at 120 the ringed
+    # outline stood 0.25 mm over the top border (#1038 point B). At 100 its
+    # south end (-189.5) is 14 north of where 120 left the 166.6 shaft, and
+    # its north end (-11.5) still sits inside the lever bank.
+    ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -100.0),
     ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
     ExplodeStep("its rod pin out", (ROD_PIN,), "z", 25.0, "north-most"),
     # South, not north: 25 north put the bar pin on the lever's lower edge

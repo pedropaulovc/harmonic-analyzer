@@ -218,8 +218,11 @@ VIEW_ARROW_TIP_GAP = 0.002
 VIEW_ARROW_RUN = 0.010
 
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
-# 10 mm below the sheet's middle, so the ring can grow at the top.
-EXPLODED_ISO_CENTER = (0.100, 0.140)
+# Centred between the borders: _assert_view_on_sheet grows the outline by
+# the balloon ring on all four sides, so either end is the first to reach a
+# border (point B at the .300 pitch: 0.2539 of the 0.254 between them, the
+# top 0.25 mm over at y 0.140).
+EXPLODED_ISO_CENTER = (0.100, _TEMPLATE.height_m / 2.0)
 # The lever balloon's leader runs along the bank axis, and the exploded fulcrum
 # shaft lies on that axis's south extension. The shaft has no hit-testable
 # edge, so SolidWorks picks where its leader lands (listed-edge), and that
