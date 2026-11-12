@@ -8,7 +8,8 @@ the part's blanked ``RingReference`` sketch (a torus has no edge to
 dimension), and its butt gap. The front view, below it in projection, shows
 the ring edge-on with the wire's stock diameter as REFERENCE. An isometric
 and the property-linked notes (the closure and the gap's band) complete the
-sheet. No datums, no frames, no roughness symbol: the part is
+sheet; note 1 is flagged ``SEE NOTE 1`` on a leader to the butt joint in the
+top view (rule 7). No datums, no frames, no roughness symbol: the part is
 ``visual_noncritical``, so every value takes the title block's band.
 
 The decimal places are the PART's (``dt_crank_pin_ring_notes``, applied
@@ -39,6 +40,7 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 import _drawing_hidden_sketches as hidden_sketches
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -54,7 +56,7 @@ from dt_crank_pin_ring_notes import (
     REFERENCE_DIMENSIONS,
     RING_ID,
 )
-from dt_crank_pin_ring_spec import MEAN_R, WIRE_DIA
+from dt_crank_pin_ring_spec import BUTT_GAP, MEAN_R, WIRE_DIA
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -99,6 +101,18 @@ TOP_KEEP = {
 FRONT_KEEP = {
     "WireDia": (FRONT_CENTER[0] - HALF_OD - 0.032, FRONT_CENTER[1] + 0.018),
 }
+
+# Note 1 governs the butt joint, so it is flagged at the joint (rule 7; v49
+# machinist review: the note sat unlinked in the note block). The gap is cut
+# on the ring's +Z side, the bottom of the top view, square across the wire at
+# the ring's centre x. The leader tip lands on the corner of the gap's +X cut
+# face with the outer rim and arrives from down-right, outside the ring, so it
+# crosses no outline. The flag's top-left corner stands below the top view,
+# right of the gap and clear of the front view.
+JOINT_NOTE_NUMBER = 1
+JOINT_FLAG = f"SEE NOTE {JOINT_NOTE_NUMBER}"
+JOINT_TIP = (TOP_CENTER[0] + BUTT_GAP / 2.0 * _S, TOP_CENTER[1] - HALF_OD)
+JOINT_FLAG_XY = (TOP_CENTER[0] + 0.018, TOP_CENTER[1] - HALF_OD - 0.0075)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -177,6 +191,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # keeps its Ø inside "( )".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_leader_note(
+        adapter,
+        JOINT_FLAG,
+        text_xy=JOINT_FLAG_XY,
+        attach_xy=JOINT_TIP,
+        label="butt joint flag",
+        view=top,
+    )
 
     return await finalize_drawing(
         adapter,
