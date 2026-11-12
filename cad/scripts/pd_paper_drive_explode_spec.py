@@ -159,6 +159,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
             "pd-transgear-feed-pinion",
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
+            "pd-vn-transgear-hub-key-pin",
             "pd-vn-transgear-disc-screw",
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
@@ -171,6 +172,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         (
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
+            "pd-vn-transgear-hub-key-pin",
             "pd-vn-transgear-disc-screw",
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
@@ -182,6 +184,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         "hub off the disc",
         (
             "pd-transgear-disc-hub",
+            "pd-vn-transgear-hub-key-pin",
             "pd-vn-transgear-disc-screw",
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
@@ -190,6 +193,9 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         -18.0,
     ),
     ExplodeStep("disc screws forward", ("pd-vn-transgear-disc-screw",), "z", -14.0),
+    # #2409: the hub's key pin out of its chord ream the way it went in,
+    # along its own axis (machine +X, out of the reamed end), clear of the hub.
+    ExplodeStep("hub key pin out", ("pd-vn-transgear-hub-key-pin",), "x", 12.0),
     ExplodeStep(
         "front bushing forward",
         ("pd-transgear-front-bushing", "pd-vn-transgear-retaining-ring"),
@@ -204,6 +210,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         (
             "pd-transgear-drive-collar",
             "pd-vn-transgear-knob-drive-pin",
+            "pd-vn-transgear-collar-flat-pin",
             "pd-transgear-thumbnut",
         ),
         "z",

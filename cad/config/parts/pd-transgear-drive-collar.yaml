@@ -7,7 +7,7 @@ pd-transgear-drive-collar:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "turned from bar (brass): turn the body and pilot from blanks with the specified facing allowance; drill undersize and finish the true D-bore, retaining its separately limited flat; ream the two drive-pin holes through; face the rear to fit directly on the knob gear front F, finish the final rear D-bore entry at 45 degrees with the specified equal-leg limits, and face the pilot to the specified sprocket proudness at assembly"
+  process: "turned from bar (brass): turn the body and pilot from blanks with the specified facing allowance; ream the .192 bore through; ream the two drive-pin holes through; ream the .0615 blind flat-pin hole from the rear to its floor and press the MHA-PD-VN-70 pin to the floor; face the rear to fit directly on the knob gear front F, facing the pin flush with it, then break the rear bore mouth .008 X 45° through the pin's crest with it (collar and pin are one permanent pair); face the pilot to the specified sprocket proudness at assembly"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
@@ -16,6 +16,16 @@ pd-transgear-drive-collar:
       reason: "Owner ruling 2026-11-01: shared #25 sprocket-seat geometry; accepted as a permanent minor exception (revisit in #2141)"
     - id: "RV-02"
       kind: "accept"
-      where: "the two Ø.0930 dowel reams' .2756 ±.0009 locations from the D-bore axis"
+      where: "the two Ø.0930 dowel reams' .2756 ±.0009 locations from the bore axis"
       finding: "reamed-hole location band tighter than the ±.002 reamed-hole row, a converted-mm value, with no fit route (rules 3, 4)"
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out F4). The band is the shared #25 sprocket seat's (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL), set by the dowel slip budget: the 3/32 dowels pressed here enter MHA-PD-09's holes with .0039 diametral slip, and the pin and hole location bands spend .0036 of it, so neither can loosen; a cross-part transfer route was not taken now because it re-keys MHA-DT-11, MHA-PD-09 and both assemblies"
+    - id: "RV-03"
+      kind: "minor"
+      where: "sheet note 2: PERMANENT PIN MHA-PD-VN-70: HOLE TO DRIVE-PIN HOLE .076 MIN."
+      finding: "web from the Ø.0615 flat-pin ream (.118 ±.002 from the bore axis) to the -Y Ø.0930 drive-pin ream at the worst centres and largest holes below the .080 target, above the .060 floor (rules 17, 20)"
+      reason: "Delegated ruling 2026-11-11 (Main), #2409; precedent band .060-.080: owner ruling 2026-11-08 #2144 item 3.2 / RV-02 on MHA-PD-17. The flat pin's centre is set by its crest over the knob shaft's D-flat and the drive-pin circle by the shared #25 sprocket seat, so neither can move to widen the web"
+    - id: "RV-04"
+      kind: "accept"
+      where: "the MHA-PD-VN-70 pin's crest on the MHA-PD-08 D-core's flat (sheet: Ø.0615 ream .118 ±.002 from the bore axis; MHA-PD-08 core flat)"
+      finding: "rotational lost motion between collar and knob shaft: the crest clears the flat by .0006-.0054 and the round bore floats on the core, so the collar turns up to ±17° on the shaft before the crest drives (rule 21: a drive with play)"
+      reason: "Delegated ruling 2026-11-11 (Main), no precedent; owner review #2144; #2409. The play is stated, not hidden: reversing the knob takes up to 34° of free travel, 3.4° at the feed sleeve through the 15:150 transgear, 0.29 mm of paper travel on the feed pinion's pitch circle. The paper feeds one way while the crank turns, so the lash is taken up once and stays loaded. Closing it needs a fitted crest (a select or ground pin), which this one-off pairing does not need"

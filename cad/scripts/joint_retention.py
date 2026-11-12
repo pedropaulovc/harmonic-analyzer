@@ -750,9 +750,11 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_rocker_thrust_washer",  # MHA-CH-VN-56 carbon-steel ring shim (McMaster 3088A429) loose on the MHA-CH-05 shaft, north and south; no thread
         "pd_transgear_arm_plate",  # MHA-PD-19: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "pd_vn_transgear_knob_cup_pin",  # MHA-PD-VN-62 1/16 slotted spring pin through the knob cup and the shaft's journal
-        "pd_transgear_disc_hub",  # MHA-PD-17 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
-        "pd_transgear_drive_collar",  # MHA-PD-22: matching D-bore on the knob shaft, reamed drive-pin holes; no thread
-        "pd_transgear_feed_pinion",  # MHA-PD-10 shifted 12T 32DP PA20 sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
+        "pd_transgear_drive_collar",  # MHA-PD-22: plain round bore on the knob shaft, reamed drive-pin holes, blind flat-pin ream; no thread
+        "pd_vn_transgear_collar_flat_pin",  # MHA-PD-VN-70 18-8 dowel pressed into the collar's blind ream, its crest on the shaft's D-flat; no thread
+        "pd_transgear_disc_hub",  # MHA-PD-17 brass hub: plain round bore on the sleeve's boss, stepped .0615 chord key-pin ream, plain flange clearance holes for the disc screws; no thread
+        "pd_vn_transgear_hub_key_pin",  # MHA-PD-VN-69 1/16 dowel pressed along the hub's chord ream to its stop, its side over the feed sleeve's flat; no thread
+        "pd_transgear_feed_pinion",  # MHA-PD-10 shifted 12T 32DP PA20 sleeve: plain bore on the pin, its flat keying the hub's MHA-PD-VN-69 pin; no thread
         "pd_transgear_front_bushing",  # MHA-PD-25 brass bushing, printed length, reamed bore on the pin; no thread
         "pd_transgear_knob_cup",  # MHA-PD-16: reamed through bore, cross-pinned to the journal at assembly; no thread
         "pd_transgear_knob_thrust_ring",  # MHA-PD-15 loose brass ring, drilled bore; no thread
@@ -791,6 +793,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "sm_vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
     "dt_vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "pd_vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
+    "pd_vn_transgear_collar_flat_pin": "dowel pin pressed into a plain hole",
+    "pd_vn_transgear_hub_key_pin": "dowel pin pressed into a plain reamed hole",
     "pd_vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "pd_vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "pd_vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's through ream",
@@ -2250,7 +2254,8 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="disc-taps-transferred",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "fix the 120T disc to the hub flange, whose D-bore is keyed on the feed sleeve's D-flat; "
+            "fix the 120T disc to the hub flange, the hub keyed to the feed sleeve by the pressed "
+            "MHA-PD-VN-69 chord key pin over the sleeve's flat (#2409); "
             "disc, hub and sleeve turn as one body. The drive torque acts about the pin axis, and the three screws "
             "on the flange's bolt circle carry it as shear across their own axes, never as torque "
             "about them"
@@ -2339,7 +2344,8 @@ JOINTS: tuple[Joint, ...] = (
             "the nut seats on the drive collar's pilot, faced .002-.006 proud of the T24's front "
             "face, so its axial clamp passes through the collar's rear face onto the shaft's "
             "actual pinion front face F while the T24 floats free under its flange. The drive "
-            "goes T24 -> the two pressed drive pins -> collar -> D-flat -> shaft; the free T24 "
+            "goes T24 -> the two pressed drive pins -> collar -> its pressed flat pin on the "
+            "D-flat -> shaft; the free T24 "
             "rocks through its pin backlash at each reversal and, pushed forward, can rub the "
             "flange (machinist review of 6c385465d)"
         ),
@@ -2347,7 +2353,7 @@ JOINTS: tuple[Joint, ...] = (
             "the nut's flange seat face bears on the collar pilot's faced front; #8-32 UNC-2B "
             "through on the shaft's single-pointed front thread. At collar-shoulder-seated the collar's "
             "fitted rear face bears on actual F and reacts the nut's axial clamp, independently "
-            "of its D-flat torque key; the flange retains the wheel on the drive pins and is "
+            "of the flat pin's torque key; the flange retains the wheel on the drive pins and is "
             "removed by hand for gear swaps"
         ),
         lock=Lock.NONE,

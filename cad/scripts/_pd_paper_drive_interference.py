@@ -74,11 +74,14 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # on a transgear spec; test_pd_paper_drive_interference_contracts pins each to
 # its owner.
 # Pairs with NO row, modelled line to line or with clearance, which the gate
-# reads as contact: the MHA-PD-17 hub's D-bore on the sleeve's Ø9 boss and
-# D-flat, the MHA-PD-VN-58 dowel in the arm's Ø3.175 ream, the sleeve and both
+# reads as contact: the MHA-PD-17 hub's plain bore on the sleeve's Ø9 boss,
+# the MHA-PD-VN-69 key pin's side clear of the sleeve's flat (#2409), the
+# MHA-PD-VN-58 dowel in the arm's Ø3.175 ream, the sleeve and both
 # bushings on the MHA-PD-23 pin (Ø3.9), the disc bore on the boss (Ø9), the
-# knob journal in the plate bore (Ø6.3246), the D-collar bore on the core
-# (Ø4.8768), the MHA-PD-VN-54 dowels in the T24's Ø2.5 holes, every screw in its
+# knob journal in the plate bore (Ø6.3246), the drive collar's round bore on
+# the core (Ø4.8768), the MHA-PD-VN-70 pin's crest clear of the core's flat
+# and its faced rear end flush on F, the MHA-PD-VN-54 dowels in the T24's Ø2.5
+# holes, every screw in its
 # clearance hole, and the MHA-PD-14 latch hook: its base on the bar's back
 # face under the MHA-PD-VN-59 heads, their shanks through its Ø3.2 holes, and
 # the MHA-PD-VN-58 pin through its Ø3.3 pin hole.
@@ -207,6 +210,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "pd-rack-pinion",
         smooth_annulus_limit_mm3(1.524, 1.191, 5.2832 - 2.3876),
     ),
+    # MHA-PD-VN-69 1/16 x 5/16 key pin (pd_vn_transgear_hub_key_pin_spec,
+    # #2409) pressed along the hub's .0615 (1.5621) chord ream to its stop:
+    # bounded over the pin's whole 7.9375 length, of which the bore's window
+    # over the flat takes part.
+    frozenset(
+        ("pd-vn-transgear-hub-key-pin-1", "pd-transgear-disc-hub-1")
+    ): smooth_annulus_limit_mm3(1.5875, 1.5621, 7.9375),
     # MHA-PD-VN-62 through the knob shaft's journal and the cup (above).
     frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")): 1.10
     * _CUP_PIN_JOURNAL_MM3,
@@ -243,6 +253,14 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "pd-transgear-drive-collar",
         smooth_annulus_limit_mm3(_SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, 2.3625),
     ),
+    # MHA-PD-VN-70 (pd_vn_transgear_collar_flat_pin_spec, Ø1/16 = 1.5875 model)
+    # pressed into the collar's Ø.0615 (1.5621) blind ream from the floor
+    # .080 (2.032) behind the seat face to the rear, faced flush with the .243
+    # model collar: FLAT_PIN_LENGTH 4.1402 (#2409). The press, bounded over the
+    # whole length although the bore's air takes the crest side.
+    frozenset(
+        ("pd-vn-transgear-collar-flat-pin-1", "pd-transgear-drive-collar-1")
+    ): smooth_annulus_limit_mm3(1.5875, 1.5621, 4.1402),
     # Chain-mesh contact at the closing station: the MHA-PD-VN-66 connecting
     # link closes the chain at station 67, whose forward pin is pin 0 on the
     # T24's pitch circle, the same seated-chain mesh the gate allows every

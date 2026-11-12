@@ -1031,6 +1031,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_vn_transgear_collar_flat_pin",
+        part="pd_vn_transgear_collar_flat_pin",
+        artifact_stem="pd-vn-transgear-collar-flat-pin",
+        script_name="draw_pd_vn_transgear_collar_flat_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_thumbnut",
         part="pd_transgear_thumbnut",
         artifact_stem="pd-transgear-thumbnut",
@@ -1049,6 +1056,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pd_transgear_disc_hub",
         artifact_stem="pd-transgear-disc-hub",
         script_name="draw_pd_transgear_disc_hub.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pd_vn_transgear_hub_key_pin",
+        part="pd_vn_transgear_hub_key_pin",
+        artifact_stem="pd-vn-transgear-hub-key-pin",
+        script_name="draw_pd_vn_transgear_hub_key_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

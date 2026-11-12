@@ -2341,6 +2341,30 @@
           "role": "BarPin"
         }
       ]
+    },
+    {
+      "old_stem": "pd-vn-transgear-hub-key-pin",
+      "old_number": null,
+      "introduced": "2026-11-11",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-hub-key-pin",
+          "number": "MHA-PD-VN-69"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-vn-transgear-collar-flat-pin",
+      "old_number": null,
+      "introduced": "2026-11-11",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-collar-flat-pin",
+          "number": "MHA-PD-VN-70"
+        }
+      ]
     }
   ],
   "retired_identities": [

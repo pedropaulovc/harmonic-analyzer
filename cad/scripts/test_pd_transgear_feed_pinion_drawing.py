@@ -53,7 +53,13 @@ def test_required_drawing_paths() -> None:
 def test_every_marked_dimension_is_placed_and_has_places() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (drawing.FRONT_KEEP, drawing.RIGHT_KEEP, drawing.LEFT_KEEP, drawing.REAR_KEEP)
+    keeps = (
+        drawing.FRONT_KEEP,
+        drawing.RIGHT_KEEP,
+        drawing.LEFT_KEEP,
+        drawing.REAR_KEEP,
+        drawing.NOSE_KEEP,
+    )
     assert sum(len(keep) for keep in keeps) == len(marked)
     assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -76,8 +82,12 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert below["BoreDia"] == callouts.BORE_CALLOUT
     assert callouts.BORE_CALLOUT.startswith(callouts.BORE_PROCESS_CALLOUT)
     assert callouts.BORE_CALLOUT.endswith(callouts.BORE_FIT_CALLOUT)
-    for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
+    for name in ("BossDia", "FaceWidth", "OverallLength"):
         assert spec.HUB_NUMBER in below[name], name
+    # #2409: the flat names the hub's key pin it keys; its end location
+    # prints its limits alone, the mate already named on the flat (r4).
+    assert callouts.HUB.KEY_PIN_NUMBER in below["FlatToAxis"]
+    assert "FlatEnd" not in below
     assert below["OutsideDia"] == callouts.MESH_CALLOUT == "SEE GEAR DATA"
     # The span's band still controls (it sets the cutter's radial setting
     # limits): its callout names the matched fit and links the block's row.
@@ -85,8 +95,11 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert "MATCHED FIT" in callouts.SPAN_CALLOUT and "SEE GEAR DATA" in callouts.SPAN_CALLOUT
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
+    # The disc cluster stack is named once, on the overall (r8 review, rule
+    # 7): the tooth length names only the spigot it seats.
+    assert STACK_NAME in below["OverallLength"]
+    assert STACK_NAME not in below["FaceWidth"]
     for name in ("FaceWidth", "OverallLength"):
-        assert STACK_NAME in below[name], name
         assert "FACED" not in below[name], name
     # Rule 7: size and process rows, then at most two rows of words.
     for name, text in below.items():
@@ -112,14 +125,14 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     for text, mate, clearance in (
         (callouts.BORE_FIT_CALLOUT, spec.PIN_NUMBER, spec.BORE_DIAMETRAL_CLEARANCE),
         (callouts.BOSS_CALLOUT, spec.HUB_NUMBER, hub.BOSS_CLEARANCE_LIMITS),
-        (callouts.FLAT_CALLOUT, spec.HUB_NUMBER, None),
     ):
         assert any(name in text for name in standard), text
         assert mate in text, text
         if clearance is not None:
             assert window(clearance) in text, text
-    # The flats' plane-to-plane clearance is accepted on the bench.
-    assert "NO ROCK" in callouts.FLAT_CALLOUT
+    # #2409: the flat is no fit; it keys the hub's pin, named.
+    assert hub.KEY_PIN_NUMBER in callouts.FLAT_CALLOUT
+    assert not any(name in callouts.FLAT_CALLOUT for name in standard)
     # The matched (turned-to-bore) boss names the hub as the shop reads it.
     assert _config.parts("pd-transgear-disc-hub")["title"].upper().endswith(
         callouts.HUB_NAME
@@ -150,17 +163,21 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("GearBlank", "FaceWidth"): "FACE_WIDTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
-        ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
+        ("FlatReference", "FlatToAxis"): "FLAT_TO_AXIS_TOL",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
-    # the disc cluster stack's +/-.001 lengths at three places, the tip
-    # class, the boss's and the flat's bands at four, where the inch title
-    # block has no row, so each carries its own explicit band.
+    # the disc cluster stack's +/-.001 lengths at three places, the tip class
+    # and the boss's band at four, where the inch title block has no row, so
+    # each carries its own explicit band.  The flat prints the shop's milled
+    # ±.002 row (the hub key pin's air, its pin named at the callout).
     assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == FIT_LENGTH_BAND_IN
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert spec.STATION_PLACES == spec.FACE_WIDTH_PLACES == 3
-    for name in ("OutsideDia", "BossDia", "FlatToAxis"):
+    assert by_name["FlatToAxis"] == 3
+    assert spec.FLAT_TO_AXIS_BAND == pytest.approx((0.002 * 25.4, -0.002 * 25.4))
+    assert spec.FLAT_TO_AXIS_BAND == (spec.FLAT_TO_AXIS_TOL, -spec.FLAT_TO_AXIS_TOL)
+    for name in ("OutsideDia", "BossDia"):
         assert by_name[name] == 4, name
 
 
@@ -199,16 +216,29 @@ def test_disc_front_stands_a_spigot_length_ahead_of_the_step() -> None:
     assert hub.DISC_STEP_GAP_WORST > 0.0
 
 
-def test_boss_and_flat_take_the_hub_bore() -> None:
-    """One round size for the hub's bore and one flat for its D: the boss
-    no longer carries the disc (the hub's spec checks the clearances at
-    every limit pair)."""
+def test_boss_takes_the_hub_bore_and_flat_the_hub_key_pin() -> None:
+    """One round size for the hub's plain bore; the flat takes the side of
+    the hub's chord key pin with air at every limit (#2409: chord axis
+    .174 ±.002 from the hub axis, the 1/16 pin's +.0001/+.0003, the flat's
+    .138 ±.002), so the hub slides on and off with the pin in it, and the
+    hub turns on the flat by no more than the play that air allows."""
     import pd_transgear_disc_hub_spec as hub
 
+    inch = 25.4
     assert spec.BOSS_DIA == hub.BORE_DIA
-    assert spec.FLAT_TO_AXIS == hub.FLAT_TO_AXIS
     assert hub.BOSS_CLEARANCE_LIMITS[0] >= 0.0
-    assert hub.FLAT_CLEARANCE[0] > 0.0
+    assert hub.KEY_PIN_CHORD_OFFSET == pytest.approx(0.174 * inch)
+    flat = sorted(spec.FLAT_TO_AXIS + band for band in spec.FLAT_TO_AXIS_BAND)
+    pin_r = sorted(d / 2.0 for d in hub.KEY_PIN.DIA_LIMITS_MM)
+    air = (
+        hub.KEY_PIN_CHORD_OFFSET - 0.002 * inch - pin_r[1] - flat[1],
+        hub.KEY_PIN_CHORD_OFFSET + 0.002 * inch - pin_r[0] - flat[0],
+    )
+    assert air == pytest.approx((0.0006 * inch, 0.0087 * inch), abs=1e-6)
+    assert hub.KEY_PIN_FLAT_AIR == pytest.approx(air)
+    # The play's lever is the pin's bearing half in the least bore (.0603).
+    assert hub.KEY_PIN_PLAY_DEG == pytest.approx(8.2707, abs=1e-3)
+    assert hub.KEY_PIN_FLAT_CHORD_MIN > max(hub.KEY_PIN.DIA_LIMITS_MM)
 
 
 def test_step_face_is_square_to_the_bore() -> None:
@@ -355,8 +385,8 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
 def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     """The flat is cut by an end mill parallel to the sleeve axis, plunged
     from the nose: its flutes cover the longest flat with 0.5 to spare.  The
-    wall stops nothing: the hub's flat starts a spigot length ahead of the
-    step, ahead of the wall at every printed limit."""
+    wall stops nothing: the hub's chord key pin lies wholly ahead of it at
+    every printed limit (#2409)."""
     import pd_transgear_disc_hub_spec as hub
 
     # The end mill reaches the MAX station on the longest sleeve; a longer
@@ -385,19 +415,17 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     worst = (
         spec.FACE_WIDTH
         - spec.FACE_WIDTH_BAND
-        + hub.SPIGOT_LENGTH_MIN
+        + hub.HUB_LENGTH_MIN
+        - max(hub.KEY_PIN_STATION_RANGE)
+        - (hub.KEY_PIN_HOLE_DIA + max(hub.KEY_PIN_HOLE_BAND)) / 2.0
         - (spec.FLAT_END_STATION + spec.STATION_TOL)
     )
-    assert hub.FLAT_END_CLEARANCE_WORST == pytest.approx(worst)
-    assert hub.FLAT_END_CLEARANCE_WORST > 0.0
+    assert hub.KEY_PIN_FLAT_END_CLEARANCE_WORST == pytest.approx(worst)
     # codjiflo P2 on edb402b/482fbdc (#2006): the title block lets the
-    # flat's floor meet the wall in an inside corner up to its ceiling.  Where
-    # the hub's flat starts, that corner's blend must stay under the flats'
-    # minimum clearance, or the hub cannot seat.
+    # flat's floor meet the wall in an inside corner up to its ceiling.  The
+    # key pin's section (#2409) lies wholly ahead of that blend, over the flat.
     corner = inside_corner_radius_mm(unit="in")
-    gap = hub.FLAT_END_CLEARANCE_WORST
-    rise = corner - math.sqrt(corner**2 - (corner - gap) ** 2) if gap < corner else 0.0
-    assert rise < hub.FLAT_CLEARANCE[0], (gap, rise)
+    assert worst > corner, (worst, corner)
 
 
 def test_flat_volume_is_the_boss_segment() -> None:
@@ -409,6 +437,78 @@ def test_flat_volume_is_the_boss_segment() -> None:
     )
     # The bore stays under the flat: it never breaks through.
     assert spec.BORE_DIA / 2.0 < spec.FLAT_TO_AXIS
+
+
+def test_the_nose_view_prints_the_flat_as_a_chord_from_the_axis(monkeypatch) -> None:
+    """r8 machinist review: the flat showed only edge-on, as a step in B-B.
+    Its distance from the axis prints on VIEW E, the nose view, from a
+    hidden Front-plane reference sketch: one construction line along the
+    flat, inside its chord, under the axis, dimensioned from the axis by the
+    same ``FlatToAxis`` global that drives the cut.  B-B keeps only the end
+    wall's station."""
+    import asyncio
+    from types import SimpleNamespace
+
+    events: list = []
+
+    def ok(data=None):
+        return SimpleNamespace(is_success=True, data=data)
+
+    class Adapter:
+        async def create_sketch(self, plane):
+            events.append(("sketch", plane))
+            return ok()
+
+        async def add_centerline(self, x0, y0, x1, y1):
+            events.append(("line", (x0, y0), (x1, y1)))
+            return ok("Line1")
+
+        async def add_sketch_constraint(self, first, second, kind):
+            events.append(("constraint", first, second, kind))
+            return ok()
+
+        async def exit_sketch(self):
+            return ok()
+
+    dims: list = []
+    applied: dict = {}
+    blanked: list = []
+
+    async def dimension_between(_adapter, first, second, kind, value, _label):
+        dims.append((first, second, kind, value))
+
+    async def ensure_fully_defined(_adapter, _label):
+        return None
+
+    def apply(self, _adapter, feature):
+        applied[feature] = list(self._rows)
+        return [(f"{name}@{feature}", drive) for name, drive in self._rows if drive]
+
+    monkeypatch.setattr(part, "dimension_between", dimension_between)
+    monkeypatch.setattr(part, "ensure_fully_defined", ensure_fully_defined)
+    monkeypatch.setattr(part, "suppress_dimension_input", lambda _adapter: None)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda _adapter, _on: None)
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, name: events.append(("name", name)))
+    monkeypatch.setattr(part, "blank_reference_sketches", lambda _adapter, names: blanked.append(names))
+    monkeypatch.setattr(part.SketchDims, "apply", apply)
+    jobs = asyncio.run(part._flat_reference(Adapter()))
+
+    assert events[0] == ("sketch", "Front")
+    (_kind, (x0, y0), (x1, y1)) = events[1]
+    half_chord = math.sqrt((spec.BOSS_DIA / 2.0) ** 2 - spec.FLAT_TO_AXIS**2)
+    assert y0 == y1 == -spec.FLAT_TO_AXIS
+    assert 0.0 == x1 < x0 < half_chord
+    assert ("constraint", "Line1.end", "origin", "vertical_points") in events
+    assert dims[-1] == ("Line1.start", "origin", "vertical_distance", spec.FLAT_TO_AXIS)
+    assert ("name", "FlatReference") in events
+    assert applied["FlatReference"][-1] == ("FlatToAxis", '"FlatToAxis"')
+    assert jobs == [("FlatToAxis@FlatReference", '"FlatToAxis"')]
+    assert blanked == [("FlatReference",)]
+    # The flat's distance prints once, on the nose view; B-B its end wall.
+    assert spec.DRAWING_DIMENSIONS["FlatReference"] == {"FlatToAxis"}
+    assert spec.DRAWING_DIMENSIONS["FlatProfile"] == {"FlatEnd"}
+    assert set(drawing.NOSE_KEEP) == {"FlatToAxis"}
+    assert "FlatToAxis" not in drawing.RIGHT_KEEP
 
 
 def test_bore_runs_on_the_pin() -> None:
@@ -443,6 +543,9 @@ def test_walls_meet_the_target_worst_case() -> None:
     # and the sheet prints its worst case floored on the .001 in grid.
     assert spec.WALL_FLOOR <= spec.FLAT_WALL_WORST < spec.WALL_TARGET
     assert spec.FLAT_WALL_WORST <= spec.FLAT_WALL
+    # .138 -.002 flat over the Ø.1265 bore's radius: .07275, printed .072 MIN.
+    assert spec.FLAT_WALL_WORST == pytest.approx((0.136 - 0.1265 / 2.0) * 25.4)
+    assert "D-FLAT WALL TO BORE .072 MIN." in spec.DRAWING_NOTES.splitlines()
     assert spec.FLAT_WALL_PRINTED <= spec.FLAT_WALL_WORST
     assert spec.FLAT_WALL_WORST - spec.FLAT_WALL_PRINTED < 0.001 * 25.4
     printed = re.search(r"(\d*\.\d+) MIN", spec.FLAT_WALL_NOTE)
@@ -474,7 +577,9 @@ def test_sheet_text_names_the_right_parts() -> None:
     # at its printed station (2026-11-07 screen: a second mention was
     # narration).
     assert note.count(spec.HUB_NUMBER) == 1 and f"WITH {spec.HUB_NUMBER}" in drill
-    assert "OilHoleStation" in hub.DRAWING_PRECISION_BY_NAME
+    # #2409: the oil hole shares the key-pin hole's printed station.
+    assert hub.OIL_HOLE_SLEEVE_Z == hub.KEY_PIN_SLEEVE_Z
+    assert "KeyPinStation" in hub.DRAWING_PRECISION_BY_NAME
     assert f"FIT ON {spec.PIN_NUMBER}" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
@@ -493,6 +598,12 @@ def test_part_record_and_finish() -> None:
 _CAP_M = 0.0035
 _ADVANCE = 109.7 / (42 * 3.5)
 _LINE_SPACING = 16.8 * 25.4 / 72.0 / 3.5
+# The oil hole note's leader as r9's layout audit (head 8d001f57cb) measured
+# it: from the note's last row down to its landing on the hole's edge.
+_OIL_HOLE_LEADER = ((0.2568, 0.2500), (0.2610, 0.1683))
+# Section B-B's native view outline as r10's overlap audit (head ea0ca5ab77)
+# measured it.
+_SECTION_OUTLINE = Box(0.1832, 0.1365, 0.2768, 0.1835)
 _NOMINAL = {
     "OutsideDia": spec.OUTSIDE_DIA,
     "RootDia": spec.ROOT_DIA_MIN,
@@ -509,7 +620,6 @@ _NOMINAL = {
 _DEVIATIONS = {
     "BoreDia": spec.BORE_DEVIATIONS,
     "BossDia": spec.BOSS_DIA_DEVIATIONS,
-    "FlatToAxis": spec.FLAT_TO_AXIS_DEVIATIONS,
     "OutsideDia": spec.OUTSIDE_DIA_DEVIATIONS,
 }
 # The places SolidWorks printed each stacked band's deviations in (run
@@ -517,14 +627,15 @@ _DEVIATIONS = {
 _DEVIATION_PLACES = {
     "BoreDia": spec.BORE_PLACES,
     "BossDia": spec.BOSS_DIA_PLACES,
-    "FlatToAxis": spec.FLAT_TO_AXIS_PLACES,
     "OutsideDia": spec.OUTSIDE_DIA_PLACES,
 }
-# The disc-cluster stack terms' symmetric bands; the other lengths print bare
-# under the title block's rows.
+# The symmetric bands and the places their ± prints in: the disc-cluster
+# stack terms at four, the flat's milled row at its own three; the other
+# lengths print bare under the title block's rows.
 _STATIONS = {
-    "OverallLength": spec.OVERALL_LENGTH_BAND,
-    "FaceWidth": spec.FACE_WIDTH_BAND,
+    "OverallLength": (spec.OVERALL_LENGTH_BAND, 4),
+    "FaceWidth": (spec.FACE_WIDTH_BAND, 4),
+    "FlatToAxis": (spec.FLAT_TO_AXIS_TOL, spec.FLAT_TO_AXIS_PLACES),
 }
 
 
@@ -566,7 +677,8 @@ def _printed_text(name: str) -> str:
             f"{value} {_inch(lower, places, sign=True)}",
         ]
     elif name in _STATIONS:
-        rows = [f"{value} \u00b1{_inch(_STATIONS[name], 4)}"]
+        band, places = _STATIONS[name]
+        rows = [f"{value} \u00b1{_inch(band, places)}"]
     else:
         rows = [value]
     if callouts.CALLOUT_BELOW in lanes:
@@ -596,8 +708,10 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
     )
     assert box is not None
     if name == "FlatToAxis":
-        # Its text prints right of its own dimension line (run
-        # 20261027T032128736Z), the line at the anchor.
+        # A vertical distance's text prints on the far side of its dimension
+        # line from the measured points: right of B-B's line (run
+        # 20261027T032128736Z), left of r9's VIEW E line, which stood left
+        # of the view.  VIEW E's line stands right of its points.
         width = box.xmax - box.xmin
         return Box(anchor[0], box.ymin, anchor[0] + width, box.ymax)
     if name.endswith("Dia") and name in drawing.RIGHT_KEEP and not _inline(anchor):
@@ -636,8 +750,9 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     each other.  Every value with its band and callout keeps the layout
     audit's text air from every other text, clears every view, and stays
     inside the border; the inline diameters print between their own
-    extension lines and off the part, and the flat's value hangs below the
-    section right of the nose, under the boss's lower extension line."""
+    extension lines and off the part, and the flat's value and its key pin
+    hang under VIEW E, the nose view, over its caption, right of the oil
+    hole note's leader."""
     s = drawing.VIEW_SCALE[0] / 1000.0
     axis_y = drawing.RIGHT_CENTER[1]
     rear_x = drawing._side_x(0.0)
@@ -645,6 +760,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     section = Box(rear_x, axis_y - drawing.HALF_OD, nose_x, axis_y + drawing.HALF_OD)
     views = {
         "end": _view_box(drawing.FRONT_CENTER),
+        "nose": _view_box(drawing.NOSE_CENTER),
         "rear": _view_box(drawing.REAR_CENTER),
         "section": section,
         # Cropped, without an outline: its geometry ends at the fence.
@@ -671,6 +787,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         **drawing.RIGHT_KEEP,
         **drawing.LEFT_KEEP,
         **drawing.REAR_KEEP,
+        **drawing.NOSE_KEEP,
     }
     boxes = {name: _printed_box(name, xy) for name, xy in keeps.items()}
     boxes["oil hole note"] = _note_box(
@@ -681,9 +798,11 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT,
     )
     boxes["outside caption"] = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    boxes["nose caption"] = _note_box(drawing.NOSE_CAPTION, drawing.NOSE_CAPTION_XY)
     for letter, (text_xy, _tip) in (
         (drawing.OUTSIDE_VIEW_LETTER, drawing.VIEW_C_ARROW),
         (drawing.REAR_VIEW_LETTER, drawing.VIEW_D_ARROW),
+        (drawing.NOSE_VIEW_LETTER, drawing.VIEW_E_ARROW),
     ):
         boxes[f"view {letter} letter"] = _note_box(
             letter, text_xy, height=drawing.VIEW_LETTER_HEIGHT
@@ -728,14 +847,43 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         assert boxes[name].ymax < axis_y + half, name
     assert inline["OutsideDia"][0] < rear_x
     assert inline["BossDia"][0] > nose_x
-    # The flat's value and mate hang below the section right of the nose,
-    # under the boss's lower extension line and left of its text; its
-    # extension lines stop short of the boss's text.
+    # The flat's value and key pin hang right of the nose view, its dimension
+    # line right of the tooth tips and of the flat's witness (so its text
+    # runs right), under the isometric and over the boss's upper extension
+    # line; the caption centred under the view.
+    nose = views["nose"]
     flat = boxes["FlatToAxis"]
-    flat_x = drawing.RIGHT_KEEP["FlatToAxis"][0]
-    assert flat.ymax + ARROW_TEXT_CLEARANCE_M < axis_y - spec.BOSS_DIA / 2.0 * s
-    assert flat.xmin > nose_x + ARROW_TEXT_CLEARANCE_M
-    assert flat_x + 2.0 * ARROW_TEXT_CLEARANCE_M < boxes["BossDia"].xmin
+    flat_x = drawing.NOSE_KEEP["FlatToAxis"][0]
+    assert flat_x == flat.xmin
+    assert nose.xmax + ARROW_TEXT_CLEARANCE_M <= flat_x
+    assert part.FLAT_WITNESS_STATION > 0.0
+    boss_line_y = axis_y + spec.BOSS_DIA / 2.0 * s
+    assert boss_line_y + ARROW_TEXT_CLEARANCE_M <= flat.ymin
+    caption = boxes["nose caption"]
+    assert caption.ymax + ARROW_TEXT_CLEARANCE_M <= nose.ymin
+    assert (caption.xmin + caption.xmax) / 2.0 == pytest.approx(
+        drawing.NOSE_CENTER[0], abs=0.001
+    )
+    # r9 layout audit: the oil hole note's leader ran from the note's last
+    # row down to its landing on the hole's edge, and VIEW E's text, then
+    # left of the view, printed across it.  Everything of VIEW E stands
+    # right of that leader, with room.
+    (lx0, ly0), (lx1, ly1) = _OIL_HOLE_LEADER
+    assert (lx1, ly1) == pytest.approx(drawing.OIL_HOLE_EDGE, abs=0.0002)
+    for box in (nose, flat, caption, boxes[f"view {drawing.NOSE_VIEW_LETTER} letter"]):
+        lo, hi = max(box.ymin, ly1), min(box.ymax, ly0)
+        if lo > hi:
+            continue
+        leader_x = max(lx0 + (lx1 - lx0) * (y - ly0) / (ly1 - ly0) for y in (lo, hi))
+        assert box.xmin - leader_x >= 0.004, box
+    # r10 overlap audit: SolidWorks' native view outlines pad the tips by
+    # 6.25 mm (View6, VIEW E, measured 47 mm square), and B-B's outline,
+    # measured, topped at 183.5 mm; VIEW E's then dipped 2.5 mm into it.
+    pad = 0.00625
+    nose_outline = Box(nose.xmin - pad, nose.ymin - pad, nose.xmax + pad, nose.ymax + pad)
+    assert nose_outline.xmax - nose_outline.xmin == pytest.approx(0.047, abs=0.0002)
+    assert nose_outline.gap(_SECTION_OUTLINE) >= 0.003
+    assert _SECTION_OUTLINE.ymax == pytest.approx(drawing._SIDE_TOP + pad, abs=0.0002)
 
 
 # The native section caption, placed by its top centre, stood 16.5 mm tall
@@ -783,7 +931,7 @@ def test_baseline_lengths_stack_without_crossing_extension_lines() -> None:
     rows = {
         name: xy
         for name, xy in drawing.RIGHT_KEEP.items()
-        if xy[1] < bottom and not name.endswith("Dia") and name != "FlatToAxis"
+        if xy[1] < bottom and not name.endswith("Dia")
     }
     assert set(rows) == {"FaceWidth", "FlatEnd", "OverallLength"}
     by_row = _assert_rows_stack(rows, drawing._side_x, rear_x, {"FaceWidth", "FlatEnd"})
@@ -1115,29 +1263,45 @@ def test_end_view_is_the_sections_third_angle_left_view(
     # native caption carries no scale field.
     order = [name for name, _args, _kwargs in seat.mock_calls]
     assert order.index("_pin_sheet_scale") < order.index("create_section_view")
-    # Views C and D are named by viewing arrows on a parent view.
+    # Views C, D and E are named by viewing arrows on a parent view.
     arrows = {
         call.args[2]: (call.args[1], call.args[3])
         for call in seat._add_view_arrow.call_args_list
     }
-    assert set(arrows) == {drawing.OUTSIDE_VIEW_LETTER, drawing.REAR_VIEW_LETTER}
+    assert set(arrows) == {
+        drawing.OUTSIDE_VIEW_LETTER,
+        drawing.REAR_VIEW_LETTER,
+        drawing.NOSE_VIEW_LETTER,
+    }
     parent, arrow = arrows[drawing.OUTSIDE_VIEW_LETTER]
     assert (parent.orientation, arrow) == ("*Back", drawing.VIEW_C_ARROW)
     parent, arrow = arrows[drawing.REAR_VIEW_LETTER]
     assert (parent.orientation, arrow) == ("*Left", drawing.VIEW_D_ARROW)
+    # VIEW E is the nose (*Front), named on the section B-B.
+    parent, arrow = arrows[drawing.NOSE_VIEW_LETTER]
+    assert parent is seat.create_section_view.return_value
+    assert arrow == drawing.VIEW_E_ARROW
+    placed = {
+        call.args[2]: (call.args[3], call.args[4])
+        for call in seat.place_view.call_args_list
+    }
+    assert placed["*Front"] == drawing.NOSE_CENTER
 
 
 def test_viewing_arrows_point_along_their_views_sight() -> None:
     """Rule 9: VIEW C (*Left, looking along model +X) is named by an arrow on
     the end view pointing left, B-B's sight in the mirrored *Back view; VIEW
     D (*Back, looking at the rear face along +Z) by an arrow on VIEW C
-    pointing right at its rear face.  Each letter stands level with its tip,
-    clear of the face it looks at."""
+    pointing right at its rear face; VIEW E (*Front, looking at the nose
+    along -Z) by an arrow on B-B pointing left at the nose.  Each letter
+    stands level with its tip, clear of the face it looks at."""
     assert drawing.LEFT_CAPTION == f"VIEW {drawing.OUTSIDE_VIEW_LETTER}"
     assert drawing.REAR_CAPTION == f"VIEW {drawing.REAR_VIEW_LETTER}"
+    assert drawing.NOSE_CAPTION == f"VIEW {drawing.NOSE_VIEW_LETTER}"
     for (text_xy, tip), face_x, sign in (
         (drawing.VIEW_C_ARROW, drawing.FRONT_CENTER[0] + drawing.HALF_OD, 1.0),
         (drawing.VIEW_D_ARROW, drawing._LEFT_REAR_X, -1.0),
+        (drawing.VIEW_E_ARROW, drawing._side_x(spec.OVERALL_LENGTH), 1.0),
     ):
         letter = _note_box("C", text_xy, height=drawing.VIEW_LETTER_HEIGHT)
         assert sign * (tip[0] - face_x) > 0.0
