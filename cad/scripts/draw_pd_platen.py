@@ -344,8 +344,12 @@ SOCKET_EDGE_XY = (
     _front_x(_SOCKET_RIGHT_X) + SOCKET_DRILL_R_SHEET * _DIAG,
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
-SOCKET_CALLOUT_HALF_WIDTH = 0.035
-SOCKET_CALLOUT_XY = (0.226, 0.252)
+# Its engagement row (#2411) is the widest, ~78 mm in the farm layout audit
+# (run 20261112T194605766Z: its left end at x 187.0 put the leader
+# through the guide callout's right end at 188.1), so the text stands 7 mm
+# further right, ~6 mm clear of the guide's right end.
+SOCKET_CALLOUT_HALF_WIDTH = 0.040
+SOCKET_CALLOUT_XY = (0.233, 0.252)
 # The engagement line states the clip screws' worst-case full thread in the
 # plate, under 1.5D (rule 20, pd_platen_callouts; pd-platen RV-03, #2411).
 SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01, RV-03
