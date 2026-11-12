@@ -482,7 +482,7 @@ def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> No
     witness moves to the front bond land and the callout hangs above, left of
     its line, between detail A's label and the front land and under the
     collar pin hole's callout."""
-    _width, height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
+    _width, height = drawing._diameter_block_size(drawing.BOND_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     assert x == pytest.approx(drawing.BOND_ZONE_LINE_X)
     centre = y - 0.0005
@@ -517,9 +517,13 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     bond land now prints its own size; the back one's block hangs left of its
     line under the shaft, between the 6.80 and 8.25 station witnesses and
     over the 8.25 row."""
-    assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BACK_BOND_CALLOUT
-    assert drawing.BACK_BOND_CALLOUT.count("\n") <= 1
-    assert "MHA-DT-01" in drawing.BACK_BOND_CALLOUT
+    # #1038 r11 machinist review (rule 26, all 3 runs): both lands carry the
+    # same fit name with its LOCTITE grade, through note 3.
+    assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
+    assert drawing.BOND_CALLOUT == "SEE NOTE 3"
+    note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
+    assert note_3 == "BOND LANDS (2X): BONDED IN MHA-DT-01, LOCTITE 638."
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
     assert "BackBondDia" in drawing.ARROWS_INSIDE
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -528,8 +532,8 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     x, y = drawing.PRINCIPAL_KEEP["BackBondDia"]
     assert x == pytest.approx(drawing.BACK_BOND_LINE_X)
     assert x < drawing._sheet_x(sheet.BACK_BOND_DIA_Z)
-    width, height = drawing._diameter_block_size(drawing.BACK_BOND_CALLOUT)
-    width = max(width, drawing.BACK_BOND_BLOCK_WIDTH)
+    width, height = drawing._diameter_block_size(drawing.BOND_CALLOUT)
+    width = max(width, drawing.DIA_VALUE_ROW_WIDTH)
     left, right = x - width, x + drawing.JOURNAL_DIA_TEXT_OVERHANG
     land_8_25 = drawing._sheet_x(spec.BACK_JOURNAL_Z)
     assert left - land_8_25 >= 0.0015
@@ -608,7 +612,7 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     assert drawing.RELIEF_BACK_X + 0.002 <= text_left
     assert text_right <= drawing.RELIEF_FRONT_X - 0.001
     # Rule 7: at most two word rows under the size line.
-    assert drawing.BOND_ZONE_CALLOUT.count("\n") <= 1
+    assert drawing.BOND_CALLOUT.count("\n") <= 1
     # Its text sits under the shaft, over the station row's line.
     shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
     assert dia_y + 0.010 <= shaft_bottom
@@ -838,13 +842,11 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert drawing.DIMENSION_CALLOUTS["BackStubDia"] == "SEE NOTE 2"
     assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
     assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
-    note_2 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[1].split())
+    note_2 = drawing.SHEET_NOTES.split("\n2. ")[1].split("\n")[0]
     # #1038 r9 machinist review (rules 1 and 26): a leadered tag, not the
-    # note's words, reaches the second span (SPAN_TAGS).
-    assert note_2 == (
-        "SPANS (2X): SLIDING FIT IN MHA-DT-33 "
-        "PINION ARBOR RETENTION COLLAR (CLEARANCE .0004-.0078)."
-    )
+    # note's words, reaches the second span (SPAN_TAGS).  One row: the mate
+    # by number (rule 7), so note 3 fits in the four rows.
+    assert note_2 == "SPANS (2X): SLIDING FIT IN MHA-DT-33 (CLEARANCE .0004-.0078)."
     # The clearance from both parts' printed limits; its minimum is the
     # collar spec's own slide-on clearance.
     assert drawing.COLLAR_CLEARANCE[0] == pytest.approx(collar.SLIDE_CLEARANCE_MIN)
@@ -925,16 +927,15 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     own Top-plane diameter, printed over its witness, clear of the fence."""
     assert "ShaftProfile" not in spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
-    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_ZONE_CALLOUT
-    # Round 3 (fan-out dt-fab-3): the bonded fit and its reason print once,
-    # at the drum span's callout; no note repeats where the drum bonds.
-    words = drawing.BOND_ZONE_CALLOUT.split()
-    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
-    assert "MHA-DT-01" not in drawing.SHEET_NOTES
+    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_CALLOUT
+    # The bonded fit, its mate and its grade print once, on note 3, which
+    # both bond lands' callouts link (#1038 r11 machinist review, rule 26).
+    words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
+    assert "BONDED" in words and "MHA-DT-01," in words and "638." in words
+    assert drawing.SHEET_NOTES.count("MHA-DT-01") == 1
     import _config
 
     assert _config.parts("dt-pinion-bracket")["title"].upper() == drawing.STRAP_NAME
-    assert _config.parts("dt-pinion-arbor-collar")["title"].upper() == drawing.COLLAR_NAME
     assert _config.parts("dt-pinion-arbor-collar")["number"] == drawing.COLLAR_NUMBER
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.

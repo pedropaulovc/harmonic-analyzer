@@ -130,20 +130,16 @@ JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
 # stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
 # keeps the band.
 STRAP_NAME = "PINION BRACKET STRAP"
-COLLAR_NAME = "PINION ARBOR RETENTION COLLAR"
 COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
-# Two word rows (rule 7), the first shortened to "BONDED IN" (#2360): the
-# block then ends ~0.169 and leaves the relief diameter room before its
-# shoulder (machinist review of 4657f680 gated a third word row).
-BOND_ZONE_CALLOUT = f"BONDED IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
-# The back bond land's own size (#1038 r8 machinist review, rules 1 and 10:
-# the front land's 2X reached one land, so the other was found by
-# elimination).  Its pocket under the shaft holds two short rows; the
-# compound prints once, on the front land's callout.
-BACK_BOND_CALLOUT = f"BONDED IN\n{DRUM_NUMBER}"
+# Both bond lands link one numbered note (rule 7: a note linked by SEE NOTE n
+# counts as being at the callout).  Rule 26's fit name is "bonded with its
+# LOCTITE grade", and the back land's pocket under the shaft holds no row as
+# wide as "BONDED IN MHA-DT-01," (#1038 r11 machinist review, all 3 runs:
+# its callout without the grade read as a different compound).
+BOND_CALLOUT = "SEE NOTE 3"
 SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
@@ -151,13 +147,14 @@ CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_C
 # Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
 # note says what the spans are, not where (#1038 r9 machinist review, rules
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
+# Note 2 names its mate by number only, to keep it to one row.
 SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER}\n"
-    f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
-    f"{_inch(COLLAR_CLEARANCE[1])})."
+    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
+    f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
+    f"3. BOND LANDS (2X): BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND}."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -378,24 +375,20 @@ JOURNAL_DIA_TEXT_OVERHANG = 0.001
 # flanks (ARROWS_INSIDE): outside, its lower tail would hang into the
 # station rows under the shaft.
 BOND_ZONE_LINE_X = _sheet_x(BOND_ZONE_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
-BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1893)
-# The block's widest row ends at its line: on the r5 sheet of #1038
-# (9dc1a4d) "BONDED IN MHA-DT-01," ran 52.5 mm left of the line, 2.625 mm a
-# character (r2 of #2360, 755e192b, read 2.47 right of it).
-BOND_ZONE_CHAR_ADVANCE = 0.002625
-BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - BOND_ZONE_CHAR_ADVANCE * max(
-    map(len, BOND_ZONE_CALLOUT.split("\n"))
-)
+BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1865)
+# A four-place Ø value row runs 31.3 mm (r8 of #1038: the front land's
+# "2X Ø.3125 -.0038" ran 38.0 mm, 6.7 mm of it the 2X); the one-row SEE NOTE
+# 3 under it is narrower, so the block's left end is the value row's.
+DIA_VALUE_ROW_WIDTH = 0.0313
+BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - DIA_VALUE_ROW_WIDTH
 # The back bond land's diameter hangs BELOW the shaft in the open pocket
 # between the relief's back-shoulder witness (6.80, x ~0.1343) and the back
 # land's (8.25, x ~0.0975), over the 8.25 row (line ~0.1059).  As the front
 # land's, its line stands 1 mm crown side of its measuring point so the text
-# hangs LEFT of it, its block top 5 mm under the shaft.  Its value row runs
-# 31.3 mm (r8 of #1038: the front land's "2X Ø.3125 -.0038" ran 38.0 mm,
-# 6.7 mm of it the 2X).  Arrows inside, as the front land's.
+# hangs LEFT of it, its block (DIA_VALUE_ROW_WIDTH wide) top 5 mm under the
+# shaft.  Arrows inside, as the front land's.
 BACK_BOND_LINE_X = _sheet_x(BACK_BOND_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
-BACK_BOND_TEXT_XY = (BACK_BOND_LINE_X, 0.1515)
-BACK_BOND_BLOCK_WIDTH = 0.0313
+BACK_BOND_TEXT_XY = (BACK_BOND_LINE_X, 0.1545)
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
 # dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
@@ -655,8 +648,8 @@ def _detail_x(model_z: float) -> float:
 DIMENSION_CALLOUTS = {
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
-    "BondZoneDia": BOND_ZONE_CALLOUT,
-    "BackBondDia": BACK_BOND_CALLOUT,
+    "BondZoneDia": BOND_CALLOUT,
+    "BackBondDia": BOND_CALLOUT,
     "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
