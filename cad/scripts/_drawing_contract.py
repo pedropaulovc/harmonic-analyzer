@@ -77,6 +77,8 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_crankshaft.py",
         "draw_dt_cylinder_gear.py",
         "draw_dt_cylinder_gear_shaft.py",
+        "draw_dt_cylinder_gear_tl_cam_fixture.py",
+        "draw_dt_cylinder_gear_tl_vn_cam_clock_pin.py",
         "draw_pd_guide_lock.py",
         "draw_fr_harmonic_base.py",
         "draw_dt_pinion_arbor.py",
