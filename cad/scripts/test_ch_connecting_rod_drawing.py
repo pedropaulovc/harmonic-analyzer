@@ -138,9 +138,9 @@ def test_inside_corner_volume_is_the_fillets_closed_form() -> None:
 
 
 def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
-    """User ruling 2026-10-09 (PR #1292 review F1): the MHA-CH-10 pin is
-    pressed into both tines as the bar pin is into the amplitude bar
-    (ch_rod_pivot_pin_spec holds the fit), so the hole is reamed to a band of
+    """User ruling 2026-10-09 (PR #1292 review F1): the RodPin member of
+    MHA-SH-VN-58 is pressed into both tines as the bar pin is into the
+    amplitude bar (sh_vn_pivot_pin_rod_spec holds the fit), so the hole is reamed to a band of
     its own, native on PinHoleDia, not a #47 drill."""
     import _config
 
@@ -160,7 +160,7 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert "drives=(None,'\"CenterDistance\"','\"PinHoleDia\"')" in build
     assert 'name_last_feature(adapter,"PinHoleProfile")' in build
     assert 'name_last_feature(adapter,"PinHole")' in build
-    assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
+    assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("sh-vn-pivot-pin")["number"]
     assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
 
@@ -204,7 +204,7 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     # sheet's one numbered note, top left over the views.
     assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
     assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
-        "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-CH-10:",
+        "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-SH-VN-58:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
         "2. FORK SLOT: RUNNING FIT ON ARM MHA-CH-06.",
         "3. RING AND SHANK: SLIDING FIT IN MHA-DT-12 CAM SLOT.",
@@ -343,7 +343,7 @@ def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
     printed all-corners R0.5 MAX a needless tightening of the title block's
     INSIDE CORNERS R.040 MAX, so the title block governs; that ceiling still
     stands under the arm's least clearance over the slot floor."""
-    import ch_rod_pivot_pin_spec as pin
+    import sh_vn_pivot_pin_rod_spec as pin
     from _printed_tolerance import inside_corner_radius_mm
 
     spec = ch_connecting_rod_spec
