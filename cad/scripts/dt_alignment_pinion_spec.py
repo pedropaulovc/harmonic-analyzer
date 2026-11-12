@@ -120,9 +120,10 @@ BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
 ARBOR_BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
-# Prints .XX (5.64): the pinion-rig end-play budget reads its band
-# (pinion_rig_layout.DRUM_LEN), so it cannot take the .X row.
-FACE_WIDTH = 153.924  # 6.06 in from the back end; #1038 re-pitch seed; S3 proves it
+# Prints .XX (6.06): the pinion-rig end-play budget reads its band
+# (pinion_rig_layout.DRUM_LEN, which records the #1038 re-pitch sizing), so it
+# cannot take the .X row.
+FACE_WIDTH = 153.924  # 6.06 in; located from the back end (drawing note)
 # Tips are functional gear surfaces, not routine exterior profiles.  Actual
 # stock-form support, coverage/no-gap, backlash, air and TE must pay both
 # printed tip corners and the retained tangent-span/fit bands independently.

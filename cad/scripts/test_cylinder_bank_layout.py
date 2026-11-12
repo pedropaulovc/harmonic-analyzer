@@ -152,8 +152,8 @@ def test_a_closed_slot_always_holds_the_whole_ring() -> None:
     assert ring_max == pytest.approx(2.2352)
     assert bank.RING_MAX == pytest.approx(ring_max)
     assert bank.SHANK_MAX == pytest.approx(ring_max)
-    # d': the thinnest in-band gear, 7.0565 - .0010 in, less FW + .002 in.
-    assert bank.SLOT_MIN == pytest.approx(3.9831)
+    # d': the thinnest in-band gear, .3000 - .0010 in, less FW + .002 in.
+    assert bank.SLOT_MIN == pytest.approx(4.5466)
     assert bank.RING_SLOT_MARGIN == pytest.approx(bank.SLOT_MIN - ring_max)
     assert bank.RING_SLOT_MARGIN >= bank.MARGIN_SPARE
 
@@ -165,7 +165,7 @@ def test_each_gear_is_accepted_on_its_print_band() -> None:
     assert bank.GEAR_THICKNESS_ACCEPT == pytest.approx(
         (gear.OVERALL_THICKNESS + lower, gear.OVERALL_THICKNESS + upper)
     )
-    # The four-place inch print (.2778 +/-.0010) moves each limit by under a
+    # The four-place inch print (.3000 +/-.0010) moves each limit by under a
     # micrometre: the print is the acceptance.
     printed = printed_deviations(
         gear.OVERALL_THICKNESS,

@@ -15,7 +15,7 @@ the arbor rides the swing brackets' top bores and carries its integral turned
 grip head plus the separate MHA-DT-15 crossrod. The knurled end collars are simplified
 away.
 
-Layout: axis Z, drum z 0..5.64 in, Ø5/16 through-bore on the axis.
+Layout: axis Z, drum z 0..6.06 in, Ø5/16 through-bore on the axis.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
 "gap"). The native gap's half-pitch rotation keeps +X at a tooth crest.
 

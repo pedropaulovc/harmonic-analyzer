@@ -120,7 +120,10 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
 # MHA-DT-22 head shoulder, ruling (c)'s bond station).
-DRUM_LEN = 153.924  # 6.06 in; #1038 re-pitch seed; S3 proves it
+# #1038 re-pitch: the former 5.64 in plus 19 x 0.5635 is 6.0615 in, so 6.06
+# keeps the j = 0 slack (J0_SLACK_WORST 3.367, was 3.405); 5.93 in is the
+# shortest drum that still covers g0 at its printed limits.
+DRUM_LEN = 153.924  # 6.06 in
 DRUM_LEN_PLACES = 2  # FaceWidth prints .XX (dt_alignment_pinion_spec)
 DRUM_LEN_UNIT = "in"  # dt_alignment_pinion_spec.UNIT, by the same lockstep
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES, unit=DRUM_LEN_UNIT)  # .01 in
