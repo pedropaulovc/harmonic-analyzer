@@ -374,7 +374,7 @@ SHAFT_FRONT_STATION = -SHAFT_FRONT_STUB
 # 1.0 mm proud of its south face.
 
 # POST_STATION (cone_line): the corrected 2.8360-in v2 crank boss spans local z
-# -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
+# -21.3868..+50.6476. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
 # unequal; the post station fixes crank X and its configured bore height sets Y.
 
@@ -522,7 +522,8 @@ import dt_vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 import _sprocket_seat_geometry as seat_geometry  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
-    COLLAR_DIA,
+    COLLAR_LENGTH,
+    COLLAR_LENGTH_MIN,
     COLLAR_REAR,
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_FLOOR,
@@ -531,9 +532,6 @@ from dt_crankshaft_spec import (  # noqa: E402
     SEAT_COLLAR_BAND,
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
     SPIGOT_DIA,
-    SPIGOT_END,
-    SPIGOT_LENGTH,
-    SPIGOT_LENGTH_TOL,
     WHEEL_SEAT_FLOAT,
 )
 from dt_crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
@@ -592,11 +590,10 @@ if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
 # Behind the seat: the integral collar, its rear face on the post boss's
 # south face (owner ruling D1, 2026-10-15: no crank-seat washer).
 CRANK_COLLAR_Z1 = CRANKSHAFT_Z0 + COLLAR_REAR
-# The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
-# body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
-# the hub rear face.  Both let the #25 plates wrapping the crank sprocket pass inside
-# the collar/barrel diameters (Main's ruling, 2026-09-30).
-CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
+# The collar is one Ø17.5 seat spigot (SEAT_FACE_Z..CRANK_COLLAR_Z1) ahead of
+# the post boss; the hub's rear Ø16.5 relief runs from its barrel's rear
+# shoulder to the hub rear face.  Both let the #25 plates wrapping the crank
+# sprocket pass inside the boss/barrel diameters (Main's ruling, 2026-09-30).
 CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.65
 # Chain-plate clearance: the plate's inner edge against the spigot
 # (print-worst, largest) and the hub relief, radially, for the CAD link and a
@@ -682,14 +679,13 @@ if abs(CHAIN_BARREL_AXIAL_AIR - _STACK_A_MODELLED) > 1e-9:
 CRANK_HUB_SPROCKET_AIR_PRINT_WORST = (
     _SEAT_FACE_Z_WORST - (seat_geometry.PLATE + max(seat_geometry.PLATE_BAND))
 ) - _HUB_REAR_Z_WORST  # 0.10
-# C: chain floated rearmost on the thinnest wheel, spigot short; the chain
-# and the body front face both ride the seat, so the seat band cancels.
-CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - seat_geometry.chain_reach_rear(
+# C: chain floated rearmost on the thinnest wheel, collar short.  The chain
+# rides the seat and the post boss's south face is where the collar's rear
+# face bears, so the air is the collar's length less the chain's reach.
+CHAIN_SPIGOT_AXIAL_AIR = COLLAR_LENGTH - seat_geometry.chain_reach_rear(
     seat_geometry.PLATE
-)  # 2.3135 on nominal spigot and plate
-CHAIN_SPIGOT_AXIAL_AIR_WORST = (
-    SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
-)  # 2.1635
+)  # 3.4223 on nominal collar and plate
+CHAIN_SPIGOT_AXIAL_AIR_WORST = COLLAR_LENGTH_MIN - _CHAIN_REACH_REAR_WORST  # 3.1191
 for _what, _air in (
     ("chain / hub relief shoulder, wheel seated", CHAIN_BARREL_AXIAL_AIR_WORST),
     (
@@ -697,7 +693,7 @@ for _what, _air in (
         CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST,
     ),
     ("hub rear face / crank sprocket front face", CRANK_HUB_SPROCKET_AIR_PRINT_WORST),
-    ("chain / crank collar body front face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
+    ("chain / post boss south face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
 ):
     if _air <= 0.0:
         raise AssertionError(f"{_what} axial air closes at print-worst: {_air:.4f}")
@@ -3793,7 +3789,7 @@ _SWING_RIG_BANDS = (
 )
 # The crank column behind the hub, each body a solid of revolution about the
 # crank axis (z band, diameter): the selected crank sprocket paper-drive seats on it, the
-# collar's seat spigot and body, the body's rear face on the post boss.
+# collar's seat spigot, its rear face on the post boss.
 CRANK_SPROCKET_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.CRANK_TEETH)
 CRANK_COLUMN_BANDS = (
     (
@@ -3802,8 +3798,7 @@ CRANK_COLUMN_BANDS = (
         CRANK_SPROCKET_TIP_DIA,
         "crank chain wheel",
     ),
-    (seat_geometry.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
-    (CRANK_SPIGOT_FRONT_Z, CRANK_COLLAR_Z1, COLLAR_DIA, "crank collar body"),
+    (seat_geometry.SEAT_FACE_Z, CRANK_COLLAR_Z1, SPIGOT_DIA, "crank seat spigot"),
 )
 _CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
 for _lo, _hi, _what in (

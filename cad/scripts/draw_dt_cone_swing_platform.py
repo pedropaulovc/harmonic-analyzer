@@ -171,7 +171,7 @@ def _planned(x: float, y: float) -> tuple[float, float]:
 # move the pivot end on the sheet.  The pivot is what stays put instead:
 # both plans' centres follow the outline from a fixed pivot station, the
 # pivot-end annotations keep their proven stations, and only the south end
-# (sheet-up) moves with the plate's length (#1038: 9.11 -> 9.54 in).
+# (sheet-up) moves with the plate's length.
 _PLAN_PER_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 _PLAN_MID_MM = tuple(
     (

@@ -143,8 +143,7 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
         geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
     )
     # PLATE_LEN rounds up to the .01 in grid past the 1.65 post body's south
-    # rim plus the 1/8 in margin: 9.54 in at the .300 in station pitch (#1038;
-    # 9.11 at the former 7.0565).
+    # rim plus the 1/8 in margin: 9.54 in at the .300 in station pitch (#1038).
     grid = 0.254
     south_margin = geometry.POST_LOCAL_Z - spec.POST_BLOCK_DIA / 2.0 - geometry.PLATE_SOUTH_Z
     assert geometry.POST_SOUTH_MARGIN <= south_margin + 1e-9 < geometry.POST_SOUTH_MARGIN + grid

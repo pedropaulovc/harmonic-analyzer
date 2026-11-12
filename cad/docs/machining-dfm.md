@@ -1205,14 +1205,14 @@ so it does not give a six-tooth form.
 | part | teeth | form | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
 | `dt-crank-pinion` | 16 | straight spur | #7 | 2 turns + 10 on 20 |
-| `dt-crank-drive-gear` | 64 | straight teeth inclined 13.0011° right hand | #2 (virtual 69 teeth) | 10 on 16 |
+| `dt-crank-drive-gear` | 64 | straight teeth inclined 12.0247° right hand | #2 (virtual 68 teeth) | 10 on 16 |
 
 Owner ruling 2026-11-10 (#2332, option A) supersedes the earlier true right-hand helix (lead
 945.862 mm): the 64T has straight teeth inclined at the cone incline. The cutter is still the one
-chosen for its virtual tooth count, N / cos³ of the 13.0011° inclination, which lands in the #2
+chosen for its virtual tooth count, N / cos³ of the 12.0247° inclination, which lands in the #2
 range ([John F's workshop, helical gears](https://johnfsworkshop.org/home/making-other/gears-links/helical-gears-links/making-helical-gears-on-a-vertical-milling-machine/)).
 Tilt the installed Precision Matthews BS-0
-([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)) 13°, feed the #2 cutter in
+([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)) 12°, feed the #2 cutter in
 a straight line through each tooth space and plain-index between spaces. Set the cutter centre
 plane to cross the gear axis 1.778 mm (.07 in) north of the south (collar) face. No lead gearing
 or spiral-capable head is needed. The printed tooth data are unchanged; approval is conditional
@@ -1220,7 +1220,7 @@ on the straight model passing the drive-train interference and soundness gates.
 
 The tilt sense sets the hand, and every other printed number is the same for a left-hand gear.
 With the cutter on the vertical spindle's stub arbor (cutter plane horizontal) and the head at
-the left end of the table, raise the head's nose 13° and cut on the operator's side of the
+the left end of the table, raise the head's nose 12° and cut on the operator's side of the
 blank. Putting the head at the right end, or the cutter behind the blank, cuts a left-hand gear;
 doing both cuts a right-hand one again. Check the first scribed pass and the finished gear:
 stood on either face, the teeth nearest you rise to the right.
