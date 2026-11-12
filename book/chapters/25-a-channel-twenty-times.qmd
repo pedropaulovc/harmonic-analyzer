@@ -29,7 +29,7 @@ One channel is easy. Twenty identical channels is the actual project. This chapt
 
 ## What will fight you
 
-Bushing **length** sets the .300 in (7.62 mm) channel pitch and the error stacks nineteen times. The rocker's R800 top edge is a profile, not a pocket. Make all twenty of a part in one session, on one setup, or accept drift.
+Hub **length** sets the .300 in (7.62 mm) channel pitch and the error stacks nineteen times: the 20 rocker-arm hubs (`ch-rocker-hub` on the built-up route) and the 20 channel-lever hubs stack face to face on their shafts. The rocker's R800 top edge is a profile, not a pocket. Make all twenty of a part in one session, on one setup, or accept drift.
 
 ## Making each part
 

@@ -57,7 +57,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 |---|---|---|
 | 9 | Turning: facing, OD, shoulders | `dt-crank-pin`, `ch-pivot-shaft` blanks |
 | 10 | Drilling, boring, reaming | `pivot-bushing` bore (Ø6.5 on Ø6.35, 0.15 mm clearance) |
-| 11 | Parting off to a length tolerance | the 19 `pivot-bushing` + 19 `lever-bushing` sets — **length sets the .300 in (7.62 mm) channel pitch** |
+| 11 | Parting off to a length tolerance | the 20 rocker-arm hubs (`ch-rocker-hub` on the built-up route) and the 20 `ch-channel-lever` hubs; the 19 bushing spacers are retired — **hub length sets the .300 in (7.62 mm) channel pitch** |
 | 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø0.79375 mm (1/32 in) slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
 | 13 | Milling: squaring, profiling, edges | `ch-rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
 | 14 | Hole patterns and tapping | `fr-rocker-arm-support` (4× 5/16 drilled foot clearances, `cad/scripts/fr_rocker_arm_support_spec.py`), the 20 Ø2.0 spring holes |
