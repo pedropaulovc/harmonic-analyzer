@@ -461,7 +461,8 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             if teeth in spec.SPIGOT_TEETH:
                 mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
             else:
-                mate = f"{shaft} MHA-DT-04, LAND 2"
+                land_name = f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND"
+                mate = f"{shaft} MHA-DT-04, {land_name}"
             assert lines[0] == f"1. BONDED SLIP FIT ON {mate}."
             assert drawing.KEY_MATE not in text
             # Rule 7 / rule 23: no size, no compound, no method in the note.
