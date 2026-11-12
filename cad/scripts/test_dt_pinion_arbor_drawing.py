@@ -916,8 +916,11 @@ def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
         assert max(map(len, text.split("\n"))) <= 6
         assert 0.005 <= shaft_bottom - top <= 0.010
         assert top - drawing.SPAN_TAG_HEIGHT - rows_under[key] >= 0.003
-    # Clear of the collar pin hole (Ø1.59) on its span.
+    # Clear of the collar pin hole (Ø1.59) on its span, and head side of its
+    # station witness's stub under the shaft (r13 layout audit: the tag and
+    # its leader straddled it).
     assert abs(tags["collar_span"][0] - spec.PIN_Z) > 5.0
+    assert tags["collar_span"][2][0] - drawing._sheet_x(spec.PIN_Z) >= 0.002
     source = inspect.getsource(drawing.build)
     assert "_span_tag_picks(adapter, principal)" in source
     assert 'entity_type="FACE"' in source

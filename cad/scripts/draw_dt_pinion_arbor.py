@@ -317,10 +317,13 @@ def _span_tag(crown_side_z: float, text: str) -> tuple[float, str, tuple[float, 
 
 SPAN_TAGS = {
     "front_journal": _span_tag(FRONT_JOURNAL_Z + JOURNAL_LEN, "SEE\nNOTE 1"),
-    "collar_span": _span_tag(FRONT_JOURNAL_Z, "SEE\nNOTE 2"),
+    # Head side of the collar pin station's witness (x ~0.2683, a stub under
+    # the shaft to ~0.1657): from the 1.82 witness the tag and its leader
+    # straddled it (r13 layout audit, text-on-line).
+    "collar_span": _span_tag(PIN_Z, "SEE\nNOTE 2"),
 }
 # The collar span's face: the shaft cylinder whose span holds the tag's
-# landing (the pin hole, ~9.5 mm toward the front land, does not split it).
+# landing, head side of the pin hole.
 COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=SPAN_TAGS["collar_span"][0])
 # The back land's 2X diameter (one size for both lands, #1038 ruling) is
 # measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
