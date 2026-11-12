@@ -6,7 +6,9 @@ native size band and one bearing-surface finish, the tip chamfer its single
 MAX limit, and every other size is an ordinary model dimension at its
 part-authored places under the title block's bands (#2314).  The thread
 relief's 45-degree lead prints in DETAIL A, a 10:1 native detail of the seat
-corner (#2172).
+corner (#2172), and the head seat on MHA-DT-35 -- the under-head radius's
+single MAX limit and the head break's two limits -- in DETAIL B, a 20:1
+native detail of the under-head face (#1757).
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -25,6 +27,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -65,7 +68,18 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from dt_crank_handle_head_seat_spec import (
+    HEAD_CHAMFER,
+    HEAD_CHAMFER_LIMITS,
+    LIMIT_TOL_TYPE,
+    SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
+    SCREW_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
+    UNDER_HEAD_RADIUS_BAND,
+    UNDER_HEAD_RADIUS_MAX,
+    UNDER_HEAD_RADIUS_TOL_TYPE,
+)
 from dt_crank_handle_pivot_screw_notes import (
+    HEAD_CHAMFER_CALLOUT,
     HEAD_DIA_CALLOUT,
     HEAD_LENGTH_CALLOUT,
     RELIEF_LEAD_CALLOUT,
@@ -73,10 +87,9 @@ from dt_crank_handle_pivot_screw_notes import (
     SHOULDER_LENGTH_CALLOUT,
     SHOULDER_LENGTH_NOTE,
     THREAD_NOTE,
+    UNDER_HEAD_RADIUS_CALLOUT,
 )
 from dt_crank_handle_pivot_screw_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
     HEAD_LENGTH,
     OVERALL_LENGTH,
@@ -94,6 +107,7 @@ from dt_crank_handle_pivot_screw_spec import (
     TIP_CHAMFER,
     TIP_CHAMFER_CALLOUT,
 )
+from _fit_deviations import deviations
 
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_handle_pivot_screw"]
@@ -293,6 +307,69 @@ DETAIL_KEEP = {
         DETAIL_CENTER[1] + DETAIL_CROP_RADIUS + 0.004 + RELIEF_LEAD_LINE_DROP,
     ),
 }
+# DETAIL B (#1757): the head seat on MHA-DT-35.  The under-head radius (0.1)
+# and the head's break (0.19) are under 0.6 mm of sheet at 3:1, so a 20:1
+# native detail of the flat under-head face carries both model dimensions.
+# The fence takes in the round's two tangent points and the break's two ends,
+# and stays above the axis.
+DETAIL_B_LETTER = "B"
+DETAIL_B_SCALE = (20, 1)
+_DBS = DETAIL_B_SCALE[0] / DETAIL_B_SCALE[1] / 1000.0
+# (model station z, radius): just past the under-head face, halfway up it.
+DETAIL_B_FOCUS_MM = (HEAD_LENGTH + 0.1, (SHOULDER_DIA + HEAD_DIA) / 4.0)
+DETAIL_B_RADIUS_MM = 0.8
+_DETAIL_B_MARGIN_MM = 0.2
+_ROUND_ON_SHOULDER = (HEAD_LENGTH + UNDER_HEAD_RADIUS_MAX, SHOULDER_DIA / 2.0)
+_ROUND_ON_FACE = (HEAD_LENGTH, SHOULDER_DIA / 2.0 + UNDER_HEAD_RADIUS_MAX)
+_BREAK_ON_OD = (HEAD_LENGTH - HEAD_CHAMFER, HEAD_DIA / 2.0)
+_BREAK_ON_FACE = (HEAD_LENGTH, HEAD_DIA / 2.0 - HEAD_CHAMFER)
+if (
+    any(
+        math.dist(DETAIL_B_FOCUS_MM, point) > DETAIL_B_RADIUS_MM - _DETAIL_B_MARGIN_MM
+        for point in (_ROUND_ON_SHOULDER, _ROUND_ON_FACE, _BREAK_ON_OD, _BREAK_ON_FACE)
+    )
+    or DETAIL_B_FOCUS_MM[1] <= DETAIL_B_RADIUS_MM
+):
+    raise AssertionError(
+        "detail B's fence must take in the under-head round and the head break, "
+        "and stay above the axis"
+    )
+# Bottom middle, right of detail A and left of the title block: the circle
+# spans x 0.156..0.188, y 0.038..0.070, under the overall's row.
+DETAIL_B_CENTER = (0.172, 0.054)
+DETAIL_B_CROP_RADIUS = DETAIL_B_RADIUS_MM * _DBS
+DETAIL_B_LABEL_XY = (
+    DETAIL_B_CENTER[0],
+    DETAIL_B_CENTER[1] - DETAIL_B_CROP_RADIUS - 0.005,
+)
+# The circle's letter on the side view stands up-left of the under-head
+# corner, left of the head and right of the finish symbol's leader.
+DETAIL_B_LETTER_XY = (UNDERHEAD_X - 0.006, SIDE_CENTER[1] + 0.016)
+
+
+def _detail_b_xy(model_z_mm: float, radius_mm: float) -> tuple[float, float]:
+    """Sheet point of a model point in detail B (as the side view: +Z left)."""
+    return (
+        DETAIL_B_CENTER[0] + (DETAIL_B_FOCUS_MM[0] - model_z_mm) * _DBS,
+        DETAIL_B_CENTER[1] + (radius_mm - DETAIL_B_FOCUS_MM[1]) * _DBS,
+    )
+
+
+# The break's horizontal leg prints its two limits, then its three callout
+# rows, with the dimension line under the last row (as the lead's): the line
+# 4 mm over the break's top end, the block right of both extension lines so
+# the line runs to the arrows over open sheet.  The radius's block stands
+# up-left of the circle, on the round's centre side, where its leader reaches
+# the arc through air above the shoulder (its arc extension drawn,
+# draw_dt_crank_handle._dress_inside_corner).
+HEAD_CHAMFER_TEXT_WIDTH = 0.041
+DETAIL_B_KEEP = {
+    "HeadChamfer": (
+        _detail_b_xy(*_BREAK_ON_OD)[0] + 0.004 + HEAD_CHAMFER_TEXT_WIDTH / 2.0,
+        _detail_b_xy(*_BREAK_ON_OD)[1] + 0.004 + RELIEF_LEAD_LINE_DROP,
+    ),
+    "UnderHeadRadius": (0.140, 0.074),
+}
 # The running shoulder's upper flank, right of the Ø dimension line and its
 # callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through
 # the block's right end).
@@ -333,25 +410,119 @@ def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("MHA-DT-32 ReliefDia did not keep its arrows inside")
 
 
-@_telemetry.traced("crank_handle_pivot_screw.relief_lead_detail")
-def _relief_lead_detail(adapter: Any, side: Any) -> Any:
-    """Native 10:1 detail A of the relief lead on the side view
-    (draw_dt_crank_handle._ferrule_seat_detail): fence, scale, outline, label
-    and letter each read back."""
+def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
+    """Prove detail B's imports print the model's head seat (#1757): the
+    under-head radius as a radial R.004 MAX, its leader reaching the arc
+    through an arc extension (its text stands on the round's centre side,
+    off the arc's span), and the head break as its two native limits."""
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    for name in ("UnderHeadRadius", "HeadChamfer"):
+        if name not in by_name:
+            raise RuntimeError(f"MHA-DT-32 detail B lacks its {name} dimension")
+    radius = _early_bound(
+        _early_bound(by_name["UnderHeadRadius"], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    if bool(radius.Diametric) or int(radius.Type2) != 5:  # swRadialDimension
+        raise RuntimeError(
+            "MHA-DT-32 UnderHeadRadius imported as a non-radial dimension"
+        )
+    dimension = _early_bound(radius.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    lower, upper = deviations(UNDER_HEAD_RADIUS_BAND)
+    if (
+        not math.isclose(
+            float(dimension.SystemValue), UNDER_HEAD_RADIUS_MAX / 1000.0, abs_tol=1e-9
+        )
+        or int(tolerance.Type) != UNDER_HEAD_RADIUS_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+        or bool(dimension.IsReference())
+    ):
+        raise RuntimeError("MHA-DT-32 UnderHeadRadius lost its model MAX limit")
+    radius.ArcExtensionLineOrOppositeSide = True
+    if not bool(radius.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("MHA-DT-32 UnderHeadRadius refused its arc extension")
+    chamfer = _early_bound(
+        _early_bound(by_name["HeadChamfer"], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(chamfer.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    nominal = float(dimension.SystemValue) * 1000.0
+    limits = (
+        nominal + float(tolerance.GetMinValue()) * 1000.0,
+        nominal + float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if (
+        not math.isclose(nominal, HEAD_CHAMFER, abs_tol=1e-6)
+        or int(tolerance.Type) != LIMIT_TOL_TYPE
+        or any(
+            not math.isclose(actual, expected, abs_tol=1e-6)
+            for actual, expected in zip(limits, HEAD_CHAMFER_LIMITS, strict=True)
+        )
+    ):
+        raise RuntimeError(f"MHA-DT-32 HeadChamfer lost its model limits: {limits}")
+
+
+@dataclass(frozen=True)
+class SideDetail:
+    """One native circular detail of the side view, at sheet coordinates."""
+
+    letter: str
+    scale: tuple[int, int]
+    focus_mm: tuple[float, float]  # (model station z, radius)
+    radius_mm: float
+    center: tuple[float, float]
+    label_xy: tuple[float, float]
+    letter_xy: tuple[float, float]
+
+
+DETAILS = (
+    SideDetail(
+        DETAIL_LETTER,
+        DETAIL_SCALE,
+        DETAIL_FOCUS_MM,
+        DETAIL_RADIUS_MM,
+        DETAIL_CENTER,
+        DETAIL_LABEL_XY,
+        DETAIL_LETTER_XY,
+    ),
+    SideDetail(
+        DETAIL_B_LETTER,
+        DETAIL_B_SCALE,
+        DETAIL_B_FOCUS_MM,
+        DETAIL_B_RADIUS_MM,
+        DETAIL_B_CENTER,
+        DETAIL_B_LABEL_XY,
+        DETAIL_B_LETTER_XY,
+    ),
+)
+
+
+@_telemetry.traced("crank_handle_pivot_screw.side_detail")
+def _side_detail(adapter: Any, side: Any, spec: SideDetail) -> Any:
+    """Native detail of the side view (draw_dt_crank_handle._ferrule_seat_detail):
+    fence, scale, outline, label and letter each read back."""
+    name = f"detail {spec.letter}"
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(side, "IView")
     if not drawing.ActivateView(view_name(adapter, side)):
-        raise RuntimeError("failed to activate detail A's parent side view")
+        raise RuntimeError(f"failed to activate {name}'s parent side view")
     draw.ClearSelection2(True)
     # The profile lies on the Right plane: model (x, y, z) = (0, radius, station).
     center = model_point_in_view(
         adapter,
         side,
-        (0.0, DETAIL_FOCUS_MM[1] / 1000.0, DETAIL_FOCUS_MM[0] / 1000.0),
-        label="detail A fence centre",
+        (0.0, spec.focus_mm[1] / 1000.0, spec.focus_mm[0] / 1000.0),
+        label=f"{name} fence centre",
     )
-    sheet_xy = [center[:2], (center[0] + DETAIL_RADIUS_MM * _S / 1000.0, center[1])]
+    sheet_xy = [center[:2], (center[0] + spec.radius_mm * _S / 1000.0, center[1])]
     sketch = _early_bound(parent.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -363,8 +534,8 @@ def _relief_lead_detail(adapter: Any, side: Any) -> Any:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     # Straight to the database: an inferred circle snaps onto nearby edges
-    # (draw_dt_pinion_lever r2), and this one sits on the seat-face corner,
-    # so the fence is read back before use.
+    # (draw_dt_pinion_lever r2), and each fence sits on a corner of the
+    # profile, so the fence is read back before use.
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous_add_to_db = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -373,23 +544,23 @@ def _relief_lead_detail(adapter: Any, side: Any) -> Any:
     finally:
         manager.AddToDB = previous_add_to_db
     if fence is None:
-        raise RuntimeError("failed to create detail A's fence")
+        raise RuntimeError(f"failed to create {name}'s fence")
     arc = _early_bound(fence, "ISketchArc")
     placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
     placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
     if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
         float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
     ):
-        raise RuntimeError("detail A's fence moved from where it was placed")
+        raise RuntimeError(f"{name}'s fence moved from where it was placed")
     draw.ClearSelection2(True)
     if not _early_bound(fence, "ISketchSegment").Select4(False, None):
-        raise RuntimeError("failed to select detail A's fence")
+        raise RuntimeError(f"failed to select {name}'s fence")
     detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
+        *spec.center,
         0.0,
         0,  # swDetViewSTANDARD
-        *DETAIL_SCALE,
-        DETAIL_LETTER,
+        *spec.scale,
+        spec.letter,
         1,  # swDetCircleCIRCLE
         True,
         False,
@@ -397,57 +568,61 @@ def _relief_lead_detail(adapter: Any, side: Any) -> Any:
         5,
     )
     if detail is None:
-        raise RuntimeError("CreateDetailViewAt4 returned no detail A")
+        raise RuntimeError(f"CreateDetailViewAt4 returned no {name}")
     detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    detail.ScaleRatio = double_array([float(value) for value in spec.scale])
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     ratio = tuple(float(value) for value in detail.ScaleRatio)
     if len(ratio) != 2 or not math.isclose(
-        ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]
+        ratio[0] / ratio[1], spec.scale[0] / spec.scale[1]
     ):
-        raise RuntimeError(f"detail A scale {ratio!r}, expected {DETAIL_SCALE!r}")
+        raise RuntimeError(f"{name} scale {ratio!r}, expected {spec.scale!r}")
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("detail A has invalid bounds")
-    span = 2.0 * DETAIL_CROP_RADIUS
+        raise RuntimeError(f"{name} has invalid bounds")
+    span = 2.0 * spec.radius_mm * spec.scale[0] / spec.scale[1] / 1000.0
     _telemetry.info(
-        f"detail A outline {outline[2] - outline[0]:.5f} x "
+        f"{name} outline {outline[2] - outline[0]:.5f} x "
         f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
     )
     if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
-        raise RuntimeError(f"detail A is smaller than its fence: {outline}")
+        raise RuntimeError(f"{name} is smaller than its fence: {outline}")
     target = [
-        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        position[axis] + spec.center[axis] - (outline[axis] + outline[axis + 2]) / 2.0
         for axis in range(2)
     ]
     if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position detail A")
+        raise RuntimeError(f"failed to position {name}")
     draw.EditRebuild3()
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail A label, found {len(notes)}")
+        raise RuntimeError(f"expected one native {name} label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    label_xyz = (*spec.label_xy, 0.0)
     if not annotation.SetPosition2(*label_xyz):
-        raise RuntimeError("failed to position detail A's label")
+        raise RuntimeError(f"failed to position {name}'s label")
     draw.EditRebuild3()
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
-        raise RuntimeError(f"detail A's label position did not persist: {actual}")
-    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
-    if len(circles) != 1:
+        raise RuntimeError(f"{name}'s label position did not persist: {actual}")
+    circles = [
+        _early_bound(raw, "IDetailCircle")
+        for raw in (_read_member(parent, "GetDetailCircles") or ())
+    ]
+    mine = [circle for circle in circles if str(circle.GetLabel()) == spec.letter]
+    if len(mine) != 1:
         raise RuntimeError(
-            f"expected one detail circle on the side view, found {len(circles)}"
+            f"expected one {name} circle on the side view, found "
+            f"{[str(circle.GetLabel()) for circle in circles]}"
         )
-    circle = _early_bound(circles[0], "IDetailCircle")
-    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    mine[0].SetLabelPosition(*spec.letter_xy)
     draw.EditRebuild3()
-    letter = tuple(float(value) for value in circle.GetLabelPosition())
-    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
-        raise RuntimeError(f"detail A's letter did not persist: {letter}")
+    letter = tuple(float(value) for value in mine[0].GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, spec.letter_xy) > 1e-8:
+        raise RuntimeError(f"{name}'s letter did not persist: {letter}")
     return detail
 
 
@@ -500,19 +675,34 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, end, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Detail A first (draw_dt_crank_handle, after draw_ch_amplitude_bar
+    # Both details first (draw_dt_crank_handle, after draw_ch_amplitude_bar
     # r743-6): a dimension already on the sheet is never imported again while
     # a deleted one is, and a native detail imported nothing after its
-    # parent's import and deletions.  The detail keeps the lead and deletes
+    # parent's import and deletions.  Each detail keeps its own and deletes
     # whatever else its fence shows; the side view's import then takes those
-    # back and skips the lead.
-    detail = _relief_lead_detail(adapter, side)
+    # back and skips the ones the details hold.
+    detail, seat_detail = (_side_detail(adapter, side, spec) for spec in DETAILS)
     set_hidden_lines_removed(adapter, detail)
+    set_hidden_lines_removed(adapter, seat_detail)
+    # The under-head round's tangent edges would draw a second line beside
+    # the under-head face and the shoulder (draw_dt_crank_handle).
+    for view, label in ((side, "side view"), (seat_detail, "detail B")):
+        view.SetDisplayTangentEdges2(0)
+        if int(view.GetDisplayTangentEdges2()) != 0:
+            raise RuntimeError(f"failed to hide MHA-DT-32 {label} tangent edges")
+        view.UpdateViewDisplayGeometry()
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
         keep=DETAIL_KEEP,
         view_label="relief lead detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    seat_annotations = curate_view_dimensions(
+        adapter,
+        seat_detail,
+        keep=DETAIL_B_KEEP,
+        view_label="head seat detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_annotations = curate_view_dimensions(
@@ -529,7 +719,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="head-end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*side_annotations, *end_annotations, *detail_annotations]
+    annotations = [
+        *side_annotations,
+        *end_annotations,
+        *detail_annotations,
+        *seat_annotations,
+    ]
     set_dimension_callouts(
         adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
     )
@@ -543,11 +738,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
             "ReliefLead": RELIEF_LEAD_CALLOUT,
+            "UnderHeadRadius": UNDER_HEAD_RADIUS_CALLOUT,
+            "HeadChamfer": HEAD_CHAMFER_CALLOUT,
         },
         location="below",
     )
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     _set_relief_arrows_inside(adapter, side_annotations)
+    _dress_head_seat(adapter, seat_annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [

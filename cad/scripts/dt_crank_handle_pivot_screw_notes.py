@@ -60,3 +60,9 @@ RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nSTAYS INSIDE\nMHA-DT-06 THREAD"
 # The shoulder's running mate, at its band, by the standard fit name (rule 4);
 # wrapped so the widest row (21 characters) clears the Ra 63 leader.
 SHOULDER_FIT_CALLOUT = "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"
+# The head seat on MHA-DT-35 (#1757), in detail B: each corner names the
+# MHA-DT-35 feature it clears (rule 3's CLEARS form, rule 4).  The radius
+# lands in the cup's floor-hole break; the head's break clears the cup's
+# pocket-floor radius.  Rows of 18 characters at most, as the lead's.
+UNDER_HEAD_RADIUS_CALLOUT = "CLEARS MHA-DT-35\nHOLE CHAMFER"
+HEAD_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT}\nCLEARS MHA-DT-35\nFLOOR RADIUS"
