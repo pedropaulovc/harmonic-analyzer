@@ -578,8 +578,8 @@ _SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # plane is (WEB_CENTRELINES), left of the spigot step's, so the row above
 # stops short of it; last the overall (".772 ±.004"), which holds the
 # axle's nut stack, left of the back face above the A-A caption.  Each
-# size's need stands over its value (CALLOUTS_ABOVE); the .61 names the
-# groove centre plane it locates (WEB_PLANE_CALLOUT).  Each
+# length's need stands over its value (CALLOUTS_ABOVE); the .61, a location,
+# prints its value and band alone (drawing-guidelines.md rule 7).  Each
 # text is centred clear of the face it leaves.  The two right-hand sizes
 # keep their arrows inside their spans, so no tail reaches a neighbouring
 # extension line.
@@ -587,10 +587,9 @@ _SPIGOT_DIM_X = _section_x(HUB_FRONT_Z) + 0.0072
 # _HUB_ROWS are the dimension lines.  A text block centres on its point, so
 # a callout over the value lifts the point half a line more than
 # _ONE_LINE_UP / _STACK_UP.  The overall's row stands over the caption; the
-# plane's runs 5.4 mm above it; the spigot length's runs 13.4 mm over the
-# plane's, so the plane's two-line block (about 9.1 mm tall, its foot 1 mm
-# over its line) tops out about 4.3 mm under the spigot length's block, more
-# than the layout audit's text separation (3.57 mm).
+# plane's runs 5.4 mm above it; the spigot length's stands 11.9 mm over the
+# plane's, so its block clears the plane's one-line value by more than the
+# layout audit's text separation (3.57 mm).
 _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0050, 0.0184, 0.0238)
@@ -602,23 +601,32 @@ SPIGOT_LENGTH_CALLOUT = f"DRUM {DRUM_NUMBER} NOT PROUD"
 # names the stack and the axle by number on one short line, so its dimension
 # line stops short of TIE 1's block.
 HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
-# The .61 runs from the spigot face to the centre plane the groove, web and
-# rim share; its extension line ends on the lower groove's bottom, but two
-# machinist reviews (integration proofs 20261109T105251629Z and
-# 20261112T153723793Z) still read the groove as unlocated, so the value
-# names what it locates.
-WEB_PLANE_CALLOUT = "GROOVE CENTRE PLANE"
 # The groove's two three-place sizes seat the pen wire (mg_magnifying_wheel_spec
 # GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): both link the one numbered note that
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
 GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
+# The .61 locates the groove: it runs from the spigot face to the centre
+# plane the groove, web and rim share, its extension line ending on the
+# lower groove's bottom.  Two machinist reviews still read the groove as
+# unlocated (integration proofs 20261109T105251629Z, 20261112T153723793Z).
+# Rule 7 keeps the location dimension bare, so the groove's own size callout
+# names the plane (delegated ruling: Repitch1038, 2026-11-12, #2144).  It
+# stands on the groove's R, whose block has open sheet to its right: the
+# groove bottom's Ø has about 33 mm between the rim's two Ø lines, too narrow
+# for this line.  The ".61" is the dimension's own value at its printed
+# places, so the words cannot drift from it.
+_PLANE_TEXT = f"{abs(HUB_FRONT_Z) / 25.4:.{DRAWING_PRECISION_BY_NAME['HubFrontZ']}f}"
+GROOVE_R_CALLOUT = f"{GROOVE_CALLOUT}\nCENTRED ON {_PLANE_TEXT.removeprefix('0')} PLANE"
+# The web plane's value is ".61 ±.03": its text is centred this many
+# characters (with the margin) right of the spigot face.
+_PLANE_VALUE_CHARS = 8
 # Capitals print wider than _TEXT_CHAR (about 2.6 mm a character), so a
 # callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
-# The drum and groove callouts are the long all-capitals lines, about
-# 3.02 mm a character: each span is estimated at that pitch so it clears
-# the spigot face's shared extension line.
+# The drum callout is the one long all-capitals line, about 3.02 mm a
+# character: its span is estimated at that pitch so it clears the spigot
+# face's shared extension line.
 _DRUM_CALLOUT_CHAR = 0.00302
 # The spoke pitch's arc spans its two extension lines: outside, its 60 deg
 # arrow's tail would stand within the layout audit's arrow-near-text gap of
@@ -646,9 +654,8 @@ SECTION_KEEP = {
     "HubFrontZ": _beside(
         _section_x(HUB_FRONT_Z),
         1,
-        math.ceil(len(WEB_PLANE_CALLOUT) * _DRUM_CALLOUT_CHAR / _TEXT_CHAR)
-        + _CALLOUT_MARGIN_CHARS,
-        _HUB_ROWS[1] + _ONE_LINE_UP + _ABOVE_UP,
+        _PLANE_VALUE_CHARS + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[1] + _ONE_LINE_UP,
     ),
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
@@ -658,12 +665,13 @@ SECTION_KEEP = {
     ),
     # The groove's R up right, its leader down-left onto the groove at 35
     # deg, right of the axial rows' line ends; its shoulder over the top of
-    # the rim-bore round's R block (ROUND_TEXT_XY), under its note link.
-    # Its one-line value leaves the shoulder where the stacked band's block
-    # put it.
+    # the rim-bore round's R block (ROUND_TEXT_XY), under its two callout
+    # lines.  Its one-line value leaves the shoulder where the stacked band's
+    # block put it; the second callout line lifts the point half a line, so
+    # the shoulder stays.
     "GrooveR": (
         SECTION_CENTER[0] + 0.0344,
-        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP),
+        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP) + _TEXT_LINE / 2.0,
     ),
 }
 # The spigot's two-line block ("(Ø.499)" over its note link) hangs on an
@@ -727,7 +735,7 @@ DIMENSION_CALLOUTS = {
     "BoreDiaDim": BORE_CALLOUT,
     "SpigotDia": f"SEE NOTE {SPIGOT_FIT_NOTE}",
     "GrooveBottomDia": GROOVE_CALLOUT,
-    "GrooveR": GROOVE_CALLOUT,
+    "GrooveR": GROOVE_R_CALLOUT,
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
@@ -735,10 +743,9 @@ DIMENSION_CALLOUTS = {
     "Tie1HoleDia": TIE1_CALLOUT,
     "Tie2HoleDia": TIE2_CALLOUT,
 }
-# Each axial size's need stands over its value.
+# Each axial length's need stands over its value.
 CALLOUTS_ABOVE = {
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
-    "HubFrontZ": WEB_PLANE_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
 }
 # SOLIDWORKS drops a multi-line callout above a value from the print

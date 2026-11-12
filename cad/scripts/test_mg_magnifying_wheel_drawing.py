@@ -302,26 +302,9 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert not hasattr(drawing, "SPOKE_CENTRELINE")
     assert spec.SPOKE_REFERENCE in spec.REFERENCE_SKETCHES
     # The .61 locates the groove, web and rim's shared mid-plane, drawn on
-    # A-A, and names the groove it locates over its value: two reviews read
-    # the groove as unlocated from the witness line alone (integration
-    # proofs 20261109T105251629Z, 20261112T153723793Z).
-    plane_callout = drawing.CALLOUTS_ABOVE["HubFrontZ"]
-    assert "GROOVE" in plane_callout.split()
-    assert "\n" not in plane_callout and not any(c.isdigit() for c in plane_callout)
+    # A-A; the location carries its value and band alone (rule 7).
+    assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
     assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
-    # Its block clears the spigot face's shared extension line, and stands
-    # under the spigot length's block by more than the layout audit's text
-    # separation (3.57 mm). Both blocks are a value with one line over it:
-    # a one-line text's box is 3.5 mm tall (layout audit of run
-    # 20261112T153723793Z), and a second line adds one line pitch.
-    face_x = drawing._section_x(geom.HUB_FRONT_Z)
-    plane_x, plane_y = drawing.SECTION_KEEP["HubFrontZ"]
-    half = len(plane_callout) * drawing._DRUM_CALLOUT_CHAR / 2.0
-    assert plane_x - half - face_x >= drawing._TEXT_OFF_LINE
-    block_half = (0.0035 + drawing._TEXT_LINE) / 2.0
-    spigot_y = drawing.SECTION_KEEP["SpigotLength"][1]
-    assert (spigot_y - block_half) - (plane_y + block_half) >= 0.00357
-    assert plane_y - block_half > drawing._HUB_ROWS[1]
     for a, b in drawing.WEB_CENTRELINES.values():
         assert a[1] == b[1] == a[2] == b[2] == 0.0
         assert abs(a[0]) == geom.HUB_DIA / 2.0
@@ -361,7 +344,16 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "REAM THRU\nSEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == "SEE NOTE 2"
     assert drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "SEE NOTE 3"
-    assert drawing.DIMENSION_CALLOUTS["GrooveR"] == "SEE NOTE 3"
+    # The groove's R links the same note and names the plane the .61
+    # locates the groove on, by the value the .61 prints; the location
+    # itself stays bare (rule 7; two reviews read the groove as unlocated:
+    # integration proofs 20261109T105251629Z, 20261112T153723793Z).
+    groove_r = drawing.DIMENSION_CALLOUTS["GrooveR"].split("\n")
+    places = drawing.DRAWING_PRECISION_BY_NAME["HubFrontZ"]
+    printed = f"{abs(geom.HUB_FRONT_Z) / 25.4:.{places}f}".lstrip("0")
+    assert groove_r == ["SEE NOTE 3", f"CENTRED ON {printed} PLANE"]
+    assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
+    assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
     assert "GrooveR" not in drawing.CALLOUTS_ABOVE
     # The literal mate numbers keep the axle, drum and wire out of the part's
     # recipe; they are the config rows' numbers.
