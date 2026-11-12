@@ -1409,6 +1409,138 @@ def test_a_request_echoing_a_title_counter_is_caused_by_the_seat():
     assert not _com_outcome.carries_title_counter(["Partial11", 11, {"f": "0x1p0"}])
 
 
+def _sw(site: str, *values: Any, flags: int = 1, result: Any = True) -> conv.Call:
+    """SolidWorks member ``site`` called (``flags`` 1), read (2) or put (4)."""
+    header = [1, 0, flags, {"t": [11, 0]}, {"t": []}]
+    return conv.Call(0, 7, "InvokeTypes", [*header, *values], site, result=result)
+
+
+def _f(value: float) -> dict[str, str]:
+    return {"f": value.hex()}
+
+
+_EDGE_FALLBACK = [
+    _sw("IModelDoc2.GetType", result=1),
+    conv.Call(0, 7, "QueryInterface", ["{IPartDoc}"], "early_bound", result={"h": 9}),
+    _sw("IPartDoc.GetBodies2", 0, False, result={"t": [{"h": 10, "p": "IBody2"}]}),
+    _sw("IBody2.GetEdges", result={"t": [{"h": 11, "p": "IEdge"}] * 2}),
+    _sw("IEdge.GetClosestPointOn", _f(0.05), result={"t": [_f(0.049)] * 5}),
+    _sw("IEdge.GetClosestPointOn", _f(0.05), result={"t": [_f(0.05)] * 5}),
+    _sw("IEntity.Select2", False, 0),
+]
+_MEASURED = [
+    _sw("IModelDocExtension.CreateMeasure", result={"h": 12, "p": "IMeasure"}),
+    _sw("IMeasure.ArcOption", 0, flags=4, result=None),
+    _sw("IMeasure.Calculate", None),
+    _sw("IMeasure.Diameter", flags=2, result=_f(0.012)),
+]
+_FILLETED = [
+    _sw("IModelDoc2.ClearSelection2", True),
+    _sw("IFeatureManager.FeatureFillet3", _f(0.001), result={"h": 13}),
+]
+
+
+def _picked(found: bool, fallback=_EDGE_FALLBACK, measured=_MEASURED, after=_FILLETED):
+    """mg_magnifying_wheel's shape (2026-11-12): an edge selected by a point
+    (``SelectByID2``); when it answers False, the vendored geometric fallback
+    selects the closest edge itself; then the edge measured, the selection
+    cleared, and the next feature."""
+    return [
+        _sw("IFeatureManager.FeatureExtrusion3", _f(0.004), result={"h": 3}),
+        _sw("IModelDoc2.ClearSelection2", True),
+        _sw("IModelDoc2.Extension", flags=2, result={"h": 4}),
+        _sw("IModelDocExtension.SelectByID2", "", "EDGE", _f(0.05), result=found),
+        *([] if found else fallback),
+        *measured,
+        *after,
+    ]
+
+
+def test_a_detour_of_reads_and_selections_is_a_seat_path(monkeypatch):
+    path = _com_outcome.seat_path
+    base, detour = _picked(True), _picked(False)
+    block = {
+        "base": [4, 4],
+        "new": [4, 4 + len(_EDGE_FALLBACK)],
+        "steered_by": "IModelDocExtension.SelectByID2",
+    }
+    assert path(base, detour) == {"path": "detour", "count": 1, "blocks": [block]}
+    # The detour in the base build: the same, the other way round.
+    assert path(detour, base)["blocks"] == [
+        {**block, "base": block["new"], "new": [4, 4]}
+    ]
+    # A put, even to a listed member, or a member not listed, is no read: the
+    # detour changed something.
+    for changed in (
+        _sw("IFeature.Name", "Edge1", flags=4, result=None),
+        _sw("IModelDoc2.Extension", {"h": 4}, flags=4, result=None),
+        _sw("IModelDoc2.EditRebuild3"),
+    ):
+        fallback = [*_EDGE_FALLBACK[:-1], changed, _EDGE_FALLBACK[-1]]
+        found = path(base, _picked(False, fallback))
+        assert found["path"] == "not_read" and changed.site in found["detail"]
+    # The measure tool's own option, after the detour only.
+    assert path(base, _picked(False, [*_EDGE_FALLBACK, _MEASURED[1]]))["path"] == (
+        "not_read"
+    )
+    # The selection the detour made reaches the next feature uncleared.
+    uncleared = _picked(False, after=_FILLETED[1:])
+    found = path(_picked(True, after=_FILLETED[1:]), uncleared)
+    assert found["path"] == "selection_kept"
+    assert found["detail"].startswith("base called IFeatureManager.FeatureFillet3")
+    # Any other answer differing, beyond noise.
+    wider = [*_MEASURED[:3], _sw("IMeasure.Diameter", flags=2, result=_f(0.013))]
+    found = path(base, _picked(False, measured=wider))
+    assert found["path"] == "answer" and "IMeasure.Diameter" in found["detail"]
+    # A request replaced, not inserted: no detour.
+    chamfered = [_FILLETED[0], _sw("IFeatureManager.InsertFeatureChamfer", _f(0.001))]
+    assert path(base, _picked(False, after=chamfered))["path"] == "unaligned"
+    # Beyond the bound: blocks too long, or too many.
+    monkeypatch.setattr(_com_outcome, "_DETOUR_CALLS", len(_EDGE_FALLBACK) - 1)
+    assert path(base, detour)["path"] == "unaligned"
+    monkeypatch.setattr(_com_outcome, "_DETOUR_CALLS", len(_EDGE_FALLBACK))
+    monkeypatch.setattr(_com_outcome, "_DETOUR_BLOCKS", 0)
+    assert path(base, detour)["path"] == "unaligned"
+
+
+def test_a_seat_path_is_judged_only_for_the_same_geometry_after_a_response(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    signals = {"mass": "same", "requests": "different", "answers": "different"}
+
+    def judged(stl: str, outcome: str = "different") -> dict[str, Any]:
+        found = {
+            "outcome": outcome,
+            "outcome_signals": {**signals, "stl": stl},
+            "outcome_details": {},
+            "judge_faults": [],
+        }
+        monkeypatch.setattr(_com_outcome, "outcome", lambda *args: found)
+        base, new = (
+            SimpleNamespace(calls=_picked(True)),
+            SimpleNamespace(calls=_picked(False)),
+        )
+        return _com_outcome.judge(base, new, {"index": 4}, Path(), Path())
+
+    found = judged("same")
+    assert found["truth_cause"] == "response:IModelDocExtension.SelectByID2"
+    assert found["seat_path"]["path"] == "detour" and found["judge_faults"] == []
+    assert judged("different")["seat_path"] is None
+    assert judged("absent", outcome="unknown")["seat_path"] is None
+
+    def raising(a, b):
+        raise ValueError("misaligned")
+
+    monkeypatch.setattr(_com_outcome, "seat_path", raising)
+    found = judged("same")
+    assert found["seat_path"] == {"path": "error", "detail": "ValueError: misaligned"}
+    assert found["judge_faults"] == [
+        {"step": "seat_path", "error": "ValueError: misaligned"}
+    ]
+
+
 def test_a_replay_reports_the_requests_that_carry_a_title_counter():
     import types
 

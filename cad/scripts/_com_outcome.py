@@ -17,6 +17,9 @@ diff``:
   something else of the same answers).
 * :func:`outcome`: whether the two builds made the same part, on signals that
   do not depend on call order (:class:`Outcome`).
+* :func:`seat_path`: for two builds SolidWorks steered apart (a response
+  cause) that made the same geometry but not the same requests, whether the
+  requests differ only by detours of reads and selections (:class:`SeatPath`).
 
 Noise, everywhere here: SolidWorks' new-document title counters (``Part11``
 against ``Part12``), the masked provenance value
@@ -145,6 +148,29 @@ class Signal(StrEnum):
     ABSENT = "absent"
 
 
+class SeatPath(StrEnum):
+    """Do two request streams differ only by detours (:func:`seat_path`)?"""
+
+    # Only by blocks of reads and selections one build made and the other
+    # did not (:data:`_DETOUR_READS`, :data:`_DETOUR_SELECTS`), each right
+    # after the one answer that steered it; every other answer the same, and
+    # in both builds the selection cleared after each block before anything
+    # but a read or a selection.
+    DETOUR = "detour"
+    # No alignment by at most :data:`_DETOUR_BLOCKS` blocks of at most
+    # :data:`_DETOUR_CALLS` calls, each resuming on :data:`_RESUME_CALLS`
+    # equal requests (or the end): calls replaced, or beyond the bound.
+    UNALIGNED = "unaligned"
+    # A block holds a call that is no listed read or selection.
+    NOT_READ = "not_read"
+    # An answer to a request both builds made differs, other than the one
+    # right before a block.
+    ANSWER = "answer"
+    # After a block, a call other than a read or a selection before
+    # ``ClearSelection2``: the selection the detour made could reach it.
+    SELECTION_KEPT = "selection_kept"
+
+
 def judge(
     base: conv.Conversation,
     new: conv.Conversation,
@@ -152,17 +178,22 @@ def judge(
     base_captures: Path,
     new_captures: Path,
 ) -> dict[str, Any]:
-    """``truth_cause`` and the :func:`outcome` fields of two recordings
-    whose request divergence (``compare_conversations``) is ``divergence``;
-    ``*_captures`` hold the files each build had SolidWorks write.
+    """``truth_cause``, the :func:`outcome` fields and ``seat_path`` of two
+    recordings whose request divergence (``compare_conversations``) is
+    ``divergence``; ``*_captures`` hold the files each build had SolidWorks
+    write. ``seat_path`` (:func:`seat_path`, ``None`` when not judged) is
+    judged only for a divergence with a ``response:`` cause, a ``different``
+    outcome, and the same mass properties and STL geometry.
 
     Never raises. A fault of this judgement costs only what it judges: the
     cause reads ``error:<type>``, a signal ``absent`` (so the outcome is at
-    best ``unknown``), each with its message in ``outcome_details``. The
-    diff's result, whose request divergence is the ground truth, is kept.
+    best ``unknown``), the seat path ``error``, each with its message in
+    ``outcome_details`` (the seat path's in its own ``detail``). The diff's
+    result, whose request divergence is the ground truth, is kept.
     ``judge_faults`` lists every fault (``step``: ``truth_cause``, a signal,
-    or ``outcome`` for all of them; ``error``), so a signal absent because its
-    judgement raised is told from one absent from both logs."""
+    ``outcome`` for all of them, or ``seat_path``; ``error``), so a signal
+    absent because its judgement raised is told from one absent from both
+    logs."""
     cause, cause_error = _attempt(
         lambda: truth_cause(
             conv.recipe_calls(base.calls), conv.recipe_calls(new.calls), divergence
@@ -180,7 +211,22 @@ def judge(
         cause = "error:" + cause_error.split(":", 1)[0]
         found["outcome_details"]["truth_cause"] = {"error": cause_error}
         found["judge_faults"].insert(0, {"step": "truth_cause", "error": cause_error})
-    return {"truth_cause": cause, **found}
+    path = None
+    signals = found["outcome_signals"]
+    if (
+        str(cause).startswith("response:")
+        and found["outcome"] == Outcome.DIFFERENT.value
+        and signals.get("mass") == signals.get("stl") == Signal.SAME.value
+    ):
+        path, path_error = _attempt(
+            lambda: seat_path(
+                conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
+            )
+        )
+        if path_error is not None:
+            path = {"path": "error", "detail": path_error}
+            found["judge_faults"].append({"step": "seat_path", "error": path_error})
+    return {"truth_cause": cause, **found, "seat_path": path}
 
 
 def truth_cause(
@@ -353,6 +399,241 @@ def label_feature(divergence: dict[str, Any] | None) -> None:
         f"the divergence lies {where} the last IFeature.Name put at or before "
         "its index in the base"
     )
+
+
+# ---------------------------------------------------------------------------
+# Seat path: detours SolidWorks steered, and nothing else
+# ---------------------------------------------------------------------------
+
+# The SolidWorks members a detour may call, by exact site, as a method or a
+# property get (never a put): each only reads the document or measures it.
+# Listed one by one, from the API reference: a member not listed is no read,
+# whatever its name. 2026-11-12, mg_magnifying_wheel: ``SelectByID2`` of an
+# edge by a point answered False on one build of five, so the vendored
+# ``_select_entity_geometric`` asked the part's type, its body's edges and
+# each edge's closest point (164) and selected the nearest; the next
+# measurement and every later request matched the other builds'.
+_DETOUR_READS = frozenset(
+    {
+        "IModelDoc2.GetType",
+        "IModelDoc2.Extension",
+        "IPartDoc.GetBodies2",
+        "IBody2.GetEdges",
+        "IEdge.GetClosestPointOn",
+        # A measure tool (IModelDocExtension::CreateMeasure) and what it
+        # measures of the selected entities (IMeasure::Calculate, properties).
+        "IModelDocExtension.CreateMeasure",
+        "IMeasure.Calculate",
+        *(
+            f"IMeasure.{name}"
+            for name in (
+                "Angle",
+                "Area",
+                "ArcLength",
+                "CenterDistance",
+                "ChordLength",
+                "DeltaX",
+                "DeltaY",
+                "DeltaZ",
+                "Diameter",
+                "Distance",
+                "IsIntersect",
+                "IsParallel",
+                "IsPerpendicular",
+                "Length",
+                "Normal",
+                "NormalDistance",
+                "Perimeter",
+                "Projection",
+                "Radius",
+                "TotalArea",
+                "TotalLength",
+                "X",
+                "Y",
+                "Z",
+            )
+        ),
+    }
+)
+# The members that select (by name or point, or the entity itself) or clear
+# the selection: the document's selection list is all they change.
+_CLEAR_SELECTION = "IModelDoc2.ClearSelection2"
+_DETOUR_SELECTS = frozenset(
+    {
+        "IModelDocExtension.SelectByID2",
+        "IEntity.Select2",
+        "IEntity.Select4",
+        _CLEAR_SELECTION,
+    }
+)
+# pywin32's own protocol on an object SolidWorks already returned (interface
+# and name lookups, type information, identity): no SolidWorks member runs.
+_PROTOCOL_OPS = frozenset(
+    {
+        "QueryInterface",
+        "GetIDsOfNames",
+        "GetTypeInfo",
+        "GetTypeInfoCount",
+        "GetTypeAttr",
+        "__eq__",
+        "__ne__",
+        "__hash__",
+    }
+)
+# A measurement's own option, put on the IMeasure tool CreateMeasure returned
+# (IMeasure::ArcOption, swMeasureArcCircleOption_e): no document state. Allowed
+# between a block and the ClearSelection2 after it, never in a block.
+_MEASURE_OPTIONS = frozenset({"IMeasure.ArcOption"})
+# The alignment's bound (:func:`_detours`): at most this many blocks of at most
+# this many calls, each resuming on this many equal requests (or both ends).
+# The work is at most blocks x calls x 2 comparisons of that many requests,
+# plus one pass over both streams; beyond it the streams are ``unaligned``.
+_DETOUR_BLOCKS = 16
+_DETOUR_CALLS = 4096
+_RESUME_CALLS = 8
+
+
+def seat_path(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> dict[str, Any]:
+    """Whether two recipe request streams differ only by detours
+    (:class:`SeatPath`): ``path``, and ``detail`` (what failed) or, for
+    ``detour``, the blocks (``base`` and ``new`` call ranges, ``steered_by``:
+    the member whose answer precedes the block; the first
+    :data:`_LISTED`) and their ``count``.
+
+    Requests are aligned as :func:`_answers_signal` keys them (member and
+    arguments, handles erased, float noise rounded) by :func:`_detours`, then
+    checked in order: every call in a block is pywin32 protocol or a listed
+    read or selection (:func:`_detour_call`); every answer to a request both
+    builds made is the same under the answers signal's rules (equal keys, or
+    :func:`_answer_close`; mass properties and the session are judged
+    elsewhere), but the one right before each block; after each block, in
+    both builds, ``ClearSelection2`` comes before any call but a detour call
+    or a measure option (:func:`_uncleared`)."""
+    keyed_a, keyed_b = _keyed_calls(a), _keyed_calls(b)
+    aligned = _detours(
+        [f"{site}\n{request}" for site, request, _ in keyed_a],
+        [f"{site}\n{request}" for site, request, _ in keyed_b],
+    )
+    if aligned is None:
+        return {
+            "path": SeatPath.UNALIGNED.value,
+            "detail": f"no alignment by at most {_DETOUR_BLOCKS} blocks of at "
+            f"most {_DETOUR_CALLS} calls",
+        }
+    runs, blocks = aligned
+    for i, i_end, j, j_end in blocks:
+        for call in (*a[i:i_end], *b[j:j_end]):
+            if not _detour_call(call):
+                return {
+                    "path": SeatPath.NOT_READ.value,
+                    "detail": f"{call.site} ({call.kind.value}) in the block at "
+                    f"base {i} new {j}",
+                }
+    steered = {(i - 1, j - 1) for i, _, j, _ in blocks}
+    for i, j, length in runs:
+        for x, y in zip(range(i, i + length), range(j, j + length), strict=True):
+            left, right = keyed_a[x][2], keyed_b[y][2]
+            if (x, y) in steered or left is None or right is None or left == right:
+                continue
+            if not _answer_close(_erased(_answer(a[x])), _erased(_answer(b[y]))):
+                return {
+                    "path": SeatPath.ANSWER.value,
+                    "detail": f"{a[x].site} answered otherwise at base {x} new {y}",
+                }
+    for i, i_end, j, j_end in blocks:
+        for side, calls, start in (("base", a, i_end), ("new", b, j_end)):
+            member = _uncleared(calls, start)
+            if member is not None:
+                return {
+                    "path": SeatPath.SELECTION_KEPT.value,
+                    "detail": f"{side} called {member} before {_CLEAR_SELECTION} "
+                    f"after the block at base {i} new {j}",
+                }
+    return {
+        "path": SeatPath.DETOUR.value,
+        "count": len(blocks),
+        "blocks": [
+            {
+                "base": [i, i_end],
+                "new": [j, j_end],
+                "steered_by": a[i - 1].site if i and j else None,
+            }
+            for i, i_end, j, j_end in blocks[:_LISTED]
+        ],
+    }
+
+
+def _detours(
+    a: Sequence[str], b: Sequence[str]
+) -> tuple[list[tuple[int, int, int]], list[tuple[int, int, int, int]]] | None:
+    """Align request streams ``a`` and ``b`` as matched runs
+    (``(i, j, length)``) and blocks only one stream holds (``(i, i_end, j,
+    j_end)``, one range empty), or ``None`` beyond the bound. Greedy: at a
+    difference, the shortest block (at most :data:`_DETOUR_CALLS` calls) in
+    either stream after which the streams resume on :data:`_RESUME_CALLS`
+    equal requests, or end together. Any alignment found is a witness: what
+    :func:`seat_path` then requires of it holds of the streams."""
+    runs: list[tuple[int, int, int]] = []
+    blocks: list[tuple[int, int, int, int]] = []
+    i = j = 0
+    while True:
+        start_i, start_j = i, j
+        while i < len(a) and j < len(b) and a[i] == b[j]:
+            i += 1
+            j += 1
+        if i > start_i:
+            runs.append((start_i, start_j, i - start_i))
+        if i == len(a) and j == len(b):
+            return runs, blocks
+        if len(blocks) == _DETOUR_BLOCKS:
+            return None
+        for k in range(1, _DETOUR_CALLS + 1):
+            if _resumes(a, i, b, j + k):
+                blocks.append((i, i, j, j + k))
+                j += k
+                break
+            if _resumes(b, j, a, i + k):
+                blocks.append((i, i + k, j, j))
+                i += k
+                break
+        else:
+            return None
+
+
+def _resumes(x: Sequence[str], p: int, y: Sequence[str], q: int) -> bool:
+    """``x`` from ``p`` and ``y`` from ``q`` agree on the next
+    :data:`_RESUME_CALLS` requests, or on all that are left of both."""
+    if q > len(y):
+        return False
+    count = min(_RESUME_CALLS, len(x) - p, len(y) - q)
+    if count < _RESUME_CALLS and len(x) - p != len(y) - q:
+        return False
+    return x[p : p + count] == y[q : q + count]
+
+
+def _detour_call(call: conv.Call) -> bool:
+    """A call a detour may make: pywin32 protocol, or a listed read or
+    selection called as a method or read as a property (never put)."""
+    if call.op in _PROTOCOL_OPS:
+        return True
+    if call.kind not in (conv.Kind.CALL, conv.Kind.GET):
+        return False
+    return call.site in _DETOUR_READS or call.site in _DETOUR_SELECTS
+
+
+def _uncleared(calls: Sequence[conv.Call], start: int) -> str | None:
+    """The first member from ``start`` that is neither a detour call nor a
+    measure option put, if it comes before ``ClearSelection2``; ``None`` when
+    the selection is cleared first, or nothing else follows."""
+    for call in calls[start:]:
+        if call.site == _CLEAR_SELECTION and call.kind is conv.Kind.CALL:
+            return None
+        if _detour_call(call):
+            continue
+        if call.site in _MEASURE_OPTIONS and call.kind is conv.Kind.PUT:
+            continue
+        return call.site
+    return None
 
 
 # ---------------------------------------------------------------------------

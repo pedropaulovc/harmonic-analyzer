@@ -834,10 +834,20 @@ class NoopJudgement(StrEnum):
     # same. A no-op rules the source out and SolidWorks answered alike, so an
     # input the replay does not pin is left (Python's own nondeterminism).
     UNEXPLAINED_DIVERGENCE = "noop_unexplained_divergence"
+    # Requests that differ only by a detour SolidWorks steered, and the base's
+    # geometry: the requests and answers the base did not make are reads and
+    # selections, after one answer that differed (Shadow.seat_path_detour;
+    # 2026-11-12, mg_magnifying_wheel: an edge SelectByID2 answered False,
+    # and the vendored geometric fallback found and selected the same edge).
+    SEAT_PATH_DIVERGENCE = "seat_path_divergence"
     # Nothing to judge by: a log without a mass-property snapshot or an STL
     # export, no comparison at all, or a divergence whose cause could not be
     # judged (``truth_cause`` ``error:<type>``, _com_outcome.judge).
     OUTCOME_UNKNOWN = "noop_outcome_unknown"
+
+
+# _com_outcome.SeatPath.DETOUR (dodo never imports the engine); pinned by test.
+SEAT_PATH_DETOUR = "detour"
 
 
 @dataclass
@@ -854,7 +864,10 @@ class Shadow:
     current source maps the base's answers onto the base's requests, so with
     pinned inputs a live request divergence after a no-op comes from
     SolidWorks: request equality is telemetry about the seat, the outcome is
-    the oracle."""
+    the oracle. ``seat_path``: for an outcome ``different`` only in the
+    requests and answers (mass and STL the same) after a response cause,
+    whether the requests differ only by detours (``_com_outcome.seat_path``:
+    ``path`` and ``detail`` or the blocks; ``None`` when not judged)."""
 
     verdict: str
     recorded: int | None = None
@@ -872,6 +885,7 @@ class Shadow:
     # What the comparison's judge raised (_com_outcome.judge ``judge_faults``:
     # ``step``, ``error``).
     judge_faults: list[dict[str, Any]] = field(default_factory=list)
+    seat_path: dict[str, Any] | None = None
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -883,6 +897,8 @@ class Shadow:
         if self.verdict != "noop":
             return None
         if self.outcome == "different":
+            if self.seat_path_detour:
+                return NoopJudgement.SEAT_PATH_DIVERGENCE
             return NoopJudgement.SOUNDNESS_ALARM
         if self.outcome != "same" or self.ground_truth not in ("same", "diverged"):
             return NoopJudgement.OUTCOME_UNKNOWN
@@ -900,6 +916,29 @@ class Shadow:
         """A replay NOOP although this build made another part than the base:
         reuse would have served a wrong artefact."""
         return self.noop_judgement is NoopJudgement.SOUNDNESS_ALARM
+
+    @property
+    def seat_path_detour(self) -> bool:
+        """This build's requests diverged from the base after SolidWorks
+        answered differently (a ``response:`` cause), only by detours of reads
+        and selections (``seat_path`` ``detour``), with the base's mass
+        properties and STL geometry. Every condition is the judge's own,
+        checked again here."""
+        return (
+            self.ground_truth == "diverged"
+            and (self.truth_cause or "").startswith("response:")
+            and self.outcome_signals.get("mass") == "same"
+            and self.outcome_signals.get("stl") == "same"
+            and (self.seat_path or {}).get("path") == SEAT_PATH_DETOUR
+        )
+
+    @property
+    def seat_path_divergence(self) -> bool:
+        """A replay NOOP, and this build made the base's part on another path
+        SolidWorks steered (:attr:`seat_path_detour`): the outcome reads
+        ``different`` only for the detour's requests and answers. Counted,
+        never an alarm, never a revocation."""
+        return self.noop_judgement is NoopJudgement.SEAT_PATH_DIVERGENCE
 
     @property
     def seat_nondeterminism(self) -> bool:
@@ -1172,6 +1211,7 @@ def shadow_of(
         shadow.outcome_signals = dict(diff.get("outcome_signals") or {})
         shadow.outcome_details = diff.get("outcome_details")
         shadow.judge_faults = list(diff.get("judge_faults") or [])
+        shadow.seat_path = diff.get("seat_path")
     return shadow
 
 
@@ -2090,8 +2130,9 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     served of recorded, seconds; the ground truth from this build's own
     requests; the outcome against the base's and the truth's cause; then the
     markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
-    ``noop_unexplained_divergence``, ``noop_outcome_unknown``,
-    ``judge_fault``). ``-`` marks a step the build never reached."""
+    ``seat_path_divergence``, ``noop_unexplained_divergence``,
+    ``noop_outcome_unknown``, ``judge_fault``). ``-`` marks a step the build
+    never reached."""
 
     def shown(name: str, unit: str = "") -> str:
         value = record.get(name)
@@ -2125,6 +2166,8 @@ def report_line(label: str, record: dict[str, Any]) -> str:
         segments.append("SOUNDNESS ALARM")
     if record.get("seat_nondeterminism"):
         segments.append("seat_nondeterminism")
+    if record.get("seat_path_divergence"):
+        segments.append("seat_path_divergence")
     if record.get("noop_unexplained_divergence"):
         segments.append("noop_unexplained_divergence")
     if record.get("noop_outcome_unknown"):
@@ -2161,6 +2204,7 @@ def _evidence(base: Base, shadow: Shadow) -> str:
         "outcome": shadow.outcome,
         "outcome_signals": shadow.outcome_signals,
         "judge_faults": shadow.judge_faults,
+        "seat_path": shadow.seat_path,
         "request_divergence": {
             name: divergence.get(name) for name in _DIVERGENCE_SUMMARY
         }
@@ -2339,6 +2383,8 @@ def _after_build(
             or None,
             "soundness_alarm": shadow.soundness_alarm,
             "seat_nondeterminism": shadow.seat_nondeterminism,
+            "seat_path_divergence": shadow.seat_path_divergence,
+            "seat_path": (shadow.seat_path or {}).get("path"),
             "noop_unexplained_divergence": shadow.noop_unexplained_divergence,
             "noop_outcome_unknown": shadow.noop_outcome_unknown,
             "noop_judgement": shadow.noop_judgement,
