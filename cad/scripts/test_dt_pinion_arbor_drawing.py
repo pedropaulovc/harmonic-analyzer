@@ -34,13 +34,14 @@ def test_required_drawing_paths_and_registry() -> None:
 
 
 def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
-    # The sheet's maps are the spec's plus the back stub's 2X diameter
-    # (dt_pinion_arbor_notes); builder and drawing read the same objects.
+    # The sheet's maps are the spec's plus the back bond land's and the back
+    # stub's diameters (dt_pinion_arbor_notes); builder and drawing read the
+    # same objects.
     assert part.DRAWING_DIMENSIONS is sheet.DRAWING_DIMENSIONS
     assert drawing.DRAWING_DIMENSIONS is sheet.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is sheet.DRAWING_PRECISION
     assert part.REFERENCE_SKETCHES is sheet.REFERENCE_SKETCHES
-    added = {"BackStubReference": {"BackStubDia"}}
+    added = {"BackBondReference": {"BackBondDia"}, "BackStubReference": {"BackStubDia"}}
     assert sheet.DRAWING_DIMENSIONS == {**spec.DRAWING_DIMENSIONS, **added}
     assert not set(added) & set(spec.DRAWING_DIMENSIONS)
     marked = set().union(*sheet.DRAWING_DIMENSIONS.values())
@@ -55,7 +56,10 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert not kept & drawing.UNPRINTED_DIMENSIONS
     assert kept | drawing.UNPRINTED_DIMENSIONS == marked
     assert set(sheet.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked - {"BackStubDia"}
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked - {
+        "BackBondDia",
+        "BackStubDia",
+    }
     assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
     # The donor carries the head diameter only; the neck's imports straight
     # into detail A.
@@ -198,6 +202,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("BackBondReference", "BackBondDia"): "*deviations(SHAFT_DIA_BAND)",
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
@@ -506,6 +511,40 @@ def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> No
     assert "BondZoneDia" in drawing.ARROWS_INSIDE
 
 
+def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
+    """#1038 r8 machinist review (rules 1 and 10): the front bond land's 2X
+    reached that land only, so the back one was found by elimination.  Each
+    bond land now prints its own size; the back one's block hangs left of its
+    line under the shaft, between the 6.80 and 8.25 station witnesses and
+    over the 8.25 row."""
+    assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BACK_BOND_CALLOUT
+    assert drawing.BACK_BOND_CALLOUT.count("\n") <= 1
+    assert "MHA-DT-01" in drawing.BACK_BOND_CALLOUT
+    assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
+    assert "BackBondDia" in drawing.ARROWS_INSIDE
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for name in ("BondZone", "BackBond"):
+        assert f'"{name}Reference", "{name}Dia", "<MOD-DIAM>"' in source
+    x, y = drawing.PRINCIPAL_KEEP["BackBondDia"]
+    assert x == pytest.approx(drawing.BACK_BOND_LINE_X)
+    assert x < drawing._sheet_x(sheet.BACK_BOND_DIA_Z)
+    width, height = drawing._diameter_block_size(drawing.BACK_BOND_CALLOUT)
+    width = max(width, drawing.BACK_BOND_BLOCK_WIDTH)
+    left, right = x - width, x + drawing.JOURNAL_DIA_TEXT_OVERHANG
+    land_8_25 = drawing._sheet_x(spec.BACK_JOURNAL_Z)
+    assert left - land_8_25 >= 0.0015
+    assert drawing.RELIEF_BACK_X - right >= 0.0015
+    centre = y - 0.0005
+    bottom, top = centre - height / 2.0, centre + height / 2.0
+    shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
+    assert 0.003 <= shaft_bottom - top <= 0.008
+    # Over the 8.25 row's line (~2.8 mm under its text position).
+    assert (
+        bottom - (drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1] - 0.0028)
+        >= 0.010
+    )
+
+
 def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
     """#2360: only the drum's ends bear; the middle of its bore is clearance."""
     drum_front = spec.DRUM_STATION
@@ -788,7 +827,11 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     rim = spec.BACK_RIM_FROM_HEAD_REAR
     stations = {f: s for f, _d, s, _l in sheet.SPAN_REFERENCES}
     lengths = {f: n for f, _d, _s, n in sheet.SPAN_REFERENCES}
-    assert set(stations) == {"BondZoneReference", "BackStubReference"}
+    assert set(stations) == {
+        "BondZoneReference",
+        "BackBondReference",
+        "BackStubReference",
+    }
     stub = stations["BackStubReference"]
     assert back_land_end < stub and stub + lengths["BackStubReference"] < rim
     assert sheet.BACK_STUB_DIA_PREFIX == "2X <MOD-DIAM>"
@@ -796,8 +839,10 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
     assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
     note_2 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[1].split())
+    # #1038 r8 machinist review (rules 1 and 10): the note names both spans
+    # the one 2X block sizes, so neither is found by elimination.
     assert note_2 == (
-        "SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN MHA-DT-33 "
+        "PIN-HOLE SPAN AND BACK-END SPAN: SLIDING FIT IN MHA-DT-33 "
         "PINION ARBOR RETENTION COLLAR (CLEARANCE .0004-.0078)."
     )
     # The clearance from both parts' printed limits; its minimum is the
@@ -996,7 +1041,7 @@ def test_drum_station_is_the_assembly_setting_not_printed_here() -> None:
     arbor no longer prints it; the model keeps the dimension."""
     import dt_drum_station_setting_spec as setting
 
-    assert spec.DRAWING_NOTES == "INSIDE CORNERS R.010 MAX."
+    assert spec.DRAWING_NOTES == "INSIDE CORNERS R.010 MAX. CENTRES OK."
     assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
     assert "DrumStationFromHeadRear" in drawing.UNPRINTED_DIMENSIONS
     assert "DrumStationFromHeadRear" not in drawing.PRINCIPAL_KEEP
@@ -1110,7 +1155,11 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     machinist reads as a groove (Main)."""
     import inspect
 
-    assert set(drawing.REFERENCE_WITNESSES) == {"BondZoneReference", "BackStubReference"}
+    assert set(drawing.REFERENCE_WITNESSES) == {
+        "BondZoneReference",
+        "BackBondReference",
+        "BackStubReference",
+    }
     assert drawing.REFERENCE_WITNESS_COLOR == 0
     assert part.SPAN_REFERENCES is sheet.SPAN_REFERENCES
     for feature, dimension, station, length in sheet.SPAN_REFERENCES:
@@ -1331,6 +1380,7 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
         "BackJournalReference",
         "BackRimReference",
         "BondZoneReference",
+        "BackBondReference",
         "BackStubReference",
         "DrumStationReference",
         "PinStationReference",
@@ -1340,7 +1390,10 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
     assert set(sheet.REFERENCE_SKETCHES) == expected
     assert len(sheet.REFERENCE_SKETCHES) == len(expected)
     assert expected == {name for name in sheet.DRAWING_DIMENSIONS if name.endswith("Reference")}
-    assert set(spec.REFERENCE_SKETCHES) == expected - {"BackStubReference"}
+    assert set(spec.REFERENCE_SKETCHES) == expected - {
+        "BackBondReference",
+        "BackStubReference",
+    }
     source = Path(part.__file__).read_text(encoding="utf-8")
     authored = set(re.findall(r'"(\w+Reference)"', source)) | {
         f"{prefix}Reference" for prefix in re.findall(r'prefix="(\w+)"', source)

@@ -293,8 +293,15 @@ DRUM_STATION_CALLOUT = (
 # review r1 of #1685; the dt-crankshaft precedent: the title block's
 # edge-break radius, until #1625 puts the default in the title block).
 INSIDE_CORNER_R_MAX = edge_break_radius_mm(unit=UNIT)  # R.010
-DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX.".replace(
-    "R0.", "R."
+# Rule 11: a 10 in, 32:1 Ø5/16 bar is turned with tailstock support, and
+# nothing bears on either crown (the SR.43 head's apex stands proud of the
+# cross hole, the SR.28 back crown past the back land runs free), so a
+# centre hole in either does no harm (#1038 r8 machinist review; the
+# dt_pinion_pivot_shaft precedent).
+DRAWING_NOTES = (
+    f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX. CENTRES OK.".replace(
+        "R0.", "R."
+    )
 )
 # MHA-DT-00, the only sheet that prints this step, follows it with the sheet
 # that carries the DRUM STATION SETTING (draw_dt_drive_train_assembly).

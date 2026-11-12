@@ -78,6 +78,7 @@ from dt_pinion_arbor_spec import (
     SURFACE_FINISHES,
 )
 from dt_pinion_arbor_notes import (
+    BACK_BOND_DIA_Z,
     BACK_STUB_DIA_Z,
     BOND_ZONE_WITNESS_LEN,
     DRAWING_DIMENSIONS,
@@ -134,15 +135,23 @@ COLLAR_CLEARANCE = (
 # block then ends ~0.169 and leaves the relief diameter room before its
 # shoulder (machinist review of 4657f680 gated a third word row).
 BOND_ZONE_CALLOUT = f"BONDED IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+# The back bond land's own size (#1038 r8 machinist review, rules 1 and 10:
+# the front land's 2X reached one land, so the other was found by
+# elimination).  Its pocket under the shaft holds two short rows; the
+# compound prints once, on the front land's callout.
+BACK_BOND_CALLOUT = f"BONDED IN\n{DRUM_NUMBER}"
 SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
+# Note 2 names both spans the back stub's 2X sizes (#1038 r8 machinist
+# review: "OUTSIDE THE JOURNALS" left the collar span to elimination, and
+# round 5 found no open space for its own block).
 SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN {COLLAR_NUMBER}\n"
+    f"2. PIN-HOLE SPAN AND BACK-END SPAN: SLIDING FIT IN {COLLAR_NUMBER}\n"
     f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
     f"{_inch(COLLAR_CLEARANCE[1])})."
 )
@@ -342,6 +351,16 @@ BOND_ZONE_CHAR_ADVANCE = 0.002625
 BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - BOND_ZONE_CHAR_ADVANCE * max(
     map(len, BOND_ZONE_CALLOUT.split("\n"))
 )
+# The back bond land's diameter hangs BELOW the shaft in the open pocket
+# between the relief's back-shoulder witness (6.80, x ~0.1343) and the back
+# land's (8.25, x ~0.0975), over the 8.25 row (line ~0.1059).  As the front
+# land's, its line stands 1 mm crown side of its measuring point so the text
+# hangs LEFT of it, its block top 5 mm under the shaft.  Its value row runs
+# 31.3 mm (r8 of #1038: the front land's "2X Ø.3125 -.0038" ran 38.0 mm,
+# 6.7 mm of it the 2X).  Arrows inside, as the front land's.
+BACK_BOND_LINE_X = _sheet_x(BACK_BOND_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
+BACK_BOND_TEXT_XY = (BACK_BOND_LINE_X, 0.1515)
+BACK_BOND_BLOCK_WIDTH = 0.0313
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
 # dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
@@ -355,6 +374,7 @@ BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - BOND_ZONE_CHAR_ADVANCE * max(
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+    "BackBondReference": (BACK_BOND_DIA_Z, BACK_BOND_DIA_Z + BOND_ZONE_WITNESS_LEN),
     "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
 # The back stub's 2X diameter (line at x ~0.075, between the back crown's
@@ -442,6 +462,7 @@ PIN_HOLE_CALLOUT_X = (
 ARROWS_INSIDE = (
     "PinStationFromHeadRear",
     "BondZoneDia",
+    "BackBondDia",
     # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
     # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
     # both arrowheads, as the 8 mm bond zone does.
@@ -483,6 +504,7 @@ PRINCIPAL_KEEP = {
     # over the 9.35 text), its text clear of every witness below the shaft.
     "BackJournalEndFromHeadRear": (0.125, 0.1024),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
+    "BackBondDia": BACK_BOND_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
@@ -599,6 +621,7 @@ DIMENSION_CALLOUTS = {
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
+    "BackBondDia": BACK_BOND_CALLOUT,
     "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
