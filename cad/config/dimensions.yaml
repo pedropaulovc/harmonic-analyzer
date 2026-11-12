@@ -1234,7 +1234,7 @@ sections:
       - confidence
       rows:
       - - Pivot cylinder
-        - Ø25.4 (1.0") OD × 158.75 (6.25") long (z −82.55..+76.2; the front, −Z, end extended .25" by owner ruling 2026-11-11, #1038 question 4, so the .300" spring row keeps its end walls), solid (no bore); mid-plane on the pivot axis
+        - Ø25.4 (1.0") OD × 158.75 (6.25") long (z −82.55..+76.2; the front, −Z, end extended .25" by owner ruling 2026-11-11, #1038 question 4, so the .300" spring row keeps its end walls), solid (no bore); coaxial with the knife-edge trunnions, the spring datum (z 0) 3.00" from datum B's end
         - '1.0'
         - SummingLever.cs + p.42–43 close-ups
         - legacy

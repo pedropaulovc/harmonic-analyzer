@@ -127,7 +127,7 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # gauge passes (this fit-up order owner-confirmed 2026-11-08 (Pedro), #2144
 # item 11.3; ``build_sm_summing_assembly`` budgets both).  Owner ruling
 # 2026-11-10 (Pedro), #2334, S2: a 2 in class ZZ pin cannot reach both
-# mounts, whose outer faces stand 7.41 apart, so the tool is an 8.0 in bar.
+# mounts, whose outer faces stand 7.67 apart, so the tool is an 8.0 in bar.
 # A bar that long has no gauge class, so it is made to the measured bores
 # (machinist review of farm build 20261110T204245.238203Z: a bare band
 # names no fit route): reference Ø.4720, the bore's smallest printed size,
