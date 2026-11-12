@@ -75,7 +75,6 @@ from _pdf_ink import read_pdf_ink
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from dt_cone_gear_spec import (
-    CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     FORM_PLACES,
     custom_six_form_points_mm,
     custom_six_gap_half_angle_rad,
@@ -486,15 +485,15 @@ def form_sheet_title() -> str:
 
 
 def form_sheet_notes() -> str:
-    """What R, X and Y are measured from, and the form band with its route
-    to the mate (sheet 1's note 2; no second copy here)."""
+    """What R, X and Y are measured from, and the route by which the form is
+    accepted: through the gear it cuts (sheet 1's note 2; no form band of its
+    own, #2358)."""
     return "\n".join(
         (
             # The R column and the plot's station radii derive from X and Y
-            # (REF); Y is a BASIC station; X carries the form band (machinist
-            # review of PR #2557).
+            # (REF); Y is a BASIC station (machinist review of PR #2557).
             "R (REF) FROM GEAR AXIS; Y BASIC, ALONG CL FROM P1; X FROM CL, EACH SIDE.",
-            f"{CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET "
+            "ACCEPT THE FORM BY THE GEAR IT CUTS, SEE SHEET "
             f"{SHEET_NAMES.index(GEAR_SHEET) + 1} NOTE {TEETH_NOTE_NUMBER}.",
         )
     )

@@ -158,6 +158,8 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_pivot_shim "
     "ch_rocker_arm_tl_oblique_hub_washer",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
+    "dt_cone_tip_gear_tl_cutter": "dt_cone_tip_gear_tl_cutter_bar dt_cone_tip_gear_tl_form_cutter "
+    "sh_vn_arbor_set_screw",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
@@ -175,7 +177,10 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ("sh_vn_brass_fillister_screw", {"fr_frame", "pd_paper_drive"}),
         ("sh_vn_fillister_screw_90280a108", {"dt_drive_train", "pd_paper_drive"}),
         ("sh_vn_clamp_screw", {"mg_magnifier", "pd_paper_drive"}),
-        ("sh_vn_arbor_set_screw", {"ch_channel", "dt_drive_train", "pn_pen"}),
+        (
+            "sh_vn_arbor_set_screw",
+            {"ch_channel", "dt_drive_train", "pn_pen", "dt_cone_tip_gear_tl_cutter"},
+        ),
         ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
         ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),

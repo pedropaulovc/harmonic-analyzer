@@ -2134,6 +2134,40 @@
       "kind": "assembly"
     },
     {
+      "old_stem": "dt-cone-tip-gear-tl-form-cutter",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-form-cutter",
+          "number": "MHA-DT-37-TL-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-gear-tl-cutter-bar",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter-bar",
+          "number": "MHA-DT-37-TL-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-gear-tl-cutter",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter",
+          "number": "MHA-DT-37-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",
