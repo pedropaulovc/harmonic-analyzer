@@ -538,7 +538,7 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # its crest drives the shaft (named there): two lines of words (rule 7).
     pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
     assert len(pin_rows) == 2
-    assert "PRESS FIT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
+    assert "PERMANENT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
     assert pin_rows[1] == f"CREST DRIVES {shaft_number}"
     # The ream is blind, on one line over the value (an above-callout with a

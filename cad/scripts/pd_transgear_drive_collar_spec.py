@@ -655,7 +655,7 @@ BORE_CALLOUT = (
 FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
 FLAT_PIN_HOLE_SUFFIX = f" <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
 FLAT_PIN_HOLE_CALLOUT_ABOVE = "BLIND REAM"
-FLAT_PIN_HOLE_CALLOUT = f"PRESS FIT, PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
+FLAT_PIN_HOLE_CALLOUT = f"PERMANENT PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
 # The rear break prints its leg and angle on one line, then the mate it
 # clears (rule 4) on two short rows under it; the clearance is the spec's
 # assertion (FLAT_PIN_CREST_CORNER_AIR_MIN).
