@@ -243,8 +243,8 @@ async def build(adapter) -> dict[str, str]:
     shank_lines = await add_line_chain(adapter, shank_points, close=False)
     set_sketch_direct_db(adapter, False)
     for line, (u0, v0), (u1, v1) in (
-        *zip(head_lines, head_points, head_points[1:], strict=True),
-        *zip(shank_lines, shank_points, shank_points[1:], strict=True),
+        *zip(head_lines, head_points[:-1], head_points[1:], strict=True),
+        *zip(shank_lines, shank_points[:-1], shank_points[1:], strict=True),
     ):
         if u0 != u1 and v0 != v1:
             continue  # a 45-degree lead or chamfer; its two legs define it

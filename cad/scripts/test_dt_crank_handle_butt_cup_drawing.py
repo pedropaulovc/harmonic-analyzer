@@ -423,10 +423,10 @@ def test_floor_hole_mouth_break_is_a_45_degree_model_feature_at_its_limits(
                      (-(spec.POCKET_DEPTH + c), hole_r, -spec.POCKET_DEPTH, hole_r + c)
                  ))
     assert cup_build.dimensions["FloorHoleChamfer"] == (
-        (f"{mouth}.start", f"{mouth}.end", "vertical_distance", c), '"FloorHoleChamfer"'
-    )
-    assert cup_build.dimensions["FloorHoleChamferDepth"] == (
         (f"{mouth}.start", f"{mouth}.end", "horizontal_distance", c), '"FloorHoleChamfer"'
+    )
+    assert cup_build.dimensions["FloorHoleChamferRise"] == (
+        (f"{mouth}.start", f"{mouth}.end", "vertical_distance", c), '"FloorHoleChamfer"'
     )
     assert seat.FLOOR_HOLE_CHAMFER_LIMITS[0] < c < seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
     cup_build.helpers["set_limits"].assert_called_once_with(
@@ -743,6 +743,14 @@ def test_mouth_break_detail_frames_the_break_inside_the_sheet() -> None:
     assert x + crop < 0.218 or y - crop > 0.065  # clear of the title block
     for kx, ky in drawing.DETAIL_KEEP.values():
         assert 0.0127 < kx < 0.4191 and 0.065 < ky < 0.2667
+    # The axial leg's line runs over the circle and its block stands right of
+    # both extension lines, so no line strikes the text.
+    kx, ky = drawing.DETAIL_KEEP["FloorHoleChamfer"]
+    line_y = ky - drawing.FLOOR_HOLE_CHAMFER_LINE_DROP
+    assert line_y > y + crop
+    block_left = kx - drawing.FLOOR_HOLE_CHAMFER_TEXT_WIDTH / 2.0
+    for point in (drawing._MOUTH_ON_HOLE, drawing._MOUTH_ON_FLOOR):
+        assert block_left > drawing._detail_xy(*point)[0]
     assert notes.FLOOR_HOLE_CHAMFER_CALLOUT.startswith("X 45")
     assert "MHA-DT-32" in notes.FLOOR_HOLE_CHAMFER_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")

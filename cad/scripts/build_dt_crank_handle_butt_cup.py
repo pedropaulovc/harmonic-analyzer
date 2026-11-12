@@ -258,14 +258,14 @@ async def build(adapter) -> dict[str, str]:
         "cup bottom chamfer rise",
     )
     profile.record("BodyChamferRise", '"BodyChamfer"')
-    # The floor hole's pocket-side mouth break prints its radial leg, whose
-    # extension lines run out over the open pocket; its axial leg equals it
-    # by equation: 45 degrees.
+    # The floor hole's pocket-side mouth break prints its axial leg, as the
+    # body chamfer and the screw's head break; its radial leg equals it by
+    # equation: 45 degrees.
     await dimension_between(
         adapter,
         f"{hole_chamfer}.start",
         f"{hole_chamfer}.end",
-        "vertical_distance",
+        "horizontal_distance",
         FLOOR_HOLE_CHAMFER,
         "cup floor-hole mouth break",
     )
@@ -274,11 +274,11 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         f"{hole_chamfer}.start",
         f"{hole_chamfer}.end",
-        "horizontal_distance",
+        "vertical_distance",
         FLOOR_HOLE_CHAMFER,
-        "cup floor-hole mouth break depth",
+        "cup floor-hole mouth break rise",
     )
-    profile.record("FloorHoleChamferDepth", '"FloorHoleChamfer"')
+    profile.record("FloorHoleChamferRise", '"FloorHoleChamfer"')
     for name, line, u_mid, radius in (
         ("BodyDia", body_od, -(OVERALL_LENGTH - BODY_CHAMFER) / 2.0, BODY_R),
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
