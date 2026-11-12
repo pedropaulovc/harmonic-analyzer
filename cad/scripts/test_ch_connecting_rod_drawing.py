@@ -656,3 +656,30 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
         "OIL BARE SURFACES"
     )
     assert int(spec["quantity"]) == 20
+
+
+def test_the_ring_and_shank_stay_flat_by_their_route_not_by_a_frame() -> None:
+    """#2340: the plate's bow is bounded by its thickness and near-face bands
+    (the cam-to-arm window spends exactly those), so the sheet's one frame
+    stays the pin hole's position; the registry route takes equal stock off
+    both faces of the bought 1/4 flat, and the figures it states are the
+    model's."""
+    import _config
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_feature_control_frame(") == 1
+    assert set(ch_connecting_rod_spec.GEOMETRIC_TOLERANCES_IN) == {
+        "rocker pin hole position"
+    }
+    process = _config.parts("ch-connecting-rod")["process"]
+    bar = 0.25 * 25.4
+    for finished in (
+        ch_connecting_rod_spec.FORK_THICKNESS,
+        ch_connecting_rod_spec.RING_THICKNESS,
+    ):
+        per_face = (bar - finished) / 2.0 / 25.4
+        assert f"{per_face:.3f}".lstrip("0") in process
+    # Equal stock off both faces: the ring and shank sit centred on the fork.
+    assert ch_connecting_rod_spec.RING_FACE_NEAR * 2.0 + (
+        ch_connecting_rod_spec.RING_THICKNESS
+    ) == pytest.approx(ch_connecting_rod_spec.FORK_THICKNESS)
