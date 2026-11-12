@@ -126,10 +126,12 @@ END_HALF_WIDTH_BAND = printed_reach_mm(2.0 * END_HALF_WIDTH, OUTLINE_PLACES) / 2
 # Either printed outline row moves a straight edge at most this far.
 OUTLINE_BAND = max(PIVOT_END_R_BAND, END_HALF_WIDTH_BAND)
 
-# --- Pivot at P: matched measured-shoulder running fit ---------------------
-# The model is a reference at the stock nominal and clearance midpoint.
-# Acceptance is correlated to THIS measured VN041 shoulder, not a universal
-# bore zone or the title block's general tolerance.
+# --- Pivot at P: a reamed running fit on the as-supplied shoulder ----------
+# #2413 (DFM, 2026-11-11): one standard .1940 chucking reamer, banded
+# +.0010/0 so .194 GO and .195 NO-GO pin gauges accept it; every as-supplied
+# MHA-PD-VN-57 shoulder (.1865-.1875) runs in every accepted bore.  Nothing
+# reads a tenth-level clearance window: the latch sets the arm's working
+# position and the hanger stack pays the whole maximum clearance as float.
 
 
 # The spot face seats the MHA-PD-VN-63 curved disc spring's OD rim (Ø10.744) under
@@ -164,58 +166,35 @@ PIVOT_SEATED_AXIS_ANGLE_MAX = (
     + math.atan(SPACER.REAR_FACE_PERPENDICULARITY / SPACER.FACE_PERPENDICULARITY_ZONE_DIA)
 )
 PIVOT_AXIS_BINDING_SWEEP_MAX = PIVOT_BEARING_LENGTH_MAX * math.tan(PIVOT_SEATED_AXIS_ANGLE_MAX)
-# The clearance window prints in inches, to four places.
+# The clearance prints in inches, to four places.
 PIVOT_FIT_CLEARANCE_PLACES = 4
-
-
-def pivot_running_clearance_mm() -> tuple[float, float]:
-    """Pay ordinary squareness before the shared standard free-running gap.
-
-    The arm's printed 90-degree bore-to-front-face angle takes the general
-    angular row. Both existing spacer face grades are paid without credit
-    for favourable alignment. Round the MIN upward on the printed inch grid;
-    preserve the shared fit class's clearance-window width, so the printed
-    MAX is paid as load play.
-    """
-    free_min, free_max = measured_close_running_clearance_mm()
-    scale = 10**PIVOT_FIT_CLEARANCE_PLACES / MM_PER_IN
-    minimum = math.ceil((free_min + PIVOT_AXIS_BINDING_SWEEP_MAX) * scale - 1e-9) / scale
-    return minimum, minimum + free_max - free_min
-
-
-PIVOT_BORE_DIAMETRAL_CLEARANCE = pivot_running_clearance_mm()
+# The least clearance the shoulder needs to run free: the shared
+# close-running minimum plus the sweep of a bore at the general angular row
+# on the seated spacer, both spacer face grades paid.
 if not 3.0 < PIVOT.SHOULDER_DIA <= 6.0:
-    raise ValueError("the matched pivot fit requires the shared ISO 3-through-6 mm clearance class")
-PIVOT_BORE_DIA = PIVOT.SHOULDER_DIA + sum(PIVOT_BORE_DIAMETRAL_CLEARANCE) / 2.0
+    raise ValueError("the pivot running minimum requires the shared ISO 3-through-6 mm clearance class")
+PIVOT_RUNNING_CLEARANCE_MIN = measured_close_running_clearance_mm()[0] + PIVOT_AXIS_BINDING_SWEEP_MAX
+PIVOT_BORE_DIA = 4.9276  # .1940, the reamer's size
+PIVOT_BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.0010/0
 PIVOT_BORE_FULL_LIMITS = (
-    PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS) + PIVOT_BORE_DIAMETRAL_CLEARANCE[0],
-    PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS) + PIVOT_BORE_DIAMETRAL_CLEARANCE[1],
+    PIVOT_BORE_DIA + PIVOT_BORE_DIA_BAND[1],
+    PIVOT_BORE_DIA + PIVOT_BORE_DIA_BAND[0],
 )
+PIVOT_BORE_DIAMETRAL_CLEARANCE = (
+    round(PIVOT_BORE_FULL_LIMITS[0] - PIVOT.SHOULDER_DIA - max(PIVOT.SHOULDER_DIA_LIMITS), 6),
+    round(PIVOT_BORE_FULL_LIMITS[1] - PIVOT.SHOULDER_DIA - min(PIVOT.SHOULDER_DIA_LIMITS), 6),
+)  # .0065, .0085
+if PIVOT_BORE_DIAMETRAL_CLEARANCE[0] < PIVOT_RUNNING_CLEARANCE_MIN:
+    raise AssertionError("the MHA-PD-18 pivot ream binds the largest MHA-PD-VN-57 shoulder")
 
-
-def pivot_bore_limits_mm(measured_shoulder_mm: float) -> tuple[float, float]:
-    """Matched-set bore limits; measure the straight shoulder, away from radii."""
-    if (not math.isfinite(measured_shoulder_mm)
-            or not PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS) - 1e-10
-            <= measured_shoulder_mm
-            <= PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS) + 1e-10):
-        raise ValueError("measured VN041 shoulder is outside its as-supplied stock limits")
-    lower, upper = PIVOT_BORE_DIAMETRAL_CLEARANCE
-    return measured_shoulder_mm + lower, measured_shoulder_mm + upper
-
-
-def require_pivot_running_fit(bore_mm: float, measured_shoulder_mm: float) -> float:
-    """Inspect the actual paired bore and shoulder; return diametral clearance."""
-    lower, upper = pivot_bore_limits_mm(measured_shoulder_mm)
-    if not math.isfinite(bore_mm) or not lower - 1e-10 <= bore_mm <= upper + 1e-10:
-        raise ValueError("arm pivot bore does not meet its measured-shoulder running clearance")
-    return bore_mm - measured_shoulder_mm
 
 # --- Pin at S: REAM THROUGH, the press for the MHA-PD-23 pin (R9-68) ---------
-# The 1/8 pin (pd_transgear_pin_spec: .125 +.0000/-.0002, ground) is pressed
-# in from the rear until its head seats on the rear face, so the hole is
-# reamed square through the ground faces.  The interference is asserted in
-# pd_transgear_arm_spec, which imports both: the pin spec imports this module.
+# The MHA-PD-23 pin is pressed in from the rear until its head seats on the
+# rear face, so the hole is reamed square through the ground faces.  #2415:
+# only the pin's short press land under its head grips this ream; the
+# running journal passes through it clear and is never dragged through the
+# press.  The press is asserted in pd_transgear_arm_spec, which imports
+# both: the pin spec imports this module.
 PIN_STATION = 68.815  # |S - P|, the reducer's kinematic station; BASIC .XXXX
 # Preserve the pivot, latch and pressed stud. The rack setting follows the
 # feed contact law; only the reducer bearing follows its physical axis datum.
@@ -236,8 +215,9 @@ KNOB_BORE_OFFSET = DISC.CENTRE_DISTANCE * (
     math.cos(_MESH_ANGLE) * ARM_N[0] + math.sin(_MESH_ANGLE) * ARM_N[1]
 )
 
-# #290: .124 REAM_H7 (+.0005/0), cut by the owned .1240 reamer.
-PIN_BORE_DIA = 3.1496  # .124
+# #2415: .1260 +.0005/0, cut by the owned .1260 reamer (the bushings'), so
+# the pin's Ø.1250 journal slips through and only its land presses.
+PIN_BORE_DIA = 3.2004  # .126
 PIN_BORE_DIA_BAND = (0.0127, 0.0)  # (upper, lower) deviations, reamed
 PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)

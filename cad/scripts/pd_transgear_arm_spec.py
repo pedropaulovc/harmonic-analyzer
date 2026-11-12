@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import math
 
-import _config
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -33,8 +32,6 @@ from pd_transgear_arm_geometry import (
     THICKNESS,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
-    PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_FIT_CLEARANCE_PLACES,
     PIVOT_END_R,
     SPOT_FACE_DIA_GROWTH,
     STOCK_THICKNESS_IN,
@@ -46,8 +43,8 @@ from pd_transgear_arm_geometry import (
 # their mm models (``pd_transgear_arm_geometry.OUTLINE_PLACES``); the tip
 # station is .XX (R9-23, ``pd_transgear_arm_geometry.TIP_STATION``); the
 # thickness is the ground stock's, a reference (the stock band governs it,
-# ``STOCK_TEXT_PREFIX``); the pivot bore's model size is REF, with acceptance
-# matched to the measured shoulder; the latch-pin hole and pin bore print
+# ``STOCK_TEXT_PREFIX``); the pivot bore prints the .1940 reamer's size under
+# its +.0010/0 band (#2413); the latch-pin hole and pin bore print
 # under their explicit ream bands; the pin station and the locating sites
 # are BASIC under circular position controls; the plate-tap stations print
 # as references, the taps being spotted through MHA-PD-19's screw holes at
@@ -89,8 +86,8 @@ PART_DATUMS = (
 # precedent; owner review #2144): no projected zone anywhere on MHA-PD-18
 # (rule 26 bars the modifier). The pin bore S (datum C) takes ⌖ Ø.004 to
 # A|B and a plain ⊥ Ø.001 to A over the bore, the reamed-hole row (owner
-# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, run on
-# from the thinnest stock to the chain plane in front of face A, is
+# ruling 2026-11-08 (Pedro), #2144 item 4.1). The axis it allows, gripped by
+# the pin's press land and run on to the chain plane in front of face A, is
 # paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM: the meshes and the
 # platen air charge it, and MHA-PD-00's collar feeler accepts the collar air
 # it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
@@ -127,11 +124,6 @@ GEOMETRIC_CONTROLS = (
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
     ),
 )
-
-
-def _inch(value_mm: float, places: int) -> str:
-    """``value_mm`` printed in inches to ``places``, without the leading zero."""
-    return f"{value_mm / 25.4:.{places}f}".removeprefix("0")
 
 
 def _floor_mm(value_mm: float, places: int) -> float:
@@ -179,30 +171,19 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
 STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 # REF: an as-bought size with the supplier's tolerance (units guidance).
 STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
-# Conditional measured-shoulder clearance on the named pivot screw, with
-# ordinary squareness paid; not an absolute H7/g6 bore zone. The bore's 90°
-# to the front face is implied and takes the title block's angular row.
-_PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
-PIVOT_BORE_CALLOUT = "\n".join((
-    "REAM TO MEASURED SHOULDER:",
-    f"{_inch(PIVOT_BORE_DIAMETRAL_CLEARANCE[0], PIVOT_FIT_CLEARANCE_PLACES)}-"
-    f"{_inch(PIVOT_BORE_DIAMETRAL_CLEARANCE[1], PIVOT_FIT_CLEARANCE_PLACES)}"
-    " DIAMETRAL CLEARANCE",
-    f"ON PIVOT SCREW {_PIVOT_SCREW['number']}",
-    "MATCHED SET; NOT INTERCHANGEABLE",
-))
 
 # --- The MHA-PD-23 pin's press in the reamed bore at S (R9-68) -----------------
 # The pin spec owns the press (it imports the arm geometry, so the geometry
-# cannot import it back); the arm prints it under the bore.
+# cannot import it back); the arm prints it under the bore.  #2415: only the
+# pin's short land presses, turned to the measured ream.
 PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
 if not all(
     math.isclose(value, expected, abs_tol=1e-9)
-    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00762, 0.0254), strict=True)
+    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00508, 0.0127), strict=True)
 ):
     raise AssertionError(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
-        "not .0003..0010"
+        "not .0002..0005"
     )
 # The true overall, pivot-end extreme to the square end, prints as a
 # reference; a derived reference has no part-side places, so the spec owns
