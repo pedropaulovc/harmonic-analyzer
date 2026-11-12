@@ -9,7 +9,7 @@ ch-channel-lever:
   finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
   quantity: 20
   tolerance_class: machined_block
-  process: "machined from 5/16 x 1 in 1018 cold-finish flat: hub and plate faces, the reamed fulcrum bore and the drilled holes"
+  process: "machined from 5/16 x 1 in 1018 cold-finish flat: hub and plate faces, the reamed fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
@@ -19,11 +19,11 @@ ch-channel-lever:
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "accept"
-      where: "the hub width .278 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
+      where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "20-hub face-to-face stack with no fit-up allowance or shim (rule 19)"
       reason: "the hubs set the station pitch with no shim by design; the stack's end float is proven at the channel assembly, not on this part (owner-accepted)"
     - id: "RV-03"
       kind: "accept"
-      where: "the hub width .278 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
+      where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "band .001 total, narrower than the milled/turned width row (+/-.001), with no fit route at the callout (rule 4)"
-      reason: "the band can neither open nor take a route on this sheet: a hub shorter than nominal closes the bar-to-bar running gap below its .10 mm floor (sh_vn_pivot_pin_bar_spec neighbour_clearance_min 0.122 at the band) and twenty hubs at +.001 must still float between the MHA-CH-07 keepers, so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
+      reason: "the band can neither open nor take a route on this sheet: twenty hubs at +.001 must still float between the MHA-CH-07 keepers on the .010 end-play leaf at the shortest lug span (MHA-CH-00 lever-bank-slides), and +.002 would close that play; at the .300 pitch the bar-to-bar top gap is 0.686 mm at the band (sh_vn_pivot_pin_bar_spec neighbour_clearance_min), so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"

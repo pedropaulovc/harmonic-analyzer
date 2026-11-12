@@ -73,18 +73,19 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-11 runs directly
 # in the Ø.4500 crank bore, whose height follows the crossed-crank config
 # above the unchanged foot -- no eccentric bushing, no drop, fixed centres.
-# The boss started at the harvested head's tangent plane (the Ø42.7506 head,
-# radius 21.3753), and runs the harvested 2.8360 in from there.  That station
-# seats the 16T on the boss face (build_dt_drive_train_assembly, the
-# crankshaft's seat), a mesh closure, so it stays put while the head snaps to
-# its .XX 1.68 (#290): the boss face stands 0.039 mm proud of the head's
-# tangent plane.  The north face is the boss's machined end, stationed from
-# the post axis on the print.
+# The boss starts .842 north of the post axis, the harvested head's tangent
+# plane (the Ø42.7506 head, radius 21.3753) on the .XXX grid its station
+# prints at, and runs the harvested 2.8360 in from there.  That station seats
+# the 16T on the boss face (build_dt_drive_train_assembly, the crankshaft's
+# seat), a mesh closure, and the far face seats the crankshaft's collar: the
+# boss face stands 0.051 mm proud of the .XX 1.68 head's tangent plane.  The
+# north face is the boss's machined end, stationed from the post axis on the
+# print.
 CRANK_BOSS_DIA = 21.844  # .86
 CRANK_BORE_DIA = 11.43  # .4500 in
 CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
-CRANK_BOSS_NORTH_FACE = 21.3753
+CRANK_BOSS_NORTH_FACE = 21.3868  # .842
 CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
 CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN

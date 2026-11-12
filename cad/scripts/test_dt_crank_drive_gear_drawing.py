@@ -302,8 +302,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (REF)",
         "ROOT DIAMETER (REF)",
-        "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
-        "TOOTH LINE:  STRAIGHT, 13.0 DEG RIGHT HAND FROM AXIS",
+        "FORM CUTTER:  #2, 55-134T, FOR 68.405 VIRTUAL TEETH (REF)",
+        "TOOTH LINE:  STRAIGHT, 12.0 DEG RIGHT HAND FROM AXIS",
         "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
@@ -428,7 +428,7 @@ def test_the_data_block_states_the_tooth_line_as_it_stated_the_helix() -> None:
     # to the axis. No view shows a tooth's line on a drawn edge, so the
     # inclination, hand and crossing station print in the data block, as
     # the helix angle did (machinist review of farm proof r3 on #2482
-    # refused a native 13 deg between reference rays in section A-A).
+    # refused a native angle between reference rays in section A-A).
     data = notes.GEAR_DATA
     assert (
         f"TOOTH LINE:  STRAIGHT, {spec.TOOTH_INCLINATION_DEG:.1f} DEG RIGHT HAND FROM AXIS; "
@@ -782,7 +782,7 @@ def test_tip_diameter_block_stands_clear_of_the_gear_data_teeth_and_section() ->
     assert block[3] > tip[3]
     assert _box_distance(tip, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
     face = _text_box(
-        drawing.SECTION_KEEP["FaceWidth"], drawing.FACE_WIDTH_CALLOUT, "7.2244 ±0.025"
+        drawing.SECTION_KEEP["FaceWidth"], drawing.FACE_WIDTH_CALLOUT, "6.6472 ±0.025"
     )
     assert tip[2] < face[0] - 0.005
     # The face-width block stands above the section and left of its south

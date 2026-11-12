@@ -72,7 +72,7 @@ GEAR_DATA = gear_data_note(
         ("ROOT DIAMETER (REF)", inch_text(spec.ROOT_DIA_MIN, 3)),
         # Straight teeth inclined to the axis (owner ruling 2026-11-10, #2332
         # option A), stated as the helix angle was: no view shows a tooth's
-        # line on a drawn edge, so a native 13 deg measured between reference
+        # line on a drawn edge, so a native angle measured between reference
         # rays in section A-A floated off real geometry (machinist review of
         # farm proof r3 on #2482). The title block's +/-1 deg and .XX rows
         # govern both numbers. The hand is the one fact a mirrored part would

@@ -115,17 +115,16 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
 def test_seats_run_in_solid_iron_on_the_support() -> None:
     """Each seat sits outboard of the through cavity (so the web column, or
     the side post past the window's side edge, runs on under its drill point)
-    and on the support's top face short of its end-face edge break. The
-    south seat now lies wholly in the post; the north one over the window's
-    side edge."""
+    and on the support's top face short of its end-face edge break. On the
+    7.56 support (#1038 re-pitch: the brackets sit 5.64 further out an end)
+    both seats lie wholly in the posts; on the 7.12 one the north seat
+    straddled the window's side edge."""
     radius = seats.SEAT_DRILL_DIA / 2.0
     for x in seats.SEAT_LOCAL_X:
         assert abs(x) - radius > support.CAV
+        assert abs(x) - radius > support.BIG
         assert abs(x) + radius <= support_spec.SUPPORT_HALF_MACHINE_Z - seats.EDGE_BREAK
-    south, north = (abs(x) for x in seats.SEAT_LOCAL_X)
-    assert south - radius > support.BIG
-    assert north - radius < support.BIG < north + radius
-    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.9, 83.29]
+    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [90.54, 88.93]
 
 
 def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> None:
@@ -215,7 +214,7 @@ def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
 def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
     """#1341 option A: one bracket on both sides. Its foot ends at the nearer
     (south) support end face, its length on the printed grid so it never
-    overhangs, and 1.80 short of the north one; the free run is too short
+    overhangs, and 1.75 short of the north one; the free run is too short
     (.320 ears beside the 1/32 thrust washers) to centre the hole, so its
     .49 station, held fixed on the printed grid, sits inside the window
     between the head-to-ear and seat end-wall limits that both sides share."""
@@ -234,7 +233,7 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
         for name in sides.SIDES
     }
     assert 0.0 <= overhang_room["S"] < 0.254
-    assert round(overhang_room["N"], 2) == 1.80
+    assert round(overhang_room["N"], 2) == 1.75
     # The fixed .49 station (#1371 review) stays inside the shared window,
     # whose limits already charge the station and length bands.
     assert sides.HOLE_Z_MIN <= sides.HOLE_Z <= sides.HOLE_Z_MAX
@@ -250,6 +249,27 @@ def test_the_support_takes_the_foot_with_its_end_wall() -> None:
     assert sides._foot_fits(2.0 * support_spec.SUPPORT_HALF_MACHINE_Z)
     assert sides.HOLE_LIGAMENTS_MIN["foot end"] >= bracket.LIGAMENT_TARGET
     assert min(sides.SUPPORT_END_Z.values()) - sides.FOOT_Z1 >= 0.0
+
+
+def test_the_support_is_the_shortest_grid_length_that_keeps_the_bracket_foot() -> None:
+    """#1038 re-pitch to .300 in, bank centred: the brackets sit 5.64 further
+    out an end, so the 7.12 support left the foot no hold-down station. On
+    the .02 in grid the foot is the nearer end face's run to the .XX below it:
+    7.52 and shorter keep no foot end wall, 7.54 fits on a .69 foot (a changed
+    MHA-CH-08) and 7.56 is the shortest that keeps today's .70; 7.58 and 7.60
+    lengthen it. 7.56 keeps both seat end walls over the 2.0 target."""
+
+    def foot_in(length_in: float) -> float:
+        end_z = min(sides._support_end_z(length_in * 25.4).values())
+        return round((sides._foot_z1(end_z) - bracket.FOOT_Z0) / 25.4, 2)
+
+    assert 2.0 * support_spec.SUPPORT_HALF_MACHINE_Z == pytest.approx(7.56 * 25.4)
+    assert not sides._foot_fits(7.52 * 25.4)
+    assert sides._foot_fits(7.54 * 25.4) and foot_in(7.54) == 0.69
+    assert foot_in(7.56) == 0.70 == round(sides.FOOT_LEN / 25.4, 2)
+    assert (foot_in(7.58), foot_in(7.60)) == (0.71, 0.72)
+    assert [round(wall, 2) for wall in seats.END_WALL_MIN] == [3.01, 4.62]
+    assert min(seats.END_WALL_MIN) >= seats.RULE12_WEB_TARGET
 
 
 def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:

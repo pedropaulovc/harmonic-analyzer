@@ -42,7 +42,7 @@ def test_plain_shaft_domed_proud_of_each_keeper() -> None:
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
     assert spec.DOME_R == spec.SHAFT_DIA / 2.0
-    assert math.isclose(spec.SHAFT_LENGTH, 166.624)  # 6.56
+    assert math.isclose(spec.SHAFT_LENGTH, 178.054)  # 7.01
 
 
 def test_flats_sit_under_the_keeper_taps() -> None:
@@ -78,7 +78,7 @@ def test_flat_pair_is_baselined_from_one_end() -> None:
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(spec.FLAT_LENGTH, 4.318)
     assert math.isclose(spec.FLAT_FROM_END, 6.096)
-    assert math.isclose(spec.FLAT_BASELINE, 156.21)
+    assert math.isclose(spec.FLAT_BASELINE, 167.64)
     assert {"FlatFromEnd", "FlatBaseline"} <= spec.DRAWING_DIMENSIONS["FlatProfile"]
     assert {"FlatFromEnd", "FlatBaseline"} <= set(drawing.RIGHT_KEEP)
     assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 2
@@ -227,7 +227,7 @@ def test_dome_prints_as_a_spherical_reference() -> None:
 
 
 def test_every_orthographic_view_is_at_sheet_scale() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.SHEET_SCALE == (3.0, 2.0)
     assert not hasattr(ch_fulcrum_shaft_spec, "END_VIEW_NOTE")
     assert notes.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert drawing.ISO_SCALE == (1, 1)
@@ -241,7 +241,7 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # under the two feet, MHA-FR-02's faced rail top, flat to one 0.04 zone: a
     # step, opposite rolls across the .55 width (each lug centre 25.2 high)
     # and a pitch over the .65 seat; the shaft runs through both lug centres
-    # 5.910 apart and each .32 lug spends its thickness x (pitch + slope).
+    # 6.360 apart and each .32 lug spends its thickness x (pitch + slope).
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 0.508)
@@ -253,17 +253,17 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     assert math.isclose(keeper.KEEPER_SEAT_LENGTH_MM, 16.51)
     lug_t = 2.0 * keeper.LUG_HALF_T
     span = 2.0 * keeper.KEEPER_Z_OFF
-    assert math.isclose(span, 150.114)
+    assert math.isclose(span, 161.544)
     sideways = 2.0 * keeper.SHAFT_AXIS_H * flatness / keeper.KEEPER_WIDTH
     slope = math.hypot(flatness, sideways) / span
     pitch = flatness / keeper.KEEPER_SEAT_LENGTH_MM
     allowance = lug_t * (pitch + slope)
     assert math.isclose(keeper.BORE_SEAT_ALLOWANCE_MM, allowance)
-    assert round(allowance, 4) == 0.0278
+    assert round(allowance, 4) == 0.0272
     least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
-    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.0381 >= 0.0378
+    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.0381 >= 0.0372
     assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0103
+    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0109
     assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
 
 
@@ -272,15 +272,15 @@ def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
     # made to order (Super Tool catalogue 2026 p.59, 9458EL: .2211-.2530,
     # 12 OAL, 1-1/2 flute, .2193 shank, NAS 897 Type C; p.42: +.0002/-.0000
     # in), gripped 1 in, carries its whole flute past the far lug's outer
-    # face, 158.242 from the near one; the toleranced reamer lies in the band.
+    # face, 169.672 from the near one; the toleranced reamer lies in the band.
     keeper = ch_fulcrum_keeper_spec
-    assert math.isclose(keeper.KEEPER_OUTER_FACE_SPAN_MM, 158.242)
+    assert math.isclose(keeper.KEEPER_OUTER_FACE_SPAN_MM, 169.672)
     assert keeper.PAIR_REAMER_OAL_IN == 12.0
     reach = (12.0 - 1.0 - 1.5) * 25.4
     assert math.isclose(
         keeper.PAIR_REAMER_REACH_MARGIN_MM, reach - keeper.KEEPER_OUTER_FACE_SPAN_MM
     )
-    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 83.1
+    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 71.6
     # An 8 in OAL reamer would not carry the flute through.
     assert (8.0 - 1.0 - 1.5) * 25.4 < keeper.KEEPER_OUTER_FACE_SPAN_MM
     assert keeper.PAIR_REAMER_DIA_IN == 0.2515

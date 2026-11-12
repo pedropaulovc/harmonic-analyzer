@@ -453,8 +453,8 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert manifest["general_tolerances"]["linear_2pl"] == pytest.approx(0.254)
     assert manifest["general_tolerances"]["linear_3pl"] == pytest.approx(0.127)
     assert features["hub_od"]["dia"] == [9.906, 10.414]
-    assert features["hub_faces"]["length"] == [7.0565, 7.1073]
-    assert features["hub_faces"]["length_nominal"] == 7.0565
+    assert features["hub_faces"]["length"] == [7.62, 7.6708]
+    assert features["hub_faces"]["length_nominal"] == 7.62
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         # BASIC: the J↔K profile zone is its band.
         assert features[name]["tip_land"] == rocker.TIP_FACE

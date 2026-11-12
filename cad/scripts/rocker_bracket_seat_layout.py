@@ -15,14 +15,17 @@ length keeps 1.5D in the cast iron at worst case with the shallowest seat.
 
 The brackets' feet run outboard toward the support's end faces (user-approved
 sketch, 2026-10-09; the one MHA-CH-08 ends flush with the south end face and
-short of the north one, #1341), so each seat lies over the window's side edge:
-the post outboard, the central web and its R6.35 pocket-corner fillet inboard. Under
-the top rail (the source casting's 6.35, no longer deepened as #743 had it)
-the seat runs down the web column, which the cavity (|x| < 63.5) never
-reaches, so the drill point has cast iron under it to the window bottom. What
-bounds the seat is the web's thickness: 2 * WEB, 12.70 (1/2 in), uniform along
-the support's length and symmetric about its centre plane (owner Q13c,
-2026-10-16; the source cast 6.35).
+short of the north one, #1341), so each seat lies outboard of the through
+cavity (|x| < 63.5) with cast iron under its drill point: the side post past
+the window's side edge, or, inside that edge, the web column under the top
+rail (the source casting's 6.35, no longer deepened as #743 had it), which
+the cavity never reaches. On the 7.56 support of the #1038 re-pitch both
+seats lie wholly in the posts (on the 7.12 one the north seat straddled the
+window's side edge). Across, the seat is bounded by the web's thickness:
+2 * WEB, 12.70 (1/2 in), uniform along the support's length and symmetric
+about its centre plane (owner Q13c, 2026-10-16; the source cast 6.35); the
+post's section is wider at every depth the seat reaches, so the web's wall
+is the bound wherever the seat lands.
 
 Across the web the seat lands where the bracket's foot puts its hole: each
 edge of the top flat prints off its nearer web face, a cast surface, at .XX
@@ -165,14 +168,19 @@ WEB_WALL_MIN = (
 # transferred position: the end face moves by half the support length's .XX
 # band, the hole by the bracket's station band from the fit-up-set ear face.
 # The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
-# local X (its length; the height is a different 177.8).
+# local X (its length; the height is a different 177.8). The end faces' top
+# edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
+# build_fr_rocker_arm_support.CHAMFER_EDGES). The thread's crest starts below
+# its own mouth break, so at the top the wall runs from that crest point to
+# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.77, N 4.37,
+# both over the target (with the .06 leg there the south one was 1.51).
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0
     - _bracket.STATION_BAND
     - LINEAR_2PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 3.06, N 4.67
+)  # S 3.01, N 4.62
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
