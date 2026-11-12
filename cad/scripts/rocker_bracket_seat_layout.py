@@ -168,7 +168,10 @@ WEB_WALL_MIN = (
 # transferred position: the end face moves by half the support length's .XX
 # band, the hole by the bracket's station band from the fit-up-set ear face.
 # The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
-# local X (its length; the height is a different 177.8).
+# local X (its length; the height is a different 177.8). The end faces' top
+# edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
+# build_fr_rocker_arm_support.CHAMFER_EDGES): no larger than the seat's own
+# mouth break, it ends above the thread, so the wall holds to the plane.
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0

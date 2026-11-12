@@ -179,17 +179,22 @@ FRONT_KEEP = {
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
 # RimChamfer is ONE model feature: .06 x 45 on every edge of the two slant
-# faces and the two end faces (all twelve outside edges plus both pocket
-# rims) and on the cavity rims on both web faces. Its one size sits on an
+# faces and on both end faces' foot edges (ten of the twelve outside edges
+# plus both pocket rims) and on the cavity rims on both web faces. The end
+# faces' top edges, under the MHA-CH-08 bracket feet, keep the title block's
+# edge break: the leg there cut the bracket seats' end wall under the floor
+# (#1038; build_fr_rocker_arm_support.CHAMFER_EDGES). Its one size sits on an
 # outside corner; drawn outside chamfers with no size read as breaks past the
 # title block's edge break (machinist review, MHA-FR-05). The r7 review's
 # "delete the chamfer" (over_spec) was rejected by Main: the callout stays.
 # The edges it governs are too long a list for the callout's two word lines
 # in the lane between the front view and the section (rule 7), so they move
-# to numbered note 1, linked by SEE NOTE 1.
+# to numbered note 1, linked by SEE NOTE 1; the note's exception takes its
+# own line.
 CHAMFER_NOTE_NUMBER = 1
 CHAMFER_NOTE = (
-    f"{CHAMFER_NOTE_NUMBER}. CHAMFER ON ALL OUTSIDE EDGES AND ON THE POCKET AND CAVITY RIMS."
+    f"{CHAMFER_NOTE_NUMBER}. CHAMFER ON ALL OUTSIDE EDGES AND ON THE POCKET AND CAVITY RIMS,\n"
+    "    EXCEPT THE TOP EDGES OF BOTH END FACES."
 )
 # Bottom-left, under the bottom view's origin arrows and left of the title
 # block: the sheet's one open band (y 15-40 mm).

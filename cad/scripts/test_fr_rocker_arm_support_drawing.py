@@ -537,9 +537,12 @@ def test_web_volume_deltas_are_the_closed_forms() -> None:
         support.POCKET_FILLET_VOLUME - support.SQUARE_POCKET_FILLET_VOLUME
     ) == pytest.approx(2.0 * band + corner - pocket + wall + taper_cut2 + pocket_taper)
     removal = support.FOOT_HOLED_VOLUME - support.RIM_CHAMFER_VOLUME
-    # The source's measured 1.27-leg removal, scaled by the leg squared.
+    # The source's measured 1.27-leg removal, scaled by the leg squared, less
+    # the two end faces' top edges the feature skips (#1038): each a
+    # leg-squared-over-two prism the top flat's width long.
+    top_edges = 2 * (2.0 * section.NARROW) * support.CHAMFER**2 / 2.0
     assert removal == pytest.approx(
-        support.SQUARE_RIM_CHAMFER_REMOVAL * (support.CHAMFER / 1.27) ** 2
+        support.SQUARE_RIM_CHAMFER_REMOVAL * (support.CHAMFER / 1.27) ** 2 - top_edges
     )
     assert support.BRACKET_SEATS_VOLUME < support.RIM_CHAMFER_VOLUME
 
@@ -655,6 +658,39 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert min(seats.END_WALL_MIN) >= WALL_TARGET_MM
 
 
+def _end_wall_square_to_top_edge_break(end_wall: float, leg: float) -> float:
+    """The bracket seat's thread to the end face's top-edge break, square to
+    its 45° face: the thread starts below its own mouth break, so a top-edge
+    leg no larger than that keeps the full end wall; a larger leg leaves the
+    run left on the top face plus the mouth's depth, over root 2."""
+    mouth = seats.EDGE_BREAK
+    if leg <= mouth:
+        return end_wall
+    return min(end_wall, (end_wall - leg + mouth) / math.sqrt(2.0))
+
+
+def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall() -> (
+    None
+):
+    """#1038 review: the .06 leg on an end face's top edge left the bracket
+    seat's thread about 1.2 mm, square to the 45° face, from it at the worst
+    case (under the .060 floor). Neither top edge is chamfered, so the edge
+    keeps the title block's break and the seats keep their end walls."""
+    from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+    from _printed_tolerance import edge_break_chamfer_mm
+
+    half = support.BOSS_DEPTH / 2.0
+    for sign in (1.0, -1.0):
+        assert [sign * half, support.HALF_Y, 0.0] not in support.CHAMFER_EDGES
+        assert [sign * half, 0.0, 0.0] not in support.CHAMFER_FACES
+    title_break = edge_break_chamfer_mm(unit=placement.UNIT)
+    for wall in seats.END_WALL_MIN:
+        assert _end_wall_square_to_top_edge_break(wall, title_break) >= WALL_TARGET_MM
+    south = min(seats.END_WALL_MIN)
+    assert _end_wall_square_to_top_edge_break(south, support.CHAMFER) < WALL_FLOOR_MM
+
+
+
 def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None:
     """r7 machinist review (clarity): the size sat on a cavity rim inside the
     section. A chamfer's size lands on its first selected edge and prints
@@ -665,7 +701,7 @@ def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None
 
     first, second = support.CHAMFER_EDGES[:2]
     assert first == [support.BOSS_DEPTH / 2.0, -support.HALF_Y, 0.0]
-    assert second == [support.BOSS_DEPTH / 2.0, support.HALF_Y, 0.0]
+    assert second == [-support.BOSS_DEPTH / 2.0, -support.HALF_Y, 0.0]
     assert "RimChamferSize" in drawing.FRONT_KEEP
     assert "RimChamferSize" not in drawing.RIGHT_KEEP
     scale = drawing.VIEW_SCALE / 1000
@@ -1394,19 +1430,20 @@ def test_rim_chamfer_feature_breaks_every_edge_its_note_names() -> None:
     )
     assert drawing.CHAMFER_NOTE.startswith(f"{drawing.CHAMFER_NOTE_NUMBER}. ")
     # The faces whose every edge the feature breaks: both slant faces (the
-    # pocket rims and the outside edges they share), the -X end face and one
-    # cavity fillet face. The +X end face is selected as its two edges the
-    # slant faces do not own (foot and top), so its size can go first.
-    assert len(support.CHAMFER_FACES) == 4
-    assert [face[0] for face in support.CHAMFER_FACES].count(
-        -support.BOSS_DEPTH / 2.0
-    ) == 1
-    assert all(face[0] != support.BOSS_DEPTH / 2.0 for face in support.CHAMFER_FACES)
+    # pocket rims and the outside edges they share) and one cavity fillet
+    # face. Each end face is selected as its foot edge, the one edge the
+    # slant faces do not own that the feature breaks (the +X one first, for
+    # the size); the top edges stay off it, as the note's exception says.
+    assert len(support.CHAMFER_FACES) == 3
+    assert all(
+        abs(face[0]) != support.BOSS_DEPTH / 2.0 for face in support.CHAMFER_FACES
+    )
     end_edges, rim_edges = support.CHAMFER_EDGES[:2], support.CHAMFER_EDGES[2:]
     assert {(edge[0], edge[1]) for edge in end_edges} == {
         (support.BOSS_DEPTH / 2.0, -support.HALF_Y),
-        (support.BOSS_DEPTH / 2.0, support.HALF_Y),
+        (-support.BOSS_DEPTH / 2.0, -support.HALF_Y),
     }
+    assert "EXCEPT THE TOP EDGES OF BOTH END FACES" in drawing.CHAMFER_NOTE
     assert len(rim_edges) == 12
     assert {abs(edge[2]) for edge in rim_edges} == {support.WEB}
 
@@ -1673,10 +1710,12 @@ def test_hole_table_with_its_mate_column_stays_inside_the_border() -> None:
 
 def test_chamfer_note_sits_in_the_open_band_under_the_bottom_view() -> None:
     left, top = drawing.CHAMFER_NOTE_XY
-    right = left + len(drawing.CHAMFER_NOTE) * NOTE_CHAR_WIDTH
+    lines = drawing.CHAMFER_NOTE.split("\n")
+    right = left + max(len(line) for line in lines) * NOTE_CHAR_WIDTH
     assert left > SHEET_LEFT_INNER_BORDER_X + 0.003
     assert right < TITLE_BLOCK_LEFT - 0.003
-    assert top - NOTE_LINE_PITCH > 0.0127 + 0.002  # the bottom inner border
+    # The note's last line stays over the bottom inner border.
+    assert top - len(lines) * NOTE_LINE_PITCH > 0.0127 + 0.002
     scale = drawing.VIEW_SCALE / 1000
     bottom_view_bottom = drawing.BOTTOM_CENTER[1] - support.WIDE * scale
     assert top < bottom_view_bottom - 0.012  # under the origin arrows

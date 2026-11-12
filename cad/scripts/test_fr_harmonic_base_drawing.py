@@ -1132,8 +1132,9 @@ NATIVE_1038_OBSTACLES = {
 }
 
 
-def _native_r5_r6_callout_layout():
-    """Reconstruct the four unchanged plan callouts from their actual display data."""
+def _native_callout_layout(native_callouts, native_boxes):
+    """Reconstruct the four plan callouts from a render's actual display data
+    (NATIVE_R5_* or NATIVE_1038_*), each box checked against its native one."""
     import draw_fr_harmonic_base as sheet
 
     anchors = {
@@ -1142,12 +1143,12 @@ def _native_r5_r6_callout_layout():
         "MHA-DT-24 spring transfer": sheet.SPRING_CALLOUT_XY,
         "MHA-FR-04 nameplate transfer": sheet.NAMEPLATE_CALLOUT_XY,
     }
-    assert set(anchors) == set(NATIVE_R5_CALLOUTS) == set(NATIVE_R5_CALLOUT_BOXES)
+    assert set(anchors) == set(native_callouts) == set(native_boxes)
     callouts, leaders, own_rows = {}, {}, {}
-    for label, (anchor, lines, texts) in NATIVE_R5_CALLOUTS.items():
+    for label, (anchor, lines, texts) in native_callouts.items():
         assert tuple(anchor) == anchors[label]  # no callout moves to make this pass
         callouts[label] = sheet.callout_text_box(anchor, lines, texts, label)
-        assert callouts[label] == pytest.approx(NATIVE_R5_CALLOUT_BOXES[label])
+        assert callouts[label] == pytest.approx(native_boxes[label])
         leaders[label] = sheet.leader_segments(lines)
         own_rows[label] = sheet.callout_text_rows(lines, texts, label)
     return callouts, leaders, own_rows
@@ -1157,7 +1158,9 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     """Observed R5/R6, then a conditional stop placement, not native after-fix proof."""
     import draw_fr_harmonic_base as sheet
 
-    callouts, leaders, own_rows = _native_r5_r6_callout_layout()
+    callouts, leaders, own_rows = _native_callout_layout(
+        NATIVE_R5_CALLOUTS, NATIVE_R5_CALLOUT_BOXES
+    )
     text_obstacles = {
         name: box for name, box in NATIVE_R5_OBSTACLES.items()
         if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
@@ -1335,21 +1338,9 @@ def test_native_1038_holes_sheet_callouts_and_tags_clear_at_the_300_pitch() -> N
     assert stop == pytest.approx((0.24556631653186178, 0.19123944393353662), abs=1e-12)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.LOCK_KNOB_XZ] == (0.2425, 0.2230)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.STOP_SCREW_XZ] == (0.247, 0.212)
-    anchors = {
-        "MHA-DT-18 block transfer": sheet.BLOCK_CALLOUT_XY,
-        "MHA-DT-02 pedestal transfer": sheet.PEDESTAL_CALLOUT_XY,
-        "MHA-DT-24 spring transfer": sheet.SPRING_CALLOUT_XY,
-        "MHA-FR-04 nameplate transfer": sheet.NAMEPLATE_CALLOUT_XY,
-    }
-    assert set(anchors) == set(NATIVE_1038_CALLOUTS) == set(NATIVE_1038_CALLOUT_BOXES)
-    callouts, leaders, own_rows = {}, {}, {}
-    for label, (anchor, lines, texts) in NATIVE_1038_CALLOUTS.items():
-        assert tuple(anchor) == anchors[label]
-        callouts[label] = sheet.callout_text_box(anchor, lines, texts, label)
-        native_box = NATIVE_1038_CALLOUT_BOXES[label]
-        assert callouts[label] == pytest.approx(native_box, abs=1e-6)
-        leaders[label] = sheet.leader_segments(lines)
-        own_rows[label] = sheet.callout_text_rows(lines, texts, label)
+    callouts, leaders, own_rows = _native_callout_layout(
+        NATIVE_1038_CALLOUTS, NATIVE_1038_CALLOUT_BOXES
+    )
     text_obstacles = {
         name: box
         for name, box in NATIVE_1038_OBSTACLES.items()
@@ -1380,7 +1371,9 @@ def test_native_r6_stop_lock_ink_blocks_require_stop_station_shift() -> None:
     from _layout_audit import AuditAnnotation, ROW_PITCH_HEIGHTS, find_merged_blocks
     from _layout_geometry import Box, DrawableRegion, Segment, SheetGeometry
 
-    _callouts, _leaders, own_rows = _native_r5_r6_callout_layout()
+    _callouts, _leaders, own_rows = _native_callout_layout(
+        NATIVE_R5_CALLOUTS, NATIVE_R5_CALLOUT_BOXES
+    )
     callout_annotations = tuple(
         AuditAnnotation(
             label=f"hole-callout {label}", kind="hole-callout", owner="callout replay",

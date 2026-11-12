@@ -516,7 +516,15 @@ SOURCE_CHAMFER = 1.27
 # on the web faces, the window rim on the slant faces), so it carries over;
 # a 45° chamfer's cross-section, so its removal, goes as the leg squared.
 RIM_CHAMFER_REMOVAL = SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
-RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - RIM_CHAMFER_REMOVAL
+# The two end faces' top edges stay off the chamfer (#1038: at the leg the
+# bracket seats' end wall, square to the 45° face, fell under the rule-17
+# floor; rocker_bracket_seat_layout). Each edge spans the top flat (2 x
+# NARROW) and gives back its leg-squared-over-two prism; the corner mitres
+# with the slant faces' end edges are of order CHAMFER**3, inside the check.
+END_TOP_EDGE_CHAMFER_RELIEF = 2 * (2.0 * NARROW) * CHAMFER**2 / 2.0  # 38.9
+RIM_CHAMFER_VOLUME = (
+    FOOT_HOLED_VOLUME - RIM_CHAMFER_REMOVAL + END_TOP_EDGE_CHAMFER_RELIEF
+)
 # The rocker brackets' two bottoming-tapped seats, down from the top face on
 # the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
 # solid iron for its whole length: the post outboard of the window edge, the
@@ -540,12 +548,14 @@ BRACKET_SEATS_VOLUME = RIM_CHAMFER_VOLUME - len(SEAT_POINTS) * blind_hole_volume
 # chamfer size prints only where its edge is seen end-on. The +X end face's
 # foot edge (along Z) goes first, so the front view shows the size at the
 # view's bottom-right outside corner (r7 machinist review: the size sat on a
-# cavity rim no view shows plainly). That end face is therefore selected as
-# its two edges the slant faces do not already own (foot and top), not as a
-# face: same edges, same chamfer, same volume.
+# cavity rim no view shows plainly). Each end face is selected as the one
+# edge the slant faces do not already own and the chamfer breaks, its foot
+# edge: its top edge, under the MHA-CH-08 bracket foot, keeps only the title
+# block's edge break, so the bracket seat's end wall holds to the end face
+# (rocker_bracket_seat_layout.END_WALL_MIN).
 CHAMFER_EDGES = [
     [BOSS_DEPTH / 2.0, -HALF_Y, 0.0],  # +X end face's foot edge (sized)
-    [BOSS_DEPTH / 2.0, HALF_Y, 0.0],  # +X end face's top edge
+    [-BOSS_DEPTH / 2.0, -HALF_Y, 0.0],  # -X end face's foot edge
     # 12 inner-frame opening edges, both web faces (Z = ±WEB)
     [0.0, -63.5, -WEB],
     [63.5, 0.0, -WEB],
@@ -563,7 +573,6 @@ CHAMFER_EDGES = [
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
     [0.0, -85.0, _wall_half_z_at(-85.0)],
     [0.0, -85.0, -_wall_half_z_at(-85.0)],  # ±Z slant window surrounds
-    [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # back trapezoid (-X) face
     [59.78, -59.78, 0.0],  # one inner fillet face
 ]
 
