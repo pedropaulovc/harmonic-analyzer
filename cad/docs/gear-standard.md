@@ -260,9 +260,11 @@ until every notch is back: 80 crank turns turn every MHA-DT-12 a whole number
 of times, so the zero returns. The set
 absorbs the pivot's play and the gears' seat floats, which take the mesh
 load the same way when set as when running; the platform pivot is still
-reamed Ø6.350 H7 (6.350–6.365 mm) on the stock 91829A560 shoulder, and the
-base's pivot seat is held ±0.05 mm from the pedestal seats, machined in one
-setup.
+reamed Ø6.350 H7 (6.350–6.365 mm) on the stock 91829A560 shoulder. The
+base's pivot seat is transfer-punched through that bore with the set at this
+same feel pose (MHA-DT-00 step 23), so it is never located from the pedestal
+seats; `cone_set_stack.PIVOT_SEAT_TRANSFER_MM` books the punch's play in the
+bore and the spot's pick-up of the mark, 0.095 mm (#2366).
 
 The CAD places every cone 0.20 mm above standard centre
 (`cone_drum_oblique_mesh.edge_slack_mm`). A feel set runs tighter than that,

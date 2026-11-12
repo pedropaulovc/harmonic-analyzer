@@ -3098,7 +3098,9 @@ def test_socket_note_two_is_flagged_from_the_rows_under_note_one() -> None:
     note = sheet.socket_note(["A1", "A2", "A3", "A4"])
     rows = note.split("\n")
     assert rows[0].startswith("2. A1-A4: MATCHED FIT TO MHA-FR-03 TUBE: SLIDES IN BY HAND")
-    assert "MHA-FR-02" in rows[1]
+    # #2386: the pattern is carried from the top frame, so its X/Y are reference.
+    assert "TRANSFER FROM MHA-FR-02" in rows[1]
+    assert "X/Y" in rows[1]
     assert len(rows) == 2
     for word in ("ASSIGNED", "MATCH MARKS"):
         assert word not in note
