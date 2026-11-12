@@ -249,7 +249,8 @@ NUMBERED_NOTES_POS = (0.015, 0.263)
 # on MHA-DT-37's spigot, T012/T018; bonded on MHA-DT-04's land 2, T024;
 # sliding on MHA-DT-04 and the MHA-DT-VN-71 key, T030..T120), note 2 the
 # teeth's mesh with MHA-DT-12 (``sheet_notes``).  The bonded notes name the
-# fit and its mate only: the compound is MHA-DT-00's bonding step's (rule 23).
+# fit, its mate and its diametral clearance (rule 23: the part sheet prints a
+# bond with its clearance); the compound is MHA-DT-00's bonding step's.
 SHAFT_MATE = "MHA-DT-04"
 # A matched pair names its mate by name and number (rule 4; round-1 review
 # of the fan-out: note 1 named MHA-DT-04 by number only, and no land).
@@ -333,7 +334,9 @@ def bore_clearances_mm(teeth: int) -> tuple[tuple[float, float], tuple[float, fl
 
 
 def bonded_fit_note(teeth: int) -> str:
-    """Note 1 of a round-bored sheet: the bonded slip fit and its mate."""
+    """Note 1 of a round-bored sheet: the bonded slip fit, its mate and its
+    diametral clearance at the parts' printed limits (rule 23; machinist
+    review, farm run 20261112T075603458Z: the bond gap was printed nowhere)."""
     if teeth in SPIGOT_TEETH:
         mate = f"{TIP_GEAR_NAME} {TIP_GEAR_MATE} SPIGOT"
     else:
@@ -342,7 +345,8 @@ def bonded_fit_note(teeth: int) -> str:
         # 20261112T035245975Z).
         land = f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND"
         mate = f"{SHAFT_NAME} {SHAFT_MATE}, {land}"
-    return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate}."
+    clearance = _inch_limits(*dt_cone_gear_spec.bond_clearance_mm(teeth))
+    return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance} ON \u00d8)."
 
 
 def sheet_notes(teeth: int) -> str:
@@ -352,7 +356,8 @@ def sheet_notes(teeth: int) -> str:
     than the shop's turned and milled rows, so it is made to the measured
     land, with the clearance the parts' limits give as REF, and names the
     key its keyway slides on.  A round bore is bonded (owner decision
-    2026-11-09, C1 keyed, PR #1992): the note names the fit and its mate.
+    2026-11-09, C1 keyed, PR #1992): the note names the fit, its mate and
+    its diametral clearance (rule 23).
     Note 2 names the mesh and the fit route of the tip, thickness and root
     bands: the over-pins and assembly backlash acceptances in GEAR DATA; it
     carries the teeth's do-not-cut, flagged to them rather than in a general
