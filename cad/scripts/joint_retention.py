@@ -675,8 +675,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
 UNTHREADED_PARTS: frozenset[str] = frozenset(
     {
         "dt_alignment_pinion",  # bonded to pinion_arbor (Loctite 638, drum-bonded)
-        "ch_amplitude_bar",  # reamed top pin hole (pressed MHA-CH-11 pin), end notches; pinned/sliding only
-        "ch_bar_pivot_pin",  # plain 5/64 drill-rod pin pressed in the bar cheeks, runs in the lever
+        "ch_amplitude_bar",  # reamed top pin hole (pressed MHA-SH-VN-58 pin), end notches; pinned/sliding only
+        "sh_vn_pivot_pin",  # MHA-SH-VN-58 5/64 dowels (RodPin, BarPin) pressed into the fork tines or bar cheeks, ends dressed flush, run in the arm or lever; no thread
         "sh_vn_chain_link",  # InnerLink and OuterLink members; pins and rollers, no thread
         "pd_vn_chain_connecting_link",  # clip-retained roller-chain link, no thread
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps
@@ -692,7 +692,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cone_tip_gear",  # MHA-DT-37: spigot bonded in the MHA-DT-04 socket, plain pivot; no thread
         "dt_cone_tip_bushing",  # MHA-DT-38 pressed on MHA-DT-37's pivot; no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-DT-VN-61; journals only
-        "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-10 pin)
+        "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-SH-VN-58 pin)
         "sm_vn_counter_spring",  # 1330K524 extension spring: upper eye free on the MHA-SM-VN-56 shoulder, lower eye hooks the boss-hook eye, no thread
         "sm_gooseneck",  # MHA-SM-01 bent 1/2 in tube (#2315): its bore takes the bonded MHA-SM-05 spigot, its bare leg is the post the frame's set screw grips; no thread
         "dt_crank_drive_gear",  # keyway on the MHA-DT-VN-71 key against the MHA-DT-04 collar, no thread
@@ -747,7 +747,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
-        "ch_rod_pivot_pin",  # MHA-CH-10 5/64 drill-rod pin, pressed into the fork's reamed tines, ends dressed flush (rod-forks-pinned); no thread
         "ch_vn_rocker_thrust_washer",  # MHA-CH-VN-56 carbon-steel ring shim (McMaster 3088A429) loose on the MHA-CH-05 shaft, north and south; no thread
         "pd_transgear_arm_plate",  # MHA-PD-19: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "pd_vn_transgear_knob_cup_pin",  # MHA-PD-VN-62 1/16 slotted spring pin through the knob cup and the shaft's journal
@@ -806,6 +805,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "mg_vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
     "pn_vn_pen_marker": "felt-tip marker; its barrel lies in the v-block groove under the thumb screw; no thread",
     "sh_vn_music_wire": "LeverWire and PenWire music-wire members; hooked/wrapped or tied through the adjuster eye, no thread",
+    "sh_vn_pivot_pin": "RodPin and BarPin dowels pressed into reamed holes; no thread",
 }
 
 JOINTS: tuple[Joint, ...] = (

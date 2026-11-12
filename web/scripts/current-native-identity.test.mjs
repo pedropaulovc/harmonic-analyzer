@@ -93,7 +93,9 @@ retiredTooling.push(...[
 // ruling 2026-11-08 (Pedro), #2144 item 11.4), the MHA-DT-28 anchor eye and
 // MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2), and the
 // MHA-DT-VN-54 stack collar and MHA-DT-VN-55 cup adjuster to the bonded cone
-// tip and its end screw (owner decision C1 keyed, 2026-11-09, PR #1992).
+// tip and its end screw (owner decision C1 keyed, 2026-11-09, PR #1992), and
+// the made MHA-CH-10 rod and MHA-CH-11 bar pivot pins to the purchased
+// MHA-SH-VN-58 dowel's RodPin and BarPin members (#2339).
 const retiredMachine = [{
   old_stem: 'vn-pen-rod-set-screw',
   old_number: 'MHA-VN-061',
@@ -128,6 +130,16 @@ const retiredMachine = [{
   old_stem: 'vn-cone-tip-adjuster',
   old_number: 'MHA-VN-017',
   new_identities: [{ parent: 'dt-drive-train', stem: 'dt-vn-cone-tip-adjuster', number: 'MHA-DT-VN-55' }],
+  status: 'retired',
+}, {
+  old_stem: 'ch-rod-pivot-pin',
+  old_number: 'MHA-CH-010',
+  new_identities: [{ stem: 'ch-rod-pivot-pin', number: 'MHA-CH-10' }],
+  status: 'retired',
+}, {
+  old_stem: 'ch-bar-pivot-pin',
+  old_number: 'MHA-CH-011',
+  new_identities: [{ stem: 'ch-bar-pivot-pin', number: 'MHA-CH-11' }],
   status: 'retired',
 }]
 
@@ -179,15 +191,21 @@ const sharedCases = [
 ].map(([parent, sourceStem, sourceNumber, priorStem, priorNumber, stem, occurrenceStem, number, configuration, role]) =>
   ({ parent, sourceStem, sourceNumber, priorStem, priorNumber, stem, occurrenceStem, number, configuration, role }))
 
+// Shared identities introduced after the consolidation, with no migrated
+// source: the bought pivot pin's two channel members (#2339).
+const introducedShared = [
+  { parent: 'ch-channel', stem: 'sh-vn-pivot-pin', number: 'MHA-SH-VN-58', configurations: ['BarPin', 'RodPin'] },
+]
+
 test('all eight shared targets retain each of the nineteen exact member and role identities', () => {
   assert.equal(table.schemaVersion, 1)
   assert.equal(table.occurrenceNamespace, 'archive-role-local')
   assert.equal(sharedCases.length, 19)
   assert.equal(new Set(sharedCases.map(row => row.stem)).size, 8)
-  const expectedGroups = [...new Set(sharedCases.map(row => row.stem))].map(stem => {
+  const expectedGroups = [...[...new Set(sharedCases.map(row => row.stem))].map(stem => {
     const members = sharedCases.filter(row => row.stem === stem)
     return [stem, members[0].number, [...new Set(members.map(row => row.configuration))].sort()]
-  }).sort()
+  }), ...introducedShared.map(group => [group.stem, group.number, group.configurations])].sort()
   assert.deepEqual(table.sharedVendors.map(row => [row.stem, row.number, [...row.configurations].sort()]).sort(), expectedGroups)
   assert.equal(CURRENT_NATIVE_IDENTITY_PROJECTION.occurrenceNamespace, 'archive-role-local')
   for (const row of sharedCases) {
@@ -205,6 +223,19 @@ test('all eight shared targets retain each of the nineteen exact member and role
     /no unique immediate parent/)
   assert.throws(() => projectCurrentNativeNumber('MHA-SH-VN-50', 'sh-vn-chain-link', 'pd-paper-drive'),
     /no unique immediate parent/)
+})
+
+test('introduced shared members resolve only by parent and member configuration', () => {
+  for (const group of introducedShared) {
+    for (const configuration of group.configurations) {
+      const occurrence = path(group.parent, `${group.stem}--${configuration}-3`)
+      assert.equal(projectCurrentNativePath(occurrence), occurrence)
+      assert.equal(projectCurrentNativeNumber(group.number, `${group.stem}--${configuration}`, group.parent), group.number)
+    }
+    assert.throws(() => projectCurrentNativeNumber(group.number, group.stem, group.parent), /no unique immediate parent/)
+    assert.throws(() => projectCurrentNativeNumber(group.number, `${group.stem}--${group.configurations[0]}`, 'pn-pen'),
+      /no unique immediate parent/)
+  }
 })
 
 test('all five Default shared groups preserve native variant suffixes on repeated projection', () => {

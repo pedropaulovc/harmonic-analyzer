@@ -324,6 +324,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="sh_vn_pivot_pin",
+        part="sh_vn_pivot_pin",
+        artifact_stem="sh-vn-pivot-pin",
+        script_name="draw_sh_vn_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm",
         part="ch_rocker_arm",
         artifact_stem="ch-rocker-arm",
@@ -363,20 +370,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_amplitude_bar",
         artifact_stem="ch-amplitude-bar",
         script_name="draw_ch_amplitude_bar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_bar_pivot_pin",
-        part="ch_bar_pivot_pin",
-        artifact_stem="ch-bar-pivot-pin",
-        script_name="draw_ch_bar_pivot_pin.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rod_pivot_pin",
-        part="ch_rod_pivot_pin",
-        artifact_stem="ch-rod-pivot-pin",
-        script_name="draw_ch_rod_pivot_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

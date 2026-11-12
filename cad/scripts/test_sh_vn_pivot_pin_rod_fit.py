@@ -1,14 +1,15 @@
 """Offline contract: the rod fork straddles its rocker arm in one plane, and
-the MHA-CH-10 pin is pressed into the fork's reamed tines and runs in the
-arm. The printed BASIC/profile controls and fork bands prove the crotch fit;
-the pin spec's older radius-band budget is a separate regression, not the
-current arc acceptance. Press fit, ends dressed flush: the user's ruling
-(2026-10-09, PR #1292 review F1), the MHA-CH-11 bar pin's joint
-(``test_ch_bar_pivot_fit``). Drawing-guidelines.md rule 17 (walls and webs)
-governs the remaining fits.
+the RodPin member of MHA-SH-VN-58 is pressed into the fork's reamed tines and
+runs in the arm. The printed BASIC/profile controls and fork bands prove the
+crotch fit; the pin spec's older radius-band budget is a separate regression,
+not the current arc acceptance. Press fit, ends dressed flush: the user's
+ruling (2026-10-09, PR #1292 review F1), the BarPin member's joint
+(``test_sh_vn_pivot_pin_bar_fit``). Drawing-guidelines.md rule 17 (walls and
+webs) governs the remaining fits.
 
-``ch_rod_pivot_pin_spec`` reads only the two parts it joins; the restated
-floors and the swing it designs for are pinned to their sources here.
+``sh_vn_pivot_pin_rod_spec`` reads only the two parts it joins and the
+purchased pin; the restated floors and the swing it designs for are pinned to
+their sources here.
 """
 
 from __future__ import annotations
@@ -24,7 +25,6 @@ import pytest
 import _config
 import cam_plane
 import ch_amplitude_bar_spec as bar
-import ch_bar_pivot_pin_spec as bar_pin
 import channel_frame_geom as frame
 import channel_kinematics as ck
 import ch_connecting_rod_notes as rod_notes
@@ -32,7 +32,9 @@ import ch_connecting_rod_spec as rod
 import ch_rocker_arm_notes as arm_notes
 import ch_rocker_arm_spec as arm
 import _rocker_interface as rocker_interface
-import ch_rod_pivot_pin_spec as pin
+import sh_vn_pivot_pin_bar_spec as bar_pin
+import sh_vn_pivot_pin_rod_spec as pin
+import sh_vn_pivot_pin_spec as purchased
 import dt_cylinder_gear_spec as gear
 import draw_ch_rocker_arm as arm_drawing
 import rocker_bank_layout as bank
@@ -51,7 +53,8 @@ def test_restated_floors_are_their_sources() -> None:
     )
     # The hubs set the pitch the neighbour stack is judged at.
     assert arm.HUB_LENGTH == bank.PITCH and arm.HUB_LENGTH_BAND[1] == 0.0
-    # FN2's 0.85 thou cap, as the bar pin's press.
+    # FN2's .2-.85 thou, as the bar pin's press.
+    assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-9)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.0215900, abs=1e-9)
     assert pin.PRESS_INTERFERENCE_MAX == bar_pin.PRESS_INTERFERENCE_MAX
 
@@ -66,10 +69,13 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
 
 
 def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
-    """The bar pin's joint: the same drill rod pressed into the same Ø1.9558
-    +0.02286/+0.0127 ream, running in a drilled #47 in the moving member."""
-    assert pin.PIN_DIA == bar_pin.PIN_DIA
-    assert pin.PIN_DIA_TOLERANCE == bar_pin.PIN_DIA_TOLERANCE
+    """The bar pin's joint: the same purchased pin pressed into the same
+    Ø1.9558 +0.02286/+0.0127 ream, running in a drilled #47 in the moving
+    member."""
+    assert pin.PIN_DIA == bar_pin.PIN_DIA == purchased.PIN_DIA
+    assert pin.PIN_DIA_LIMITS == bar_pin.PIN_DIA_LIMITS == purchased.PIN_DIA_LIMITS
+    assert pin.CONFIGURATION != bar_pin.CONFIGURATION
+    assert {pin.CONFIGURATION, bar_pin.CONFIGURATION} == set(purchased.CONFIGURATIONS)
     assert pin.ROD_HOLE_DIA == rod.PIN_HOLE_DIA == bar.TOP_PIN_HOLE_DIA
     assert pin.ROD_HOLE_BAND == rod.PIN_HOLE_BAND == bar.TOP_PIN_HOLE_BAND
     assert arm.ROD_HOLE_SPEC.kind == "drilled_number"
@@ -84,14 +90,17 @@ def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # The press, at the pin's +/-0.00508 against the ream's +0.02286/+0.0127.
-    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
+    # The press, at the catalogue's 0/+0.00508 against the ream's
+    # +0.02286/+0.0127.
+    assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] <= b["interference_max"]
+    # FN2 by limits alone: the loosest pin still presses at its minimum.
+    assert b["interference_min"] >= pin.PRESS_INTERFERENCE_MIN
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # The run, in the arm's #47 (.0785 +.004/0).
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.127, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.2794, abs=1e-6)
     assert b["neighbour_clearance_min"] == pytest.approx(0.4271, abs=1e-6)
@@ -103,10 +112,11 @@ def test_worst_case_joint_budget() -> None:
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.794, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
-    # Dressing stock: the shortest blank the .26 MIN limit allows still covers
-    # the thickest .246 fork; a longer blank only dresses back further.
-    assert b["blank_excess_min"] == pytest.approx(0.3556, abs=1e-6)
-    assert "blank_excess_max" not in b
+    # Dressing stock: the shortest supplied 5/16 pin (.3025 under the assumed
+    # +/-.010 grade) over the thickest .246 fork, .02825 at each end.
+    assert b["length_excess_min"] == pytest.approx(1.4351, abs=1e-6)
+    assert b["dress_stock_per_end_min"] == pytest.approx(0.71755, abs=1e-6)
+    assert not any(key.startswith("blank") for key in b)
     assert not any(key.startswith(("upset", "retention")) for key in b)
 
 
@@ -230,12 +240,14 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     assert hole_dia == rod.PIN_HOLE_DIA
     assert engaged == pytest.approx(rod.FORK_THICKNESS - rod.FORK_SLOT_WIDTH, abs=1e-9)
     pairs = ic.ALLOWED_PAIRS
+    # One purchased part, two members: channel n's RodPin is instance 2n - 1
+    # and its BarPin 2n (build_ch_channel_assembly inserts them in that order).
     rod_pairs = {
-        frozenset((f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}"))
+        frozenset((f"sh-vn-pivot-pin-{2 * n - 1}", f"ch-connecting-rod-{n}"))
         for n in range(1, 21)
     }
     bar_pairs = {
-        frozenset((f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}"))
+        frozenset((f"sh-vn-pivot-pin-{2 * n}", f"ch-amplitude-bar-{n}"))
         for n in range(1, 21)
     }
     set_screw_pairs = {
@@ -427,7 +439,7 @@ def _joint_translation_allowance() -> float:
         + float(arm.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     ) / 2.0
     arm_hole_max = NUMBER_DRILL_MM[arm.ROD_HOLE_SPEC.size] + pin.DRILLED_PLUS
-    pin_drop = (arm_hole_max - (pin.PIN_DIA - pin.PIN_DIA_TOLERANCE)) / 2.0
+    pin_drop = (arm_hole_max - pin.PIN_DIA_LIMITS[0]) / 2.0
     # A square enclosing both position discs and the running-clearance disc:
     # expand the X window AND subtract the Y loss. This is conservative even
     # for lateral wander; a pressed pin has no additional drop in the tines.

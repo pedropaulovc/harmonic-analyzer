@@ -282,7 +282,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 45)
+        self.assertEqual(len(retired), 47)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
@@ -290,7 +290,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         # #2144 9.2: the screwed jack chain took the MHA-DT-28 anchor eye's and
         # the MHA-DT-VN-66 loop link's places;
         # PR #1992 (C1 keyed): the bonded tip and its end screw retired the
-        # MHA-DT-VN-54 stack collar and the MHA-DT-VN-55 cup adjuster.
+        # MHA-DT-VN-54 stack collar and the MHA-DT-VN-55 cup adjuster;
+        # #2339: the purchased MHA-SH-VN-58 dowel retired the made MHA-CH-10
+        # rod and MHA-CH-11 bar pivot pins.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
@@ -299,7 +301,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                                                 ("vn-keeper-chain-link", ["MHA-DT-VN-66"]),
                                                 ("dt-crank-pin-eye", ["MHA-DT-28"]),
                                                 ("vn-cone-tip-collar", ["MHA-DT-VN-54"]),
-                                                ("vn-cone-tip-adjuster", ["MHA-DT-VN-55"])])
+                                                ("vn-cone-tip-adjuster", ["MHA-DT-VN-55"]),
+                                                ("ch-rod-pivot-pin", ["MHA-CH-10"]),
+                                                ("ch-bar-pivot-pin", ["MHA-CH-11"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",
@@ -391,6 +395,20 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                          PREFIX + "mg-magnifier/sh-vn-music-wire--LeverWire--T006-1@upper")
         self.assertEqual(project_current_native_path(PREFIX + "pd-paper-drive/vn-latch-hook-rivet-1"),
                          PREFIX + "pd-paper-drive/pd-vn-latch-hook-rivet-1")
+
+    def test_introduced_shared_members_resolve_only_by_parent_and_member(self):
+        # #2339: the bought pivot pin is its own source, two channel members.
+        identity = CurrentNativeIdentity()
+        for configuration in ("RodPin", "BarPin"):
+            with self.subTest(configuration=configuration):
+                occurrence = PREFIX + f"ch-channel/sh-vn-pivot-pin--{configuration}-3"
+                self.assertEqual(identity.project_path(occurrence), occurrence)
+                self.assertEqual(identity.project_number(
+                    "MHA-SH-VN-58", f"sh-vn-pivot-pin--{configuration}", "ch-channel"), "MHA-SH-VN-58")
+                with self.assertRaisesRegex(ValueError, "No unique immediate parent"):
+                    identity.project_number("MHA-SH-VN-58", f"sh-vn-pivot-pin--{configuration}", "pn-pen")
+        with self.assertRaisesRegex(ValueError, "No unique immediate parent"):
+            identity.project_number("MHA-SH-VN-58", "sh-vn-pivot-pin", "ch-channel")
 
     def test_jig_kit_members_project_to_configured_parent_scoped_kits(self):
         # #2187 owner ruling: one parent-scoped native part per multi-member

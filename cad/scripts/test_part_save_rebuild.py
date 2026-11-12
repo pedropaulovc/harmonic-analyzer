@@ -438,7 +438,6 @@ def test_configuration_creators_have_explicit_saved_cache_coverage() -> None:
         "build_dt_crank_handle_pivot_screw",
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
-        "build_ch_bar_pivot_pin",
         "build_ch_vn_spring_hook",
         "build_dt_vn_post_mount_screw",
         "build_pd_vn_transgear_pivot_screw",

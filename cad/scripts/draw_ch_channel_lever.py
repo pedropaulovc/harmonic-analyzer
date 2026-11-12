@@ -137,7 +137,7 @@ def _sheet_x(mx: float) -> float:
 # --- Mates and functions named on the bands' own callouts (rules 4 and 7). ---
 SHAFT_NUMBER = _config.parts("ch-fulcrum-shaft")["number"]
 BAR_NUMBER = _config.parts("ch-amplitude-bar")["number"]
-PIN_NUMBER = _config.parts("ch-bar-pivot-pin")["number"]
+PIN_NUMBER = _config.parts("sh-vn-pivot-pin")["number"]
 SPRING_NUMBER = _config.parts("ch-vn-channel-spring-installed")["number"]
 STATIONS = _config.machine("channels", "count")
 _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
@@ -180,7 +180,7 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # what it serves at the dimension (rule 4; ch-fab-2 r2: 3/3 runs asked for
 # it there, and a second reason on the .118 read as narration): each bar
 # rides its lever's plate, so the offset spaces neighbouring bars in the
-# stack (ch_bar_pivot_pin_spec).
+# stack (sh_vn_pivot_pin_bar_spec).
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
     "PlateOffset": f"SPACES {BAR_NUMBER} BARS",

@@ -1,26 +1,26 @@
-r"""Rod pivot pin (MHA-CH-10) and the rod-fork-to-rocker joint it closes.
+r"""RodPin member of MHA-SH-VN-58 and the rod-fork-to-rocker joint it closes.
 
 PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the
-pattern). The part build (``build_ch_rod_pivot_pin.py``), its drawing, the
-channel assembly and ``test_ch_rod_pivot_fit`` import it; it reads only the
-two parts it joins, so the pin never re-keys on bank layout or config.
+pattern). The part build (``build_sh_vn_pivot_pin.py``), the channel assembly
+and ``test_sh_vn_pivot_pin_rod_fit`` import it; it reads only the two parts it
+joins and the purchased pin (``sh_vn_pivot_pin_spec``), so the pin never
+re-keys on bank layout or config.
 
 The joint: each connecting rod's fork (``ch_connecting_rod_spec``) straddles
-its rocker arm (``ch_rocker_arm_spec``) in the arm's own plane, and one plain
-5/64 drill-rod pin runs through both tines and the arm's #47 rod hole. The
-pin RUNS in the arm (the one moving member) and is PRESSED into holes reamed
-through both tines, its ends dressed flush with the fork's faces, exactly as
-the MHA-CH-11 bar pin (``ch_bar_pivot_pin_spec``) is pressed into the
-amplitude bar. Press-fit retention is the user's ruling (2026-10-09, PR #1292
-review F1): a 90-degree Ø3.2 countersink sunk into each tine for a peened end
-left 0.92 of bearing land under the pin, below drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor, so the
+its rocker arm (``ch_rocker_arm_spec``) in the arm's own plane, and one
+purchased 5/64 x 5/16 dowel runs through both tines and the arm's #47 rod
+hole. The pin RUNS in the arm (the one moving member) and is PRESSED into
+holes reamed through both tines, its ends dressed flush with the fork's
+faces, exactly as the BarPin member (``sh_vn_pivot_pin_bar_spec``) is pressed
+into the amplitude bar. Press-fit retention is the user's ruling (2026-10-09,
+PR #1292 review F1): a 90-degree Ø3.2 countersink sunk into each tine for a
+peened end left 0.92 of bearing land under the pin, below drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor, so the
 ruling reverses the #746 reconstruction choice of peening. A pressed pin
 drives out with a punch.
 
 Frame (part): pin axis = part Z, axial mid-plane = Front Plane (z = 0); the
-model is the INSTALLED pin -- a Ø PIN_DIA cylinder FORK_THICKNESS long, flush
-with both tines. The shop cuts the blank at least PIN_BLANK_LENGTH long; the
-drawing states that.
+member is the INSTALLED pin -- a Ø PIN_DIA cylinder FORK_THICKNESS long, flush
+with both tines.
 """
 
 from __future__ import annotations
@@ -30,11 +30,10 @@ import math
 import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
 import _rocker_interface as rocker_interface
+import sh_vn_pivot_pin_spec as _pin
 from _hole_spec import NUMBER_DRILL_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-
-MM_PER_IN = 25.4
 
 # --- The arm sheet's drilled-hole band (its #47 rod hole): a twist drill
 # cuts on-size to oversize. ---
@@ -42,19 +41,17 @@ DRILLED_PLUS = drilled_oversize_mm(unit=_arm.UNIT)
 # The rod sheet's .XX band: its fork outline, slot depth and boss length.
 ROD_LINEAR_2PL = printed_band_mm(2, unit=_rod.UNIT)
 
-# --- The pin: 5/64 drill rod (AISI O1/W1 drill rod or 1018 pin stock, used
-# annealed as supplied; ground to +/-0.0002 in). ---
-PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
-PIN_DIA_TOLERANCE = 0.00508  # +/-.0002 in, drill-rod grind
+# --- The pin: the purchased dowel (McMaster 90145A299, 0/+.0002 in on its
+# 5/64 diameter), used as supplied: pressed through and dressed flush. ---
+CONFIGURATION = _pin.ROD_PIN_CONFIGURATION
+BOM_DESCRIPTION = "ROD PIVOT PIN"
+PIN_DIA = _pin.PIN_DIA  # 1.984
+PIN_DIA_LIMITS = _pin.PIN_DIA_LIMITS
 PIN_INSTALLED_LENGTH = _rod.FORK_THICKNESS  # dressed flush with both tines
-# Cut length of the blank: the fork plus dressing stock at each end. Its only
-# job is to leave stock over the thickest fork, so it prints as a single MIN
-# limit (drawing-guidelines.md rule 4 (tighten only for function); machinist
-# review 2026-10-15, #1522): any longer blank just dresses back further.
-# .26 MIN leaves .007 of dressing stock over the thickest .246 fork (the .25
-# nearest the former 6.4 mm would leave .004 for both ends).
-PIN_BLANK_LENGTH = 6.604  # .26
-PIN_BLANK_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".26 MIN"
+# The supplied length (5/16 in, ASME B18.8.2 +/-.010 assumed) stands proud of
+# both tines before dressing: the shortest pin over the thickest fork leaves
+# the stock both dressed ends share.
+PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
 # Dressed ends stand nothing proud of the tine faces (the press-fit ruling).
 PIN_END_PROUD_MAX = 0.0
 
@@ -63,13 +60,14 @@ PIN_END_PROUD_MAX = 0.0
 ROD_HOLE_DIA = _rod.PIN_HOLE_DIA
 ROD_HOLE_BAND = _rod.PIN_HOLE_BAND
 
-# --- The joint's limits (the budget test_ch_rod_pivot_fit holds). ---
-# The tightest press the tines take: ANSI B4.1-1967 (R1987) FN2 "medium drive
-# fit, suitable for ordinary steel parts", nominal size 0-0.12 in:
-# interference 0.2-0.85 thousandths of an inch. Its 0.85 thou maximum caps the
-# press; the minimum only has to stay positive (the pin carries no axial load:
-# the arm bears on it radially and the tines hold it square).
-PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
+# --- The joint's limits (the budget test_sh_vn_pivot_pin_rod_fit holds). ---
+# The press the tines take: ANSI B4.1-1967 (R1987) FN2 "medium drive fit,
+# suitable for ordinary steel parts", nominal size 0-0.12 in: interference
+# 0.2-0.85 thousandths of an inch. Its 0.85 thou maximum caps the press; the
+# loosest pin in the largest hole still presses at its 0.2 thou minimum (the
+# pin carries no axial load: the arm bears on it radially and the tines hold
+# it square).
+PRESS_INTERFERENCE_MIN, PRESS_INTERFERENCE_MAX = _pin.FN2_INTERFERENCE
 RULE12_WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines.md rule 17: .080 in
 RULE12_WALL_FLOOR = WALL_FLOOR_MM  # .060 in
 RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR: oiled steel faces
@@ -80,7 +78,7 @@ BRIDGE_TARGET = WALL_TARGET_MM  # fork bridge below the slot floor: the drawing-
 # Arm tilt less rod tilt, the swing the crotch must clear: the solved loop
 # (channel_kinematics, cam phase 0..360) spans -8.662..+1.061 deg with the
 # rod closing the raised drive axis to the level rocker, restated here
-# rounded outward (test_ch_rod_pivot_fit pins it to the solved loop).
+# rounded outward (test_sh_vn_pivot_pin_rod_fit pins it to the solved loop).
 RELATIVE_SWING_DEG = (-8.67, 1.07)
 _SWING_STEPS = 400
 
@@ -121,14 +119,14 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
-    the drill rod +/-.0002 in, the reamed tine hole +.0009/+.0005, the arm's
-    #47 hole at its sheet's DRILLED HOLES row, the arm strap and its symmetry
-    to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot .106
-    +/-.002 (so the fork over the tines, their reference sum, spans
+    the purchased pin's 0/+.0002 in, the reamed tine hole +.0009/+.0005, the
+    arm's #47 hole at its sheet's DRILLED HOLES row, the arm strap and its
+    symmetry to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot
+    .106 +/-.002 (so the fork over the tines, their reference sum, spans
     FORK_THICKNESS_BAND), the hubs that set the pitch never shorter than
     nominal; the fork outline and slot depth at the rod sheet's .XX band, the
     arm radii at the arm sheet's, the arm's top edge at its TOP_EDGE_BAND over
-    its pivot; the blank at its printed MIN length.
+    its pivot; the supplied pin at its shortest length.
     """
     t_min, t_max = _band(_arm.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
     _w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
@@ -137,7 +135,7 @@ def joint_budget() -> dict[str, float]:
     hole_min, hole_max = _band(ROD_HOLE_DIA, ROD_HOLE_BAND)
     arm_hole_min = NUMBER_DRILL_MM[_arm.ROD_HOLE_SPEC.size]
     arm_hole_max = arm_hole_min + DRILLED_PLUS
-    pin_min, pin_max = PIN_DIA - PIN_DIA_TOLERANCE, PIN_DIA + PIN_DIA_TOLERANCE
+    pin_min, pin_max = PIN_DIA_LIMITS
     pitch_min = _arm.HUB_LENGTH  # hubs bear face on face; +0.05/0 band
     # Each rod floats on its own arm's strap by the slot's side clearance, and
     # each strap stands off its hub's mid-plane by up to half its symmetry
@@ -206,9 +204,10 @@ def joint_budget() -> dict[str, float]:
             _rod.FORK_BASE_BELOW_PIN - _rod.FORK_CROTCH_BELOW_PIN - 2.0 * ROD_LINEAR_2PL
         ),
         "crown_wall_min": _rod.FORK_CROWN_RADIUS - crown_loss - hole_max / 2.0,
-        # The shortest blank the MIN limit allows over the thickest fork: the
-        # dressing stock both ends share (a longer blank dresses back further).
-        "blank_excess_min": PIN_BLANK_LENGTH - w_max,
+        # The shortest supplied pin over the thickest fork: the dressing stock
+        # both ends share, and each end's share with the pin pressed centred.
+        "length_excess_min": PIN_LENGTH_LIMITS[0] - w_max,
+        "dress_stock_per_end_min": (PIN_LENGTH_LIMITS[0] - w_max) / 2.0,
     }
 
 
@@ -235,7 +234,9 @@ if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
     raise AssertionError("fork bridge below the slot under the .080 in target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:
     raise AssertionError("reamed hole to fork crown under the drawing-guidelines.md rule 17 (walls and webs) target")
-if BUDGET["blank_excess_min"] <= 0.0:
-    raise AssertionError("pin blank too short to dress flush at both tines")
+if BUDGET["length_excess_min"] <= 0.0:
+    raise AssertionError("the shortest supplied pin cannot dress flush at both tines")
+if BUDGET["dress_stock_per_end_min"] < 0.0:
+    raise AssertionError("a centred pin leaves a tine end short of its face")
 if PIN_INSTALLED_LENGTH != _rod.FORK_THICKNESS:
     raise AssertionError("the installed pin must be flush with both tines")

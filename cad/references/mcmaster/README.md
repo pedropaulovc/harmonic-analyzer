@@ -28,6 +28,7 @@ recipes:
 | 90114A124 | `ms-vn-stop-plate-screw`; `pd-vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `sh-vn-brass-fillister-screw` (MHA-SH-VN-51; shared by dt, fr and pd) | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
+| 90145A299 | `sh-vn-pivot-pin` (MHA-SH-VN-58, `RodPin` and `BarPin`; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -1228,6 +1229,22 @@ Catalog specifications checked on September 10, 2026:
   in the MHA-DT-20 plate's .0630 thru ream, match-drilled at MHA-DT-00
   step 2. `diag_build_98381A417.py` models the plain nominal cylinder;
   catalogue-only, no vendor model, no replica gate.
+- [90145A299](https://www.mcmaster.com/90145A299/) (`sh-vn-pivot-pin`,
+  MHA-SH-VN-58, 40 installed: 20 `RodPin`, 20 `BarPin`; #2339) was read live
+  on November 11, 2026 from the product page, its 2-D PDF and the family
+  table https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~5-64/:
+  18-8 stainless steel dowel pin, 5/64 in diameter, 0 to +0.0002 in over
+  nominal (the drawing's .0781 +.0002/-.0000, not the 98381A family's
+  +0.0001/+0.0003), 5/16 in long (.313 printed with no length band; the code
+  assumes the ASME B18.8.2 dowel length grade, ±.010 in), chamfered both
+  ends, passivated, hardness "Not Rated", material certificate, $10.80 per
+  pack of 5. It replaces the shop-made MHA-CH-10/MHA-CH-11 drill-rod pins:
+  its band presses .000225 to .000825 in into the owner-ruled Ø.0770
+  +.0009/+.0005 fork and cheek reams, inside ANSI FN2, and each pin is
+  pressed through and dressed flush at MHA-CH-00, which takes the chamfers
+  off. `_mcmaster_90145a299.py` holds the catalogue data and
+  `build_sh_vn_pivot_pin.py` models each member as the plain installed
+  cylinder; catalogue-only, no vendor model, no replica gate.
 - [98830A511](https://www.mcmaster.com/98830A511/) (`dt-vn-cone-shaft-key`,
   MHA-DT-VN-71, quantity one; owner decision C1 keyed, 2026-11-09, PR #1992)
   was read live on November 9, 2026 from the product page and the family

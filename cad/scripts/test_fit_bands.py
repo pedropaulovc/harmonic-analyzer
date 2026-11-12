@@ -324,13 +324,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("ch_connecting_rod_spec", "FORK_THICKNESS_BAND"): (
         "the fork over the tines, a reference: two TINE_BANDs and the "
-        "FORK_SLOT_BAND, indexed by ch_rod_pivot_pin_spec for the blank's "
-        "dressing stock"
-    ),
-    ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
-        "the drill-rod blank's cut length under the title block's .XX band "
-        "it prints at, restated for the dressing-stock stack "
-        "(blank_excess_min/max)"
+        "FORK_SLOT_BAND, indexed by sh_vn_pivot_pin_rod_spec for the bought "
+        "pin's dressing stock"
     ),
     ("dt_cylinder_gear_spec", "WHOLE_DEPTH_BAND"): (
         "indexed into the cylinder gear-data whole-depth limits"

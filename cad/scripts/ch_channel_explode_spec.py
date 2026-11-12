@@ -36,15 +36,23 @@ WASHER = "ch-vn-rocker-thrust-washer"
 BANK_SPRING = "ch-vn-rocker-bank-spring"
 ROD = "ch-connecting-rod"
 BAR = "ch-amplitude-bar"
-BAR_PIN = "ch-bar-pivot-pin"
+# The purchased pivot pin's two members (MHA-SH-VN-58) share one file stem;
+# each is its own family, keyed as its BOM row is (stem--member).
+PIVOT_PIN = "sh-vn-pivot-pin"
+BAR_PIN = f"{PIVOT_PIN}--BarPin"
 HOOK = "ch-vn-spring-hook"
 ANCHOR_NUT = "ch-anchor-jam-nut"
 ARM = "ch-rocker-arm"
-ROD_PIN = "ch-rod-pivot-pin"
+ROD_PIN = f"{PIVOT_PIN}--RodPin"
 LEVER = "ch-channel-lever"
 # The installed spring's family: the model holds its built variants
 # (``-stretchNN``, build_ch_channel_assembly), each one family here.
 CHANNEL_SPRING = "ch-vn-channel-spring-installed"
+
+
+def member_family(stem: str, configuration: str) -> str:
+    """A component's family key: the pivot pin's per member, else its stem."""
+    return f"{stem}--{configuration}" if stem == PIVOT_PIN else stem
 
 
 def family(stem: str) -> str:

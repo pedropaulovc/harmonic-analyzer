@@ -16,7 +16,7 @@ import pytest
 
 import cam_plane
 import ch_connecting_rod_spec as rod
-import ch_rod_pivot_pin_spec as pin
+import sh_vn_pivot_pin_rod_spec as pin
 import cylinder_bank_layout as bank
 import dt_cylinder_gear_spec as gear
 import ch_rocker_arm_spec as arm
