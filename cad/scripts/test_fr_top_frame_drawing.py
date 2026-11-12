@@ -326,6 +326,18 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     )
     assert part.KEEPER_RELIEF_CAP_RECESS_WALL == pytest.approx(wall)
     assert wall >= part.WALL_TARGET_MM
+    # On the boss top the recess's mouth lead-in, at its largest printed
+    # leg, comes off that wall; the land left still meets the target.  The
+    # former .03 lead-in left 1.803 there (codjiflo, PR #2599).
+    assert part.BORE_CHAMFER / spec.IN == pytest.approx(0.02)
+    mouth_places = spec.DRAWING_REFERENCE_PRECISION["top bore mouth chamfer"]
+    mouth_max = part.BORE_CHAMFER + spec.PRINTED_LINEAR_BAND_MM[mouth_places]
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(wall - mouth_max)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(2.0574, abs=5e-4)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND >= part.WALL_TARGET_MM
+    assert wall - (0.03 * spec.IN + spec.PRINTED_LINEAR_BAND_MM[mouth_places]) < (
+        part.WALL_TARGET_MM
+    )
     assert chord - part.CAP_RECESS_DIAMETER / 2.0 == pytest.approx(3.2639)
     # The relief removes only the band over the faced top: the cross screws
     # and the cast datum targets lie under it.
@@ -7569,12 +7581,13 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
-    # Owner ruling K5 (#1038): the feet end past the end rails' window faces,
-    # in the corners, where the end rail's own faced flange carries on under
-    # them to the relief step at every printed limit.
+    # Owner ruling K5 (#1038): the feet end past the end rails' window
+    # faces.  No edge of the faced top lies there: each foot stands on the
+    # west rail's own flange, which runs on under the barrel to the corner,
+    # its two sides inside that rail's rims (below).
     assert abs(part.KEEPER_FOOT_TIP_Z_FRONT) > part.INNER_Z
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN == pytest.approx(1.397)
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN > 0.0
+    assert not hasattr(part, "KEEPER_FOOT_CORNER_FLANGE_MARGIN")
+    assert part.KEEPER_TAP_X - 7.0 > part.INNER_X
     # Across it the widest printed foot (on the keeper's own sheet), at the
     # farthest printed fit-up offset from the web's median, stays inside the
     # narrowest as-cast flange less the largest printed top-rim break leg
