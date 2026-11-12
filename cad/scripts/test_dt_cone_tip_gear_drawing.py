@@ -146,6 +146,9 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
         assert retired not in text, retired
     gear_data = notes.gear_data()
     assert "MATE:  MHA-DT-12, 120T" in gear_data
+    # The cutter row names the fly-cutter bit that carries the form (#2358).
+    bit = _config.parts("dt-cone-tip-gear-tl-form-cutter")["number"]
+    assert f"CUTTER:  {bit};" in gear_data and "NOT STOCK" not in gear_data
     # The setup names the features the sheet draws, not private labels.
     assert "TIR MAX TO BOTH \u00d8.0625 ENDS" in gear_data
     assert "SPIGOT" not in gear_data and "PIVOT" not in gear_data
@@ -187,8 +190,9 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
 
 
 def test_tooth_space_sheet_defines_the_space_point_by_point() -> None:
-    """Sheet 2 defines the T006 tooth space (one-sided form tolerance), which
-    is DT6-FORM1's edge; the gear is accepted by sheet 1's note 2."""
+    """Sheet 2 defines the T006 tooth space, which is DT6-FORM1's edge (the
+    MHA-DT-37-TL-01 bit); the form carries no band of its own (#2358): the
+    gear it cuts is accepted by sheet 1's note 2."""
     profile = family.stock_form_profile(6)
     template = profile.template
     table = drawing.form_table_rows()
@@ -199,8 +203,10 @@ def test_tooth_space_sheet_defines_the_space_point_by_point() -> None:
     assert len(lines) <= 4
     assert title == "MHA-DT-37 TOOTH SPACE, INCH (CONTINUED FROM SHEET 1)"
     assert drawing.SHEET_NAMES == ("T006", "DT6-FORM1")
-    assert notes_text.splitlines()[-1] == (
-        f"{family.CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET 1 NOTE {notes.TEETH_NOTE_NUMBER}."
+    assert "TOLERANCE" not in notes_text
+    assert family.CUSTOM_SIX_FORM_TOLERANCE_NOTE not in notes_text
+    assert notes_text.splitlines()[-1].endswith(
+        f"SEE SHEET 1 NOTE {notes.TEETH_NOTE_NUMBER}."
     )
     data = "\n".join([*lines, *(" ".join(row) for row in table)])
     assert notes.CYLINDER_MATE_NUMBER not in data and "BACKLASH" not in data

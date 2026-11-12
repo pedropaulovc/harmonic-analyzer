@@ -2289,6 +2289,37 @@
       "kind": "assembly"
     },
     {
+      "sourceStem": "dt-cone-tip-gear-tl-form-cutter",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-form-cutter",
+          "number": "MHA-DT-37-TL-01"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear-tl-cutter-bar",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter-bar",
+          "number": "MHA-DT-37-TL-02"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear-tl-cutter",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter",
+          "number": "MHA-DT-37-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
       "sourceStem": "dt-cone-tip-gear",
       "sourceNumber": null,
       "identities": [
