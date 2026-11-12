@@ -111,7 +111,10 @@ sections:
       `BLOCK_SCREW_XZ` reads `pinion_rig_park_geometry.PIVOT_X` and
       `pinion_rig_layout.BLOCK_SEAT_Z`; `FOOT_SCREW_XZ` reads that same pivot
       and `SPRING_PAD_Z`. Pedestal seats remain at X = −60.393602135 and
-      Z = −90.518912220 / +92.061087780, through `PEDESTAL_SCREW_XZ`.
+      sit at Z = −97.049312220 / +97.194687780 through `PEDESTAL_SCREW_XZ`
+      since the #1038 re-pitch to .300 in (centred bank; were −91.414312220 /
+      +91.559687780), leaving 26.25 of deck land at the transfer envelope
+      (was 31.89).
       The former block X = −21.412205567 / −4.412205567 and spring-foot
       X = −32.912205567 describe the earlier ideal-tooth parked rig; they are
       historical reconstruction coordinates, not current drilling inputs.
@@ -881,7 +884,7 @@ sections:
         - 'design: replaces the 0.45 end-play leaf and reverses #743 Q4 ("no keeper"): the stack is held north on the datum ear (the shaft by its set screws), so a flat rod held at cam and arm needs no end-play allowance; each spring is checked free on the shaft at fit-up, the catalogue ID tolerance reaching under Ø6.35 (`rocker_bank_layout.ROCKER_PRELOAD`)'
         - med (catalogue)
       - - Support casting ×1 (windowed rocker-arm support)
-        - 'green 180.5 long × 177.8 tall windowed casting (the source''s 177.8 length widened 1.35 an end for the MHA-CH-08 feet, user ruling 2026-10-14 and #1371), 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 5/16 hold-down clearance drills (`cad/scripts/build_fr_rocker_arm_support.py`).'
+        - 'green 192.0 (7.56 in) long × 177.8 tall windowed casting (the source''s 177.8 length widened for the MHA-CH-08 feet: to 180.8 by user ruling 2026-10-14 and #1371, then to 192.0 by the #1038 re-pitch to .300 in, 2026-11-11, whose centred bank sets the feet 5.64 further out an end; 7.56 in is the shortest .02 in length that keeps the MHA-CH-08 foot at its .70, seat end walls 3.01 / 4.62 against 2.0, 2.77 / 4.37 at the end faces'' top edges, which keep the title-block break, not the .06 rim chamfer), 63.5 thick tapering to 16.76 at the top, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). The centred 127.0 cavity and 165.1 pockets locate 1.28 / .53 in off the end faces. Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 5/16 hold-down clearance drills (`cad/scripts/build_fr_rocker_arm_support.py`).'
         - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
         - photo + legacy height
         - med
