@@ -18,12 +18,13 @@ import math
 from itertools import product
 
 import _config
+from _fit_ream_slide import REAM_SLIDE
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
 from dt_pinion_bracket_geometry import THICKNESS_LIMITS as STRAP_T_LIMITS
-from dt_pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND
+from dt_pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND, ROD_SPAN
 from pinion_rig_layout import (
     DRUM_END_SHIM,
     DRUM_END_SHIM_SET_ERROR,
@@ -51,11 +52,12 @@ SHAFT_DIA = 7.9375
 # rear face at -0.66 (#290; was 226.25, 0.088 longer).
 SHAFT_LEN = 226.162
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
-# carry the running band and the Ra 1.6 finish (U39).  Everything else,
-# the MHA-DT-01 drum bond zone included, is 5/16 -.0004/-.0038 in: the drum's
-# REAM_SLIDE bore starts at .3135, so the guaranteed slide-on clearance is
-# .0014 in, and the loosest pair (.3140 on .3087) stays a .0053 in diametral
-# gap, inside Loctite 638's 0.25 mm.
+# carry the running band and the Ra 1.6 finish (U39).  Every other Ø5/16
+# span, the two MHA-DT-01 bond lands included, is 5/16 -.0004/-.0038 in: the
+# drum's REAM_SLIDE bore starts at .3135, so the guaranteed slide-on clearance
+# is .0014 in, and the loosest pair (.3140 on .3087) stays a .0053 in
+# diametral gap, inside Loctite 638's 0.25 mm.  The middle of the drum's
+# length is relieved (BOND_RELIEF_* below).
 SHAFT_DIA_BAND = (-0.01016, -0.09652)
 # The drum also slides over the back land on its way on from the back crown,
 # so the lands sit .0004 in under 5/16 too (Main ruling): the same .0008-wide
@@ -349,29 +351,125 @@ if (
     > BACK_RIM_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("back journal land runs into the back-crown root")
+# --- Bond lands and middle relief (#2360; owner, 2026-11-11) -----------------
+# The 5.64 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
+# (about 4.25 in), so it is drilled and reamed from both ends and its two
+# halves meet near mid-length with whatever small step the re-chucking
+# leaves.  The owner's direction: hold the fit only at the two ends and let
+# the middle be clearance.  A recess in the drum's bore cannot be cut with
+# owned tools (it would need a boring bar reaching 2.9 in through a .3135
+# land), so the clearance is turned on the arbor instead: a plain relief
+# between two bond lands.  The drum then bears and bonds only on those lands,
+# and the long shaft no longer has to follow the bore's straightness over its
+# whole length.  The arbor's back end still slides through the meeting point
+# on assembly, so the halves must meet within the back journal's .0014 in
+# worst-case diametral clearance; the drum sheet's SLIDES ON BY HAND is that
+# check, made before bonding.  So a step under a land is harmless: it is at
+# most that .0014, under the land's .0014-.0053 bond clearance.
+#
+# The relief's front shoulder is located from the head rear face, the sheet's
+# datum for every station (drawing-guidelines rules 10/11; machinist review
+# of 7454ba6d gated a chain off the front land), and its length is its own
+# size, as each journal's is.  Both at .XX.  The front land is the longer:
+# the operator's torque enters at the head and reaches the drum through it.
+# The back shoulder stands 15 mm ahead of the bond-zone diameter's witness
+# (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the back land.
+BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
+BOND_RELIEF_LEN = 66.04  # 2.60
+BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
+# Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
+# relief's .29 maximum the radial air is .0118 in (0.30 mm), ten times the
+# step the reamed halves may leave, so nothing in the middle touches.
+BOND_RELIEF_DIA = 7.112  # .28
+BOND_RELIEF_MIN_RADIAL_AIR = 0.25
+DRUM_BORE_MIN = SHAFT_DIA + REAM_SLIDE[1]  # MHA-DT-01's REAM_SLIDE bore, .3135
+BOND_RELIEF_RADIAL_AIR = (DRUM_BORE_MIN - (BOND_RELIEF_DIA + LINEAR_XX_BAND)) / 2.0
+if BOND_RELIEF_RADIAL_AIR < BOND_RELIEF_MIN_RADIAL_AIR:
+    raise AssertionError(
+        f"bond relief clears the drum bore by {BOND_RELIEF_RADIAL_AIR:.3f}, "
+        f"under {BOND_RELIEF_MIN_RADIAL_AIR}"
+    )
+# Each drum end's bonded overlap, every printed band at its short corner: the
+# relief's front shoulder from the head rear face, its back shoulder that
+# plus the relief length; the drum from its station and length.
+FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
+    DRUM_STATION + DRUM_STATION_BAND
+)
+BACK_BOND_OVERLAP_MIN = (
+    DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
+) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
+# The relief spans the drum's mid-length, where halves reamed to about half
+# depth from each end meet.  This is not a requirement: a deeper pass (the
+# reamer's reach, about 4.25 in, puts the step anywhere from 3.79 to 6.65 in
+# from the head rear face) may leave the step under the front land, where
+# the slide check above already bounds it.
+_DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
+if not (
+    BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
+    and _DRUM_MID + DRUM_STATION_BAND
+    < BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN - 2.0 * LINEAR_XX_BAND
+):
+    raise AssertionError("the bond relief must span the drum's mid-length")
+# Torque: either land alone holds twice a hard hand twist on the MHA-DT-15
+# T-bar (30 N at each end, about 32.5 mm out: 2.0 N m).  LOCTITE 638's ISO
+# 10123 shear is 25 N/mm^2 minimum (TDS), derated with the Henkel Retaining
+# Compound Design Guide's factors taken low: 0.4 for the brass drum
+# [unverified: no brass row was read; the guide's cast iron is 0.8,
+# aluminium 0.6], 0.3 for the clearance at the loosest pair (.0053 in;
+# sm_gooseneck_spring_joint books 0.3 at 0.25 mm) and 0.5 for a long land.
+LOCTITE_638_SHEAR_MPA = 25.0
+BOND_FACTOR = 0.4 * 0.3 * 0.5
+HAND_TORQUE_NM = 2.0 * 30.0 * ROD_SPAN / 2.0 / 1000.0
+BOND_TORQUE_MARGIN_MIN = 2.0
 
-# The bond zone's 5/16 -.0004/-.0038 in is dimensioned on its own flank, from a
-# Top-plane reference sketch like the lands', not off the end-on shaft circle:
-# that circle sits in the neck face on the Front plane, so its witnesses ran
-# along the neck and out through the detail-A fence (run 492a7be5).  The
-# witness station lies inside the drum's bond zone, clear of both lands, so
-# the diameter reads as the bond zone's.  Machinist review r1 of #1685: the
-# callout grew to name its scope and the drum, too tall for the gap above the
-# shaft under detail A, so the witness moved back to 188.0, 11 mm short of
-# the back land, where the callout hangs below the shaft in the open run
-# between the back land and the drum station's text.
+
+def bond_torque_capacity(overlap: float) -> float:
+    """N m one bonded land of ``overlap`` mm holds on the Ø5/16 shaft."""
+    return (
+        LOCTITE_638_SHEAR_MPA
+        * BOND_FACTOR
+        * math.pi
+        * SHAFT_DIA
+        * overlap
+        * SHAFT_DIA
+        / 2.0
+        / 1000.0
+    )
+
+
+if (
+    min(
+        bond_torque_capacity(FRONT_BOND_OVERLAP_MIN),
+        bond_torque_capacity(BACK_BOND_OVERLAP_MIN),
+    )
+    < BOND_TORQUE_MARGIN_MIN * HAND_TORQUE_NM
+):
+    raise AssertionError("a drum bond land does not hold twice the hand torque")
+# Stiffness: the drum is bonded at both ends, so between the lands the brass
+# drum (root Ø15.6 over the .3135 bore, E 97 GPa) carries the bending; its
+# EI is about 12 times the relieved steel's at Ø.27.  The relief carries no
+# torque either: the front land hands it to the drum.
+
+# The bond lands' 5/16 -.0004/-.0038 in is dimensioned on its own flank, from
+# a Top-plane reference sketch like the lands', not off the end-on shaft
+# circle: that circle sits in the neck face on the Front plane, so its
+# witnesses ran along the neck and out through the detail-A fence (run
+# 492a7be5).  The witness station lies on the back bond land, clear of the
+# relief and the back journal, so the diameter reads as the bond lands'.
+# Machinist review r1 of #1685: the callout hangs below the shaft in the open
+# run between the back land and the front land's diameter block.
 BOND_ZONE_DIA_FROM_HEAD_REAR = 188.0
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
 BOND_ZONE_LAND_CLEARANCE = 10.0
 if not (
-    max(FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN, DRUM_STATION)
-    + BOND_ZONE_LAND_CLEARANCE
+    BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + BOND_ZONE_LAND_CLEARANCE
     <= BOND_ZONE_DIA_FROM_HEAD_REAR
     <= min(BACK_JOURNAL_FROM_HEAD_REAR, DRUM_STATION + DRUM_LEN)
     - BOND_ZONE_LAND_CLEARANCE
 ):
     raise AssertionError(
-        "the bond-zone diameter must sit on the drum, clear of both lands"
+        "the bond-zone diameter must sit on the back bond land, clear of the "
+        "relief and the back journal"
     )
 
 # R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-33

@@ -3593,23 +3593,27 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # 20261103T022858451Z-5246d64b8fdf4b9783273c349bf8680b (4cd6a0b1c: #2125's
 # inch drum, 143.256 face, on #2106 f1cb27ac9 with the 7.29 shaft): the
 # moments moved +0.015% parked and -0.004% engaged.
+# Re-measured 2026-11-11 from farm run
+# 20261111T190620364Z-755e192b28244d509c72ba587ea5469a (ce59dcd6d, #2360:
+# the Ø.28 relief between MHA-DT-22's two bond lands, -644 mm^3 of steel):
+# the moments fell 1.36% parked and 1.34% engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.417201200601465, 24.528885296711817)
-SWING_GRAVITY_CORNER_NMM = (14.700792280042016, 25.005658141428334)
+SWING_GRAVITY_NMM = (14.221824088117998, 24.200417624544546)
+SWING_GRAVITY_CORNER_NMM = (14.50541516755855, 24.677190469261063)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 24318.026182668003, 8500.0),
-    "dt-pinion-arbor": (1, 13573.853062566704, 7800.0),
+    "dt-pinion-arbor": (1, 12929.48190210243, 7800.0),
     "dt-pinion-pivot-shaft": (1, 5881.487907488445, 7800.0),
     "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 467.4031930214187
+SWING_GRAVITY_MASS_G = 462.3770979697974
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
