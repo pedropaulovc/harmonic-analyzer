@@ -165,7 +165,7 @@ def test_each_gear_is_accepted_on_its_print_band() -> None:
     assert bank.GEAR_THICKNESS_ACCEPT == pytest.approx(
         (gear.OVERALL_THICKNESS + lower, gear.OVERALL_THICKNESS + upper)
     )
-    # The four-place inch print (.2778 +/-.0010) moves each limit by under a
+    # The four-place inch print (.3000 +/-.0010) moves each limit by under a
     # micrometre: the print is the acceptance.
     printed = printed_deviations(
         gear.OVERALL_THICKNESS,
