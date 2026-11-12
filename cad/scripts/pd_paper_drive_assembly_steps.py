@@ -304,18 +304,22 @@ if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
     )
 # If every term stacks, the contact ratio falls just under 1.0: a slight hitch
 # in the feed at that station, which the steady-advance check
-# ("loaded-rack-geometry-checked") catches. Its remedy re-solders the rack
-# with its crests level, the one term the fitter controls, before setting the
-# mesh again by feel on a new hook; without that term even the arithmetic
-# worst case keeps the floor, so the loop ends.
+# ("loaded-rack-geometry-checked") catches. With every part inside its sheet
+# its remedy re-solders the rack with its crests reading the same at both ends
+# on step 2's height gauge, the one term the fitter controls, before setting
+# the mesh again by feel on a new hook. "The same" leaves at most one .001
+# division of drift, and with that the arithmetic worst case keeps the floor,
+# so the loop ends.
 FEED_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_WORST_CASE_BACKLASH_MM)
 )
+LEVEL_RACK_CREST_DRIFT = 0.0254  # one .001 height-gauge division
 FEED_LEVEL_RACK_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
     (
         FEED_FIRST_BIND_BACKLASH_MM,
         FEED_WORST_CASE_BACKLASH_MM
-        - FEED_LOOSE_TERMS_MM["rack crest drift along the run"],
+        - FEED_LOOSE_TERMS_MM["rack crest drift along the run"]
+        + 2.0 * LEVEL_RACK_CREST_DRIFT * _PRESSURE_ANGLE_TAN,
     )
 )
 if not FEED_LEVEL_RACK_WORST_CASE_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:

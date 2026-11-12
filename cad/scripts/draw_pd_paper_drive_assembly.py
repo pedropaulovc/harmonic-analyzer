@@ -2514,23 +2514,27 @@ def _step_text(
             "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",
-            # Codjiflo P2s on 6abe1aa7f and aa3c6786c: a re-seat moves the rack
-            # against the match-drilled latch, so the mesh is set again by feel
-            # on a new hook. A feel set always lands at the run's tight-spot
-            # bind, so with every part inside its sheet the remedy takes out
-            # the one term the fitter controls, the crest drift (re-soldered
-            # level, the arithmetic worst case passes:
-            # steps.FEED_LOOSE_TERMS_MM), before setting it again.
-            "IF A CHECK FAILS, RE-SEAT ANY LOOSE RACK OR GUIDE (STEPS "
-            f"{steps.step_number('rack-soldered')} AND "
+            # Codjiflo P2s on 6abe1aa7f and aa3c6786c: any rework of the rack
+            # or guides moves the rack against the match-drilled latch, so the
+            # mesh is set again by feel on a new hook. A feel set always lands
+            # at the run's tight-spot bind, so with every part inside its sheet
+            # the remedy takes out the one term the fitter controls, the crest
+            # drift, by re-soldering the rack level; that the loop then ends is
+            # steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen comes off
+            # for the rework as in lock-seats-faced (codjiflo P3 on 6c847adb0).
+            f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
+            f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS, AND THE RACK AND "
+            "GUIDES FOR LOOSENESS.",
+            f"THEN UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
+            "WITH THE HOOK OFF, REMOVE THE LOCKS.",
+            "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
+            "REPLACE ANY PART FOUND OUTSIDE OR LOOSE, PER ITS STEP "
+            f"({steps.step_number('rack-soldered')} OR "
             f"{steps.step_number('guides-screwed')}).",
-            f"IF NONE IS LOOSE, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH AND "
-            f"THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
-            "REPLACE ANY PART FOUND OUTSIDE.",
-            "IF ALL ARE INSIDE, RE-SOLDER THE RACK PER STEP "
+            "IF NONE WAS FOUND, RE-SOLDER THE RACK PER STEP "
             f"{steps.step_number('rack-soldered')}, ITS CRESTS READING THE SAME AT "
             "BOTH ENDS.",
-            "REMOVE THE PAPER.",
+            f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)}.",
             f"WITH THE NEW HOOK, REPEAT {s('hanger-meshed', 0)}-"

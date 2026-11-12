@@ -216,7 +216,12 @@ catches. The 1.0 floor and the root sum square are delegated rulings (Main,
 continuous conjugate action is what "paper advances at constant speed" asks,
 and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
 is used because the setting is by feel and the acceptance is functional, an
-exception to the worst-case mesh stacks limited to this mesh. Easing
+exception to the worst-case mesh stacks limited to this mesh. A hitch with every
+part inside its sheet is cured by re-soldering the rack with its crests reading
+the same at both ends, which leaves at most one .001 division of drift; with
+that the arithmetic worst case keeps contact ratio 1.0 (1.037,
+`FEED_LEVEL_RACK_WORST_CASE_MESH`), and the mesh is set again by feel on a new
+hook. Easing
 past the bind is not booked: the remedy stops where the teeth just turn free,
 and the no-skip check only guards against the mesh coming loose. The builder's
 0.12–0.14 datum band remains the design proof of the modelled mesh
