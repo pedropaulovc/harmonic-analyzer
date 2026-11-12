@@ -410,8 +410,12 @@ def _merged(table: Any, row: int) -> bool:
     WithRow/WithColumn [in,out] VT_BYREF|VT_I4, so they are passed (0, like
     GetSplitInformation's) and come back with the BOOL as one tuple; farm
     20261112T125911703Z refused the two-argument call ('Type mismatch').
-    The WithRow/WithColumn outputs are not relied on."""
-    state = table.IsCellMerged(row, NOTE_COLUMN, 0, 0)
+    IsCellMerged has no IncludeHidden flag and indexes VISIBLE columns, as
+    GetColumnWidth does: farm 20261112T130432678Z read every group merged
+    at physical NOTE 4 before SIZE was hidden, then A1 unmerged at 4 once
+    it was. The WithRow/WithColumn outputs are not relied on."""
+    column = NOTE_COLUMN - sum(1 for physical in range(NOTE_COLUMN) if table.ColumnHidden(physical))
+    state = table.IsCellMerged(row, column, 0, 0)
     return bool(state[0] if isinstance(state, tuple) else state)
 
 
@@ -440,8 +444,12 @@ def _frozen_rows(
                 row = rows[tag][0]
                 notes[tag] = (note,) if row == top else ("", note)
                 if bottom > top and not _merged(table, row):
+                    visible = columns - sum(1 for c in range(columns) if table.ColumnHidden(c))
+                    census = [table.IsCellMerged(row, c, 0, 0) for c in range(visible)]
                     raise RuntimeError(
-                        f"carrier size group {tags} NOTE is not merged {stage}: {tag} (row {row})"
+                        f"carrier size group {tags} NOTE is not merged {stage}: {tag} (row {row}); "
+                        f"IsCellMerged by visible column={census!r} "
+                        f"NOTE text={_cell(table, row, NOTE_COLUMN)!r}"
                     )
     for tag, (row, cells) in rows.items():
         expected = generated[tag]

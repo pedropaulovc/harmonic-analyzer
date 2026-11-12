@@ -215,9 +215,10 @@ class NativeCells:
 
     def IsCellMerged(self, row, col, with_row, with_col):
         # The generated binding's WithRow/WithColumn are [in,out]: a call
-        # without them is the farm's 'Type mismatch'.
+        # without them is the farm's 'Type mismatch'. The column is a
+        # VISIBLE position (no IncludeHidden flag), as GetColumnWidth's.
         assert (with_row, with_col) == (0, 0)
-        return (col == table.NOTE_COLUMN and row in self.merged, row, col)
+        return (self._physical(col, False) == table.NOTE_COLUMN and row in self.merged, row, col)
 
     def ColumnHidden(self, col):
         return self.hidden.get(col, False)
@@ -652,6 +653,18 @@ def test_frozen_rows_refuse_a_size_group_that_is_not_merged():
         row[4] = ""
     native.merged.clear()
     assert set(table._frozen_rows(native, generated, grouped=False, stage="now")) == set(TABLED)
+
+def test_merge_probe_reads_the_visible_note_position_once_size_is_hidden():
+    """Farm 20261112T130432678Z: every group read merged at physical NOTE 4
+    before SIZE was hidden, and unmerged at 4 at settled readback, once it
+    was: IsCellMerged indexes visible columns."""
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    native.SetColumnHidden(table.SIZE_COLUMN, True)
+    assert table._merged(native, 2)
+    assert set(table._frozen_rows(native, generated, grouped=True, stage="now")) == set(TABLED)
+    assert not native.IsCellMerged(2, table.NOTE_COLUMN, 0, 0)[0]  # the physical index misreads
+
 
 
 def _strip_leading_zero(text):
@@ -1211,7 +1224,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         HoleTable=feature, TotalRowCount=len(TABLED) + 1, TotalColumnCount=5,
         InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
         IsCellTextEditable=lambda *_: True,
-        MergeCells=lambda *_: True, IsCellMerged=lambda *_: (True, 0, 0),
+        MergeCells=lambda *_: True, IsCellMerged=lambda *_: (True, 0, 0), ColumnHidden=lambda _col: False,
         SetText2=lambda row, _col, _hidden, text: notes.__setitem__(row, text),
         Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes.get(row, ""),
         SetColumnWidth=lambda _col, width, _style: width,
