@@ -1,0 +1,14 @@
+dt-cone-tip-gear-tl-cutter-bar:
+  title: Cone Tip Gear Fly Cutter Bar
+  # Shop tooling: the parent MHA-DT-37 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2358: the round holder for the MHA-DT-37-TL-01 bit, held in the
+  # PM-30MV's 3/8 R8 collet; one #4-40 set screw (MHA-SH-VN-54) clamps the bit
+  # (fixture MHA-DT-37-TL-00). Never in a machine assembly or BOM.
+  number: MHA-DT-37-TL-02
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: low-carbon cold-finished steel round, 3/8 in, ASTM A108 (1018)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "saw 3/8 cold-finished round to length and face both ends; drill and ream the cross hole square to the axis; drill and tap the end to the cross hole"

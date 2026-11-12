@@ -58,6 +58,8 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_cone_tip_bushing.py",
         "draw_dt_cone_tip_end_screw.py",
         "draw_dt_cone_tip_gear.py",
+        "draw_dt_cone_tip_gear_tl_cutter_bar.py",
+        "draw_dt_cone_tip_gear_tl_form_cutter.py",
         "draw_dt_vn_cone_tip_block_screw.py",
         "draw_dt_crank_arm.py",
         "draw_dt_crank_drive_gear.py",
