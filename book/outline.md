@@ -56,7 +56,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | # | chapter | ends by making |
 |---|---|---|
 | 9 | Turning: facing, OD, shoulders | `dt-crank-pin`, `ch-pivot-shaft` blanks |
-| 10 | Drilling, boring, reaming | `pivot-bushing` bore (Ø6.5 on Ø6.35, 0.15 mm clearance) |
+| 10 | Drilling, boring, reaming | `ch-rocker-arm` hub pivot bore (Ø.256 +.001/.000 reamed on the Ø.250 `ch-pivot-shaft`, `ch_rocker_arm_spec.PIVOT_HOLE_DIA`) |
 | 11 | Parting off to a length tolerance | the 20 rocker-arm hubs (`ch-rocker-hub` on the built-up route) and the 20 `ch-channel-lever` hubs; the 19 bushing spacers are retired — **hub length sets the .300 in (7.62 mm) channel pitch** |
 | 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø0.79375 mm (1/32 in) slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
 | 13 | Milling: squaring, profiling, edges | `ch-rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
@@ -79,7 +79,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.64 mm minimum root-to-bore web on its 1/32 in (Ø0.794 mm) bore. |
 | 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
-| 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
+| 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm` (with `ch-rocker-hub` on the built-up route), `ch-amplitude-bar`, `ch-channel-lever`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
 | 26 | The measuring stick | `ms-stick` — hand-stamped divisions, and why the original's are uneven; `ms-stop-block` + `ms-stop-plate`, the thumbscrew stop clamped at the 2.0 mark |
 | 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `sm-vn-knife-hanger-stud`, `sm-vn-knife-mount-dowel`, `sm-vn-boss-hook`, `sm-vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
 | 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm rim, ×5 via the pressed brass `mg-wheel-drum`), `mg-wheel-axle` + `mg-wheel-axle-spacer`, bracket, clamp, vertical rod, and the purchased music wire `sh-vn-music-wire` (`LeverWire` configuration; McMaster 9666K56) |

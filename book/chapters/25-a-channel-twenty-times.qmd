@@ -19,8 +19,7 @@ One channel is easy. Twenty identical channels is the actual project. This chapt
 | `ch-connecting-rod` ×20 | TODO | TODO | TODO |
 | `ch-amplitude-bar` ×20 | TODO | TODO | TODO |
 | `ch-channel-lever` ×20 | TODO | TODO | TODO |
-| `pivot-bushing` ×19 | TODO | TODO | TODO |
-| `lever-bushing` ×19 | TODO | TODO | TODO |
+| `ch-rocker-hub` ×20 (built-up rocker route) | TODO | TODO | TODO |
 | `ch-pivot-shaft` | TODO | TODO | TODO |
 | `ch-fulcrum-shaft` | TODO | TODO | TODO |
 | `ch-vn-spring-hook` | TODO | TODO | TODO |

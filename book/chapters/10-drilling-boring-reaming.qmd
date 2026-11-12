@@ -37,7 +37,7 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-One `pivot-bushing`: Ø10.0 OD, Ø6.5 through bore running on a Ø6.35 shaft.
+One `ch-rocker-arm` hub pivot bore: Ø.256 +.001/.000 in, reamed through, running on the Ø.250 in `ch-pivot-shaft` (`ch_rocker_arm_spec.PIVOT_HOLE_DIA`).
 :::
 
 ---
