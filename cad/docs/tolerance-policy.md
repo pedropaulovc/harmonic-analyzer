@@ -117,14 +117,17 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
 
 - **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
   centre is set by feel at assembly (owner direction 2026-11-11, #2365,
-  superseding the feeler sets of 2026-10-10 and 2026-11-08). Each pedestal
-  tapped in until the gears at its end just bind and tightened, then the set
-  swung in until a gear just binds, eased out only until the gears turn, and
+  superseding the feeler sets of 2026-10-10 and 2026-11-08). The set swung in
+  until a gear just binds and held, each pedestal tapped in or out until the
+  gears at its end just bind and tightened, then the set swung in
+  until a gear just binds, eased out in small steps to the first free run, and
   the cone-lock-knob (MHA-DT-VN-51) locked; the pedestals are not loosened
   after the set. No setting reading is booked: the feel set guarantees that
   no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
   gear). Gated: nominal contact ratio ≥ 1.0 at the loosest centre a feel set
-  leaves the cone: the highest first bind of any pair, opened by both gears'
+  leaves the cone: the highest first bind of any pair (taking every pair to
+  lie between the two holds; a gear past a hold is the open owner question on
+  #2584), opened by both gears'
   running runout. No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing

@@ -4,9 +4,10 @@ Owner direction 2026-11-11 (#2365), superseding the feeler sets of user
 ruling 2026-10-10 and owner ruling 2026-11-08 for this setting: the cone set
 is swung in and out by the operator many times and is locked by feel where
 the gears do not bind. Assembly order (the assembly drawing's CHECKS note):
-arbor-pedestal screws snug-loose, hold the set swung in and tap each pedestal
-in until the gears at its end just bind, tighten the pedestals, then swing in
-until a gear just binds, ease out only until the gears turn freely, and lock
+arbor-pedestal screws snug-loose, swing the set in until a gear just binds
+and hold it there, tap each pedestal in or out until the gears at its end
+just bind, tighten the pedestals, then swing in until a gear just binds,
+ease out in small steps and stop at the first free run, and lock
 the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
@@ -24,9 +25,14 @@ ground relief takes the drum tip below its base circle; its own clearance is
 dt_mesh_checks.t006_relief_clearance_mm). What the feel set guarantees is the
 floor: no pair runs tighter than its own first bind at its tightest phase,
 so the tightest pair runs at backlash >= 0. It does not fix how much looser
-the other pairs run. Check 4 lays the arbor line on the binds at both ends
-of the set, so no pair is held further above standard than the highest
-first bind of any pair (``SET_OFFSET_MAX_MM``); a pair then runs looser than
+the other pairs run. Check 4 lays the arbor line on a bind near each end of
+the set, and the gate below takes every pair to lie between the two pairs
+that hold it, none held further above standard than the highest first bind
+of any pair (``SET_OFFSET_MAX_MM``). That is an assumption, not a guarantee:
+the holding pairs are wherever the binds fall, and a gear past a hold lies on
+the line's extension, higher by the line's slope times its overhang. Its
+function (gears that do not come loose) is the open owner question on
+#2584; no allowance is booked for it here. A pair then runs looser than
 that at the far phase of its running runout, the cone and the drum each
 ``TOOTH_RUNOUT_TIR_MM`` about their bores. The seat floats, the pivot's
 translation and the arbor's float are taken up the same way under the mesh

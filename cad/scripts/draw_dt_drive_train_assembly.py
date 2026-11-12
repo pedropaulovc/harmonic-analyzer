@@ -2129,11 +2129,14 @@ CHECKS = _note_text(
         # Owner direction 2026-11-11 (#2365), superseding the feeler sets of
         # user ruling 2026-10-10 and owner ruling 2026-11-08: the operator
         # swings the cone set in and out many times and locks it by feel where
-        # the gears do not bind (cone_set_stack).  Each pedestal is first
-        # tapped in until the gears at its end just bind, so the arbor lies on
-        # the binds at both ends; the swing then comes in to the first bind
-        # and eases out only until the gears turn, which bounds the loosest
-        # centre (cone_set_stack.SET_OFFSET_MAX_MM).  The pedestals may move
+        # the gears do not bind (cone_set_stack).  The set is first swung in
+        # until a gear just binds and held there, a stated pose (#2587); each
+        # pedestal is then tapped either way until the gears at its end just
+        # bind, so the arbor lies on a bind near each end (a gear past a hold
+        # is the open owner question on #2584).  The swing then comes in
+        # to the first bind and eases out in small steps to the first free
+        # run, an observable stop that bounds the loosest centre
+        # (cone_set_stack.SET_OFFSET_MAX_MM, #2585).  The pedestals may move
         # only inside their setting-table ranges (#1691 review r4).  A bind is
         # cleared by easing the swing at the binding phase, not by stoning a
         # tip.  One turn of every MHA-DT-12 is one turn of the slowest,
@@ -2143,8 +2146,8 @@ CHECKS = _note_text(
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 OUT TO THE MHA-SH-VN-52 STOP.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
         "4C. EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES UNDER LIGHT TAPS.",
-        "4D. HOLD THE CONE SET SWUNG IN.",
-        "4E. TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND.",
+        "4D. SWING THE CONE SET IN UNTIL A GEAR JUST BINDS; HOLD IT THERE.",
+        "4E. TAP EACH MHA-DT-02 IN OR OUT UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. TIGHTEN MHA-DT-VN-62.",
         "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
         f"{SETTING_SHEET}): EACH DRO VALUE PLUS ITS INDICATOR READING MUST BE IN "
@@ -2158,7 +2161,8 @@ CHECKS = _note_text(
         "4K. REDO 4C-4G.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
-        f"4N. EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} CRANK TURNS.",
+        f"4N. EASE OUT IN SMALL STEPS; STOP AT THE FIRST FREE {CONE_TURN_CRANK_TURNS} CRANK "
+        "TURNS.",
         "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
         "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",

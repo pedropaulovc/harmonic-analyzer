@@ -112,18 +112,24 @@ assembly (owner direction 2026-11-11, #2365), so the gate is written for what
 a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
 `test_standard_mesh_checks`):
 
-- No binding is what the feel set itself guarantees. Check 4 taps each
-  pedestal in until the gears at its end just bind, then swings the set in
-  until a gear just binds and eases it out only until the gears turn. No pair
-  runs tighter than its own first bind, so at the tightest gear the backlash
-  is at least zero (`cone_check` reports it; it is not a separate gate).
+- No binding is what the feel set itself guarantees. Check 4 swings the set
+  in until a gear just binds and holds it there, taps each pedestal in or out
+  until the gears at its end just bind, then swings the set in
+  until a gear just binds and eases it out in small steps to the first free
+  run. No pair runs tighter than its own first bind, so at the tightest gear
+  the backlash is at least zero (`cone_check` reports it; it is not a separate
+  gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout. Check 4N then eases the set
-  out of the bind only until the gears turn freely. That ease is neither
-  printed nor measured, and no number is booked for it (delegated ruling
-  2026-11-12, Main, following the owner's direction of 2026-11-11 on #2416;
-  owner review
+  any pair, opened by both gears' running runout. That loosest centre takes
+  every pair to lie between the two pairs that hold the line; the holds are
+  wherever the binds fall near each end, and a gear past a hold rides the
+  line's extension, higher by its slope times the overhang. Whether that may
+  let a gear come loose is the open owner question on #2584; no allowance is
+  booked for it. Check 4N stops easing at the first free run, an
+  observable stop; the ease is neither printed nor measured, and no number is
+  booked for it (delegated ruling 2026-11-12, Main, following the owner's
+  direction of 2026-11-11 on #2416; owner review
   [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144),
   pending owner confirmation): the 0.04 mm allowance #2557 carried for it had
   no source. Nominal ratios at the loosest centre run from 1.07 (T012) up to
