@@ -1,7 +1,7 @@
 ch-connecting-rod:
   number: MHA-CH-03
   material: Plain Carbon Steel
-  material_specification: AISI 1018 low-carbon steel plate
+  material_specification: AISI 1018 CF flat, 1/4 x 2 REF
   finish: BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; OIL BARE SURFACES
   quantity: 20
   tolerance_class: machined_block

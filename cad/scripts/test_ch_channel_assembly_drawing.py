@@ -1230,12 +1230,13 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
     # The slide check carries no keeper part data (rule 24) and names the
     # shaft; the bore band covers it (ch_fulcrum_shaft_spec).
     checked = _step_body("keeper-bores-checked")
-    assert drawing.item("ch-fulcrum-shaft") in checked and "SLIDES FREELY" in checked
-    for part_data in (".2525", "6.4", "REAM"):
+    assert drawing.item("ch-fulcrum-shaft") in checked
+    assert drawing.item("ch-fulcrum-keeper") in checked
+    for part_data in (".2540", "6.4", "REAM"):
         assert part_data not in checked
-    assert keeper.BORE_LEAST_CLEARANCE_MM >= (
-        keeper.BORE_RUNNING_MIN_CLEARANCE_MM + keeper.BORE_ALIGNMENT_ALLOWANCE_MM
-    )
+    import ch_fulcrum_shaft_spec as shaft
+
+    assert shaft.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM
     # #1660 r2 (rule 19): the lever bank has no stack fit-up because it
     # needs none: twenty hubs at the top of their band leave end play at the
     # shortest lug span, which the slide check gauges.

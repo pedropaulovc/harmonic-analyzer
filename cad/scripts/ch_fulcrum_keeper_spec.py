@@ -34,7 +34,6 @@ from __future__ import annotations
 from math import floor, radians, sqrt, tan
 
 import _config
-from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -105,17 +104,29 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # and locate it, not run on it (the dt_pinion_cam slip bore's case). Each
 # keeper is finished alone, as a detail, to its own print (#2338: the
 # at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
-# setup). Two bores reamed apart sit out of line by their bore-height bands,
-# so the bore is a stock .2525 chucking reamer's size (shop-equipment.toml
-# tools.reamer-2525), BORE_DIA_BAND +.0010/.0000: its least clearance on the
-# shaft covers the slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
+# setup). Two bores reamed apart sit out of line by their bore-height bands
+# and each bore's own tilt to its seat, so the bore is a stock .2540
+# chucking reamer's size (shop-equipment.toml tools.reamer-2540),
+# BORE_DIA_BAND +.0010/.0000: its least clearance on the shaft covers the
+# slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
 # The crown is a full round tangent to both side faces, centred on the bore
 # (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
 # BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's
 # worst case below spends that offset under the round.
-BORE_DIA = 0.2525 * 25.4  # 6.4135
+BORE_DIA = 0.2540 * 25.4  # 6.4516
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2525 +.0010/.0000 in
+BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2540 +.0010/.0000 in
+# The reamer that cuts it: TTC 06-002-540, ANSI B94.2 diameter tolerance
+# +.0001/+.0005 in over 1/4 in (Machinery's Handbook, chucking reamers); the
+# hole it cuts lies inside the bore band.
+BORE_REAMER_DIA_RANGE_MM = (BORE_DIA + 0.0001 * 25.4, BORE_DIA + 0.0005 * 25.4)
+if not (
+    BORE_DIA + BORE_DIA_BAND[1]
+    <= BORE_REAMER_DIA_RANGE_MM[0]
+    < BORE_REAMER_DIA_RANGE_MM[1]
+    <= BORE_DIA + BORE_DIA_BAND[0]
+):
+    raise AssertionError("the keeper bore reamer does not cut inside the bore band")
 KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 # The rail under the two feet: both foot seats lie on MHA-FR-02's one faced
 # top plane (its note B, faced in one setup; no flatness frame is printed,
@@ -508,27 +519,28 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 # axes stand up to BORE_HEIGHT_MISMATCH_MM apart in height over the
 # 2 x KEEPER_Z_OFF lug span, and each seat may pitch its zone over its
 # length. The shaft takes the straight line through both lug centres, so
-# each .32 lug spends its thickness x (its seat's pitch + that line's slope)
-# of diametral clearance: BORE_ALIGNMENT_ALLOWANCE_MM. The bore band's least
-# clearance on the largest shaft keeps the slip minimum on top of it
-# (ch_fulcrum_shaft_spec states the result, ALIGNED_MIN_CLEARANCE_MM).
+# each lug, at the thick end of its printed LugThickness band, spends its
+# thickness x (its seat's pitch + that line's slope) of diametral
+# clearance. Each bore, reamed in its own setup, may also tilt to its seat:
+# BORE_TILT_MM, the shop table's routine squareness (.001 per inch, never
+# under .001 total) over the under-1-in bore. Together they make
+# BORE_ALIGNMENT_ALLOWANCE_MM; ch_fulcrum_shaft_spec checks the bore band's
+# least clearance on the largest shaft keeps the slip minimum on top of it
+# (ALIGNED_MIN_CLEARANCE_MM).
 BORE_HEIGHT_MISMATCH_MM = (
     2.0 * _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]]
     + KEEPER_SEAT_FLATNESS_BUDGET_MM
 )  # 0.548
+LUG_THICKNESS_MAX_MM = (
+    2.0 * LUG_HALF_T + _BAND_BY_PLACES[DRAWING_PRECISION["LugBody"]["LugThickness"]]
+)  # 8.382
+BORE_TILT_MM = 0.001 * 25.4
 BORE_ALIGNMENT_ALLOWANCE_MM = (
-    2.0
-    * LUG_HALF_T
+    LUG_THICKNESS_MAX_MM
     * (
         KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_SEAT_LENGTH_MM
         + BORE_HEIGHT_MISMATCH_MM / (2.0 * KEEPER_Z_OFF)
     )
-)  # 0.0473
-_SHAFT_MAX_DIA = 0.25 * 25.4 + SHAFT_H[0]  # MHA-CH-04 at the top of its band
-BORE_LEAST_CLEARANCE_MM = BORE_DIA + BORE_DIA_BAND[1] - _SHAFT_MAX_DIA  # .0025 in
-if (
-    BORE_LEAST_CLEARANCE_MM
-    < BORE_RUNNING_MIN_CLEARANCE_MM + BORE_ALIGNMENT_ALLOWANCE_MM
-):
-    raise AssertionError("the keeper bore band does not cover the bore alignment")
+    + BORE_TILT_MM
+)  # 0.0741
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

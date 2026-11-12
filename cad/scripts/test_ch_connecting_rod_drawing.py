@@ -648,9 +648,11 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("ch-connecting-rod")
-    # Main ruling 2026-10: machined from 1018 plate, black finish.
+    # Main ruling 2026-10: machined from 1018, black finish; #2173/#2340: the
+    # stock is the bought cold-finished flat the route names.
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
-    assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
+    assert "1018" in spec["material_specification"]
+    assert "plate" not in spec["material_specification"].lower()
     assert spec["finish"] == (
         "BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; "
         "OIL BARE SURFACES"

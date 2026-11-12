@@ -1434,17 +1434,20 @@ JOINTS: tuple[Joint, ...] = (
         installed_at=ch_channel_assembly_steps.step_ref(
             ch_channel_assembly_steps.KEEPERS_SCREWED_KEY
         ),
-        # #1180: the pivot brackets' reasoning (north/south-pivot-bracket-
-        # hold-down rows above) holds here: the shaft is set-screwed in both
-        # keepers' slip bores and joins them into one frame.
+        # #1180, delegated ruling (Main's #2338 assignment; logged on #2144 for
+        # owner review): the pivot brackets' reasoning (north/
+        # south-pivot-bracket-hold-down rows above) holds here: the shaft is
+        # set-screwed in both keepers and joins them into one frame located
+        # by the two screws.
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps each fulcrum_keeper foot to the stationary top_frame rail (neither "
             "moves in operation); one screw per foot, but the keeper cannot turn about "
-            "it: the fulcrum_shaft runs through both keepers' bores, set-screwed in each "
-            "(MHA-CH-VN-55 on its flat), so either keeper's yaw about its screw would "
-            "swing its lug sideways and turn the shaft with it, which the other keeper's "
-            "bore and screw 161.5 along the shaft resist; the channel_levers' oscillating "
+            "it: the fulcrum_shaft runs through both keepers' bores, each set screw "
+            "(MHA-CH-VN-55 on its flat) clamping it to its bore, so the two keepers and "
+            "the shaft are one frame held by two screws 177.3 apart on the shaft line, "
+            "and either keeper's yaw about its own screw would have to drag the other "
+            "keeper's clamped foot sideways; the channel_levers' oscillating "
             "drag acts about the shaft axis (Z), perpendicular to the vertical screw axis, "
             "and their spring and bar loads press the foot on its seat"
         ),

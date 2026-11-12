@@ -50,8 +50,6 @@ UNIT = drawing_unit("parts/ch-fulcrum-shaft", _config.parts("ch-fulcrum-shaft"))
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
-if SHAFT_DIA + SHAFT_DIA_BAND[0] >= BORE_DIA + BORE_DIA_BAND[1]:
-    raise AssertionError("fulcrum shaft does not slide in the keeper bore")
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
@@ -298,15 +296,15 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
 # --- The keepers' bores, each reamed alone on its own keeper
 # (ch_fulcrum_keeper_spec): the straight shaft through both spends
 # BORE_ALIGNMENT_ALLOWANCE_MM of each bore's clearance on the two bore
-# heights' bands and the rail seats under the feet, and the rest must still
-# be the slip minimum.
+# heights' bands, each bore's tilt and the rail seats under the feet, and
+# the rest must still be the slip minimum. The one guard on the keeper fit.
 ALIGNED_MIN_CLEARANCE_MM = (
     BORE_DIA
     + BORE_DIA_BAND[1]
     - SHAFT_DIA
     - SHAFT_DIA_BAND[0]
     - BORE_ALIGNMENT_ALLOWANCE_MM
-)  # 0.0162
+)  # 0.0275
 if ALIGNED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
     raise AssertionError(
         f"the keeper bores keep {ALIGNED_MIN_CLEARANCE_MM:.4f} on the shaft "
