@@ -7,7 +7,7 @@ dt-crankshaft:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   drawing_unit: in
-  process: "turned from bar: 3/8 in core, integral Ø.81 collar with a Ø.689 sprocket seat spigot and 2 reamed drive-pin holes, Ø.3125 pinion seat step (steel)"
+  process: "turned from bar: 3/8 in core, integral Ø.689 sprocket seat collar with 2 reamed drive-pin holes, Ø.3125 pinion seat step (steel)"
   machinist_exceptions:
     # TODO(#1625): remove RV-01 and the INSIDE CORNERS note when the title
     # block gains its inside-corner default.
@@ -38,6 +38,6 @@ dt-crankshaft:
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 8.1 (fan-out ruling on Q-DT11-2: the depth stays as is). The depth is the press depth shared with drive pin MHA-DT-VN-67 (dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH), which sets the pins' projection into sprocket MHA-PD-09; restating it re-keys the seat geometry across slices and is deferred to its next re-key. Accepts this depth's places only, no other departure."
     - id: "RV-06"
       kind: "accept"
-      where: "front view: the 2X Ø.375 ±.010 callout, with its one leader on the neck at the Ø.3125 seat step; its second neck lies between the Ø.81 collar and the left Ø.4490 journal"
+      where: "front view: the 2X Ø.375 ±.010 callout, with its one leader on the neck at the Ø.3125 seat step; its second neck lies between the Ø.689 collar and the left Ø.4490 journal"
       finding: "the 2X callout has a leader to one of its two necks only (rules 10, 26)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 8.1 (fan-out rule L3). Both necks are one Ø.375 ±.010 turned diameter identified by the 2X count, ASME practice for identical features. Every diameter on this sheet is authored in the end-profile sketch and reaches the side view only by dragging one dimension, and the collar-side land has no free text position (the collar spigot, journal and station dimensions fence it), so a second leader or a detail would need a new model witness and a re-layout. Accepts the single leader only, no other band or callout departure."

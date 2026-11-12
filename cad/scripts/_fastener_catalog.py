@@ -248,13 +248,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A009",
     ),
-    # Thin zinc-plated steel #10-24 nut jammed against the MHA-SM-03 boss
-    # top face, locking the MHA-SM-VN-50 counter anchor.
-    "sm-vn-boss-hook-jam-nut": _stock(
-        "sm-vn-boss-hook-jam-nut",
-        "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut",
-        "90760A140",
-    ),
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.4: the counter spring's
     # upper eye rides free on this shoulder screw's 1/4 shoulder, seated on
     # the MHA-SM-05 end plug's face, retained by its head.  Owner ruling 2026-11-08

@@ -83,7 +83,7 @@ def _station_delta(j: int) -> tuple[float, float]:
 
 def test_the_clear_window_is_the_flat_rods() -> None:
     low, high = _clear_window()
-    assert (low, high) == pytest.approx((-0.73425, 0.73425), abs=1e-6)
+    assert (low, high) == pytest.approx((-1.016, 1.016), abs=1e-6)
     # The plate's near face prints from the fork's datum face and its
     # thickness at the ring (#982 review r1): the same window the two face
     # ordinates (+/-.002 each) spent.

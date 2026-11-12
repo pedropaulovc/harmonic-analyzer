@@ -62,7 +62,7 @@ COUNT = 20  # the full bank (the brackets never follow active_count)
 STATION_Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane
 PITCH = _config.machine("channels", "station_pitch_mm")
 # Arm/bar/lever mid-planes, the rod-pin plane and the spring stations sit on
-# the cam plane: z_j + CAM_MID_DZ (-3.528, the integral cam's mid-width).
+# the cam plane: z_j + CAM_MID_DZ (-3.81, the integral cam's mid-width).
 ARM_MID_DZ = CAM_MID_DZ
 if abs(HUB_LENGTH - PITCH) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the station pitch")
@@ -173,7 +173,7 @@ PIVOT_SHAFT_OVERALL_LENGTH = (
         / _PRINT_GRID
     )
     * _PRINT_GRID
-)  # 6.40
+)  # 6.85
 PIVOT_SHAFT_LENGTH = PIVOT_SHAFT_OVERALL_LENGTH - 2.0 * _shaft.DOME_HEIGHT
 PIVOT_SHAFT_NORTH_Z = NORTH_EAR_OUTER_Z
 PIVOT_SHAFT_SOUTH_Z = PIVOT_SHAFT_NORTH_Z - PIVOT_SHAFT_LENGTH

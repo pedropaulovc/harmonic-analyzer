@@ -116,9 +116,11 @@ CAM_DIA_PLACES = 3
 # now stack about nominal and the 20-gear acceptance
 # (cylinder_bank_layout.STACK_L20_ACCEPT) passes first time. A long stack is
 # re-faced at fit-up; a short one gets its thinnest gear remade.
-# Exempt from the inch grid (#290): the station-pitch closure, 7.0565 mm, so
-# it prints .2778 at four places (0.4 um under the model).
-OVERALL_THICKNESS = 7.0565
+# On the inch grid since the #1038 re-pitch: the station-pitch closure is
+# .300 in exactly.  It keeps four places for its +/-.0010 band, the class the
+# cam throw prints at too (DRAWING_PRECISION below), not for a converted-mm
+# nominal: three would read as the +/-.002 row the cam OD and face carry.
+OVERALL_THICKNESS = 7.62
 OVERALL_THICKNESS_BAND = (0.0254, -0.0254)  # (upper, lower) deviations: +/-.0010 in
 OVERALL_THICKNESS_PLACES = 4
 CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot

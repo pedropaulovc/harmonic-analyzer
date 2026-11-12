@@ -282,7 +282,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 47)
+        self.assertEqual(len(retired), 49)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
@@ -291,6 +291,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         # the MHA-DT-VN-66 loop link's places;
         # PR #1992 (C1 keyed): the bonded tip and its end screw retired the
         # MHA-DT-VN-54 stack collar and the MHA-DT-VN-55 cup adjuster;
+        # #2326: the spring hooks stand bare, retiring both jam nuts;
         # #2339: the purchased MHA-SH-VN-58 dowel retired the made MHA-CH-10
         # rod and MHA-CH-11 bar pivot pins.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
@@ -302,6 +303,8 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                                                 ("dt-crank-pin-eye", ["MHA-DT-28"]),
                                                 ("vn-cone-tip-collar", ["MHA-DT-VN-54"]),
                                                 ("vn-cone-tip-adjuster", ["MHA-DT-VN-55"]),
+                                                ("ch-anchor-jam-nut", ["MHA-CH-14"]),
+                                                ("vn-boss-hook-jam-nut", ["MHA-SM-VN-55"]),
                                                 ("ch-rod-pivot-pin", ["MHA-CH-10"]),
                                                 ("ch-bar-pivot-pin", ["MHA-CH-11"])])
         oblique_reservations = {

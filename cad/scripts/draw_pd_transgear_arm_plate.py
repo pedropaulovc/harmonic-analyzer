@@ -294,10 +294,11 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
 # The boss diameter stands beyond the boss face's caption.  The over-arm
-# thickness's value and its three-line callout (about 20 mm of model wide at
-# 2:1) stand centred 13 mm right of the boss face, so the whole block clears
-# the hub-to-boss dimension's boss-face witness line (at +6 that line ran
-# through the text: machinist review of ae9ed661a), in the open sheet above
+# thickness's value and its two-line callout (16 characters, about 21 mm of
+# model wide at 2:1) stand centred 16 mm right of the boss face, so the whole
+# block clears the hub-to-boss dimension's boss-face witness line by about
+# 5 mm of model, as the three 12-character lines did at +13 (at +6 that line
+# ran through the text: machinist review of ae9ed661a), in the open sheet above
 # the boss; between the plate's own witness lines they would cross face A's.
 # The hub station's callout takes two lines.  SOLIDWORKS centres the
 # value-and-callout block on its position, so each line raises the value
@@ -308,7 +309,7 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, BOSS_FACE_Z + 13.0),
+    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, BOSS_FACE_Z + 16.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 17.9, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
@@ -457,8 +458,27 @@ PLAN_CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
     "LocatorDia1": LOCATOR_COUNT_CALLOUT,
 }
+
+
+def two_lines_of_words(caption: str) -> str:
+    """The spec caption's words, in order, on two lines broken where the
+    longer line is shortest.
+
+    Rule 7 allows a callout at most two lines of words; the spec holds the
+    thickness callout and the thrust-face captions as three (machinist
+    review, run 20261112T153723793Z).  The wrap stays here until the next
+    change that re-keys the part moves it into the spec (#2657).
+    """
+    words = caption.split()
+    cut = min(
+        range(1, len(words)),
+        key=lambda i: max(len(" ".join(words[:i])), len(" ".join(words[i:]))),
+    )
+    return f"{' '.join(words[:cut])}\n{' '.join(words[cut:])}"
+
+
 SECTION_CALLOUTS = {
-    "ThicknessOverArm": THICKNESS_CALLOUT,
+    "ThicknessOverArm": two_lines_of_words(THICKNESS_CALLOUT),
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
@@ -578,9 +598,16 @@ DATUM_A_MODEL = (0.0, _SCREW_Y, -14.0)
 # annulus between the bore and the face's diameter, below the axis, and the
 # symbol stands level with it beyond the face, inside the diameter's witness
 # lines (under them, its leader crossed the hub's: run 20261027T130144223Z).
-# The hub face's caption stands under the hub diameter's lower witness line;
-# the boss face's above its symbol.  Each caption's xy is its top-left
-# corner. Model points, mm.
+# Each face's caption stands directly over its own symbol, on the symbol's
+# side of every witness line (inside the face diameter's), so it reads as
+# the symbol's words: under the hub diameter's lower witness line, the hub
+# caption read as loose text or a note on the diameter (machinist review,
+# run 20261112T165728270Z; that placement was main's).  The hub caption's
+# widest line (the second, 14 characters) ends short of the face.  Each
+# caption's xy is its top-left corner. Model points, mm.
+FACE_FINISH_CAPTIONS = {
+    key: two_lines_of_words(caption) for key, caption in FINISH_CAPTIONS.items()
+}
 _ModelPoint = tuple[float, float, float]
 
 
@@ -589,16 +616,25 @@ def _annulus_mid_y(face_dia: float) -> float:
     return -(BORE_DIA + face_dia) / 4.0
 
 
+# On the run 20261112T165728270Z sheet the Ra symbol stands 3.5 mm of model
+# over its pick, and a two-line caption's block (the note's top pad, two
+# lines at their pitch) is 4.2 tall; each caption's foot stands
+# _CAPTION_FOOT_GAP over its symbol, less than one caption text height.
+FINISH_SYMBOL_HEIGHT = 3.5
+CAPTION_BLOCK_HEIGHT = 4.2
+_CAPTION_FOOT_GAP = 0.7
+_CAPTION_OVER_PICK = FINISH_SYMBOL_HEIGHT + _CAPTION_FOOT_GAP + CAPTION_BLOCK_HEIGHT
+
 FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
     "hub_face": (
         (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z),
         (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z - 9.5),
-        (0.0, -HUB_DIA / 2.0 - 1.5, HUB_FACE_Z - 17.5),
+        (0.0, _annulus_mid_y(HUB_DIA) + _CAPTION_OVER_PICK, HUB_FACE_Z - 20.5),
     ),
     "boss_face": (
         (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z),
         (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z + 4.0),
-        (0.0, 4.0, BOSS_FACE_Z + 3.0),
+        (0.0, _annulus_mid_y(BOSS_DIA) + _CAPTION_OVER_PICK, BOSS_FACE_Z + 3.0),
     ),
 }
 # A placed note reads back its own SetPosition point; a refused move leaves
@@ -1020,7 +1056,7 @@ async def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
         _add_note(
-            adapter, knob_section, FINISH_CAPTIONS[key],
+            adapter, knob_section, FACE_FINISH_CAPTIONS[key],
             _sheet_xy(adapter, knob_section, caption, f"{label} caption"),
             f"{label} caption",
         )

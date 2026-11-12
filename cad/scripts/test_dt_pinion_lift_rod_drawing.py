@@ -145,7 +145,8 @@ def test_each_flat_covers_its_cams_feeler_set_range() -> None:
     # A): each flat is twice its screw's half range plus the #2-56 major, up
     # to .01, and sits on the nominal tap station (owner_q2_rule23_sketch.py,
     # panel 2).
-    assert spec.SCREW_FROM_RIM["front"] == pytest.approx(6.6563 * _IN, abs=1e-3)
+    # #1038 re-pitch: the 6.06 drum moves the front cam .42 in (10.668) aft.
+    assert spec.SCREW_FROM_RIM["front"] == pytest.approx(7.0763 * _IN, abs=1e-3)
     assert spec.SCREW_FROM_RIM["back"] == pytest.approx(0.66835 * _IN, abs=1e-3)
     assert spec.SCREW_HALF_RANGE["front"] == pytest.approx(0.06575 * _IN, abs=1e-3)
     assert spec.SCREW_HALF_RANGE["back"] == pytest.approx(0.03787 * _IN, abs=1e-3)
@@ -158,9 +159,9 @@ def test_each_flat_covers_its_cams_feeler_set_range() -> None:
     # the grid point nearest centring its flat on the tap station that still
     # holds the screw point on the flat at both bands' worst case.  Rounding
     # to nearest gave the back flat .58, which lets the point run off.
-    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.55 * _IN)
+    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.97 * _IN)
     assert spec.BACK_FLAT_EDGE_FROM_RIM == pytest.approx(0.59 * _IN)
-    assert spec.FRONT_FLAT_FROM_RIM == pytest.approx(6.66 * _IN)
+    assert spec.FRONT_FLAT_FROM_RIM == pytest.approx(7.08 * _IN)
     assert spec.BACK_FLAT_FROM_RIM == pytest.approx(0.675 * _IN)
     band = 0.01 * _IN
     point_r = spec.SET_SCREW_POINT_DIA / 2.0

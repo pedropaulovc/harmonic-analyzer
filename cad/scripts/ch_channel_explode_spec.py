@@ -41,7 +41,6 @@ BAR = "ch-amplitude-bar"
 PIVOT_PIN = "sh-vn-pivot-pin"
 BAR_PIN = f"{PIVOT_PIN}--BarPin"
 HOOK = "ch-vn-spring-hook"
-ANCHOR_NUT = "ch-anchor-jam-nut"
 ARM = "ch-rocker-arm"
 ROD_PIN = f"{PIVOT_PIN}--RodPin"
 LEVER = "ch-channel-lever"
@@ -113,7 +112,6 @@ _CHANNEL_GROUP = (
     BAR_PIN,
     CHANNEL_SPRING,
     HOOK,
-    ANCHOR_NUT,
 )
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south keeper out", _KEEPER_GROUP, "z", -50.0, "south"),
@@ -145,19 +143,19 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
     # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
-    # Each anchor's MHA-CH-14 jam nut goes down with it, then a further 30
-    # off the shank's bottom. On the shank, the 6.66-diameter nut is under 1 mm
-    # at 1:7 and shares the anchor's outline. 30 (3.5 mm on the sheet) orders
-    # its balloon round the ring clear of the anchor's (ring replay).
-    ExplodeStep("anchors down", (HOOK, ANCHOR_NUT), "y", -40.0),
-    ExplodeStep("anchor nuts off the shank", (ANCHOR_NUT,), "y", -30.0),
+    ExplodeStep("anchors down", (HOOK,), "y", -40.0),
     # Withdrawn past a keeper: in place only its 10 mm tips stand clear of the
     # lever hubs, under 1.5 mm at 1:7, and its balloon landed on lever 20's
     # ink (r4 balloon pick, shared edge). South, not north: withdrawn north its
     # balloon joined the lever-bank cluster at the top of the view and the ring
     # crossed leaders 2/17 and 8/10 (r6 layout audit); south it attaches out at
     # the right, which a replay of the r6 ring places clear of every leader.
-    ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
+    # 100, not 120: at the .300 pitch the shaft is 11.45 longer, and its south
+    # end sets the box's south (top-of-sheet) corner; at 120 the ringed
+    # outline stood 0.25 mm over the top border (#1038 point B). At 100 its
+    # south end (-189.5) is 14 north of where 120 left the 166.6 shaft, and
+    # its north end (-11.5) still sits inside the lever bank.
+    ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -100.0),
     ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
     ExplodeStep("its rod pin out", (ROD_PIN,), "z", 25.0, "north-most"),
     # South, not north: 25 north put the bar pin on the lever's lower edge

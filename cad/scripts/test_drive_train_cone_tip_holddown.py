@@ -13,6 +13,8 @@ block, owner decision C1 keyed 2026-11-09, PR #1992) is proved here too.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 
@@ -69,6 +71,48 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
         assert bdt._plat_side_half_widths(station)["+X"] == pytest.approx(
             geometry._west_edge_x(z_local)
         )
+
+
+def test_plate_edges_come_from_the_platform_outline() -> None:
+    """#2611: the assembly reads the plate's edges from PLATE_OUTLINE, so in
+    the band the south-east chamfer runs, the east edge is the chamfer line,
+    not the straight east taper continued to the south edge."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_geometry as geometry
+
+    south_x, south_z = geometry.SE_CHAMFER_SOUTH_XZ
+    east_x, east_z = geometry.SE_CHAMFER_EAST_XZ
+    z_local = (south_z + east_z) / 2.0
+    station = bdt.PIVOT_STATION + z_local
+    chamfer_x = south_x + (east_x - south_x) * (z_local - south_z) / (east_z - south_z)
+    taper_east = geometry.HALF_WIDTH_N + (
+        geometry.EAST_HALF_S - geometry.HALF_WIDTH_N
+    ) * (geometry.NORTH_OVERHANG - z_local) / geometry.PLATE_LEN
+    assert bdt._plat_side_half_widths(station)["-X"] == pytest.approx(-chamfer_x)
+    assert -chamfer_x < taper_east - 1.0
+    # North of the chamfer the east edge is still the taper.
+    north = bdt.PIVOT_STATION + geometry.NORTH_OVERHANG - 1.0
+    assert bdt._plat_side_half_widths(north)["-X"] == pytest.approx(
+        geometry.HALF_WIDTH_N
+        + (geometry.EAST_HALF_S - geometry.HALF_WIDTH_N) / geometry.PLATE_LEN
+    )
+
+
+def test_pivot_post_is_held_on_the_plate_as_a_circle() -> None:
+    """#2611: the post's round foot is checked as a circle against every
+    outline edge, the chamfer included, and agrees with the platform part's
+    own POST_FOOT_CONTAINMENT; a foot one margin wider fails."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_checks as checks
+
+    assert "pivot post" not in bdt.PLATFORM_RIDER_SPANS
+    radius = bdt.POST_BLOCK_DIA / 2.0
+    assert bdt.POST_PLATFORM_CONTAINMENT_MM == pytest.approx(
+        checks.POST_FOOT_CONTAINMENT
+    )
+    assert bdt.POST_PLATFORM_CONTAINMENT_MM >= bdt.PLATFORM_CONTAINMENT_FLOOR_MM
+    grown = radius + bdt.POST_PLATFORM_CONTAINMENT_MM + 0.01
+    assert bdt._plat_round_foot_containment_mm(bdt.POST_STATION, grown) < 0.0
 
 
 def test_block_width_one_sided_band_holds_containment() -> None:
@@ -361,6 +405,34 @@ def test_swing_sweep_catches_a_footprint_the_engaged_pose_misses() -> None:
     # And a round occupant is held off by its radius plus the clearance.
     with pytest.raises(AssertionError, match="synthetic post"):
         bdt.require_swing_clearance({}, {"synthetic post": ((cx, cz), 0.5)})
+
+
+def test_south_east_chamfer_is_what_clears_column_socket_0(monkeypatch) -> None:
+    """#1038 conflict 4: with the bank centred the swung plate's south end
+    passes the front column.  The swept outline is the plate's own
+    (south-east corner chamfered); the sharp corner it replaces is the
+    fail-first control and fires the same import-time assertion."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_geometry as geometry
+
+    assert bdt._PLATFORM_VERTICES == tuple((x, z) for _label, x, z in geometry.PLATE_OUTLINE)
+    gap, swing = bdt.SWING_OCCUPANT_CLEARANCE["column socket 0"]
+    assert gap >= bdt.SWING_SEAT_RUNNING_CLEARANCE
+    # The nearest pass is at the end of the certified swing, where the column
+    # stands almost on the plate's axis: the south edge passes it, not only
+    # the corner.
+    assert swing == pytest.approx(bdt.P1_SWEEP_DEG[1])
+    pivot = (bdt._PPIVOT[0], bdt._PPIVOT[2])
+    socket, radius = bdt.SWING_ROUND_OCCUPANTS["column socket 0"]
+    keep_out = math.dist(pivot, socket) - radius - bdt.SWING_SEAT_RUNNING_CLEARANCE
+    post_foot_rim = -geometry.POST_LOCAL_Z + geometry.POST_MAIN_DIA / 2.0
+    assert 0.0 < keep_out - post_foot_rim < 1.0
+    assert -geometry.PLATE_SOUTH_Z > keep_out
+
+    sharp = tuple((x, z) for _label, x, z, _radius in geometry.PLATE_CORNERS)
+    monkeypatch.setattr(bdt, "_PLATFORM_VERTICES", sharp)
+    with pytest.raises(AssertionError, match="column socket 0"):
+        bdt.require_swing_clearance({}, bdt.SWING_ROUND_OCCUPANTS)
 
 
 def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:

@@ -4,16 +4,14 @@ Twenty of these routing eyebolts replace the old formed-wire J-hook. Each one
 threads DOWN through a #6-32 tap in the summing lever's coefficient plate
 (``sm_summing_lever_spec.HOLE_SPEC``, sourced from this same anchor record) and
 the channel spring's lower eye links onto its eye. The SUPPLIED HEX NUT IS
-OMITTED: the anchor is locked by the separate MHA-CH-14 round jam nut
-(``ch_anchor_jam_nut_spec``) on the plate underside, so the production
-part is the bolt body alone.
+OMITTED: nothing torques the anchor, so it stays bare in its tap (#2326), and
+the production part is the bolt body alone.
 
 Two supplier options this production part takes -- the nut above and LENGTH:
 the vendor's 19.05 mm shank is cut to ``ch_vn_spring_hook_spec.SHANK_LENGTH_MM``
 with the 45 deg deburr restored at the new end (its leg driven to the sheet's
-.03 nominal), so the shank crosses the plate, carries the jam nut and still
-shows two full threads below it after the calibration back-out -- and the
-factory thread phase survives.
+.03 nominal), so the shank's full thread still spans the plate after the
+calibration back-out -- and the factory thread phase survives.
 
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
@@ -100,8 +98,8 @@ FINISHED_FEATURES = (
 )
 
 # The vendor ships 9489T111 with a captive hex nut; it is discarded (the
-# MHA-CH-14 jam nut is its own part), so no nut geometry belongs in the
-# SLDPRT -- and the trim below would cut through its seat.
+# anchor stays bare in its tap), so no nut geometry belongs in the SLDPRT --
+# and the trim below would cut through its seat.
 NUT = "omitted"
 
 

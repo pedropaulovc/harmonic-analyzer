@@ -69,10 +69,11 @@ Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
-stations: z_j = -64.0124 + 7.0565 j. The connecting rod is flat -- ring,
-shank and fork share one mid-plane -- so the cam, the rod, the arm/bar/lever
-mid-planes and the spring stations all sit at z_j + ARM_MID_DZ (= the cam
-plane, -3.528: half the cylinder gear's 7.0565 stacking thickness, the ring
+stations: z_j = -69.0839 + 7.62 j (.300 in pitch, #1038). The connecting rod
+is flat -- ring, shank and fork share one mid-plane -- so the cam, the rod,
+the arm/bar/lever mid-planes and the spring stations all sit at z_j +
+ARM_MID_DZ (= the cam plane, -3.81: half the cylinder gear's 7.62 stacking
+thickness, the ring
 centred in its closed slot, #743). Each rod's U-shaped fork straddles its
 arm in that plane.
 
@@ -213,7 +214,6 @@ from _cwm import (
     resolve_entity,
 )
 from _transforms import (
-    ROT_X_POS90,
     ROT_Y_180,
     ROT_Y_POS90,
     compose_rows,
@@ -559,7 +559,8 @@ ROT_Y_NEG90 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 # p.40 / ch30 p008 black shaft-END brackets). Each lug's inner face must float
 # clear of the end lever hub: the levers sit at hub_mid_z(j) (= z_j +
 # ARM_MID_DZ, asserted above) with their integral hubs one pitch long, so the
-# bank ends half a hub past the end levers (-71.069 / +70.061; floats 0.435).
+# bank ends half a hub past the end levers (-76.704 / +75.696; floats 0.508
+# with KEEPER_Z_OFF 3.180 in, #1038 re-pitch).
 from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 
 KEEPER_HUB_FLOAT_MIN = 0.25
@@ -601,7 +602,6 @@ import ch_channel_lever_spec  # noqa: E402
 import ch_vn_channel_spring_stock_geom as spring_stock  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import ch_vn_spring_hook_spec  # noqa: E402
-import ch_anchor_jam_nut_spec  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 
@@ -619,16 +619,6 @@ IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
-
-
-# MHA-CH-14 on each anchor axis, its z = 0 bearing face on the coefficient
-# plate underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine
-# -Y, so the round nut hangs below the plate around the anchor's protruding shank.
-CHANNEL_ANCHOR_NUT_XY = (
-    spring_mounts.CHANNEL_ANCHOR_XY[0],
-    spring_mounts.PLATE_BOTTOM_Y,
-)
-CHANNEL_ANCHOR_NUT_ROWS = ROT_X_POS90
 
 
 def z_station(j: int) -> float:
@@ -954,10 +944,10 @@ def _assert_spring_mount(
             f"channel anchor engages {engagement:.4f} mm of plate, expected "
             f"{ch_vn_spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
         )
-    # The cut end crosses the plate and carries the MHA-CH-14 jam nut on the
-    # underside; at the worst case (shortest in-band part under the thickest
-    # nut, through the thickest in-band plate, backed out the whole calibration
-    # budget) full threads must still show below the nut.
+    # The cut end crosses the plate with no nut on it (#2326); at the worst
+    # case (shortest in-band part, through the thickest in-band plate, backed
+    # out the whole calibration budget) its full-form thread still spans the
+    # plate.
     protrusion = bottom - thread_bottom
     nominal_protrusion = ch_vn_spring_hook_spec.PROTRUSION_MM
     if abs(protrusion - nominal_protrusion) > 1e-6:
@@ -966,29 +956,13 @@ def _assert_spring_mount(
             f"underside, expected {nominal_protrusion:.4f}"
         )
     budget = ch_vn_spring_hook_spec.ADJUSTMENT_TRAVEL_MM
-    past_nut = ch_vn_spring_hook_spec.full_threads_past_nut_mm(
+    below_plate = ch_vn_spring_hook_spec.full_thread_below_plate_mm(
         budget, -ch_vn_spring_hook_spec.LENGTH_BAND_WORST_MM
     )
-    floor = ch_vn_spring_hook_spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
-    if past_nut < floor - 1e-9:
+    if below_plate < -1e-9:
         raise RuntimeError(
-            f"channel anchor shows {past_nut:.4f} mm of full thread past its jam "
-            f"nut at the worst case, under the {floor:.4f} mm floor"
-        )
-    # Neighbouring round nuts on the one-row tap pattern, both at their
-    # largest printed O.D., their taps displaced toward each other across the
-    # lever's spring-hole position zone (a zone radius each; code review C06).
-    nut_gap = (
-        sm_summing_lever_spec.CHANNEL_PITCH
-        - float(
-            sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
-        )
-        - ch_anchor_jam_nut_spec.OD_MAX
-    )
-    if nut_gap < ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE:
-        raise RuntimeError(
-            f"neighbouring channel anchor jam nuts clear by {nut_gap:.4f} mm, "
-            f"under {ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE} mm"
+            f"channel anchor's full thread ends {-below_plate:.4f} mm inside the "
+            "plate at the worst case"
         )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
@@ -1000,10 +974,9 @@ def _assert_spring_mount(
         f"stock spring mount: inside length {pose.length_mm:.4f} mm, "
         f"thread engagement {engagement:.3f} mm, "
         f"cut end {protrusion:.3f} mm below the plate underside, "
-        f"{past_nut:.3f} mm full thread past the jam nut after the "
+        f"full thread {below_plate:.3f} mm past the plate underside after the "
         f"{budget:.3f} mm back-out budget "
-        f"({ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} turn), "
-        f"{nut_gap:.3f} mm between neighbouring jam nuts"
+        f"({ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} turn)"
     )
 
 
@@ -1042,11 +1015,11 @@ def _finish_settings_feature(adapter, feature: str, dims: SketchDims) -> list:
 async def _author_settings_reference(adapter) -> None:
     """The fit-up's settings as model dimensions: no solid or pose edits, one
     construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
-    the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
     leg on the fulcrum axis between the keeper lugs' inner faces -- and one
-    for the keeper plan view (the MHA-FR-02 socket bore and boss, socket
-    line, web centre line, the lug centre line and the two inner-face
-    stations, plus the web faces as its only non-construction lines), each
+    for the keeper plan view (the MHA-FR-02 socket bore and boss, the boss's
+    keeper relief step, socket line, web centre line, the lug centre line
+    and the two inner-face stations, plus the inner web face as its only
+    non-construction line), each
     dimensioned from
     globals, banded, marked for the drawing and blanked (the mg
     AxleStackReference pattern). On the Right plane, sketch x is machine -z
@@ -1074,7 +1047,8 @@ async def _author_settings_reference(adapter) -> None:
         ("ChKeeperSocketBoss", spec.SOCKET_BOSS_DIA),
         ("ChKeeperWebHalfT", spec.KEEPER_PLAN_WEB_HALF_T),
         ("ChKeeperWebFaceFromSocket", spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET),
-        ("ChKeeperFootTipFromSocket", spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET),
+        ("ChKeeperReliefFromSocket", spec.KEEPER_PLAN_RELIEF_FROM_SOCKET),
+        ("ChKeeperReliefHalfChord", spec.KEEPER_PLAN_RELIEF_HALF_CHORD),
         ("ChKeeperLugX", spec.KEEPER_LUG_X - socket_x),
         ("ChKeeperFrontFaceZ", socket_y - face_ys[0]),
         ("ChKeeperRearFaceZ", socket_y - face_ys[1]),
@@ -1134,13 +1108,14 @@ async def _author_settings_reference(adapter) -> None:
     set_sketch_direct_db(adapter, True)
     # The MHA-FR-02 features (ch_channel_assembly_spec): the socket line
     # runs east (-x) past the boss toward the upper-left socket; the socket's
-    # bore and boss circles sit on its centre; the web centre line runs
-    # rearward (+z, sketch -y) to the front lug inner-face station; the lug
-    # centre line runs from the socket line through both inner-face
-    # stations, front then rear. All construction (phantom on the sheet)
-    # but the web faces, which print as visible lines from where they leave
-    # the boss: the inner face to the station, beside the front keeper, the
-    # outer face to the keeper's foot tip, where it goes under it.
+    # bore and boss circles sit on its centre; the boss's keeper relief step
+    # crosses the boss square to the rail; the web centre line runs rearward
+    # (+z, sketch -y) to the front lug inner-face station; the lug centre line
+    # runs from the socket line through both inner-face stations, front then
+    # rear. All construction (phantom on the sheet) but the inner web face,
+    # which prints as a visible line from where it leaves the boss to the
+    # station, beside the front keeper; the outer face lies under the keeper
+    # from the boss on, so it shows nowhere in plan.
     socket_line = check(
         "keeper-plan socket line",
         await adapter.add_line(
@@ -1157,25 +1132,29 @@ async def _author_settings_reference(adapter) -> None:
             ("boss", spec.SOCKET_BOSS_DIA),
         )
     ]
+    relief_y = socket_y - spec.KEEPER_PLAN_RELIEF_FROM_SOCKET
+    relief_step = check(
+        "keeper-plan boss relief step",
+        await adapter.add_line(
+            socket_x - spec.KEEPER_PLAN_RELIEF_HALF_CHORD,
+            relief_y,
+            socket_x + spec.KEEPER_PLAN_RELIEF_HALF_CHORD,
+            relief_y,
+        ),
+    )
     web_line = check(
         "keeper-plan web centre line",
         await adapter.add_line(socket_x, socket_y, socket_x, face_ys[0]),
     )
-    web_face_y = socket_y - spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET
-    outer_face, inner_face = web_faces = [
-        check(
-            f"keeper-plan {side} web face",
-            await adapter.add_line(x, web_face_y, x, end_y),
-        )
-        for side, x, end_y in (
-            (
-                "outer",
-                socket_x + spec.KEEPER_PLAN_WEB_HALF_T,
-                socket_y - spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET,
-            ),
-            ("inner", socket_x - spec.KEEPER_PLAN_WEB_HALF_T, face_ys[0]),
-        )
-    ]
+    inner_face = check(
+        "keeper-plan inner web face",
+        await adapter.add_line(
+            socket_x - spec.KEEPER_PLAN_WEB_HALF_T,
+            socket_y - spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET,
+            socket_x - spec.KEEPER_PLAN_WEB_HALF_T,
+            face_ys[0],
+        ),
+    )
     lug_ys = [socket_y, *face_ys]
     lug_legs = [
         check(
@@ -1185,9 +1164,16 @@ async def _author_settings_reference(adapter) -> None:
         for index, (y0, y1) in enumerate(zip(lug_ys, lug_ys[1:]))
     ]
     set_sketch_direct_db(adapter, False)
-    for entity in (socket_line, *socket_circles, web_line, *web_faces, *lug_legs):
+    for entity in (
+        socket_line,
+        *socket_circles,
+        relief_step,
+        web_line,
+        inner_face,
+        *lug_legs,
+    ):
         segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
-        construction = entity not in web_faces
+        construction = entity != inner_face
         segment.ConstructionGeometry = construction
         if bool(segment.ConstructionGeometry) is not construction:
             raise RuntimeError(
@@ -1195,8 +1181,9 @@ async def _author_settings_reference(adapter) -> None:
             )
     for line, relation in (
         (socket_line, "horizontal"),
+        (relief_step, "horizontal"),
         (web_line, "vertical"),
-        *((face, "vertical") for face in web_faces),
+        (inner_face, "vertical"),
         *((leg, "vertical") for leg in lug_legs),
     ):
         check(
@@ -1244,35 +1231,48 @@ async def _author_settings_reference(adapter) -> None:
             "KeeperSocketLine",
             '"ChKeeperSocketLine"',
         ),
-        *(
-            dimension
-            for face, side in zip(web_faces, ("Outer", "Inner"), strict=True)
-            for dimension in (
-                (
-                    socket,
-                    f"{face}.start",
-                    "horizontal_distance",
-                    spec.KEEPER_PLAN_WEB_HALF_T,
-                    f"Keeper{side}WebFaceX",
-                    '"ChKeeperWebHalfT"',
-                ),
-                (
-                    socket,
-                    f"{face}.start",
-                    "vertical_distance",
-                    spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET,
-                    f"Keeper{side}WebFaceZ",
-                    '"ChKeeperWebFaceFromSocket"',
-                ),
-            )
+        # The relief step: each end the half chord off the web centre (east
+        # end first), the step the relief's distance rearward of the socket
+        # (the line is horizontal).
+        (
+            socket,
+            f"{relief_step}.start",
+            "horizontal_distance",
+            spec.KEEPER_PLAN_RELIEF_HALF_CHORD,
+            "KeeperReliefStepEastX",
+            '"ChKeeperReliefHalfChord"',
         ),
         (
             socket,
-            f"{outer_face}.end",
+            f"{relief_step}.end",
+            "horizontal_distance",
+            spec.KEEPER_PLAN_RELIEF_HALF_CHORD,
+            "KeeperReliefStepWestX",
+            '"ChKeeperReliefHalfChord"',
+        ),
+        (
+            socket,
+            f"{relief_step}.start",
             "vertical_distance",
-            spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET,
-            "KeeperOuterWebFaceEnd",
-            '"ChKeeperFootTipFromSocket"',
+            spec.KEEPER_PLAN_RELIEF_FROM_SOCKET,
+            "KeeperReliefStepZ",
+            '"ChKeeperReliefFromSocket"',
+        ),
+        (
+            socket,
+            f"{inner_face}.start",
+            "horizontal_distance",
+            spec.KEEPER_PLAN_WEB_HALF_T,
+            "KeeperInnerWebFaceX",
+            '"ChKeeperWebHalfT"',
+        ),
+        (
+            socket,
+            f"{inner_face}.start",
+            "vertical_distance",
+            spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET,
+            "KeeperInnerWebFaceZ",
+            '"ChKeeperWebFaceFromSocket"',
         ),
         (
             socket,
@@ -2429,15 +2429,6 @@ async def build(adapter) -> dict[str, str]:
                 "rotation": [0.0, 0.0, 0.0],
                 "rows": IDENTITY,
                 "label": f"spring-hook ch{j:02d} direct threaded seat",
-            }
-        )
-        grounded_specs.append(
-            {
-                "part": "ch-anchor-jam-nut",
-                "position": [*CHANNEL_ANCHOR_NUT_XY, z_mid],
-                "rotation": euler_from_rows(CHANNEL_ANCHOR_NUT_ROWS),
-                "rows": CHANNEL_ANCHOR_NUT_ROWS,
-                "label": f"spring-hook jam nut ch{j:02d} on the plate underside",
             }
         )
 

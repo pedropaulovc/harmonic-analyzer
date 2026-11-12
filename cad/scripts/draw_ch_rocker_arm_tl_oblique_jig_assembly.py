@@ -1131,15 +1131,28 @@ def _first_index(lines: Sequence[str], head: str) -> int:
 
 _OPERATION_START = _first_index(spec.OPERATION_STEPS, "15")
 _CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
-# The one sequence, in print order: the general torque note, the pivot-hole
-# and station keys, the assembly, then the pass change and service and the tooling and
-# cutting groups, each under its heading; the reference heights stand under
-# the cutting heading.
+# The workpiece the strap steps cut, named by its drawing number and count
+# from MHA-CH-13's own registry row. #2642 asked for its stock or count
+# ("each strap blank" had none in this package: TL-00 machinist review,
+# integration proof run 20261112T074730410Z); the review of that fix (run
+# 20261112T153723793Z, rule 24) ruled that the stock belongs on MHA-CH-13's
+# own drawing, so this assembly sheet names the part and count only. It is
+# not a jig part, so it has no BOM row.
+_STRAP = _config.parts("ch-rocker-strap")
+STRAP_BLANK_KEY = (
+    f"STRAP BLANK (STEPS 1M-1N, 19-21J): {str(_STRAP['number']).upper()}, "
+    f"{int(_STRAP['quantity'])} OFF; NOT A JIG PART."
+)
+# The one sequence, in print order: the general torque note, the pivot-hole,
+# station and near/far keys, the strap-blank key, the assembly, then the pass
+# change and service and the tooling and cutting groups, each under its
+# heading; the reference heights stand under the cutting heading.
 INSTRUCTION_LINES = (
     spec.GENERAL_TORQUE_NOTE,
     spec.PIVOT_HOLE_KEY,
     spec.STATION_KEY,
     spec.NEAR_FAR_KEY,
+    STRAP_BLANK_KEY,
     *spec.ASSEMBLY_STEPS,
     "PASS CHANGE AND SERVICE:",
     *spec.OPERATION_STEPS[_OPERATION_START:_CUTTING_START],

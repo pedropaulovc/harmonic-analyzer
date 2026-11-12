@@ -164,7 +164,7 @@ tolerance.**
      the cone and cylinder gear specs both read it through `read_config`, so the whole
      20-pair train and the 32T alignment pinion share it by construction);
    - **crossed crank pair — normal 24DP / 20° PA** (`gear_train.yaml crank_drive_normal_module_mm`),
-     a straight 16T pinion driving a 64T with straight right-hand teeth inclined 13.0011° (#2332);
+     a straight 16T pinion driving a 64T with straight right-hand teeth inclined at the 12.0247° cone incline (`dt_crank_drive_gear_spec.TOOTH_INCLINATION_DEG`; #2332);
    - **paper-drive reducer — 48DP / 20°** (`pd_rack_pinion_spec.py`, 150T disc and the 15T knob
      pinion since #2034; same pitch as the cone train, cut with the #1 and #7 cutters the cones
      do not use, and a separate meshing pair);
@@ -241,7 +241,7 @@ means, so it is called out per row.
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `fr-rocker-arm-support` 4× foot holes; `sm-summing-lever` 20 spring holes at 7.0565 pitch; channel pivot / lever bores; `sm-knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
+| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `fr-rocker-arm-support` 4× foot holes; `sm-summing-lever` 20 spring holes at 7.62 pitch; channel pivot / lever bores; `sm-knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
 
 Position replaces a `±`-boxed hole location with a **round** zone evenly distributed about the true
 position (a square `±` zone is both too tight on the diagonal and too loose on the axes), and it
@@ -343,7 +343,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Summing lever** `sm-summing-lever`, `sm-knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
 | **Cylinder gears + cams** `dt-cylinder-gear`, `ch-connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
 | **Cone gears** `dt-cone-gear`, `dt-cone-gear-shaft` | **T1** | tooth-cutting setup within **0.05 mm TIR** of the finished bore; ordinary bands (OD +0/−0.05, tooth thickness ±0.075; T006 thin-only); **48DP / 20° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.64 mm minimum web on its 1/32 in bore** + harder tip metal (Finding 4); `precision` on bore. The centre distance is **set at assembly** on T120's feeler and locked by the cone-lock knob (MHA-DT-VN-51), so the mesh is gated at nominal plus an RSS corner, not at the arithmetic worst case ([`gear-standard.md`](./gear-standard.md#how-the-meshes-are-accepted)). |
-| **Pivots & bushings** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
+| **Pivots & hubs** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `ch-rocker-hub`, the `ch-channel-lever` hubs | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 20 integral hubs one length, one setup** (they stack face to face at the 7.62 mm channel pitch; the 19 spacers are retired); shaft straightness. |
 | **Rocker arms** `ch-rocker-arm`, `fr-rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `ch-amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
 | **Drive train** `crankshaft`, `dt-crank-pin`, `dt-crank-drive-gear`, `dt-crank-pinion`, `dt-crank-arm`, `dt-crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
@@ -361,10 +361,11 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 Express these as **consistency + fit-at-assembly**, not absolute position — that matches both the
 error model and how the machine was actually built and trimmed.
 
-- **Channel pitch & coplanarity (the real assembly precision):** the 7.0565 mm channel spacing and
-  the coplanarity of the 20 rockers / 20 levers are set by the **spacer-bushing lengths** and the
-  **pivot-shaft straightness**, not by 20 independently located holes. → machine the spacers
-  together; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
+- **Channel pitch & coplanarity (the real assembly precision):** the 7.62 mm (.300 in) channel spacing and
+  the coplanarity of the 20 rockers / 20 levers are set by the **integral hub lengths** (each
+  set's 20 hubs stack face to face; the 19 bushing spacers are retired) and the
+  **pivot-shaft straightness**, not by 20 independently located holes. → face each set's hubs
+  in one setup; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
   consistency" is won or lost.
 - **Gear mesh centre distances:** **set at assembly by feel** for light backlash; the cone set
   *pivots out of engagement* by design, so spec nominal + "adjust for a little backlash, never
@@ -462,7 +463,7 @@ geometric:            # keyed by GD&T characteristic (§5.2); each = tolerance z
   straightness:     { tol_mm: 0.05, applies_to: "pivot/fulcrum/cone-gear-shaft + crank-pin axes", how: "between-centres + steady; Rule #1 already bounds it at MMC" }
   perpendicularity: { tol_mm: 0.05, applies_to: "pivot-bore axis to mount face; knife edge to motion plane", how: "bore in the setup that faces the mount" }
   parallelism:      { tol_mm: 0.05, applies_to: "amplitude-bar slide", how: "indicate" }
-  position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.0565, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
+  position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.62, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
   profile_surface:  { tol_mm: 0.1, applies_to: "rocker R800 concave form, cam eccentric profile, gear-tooth flanks", how: "form-cut/CNC; CMM scan vs the nominal curve" }
   runout:           { tir_mm: [0.025, 0.05], types: [circular, total], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "mandrel / bore-and-cut one setup; dial gauge" }
   # feature notes that resolve to the characteristics above:
@@ -560,8 +561,8 @@ against the actual audience and the toolchain, each is now a decision, not a def
 
 **Toolchain (corrected).** The build is **manual-primary by deliberate choice** — manual mill +
 lathe with DROs, chosen for fidelity to a hand-built 1898 machine — **with a PM-30MV CNC available
-for the repetitive, high-count parts**: the **20 cams**, the **19+19 spacer bushings** (the
-`pivot-bushing` and `lever-bushing` banks — different OD and length, both 19-off), and the
+for the repetitive, high-count parts**: the **20 cams**, the **20+20 integral hubs** (the
+`ch-rocker-hub` and `ch-channel-lever` hub banks, each 20 hubs at the .300 channel pitch), and the
 **cone/cylinder gear train**. That is exactly where channel-to-channel *consistency* (§2's expensive
 error mode) is hardest to hold by hand, so CNC is the right tool there even though manual remains the
 main path for one-off parts. An earlier draft of this section wrongly called the toolchain
@@ -626,7 +627,7 @@ so supplying them is the single highest-value contribution this supplement makes
 ### CAM (STEP → CAM → G-code) — IN SCOPE, deferred until the nominal model is validated
 
 **Corrected from a prior "OUT."** With the **PM-30MV CNC** in the toolchain for the repetitive parts
-(20 cams, 19+19 spacer bushings, cone/cylinder gear train), CAM has a real consumer. The **primary feed
+(20 cams, 20+20 integral hubs, cone/cylinder gear train), CAM has a real consumer. The **primary feed
 is the 3D solid via STEP**, not DXF: `SW → STEP → CAM (SOLIDWORKS CAM / HSMWorks / external) → select
 faces & pockets, define stock + tools + operations → post G-code`. For a **3-axis mill cutting a real
 solid**, STEP is the mainstream, robust path — it preserves the true form (bores, hubs, varying

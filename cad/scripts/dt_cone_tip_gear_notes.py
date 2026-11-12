@@ -16,6 +16,7 @@ from dataclasses import replace
 
 import _config
 import cone_set_stack
+import cone_tip_cluster
 import dt_cone_gear_spec as family
 import dt_cone_tip_gear_spec as spec
 import dt_mesh_checks
@@ -48,8 +49,11 @@ PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
-FACE_NOTE_NUMBER = 4
-FACE_NOTE_FLAG = f"SEE NOTE {FACE_NOTE_NUMBER}"
+# The gear width's callout, in MHA-DT-03's form (draw_dt_cone_gear): the
+# .2934 nominal is the stack closure of the touching faces, and the callout
+# names that stack at the dimension (machinist review, farm run
+# 20261112T053742990Z: behind a note flag it read as an off-grid nominal).
+FACE_STACK_CALLOUT = f"20-GEAR STACK\nON {SHAFT_MATE_NUMBER}"
 
 
 def sheet_notes() -> str:
@@ -62,8 +66,7 @@ def sheet_notes() -> str:
     end screw's hole then runs on it with the clearance its limits give. Note
     2 names the mesh and the fit route of the tip, thickness and root bands,
     with the teeth's do-not-cut. Note 3: the stems are turned between centres,
-    and a centre hole in either end harms nothing (rule 11). Note 4 names the
-    gear width's mate: the leaves set the cone gear stack on the shaft.
+    and a centre hole in either end harms nothing (rule 11).
     """
     interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
     clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
@@ -77,7 +80,6 @@ def sheet_notes() -> str:
             "THEN BY BACKLASH AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
             "3. CENTRES OK.",
-            f"{FACE_NOTE_NUMBER}. GEAR WIDTH: SETS THE CONE GEAR STACK ON {SHAFT_MATE_NUMBER}.",
         )
     )
 
@@ -87,9 +89,10 @@ def sheet_notes() -> str:
 # note (rule 4).
 DIMENSION_CALLOUTS = {
     # The spigot's band is the turned-diameter row's width, so it needs no
-    # fit route: the bonded fit and its three mates.
+    # fit route: the bonded fit with its compound (rule 26's fit name, as
+    # MHA-DT-04's note prints it) and its three mates.
     "SpigotDia": (
-        f"BONDED FIT IN {SHAFT_MATE_NUMBER} SOCKET\n"
+        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN {SHAFT_MATE_NUMBER} SOCKET\n"
         f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
     # One diameter carries both of note 1's fits.
@@ -98,10 +101,10 @@ DIMENSION_CALLOUTS = {
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\n{TEETH_NOTE_FLAG}",
     # The leaves are one face of the twenty-gear cone stack (dt_cone_gear_stack)
-    # on the cone shaft: named in flagged note 4, so the callout block stays
-    # inside the width's own extension lines, which the pivot's and spigot's
-    # lengths share (farm review round 2, rule 14).
-    "FaceWidth": FACE_NOTE_FLAG,
+    # on the cone shaft.  At the .2934 face the two short lines stand inside
+    # the width's own extension lines, which the pivot's and spigot's lengths
+    # share (rule 14).
+    "FaceWidth": FACE_STACK_CALLOUT,
 }
 # Text over the value, one line each (a multi-line callout above a value
 # drops from the print, draw_dt_cone_gear).

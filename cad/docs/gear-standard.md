@@ -10,7 +10,7 @@ involute cutter instead of making cutters for an odd pitch.
 | Meshing domain | Parts | Tooth system |
 |---|---|---|
 | Cone and cylinder train | `dt-cone-tip-gear` T006, `dt-cone-gear` T012–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
-| Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, straight teeth inclined 13.0011° right hand) | normal 24DP, normal PA20 |
+| Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, straight teeth inclined 12.0247° right hand) | normal 24DP, normal PA20 |
 | Paper-drive reducer | `pd-rack-pinion` (150T disc), `pd-transgear-knob-shaft` (integral 15T) | 48DP, PA20 (#1 and #7, added to the cone set) |
 | Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
 | Chain | crank and knob sprockets, 66 links | ANSI #25 |
@@ -119,9 +119,15 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout, plus a 0.04 mm allowance
-  for the felt ease (`cone_set_stack.FEEL_EASE_MM`). Nominal ratios at the
-  ceiling run from 1.07 (T012) up to about 1.20.
+  any pair, opened by both gears' running runout. Check 4N then eases the set
+  out of the bind only until the gears turn freely. That ease is neither
+  printed nor measured, and no number is booked for it (delegated ruling
+  2026-11-12, Main, following the owner's direction of 2026-11-11 on #2416;
+  owner review
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144),
+  pending owner confirmation): the 0.04 mm allowance #2557 carried for it had
+  no source. Nominal ratios at the loosest centre run from 1.07 (T012) up to
+  about 1.20; T012 keeps a ratio of 1.0 for a further 0.04 mm of centre (REF).
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
   ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
   least 0.010 mm clear of every printed drum-tip path where the swing locks
@@ -338,7 +344,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   and 17.99 mm) so that the whole cutter-form flank stays inside the stock
   cutter's ground profile at every tolerance corner.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
-  7.0565 mm channel pitch is unchanged.
+  7.0565 mm channel pitch was unchanged by the pitch change. The #1038
+  re-pitch (owner ruling 2026-11-11) then moved the channel pitch to 7.62 mm
+  (.300 in): sin i = 1.5875/7.62 gives a cone incline of 12.025°, a seat
+  pitch of 7.4528 mm (the cone face width, .2934 in) and a 149.056 mm
+  twenty-gear cone stack. Tooth counts, DP, PA, bores and keyways did not
+  move.
 - Cone outside diameters follow the AGMA standard blank: 7.26 mm at 12T up to
   64.35 mm at 120T, where the #2 cutter's form caps it just under the ideal
   64.56 mm. T006 is 4.31 mm, above its AGMA 4.23 mm, so that its tip keeps a
@@ -378,12 +389,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   floor is Ø2.136 mm MIN, so the cutter runs off over the stems and no web
   remains to break. The thinnest cone web is now T012's 1.641 mm over its
   reamed spigot bore.
-- The 64T crank gear has straight teeth inclined 13.0011° right hand (owner
+- The 64T crank gear has straight teeth inclined 12.0247° right hand (owner
   ruling 2026-11-10, #2332 option A, superseding the earlier true helix of lead
   945.86 mm per turn). Each tooth space is one straight pass of the #2 stock
   cutter with plain indexing on the shop's Precision Matthews BS-0
   ([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0))
-  tilted 13°, so no lead gearing or spiral-capable head is needed. The cutter
+  tilted 12°, so no lead gearing or spiral-capable head is needed. The cutter
   centre plane crosses the gear axis 1.778 mm (.07 in) north of the south
   face. The tilt sense sets the hand
   ([machining-dfm.md](machining-dfm.md#crossed-crank-pair-normal-24dp-pa20)).
@@ -391,11 +402,11 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   new. The printed tooth data, the error budget and the mid-face mesh check
   are unchanged. Away from the station where the cutter crosses the axis a
   straight tooth is thicker on the pitch circle than the helix was, by up to
-  0.017 mm at the north face; `crank_mesh_stack.station_checks` books it per
+  0.011 mm at the north face; `crank_mesh_stack.station_checks` books it per
   face station (#2481). Off the pitch circle its flanks also lean against the
   helix's, one way at the tip and the other at the root; with drive and coast
-  contact at different radii that takes 0.016 mm more backlash at the south
-  face and 0.040 mm at the north face in the plane model. `station_checks`
+  contact at different radii that takes 0.014 mm more backlash at the south
+  face and 0.033 mm at the north face in the plane model. `station_checks`
   reports it beside the backlash and does not gate it (#2481). The ruling is
   conditional on the straight model
   passing the drive-train interference and soundness gates.

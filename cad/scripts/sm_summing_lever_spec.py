@@ -13,7 +13,7 @@ Values MUST match build_sm_summing_lever.py.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths
 stay physical millimetres.  The lever's nominals are kinematic closures
-(knife ridge, spring stations and pitch), spring/nut seats or values other
+(knife ridge, spring stations and pitch), spring seats or values other
 subsystems read, so they keep their values and print at the places that
 hold them; every check below takes the printed limits.  Only the R MAX
 limits (knife-ridge round, rib blends) and the knife-edge side band move to
@@ -25,7 +25,8 @@ from __future__ import annotations
 import math
 
 import _config
-from _hole_spec import HoleSpec
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     inside_corner_radius_mm,
@@ -41,13 +42,21 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
-# --- Nominal geometry (SummingLever.cs, inches -> mm; DIMENSIONS.md ch. 18). ---
+# --- Nominal geometry (mm); plate/web centring per owner issue #2129. ---
 PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
-PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
-COUNTER_WEB_T = 0.2 * MM_PER_IN  # 5.08 negative-X web, centered on Y0
-COEFFICIENT_T = 7.0  # uniform positive-X plate; thickened downward only (.276)
-COEFFICIENT_TOP_Y = 0.1 * MM_PER_IN  # fixed +2.54 seat, independent of web depth
-COEFFICIENT_BOTTOM_Y = COEFFICIENT_TOP_Y - COEFFICIENT_T  # -4.46 nut seats
+# Owner ruling 4 (#1038, 2026-11-11): the .300 station pitch lengthens the tap
+# row 134.07 -> 144.78, so the plate's front (-Z) end is extended .25 in. The
+# rear (+Z) end, datum B, the local origin (the installed SUMMING_Z station),
+# the counter boss and the middle rib stay: the body is no longer symmetric
+# about the origin, and every Z station is one of these two ends, never a
+# half length.
+PLATE_Z_PLUS = 3.0 * MM_PER_IN  # +76.20 rear body end, datum B
+PLATE_Z_MINUS = -3.25 * MM_PER_IN  # -82.55 front body end
+PLATE_L = PLATE_Z_PLUS - PLATE_Z_MINUS  # 158.75 plate / pivot length (Z), 6.25
+COEFFICIENT_T = 7.0  # uniform plate centred on the pivot/trunnion axis
+COUNTER_WEB_T = COEFFICIENT_T  # negative-X web shares the plate's two faces
+COEFFICIENT_TOP_Y = COEFFICIENT_T / 2.0  # +3.50 spring-anchor seats
+COEFFICIENT_BOTTOM_Y = -COEFFICIENT_T / 2.0  # -3.50 plate underside
 CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
@@ -127,7 +136,7 @@ KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
 # KNIFE_RIDGE_CONTACT_SPAN apart; their relative offset skews the knife axis
 # and spreads the spring hook arms by up to KNIFE_HOOK_ARM_SPREAD_MAX.
 KNIFE_STUB_RIDGE_OFFSET_MAX = 2.0 * RIDGE_FROM_SIDE_TOL  # 0.1016
-KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 174.117 stub mid to stub mid
+KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 180.467 stub mid to stub mid
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
@@ -146,7 +155,7 @@ SURFACE_FINISHES = (
         PlanarFace(
             KNIFE_FACE_NORMAL,
             KNIFE_FACE_OFFSET,
-            contains_z_mm=(PLATE_L + HEX_DEPTH) / 2.0,
+            contains_z_mm=PLATE_Z_PLUS + HEX_DEPTH / 2.0,
         ),
         display_unit=UNIT,
     ),
@@ -157,7 +166,7 @@ SURFACE_FINISHES = (
         PlanarFace(
             KNIFE_FACE_NORMAL,
             KNIFE_FACE_OFFSET,
-            contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+            contains_z_mm=PLATE_Z_MINUS - HEX_DEPTH / 2.0,
         ),
         display_unit=UNIT,
     ),
@@ -165,29 +174,30 @@ SURFACE_FINISHES = (
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``ch-vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the supplied nut is discarded
-# and each is locked by an MHA-CH-14 jam nut on the plate underside -- so
-# each station is a through tap, not a bore:
+# and each stays bare, nothing torquing it (#2326) -- so each station is a
+# through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
 # supplier change can never leave the lever tapped for the wrong screw.
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
 HOLE_X = 39.85
 HOLE_COUNT = 20
-CHANNEL_Z0 = -67.1
-CHANNEL_PITCH = 7.0565
+CHANNEL_Z0 = -72.1715  # _cone_axis_constants.FORMER_CHANNEL_Z0 (#1038 re-pitch)
+CHANNEL_PITCH = 7.62  # machine channels.station_pitch_mm, .300
 # The spring stations sit on the channel arm plane, the cam plane
 # (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
 # like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
 # _interference_contracts, so an import would put the gear-train and channel
-# config into every assembly's closure. test_sm_summing_lever_drawing pins it.
-HOLE_Z_OFFSET = -3.52825
+# config into every assembly's closure. test_sm_summing_lever_drawing and
+# test_station_pitch_lockstep pin it (-CHANNEL_PITCH / 2).
+HOLE_Z_OFFSET = -3.81
 # The whole coefficient plate now supplies the spring tap's 1.5D engagement
-# at its printed .XX band. Its top and underside remain the
-# existing spring-eye and jam-nut seats; there is no separate pad or step.
+# at its printed .XX band. Its top remains the existing spring-eye seat;
+# there is no separate pad or step.
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
 RIB_T = 5.08  # every edge/middle rib extrusion, .20 on the ordinary .XX band
 RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
-# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst nut
-# footprint at X36.449.
+# 1.41 on the .XX grid; at its printed MAX (36.068) clear of the worst
+# protruding anchor-shank footprint at X37.970 (no jam nut, #2326).
 RIB_REACH = 35.814  # 1.41 in
 # Modeled at the title block's inside-corner ceiling, R.040 MAX.
 RIB_BLEND_R = inside_corner_radius_mm(unit=UNIT)
@@ -203,14 +213,21 @@ COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
+# Preserve the nominal tangent apex exactly; rounding is drawing-only.
+COUNTER_FLANK_ANGLE_DEG = math.degrees(math.asin(RIB_WRAP_R / abs(TIP_X)))
 HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
 HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
-HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
-HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
-HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
-# The between-stub ridge offset's hook-arm spread over the hole column (0.077).
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST - PLATE_Z_MINUS  # 6.5685 from the -Z end
+HOLE_END_OFFSET_LAST = PLATE_Z_PLUS - HOLE_Z_LAST  # 7.4015 from the +Z end
+# Each trunnion's inboard face is flush with its body end; its outboard face
+# overhangs HEX_DEPTH (-104.267 / +97.917). The ridges rest on the knife
+# mounts at the stubs' mid-lengths (-93.4085 / +87.0585).
+HEX_Z_OUTER_PLUS = PLATE_Z_PLUS + HEX_DEPTH
+HEX_Z_OUTER_MINUS = PLATE_Z_MINUS - HEX_DEPTH
+KNIFE_SEAT_Z_PLUS = PLATE_Z_PLUS + HEX_DEPTH / 2.0
+KNIFE_SEAT_Z_MINUS = PLATE_Z_MINUS - HEX_DEPTH / 2.0
+# The between-stub ridge offset's hook-arm spread over the hole column (0.082).
 KNIFE_HOOK_ARM_SPREAD_MAX = (
     KNIFE_STUB_RIDGE_OFFSET_MAX
     * (HOLE_Z_LAST - HOLE_Z_FIRST)
@@ -232,6 +249,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationPlate": {"WebThickness": 2},
     "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 2, "RibReach": 2},
     "EdgeRibFront": {"EdgeRibThickness": 2},
+    "MiddleRibProfile": {"MiddleRibCounterAngle": 1},
     "KnifeStubReference": {"KnifeStubLength": 2},
     "KnifeRidgeFillet": {"KnifeRidgeRadius": KNIFE_RIDGE_R_PLACES},
     "KnifeEnvelopeReference": {
@@ -268,12 +286,55 @@ RIB_REACH_DEVIATIONS = _deviations(RIB_REACH, "EdgeRibFrontProfile", "RibReach")
 # Manufacturing GD&T limits consumed by the part's drawing projection.  The
 # inch zones are the source; the drawing prints them, the mm table is derived.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    # Ø.006 (#290; Ø0.15 before), tightened from Ø0.30 (owner ruling on code
-    # review C06): two neighbouring MHA-CH-14 jam nuts stand on adjacent taps,
-    # and at Ø0.30 their worst approach leaves no O.D. both the wall floor and
-    # the 0.25 neighbour clearance admit (ch_anchor_jam_nut_spec).
-    "spring-hole pattern position": ".006",
+    # Ø.010: a THRU tap with no REAM, dowel or register word carries no
+    # position tighter (drawing-guidelines.md "Necessity, then the shop
+    # table"). The hooks thread straight in with no jam nut (#2326), so no
+    # neighbour clearance tightens it; half the zone, ±.005 normal to the knife
+    # line, is error_budget.yaml's summing_hook_arm allowance.
+    "spring-hole pattern position": ".010",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
+
+# --- Spring-tap end walls (drawing-guidelines rule 17), at the printed limits. ---
+# The tap row follows the channel stations (CHANNEL_Z0, CHANNEL_PITCH) while
+# the plate ends are this part's own, so a station or pitch change can walk an
+# end tap out of the plate with every other check green (#1038: at the .300
+# pitch the front tap stood 0.22 from the 6.00 plate's end).  Each end tap's
+# thread major -- the purchased hook's shank and neck are no larger -- keeps
+# the rule-17 wall target to its plate end at the worst printed case: the
+# pattern's position zone at both ends and, at the -Z end, the plate length's
+# printed band too (the +Z end face is datum B, which the row's start Z is
+# BASIC from).
+SPRING_TAP_WALL_RADIUS = (
+    max(
+        THREAD_MAJOR_MM[HOLE_SPEC.size],
+        ANCHOR_9489T111.thread_major_dia_mm,
+        ANCHOR_9489T111.neck_dia_mm or 0.0,
+    )
+    / 2.0
+)
+_SPRING_TAP_POSITION_RADIUS = (
+    GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"] / 2.0
+)
+SPRING_TAP_END_WALL_PLUS = (
+    HOLE_END_OFFSET_LAST - _SPRING_TAP_POSITION_RADIUS - SPRING_TAP_WALL_RADIUS
+)
+SPRING_TAP_END_WALL_MINUS = (
+    HOLE_END_OFFSET_FIRST
+    + PLATE_L_DEVIATIONS[0]
+    - _SPRING_TAP_POSITION_RADIUS
+    - SPRING_TAP_WALL_RADIUS
+)
+SPRING_TAP_END_WALL_MIN = WALL_TARGET_MM
+for _end, _wall in (
+    ("+Z", SPRING_TAP_END_WALL_PLUS),
+    ("-Z", SPRING_TAP_END_WALL_MINUS),
+):
+    if _wall < SPRING_TAP_END_WALL_MIN:
+        raise AssertionError(
+            f"spring-tap row: the {_end} end tap keeps {_wall:.3f} mm of wall to "
+            f"the plate end at the printed limits, under "
+            f"{SPRING_TAP_END_WALL_MIN} mm"
+        )

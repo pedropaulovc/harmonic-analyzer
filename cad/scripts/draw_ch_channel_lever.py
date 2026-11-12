@@ -25,14 +25,17 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 import _config
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -68,6 +71,7 @@ from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
+    BAR_TALL,
     HUB_DIA,
     LEVER_SPRING_X,
     PIVOT_HOLE_BAND,
@@ -127,6 +131,43 @@ def _name_hole_mate(display: Any, *, label: str) -> None:
             f"{label}: hole callout mate or native definitions did not persist: "
             f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
         )
+
+
+def _add_bar_centerline(adapter: Any, view: Any) -> None:
+    """Draw the bar's longitudinal centreline between its two long edges.
+
+    The fulcrum bore, the bar-pin hole and the spring-eye hole lie on the
+    bar's mid-height axis; the line through their centre marks prints that,
+    and the .43 bar symmetric about it, so the holes' cross-bar position is
+    drawn, not implied (r5 machinist review, clarity). draw_dt_crank_arm's
+    recipe: InsertCenterLine2 on the two long edges, picked between the
+    bar-pin and spring-eye holes, bisects them.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the front view for its centreline")
+    draw.ClearSelection2(True)
+    mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2000.0
+    for index, side in enumerate((-1.0, 1.0)):
+        x, y = model_point_in_view(
+            adapter,
+            view,
+            (mid_x, side * BAR_TALL / 2000.0, 0.0),
+            label=f"bar long edge {index + 1}",
+        )
+        if not draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+        ):
+            raise RuntimeError("failed to select a bar long edge for its centreline")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError("failed to insert the bar centreline between its edges")
+    count = int(_early_bound(view, "IView").GetCenterLineCount())
+    if count != 1:
+        raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
 
 def _sheet_x(mx: float) -> float:
@@ -262,7 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The integral Ø.47 x .278 fulcrum hub hides the whole plate section
+    # The integral Ø.47 x .300 fulcrum hub hides the whole plate section
     # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -387,6 +428,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    _add_bar_centerline(adapter, front)
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
     # rim at 300 degrees, the symbol below-right of the hub: between the REAM

@@ -62,14 +62,20 @@ UNIT = drawing_unit("parts/ch-fulcrum-keeper", _config.parts("ch-fulcrum-keeper"
 # to the end hubs. Literals rather than machine config, so the frame does not
 # re-key on machine/channels.yaml; build_ch_channel_assembly asserts the
 # result equals rocker_bank_layout.STACK_MID_Z. ---
-_STATION_PITCH = 7.0565  # machine channels.station_pitch_mm
+_STATION_PITCH = 7.62  # machine channels.station_pitch_mm, .300
 _BANK_COUNT = 20  # the full lever bank (never follows active_count)
 FULCRUM_KEEPER_CENTRE_Z = (
     CHANNEL_Z0 - _STATION_PITCH / 2.0 + _STATION_PITCH * (_BANK_COUNT - 1) / 2.0
 )  # -0.504
 # Lug mid-plane off the centre, on the .005 in grid so the shaft's flat
-# stations (2 x this apart) print .XX: 2.955 in, inner face at 70.993.
-KEEPER_Z_OFF = 75.057  # 2.955
+# stations (2 x this apart) print .XX: 3.180 in, inner face at 76.708. The
+# least grid value whose inner faces, each at the -.001 edge of its fit-up
+# band, leave twenty levers at the top of their +.001 hub band a .010 feeler
+# leaf of end play (draw_ch_channel_assembly) and each lug >= 0.25 of float
+# (build_ch_channel_assembly): KEEPER_Z_OFF >= 10P + LUG_HALF_T + 10 x .001
+# + .001 + .005, i.e. 80.645 at P 7.62 gives .0080 in of play, under a leaf;
+# 80.772 (3.180) gives .0180, a .010 leaf, 0.508 nominal float per lug.
+KEEPER_Z_OFF = 80.772  # 3.180 in (#1038 re-pitch; was 2.955 at the 7.0565 pitch)
 
 # --- Nominal geometry (mm; inch in the comments). Shaft axis 25.2 above the
 # rail top face (y=1036.2 -> 1061.4, the 2026-08-02 top-frame contract). ---
@@ -120,8 +126,8 @@ BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
 # the rail-seat budget (BORE_SEAT_ALLOWANCE_MM below), and the .2515 pair
 # reamer's +.0002/-.0000 size lies inside.
 BORE_DIA_BAND = (0.0508, 0.0381)  # (upper, lower)
-KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 142.0
-KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 158.0
+KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
+KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 169.672
 # The one-pass reamer: a 0.2515 in long-series chucking reamer, 12 in overall,
 # made to order (Super Tool catalogue 2026 p.59, list 9458EL EDP 645808EL:
 # finished to any size in .2211-.2530, solid carbide, 1-1/2 flute, .2193
@@ -206,7 +212,7 @@ KEEPER_FITUP_X_BAND_MM = 0.1016  # ±.004 in
 KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
     FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
     for side in (-1.0, 1.0)
-)  # (40.503, 182.489): front, rear
+)  # (34.802, 188.218): front, rear (1.3702, 7.4102 in)
 
 # --- Foot screw: one #2 close-clearance drill + counterbore on the foot's
 # centre line, SCREW_FROM_TIP off its tip, for the #2-56 x 7/16 fillister
@@ -223,7 +229,7 @@ SCREW_FROM_TIP = 4.572  # .18, printed off the foot tip
 SCREW_X = FOOT_TIP_X - SCREW_FROM_TIP  # 7.874 (.31)
 SCREW_FROM_SIDE = KEEPER_WIDTH / 2.0  # 6.985 (.275): printed off a side face
 BORE_FROM_SIDE = KEEPER_WIDTH / 2.0  # 6.985: the bore's reference station off that face
-KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 82.931: screw off the centre
+KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 88.646: screw off the centre
 SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
 HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 # Ø.150 clears the Ø.140 stock head; the depth is the exact stock head

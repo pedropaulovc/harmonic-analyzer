@@ -83,16 +83,16 @@ pieces = 1
 dia_in = { value = 0.2558, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
 length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "calipers" } }
 
-# MHA-SM-00 step 5B / check 6 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
+# MHA-SM-00 step 5B / check 5 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
 # #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
-# stand 7.41 in apart at worst. To make: not owned, no receipt metrology.
+# stand 7.67 in apart at worst. To make: not owned, no receipt metrology.
 [gauges.gauge-bar-0472x8]
 name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
 kind = "gauge_bar"
 present = false
 shop_made = true
 purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
-note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 6 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
 pieces = 1
 
 # --- assembly tools, gauges and consumables (#2392) ------------------------
@@ -246,11 +246,6 @@ present = false
 [tools.pliers]
 name = "Pliers"
 kind = "pliers"
-present = false
-
-[tools.flat-screwdriver]
-name = "Flat screwdriver to grind into the MHA-HA-00 forked driver"
-kind = "screwdriver"
 present = false
 
 [tools.ball-peen-hammer-16oz]

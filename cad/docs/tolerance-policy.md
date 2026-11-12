@@ -124,9 +124,11 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   after the set. No setting reading is booked: the feel set guarantees that
   no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
   gear). Gated: nominal contact ratio ≥ 1.0 at the loosest centre a feel set
-  leaves the cone, plus a 0.04 mm felt-ease allowance. Reported only (REF):
-  the printed-corner contact ratio there. A gear that binds is cleared by
-  easing the swing, not by stoning a tip.
+  leaves the cone: the highest first bind of any pair, opened by both gears'
+  running runout. No number is booked for the ease out of the bind (check 4N;
+  delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
+  printed-corner contact ratio there. A gear that binds is cleared by easing
+  the swing, not by stoning a tip.
 - **T006** (pending exception ruling #971): its DT6-FORM1 relief stands
   ≥ 0.010 mm clear of every printed drum-tip path where the swing locks and at
   the loosest running centre, so it never holds the swing out; its contact
@@ -560,8 +562,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   owner decision, the two **2-56 UNC 2B** taps fasten **MHA-MG-01**, with
   native **2X Ø.070 DRILL .26** and **.195 MIN** full thread. The drill
   takes the **+.004/0 in** drilled-hole row and the **.XX ±.01 in** depth band.
-  The fixed-top **7.00 mm** slab stays at **Y=−4.46..+2.54 mm**. The owner
-  moved only the matched mounting row down **0.71 mm**: receiver coordinates
+  Owner issue **#2129** centers the **7.00 mm** slab at **Y=±3.50 mm**.
+  The matched mounting row rises **0.96 mm** with the top: receiver coordinates
   are **.128 ±.002 in (3.2512 ±0.0508 mm) below the actual top** and **1.120 / .581 ±.002 in** from the free edge,
   the nearest .001 in to the bracket's millimetre stations (at most **0.0075 mm** off, charged
   to the head and shank float), with bracket holes and screws
@@ -614,22 +616,27 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
   Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
-  trimmed to **18.6 mm** (**31.3 mm** overall to eye crown), each locked by
-  an **MHA-CH-14 jam nut** on the coefficient plate underside. The neck seats
-  on the fixed plate top; one turn maximum back-out is retained for preload
-  trim, then the nut is tightened while holding eye clocking. The uniform
-  **7.00 mm** coefficient plate spans local **Y=−4.46..+2.54 mm**; it is
-  thickened downward, not recentered. This retains the world top **982.24 mm**,
-  nut seat **975.24 mm**, all twenty stations and the **Ø.006 RFS** pattern.
-  Worst-case anchor sizing retains two full turns beyond the jam nut through
-  the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
-  boss-through trim and top jam nut; neither counter anchor nor boss pose
-  changes. Existing upper lever holes are retained, with no upper pins.
+  trimmed to **12.700 mm** (**25.400 mm**, 1.00 in, overall to eye crown, with
+  the .03 title-block deburr of #2314) and
+  left bare in the coefficient-plate tap: nothing torques the hooks, so no jam
+  nut (owner, #2326). The neck seats on the plate top; one turn maximum
+  back-out is retained for preload trim while holding eye clocking. The
+  uniform **7.00 mm** coefficient plate spans local **Y=−3.50..+3.50 mm**.
+  The world top is **983.1932 mm** at the level pose; all twenty X/Z
+  stations are unchanged and the pattern is located **Ø.010 RFS**, the shop
+  table's cap for a tap with no fit word (#2326). The shortest in-band
+  anchor, backed out its full turn, keeps full thread through the thickest
+  in-band plate (6.858–7.366 mm limits); its cut end hangs **2.525 mm** below the plate
+  underside nominally, **2.921 mm** at most. The counter **9490T1 #10-24**
+  keeps its boss-through trim with its eye **3.836 mm** above the boss top,
+  no jam nut; neither counter anchor nor boss pose changes. Existing upper
+  lever holes are retained, with no upper pins.
   View G's actual-edge boss-top/coefficient-top location is
-  **9.525−2.54 = 6.985 mm**, printed **.28** under the `.XX` ±.01 in band.
-  The **19.05 mm** boss and **5.08 mm** web remain centered on Y=0; the web
-  top is flush with the coefficient top. Neither feature is referenced to
-  the asymmetric slab midplane. The existing sheet-2 isometric shows the
+  **9.525−3.50 = 6.025 mm**, printed **.24** under the `.XX` ±.01 in band.
+  The **19.05 mm** boss and **7.00 mm** web remain centered on Y=0; the web
+  shares the coefficient plate's top and bottom faces. VIEW F retains its
+  native theoretical-vertex-to-top dimension, **1.634 mm**, printed **.06**.
+  The existing sheet-2 isometric shows the
   underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**, keeping six views.
   The gooseneck end plug (MHA-SM-05) remains Ø.500 to retain the counter's double loop.
   Option A's historical source-union estimate at the prior **8.20 mm** receiver
@@ -645,6 +652,10 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   maximum-minus-force or full catalog span. The default static balance/error
   budget omits lever gravity. Native mass/CG, underside and operating-pose
   swept-clearance checks, and measured installed balance remain outstanding.
+  The **+0.96 mm** lower spring-seat shift changes the channel springs'
+  installed axes and lengths, not just their rigid placement. Recalibrate
+  neutral and square with the existing native runner and recheck static balance;
+  earlier calibration and gravity measurements do not certify #2129.
   Assembly seating uses the native supplier surfaces, not the ideal-circle
   offsets used to initialize the model. Supplier and replica probes found the
   same 3.7–4.4 µm departure from the nominal round-wire envelope at the counter
@@ -711,7 +722,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   including its −0.71 mm relocation rather than the old nominal row.
   Section calculations use minimum accepted **11.7 × 10.9 mm**, not nominal
   12.5 × 11.0; the longest printed seat distance, independent head locations
-  and shortest grip bound the arm span at **97.965 mm**. The force directions
+  and shortest grip bound the arm span at **91.311 mm** (#1038: the lever's
+  front end stands .25 in nearer the nose). The force directions
   and X/Y load stations remain the nominal A1 installation, not an
   all-geometric-variation or native articulation certificate.
   Its material report remains a load-demand estimate with assumed elastic

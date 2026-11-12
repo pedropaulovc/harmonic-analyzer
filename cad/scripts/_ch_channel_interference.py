@@ -57,7 +57,6 @@ PIVOT_EAR_SET_SCREW_LIMIT = smooth_annulus_limit_mm3(
     _PIVOT_EAR_TAP_COLUMN,
 )
 FULCRUM_SET_SCREW_THREAD = (1.854, 1.511, 3.96875)
-CHANNEL_ANCHOR_NUT_THREAD = (3.505, 2.705, 3.556)
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     **{
         frozenset((f"{_PIVOT_PIN}-{2 * n - 1}", f"ch-connecting-rod-{n}")): (
@@ -89,17 +88,6 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         range(1, 3),
         "ch-fulcrum-keeper",
         smooth_annulus_limit_mm3(*FULCRUM_SET_SCREW_THREAD),
-        second_number=None,
-    ),
-    # Each MHA-CH-VN-51 anchor's #6-32 major envelope in its MHA-CH-14 round
-    # jam nut's #36 tap drill over the nut's 3.60 thickness; anchor and nut
-    # are placed in the same channel loop, so their suffixes match.  Literals,
-    # like the rows above; test_ch_vn_spring_hook_drawing pins them to the specs.
-    **numbered_pairs(
-        "ch-vn-spring-hook",
-        range(1, 21),
-        "ch-anchor-jam-nut",
-        smooth_annulus_limit_mm3(*CHANNEL_ANCHOR_NUT_THREAD),
         second_number=None,
     ),
 }

@@ -17,6 +17,6 @@ dt-pinion-pivot-shaft:
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F1/F5). The band is the fleet-shared _fit_shaft_h.SHAFT_H (shaft_in_bushing fit class), restated in inch steps at the next re-key of that family; the matched running fit to the MHA-DT-18 pivot block bores is printed at the callout. Accepts the -.0008 notation and band on this diameter only, no other band or callout departure."
     - id: "RV-02"
       kind: "accept"
-      where: "front view: 7.29 CYLINDRICAL BODY length between the SR.18 crown rims, with the reference overall (7.39) tip to tip"
+      where: "front view: 7.71 CYLINDRICAL BODY length between the SR.18 crown rims, with the reference overall (7.81) tip to tip"
       finding: "the controlling length runs between the domes' tangent edges, not from a faced end, and the true overall is only a reference (rules 10 and 11)"
       reason: "Delegated ruling 2026-11-07 (Main), following owner precedent 2026-10-19 dt-pinion-lift-rod RV-01 (body length controls, overall is reference); owner review #2144. The rig's stacks read the body length's .XX band (U27; pinion_rig_layout torque_shaft_bearing_stack and torque_shaft_back_bearing_stack, back-flush at the back block); tolerancing the overall instead would stack both crown heights' bands on them."

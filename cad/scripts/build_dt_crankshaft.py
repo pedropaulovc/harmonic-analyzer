@@ -61,7 +61,6 @@ from dt_crank_pinion_spec import (
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
 from dt_crankshaft_spec import (
-    COLLAR_DIA,
     COLLAR_LENGTH,
     COLLAR_REAR,
     DRAWING_DIMENSIONS,
@@ -108,8 +107,6 @@ from dt_crankshaft_spec import (
     SHAFT_LENGTH_BAND,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
-    SPIGOT_END,
-    SPIGOT_LENGTH,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -424,9 +421,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
     await set_global(adapter, "SeatCollar", f"{SEAT_COLLAR}mm")
     await set_global(adapter, "CollarLength", f"{COLLAR_LENGTH}mm")
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
-    await set_global(adapter, "SpigotLength", f"{SPIGOT_LENGTH}mm")
     await set_global(adapter, "DrivePinCircleRadius", f"{DRIVE_PIN_CIRCLE_RADIUS}mm")
     await set_global(adapter, "DrivePinHoleDia", f"{DRIVE_PIN_HOLE_DIA}mm")
     await set_global(adapter, "DrivePinDepth", f"{DRIVE_PIN_DEPTH}mm")
@@ -754,12 +749,10 @@ async def build(adapter) -> dict[str, str]:
     v_final -= v_pinion_pin
     await volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
 
-    # ch. 23 seat collar, integral with the shaft (CONTRACT-crank), turned in
-    # two sections: the seat spigot, whose face on the SeatCollar datum is the
-    # removable sprocket's seat and which the #25 plates wrapping the T12 pass
-    # over, then the body from the spigot's step (the SpigotEnd datum) to the
-    # CollarRear face that bears on the post boss.  The step is sharp: the title
-    # block's general edge break covers its corners.
+    # ch. 23 seat collar, integral with the shaft (CONTRACT-crank): one seat
+    # spigot, whose face on the SeatCollar datum is the removable sprocket's
+    # seat, which the #25 plates wrapping the T12 pass over, and whose
+    # CollarRear face bears on the post boss.
     v_final += await _collar_section(
         adapter,
         "Spigot",
@@ -768,23 +761,9 @@ async def build(adapter) -> dict[str, str]:
         station_expr='"SeatCollar"',
         dia=SPIGOT_DIA,
         dia_global="SpigotDia",
-        length=SPIGOT_LENGTH,
+        length=COLLAR_LENGTH,
         length_name="SpigotLength",
-        length_expr='"SpigotLength"',
-        drive_jobs=drive_jobs,
-    )
-    await volume_check(adapter, "shaft + seat spigot", v_final, 0.005 * v_final)
-    v_final += await _collar_section(
-        adapter,
-        "Collar",
-        plane="SpigotEnd",
-        station=SPIGOT_END,
-        station_expr='"SeatCollar" + "SpigotLength"',
-        dia=COLLAR_DIA,
-        dia_global="CollarDia",
-        length=COLLAR_LENGTH - SPIGOT_LENGTH,
-        length_name="CollarBodyLength",
-        length_expr='"CollarLength" - "SpigotLength"',
+        length_expr='"CollarLength"',
         drive_jobs=drive_jobs,
     )
     await volume_check(adapter, "shaft + seat collar", v_final, 0.005 * v_final)
@@ -1091,9 +1070,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the seat
     # spigot's diameter, and the drive-pin holes' location, press size and
-    # depth.  The two far-end collar stations and the spigot's length from the
-    # seat face print at three places under the title block's .XXX band
-    # (#2314), and the collar body's Ø.81 at its .XX band (no mate).
+    # depth.  The two far-end collar stations print at three places under
+    # the title block's .XXX band (#2314).
     set_dimension_bilateral_tolerance(
         adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND), display_unit=UNIT
     )
@@ -1142,7 +1120,6 @@ async def build(adapter) -> dict[str, str]:
                 "PinionPinStationPlane",
                 "PinionPinClockingPlane",
                 "SeatCollar",
-                "SpigotEnd",
                 "CollarRear",
                 "DrivePinFloor",
                 "SeatPinion",

@@ -38,7 +38,8 @@ from build_ch_channel_assembly import (
     rot_z_rows,
     z_station,
 )
-from _cone_axis_constants import CHANNEL_Z0, DRUM_X
+from _cone_axis_constants import DRUM_X
+from cone_line import DRUM_FACE, Y_DRIVE
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -56,10 +57,8 @@ from _assembly import (
 )
 
 # drive-train cam (build_dt_drive_train_assembly / build_dt_cylinder_gear)
-X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = DRUM_X, 90.518, CHANNEL_Z0, 7.0568
-DRUM_FACE = 3.0
+X_DRUM = DRUM_X
 GEAR_PHASE_DEG = 1.5
-CAM_R = 25.4  # cam lobe OD radius (Ø50.8)
 
 CAM_RPM = 30.0
 DURATION_S = 4.0

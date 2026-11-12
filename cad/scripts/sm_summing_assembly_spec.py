@@ -14,7 +14,8 @@ assembly. No SolidWorks imports.
 
 Assembly frame: machine coordinates (Y up, output side -Z). The lever rocks
 on the hex trunnions' top ridge (the knife edge) at ``KNIFE_POINT``; the two
-knife mounts sit at ``SUMMING_Z +/- HEX_Z_MID`` (front = +Z).
+knife mounts sit at the trunnions' mid-lengths,
+``build_sm_summing_assembly.KNIFE_MOUNT_Z_PLUS`` / ``_MINUS`` (front = +Z).
 """
 
 from __future__ import annotations
@@ -35,7 +36,6 @@ HANGER_BOLT = "sm-vn-knife-hanger-stud"
 DOWEL = "sm-vn-knife-mount-dowel"
 LEVER = "sm-summing-lever"
 BOSS_HOOK = "sm-vn-boss-hook"
-BOSS_JAM_NUT = "sm-vn-boss-hook-jam-nut"
 COUNTER_SPRING = "sm-vn-counter-spring"
 GOOSENECK = "sm-gooseneck"
 # MHA-SM-05, bonded into the gooseneck's arm end at this assembly (owner
@@ -52,7 +52,6 @@ QUANTITIES = {
     DOWEL: 2,
     LEVER: 1,
     BOSS_HOOK: 1,
-    BOSS_JAM_NUT: 1,
     COUNTER_SPRING: 1,
     GOOSENECK: 1,
     END_PLUG: 1,

@@ -18,6 +18,7 @@ import _cone_gear_readback as readback
 import _cone_gear_sheet as cone_sheet
 import build_dt_cone_gear as part
 import cone_land_key
+import cone_tip_cluster
 import dt_cone_gear_notes as notes
 import dt_cone_gear_shaft_spec
 import dt_cone_gear_spec as spec
@@ -163,7 +164,8 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     # longer than the pitch; cone_gear_stack owns the stack's band.
     assert spec.FACE_WIDTH == math.floor(spec.SEAT_PITCH * 1e4) / 1e4
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
-    assert spec.FACE_WIDTH_BAND == (0.0254, -0.0254)
+    upper, lower = spec.FACE_WIDTH_BAND
+    assert upper == -lower > 0.0  # centred, as the stack's partial bands need
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 
@@ -427,9 +429,9 @@ def test_tight_bands_name_their_mates_once_in_flagged_notes() -> None:
 def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
     """Note 1 is the bore's fit: a keyed bore's matched sliding fit on its
     MHA-DT-04 land and the MHA-DT-VN-71 key, with the clearances the parts'
-    printed limits give (REF); a round bore's bonded slip fit on its mate,
-    no size and no method. Note 2 names the mesh and the over-pins and
-    backlash acceptances."""
+    printed limits give (REF); a round bore's bonded slip fit on its mate
+    with its diametral clearance (rule 23), no compound and no method. Note 2
+    names the mesh and the over-pins and backlash acceptances."""
     import cone_shaft_land_bands as lands
 
     shaft = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
@@ -460,11 +462,19 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             if teeth in spec.SPIGOT_TEETH:
                 mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
             else:
-                mate = f"{shaft} MHA-DT-04, LAND 2"
-            assert lines[0] == f"1. BONDED SLIP FIT ON {mate}."
+                land_name = f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND"
+                mate = f"{shaft} MHA-DT-04, {land_name}"
+            low, high = spec.bond_clearance_mm(teeth)
+            # A bond: never interference, never past the compound's largest gap.
+            assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
+            clearance = f"{spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}"
+            assert lines[0] == (
+                f"1. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance} ON \u00d8)."
+            )
             assert drawing.KEY_MATE not in text
-            # Rule 7 / rule 23: no size, no compound, no method in the note.
-            assert "CLEARANCE" not in text and "LOCTITE" not in text
+            # Rule 23: the part sheet gives the bond's clearance; the grade and
+            # method are MHA-DT-00's bonding step's.
+            assert "LOCTITE" not in text
             notes_from = 1
         assert "ACROSS FLAT" not in text
         assert lines[notes_from].startswith(f"2. TEETH MESH WITH {notes.CYLINDER_MATE_NUMBER}")

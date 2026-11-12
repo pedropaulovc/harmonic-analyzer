@@ -613,6 +613,26 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "FEELER" not in check and "LEAVES" not in check
 
 
+def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
+    """Check 4J sends the fitter to the recheck table's last column, and every
+    row has a remedy naming that end's gears (X) or its indicator (Y); the
+    widened table still fits inside the sheet 15 frame."""
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    (line_4j,) = re.findall(r"4J\. [^.]*\.", check)
+    assert f"SHEET {drawing.SETTING_SHEET}" in line_4j
+    assert drawing.PEDESTAL_RECHECK_HEADER[-1] in line_4j
+    remedies = {row[0]: row[-1] for row in drawing.PEDESTAL_RECHECK_ROWS}
+    assert all(remedies.values())
+    gears = drawing.CYLINDER_GEAR_COUNT if hasattr(drawing, "CYLINDER_GEAR_COUNT") else 20
+    assert "GEAR 0 " in remedies["FRONT MHA-DT-02, X"]
+    assert f"GEAR {gears - 1} " in remedies["BACK MHA-DT-02, X"]
+    assert "INDICATOR" in remedies["FRONT MHA-DT-02, Y"]
+    widths = drawing.table_column_widths(
+        drawing.PEDESTAL_RECHECK_HEADER, drawing.PEDESTAL_RECHECK_ROWS
+    )
+    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.NOTE_FIELD_RIGHT[2]
+
+
 def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
     """The feel set guarantees no bind only where it was felt, so the
     acceptance turns the crank until the slowest MHA-DT-12 has made a turn."""
@@ -889,15 +909,19 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
 
     step = _rig_step_body("other-base-mounting")
     number = steps.step_number("other-base-mounting")
+    # The transfer pose (check 4's feel set, both ends bound) comes before
+    # the clamp and the punch; sequence, not wording (AGENTS.md).
     route = [
-        f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
-        f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
-        f"{number}C. LIFT MHA-DT-20 OFF.",
-        f"{number}D. SPOT-DRILL THE PUNCH MARK.",
-        f"{number}E. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
+        "JUST BIND",
+        "TURN FREELY THROUGH",
+        "CLAMP MHA-DT-20 TO MHA-FR-01.",
+        "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
+        "LIFT MHA-DT-20 OFF.",
+        "SPOT-DRILL THE PUNCH MARK.",
+        f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
         "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
     ]
-    assert step.startswith("CONE SET ON THE BASE: SET MHA-DT-20 WHERE NO GEAR BINDS.")
+    assert f"{number}A." in step
     positions = [step.index(part) for part in route]
     assert positions == sorted(positions)
     assert step.count("CHECK THAT") == 1
@@ -1574,6 +1598,158 @@ def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> 
     assert scales[drawing.SHEET_NAMES[drawing.CLUSTER_SHEETS["crank"] - 1]] == (1.0, 4.0)
     assert scales[drawing.SHEET_NAMES[drawing.FULL_DETAIL_SHEET - 1]] == (2.0, 3.0)
     assert drawing.package_sheet_scales(drawing.CLUSTER_SCALES) == drawing.SHEET_SCALES
+
+
+# The cone set's view as fitted at 1:3 on sheet 4 (machinist review r8 of
+# PR #2640, run 20261112T124601584Z, layout audit outline).
+R8_CONE_SET_OUTLINE = (0.1464, 0.0820, 0.2696, 0.2227)
+
+
+def test_the_cone_tip_detail_balloons_the_tip_families_the_1_3_view_drops() -> None:
+    """r3, r7 and r8 of PR #2640: balloons 37 and 38 met on one tip at 1:3.
+    The six tip families are the cone set's own, each has a frozen anchor,
+    and the 1:3 view keeps every other cone-set family, so each BOM item is
+    still ballooned once on sheet 4."""
+    facts = _drawing_facts()
+    names = drawing.cone_tip_detail_names(facts)
+    assert names <= frozenset(facts.clusters["cone-set"])
+    shown = {i.stem for i in facts.instances if i.name in names}
+    assert shown == drawing.CONE_TIP_DETAIL_STEMS
+    assert {"dt-cone-tip-gear", "dt-cone-tip-bushing"} <= shown
+    assert drawing.CONE_TIP_DETAIL_STEMS <= set(drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cone-set"])
+    cone_set = {i.stem for i in facts.instances if i.name in facts.clusters["cone-set"]}
+    assert cone_set - drawing.CONE_TIP_DETAIL_STEMS, "the 1:3 view keeps balloons"
+    arrows = (letter for letter, _y in drawing.SHEET1_VIEW_ARROWS)
+    taken = {drawing.FULL_DETAIL_VIEW_LETTER, "A", "B", *arrows}
+    assert drawing.CONE_TIP_DETAIL_LETTER not in taken
+
+
+def test_a_cone_tip_detail_with_no_tip_family_in_the_cone_set_is_refused() -> None:
+    facts = _drawing_facts()
+    facts.clusters = {**facts.clusters, "cone-set": ()}
+    with pytest.raises(RuntimeError, match="cone tip detail"):
+        drawing.cone_tip_detail_names(facts)
+
+
+def _ring(box: tuple[float, ...], reach: float) -> tuple[float, ...]:
+    return (box[0] - reach, box[1] - reach, box[2] + reach, box[3] + reach)
+
+
+@pytest.mark.parametrize(
+    ("size_mm", "expected"),
+    [((52.0, 85.0), (1.0, 1.0)), ((120.0, 120.0), (2.0, 3.0)), ((180.0, 300.0), (1.0, 2.0))],
+)
+def test_the_cone_tip_detail_ring_fits_right_of_the_cone_set_ring(size_mm, expected) -> None:
+    """The detail takes the largest ladder scale whose balloon ring stands in
+    the empty right half: clear of the 1:3 view's ring, the title block plus
+    its caption line, and the frame.  r8's tip parts spanned about 17 x 28 mm
+    at 1:3, so they read at 1:1."""
+    region = drawing.cone_tip_detail_region(R8_CONE_SET_OUTLINE)
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    parent_reach = drawing.CLUSTER_BALLOON_MARGINS["cone-set"] + drawing.BALLOON_DIAMETER / 2
+    assert region[0] > R8_CONE_SET_OUTLINE[2] + parent_reach
+    assert region[1] >= template.title_block_top_m + drawing.CLUSTER_TITLE_BLOCK_CLEARANCE
+    assert region[2] < template.width_m - 0.0127 and region[3] < template.height_m - 0.0127
+    outline = _outline_mm(*size_mm)
+    scale, shift = drawing.cone_tip_detail_fit(outline, (1.0, 1.0), region)
+    assert scale == expected
+    k = scale[0] / scale[1]
+    cx, cy = (outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2
+    hw, hh = (outline[2] - outline[0]) / 2 * k, (outline[3] - outline[1]) / 2 * k
+    box = (cx - hw + shift[0], cy - hh + shift[1], cx + hw + shift[0], cy + hh + shift[1])
+    ring = _ring(box, drawing.CONE_TIP_DETAIL_REACH)
+    assert region[0] - 1e-9 <= ring[0] and ring[2] <= region[2] + 1e-9
+    assert region[1] - 1e-9 <= ring[1] and ring[3] <= region[3] + 1e-9
+
+
+def test_a_cone_tip_detail_no_ladder_scale_fits_raises() -> None:
+    region = drawing.cone_tip_detail_region(R8_CONE_SET_OUTLINE)
+    with pytest.raises(ValueError, match="cone tip detail.*1:2"):
+        drawing.cone_tip_detail_fit(_outline_mm(400.0, 400.0), (1.0, 1.0), region)
+
+
+def test_the_cone_tip_boundary_circles_the_detail_parts_on_the_1_3_view() -> None:
+    """A point of the detail lies, from the model origin's projection, one
+    third as far on the 1:3 view; the circle holds the parts' whole box."""
+    outline = (0.300, 0.100, 0.352, 0.185)
+    detail_origin = (0.296, 0.1545)
+    parent_origin = (0.180, 0.120)
+    ratio = 1.0 / 3.0
+    centre, radius = drawing.cone_tip_detail_boundary(outline, detail_origin, parent_origin, ratio)
+    assert centre == pytest.approx((0.190, 0.116))
+    for x in (outline[0], outline[2]):
+        for y in (outline[1], outline[3]):
+            mapped = (
+                parent_origin[0] + (x - detail_origin[0]) * ratio,
+                parent_origin[1] + (y - detail_origin[1]) * ratio,
+            )
+            gap = radius - math.dist(mapped, centre)
+            assert gap == pytest.approx(drawing.CONE_TIP_DETAIL_BOUNDARY_PAD)
+
+
+# r9 (run 20261112T135520653Z): sheet 4's boundary circle and the letter box
+# the audit read, which balloon 15 overlapped at 225 degrees.
+R9_BOUNDARY = ((0.1820, 0.1150), 0.0340)
+R9_LETTER_SIZE = (0.0023, 0.0048)
+
+
+def _letter_box(corner: tuple[float, float]) -> tuple[float, float, float, float]:
+    w, h = R9_LETTER_SIZE
+    return (corner[0], corner[1] - h, corner[0] + w, corner[1])
+
+
+def test_the_boundary_letter_stands_just_outside_its_circle_on_the_preferred_side() -> None:
+    (cx, cy), r = R9_BOUNDARY
+    box = _letter_box(drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [], []))
+    mid = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+    assert mid[0] < cx and mid[1] < cy, "lower left first"
+    corners = [(x, y) for x in (box[0], box[2]) for y in (box[1], box[3])]
+    offset = drawing.CONE_TIP_DETAIL_LETTER_OFFSET
+    assert min(math.dist(c, (cx, cy)) for c in corners) >= r + offset - 1e-9
+    assert math.dist(mid, (cx, cy)) < r + 0.01, "it stays beside its circle"
+
+
+def test_the_boundary_letter_moves_off_a_balloon_or_leader_on_its_side() -> None:
+    """r9's balloon 15 sat on the lower-left side; a leader crossing the next
+    side moves the letter on again, and it never touches either."""
+    (cx, cy), r = R9_BOUNDARY
+    first = _letter_box(drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [], []))
+    balloon = ((first[0] + first[2]) / 2 + 0.004, (first[1] + first[3]) / 2)
+    second = _letter_box(
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [balloon], [])
+    )
+    assert second != first
+    br = drawing.BALLOON_DIAMETER / 2
+    keep = (balloon[0] - br, balloon[1] - br, balloon[0] + br, balloon[1] + br)
+    assert not drawing._boxes_overlap(second, keep)
+    mid = ((second[0] + second[2]) / 2, (second[1] + second[3]) / 2)
+    leader = drawing.LeaderSegment(
+        "L", "note", mid[0] - 0.01, mid[1] - 0.01, mid[0] + 0.01, mid[1] + 0.01
+    )
+    third = _letter_box(
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [balloon], [leader])
+    )
+    assert third not in (first, second)
+    assert not drawing._segment_meets_box(leader, third)
+
+
+def test_a_boundary_letter_with_no_clear_side_is_refused() -> None:
+    (cx, cy), r = R9_BOUNDARY
+    reach = r + 0.006
+    ring = [
+        (cx + reach * math.cos(math.radians(a)), cy + reach * math.sin(math.radians(a)))
+        for a in range(0, 360, 5)
+    ]
+    with pytest.raises(RuntimeError, match="every side"):
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, ring, [])
+
+
+def test_the_cone_tip_detail_caption_names_its_scale_and_what_it_omits() -> None:
+    """Rule 9 prints its scale against the 1:3 sheet; sheet 1 promises the
+    teeth- and thread-free configuration only at 1:2 and smaller."""
+    caption = drawing.cone_tip_detail_caption((1.0, 1.0), (1.0, 3.0))
+    assert caption.startswith(f"DETAIL {drawing.CONE_TIP_DETAIL_LETTER} 1:1")
+    assert "TEETH" in caption and "THREADS" in caption
 
 
 def _outline_mm(width: float, height: float) -> tuple[float, float, float, float]:

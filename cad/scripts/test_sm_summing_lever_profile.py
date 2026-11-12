@@ -61,32 +61,51 @@ def _g1_contract(section: profile.RibProfile) -> None:
 
 
 def test_defining_dimensions_derive_the_approved_g1_profile() -> None:
-    assert (spec.COEFFICIENT_T, spec.COEFFICIENT_TOP_Y, spec.COEFFICIENT_BOTTOM_Y) == pytest.approx((7.0, 2.54, -4.46))
+    assert (spec.COEFFICIENT_T, spec.COEFFICIENT_TOP_Y, spec.COEFFICIENT_BOTTOM_Y) == pytest.approx((7.0, 3.50, -3.50))
     assert spec.COEFFICIENT_TOP_Y - spec.COEFFICIENT_BOTTOM_Y == pytest.approx(spec.COEFFICIENT_T)
-    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((5.08, 15.24, 35.814, 1.016))
-    assert profile.UPPER.wrap_xy == pytest.approx((5.506482, 14.210428), abs=1e-6)
-    assert profile.LOWER.wrap_xy == pytest.approx((4.700858, -14.496880), abs=1e-6)
+    assert (spec.COUNTER_WEB_T, spec.RIB_WRAP_R, spec.RIB_REACH, spec.RIB_BLEND_R) == pytest.approx((7.0, 15.24, 35.814, 1.016))
+    # Independent angular construction of the approved common tangent, rather
+    # than reusing RibProfile's Cartesian solution or guessing new goldens.
+    angle = math.atan2(3.50 + 1.016, 35.814) + math.acos(
+        (15.24 + 1.016) / math.hypot(35.814, 3.50 + 1.016)
+    )
+    wrap = (15.24 * math.cos(angle), 15.24 * math.sin(angle))
+    assert profile.UPPER.wrap_xy == pytest.approx(wrap, abs=1e-6)
+    assert profile.LOWER.wrap_xy == pytest.approx((wrap[0], -wrap[1]), abs=1e-6)
     _g1_contract(profile.PROFILE)
-    assert profile.rib_bounds(spec.RIB_REACH) == pytest.approx((-4.46, 2.54))
+    assert profile.rib_bounds(spec.RIB_REACH) == pytest.approx((-3.50, 3.50))
     lower, upper = profile.rib_bounds(29.7)
-    assert upper != pytest.approx(-lower)
+    assert upper == pytest.approx(-lower)
     assert profile.rib_bounds(-spec.RIB_WRAP_R) == pytest.approx((0.0, 0.0))
     with pytest.raises(ValueError):
         profile.rib_bounds(spec.RIB_REACH + 0.01)
 
 
+def test_counter_angle_preserves_the_nominal_apex_without_display_rounding() -> None:
+    assert spec.COUNTER_FLANK_ANGLE_DEG == math.degrees(
+        math.asin(spec.RIB_WRAP_R / abs(spec.TIP_X))
+    )
+    apex_mm = -spec.RIB_WRAP_R / math.sin(math.radians(spec.COUNTER_FLANK_ANGLE_DEG))
+    assert abs(apex_mm - spec.TIP_X) <= 1e-6
+    rounded_apex_mm = -spec.RIB_WRAP_R / math.sin(math.radians(11.537))
+    assert abs(rounded_apex_mm - spec.TIP_X) > 1e-6
+    assert spec.DRAWING_PRECISION["MiddleRibProfile"] == {"MiddleRibCounterAngle": 1}
+
+
 def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() -> None:
-    assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 152.4, 12.7))
-    assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.52825))
-    assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-67.1, 7.0565))
+    # #1038: .300 in pitch; the body's -Z end .25 in longer (owner ruling 4).
+    assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 158.75, 12.7))
+    assert (spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS) == pytest.approx((-82.55, 76.2))
+    assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.81))
+    assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-72.1715, 7.62), abs=5e-4)
     assert (spec.HEX_W, spec.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
     assert (spec.TIP_X, spec.ANCHOR_H) == pytest.approx((-76.2, 19.05))
     # The lever's taps sit at the nearest .001 in (1.120 / .581, .128).
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
-    assert all(point[1] == pytest.approx(-0.7112) for point in joint.LEVER_HOLE_POINTS)
-    assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
+    assert all(point[1] == pytest.approx(0.2488) for point in joint.LEVER_HOLE_POINTS)
+    assert all(point[2] == pytest.approx(-82.55) for point in joint.LEVER_HOLE_POINTS)
     assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.604, 4.95)
-    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
+    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-77.47)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
     assert joint.BRACKET_ORIGIN == (40.0, KNIFE_Y, -173.5192)
@@ -103,7 +122,7 @@ def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -
     # Beyond the blend endpoint the real wall is the horizontal plate face,
     # not a negative-clearance extension of the rib flank.
     x, y = 40.0, 0.0
-    assert profile.receiver_wall_margin(x, y, 0.0) == pytest.approx(2.54)
+    assert profile.receiver_wall_margin(x, y, 0.0) == pytest.approx(3.50)
     assert spec.RIB_WRAP_R - _dot(branch.normal_xy, (x, y)) < 2.0
     # On the concave runout, nearest distance is to the circular arc, not its
     # infinite tangent line. The rightward normal points into material here.
@@ -114,7 +133,7 @@ def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -
     assert profile.receiver_wall_margin(*inside, 0.0) == pytest.approx(0.1, abs=1e-11)
     assert abs(spec.RIB_WRAP_R - _dot(branch.normal_xy, inside) - 0.1) > 0.001
     assert profile.receiver_wall_margin(44.5, 0.0, 0.0) == pytest.approx(-0.05)
-    assert profile.receiver_wall_margin(40.0, 3.0, 0.0) == pytest.approx(-0.46)
+    assert profile.receiver_wall_margin(40.0, 4.0, 0.0) == pytest.approx(-0.50)
     # The rib's sketch closure at reach lies INSIDE the plate; it is no wall.
     assert profile.receiver_wall_margin(spec.RIB_REACH - 0.01, 0.0, 0.0) > 2.5
 
@@ -149,7 +168,7 @@ def _witness_clearance(
 
 
 def _plate_top_y_limits() -> tuple[float, float]:
-    """The printed chain: the top .10 (.XX) below the knife ridge, which stands
+    """The printed chain: the top .06 (.XX) below the knife ridge, which stands
     half the .404 (.XXX) vertex height above the axis."""
     xx, xxx = printed_band_mm(2, unit="in"), printed_band_mm(3, unit="in")
     ridge = round(spec.HEX_H / spec.MM_PER_IN, 3) * spec.MM_PER_IN / 2.0
@@ -433,13 +452,13 @@ def _edge_added_moments() -> tuple[profile.SectionMoments, profile.SectionMoment
 
 
 def _rib_prism_change(thickness: float) -> tuple[profile.SectionMoments, float]:
-    """Current-minus-PR1769 material of owned common sections only.
+    """Rib-depth-only material delta at the current common profile.
 
+    The comparison uses PR1769's axial rib depths, not its old section shape.
     Both edge ribs include their full negative wrap. The middle contribution
     here is its positive-X branch only: the pure profile does not describe the
-    negative counterarm, and shrinking that part of the middle extrusion is
-    deliberately NOT claimed to cancel. Excludes roots, hole relocation and
-    any assertion about final lever mass, CG, strength or spring reserve.
+    negative counterarm. Excludes roots, plate/web resizing, hole relocation
+    and any assertion about final lever mass, CG, strength or spring reserve.
     """
     edge, negative = _edge_added_moments()
     positive = edge - negative
@@ -448,13 +467,15 @@ def _rib_prism_change(thickness: float) -> tuple[profile.SectionMoments, float]:
         edge.scaled(2.0 * thickness - back_before - front_before)
         + positive.scaled(thickness - middle_before)
     )
-    half_length = spec.PLATE_L / 2.0
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
     old_axial_moment = (
-        back_before * (-half_length + back_before / 2.0)
-        + front_before * (half_length - front_before / 2.0)
+        back_before * (z_minus + back_before / 2.0)
+        + front_before * (z_plus - front_before / 2.0)
     )
-    # Equal end depths and a centred middle leave zero new axial first moment.
-    return delta, -edge.area_mm2 * old_axial_moment
+    # Equal end depths on unequal ends: the pair's axial first moment is the
+    # depth times the ends' sum; the centred middle rib adds none.
+    new_axial_moment = thickness * (z_minus + z_plus)
+    return delta, edge.area_mm2 * (new_axial_moment - old_axial_moment)
 
 
 @pytest.mark.parametrize("thickness", [4.80, spec.RIB_T, 5.30])
@@ -470,11 +491,11 @@ def test_all_three_uniform_rib_prisms_recompute_material_not_receiver_extension_
         section.upper.flank_xy[0], section.lower.flank_xy[0], section.reach,
     ]
     # Independent axial spans, rather than the analytic helper's coefficients.
-    half = spec.PLATE_L / 2.0
-    old_spans = ((-half, -half + 9.0), (-5.08 / 2.0, 5.08 / 2.0), (half - 5.08, half))
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
+    old_spans = ((z_minus, z_minus + 9.0), (-5.08 / 2.0, 5.08 / 2.0), (z_plus - 5.08, z_plus))
     new_spans = (
-        (-half, -half + thickness), (-thickness / 2.0, thickness / 2.0),
-        (half - thickness, half),
+        (z_minus, z_minus + thickness), (-thickness / 2.0, thickness / 2.0),
+        (z_plus - thickness, z_plus),
     )
 
     def slice_change(x: float, kind: str) -> float:
@@ -512,25 +533,28 @@ def test_uniform_thickness_perturbation_charges_both_edges_and_middle_branch() -
         assert getattr(changed - baseline, field) == pytest.approx(
             getattr(derivative, field) * 0.10, abs=1e-10,
         )
-    assert changed_z == baseline_z
+    assert changed_z - baseline_z == pytest.approx(
+        edge.area_mm2 * 0.10 * (spec.PLATE_Z_MINUS + spec.PLATE_Z_PLUS)
+    )
     assert edge.area_mm2 == pytest.approx(profile.edge_rib_added_area_mm2())
     assert negative.area_mm2 > 0.0
     assert negative.x_mm3 < 0.0
 
 
 def test_uniform_rib_axial_spans_preserve_both_end_faces_and_centre() -> None:
-    half = spec.PLATE_L / 2.0
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
     spans = (
-        (-half, -half + spec.RIB_T), (-spec.RIB_T / 2.0, spec.RIB_T / 2.0),
-        (half - spec.RIB_T, half),
+        (z_minus, z_minus + spec.RIB_T), (-spec.RIB_T / 2.0, spec.RIB_T / 2.0),
+        (z_plus - spec.RIB_T, z_plus),
     )
-    assert spans[0] == pytest.approx((-76.2, -71.12))
+    assert spans[0] == pytest.approx((-82.55, -77.47))
     assert spans[1] == pytest.approx((-2.54, 2.54))
     assert spans[2] == pytest.approx((71.12, 76.2))
     assert all(end - start == pytest.approx(5.08) for start, end in spans)
-    # The separate counterweb is not a rib: its retained top still meets +2.54.
-    assert spec.COUNTER_WEB_T == 5.08
+    # The counterweb is not a rib: both its faces meet the centred 7 mm slab.
+    assert spec.COUNTER_WEB_T == 7.0
     assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y
+    assert -spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_BOTTOM_Y
 
 
 @pytest.mark.parametrize("changes", [

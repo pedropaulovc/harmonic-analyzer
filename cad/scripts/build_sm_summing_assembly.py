@@ -8,9 +8,10 @@ top-frame casting's integral crossbar by one knife-hanger screw and located
 by one pressed dowel, and counter-balanced from above by the
 boss-hook / counter-spring / gooseneck chain.
 
-* knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
-  ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``; each top seat is clamped
-  to the crossbar underside (``MOUNT_GAP`` 0).
+* knife-mount x2 -- the bearing supports, one per hex trunnion, at
+  ``KNIFE_MOUNT_Z_PLUS`` and ``KNIFE_MOUNT_Z_MINUS`` (the trunnions'
+  mid-lengths); each top seat is clamped to the crossbar underside
+  (``MOUNT_GAP`` 0).
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
   plus the .351 +/-.005 in fit-up reach (46.70 mm nominal under the head);
@@ -30,8 +31,8 @@ boss-hook / counter-spring / gooseneck chain.
   Motion study. The rock is the sub's single FREED operational DOF: its
   drive spec is recorded into the DOF manifest, never authored, so the
   saved model rocks on the knife edge.
-* boss-hook (keyed to the lever's anchor eye) + its MHA-SM-VN-55 jam nut on the
-  boss top face + counter-spring + gooseneck -- the counter-balance hung from
+* boss-hook (keyed to the lever's anchor eye, threaded straight into the boss)
+  + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the gooseneck's bare Ø12.70 leg is the post the top-frame
   rail hub's set screw grips (no sleeve and no separate clamp part: owner
   rulings 2026-11-08 (Pedro), #2315, MHA-FR-02's hub bored to the tube).
@@ -56,7 +57,7 @@ its blind reams (fr-frame.SLDASM); the gooseneck's bare leg drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
-final transform and fixed; the summing lever, boss-hook and jam nut are left
+final transform and fixed; the summing lever and boss-hook are left
 free and constrained by mates; transforms asserted by read-back; zero
 interference.
 
@@ -115,7 +116,7 @@ from _assembly import (
 )
 from _native_spring_contact import assert_assembly_spring_contacts
 from _sm_summing_interference import ALLOWED_PAIRS
-from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_180, ROT_Y_POS90, euler_from_rows
+from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90, euler_from_rows
 from _cone_axis_constants import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
@@ -130,13 +131,19 @@ from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_sm_knife_mount) -----------------------------
 from sm_summing_lever_spec import (  # noqa: E402
-    HEX_Z_INNER,
-    HEX_Z_OUTER,
+    KNIFE_SEAT_Z_MINUS,
+    KNIFE_SEAT_Z_PLUS,
     KNIFE_SHOULDER_DROP_MIN,
     KNIFE_SHOULDER_X_MAX,
 )
 
-HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
+# Each mount stands at its trunnion's mid-length.  The lever's -Z end is
+# extended .25 in (owner ruling 4, #1038), so the two stations are not
+# mirrored about SUMMING_Z: +90.146 and -90.321, the crossbar's
+# ``fr_top_frame_spec.STUD_Z_REAR`` / ``STUD_Z_FRONT`` hanger holes.  This
+# assembly's labels call the +Z mount "front" and the -Z one "back".
+KNIFE_MOUNT_Z_PLUS = SUMMING_Z + KNIFE_SEAT_Z_PLUS
+KNIFE_MOUNT_Z_MINUS = SUMMING_Z + KNIFE_SEAT_Z_MINUS
 
 # --- knife-hanger hardware (two #10-24 hex bolts, washers and dowels) ---------
 # The top-frame, knife-mount and purchased hardware specs own every term.
@@ -226,12 +233,12 @@ KNIFE_DOWEL_X_OFFSETS = (knife_mount.PIN_HOLE_X,)
 # hole's centring to datum D (⌖.010|D, owner ruling 2026-11-06: 0.127), the
 # ream's .XXX station, B's slip and simulator and the bore's ⌖Ø.008|A|B
 # zone radius (0.102), 0.414, at opposite limits over the stations'
-# spacing (174.12): a 0.27 deg turn, plus the bar's play in the bore below
-# (0.18 deg), moving the tap 0.060.  The
+# spacing (180.47): a 0.26 deg turn, plus the bar's play in the bore below
+# (0.18 deg), moving the tap 0.059.  The
 # rear mount, re-hung on the lever's stub at MHA-SM-00 and swung about its
 # dowel until the rock gauge passes, needs that same turn (the lever's
 # ridge lies along the bar-set front bore); KNIFE_REAR_YAW_RANGE_DEG is the
-# turn its bolt float allows.  hypot(0.249, 0.309) = 0.397.
+# turn its bolt float allows.  hypot(0.249, 0.308) = 0.396.
 _KNIFE_DOWEL_SLIP_MAX = knife_dowel.SLIP_CLEARANCE_MAX
 KNIFE_BLOCK_SHIFT = (
     top_frame.HANGER_PIN_X_TOL
@@ -246,10 +253,10 @@ KNIFE_BORE_LINE_OFFSET = (
     + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
     + knife_mount.KNIFE_BORE_POSITION_TOL / 2.0
 )  # 0.4140
-_KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 174.12
+_KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 180.47
 KNIFE_BAR_YAW_DEG = math.degrees(
     math.atan(2.0 * KNIFE_BORE_LINE_OFFSET / _KNIFE_STATION_SPACING)
-)  # 0.272
+)  # 0.263
 # The bar's own diametral clearance in each bore (sheet 5B's matched fit,
 # .0017 max) lets each block turn on the bar by that clearance over its
 # shortest bore: atan(0.0432 / 13.716) = 0.180 deg (owner review of #2334
@@ -261,7 +268,7 @@ _KNIFE_BLOCK_DEPTH_MIN = knife_mount.SUPPORT_Z_THICK - knife_mount.BLOCK_SIZE_TO
 KNIFE_BAR_PLAY_YAW_DEG = math.degrees(
     math.atan(KNIFE_BAR_CLEARANCE / _KNIFE_BLOCK_DEPTH_MIN)
 )  # 0.180
-KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.453
+KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.443
 KNIFE_BAR_YAW_SHIFT = knife_mount.PIN_HOLE_X * math.tan(math.radians(KNIFE_TAP_YAW_DEG))
 HANGER_SCREW_MISMATCH_X = KNIFE_BLOCK_SHIFT
 HANGER_SCREW_MISMATCH_Z = KNIFE_BLOCK_SHIFT + KNIFE_BAR_YAW_SHIFT
@@ -270,7 +277,7 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # crossbar body to the hole's top end at the faced top, at the longest
 # printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 C drill
 # hole's 0.6604 radial float covers this plus the station mismatch,
-# 0.3969, with 0.0717 spare (HANGER_SCREW_FLOAT_SPARE).
+# 0.3959, with 0.0727 spare (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -299,8 +306,8 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # is the bar's diametral clearance in the largest bore, .4735 - (.4720 -
 # .0002) = .0017 (0.0432), and the lever's ridge, spanning both bores, adds
 # its yaw over the shortest mouth-to-mouth run (codjiflo, PR #1978): that
-# clearance walked across the deepest .XX block, 14.224 * 0.0432 / 159.9 =
-# 0.0038.  t 0.047 leaves about 7.76 deg.  The bore's ∥.002|A is its
+# clearance walked across the deepest .XX block, 14.224 * 0.0432 / 166.2 =
+# 0.0037.  t 0.047 leaves about 7.76 deg.  The bore's ∥.002|A is its
 # pitch, which the lateral rock model (free_rock_deg) does not read.  The
 # rear mount's yaw is accepted by the rock gauge itself
 # (sm_summing_assembly_spec.BOSS_ROCK_TRAVEL, sheet check 2): the fitter
@@ -313,10 +320,10 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
 # ``KNIFE_SHOULDER_DROP_MIN``).
 _KNIFE_BLOCK_DEPTH_MAX = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
-KNIFE_RIDGE_MOUTH_SPAN_MIN = _KNIFE_STATION_SPACING - _KNIFE_BLOCK_DEPTH_MAX  # 159.90
+KNIFE_RIDGE_MOUTH_SPAN_MIN = _KNIFE_STATION_SPACING - _KNIFE_BLOCK_DEPTH_MAX  # 166.25
 # Owner ruling 2026-11-10 (Pedro), #2334, S2: the gauge bar spans both
-# mounts' outer faces (7.41 in at the thickest .XX blocks) with its 8.0 in.
-KNIFE_MOUNT_OUTER_SPAN_MAX = _KNIFE_STATION_SPACING + _KNIFE_BLOCK_DEPTH_MAX  # 188.34
+# mounts' outer faces (7.67 in at the thickest .XX blocks) with its 8.0 in.
+KNIFE_MOUNT_OUTER_SPAN_MAX = _KNIFE_STATION_SPACING + _KNIFE_BLOCK_DEPTH_MAX  # 194.69
 KNIFE_GAUGE_BAR_LENGTH = knife_mount.KNIFE_GAUGE_BAR_LENGTH_IN * 25.4  # 203.2
 KNIFE_RIDGE_YAW_OFFSET = (
     _KNIFE_BLOCK_DEPTH_MAX * KNIFE_BAR_CLEARANCE / KNIFE_RIDGE_MOUTH_SPAN_MIN
@@ -593,17 +600,8 @@ from _counter_spring_hang import assert_counter_spring_top_hang  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
-import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
-# ROT_X_NEG90 turns the nut's local +Z thread axis to machine +Y.
-JAM_NUT_POS = (
-    spring_mounts.COUNTER_ANCHOR_XY[0],
-    spring_mounts.COUNTER_BOSS_TOP_Y,
-    SUMMING_Z,
-)
-JAM_NUT_ROWS = ROT_X_NEG90
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
 
@@ -745,32 +743,33 @@ async def _author_settings(adapter) -> None:
 
 
 def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
-    """Require full direct thread engagement, full thread under the jam nut
-    and a tensioned supplier spring."""
+    """Require full direct thread engagement, a cut end flush with the boss
+    underside and a tensioned supplier spring."""
     anchor = ANCHOR_9490T1
     tap = sm_summing_lever_spec.COUNTER_HOLE_SPEC
     if tap.kind != "tapped" or tap.size != anchor.thread_size:
         raise RuntimeError("counter anchor requires its matching native through tap")
-    if jam_nut.THREAD != anchor.thread_size:
-        raise RuntimeError("counter jam nut thread does not match the anchor")
     thread_top = BOSS_HOOK_POS[1] + anchor.thread_start_y_mm
     boss_top = spring_mounts.COUNTER_BOSS_TOP_Y
-    exposed = spring_mounts.COUNTER_SHANK_LENGTH_MM - sm_summing_lever_spec.ANCHOR_H
-    if abs(thread_top - boss_top - exposed) > 1e-6:
-        raise RuntimeError("counter anchor cut end is not flush with the boss underside")
-    if exposed < jam_nut.THICKNESS + anchor.thread_pitch_mm - 1e-3:
+    boss_bottom = boss_top - sm_summing_lever_spec.ANCHOR_H
+    cut_end = thread_top - spring_mounts.COUNTER_SHANK_LENGTH_MM
+    if abs(cut_end - boss_bottom) > 1e-6:
         raise RuntimeError(
-            f"counter anchor stands {exposed:.3f} mm of thread above the boss, "
-            f"under the jam nut's {jam_nut.THICKNESS:.3f} plus one pitch"
+            f"counter anchor cut end stands {cut_end - boss_bottom:.4f} mm off the "
+            "boss underside, not flush"
         )
-    if 2.0 * sm_summing_lever_spec.ANCHOR_R < jam_nut.ACROSS_CORNERS:
-        raise RuntimeError("counter jam nut corners overhang the boss top face")
+    engagement = min(boss_top, thread_top) - max(boss_bottom, cut_end)
+    if abs(engagement - sm_summing_lever_spec.ANCHOR_H) > 1e-6:
+        raise RuntimeError(
+            f"counter anchor engages {engagement:.4f} mm of the boss, expected "
+            f"{sm_summing_lever_spec.ANCHOR_H:.4f}"
+        )
+    standoff = thread_top - boss_top
     counter_stock.validate_length_mm(pose.length_mm)
     log(
         f"counter lower anchor: {tap.size} direct through tap, "
-        f"{sm_summing_lever_spec.ANCHOR_H:.3f} mm engagement, "
-        f"{exposed:.3f} mm thread above the boss under the "
-        f"{jam_nut.THICKNESS:.3f} jam nut; "
+        f"{sm_summing_lever_spec.ANCHOR_H:.3f} mm engagement, cut end flush with "
+        f"the boss underside, eye {standoff:.3f} mm above the boss; "
         f"spring inside length {pose.length_mm:.4f} mm, "
         f"calibrated force {spring_mounts.counter_force_n(pose.length_mm):.3f} N"
     )
@@ -796,7 +795,7 @@ async def build(adapter) -> dict[str, str]:
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
-    # body at SUMMING_Z +/- HEX_Z_MID). The front support is FIRST so the auto-fixed assembly
+    # body at KNIFE_MOUNT_Z_PLUS / _MINUS). The front support is FIRST so the auto-fixed assembly
     # seed is structure, not the mated summing lever. Each support's circular
     # bore is much larger than the hex, so only the trunnion's top vertex line
     # (the knife edge) nears the upper inner wall. The named "knife axis" is that
@@ -804,7 +803,7 @@ async def build(adapter) -> dict[str, str]:
     km = await place_component(
         adapter,
         "sm-knife-mount",
-        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z + HEX_Z_MID],
+        [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_PLUS],
         [0.0, 0.0, 0.0],
         IDENTITY,
         label="knife-mount (front)",
@@ -812,7 +811,7 @@ async def build(adapter) -> dict[str, str]:
     await place_component(
         adapter,
         "sm-knife-mount",
-        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z - HEX_Z_MID],
+        [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_MINUS],
         [0.0, 0.0, 0.0],
         IDENTITY,
         label="knife-mount (back)",
@@ -827,8 +826,8 @@ async def build(adapter) -> dict[str, str]:
     hanger_washers: list[str] = []
     knife_dowels: list[str] = []
     for side, station_z in (
-        ("front", SUMMING_Z + HEX_Z_MID),
-        ("back", SUMMING_Z - HEX_Z_MID),
+        ("front", KNIFE_MOUNT_Z_PLUS),
+        ("back", KNIFE_MOUNT_Z_MINUS),
     ):
         hanger_washers.append(
             await place_component(
@@ -894,7 +893,7 @@ async def build(adapter) -> dict[str, str]:
         hanger_screws,
         hanger_washers,
         station_dowels,
-        (SUMMING_Z + HEX_Z_MID, SUMMING_Z - HEX_Z_MID),
+        (KNIFE_MOUNT_Z_PLUS, KNIFE_MOUNT_Z_MINUS),
         strict=True,
     ):
         screw_o = _assert_hanger_seat_placement(
@@ -991,25 +990,6 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis2@{sl}", "AXIS"),
         label="boss-hook keyed",
     )
-    # The jam nut on the anchor's exposed thread, jammed on the boss top face
-    # with the eye clocked: placed at its exact pose and locked to the lever
-    # it rides -- one Lock mate, as the hook; a coaxial mate on top would only
-    # over-constrain the solve.
-    nut = await place_component(
-        adapter,
-        "sm-vn-boss-hook-jam-nut",
-        list(JAM_NUT_POS),
-        euler_from_rows(JAM_NUT_ROWS),
-        JAM_NUT_ROWS,
-        ground=False,
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{nut}", "PLANE"),
-        named_ref(f"Front Plane@{sl}", "PLANE"),
-        label="boss-hook jam nut locked to lever",
-    )
-    assert_component_placed(adapter, nut, list(JAM_NUT_POS), JAM_NUT_ROWS)
     # Preserve the vendor +X coil frame and required half-turn clocking at the
     # complete fixed measured pose; no seed placement or corrective move follows.
     await place_component(
@@ -1079,10 +1059,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or
-    # other structural component.  The lock-mated boss-hook and its jam nut
-    # MUST read under-constrained WITH the lever -- a grounded/fixed regression
-    # would freeze the counter-spring anchor while the lever still swings.
-    lever_riders = ("sm-summing-lever", "sm-vn-boss-hook", "sm-vn-boss-hook-jam-nut")
+    # other structural component.  The lock-mated boss-hook MUST read
+    # under-constrained WITH the lever -- a grounded/fixed regression would
+    # freeze the counter-spring anchor while the lever still swings.
+    lever_riders = ("sm-summing-lever", "sm-vn-boss-hook")
     assert_free_dof_necessity(
         adapter,
         1,

@@ -57,7 +57,7 @@ fr-top-frame:
   # printed limit at once the cross-screw head can stand .029 proud of the
   # counterbore mouth (.041 under it at nominal); that residual is the
   # owner's (#2516).
-  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, the four boss tops, the edge breaks bordering those faced planes, tube sockets, cap recesses and their mouth chamfers, gooseneck bore and its mouth chamfer, set-screw tap and spot face, cross-screw counterbores, clearance holes and far-wall taps, hanger holes, dowel reams and knockouts, and the keeper taps transferred at assembly"
+  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, the four boss tops, the faced top carried into the two west bosses under the MHA-CH-07 keeper feet (owner ruling 2026-11-11, #1038, option K5: the proud .18 removed inboard of a step .67 from each socket axis, its floor one plane with the faced top, root R.02 max), the edge breaks bordering those faced planes, tube sockets, cap recesses and their mouth chamfers, gooseneck bore and its mouth chamfer, set-screw tap and spot face, cross-screw counterbores, clearance holes and far-wall taps, hanger holes, dowel reams and knockouts, and the keeper taps transferred at assembly"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -108,7 +108,7 @@ fr-top-frame:
       kind: "accept"
       where: "the 4X corner bosses' position frame (⌖ Ø.06 | A | B, 4X, on the Ø1.77 ±.03 boss at the faced top, sheet 3)"
       finding: "position frame on as-cast bosses over-specified (rule 5)"
-      reason: "Delegated ruling 2026-11-11 (Main), following owner precedent 2026-11-10 (#2333 D3, the rail webs' ⌖ .06 | A | B, RV-10, and D6, whose stacks charge a barrel within .03 of its socket); owner review #2144: each cast barrel stays within .03 of its machined socket, which is what leaves the socket wall .247 minimum at the boss bottom (.383 at the faced top, less half the barrel's ±.03, its steepest 3° draft over the 1.69 to the boss bottom, half the socket's .XXX band and that zone's radius) and the MHA-CH-07 keeper feet .009 minimum off the barrels; the sockets' Ø.06 to E | F | G does not hold it, because F and G touch the barrels 1.56 under the faced top"
+      reason: "Delegated ruling 2026-11-11 (Main), following owner precedent 2026-11-10 (#2333 D3, the rail webs' ⌖ .06 | A | B, RV-10, and D6, whose stacks charge a barrel within .03 of its socket); owner review #2144: each cast barrel stays within .03 of its machined socket, which is what leaves the socket wall .247 minimum at the boss bottom (.383 at the faced top, less half the barrel's ±.03, its steepest 3° draft over the 1.69 to the boss bottom, half the socket's .XXX band and that zone's radius) and each west barrel at least .160 past its keeper relief's step (owner ruling 2026-11-11, #1038, K5: the MHA-CH-07 keeper feet now stand .029 minimum off those machined steps, which are located from the socket axes, not off the barrels); the sockets' Ø.06 to E | F | G does not hold it, because F and G touch the barrels 1.56 under the faced top"
     - id: "RV-12"
       kind: "accept"
       where: "the added draft's callout (2° +1°/0° DRAFT, WEBS, CROSSBAR, POCKETS, GUSSETS, PADS, SET-BOSS SIDES, HOLDS 2-56 TAP WALL .080 MIN, sheet 7)"

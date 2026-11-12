@@ -4,10 +4,10 @@ The cast-iron lever that sums the pull of the 20 channel springs and balances
 them against the master (counter) spring -- a FIRST-CLASS LEVER hung in
 suspension on a knife edge.
 
-PROVENANCE / REVERT NOTICE: this restores the legacy ``cad/SummingLever.cs``
-shape (commit 9eb1710, itself translated from ``summing-lever.kcl``) at the
-user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
-Ø14 bore" model. Two corrections the user made over the raw .cs:
+PROVENANCE: the 2026-06-16 reconstruction superseded the M6.4 "knife-edge
+tube + Ø14 bore" model. Historical .cs/KCL geometry records that reconstruction,
+not the current design authority: the shared spec and owner decisions govern.
+Two corrections established the solid pivot and knife-edge trunnions:
 
 * The real lever has **NO bore** -- the M6.4 bored tube was wrong. The .cs
   solid pivot cylinder is correct.
@@ -17,15 +17,17 @@ user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
   references/.../ch18_images/page001_img0{1,3}, photogrammetry 194637152 /
   194651412) and is tuned against the knife-mount fit + ch30 parity.
 
-Seven features (the six .cs features + the hex knife edge):
+Seven principal features:
 
-1. Coefficients plate  -- uniform 7 mm positive-X slab with its top held at
-   local Y+2.54; the downward addition leaves spring and knife registration
-   unchanged. The negative-X counter web stays 5.08 mm centered on Y0.
-2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
-   extrude along the long edge (the pivot/rock axis = local Z).
+1. Coefficients plate  -- uniform 7 mm positive-X slab centred at local Y0,
+   with faces Y±3.50, matching the centred 7 mm negative-X counter web
+   (owner decision #2129). The knife-edge trunnions remain unchanged. The
+   body runs from local Z -82.55 to +76.20: the -Z end is extended .25 in
+   (owner ruling 4, #1038); the origin, boss and middle rib stay.
+2. Pivot cylinder      -- Front-plane solid circle at the origin, extruded
+   between the body ends along the long edge (the pivot/rock axis = local Z).
 3. Hex knife edges     -- ONE vertex-up hexagonal prism through the pivot,
-   extruded mid-plane out past both body ends: the two trunnion stubs it
+   extruded out past both body ends: the two trunnion stubs it
    leaves PROTRUDE beyond the body (one per side), so each knife edge rests
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
@@ -42,15 +44,14 @@ Part-local frame: origin = the knife-edge line, placed IDENTITY at machine
 (-15, 979.6932, 0), so local axes ARE machine axes: +X = the channel-spring
 (coefficients-plate) arm (machine west), -X = the counter-spring
 (summation-anchor) arm (machine east), +Y up, +Z along the knife edge
-(channel direction). The spring holes sit at their registered local
-positions (so the 20 channel springs need no change) and the summation
-anchor lands where the counter-spring boss-hook attaches (local x -76 ->
-machine -91 ~ the M6.4 hook at -90.5).
+(channel direction). The spring-hole X/Z stations remain registered; their
+entry face follows the centred coefficient top. The summation anchor lands
+where the counter-spring boss-hook attaches (local x -76 -> machine -91).
 
 Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py).
 The common rib profile has native tangent constraints, defining dimensions,
 face/profile readback and exact incremental-volume gates. Bounded internal
-root fillets are selected explicitly and cannot grow into the spring-nut lane.
+root fillets are selected explicitly and cannot grow into the spring-anchor lane.
 
 Dimensions: cad/DIMENSIONS.md ch. 18 (legacy KCL values + M6.4 registration;
 low/med confidence).
@@ -147,6 +148,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_BOTTOM_Y,
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
+    COUNTER_FLANK_ANGLE_DEG,
     COUNTER_WEB_T,
     CHANNEL_PITCH,
     CHANNEL_Z0,
@@ -158,13 +160,20 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_OFFSET,
     HOLE_Z_LAST,
+    HEX_Z_OUTER_MINUS,
+    HEX_Z_OUTER_PLUS,
+    KNIFE_SEAT_Z_MINUS,
+    KNIFE_SEAT_Z_PLUS,
     KNIFE_FLANK_TO_SIDE_TOL_DEG,
     KNIFE_ENVELOPE_PLACES,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
     KNIFE_RIDGE_R_PLACES,
     KNIFE_RIDGE_R_TOL_TYPE,
+    PLATE_L,
     PLATE_W_DEVIATIONS,
+    PLATE_Z_MINUS,
+    PLATE_Z_PLUS,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
     RIB_BLEND_R,
@@ -183,15 +192,13 @@ from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_m
 PART_NAME = "sm-summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 
-# The .cs is authored with the coefficients plate on -X; the machine wants it on
-# the +X arm (to match the M6.4 frame the rest of the assembly registers to), so
-# every .cs-derived X is multiplied by SX.
+# The historical reconstruction's X direction is opposite the installed
+# coefficient arm. SX preserves that registration, not a .cs design authority.
 SX = -1.0
 
-# --- SummingLever.cs constants (inches -> mm) ------------------------------
+# --- retained reconstruction dimensions (inches -> mm) ---------------------
 PLATE_W = 1.75 * IN  # coefficients plate width (along the arm, X)   44.45
-PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
-# Coefficient thickness and fixed top are imported separately from counter web.
+# The shared spec owns both centred 7 mm sections and their real face levels.
 CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
 RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
 SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
@@ -209,14 +216,12 @@ ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 # (Y, vertex to vertex) x 21.717 deep (Z protrusion). The top vertex ridge is
 # the knife edge (= the rock axis, above the cylinder centreline).
 # Both stubs are one prism (``_hex_knife``): one sketch extruded through the
-# body from -HEX_Z_OUTER to +HEX_Z_OUTER.  Every vertex lies inside the
-# solid pivot cylinder (circumradius HEX_H/2 < CYL_R), so between the body
+# body from HEX_Z_OUTER_MINUS to HEX_Z_OUTER_PLUS.  Every vertex lies inside
+# the solid pivot cylinder (circumradius HEX_H/2 < CYL_R), so between the body
 # ends the prism merges into it and the solid is the two stubs' alone.
 HEX_W = 8.080  # across-flats width (X); = sm_summing_lever_spec.HEX_W
 HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
 HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
-HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 if not HEX_H / 2.0 < CYL_R:
     raise AssertionError("the knife prism must lie inside the pivot cylinder")
 # The readback (``_assert_knife_sides_coplanar``) holds each lateral face of
@@ -226,15 +231,66 @@ KNIFE_SIDE_PLANE_TOL = 1e-6
 KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 
 # --- derived ---------------------------------------------------------------
-SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
+
+
+def _circumcenter(
+    p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]
+) -> tuple[float, float]:
+    """Centre of the circle through three non-collinear points."""
+    (ax, ay), (bx, by), (cx, cy) = p1, p2, p3
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-12:
+        raise ValueError("circumcenter: collinear points")
+    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    return ux, uy
+
+
+def _summation_side_points() -> dict[float, tuple[tuple[float, float], ...]]:
+    """Each counter-web side arc as world (x, z): base end, interior, boss end.
+
+    The +Z arc is the retained reconstruction's (through its historical
+    interior point).  The -Z arc runs from the extended front body end
+    (#1038) to the boss's other quadrant at the SAME radius, bowed towards the
+    counter axis like its twin, so the print's one "2X R" sizes both.
+    """
+    plus = (
+        (0.0, PLATE_Z_PLUS),
+        (SX * SUM_H / 2.0, PLATE_Z_PLUS / 2.0 - SUM_CURV),
+        (TIP_X, ANCHOR_R),
+    )
+    cx, cz = _circumcenter(*plus)
+    radius = math.hypot(plus[0][0] - cx, plus[0][1] - cz)
+    start, end = (0.0, PLATE_Z_MINUS), (TIP_X, -ANCHOR_R)
+    chord = math.dist(start, end)
+    ux, uz = (end[0] - start[0]) / chord, (end[1] - start[1]) / chord
+    rise = math.sqrt(radius**2 - (chord / 2.0) ** 2)
+    mid = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    # The centre lies beyond the chord from the counter axis (more -Z, -X).
+    centre = (mid[0] - uz * rise, mid[1] + ux * rise)
+    if not (centre[1] < mid[1] and centre[0] < mid[0]):
+        raise AssertionError("the -Z web arc's centre is on the wrong side")
+    interior = (
+        centre[0] + (mid[0] - centre[0]) * radius / rise,
+        centre[1] + (mid[1] - centre[1]) * radius / rise,
+    )
+    return {1.0: plus, -1.0: (start, interior, end)}
+
+
+# The counter web's side arcs, keyed by their Z side.
+SUMMATION_SIDE_POINTS = _summation_side_points()
 ARC_R = RIB_WRAP_R
-RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fixed
+# Each edge rib's inner cap; the outside caps are the body ends.
+RIB_INNER_Z_PLUS = PLATE_Z_PLUS - RIB_T  # +71.12
+RIB_INNER_Z_MINUS = PLATE_Z_MINUS + RIB_T  # -77.47
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # In X, all ribs stop at 35.814 (1.41) before the unchanged spring-hole column
-# and worst jam-nut footprint at 36.449. The pilot continues beyond the 5.08 mm
-# entry rib into the connected coefficient plate, not an enlarged receiver.
+# and the worst protruding anchor-shank footprint at 37.970. The pilot
+# continues beyond the 5.08 mm entry rib into the connected coefficient plate,
+# not an enlarged receiver.
 # The shared positive-X branch meets both plate faces with R.040 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
@@ -242,7 +298,7 @@ if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
 
 # Receiver-coordinate marks (``_receiver_coordinate_dimensions``): short
 # construction lines whose ends carry the bracket-tap coordinates.  The edge
-# mark lies on the free edge below its fixed top corner; each tap mark lies
+# mark lies on the free edge below its actual top corner; each tap mark lies
 # on its row inside the tap drill.
 RECEIVER_EDGE_MARK = 1.0
 RECEIVER_TAP_MARK = 0.5
@@ -278,20 +334,6 @@ SPRING_PITCH_EXPR = '"ChannelPitch"'
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
 
 
-def _circumcenter(
-    p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]
-) -> tuple[float, float]:
-    """Centre of the circle through three non-collinear points."""
-    (ax, ay), (bx, by), (cx, cy) = p1, p2, p3
-    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-    if abs(d) < 1e-12:
-        raise ValueError("circumcenter: collinear points")
-    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
-    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
-    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
-    return ux, uy
-
-
 async def _three_point_arc(
     adapter,
     start: tuple[float, float],
@@ -321,7 +363,7 @@ async def _three_point_arc(
 
 
 def _assert_coefficient_slab(adapter) -> None:
-    """Fixed real seats and persistent extrusion dimensions after rebuild."""
+    """Centred real seats and persistent extrusion dimensions after rebuild."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = _early_bound(model.FeatureByName("CoefficientsPlate"), "IFeature")
     heights = []
@@ -353,17 +395,50 @@ def _assert_coefficient_slab(adapter) -> None:
     )
 
 
-def _assert_boss_face_graph(adapter) -> None:
-    """Real Y faces tie the boss and counterweb to the coefficient top.
+def _assert_z_end_planes(
+    adapter, name: str, required: tuple[float, ...], allowed: tuple[float, ...] = ()
+) -> None:
+    """Read ``name``'s planar caps normal to Z: every ``required`` station is
+    one, and no cap stands anywhere else (``allowed`` adds coplanar stations
+    an earlier feature may own).  The body is not symmetric about the Front
+    plane (owner ruling 4, #1038), so its volume no longer shows which side
+    of that plane an offset boss went: these planes do."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    raw = model.FeatureByName(name)
+    if raw is None:
+        raise RuntimeError(f"{name}: missing native feature")
+    planes: list[float] = []
+    for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
+        surface = _early_bound(_early_bound(raw_face, "IFace2").GetSurface(), "ISurface")
+        if surface is None or not surface.IsPlane():
+            continue
+        values = tuple(float(value) for value in surface.PlaneParams)
+        if len(values) != 6 or not all(math.isfinite(value) for value in values):
+            raise RuntimeError(f"{name}: invalid native plane parameters {values}")
+        if abs(abs(values[2]) - 1.0) < 1e-7:
+            planes.append(values[5] * 1000.0)
+    if not all(
+        any(abs(z - station) <= 1e-5 for z in planes) for station in required
+    ) or any(
+        min(abs(z - station) for station in (*required, *allowed)) > 1e-5
+        for z in planes
+    ):
+        raise RuntimeError(
+            f"{name}: native Z caps {sorted(planes)} mm are not {required} mm"
+        )
+    _telemetry.success(f"{name}: native Z caps {sorted(planes)} mm")
 
-    The plate is not symmetric about Y0. Its actual top is the common web
-    top; the boss top stands ANCHOR_H/2 above Y0, not above the plate centre.
-    This proves the flush caption without inventing a midplane datum.
+
+def _assert_boss_face_graph(adapter) -> None:
+    """Prove both centred plate/web faces and the unchanged boss envelope.
+
+    Both 7 mm sections meet at Y±3.50. The boss remains centred at Y0 with
+    its own ANCHOR_H span; neither the boss nor knife trunnions follow a face.
     """
     model = _early_bound(adapter.currentModel, "IPartDoc")
     for owner, expected in (
         ("SummationAnchor", (-ANCHOR_H / 2.0, ANCHOR_H / 2.0)),
-        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COEFFICIENT_TOP_Y)),
+        ("SummationPlate", (-COUNTER_WEB_T / 2.0, COUNTER_WEB_T / 2.0)),
         ("CoefficientsPlate", (COEFFICIENT_BOTTOM_Y, COEFFICIENT_TOP_Y)),
     ):
         raw_feature = model.FeatureByName(owner)
@@ -383,15 +458,15 @@ def _assert_boss_face_graph(adapter) -> None:
             raise RuntimeError(f"{owner}: native Y faces {heights} do not contain {expected}")
     _telemetry.success(
         "boss face graph: boss top above coefficient top by "
-        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; counterweb top flush"
+        f"{ANCHOR_H / 2.0 - COEFFICIENT_TOP_Y:.6f} mm; both counterweb faces flush"
     )
 
 
 async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 1: uniform coefficient slab from Y-4.46 to fixed Y+2.54.
+    """Feature 1: uniform coefficient slab centred on Y0, with faces Y±3.50.
 
-    The HOLE_COUNT spring holes are ONE seed cut at station j=0 + a native
-    FeatureLinearPattern5 marching the remaining stations at CHANNEL_PITCH.
+    The HOLE_COUNT spring holes are ONE seed cut at station j=HOLE_COUNT-1
+    plus a native FeatureLinearPattern5 marching at CHANNEL_PITCH down -Z.
     (An early pattern attempt marched along an AUTO-selected plate edge whose
     natural sense silently reversed the field off the -Z plate edge -- only
     j=0 stayed cut -- and was replaced by cutting all 20 stations outright in
@@ -401,13 +476,9 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     the plate, and an analytic volume gate that resolves a single missing
     hole.)
 
-    Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
-    PLACEMENT, not baked here -- see spring_mount_geom.PLATE_TOP_Y and the
-    Phase 2/3 plan."""
-    from solidworks_mcp.adapters.base import (
-        ExtrusionParameters,
-        LinearPatternParameters,
-    )
+    Assembly placement retains the knife registration; the spring entry Y
+    follows COEFFICIENT_TOP_Y, not a historical fixed-top convention."""
+    from solidworks_mcp.adapters.base import LinearPatternParameters
 
     plate = SketchDims()
     check("create_sketch plate", await adapter.create_sketch("Front"))
@@ -436,13 +507,12 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     check("exit_sketch plate", await adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs += plate.apply(adapter, "PlateProfile")
-    check(
-        "extrude coefficients plate",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PLATE_L, both_directions=True)
-        ),
-    )
+    # One blind boss from the -Z body end to datum B: a negative start offset
+    # is behind the Front plane and the boss runs along +Z (the edge ribs'
+    # ``flip=False`` sense), so PlateLength stays one native end-to-end depth.
+    extrude_at_offset(adapter, PLATE_L, PLATE_Z_MINUS)
     name_last_feature(adapter, "CoefficientsPlate")
+    _assert_z_end_planes(adapter, "CoefficientsPlate", (PLATE_Z_MINUS, PLATE_Z_PLUS))
     [length] = name_dimensions(adapter, "CoefficientsPlate", ["PlateLength"])
     drive_jobs.append((length, '"PlateL"'))
     _assert_coefficient_slab(adapter)
@@ -509,9 +579,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 
 async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 2: Front-plane solid circle at origin, symmetric extrude along the
-    long edge -- the pivot/rock axis (local Z). NO bore."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    """Feature 2: Front-plane solid circle at origin, extruded between the body
+    ends along the long edge -- the pivot/rock axis (local Z). NO bore."""
 
     # Origin circle: only the diameter is a dim (the centre is a coincident
     # relation), so define_circle records just that one slot.
@@ -531,30 +600,26 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     check("exit_sketch cylinder", await adapter.exit_sketch())
     name_last_feature(adapter, "CylinderProfile")
     drive_jobs += cyl.apply(adapter, "CylinderProfile")
-    check(
-        "extrude cylinder",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PLATE_L, both_directions=True)
-        ),
-    )
+    extrude_at_offset(adapter, PLATE_L, PLATE_Z_MINUS)
     name_last_feature(adapter, "PivotCylinder")
+    _assert_z_end_planes(
+        adapter, "PivotCylinder", (), allowed=(PLATE_Z_MINUS, PLATE_Z_PLUS)
+    )
 
 
 async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Both hexagonal knife-edge trunnion stubs as ONE prism: a Front-plane
     vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the pivot axis,
     a vertex at the top (the knife edge runs along Z at that top vertex
-    line), extruded mid-plane to |z| HEX_Z_OUTER.  Inside the body it merges
-    into the solid pivot cylinder; past each body end it is a stub, the
-    overhang the knife edge rests on a bearing support with.
+    line), extruded from HEX_Z_OUTER_MINUS to HEX_Z_OUTER_PLUS.  Inside the body
+    it merges into the solid pivot cylinder; past each body end it is a stub,
+    the overhang the knife edge rests on a bearing support with.
 
     One sketch and one extrude, so each side face, flank and lower face of
     the +Z stub lies in the same plane as its -Z twin by construction (code
     review C09): the symmetry Detail D prints for each stub then holds the two
     ridges to each other (``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``).
     ``_assert_knife_sides_coplanar`` reads that back."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
     hexd = SketchDims()
     check("create_sketch hex knife", await adapter.create_sketch("Front"))
     # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
@@ -602,13 +667,9 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     check("exit_sketch hex knife", await adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
-    check(
-        "extrude hex knife",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * HEX_Z_OUTER, both_directions=True)
-        ),
-    )
+    extrude_at_offset(adapter, PLATE_L + 2.0 * HEX_DEPTH, HEX_Z_OUTER_MINUS)
     name_last_feature(adapter, stem)
+    _assert_z_end_planes(adapter, stem, (HEX_Z_OUTER_MINUS, HEX_Z_OUTER_PLUS))
     # The total length is the body plus both stubs; the print sizes a stub's
     # own length from the hidden KnifeStubReference (``_knife_stub_reference``).
     [length] = name_dimensions(adapter, stem, [f"{stem}Length"])
@@ -697,8 +758,7 @@ async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     limit).  Picked mid-stub on each ridge line, the only edge through that
     point; HexHeight stays the theoretical sharp, the knife axis (Axis3) too."""
     picks = [
-        [0.0, HEX_H / 2.0, side * (HEX_Z_INNER + HEX_DEPTH / 2.0)]
-        for side in (1.0, -1.0)
+        [0.0, HEX_H / 2.0, seat_z] for seat_z in (KNIFE_SEAT_Z_PLUS, KNIFE_SEAT_Z_MINUS)
     ]
     v_before = await _measured_volume(adapter, "before the knife-ridge round")
     check(
@@ -765,8 +825,8 @@ def _assert_edge_rib_end_planes(adapter) -> None:
     """Read all three native rib depths and caps; edge outer caps may merge."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     expected = {
-        "EdgeRibBack": (-RIB_OFFSET, -PLATE_L / 2.0, "EdgeRibThickness", RIB_T),
-        "EdgeRibFront": (RIB_OFFSET, PLATE_L / 2.0, "EdgeRibThickness", RIB_T),
+        "EdgeRibBack": (RIB_INNER_Z_MINUS, PLATE_Z_MINUS, "EdgeRibThickness", RIB_T),
+        "EdgeRibFront": (RIB_INNER_Z_PLUS, PLATE_Z_PLUS, "EdgeRibThickness", RIB_T),
         "MiddleRib": (-RIB_T / 2.0, RIB_T / 2.0, "MiddleRibThickness", RIB_T),
     }
     tolerance_mm = 1e-5
@@ -811,6 +871,47 @@ def _assert_edge_rib_end_planes(adapter) -> None:
             f"{name}: native depth {depth_mm:.2f} mm; end planes {sorted(planes)} mm; "
             f"inner cap {inner:.2f} mm; outer boundary {outer:.2f} mm"
         )
+
+
+def _add_driving_counter_angle(adapter, flank: str, baseline: str) -> None:
+    """Drive the upper counter tangent from its on-axis construction ray.
+
+    Select two segments, not the adapter's segment/vertex angular route.
+    Front-plane sketch/model XY coincide; place text inside the acute wedge
+    before making the measured angle driving, never its supplement.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    half = math.radians(COUNTER_FLANK_ANGLE_DEG / 2.0)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [flank, baseline], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        TIP_X / 1000.0 + 0.020 * math.cos(half),
+        0.020 * math.sin(half), 0.0,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None or int(status) != 0:  # swAddSpecificDimension_Success
+        raise RuntimeError(f"counter angle: AddSpecificDimension failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if (
+        int(display.Type2) != 3
+        or not math.isclose(
+            float(dimension.SystemValue), math.radians(COUNTER_FLANK_ANGLE_DEG),
+            rel_tol=0.0, abs_tol=1e-10,
+        )
+    ):
+        raise RuntimeError("counter angle: native dimension is not the nominal acute angle")
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError("counter angle: native dimension did not become driving")
 
 
 async def _rib_profile_sketch(
@@ -858,6 +959,8 @@ async def _rib_profile_sketch(
         negative_top = await line(top, (TIP_X, 0.0), "counter upper tangent")
         negative_bottom = await line((TIP_X, 0.0), bottom, "counter lower tangent")
         lower_wrap = await arc((0.0, 0.0), bottom, LOWER.wrap_xy, "lower wrap")
+        counter_axis = await line((TIP_X, 0.0), (0.0, 0.0), "counter axis")
+        _as_construction(adapter, counter_axis)
     else:
         wrap = await arc((0.0, 0.0), UPPER.wrap_xy, LOWER.wrap_xy, "pivot wrap")
         lower_wrap = wrap
@@ -912,10 +1015,16 @@ async def _rib_profile_sketch(
     ]
     if middle:
         pairs += [(wrap, negative_top), (lower_wrap, negative_bottom)]
-        await anchor_point_to_origin(
-            adapter, f"{negative_top}.end", TIP_X, 0.0, f"{stem} counter tip"
+        check(
+            f"{stem} counter axis origin",
+            await adapter.add_sketch_constraint(f"{counter_axis}.end", "origin", "coincident"),
         )
-        rib.record(f"{stem}CounterReach", '"SumH"')
+        check(
+            f"{stem} counter axis horizontal",
+            await adapter.add_sketch_constraint(counter_axis, None, "horizontal"),
+        )
+        _add_driving_counter_angle(adapter, negative_top, counter_axis)
+        rib.record(f"{stem}CounterAngle", '"CounterFlankAngle"')
     for index, (first, second) in enumerate(pairs):
         check(
             f"{stem} tangent {index}",
@@ -927,14 +1036,15 @@ async def _rib_profile_sketch(
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
 
 
-def _assert_native_rib_profile(adapter, stem: str) -> None:
-    """Prove both real flanks and both R.040 blend surfaces, not only the sketch."""
+def _assert_native_rib_profile(adapter, stem: str, *, equation_bound: bool = False) -> None:
+    """Prove native flanks/blends and the counter angle's stage-specific state."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     raw = model.FeatureByName(stem)
     if raw is None:
         raise RuntimeError(f"{stem}: missing native profile feature")
     found_flanks: set[int] = set()
     found_blends: set[int] = set()
+    found_counter: set[int] = set()
     for raw_face in _early_bound(raw, "IFeature").GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
@@ -947,6 +1057,18 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
                 offset = sum(a * b for a, b in zip(expected, point, strict=True)) * 1000.0
                 if aligned > 1.0 - 1e-8 and abs(offset - ARC_R) < 1e-5:
                     found_flanks.add(index)
+            if stem == "MiddleRib":
+                for index, sign in enumerate((1.0, -1.0)):
+                    expected = (ARC_R / TIP_X, sign * math.sqrt(1.0 - (ARC_R / TIP_X)**2), 0.0)
+                    aligned = abs(sum(a * b for a, b in zip(normal, expected, strict=True)))
+                    offset = sum(a * b for a, b in zip(expected, point, strict=True)) * 1000.0
+                    if aligned > 1.0 - 1e-8 and abs(offset - ARC_R) < 1e-5:
+                        # Plane intersection with y=0, in MILLIMETRES. A
+                        # rounded 11.537-degree driver must fail this gate.
+                        apex_x = (point[0] + normal[1] * point[1] / normal[0]) * 1000.0
+                        if not math.isfinite(apex_x) or abs(apex_x - TIP_X) > 1e-6:
+                            raise RuntimeError(f"{stem}: counter apex {apex_x:.9f} mm, expected {TIP_X}")
+                        found_counter.add(index)
         elif surface.IsCylinder():
             values = tuple(float(value) for value in surface.CylinderParams)
             if len(values) != 7 or abs(abs(values[5]) - 1.0) > 1e-8:
@@ -962,16 +1084,45 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
             f"{stem}: native tangent profile lost flanks {found_flanks} "
             f"or bounded blends {found_blends}"
         )
+    if stem == "MiddleRib":
+        if found_counter != {0, 1}:
+            raise RuntimeError(f"{stem}: missing native counter planes {found_counter}")
+        raw_dimension = adapter.currentModel.Parameter("MiddleRibCounterAngle@MiddleRibProfile")
+        if raw_dimension is None:
+            raise RuntimeError(f"{stem}: missing native driving counter angle")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        # Equation-controlled dimensions report driven (1), not their
+        # creation-time driving state (2), as the PlateWidth control confirms.
+        expected_state = 1 if equation_bound else 2
+        driven_state = int(dimension.DrivenState)
+        actual_radians = float(dimension.SystemValue)
+        expected_radians = math.radians(COUNTER_FLANK_ANGLE_DEG)
+        if (
+            driven_state != expected_state
+            or not math.isclose(
+                actual_radians, expected_radians,
+                rel_tol=0.0, abs_tol=1e-10,
+            )
+        ):
+            raise RuntimeError(
+                f"{stem}: counter angle {dimension.FullName!r} is not the nominal native driver: "
+                f"DrivenState={driven_state!r}, expected={expected_state}; "
+                f"SystemValue={actual_radians!r} rad, expected={expected_radians!r} rad; "
+                f"delta={actual_radians - expected_radians!r} rad; "
+                f"actual_degrees={math.degrees(actual_radians)!r}"
+            )
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 
 async def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
-    """The common tangent profile and uniform thickness at either fixed end."""
+    """The common tangent profile and uniform thickness at either fixed end:
+    ``flip`` builds the -Z rib, mirrored about the Front plane."""
     v_before = await _measured_volume(adapter, f"before {stem}")
     await _rib_profile_sketch(adapter, stem, drive_jobs)
-    extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
+    offset = -RIB_INNER_Z_MINUS if flip else RIB_INNER_Z_PLUS
+    extrude_at_offset(adapter, RIB_T, offset, flip=flip)
     name_last_feature(adapter, stem)
     added_volume = edge_rib_added_area_mm2() * RIB_T
     await force_rebuild(adapter)
@@ -984,18 +1135,21 @@ async def _edge_rib(
 
 
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0), two
-    curved sides, short tip edge at the anchor (x=TIP_X)."""
+    """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0)
+    between the body ends, two curved sides of one radius, short tip edge at
+    the anchor (x=TIP_X).  The Top-plane sketch maps world Z to -sketchY."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     sd = SketchDims()
     check("create_sketch summation plate", await adapter.create_sketch("Top"))
-    p1 = (0.0, -SUM_BASE)
-    p2 = (0.0, SUM_BASE)
+    p1 = (0.0, -PLATE_Z_PLUS)
+    p2 = (0.0, -PLATE_Z_MINUS)
     p3 = (TIP_X, ANCHOR_R)
     p4 = (TIP_X, -ANCHOR_R)
-    top_int = (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV)
-    bot_int = (SX * SUM_H / 2.0, -SUM_BASE / 2.0 + SUM_CURV)
+    top_int, bot_int = (
+        (SUMMATION_SIDE_POINTS[side][1][0], -SUMMATION_SIDE_POINTS[side][1][1])
+        for side in (-1.0, 1.0)
+    )
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
@@ -1010,15 +1164,15 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     # Record each manual dim in creation order. Unsigned-distance anchors at
     # negative coordinates negate the (negative) source so the drive evaluates
-    # positive: base start at y=-SUM_BASE drives "PlateL" / 2; the tip-end anchor
-    # at (TIP_X<0, -ANCHOR_R) drives |TIP_X|="SumH" then "AnchorR". The two arc
-    # centres are circumcentre-derived (no clean global), left None.
+    # positive: base start at y=-PLATE_Z_PLUS drives "PlateZPlus"; the tip-end
+    # anchor at (TIP_X<0, -ANCHOR_R) drives |TIP_X|="SumH" then "AnchorR". The
+    # two arc centres are circumcentre-derived (no clean global), left None.
     check(
         "summation base vertical",
         await adapter.add_sketch_constraint(base, None, "vertical"),
     )
     await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
-    sd.record("SumBaseStartZ", '"PlateL" / 2')  # vertical_distance = SUM_BASE
+    sd.record("SumBaseStartZ", '"PlateZPlus"')  # vertical_distance = PLATE_Z_PLUS
     await dimension_between(
         adapter,
         f"{base}.start",
@@ -1176,7 +1330,7 @@ def _assert_receiver_plate_backing(adapter) -> None:
     for x, y, entry_z in LEVER_HOLE_POINTS:
         inner_z = entry_z + RIB_T
         tip_z = entry_z + DRILL_DEPTH + DRILL_POINT_DEPTH
-        if not -PLATE_L / 2.0 < inner_z < tip_z < PLATE_L / 2.0:
+        if not PLATE_Z_MINUS < inner_z < tip_z < PLATE_Z_PLUS:
             raise RuntimeError("receiver: pilot backing interval is not inside the coefficient plate")
         for axis, level in boundaries:
             clearance = level - (x if axis == 0 else y) - radius
@@ -1235,7 +1389,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
     if not sides:
         raise RuntimeError("receiver: no native longitudinal profile faces")
     radius = TAP_DRILL_DIA / 2.0
-    z = -PLATE_L / 2.0 + RIB_T / 2.0
+    z = PLATE_Z_MINUS + RIB_T / 2.0
     for x, y, _ in LEVER_HOLE_POINTS:
         distances = []
         for face in sides:
@@ -1287,41 +1441,74 @@ def _assert_receiver_profile_walls(adapter) -> None:
     )
 
 
-def coefficient_underside_root_geometry() -> tuple[
+def summation_side_z(x: float, side: float) -> float:
+    """World Z of the counter web's ``side`` (+1/-1) arc at X."""
+    start, interior, end = SUMMATION_SIDE_POINTS[side]
+    if not end[0] <= x <= start[0]:
+        raise ValueError(f"counter-web side arc does not span X{x}")
+    cx, cz = _circumcenter(start, end, interior)
+    radius = math.hypot(start[0] - cx, start[1] - cz)
+    return cz + math.copysign(math.sqrt(radius**2 - (x - cx) ** 2), interior[1] - cz)
+
+
+def longitudinal_root_families() -> tuple[tuple[str, float, float], ...]:
+    """Name, X side and face level of each plate/web-to-pivot-cylinder junction."""
+    return (
+        ("CoefficientUndersideRootFillets", 1.0, COEFFICIENT_BOTTOM_Y),
+        ("CoefficientTopRootFillets", 1.0, COEFFICIENT_TOP_Y),
+        ("CounterWebTopRootFillets", -1.0, COUNTER_WEB_T / 2.0),
+        ("CounterWebUndersideRootFillets", -1.0, -COUNTER_WEB_T / 2.0),
+    )
+
+
+def longitudinal_root_geometry(x_sign: float, face_y: float) -> tuple[
     float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
 ]:
-    """Nominal lower junction, tangent R.040 cylinder and two inboard edge runs.
+    """Signed junction X, tangent R.040 cylinder and two inboard edge runs.
 
     The fillet circle is externally tangent to the pivot cylinder and tangent
-    to the plate underside. Its centre is R below the underside, at distance
-    CylR + R from the pivot axis. Cap-root corner patches get a one-radius
-    neighbourhood in the native audit; neither outside body end is selected.
+    to the plate or web face. Its centre is R beyond that face, at distance
+    CylR + R from the pivot axis. Coefficient runs end at the edge-rib caps;
+    counter-web runs end where the web's side arc leaves the cylinder.
+    Cap-root corner patches get a one-radius neighbourhood in the native
+    audit; neither outside body end is selected.
     """
-    bottom, radius = COEFFICIENT_BOTTOM_Y, RIB_BLEND_R
-    runs = (
-        (-RIB_OFFSET, -RIB_T / 2.0),
-        (RIB_T / 2.0, RIB_OFFSET),
-    )
+    radius = RIB_BLEND_R
     if (
-        not all(math.isfinite(value) for value in (bottom, radius, CYL_R, PLATE_L))
-        or not -CYL_R < bottom < 0.0
+        not all(math.isfinite(value) for value in (face_y, radius, CYL_R, PLATE_L))
+        or not 0.0 < abs(face_y) < CYL_R
         or radius <= 0.0
-        or any(
-            not all(math.isfinite(value) for value in (start, end))
-            or not -PLATE_L / 2.0 < start - radius < end + radius < PLATE_L / 2.0
-            or end - start <= 4.0 * radius
-            for start, end in runs
-        )
     ):
-        raise ValueError("lower plate/cylinder blend violates inboard tangent-run premises")
-    edge_x = math.sqrt(CYL_R**2 - bottom**2)
-    center_y = bottom - radius
-    center_x = math.sqrt((CYL_R + radius)**2 - center_y**2)
-    tangent = (
-        center_x * CYL_R / (CYL_R + radius),
-        center_y * CYL_R / (CYL_R + radius),
+        raise ValueError("plate/cylinder blend violates inboard tangent-run premises")
+    edge_x = math.copysign(math.sqrt(CYL_R**2 - face_y**2), x_sign)
+    ends = (
+        (RIB_INNER_Z_MINUS, RIB_INNER_Z_PLUS)
+        if x_sign > 0.0
+        else (
+            max(RIB_INNER_Z_MINUS, summation_side_z(edge_x, -1.0)),
+            min(RIB_INNER_Z_PLUS, summation_side_z(edge_x, 1.0)),
+        )
     )
-    return edge_x, (center_x, center_y), tangent, runs
+    runs = ((ends[0], -RIB_T / 2.0), (RIB_T / 2.0, ends[1]))
+    if any(
+        not all(math.isfinite(value) for value in (start, stop))
+        or not PLATE_Z_MINUS < start - radius < stop + radius < PLATE_Z_PLUS
+        or stop - start <= 4.0 * radius
+        for start, stop in runs
+    ):
+        raise ValueError("plate/cylinder blend violates inboard tangent-run premises")
+    center_y = face_y + math.copysign(radius, face_y)
+    center_x = math.copysign(math.sqrt((CYL_R + radius) ** 2 - center_y**2), x_sign)
+    scale = CYL_R / (CYL_R + radius)
+    return edge_x, (center_x, center_y), (center_x * scale, center_y * scale), runs
+
+
+def counter_flank_crease_x() -> float:
+    """X where each negative-X middle-rib flank sinks into a counter-web face."""
+    crease = TIP_X + COUNTER_WEB_T / 2.0 / math.tan(math.radians(COUNTER_FLANK_ANGLE_DEG))
+    if not TIP_X + ANCHOR_R < crease < 0.0:
+        raise ValueError(f"counter flank crease X{crease} is not between boss and pivot")
+    return crease
 
 
 def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]:
@@ -1331,7 +1518,7 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
     including cylindrical curvature and end-corner interactions. It bounds
     actual ADDED native material, not the unfilleted body's bounding box.
     """
-    end_caps = (-RIB_OFFSET, RIB_OFFSET)
+    end_caps = (RIB_INNER_Z_MINUS, RIB_INNER_Z_PLUS)
     middle_caps = (-RIB_T / 2.0, RIB_T / 2.0)
     plate_picks = [
         [25.0, y, z]
@@ -1346,39 +1533,89 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
         [-30.0, sign * COUNTER_WEB_T / 2.0, z]
         for z in middle_caps for sign in (-1.0, 1.0)
     ]
-    edge_x, _, _, longitudinal_runs = coefficient_underside_root_geometry()
-    longitudinal_picks = [
-        [edge_x, COEFFICIENT_BOTTOM_Y, (start + end) / 2.0]
-        for start, end in longitudinal_runs
-    ]
-    return (
+    families = [
         ("RibCylinderRootFillets", cylinder_picks, 4.0 * math.tau * CYL_R),
         ("RibCounterRootFillets", counter_picks, 4.0 * SUM_H),
         ("RibRootFillets", plate_picks, 8.0 * RIB_REACH),
-        # Keep the established cap-root operations and their bounds unchanged.
-        # Mid-run longitudinal edges survive those rounds; the last operation
-        # joins their corner patches without tangent propagation.
-        (
-            "CoefficientUndersideRootFillets",
-            longitudinal_picks,
-            sum(end - start for start, end in longitudinal_runs) + 4.0 * RIB_BLEND_R,
-        ),
-    )
+    ]
+    # Keep the established cap-root operations and their bounds unchanged.
+    # Mid-run longitudinal edges survive those rounds; each later operation
+    # joins their corner patches without tangent propagation.
+    for name, x_sign, face_y in longitudinal_root_families():
+        edge_x, _, _, runs = longitudinal_root_geometry(x_sign, face_y)
+        families.append((
+            name,
+            [[edge_x, face_y, (start + end) / 2.0] for start, end in runs],
+            sum(end - start for start, end in runs) + 4.0 * RIB_BLEND_R,
+        ))
+    # The boss rim on both web faces, the web side's two creases into the
+    # boss at its Z extremes, and both middle-rib flank creases into the web.
+    # The flank stays inside the web wherever it meets the boss.
+    crease_x = counter_flank_crease_x()
+    web_picks = [[TIP_X + ANCHOR_R, sign * COUNTER_WEB_T / 2.0, 0.0] for sign in (1.0, -1.0)]
+    web_picks += [[TIP_X, 0.0, sign * ANCHOR_R] for sign in (1.0, -1.0)]
+    web_picks += [[crease_x, sign * COUNTER_WEB_T / 2.0, 0.0] for sign in (1.0, -1.0)]
+    families.append((
+        "CounterWebJunctionFillets",
+        web_picks,
+        math.tau * ANCHOR_R + 2.0 * COUNTER_WEB_T + 2.0 * RIB_T + 12.0 * RIB_BLEND_R,
+    ))
+    # Each web side arc leaving the pivot cylinder, across the web.
+    families.append((
+        "CounterWebSideRootFillets",
+        [[-CYL_R, 0.0, summation_side_z(-CYL_R, sign)] for sign in (1.0, -1.0)],
+        2.0 * COUNTER_WEB_T + 8.0 * RIB_BLEND_R,
+    ))
+    # Both stub roots at the body end faces: two hexagon perimeters plus
+    # one-radius corner neighbourhoods.
+    families.append((
+        "KnifeShoulderFillets",
+        knife_shoulder_picks(),
+        2.0 * (HEX_H + 4.0 * math.hypot(HEX_W / 2.0, HEX_H / 4.0)) + 14.0 * RIB_BLEND_R,
+    ))
+    return tuple(families)
+
+
+def knife_shoulder_picks() -> list[list[float]]:
+    """Each stub root's six lateral-face edges and ridge round at the body end."""
+    w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    crest = h2 - KNIFE_RIDGE_R / math.sin(half) + KNIFE_RIDGE_R
+    flank = (h2 + h4) / 2.0
+    section = [
+        (-w2 / 2.0, flank), (-w2, 0.0), (-w2 / 2.0, -flank),
+        (w2 / 2.0, -flank), (w2, 0.0), (w2 / 2.0, flank), (0.0, crest),
+    ]
+    return [
+        [x, y, body_end] for body_end in (PLATE_Z_PLUS, PLATE_Z_MINUS) for x, y in section
+    ]
 
 
 def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     """Read only new fillet surfaces: bounded reach, entry and radius."""
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(name)
     feature = _early_bound(raw, "IFeature")
-    count = 0
-    underside = name == "CoefficientUndersideRootFillets"
-    if underside:
-        _, center, tangent, runs = coefficient_underside_root_geometry()
+    count = seen = 0
+    knife = name == "KnifeShoulderFillets"
+    expected_radius = RIB_BLEND_R
+    reach = [0.0, 0.0, 0.0]  # knife roots: max |x|, |y| and |z| measured
+    longitudinal = {
+        family: (x_sign, face_y) for family, x_sign, face_y in longitudinal_root_families()
+    }.get(name)
+    # (x, y, z) limits; None leaves an axis to the common reach/entry checks.
+    envelope = (None, None, None)
+    if longitudinal is not None:
+        x_sign, face_y = longitudinal
+        _, center, tangent, runs = longitudinal_root_geometry(x_sign, face_y)
+        y_sign = math.copysign(1.0, face_y)
         # A finite one-radius cap-corner neighbourhood surrounds the exact
-        # straight-run tangent section. This is not an allowance for the old
-        # families, whose reach/entry/radius bounds below remain unchanged.
-        lower_bounds = (tangent[0] - RIB_BLEND_R, tangent[1] - RIB_BLEND_R)
-        upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
+        # straight-run tangent section. This is not an allowance for the
+        # cap-root families, whose reach/entry/radius bounds remain unchanged.
+        envelope = (
+            tuple(sorted((tangent[0] - x_sign * RIB_BLEND_R, center[0] + x_sign * RIB_BLEND_R))),
+            tuple(sorted((tangent[1] + y_sign * RIB_BLEND_R, face_y - y_sign * RIB_BLEND_R))),
+            None,
+        )
         covered_runs = set()
         from magnifying_bracket_joint_layout import (
             DRILL_WANDER_MAX, POSITION_BAND, receiver_pilot_radius_max,
@@ -1393,11 +1630,49 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             + PLATE_W_DEVIATIONS[0] - POSITION_BAND - pilot_radius
         )
         if (
-            upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
-            or upper_bounds[1] >= COEFFICIENT_TOP_Y
+            envelope[0][1] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
+            or not COEFFICIENT_BOTTOM_Y < face_y - y_sign * RIB_BLEND_R < COEFFICIENT_TOP_Y
         ):
-            raise RuntimeError(f"{name}: lower-junction envelope reaches a retained interface")
+            raise RuntimeError(f"{name}: junction envelope reaches a retained interface")
+    elif name == "CounterWebJunctionFillets":
+        # Outside the boss and its tap, below its top seat, inboard of the pivot.
+        envelope = (
+            (TIP_X - RIB_BLEND_R, counter_flank_crease_x() + RIB_BLEND_R),
+            (-COUNTER_WEB_T / 2.0 - RIB_BLEND_R, COUNTER_WEB_T / 2.0 + RIB_BLEND_R),
+            (-ANCHOR_R - RIB_BLEND_R, ANCHOR_R + RIB_BLEND_R),
+        )
+    elif name == "CounterWebSideRootFillets":
+        # Where each side arc leaves the pivot: across the web, within one
+        # radius of the cylinder and of the arc (|Z| below).
+        envelope = (
+            (
+                -CYL_R - 2.0 * RIB_BLEND_R,
+                -math.sqrt(CYL_R**2 - (COUNTER_WEB_T / 2.0) ** 2) + RIB_BLEND_R,
+            ),
+            (-COUNTER_WEB_T / 2.0 - RIB_BLEND_R, COUNTER_WEB_T / 2.0 + RIB_BLEND_R),
+            None,
+        )
+        # |Z| band of each side arc's root, keyed by the arc's Z side.
+        side_bands = {
+            side: (
+                abs(summation_side_z(-CYL_R - 2.0 * RIB_BLEND_R, side)),
+                abs(summation_side_z(envelope[0][1] - RIB_BLEND_R, side))
+                + 2.0 * RIB_BLEND_R,
+            )
+            for side in (1.0, -1.0)
+        }
+        covered_sides = set()
+    elif knife:
+        # Around each hexagon, inside one radius of the body end face. The
+        # roots meet mitred at the sharp bottom vertex, R/sin(half angle) out.
+        mitre = RIB_BLEND_R / math.sin(math.radians(RIDGE_ANGLE_DEG) / 2.0)
+        envelope = (
+            (-HEX_W / 2.0 - RIB_BLEND_R, HEX_W / 2.0 + RIB_BLEND_R),
+            (-HEX_H / 2.0 - mitre, HEX_H / 2.0 + mitre),
+            None,
+        )
     for raw_face in feature.GetFaces() or ():
+        seen += 1
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
         radius = None
@@ -1406,7 +1681,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         elif surface.IsTorus():
             radius = float(surface.TorusParams[7]) * 1000.0
         # A transition patch can be nonanalytic. It must pass the same exact
-        # bounds, but cannot stand in for a proved cylindrical/toroidal R.040.
+        # bounds, but cannot stand in for a proved cylindrical/toroidal radius.
         # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
         # this actual trimmed fillet face gives exact directional extrema,
         # without confusing its envelope with the plate's X44.45 free edge.
@@ -1415,38 +1690,55 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             raise RuntimeError(f"{name}: cannot extract native root face for exact bounds")
         sheet = _early_bound(sheet_raw, "IBody2")
         extrema = []
-        directions = [
+        for direction, axis in (
             ((1.0, 0.0, 0.0), 0), ((0.0, 0.0, -1.0), 2), ((0.0, 0.0, 1.0), 2),
-        ]
-        if underside:
-            directions += [
-                ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
-            ]
-        for direction, axis in directions:
+            ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
+        ):
             result = sheet.GetExtremePoint(direction[0], direction[1], direction[2])
             if result is None or len(result) != 4 or not result[0] or not all(
                 math.isfinite(float(value)) for value in result[1:]
             ):
                 raise RuntimeError(f"{name}: invalid exact native root extreme {result}")
             extrema.append(float(result[axis + 1]) * 1000.0)
-        x_max, z_min, z_max = extrema[:3]
+        x_max, z_min, z_max, x_min, y_min, y_max = extrema
         if x_max > RIB_REACH + 1e-5:
             raise RuntimeError(
-                f"{name}: R{RIB_BLEND_R} root face grows beyond X{RIB_REACH}: {extrema}"
+                f"{name}: R{expected_radius} root face grows beyond X{RIB_REACH}: {extrema}"
             )
-        if z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
-            raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
-        if underside:
-            x_min, y_min, y_max = extrema[3:]
+        if knife:
+            near, far = sorted((abs(z_min), abs(z_max)))
+            body_end = PLATE_Z_PLUS if z_min > 0.0 else -PLATE_Z_MINUS
             if (
-                x_min < lower_bounds[0] - 1e-5 or x_max > upper_bounds[0] + 1e-5
-                or y_min < lower_bounds[1] - 1e-5 or y_max > upper_bounds[1] + 1e-5
-                or not any(
-                    start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
-                    for start, end in runs
-                )
+                z_min * z_max <= 0.0 or near < body_end - 1e-5
+                or far > body_end + RIB_BLEND_R + 1e-5
             ):
-                raise RuntimeError(f"{name}: native face escapes the lower-junction envelope: {extrema}")
+                raise RuntimeError(f"{name}: shoulder blend leaves the stub root: {extrema}")
+            reach = [
+                max(reach[0], abs(x_min), abs(x_max)), max(reach[1], abs(y_min), abs(y_max)),
+                max(reach[2], far - body_end),
+            ]
+        elif name == "CounterWebSideRootFillets":
+            near, far = sorted((abs(z_min), abs(z_max)))
+            side_band = side_bands[math.copysign(1.0, z_min)]
+            if z_min * z_max <= 0.0 or near < side_band[0] - 1e-5 or far > side_band[1] + 1e-5:
+                raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
+            covered_sides.add(math.copysign(1.0, z_min))
+        elif z_min <= PLATE_Z_MINUS + 1e-5 or z_max >= PLATE_Z_PLUS - 1e-5:
+            raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
+        if any(
+            limits is not None
+            and not limits[0] - 1e-5 <= low <= high <= limits[1] + 1e-5
+            for limits, low, high in zip(
+                envelope, (x_min, y_min, z_min), (x_max, y_max, z_max), strict=True,
+            )
+        ):
+            raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
+        if longitudinal is not None:
+            if not any(
+                start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
+                for start, end in runs
+            ):
+                raise RuntimeError(f"{name}: native face escapes the junction envelope: {extrema}")
             if surface.IsCylinder() and z_max - z_min > 4.0 * RIB_BLEND_R:
                 parameters = tuple(float(value) for value in surface.CylinderParams)
                 if (
@@ -1456,25 +1748,35 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
                     or abs(parameters[3]) > 1e-6 or abs(parameters[4]) > 1e-6
                     or not math.isclose(abs(parameters[5]), 1.0, abs_tol=1e-6)
                 ):
-                    raise RuntimeError(f"{name}: native cylinder is not the lower tangent blend: {parameters}")
+                    raise RuntimeError(f"{name}: native cylinder is not the tangent junction blend: {parameters}")
                 for index, (start, end) in enumerate(runs):
                     if z_min <= start + 2.0 * RIB_BLEND_R and z_max >= end - 2.0 * RIB_BLEND_R:
                         covered_runs.add(index)
         if radius is not None:
             if not math.isfinite(radius) or not math.isclose(
-                radius, RIB_BLEND_R, abs_tol=1e-5
+                radius, expected_radius, abs_tol=1e-5
             ):
                 raise RuntimeError(
-                    f"{name}: native root radius {radius} is not R{RIB_BLEND_R}"
+                    f"{name}: native root radius {radius} is not R{expected_radius}"
                 )
             count += 1
-    if count < minimum_faces:
+    # The blend between the crossed pivot and side-arc cylinders need not be
+    # analytic: the envelope bounds its faces, the feature radius its size.
+    analytic_minimum = 0 if name == "CounterWebSideRootFillets" else minimum_faces
+    if count < analytic_minimum or seen < minimum_faces:
         raise RuntimeError(
-            f"{name}: only {count} native R{RIB_BLEND_R} root surfaces "
-            f"for {minimum_faces} selected reentrant roots"
+            f"{name}: only {count} native R{expected_radius} root surfaces "
+            f"({seen} faces) for {minimum_faces} selected reentrant roots"
         )
-    if underside and covered_runs != set(range(len(runs))):
+    if longitudinal is not None and covered_runs != set(range(len(runs))):
         raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
+    if name == "CounterWebSideRootFillets" and covered_sides != {1.0, -1.0}:
+        raise RuntimeError(f"{name}: missing native side-arc blend at Z side: {sorted(covered_sides)}")
+    if knife:
+        _telemetry.info(
+            f"{name}: native roots reach |X| {reach[0]:.4f}, |Y| {reach[1]:.4f}, "
+            f"{reach[2]:.4f} mm beyond the body end"
+        )
 
 
 async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1504,11 +1806,11 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 def _rib_radius_max_limits(adapter) -> None:
-    """Band every modeled rib blend under the title-block R.040 MAX ceiling.
+    """Band every modeled rib and junction blend under the R.040 MAX ceiling.
 
-    Profile blends, perpendicular rib-side roots and the changed longitudinal
-    coefficient underside remain native controls without a duplicate drawing
-    callout. Unchanged body junctions are not given a modeled-fillet claim.
+    Profile blends, perpendicular rib-side roots and the longitudinal, boss
+    and crease junction blends remain native controls without a duplicate
+    drawing callout.
     """
     owners = [
         (f"{stem}Profile", f"{stem}{side}BlendR")
@@ -1745,8 +2047,9 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     seat needs.  Construction lines carry them off the same globals: the
     vertex line (HexHeight), the shoulder line between the upper shoulders
     (the ridge sharp from each end, RidgeFromLeft/Right; HexWidth a driven
-    reference), and the +X upper flank and side face (FlankToSide, driven).
-    The part saves the sketch hidden and the drawing shows it only in
+    reference), the +X upper flank and side face (FlankToSide, driven), and
+    the +X lower flank and side face (LowerFlankToSide, driven, at the title
+    block's angular tolerance).  The part saves the sketch hidden and the drawing shows it only in
     Detail D (code review C09, owner ruling T1)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
@@ -1769,13 +2072,24 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife-envelope +X side face",
         await adapter.add_line(HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, 0.0),
     )
+    # The lower half: the side face's other half and the +X lower flank to
+    # the bottom vertex, so the lower corner's angle can print.
+    lower_side = check(
+        "knife-envelope +X lower side face",
+        await adapter.add_line(HEX_W / 2.0, 0.0, HEX_W / 2.0, -HEX_H / 4.0),
+    )
+    lower_flank = check(
+        "knife-envelope +X lower flank",
+        await adapter.add_line(HEX_W / 2.0, -HEX_H / 4.0, 0.0, -HEX_H / 2.0),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (width, height, flank, side):
+    for entity in (width, height, flank, side, lower_side, lower_flank):
         _as_construction(adapter, entity)
     for entity, relation in (
         (width, "horizontal"),
         (height, "vertical"),
         (side, "vertical"),
+        (lower_side, "vertical"),
     ):
         check(
             f"knife-envelope {entity} {relation}",
@@ -1785,11 +2099,18 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         (f"{flank}.start", f"{height}.end"),
         (f"{flank}.end", f"{width}.end"),
         (f"{side}.start", f"{width}.end"),
+        (f"{lower_side}.start", f"{side}.end"),
+        (f"{lower_flank}.start", f"{lower_side}.end"),
+        (f"{lower_flank}.end", f"{height}.start"),
     ):
         check(
             f"knife-envelope {first} on {second}",
             await adapter.add_sketch_constraint(first, second, "coincident"),
         )
+    check(
+        "knife-envelope side halves equal",
+        await adapter.add_sketch_constraint(lower_side, side, "equal"),
+    )
     check(
         "knife-envelope side foot level with the origin",
         await adapter.add_sketch_constraint(
@@ -1849,6 +2170,17 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
     )
     knife.record("FlankToSide")
+    # The lower corner at the title block's angular tolerance; its text in
+    # the exterior wedge below the +X lower shoulder.
+    await add_angular_reference_dimension(
+        adapter,
+        lower_flank,
+        lower_side,
+        (HEX_W / 2.0 + 2.0, -HEX_H / 4.0 - 0.6),
+        "knife lower flank to side face",
+        expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
+    )
+    knife.record("LowerFlankToSide")
     await ensure_fully_defined(adapter, "knife-envelope reference sketch")
     check("exit knife-envelope reference", await adapter.exit_sketch())
     name_last_feature(adapter, "KnifeEnvelopeReference")
@@ -1913,17 +2245,17 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
 
     Both stubs are one prism through the body (``_hex_knife``), so no feature
     dimension is a stub's own length.  A construction line down the -Z
-    stub's -X side, from the body end (|z| HEX_Z_INNER) to the stub's
+    stub's -X side, from the body end (PLATE_Z_MINUS) to the stub's
     outboard face, carries it as a driving dimension off "HexDepth"; the part
     saves the sketch hidden and the plan shows it as the stubs' "2X".  The
     Top-plane sketch maps world Z to -sketchY."""
     reference = SketchDims()
     check("create knife-stub reference", await adapter.create_sketch("Top"))
-    start = (-HEX_W / 2.0, HEX_Z_INNER)
+    start = (-HEX_W / 2.0, -PLATE_Z_MINUS)
     set_sketch_direct_db(adapter, True)
     length = check(
         "knife-stub length reference",
-        await adapter.add_line(*start, start[0], HEX_Z_OUTER),
+        await adapter.add_line(*start, start[0], -HEX_Z_OUTER_MINUS),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, length)
@@ -1944,7 +2276,7 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
         adapter, f"{length}.start", *start, "knife-stub length reference start"
     )
     reference.record("KnifeStubRefX", '"HexW" / 2')
-    reference.record("KnifeStubRefZ", '"PlateL" / 2')
+    reference.record("KnifeStubRefZ", '"PlateL" - "PlateZPlus"')
     await ensure_fully_defined(adapter, "knife-stub reference sketch")
     check("exit knife-stub reference", await adapter.exit_sketch())
     name_last_feature(adapter, "KnifeStubReference")
@@ -1981,6 +2313,7 @@ def _drawing_dimension_contract(adapter) -> None:
     # own tolerances; the vertex height the title block's .XXX (the envelope's
     # places are DRAWING_PRECISION's).
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
+    set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "LowerFlankToSide", 1)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
         set_dimension_symmetric_tolerance(
             adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL,
@@ -2001,15 +2334,7 @@ def _drawing_dimension_contract(adapter) -> None:
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
-    """Native coordinates from the real free edge and fixed plate top.
-
-    Each dimension runs from the free edge's top corner, a model vertex, to
-    a tap centre.  Both are ends of short construction marks that lie on ink
-    the view prints anyway: the corner's runs down the free edge, each tap's
-    along its row inside the drill, on the centre mark.  The old L-chain
-    through the plate-top corner over each tap drew a line across the end
-    rib's face at the plate top, read as a face 2.54 over the taps
-    (machinist review r11); the rib's slants wall the taps there."""
+    """Native coordinates from the real free edge and actual plate top."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
@@ -2109,6 +2434,7 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
 # The globals the spring row's drives read, as ``build`` sets them (mm).
 SPRING_ROW_GLOBALS_MM = {
     "PlateL": PLATE_L,
+    "PlateZPlus": PLATE_Z_PLUS,
     "HexDepth": HEX_DEPTH,
     "HoleX": HOLE_X,
     "ChannelZ0": CHANNEL_Z0,
@@ -2199,8 +2525,8 @@ async def _spring_row_coordinates(adapter) -> None:
 
     check("spring-row coordinate sketch", await adapter.create_sketch("Top"))
     dimensions = SketchDims()
-    ridge = (0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
-    end = (SPRING_ROW_END_MARK_X, -PLATE_L / 2.0)
+    ridge = (0.0, -PLATE_Z_MINUS + 0.3 * HEX_DEPTH)
+    end = (SPRING_ROW_END_MARK_X, -PLATE_Z_PLUS)
     seed = (HOLE_X, -HOLE_Z_LAST)
     second = (HOLE_X, -(HOLE_Z_LAST - CHANNEL_PITCH))
     set_sketch_direct_db(adapter, True)
@@ -2239,7 +2565,9 @@ async def _spring_row_coordinates(adapter) -> None:
     await anchor_point_to_origin(
         adapter, f"{ridge_mark}.start", *ridge, "spring-row ridge station"
     )
-    dimensions.record("SpringRowRidgeZ", '"PlateL" / 2 + 0.3 * "HexDepth"')
+    dimensions.record(
+        "SpringRowRidgeZ", '"PlateL" - "PlateZPlus" + 0.3 * "HexDepth"'
+    )
     check(
         "spring-row end mark horizontal",
         await adapter.add_sketch_constraint(end_mark, None, "horizontal"),
@@ -2253,7 +2581,7 @@ async def _spring_row_coordinates(adapter) -> None:
         adapter, f"{end_mark}.start", *end, "spring-row plate end"
     )
     dimensions.record("SpringRowEndX", None)
-    dimensions.record("SpringRowEndZ", '"PlateL" / 2')
+    dimensions.record("SpringRowEndZ", '"PlateZPlus"')
     for label, mark in (("seed", seed_mark), ("second", second_mark)):
         check(
             f"spring-row {label} mark horizontal",
@@ -2273,7 +2601,7 @@ async def _spring_row_coordinates(adapter) -> None:
         adapter, f"{end_mark}.start", f"{seed_mark}.start", "vertical_distance",
         HOLE_END_OFFSET_LAST, "spring-hole start Z",
     )
-    dimensions.record("SpringStartZ", f'"PlateL" / 2 - ({SPRING_SEED_STATION_EXPR})')
+    dimensions.record("SpringStartZ", f'"PlateZPlus" - ({SPRING_SEED_STATION_EXPR})')
     check(
         "spring-row second station on the row",
         await adapter.add_sketch_constraint(
@@ -2355,6 +2683,7 @@ async def build(adapter) -> dict[str, str]:
     # HexDepth drives the knife prism's length and the stub reference.
     await set_global(adapter, "PlateW", f"{PLATE_W}mm")
     await set_global(adapter, "PlateL", f"{PLATE_L}mm")
+    await set_global(adapter, "PlateZPlus", f"{PLATE_Z_PLUS}mm")
     await set_global(adapter, "CounterWebT", f"{COUNTER_WEB_T}mm")
     await set_global(adapter, "CoefficientT", f"{COEFFICIENT_T}mm")
     await set_global(adapter, "CoefficientTopY", f"{COEFFICIENT_TOP_Y}mm")
@@ -2380,6 +2709,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
+    # Keep the derivation native: a degree literal was rounded to angular places.
+    await set_global(
+        adapter, "CounterFlankAngle",
+        'atn("ArcR" / sqr("SumH" * "SumH" - "ArcR" * "ArcR"))',
+    )
     # On its printed 1.41 grid (rule 3), not offset from the hole column.
     await set_global(adapter, "RibReach", f"{RIB_REACH}mm")
     await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
@@ -2438,7 +2772,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_coefficient_slab(adapter)
     _assert_boss_face_graph(adapter)
     for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib"):
-        _assert_native_rib_profile(adapter, stem)
+        _assert_native_rib_profile(adapter, stem, equation_bound=True)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no

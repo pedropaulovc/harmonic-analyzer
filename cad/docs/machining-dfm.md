@@ -26,7 +26,7 @@ its first-root position; no second general note restates that location.
 
 - **Three parts carry the whole risk. Everything else is generous.**
   1. **`dt-cone-tip-gear` (T006, MHA-DT-37)** — six leaves on a **Ø4.31 mm OD** solid, with an integral
-     Ø.0625 in spigot (.71 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
+     Ø.0625 in spigot (.76 in long, L/D about 12) to the south and an integral Ø.0625 in pivot (.25 in) to the north
      (owner decision C1 keyed, 2026-11-09, PR #1992). The single hardest part in the machine. Its
      turning route is **not selected**: the part's process text and sheet note 3 (`CENTRES OK.`) name
      centres and a steady, but no listed centre or steady rest fits a Ø.0625 stem
@@ -44,7 +44,7 @@ its first-root position; no second general note restates that location.
   3. **The bonded cone tip** (owner decision C1 keyed, 2026-11-09, PR #1992) — T024 bonded with LOCTITE 638
      on round land 2 one 0.45 ±0.10 feeler off T030 (0.35–0.55 mm stack float); T018 and T012 bonded on the
      MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
-     ends .025 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
+     ends .030 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
      stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner rulings
      2026-11-09 and 2026-11-10: one blade per gear in the tooth space beside its phase-0 tooth, T030 to
      T006), and let it cure before load; a bonded
@@ -69,8 +69,8 @@ its first-root position; no second general note restates that location.
      air minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent printed
      manufacturing and set tolerances, minus the swing-interval arc allowance. Fastener and running
      clearances, thread centring, shaft swing in the post journal and G19 cock can all be taken up
-     together; never put them in the RSS. The current calculated least air is 0.112 mm at the bushing,
-     3.945 mm at the end screw and 5.094 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
+     together; never put them in the RSS. The current calculated least air is 0.125 mm at the bushing,
+     3.985 mm at the end screw and 5.045 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
      clearance; `_native_cone_tip_air` checks the saved bodies against it.
      The shaft drawing (one sheet, **Shaft Controls**) dimensions each chucking
      from its own collar face (rule 11): the journal and the collar web from the
@@ -84,7 +84,7 @@ its first-root position; no second general note restates that location.
   |---|---|---|
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Teeth with the stock #2 cutter on the BS-0; the cam's throw and phase need an eccentric fixture that is not drawn, so the cam route is **not selected** ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); the notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
   | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt; the cutters and arbors are not yet in the inventory ([#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
-  | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.0565 channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
+  | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.62 (.300) channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
   | `ch-connecting-rod` | 20 | flat outline from 1018 plate, stepped both faces, slotted fork; the outline on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)) |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical; 4140/4142 HT pre-hardened bar (28-32 HRC), no heat treatment |
@@ -342,15 +342,15 @@ The owner's **2026-10-22 plate-tap relocation** makes all three rib extrusions
 retain their outer faces at **Z=±76.20 mm**; their inner caps are now
 **Z=±71.12 mm**, and the middle rib remains centered on Z=0. One native
 **3X .20** thickness dimension replaces the three separate thickness authorities.
-The separate counter-arm leaf remains **5.08 mm**; it is not a rib extrusion.
+The separate counter-arm web is **7.00 mm**, centered on Y=0 with the coefficient plate per owner issue **#2129**; it is not a rib extrusion.
 
-The two receiver axes move down to local **Y=−0.7112 mm**, the nearest .001 in to the bracket's **−0.71 mm** row.
-**ReceiverY0 = .128 ±.002 in (3.2512 ±0.0508 mm) below the actual coefficient top** owns that
+The two receiver axes are at local **Y=+0.2488 mm**, the nearest .001 in top-relative offset to the bracket's **+0.25 mm** row.
+**ReceiverY0 = .128 ±.002 in (3.2512 ±0.0508 mm) below the actual coefficient top** still owns that
 location, not the unchanged hex centre. The matching bracket clearance holes
 and installed MHA-MG-VN-53 screws move by the same delta. Their X stations,
 **13.7 mm** pitch, Z stations, **3.175 mm** flange grip, bracket body/seat,
-threaded-lever pose and spring interfaces do not move. The bracket's row
-ordinate from its actual lower flange edge becomes **5.64 ±0.05 mm**.
+threaded-lever pose do not move. The coefficient spring seats move up **0.96 mm** with the plate. The bracket's row
+ordinate is derived from its actual lower flange edge in `magnifying_bracket_joint_layout`.
 
 The drill continues beyond the 5 mm rib into the continuous 7 mm coefficient
 plate. Requiring either the full thread or pilot point to end inside the rib
@@ -376,8 +376,8 @@ stack/design checks, not a strength or native-geometry certificate.
 against `RECEIVER_PILOT_WALL_MIN`, using the actual tangent profile, printed
 shape/plate limits, correlated actual-top/free-edge positions, and the printed
 pilot radius plus drill wander. The independent native **PlateTopY** dimension
-takes **±0.3683 mm**, the larger printed excursion of the sheet's knife-ridge
-(**.404**, `.XXX`) to coefficient-top (**.10**, `.XX`) chain. **ReceiverY0**
+takes **±0.4243 mm**, the larger printed excursion of the sheet's knife-ridge
+(**.404**, `.XXX`) to coefficient-top (**.06**, `.XX`) chain. **ReceiverY0**
 remains **±.002 in (0.0508 mm) from the actual top**, so top/axis motion stays
 correlated; the independent thickness takes its printed **.28 ±.01 in** limits
 (−0.142/+0.366 mm about 7.00). The boundary test constructs
@@ -396,32 +396,54 @@ with `receivers`/`boundaries` counts; knife-height dimension insertion emits one
 These operation-level spans add no per-witness spans or COM reads; the returned
 settled-height check and all geometry/acceptance checks remain unchanged.
 
-The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
-and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,
-downward to **Y=−4.46 mm**. It is not a recentered 7 mm plate. The separate
-counter-arm web remains **5.08 mm**, centered on Y=0. Every spring station,
-the **Ø.006 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
-underside seats** are unchanged. Only the matched bracket mounting row moves;
-the #1769 bracket body and threaded-lever installation stay fixed. World spring
-top remains **982.24 mm** and nut seat **975.24 mm**.
+Owner issue **#2129** centers both the coefficient plate and the separate
+counter-arm web on **Y=0**, each **7.00 mm** thick with faces at
+**Y=±3.50 mm**. The coefficient slab still spans
+**X=0..44.45, Z=±76.20 mm**. Its twenty X/Z spring stations are unchanged;
+the spring-neck top seat rises **0.96 mm**. The anchors thread straight into
+the plate with no jam nut, so the pattern is **Ø.010 RFS**, the cap for a tap
+with no ream or register (#2326).
+At the level installed pose the world top is **983.1932 mm** and the underside
+**976.1932 mm** (`top_frame_plane.KNIFE_Y` plus each local face). The matched bracket mounting row also rises **0.96 mm**;
+the bracket body and threaded-lever installation stay fixed.
 The full-width lower face eliminates the integral underside pad and its step.
 
 View G locates the boss's upper axial face at **Y=+9.525 mm** relative to the
-coefficient top at **Y=+2.54 mm**: the actual-edge native vertical dimension
-measures **6.985 mm**, printed **.28** under the `.XX` ±.01 in band. Its
+coefficient top at **Y=+3.50 mm**: the actual-edge native vertical dimension
+measures **6.025 mm**, printed **.24** under the `.XX` ±.01 in band. Its
 attachments are the boss upper rim and the actual +Z coefficient-top edge,
 with projected +Y checked before annotation and attachment/value rechecked
-after settling. The separate **19.05 mm** boss length and **5.08 mm** counter
-web thickness remain; the web top is flush with the coefficient top.
-The boss and counter web still share Y=0, and neither is located from the
-asymmetric 7.00 coefficient plate's midplane.
+after settling. The **19.05 mm** boss length remains; the counter web is
+**7.00 mm** thick and shares both coefficient-plate faces at **Y=±3.50 mm**.
+The boss, web and coefficient plate all share Y=0, but the drawing retains
+the real-face location rather than dimensioning from an intangible midplane.
+VIEW F's theoretical knife vertex-to-top location is
+**HEX_H/2 − COEFFICIENT_TOP_Y = 1.634 mm**, printed **.06**;
+both locations remain associative native dimensions, not typed values.
 
-The source-neighbour intent is **X reach 35.814 mm (1.41 in) before the worst nut
-footprint at X36.449 mm**, not a claim of axial separation. Charging the
+The source-neighbour intent is **X reach 35.814 mm (1.41 in) before the worst
+protruding anchor-shank footprint at X37.970 mm** (no jam nut, #2326), not a claim of axial separation. Charging the
 printed rib reach (**1.41 ±.01 in**, at most 36.068 mm) gives
-**36.449−36.068 = 0.381 mm** geometric
+**37.970−36.068 = 1.902 mm** geometric
 X clearance. Native full-interference validation must still qualify the
-rib/nut, screw-head/knife-mount and installed-neighbour clearances.
+rib/anchor-shank, screw-head/knife-mount and installed-neighbour clearances.
+
+The middle rib's negative-X contour retains its nominal geometry but is now
+controlled by **MiddleRibCounterAngle@MiddleRibProfile**, driven from the
+**CounterFlankAngle** native equation
+`atn("ArcR" / sqr("SumH" * "SumH" - "ArcR" * "ArcR"))`. In SolidWorks' degree
+dialect this is `degrees(asin(RIB_WRAP_R / abs(TIP_X)))`
+(**11.53695903281549°**), without a rounded degree literal.
+One upper-flank angle to an on-axis construction ray controls
+both tangents through their shared apex and coradial wrap arcs; no second
+angle or mirror relation is added. Native readback requires both counter
+planes, their derived apex at **X=−76.20, Y=0 mm** within **0.000001 mm**,
+and the exact angle value. Its native state is driving (2) at creation and
+equation-controlled/driven (1) after binding, matching the same part's
+equation-bound plate-width dimension. The drawing imports one decimal under the ordinary
+title-block angular band, without a tighter local tolerance or reference
+parentheses. **SumH** remains the web/boss authority, not a second rib-apex
+dimension.
 
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
 **R.040** transitions into the coefficient top/bottom faces at **X=35.814 mm**;
@@ -430,63 +452,65 @@ the negative-X middle-rib contour is unchanged. The title block's
 callout repeats that ceiling (drawing-guidelines rule 2). The bounded native
 R.040 controls and geometry guards cover the modeled profile transitions
 and rib inner-cap side roots against the plate, pivot cylinder and counter
-web. A fourth family, **CoefficientUndersideRootFillets**, implements the
-owner's **2026-10-21 model-the-blend** decision at the moved lower
-plate/cylinder junction. All four families disable tangent propagation;
-the established three families retain their separate picks and added-volume
-bounds. This is not a general body-fillet claim. The following unchanged
-sharp junctions remain outside that proof:
+web. Further families model every remaining inside corner, all without
+tangent propagation:
 
-- Longitudinal coefficient-plate **top**-to-pivot-cylinder junctions
-  between rib caps (near X=+12.44 mm).
-- Longitudinal counter-web face-to-pivot-cylinder junctions (near X=−12.44 mm).
-- Boss-to-counter-web and boss-to-negative-X-middle-rib-flank junctions.
-- The obtuse crease where each negative-X middle-rib tangent flank sinks
-  into a counter-web face (near X=−63.75 mm).
-- Knife-stub-to-end-rib shoulders.
+- **CoefficientUndersideRootFillets** and **CoefficientTopRootFillets**: both
+  coefficient faces to the pivot cylinder between rib caps, at X≈+12.21 mm.
+- **CounterWebTopRootFillets** and **CounterWebUndersideRootFillets**: both
+  counter-web faces to the cylinder at X≈−12.21 mm, from the middle-rib caps
+  to where the web's side arc leaves the cylinder (|Z|≈56.79 mm).
+- **CounterWebJunctionFillets**: the boss rim on both web faces, the two
+  web-side creases into the boss at its Z extremes, and both creases at
+  X≈−59.06 mm where the negative-X middle-rib flanks sink into the web
+  faces. With the 7.00 web the flank stays inside the web wherever it meets
+  the boss (1.94 mm above Y0 at the boss rim), so no flank-to-boss junction
+  exists.
+- **CounterWebSideRootFillets**: where each web side arc leaves the pivot
+  cylinder (|Z|≈56.8 mm), across the web's 7.00 mm. The blend between the
+  crossed cylinders need not be analytic; its feature radius carries the
+  R.040 MAX band and an exact envelope bounds its faces.
+- **KnifeShoulderFillets**: each stub's six lateral faces and ridge round
+  into the body end face, under the same title-block **R.040 MAX**; the two
+  lower flanks' roots meet mitred at the sharp bottom vertex. They occupy
+  |Z| 76.20–77.22 mm; the worst-case knife-mount face is at |Z| 79.95 mm, so
+  the seat and rock are unaffected (2.73 mm clear). Delegated ruling
+  (coordinator, 2026-11-09), no precedent, prompted by the owner's question
+  "why not leave default radius": knife-stub roots take the title-block
+  R.040 MAX; the #1625 **R.020 MAX** figure (R0.5 in mm) had no functional
+  basis. Awaiting owner review in
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144).
 
-Only these unchanged junctions retain the existing **RV-02** authorization
-from **b2c8d954**: the owner's **2026-10-18 R.040 MAX** inside-corner ceiling,
-now carried by the shop-wide title-block row. This is carried-forward
-authorization for the listed unchanged junctions, not a new exception or a
-waiver for the changed rib roots. The coefficient underside moved from
-Y=−2.54 to **Y=−4.46 mm**, moving its longitudinal cylinder intersection from
-X≈+12.44 to **X≈+11.89 mm**. That moved junction is excluded from this
-unchanged-only RV-02 carry-forward; it now has an implemented native **R.040 MAX**
-fillet contract, not an expanded sharp-corner exception.
+These remove the former **RV-02** sharp-junction exception (b2c8d954,
+2026-10-18) by owner ruling 2026-11-09.
 
-The lower-junction picks derive from **sqrt(CylR² − BottomY²), BottomY** and
-the midpoints of the actual two inboard cap intervals:
-**Z=−71.20..−2.50** and **+2.50..+71.20 mm**. They are applied after the
-three cap-root families, while these mid-run edges still exist. Its added
+The longitudinal picks derive from **sqrt(CylR² − FaceY²), FaceY** and the
+midpoints of the actual two inboard runs. They are applied after the three
+cap-root families, while these mid-run edges still exist. Each family's added
 native volume must be strictly positive and no more than
-**2R² × (sum of run lengths + 4R)**, including one-radius end-corner
-neighbourhoods; at R = 1.016 mm the current upper bound is **292.05 mm³**. Exact six-direction
-sheet-body extrema bound every new surface to the lower tangent section
-plus those finite corner neighbourhoods. Both runs must contain native
-**R.040 cylinders parallel to Z at the derived tangent centre**; a nonanalytic
-corner patch cannot replace a missing run or evade the bounds. The new
-family participates in the existing native radius/MAX-band readback, and
-all four feature-envelope audits run again on the final rebuilt model.
+**2R² × (sum of selected edge lengths + corner neighbourhoods)**. Exact
+six-direction sheet-body extrema bound every new surface: a longitudinal face
+to its own tangent section plus finite corner neighbourhoods, and both runs
+must contain native **R.040 cylinders parallel to Z at the derived tangent
+centre**; the web family to the web faces ±R, outside the boss's top seat and
+inboard of the crease; the knife roots to one shoulder radius off the end face
+around each hexagon. A nonanalytic corner patch cannot replace a missing run
+or evade the bounds. Every family participates in the native radius/MAX-band
+readback, and all envelope audits run again on the final rebuilt model.
 
-The complete bounded lower-blend envelope is X-disjoint from both receiver
+The complete bounded coefficient-blend envelopes are X-disjoint from both receiver
 pilots, charging the printed pilot radius, drill wander, ordinary free-edge
 variation and actual-axis position bands.
-Its Z envelope stays inside the rib caps' finite neighbourhoods and away from
-the receiver entry/body-end/knife faces; its X reach stays clear of the spring
-and nut lane, outer plate edge, and its Y envelope cannot reach the top seat.
+Their Z envelopes stay inside the rib caps' finite neighbourhoods and away from
+the receiver entry/body-end/knife faces; their X reach stays clear of the spring
+and anchor-shank lane and outer plate edge, and neither Y envelope reaches the opposite seat.
 The analytic section adds material only. Receiver wall proofs therefore take
-**no extra wall credit** for this blend and retain their independent pilot
-and connected-material gates. **Fresh native fillet topology, corner integration,
-saved-feature surfaces/radii and installed clearance verification are pending**;
-the source implementation and fail-closed guards do not claim a native pass.
+**no extra wall credit** for these blends and retain their independent pilot
+and connected-material gates.
 
 There is no end ledge or reference-only **(0.44)** contract: the former
-pad-step scope and RV-04 ledge exception are removed. The unchanged knife
-roots retain their separate local **R.020 MAX** debt (#1625); knife
-material/hardness remains #1611. Neither the retained RV-02 authorization
-nor the changed-rib proof claims that those unchanged junctions are modeled
-with fillets or that the knife roots are manufacturable.
+pad-step scope and RV-04 ledge exception are removed. Knife
+material/hardness remains #1611.
 
 The screw/grip, engagement, tip-gap and bottoming-tap-lead guards are retained.
 The bounded **.26 ±.01 in** drill (6.604 mm model depth) now runs into the connected coefficient
@@ -495,8 +519,8 @@ full-thread metadata remains a screw-stack input, not a maximum imposed by the
 printed **.195 MIN**. An unbounded MIN drill remains unacceptable.
 `magnifying_bracket_joint_layout` owns those stacks and the independent
 pilot-only material budget. The **.128 ±.002 in** actual-top row location
-places both receiver axes at local **Y=−0.7112 mm**; the matched bracket holes
-and screws follow it without shifting any body, seat, spring or threaded-lever pose.
+places both receiver axes at local **Y=+0.2488 mm**; the matched bracket holes
+and screws follow it without shifting the bracket body, seat or threaded-lever pose.
 
 The drawing retains **6 views**, reduced from 9 by removing C-C and H-H and
 combining knife detail D and ridge detail E into **D at 10:1**, with the
@@ -565,15 +589,18 @@ Known edge-missing collector artifacts remain reported, not demoted.
 
 The part authors every printed decimal place (`sm_summing_lever_spec.DRAWING_PRECISION`)
 and the drawing imports them unchanged; the body-end **PlateLength** is read
-back immediately after its top-view import. It prints **6.00** under the
-two-place **±.01 in** band, which the receiver pilot-material budget charges at
-the opposite end (`PLATE_L_DEVIATIONS`). Nominal geometry, receiver
-entry-relative depths and poses are unchanged. Native precision/ink acceptance
+back immediately after its top-view import. It prints **6.25** under the
+two-place **±.01 in** band (#1038 owner ruling 4: the body's front, −Z, end
+stands .25 in farther out than datum B's end, so the .300 in spring row keeps
+a rule-17 wall at both ends; `sm_summing_lever_spec.SPRING_TAP_END_WALL_MIN`
+refuses at import below it). The receiver pilot-material budget charges that
+band at the opposite end (`PLATE_L_DEVIATIONS`). The receivers and the
+MHA-MG-01 seat ride the extended end. Native precision/ink acceptance
 remains pending with the layout changes above.
 
 **Historical source-only material/gravity estimate (against #1761, b2c8d954,
 at the prior 8.20 receiver depth).** The following numbers describe the earlier
-rib dimensions, not the current uniform-5.00-rib design, and are not current
+rib dimensions and downward-only slab, not the current centered plate/web design, and are not current
 mass/CG acceptance values. The gross downward box is 10.080 cm³, but it overlaps the
 existing cylinder and ribs. Integrating the source prism unions gives
 **+5.808 cm³** for the plate
@@ -602,8 +629,8 @@ probe, not evidence that it has been run for option A.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs, bounded R.040 MAX side roots/profile blends and a separately bounded lower longitudinal plate/cylinder blend, not general body fillets | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor; unchanged top-plate/cylinder, counter-web/cylinder, boss/counter-web, boss/middle-rib-flank, middle-rib-flank/counter-web and knife-stub shoulder junctions retain baseline RV-02 only; separate knife-root/tool-access debt remains | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), 4140/4142 HT pre-hardened bar, 28-32 HRC as supplied and not heat treated, the bore and B reamed once to their printed bands (owner ruling 2026-11-10 (Pedro), #2334 option B1; supersedes the 2026-11-08 harden-less O1 ruling); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth .438 ±.002 (11.1252 ±0.0508), full thread .375 ±.005 (9.525 ±0.127); fully charged drill-point crown web 2.1060 (≥2.032), no break-in (conservative proof envelope Ø3.924, above accepted MAX Ø3.8989; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the bore carries ⌖Ø.008 to A and B (datum C) plus a separate ∥.002 to A, and the tap is cut on the part at ⌖Ø.005 | A | B | C▷ (owner ruling 2026-11-10 (Pedro), #2334, S1 and margin option 1a; formerly spotted through MHA-FR-02's #10 hole); the bore's yaw about B is set at MHA-SM-00 by a (Ø.4720) × 8.0 in gauge bar, .0002-.0017 diametral clearance in each bore, through both mounts' bores (#2334, S2): knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0470 being the bar's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 159.90 minimum mouth span; bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | manual (×2). Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.005 in (8.9154 ±0.127); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block .XXX ±0.13) above faced underside. Nominal reach 8.9173, range 8.7884–9.0424; full-form engagement MIN 7.730067 ≥7.239, tip air MIN 0.3556. The bolt goes in plain, without threadlocker (coordinator ruling 2026-10-16: a doweled static clamp needs no lock). One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-summing-lever`** | machined-from-solid organic first-class lever; coefficient slab and counter web both 7.00 thick, centered Y±3.50 | solid pivot cylinder Ø25.4×158.75 (**no bore**; Z −82.55..+76.2 about the spring datum, #1038); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.62 (.300 in) pitch (Ø2.705 tap drill), anchors threaded straight in (no jam nuts, #2326); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss, its anchor threaded straight in; shared R15.24 tangent positive ribs; bounded R.040 MAX side roots, profile blends, longitudinal plate/web, boss, crease and knife-stub root blends at every inside corner | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; independent pilot wall guards retain the .080 in (2.032 mm) pilot floor | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; spring seats and matched bracket rows follow the centered plate; mounts stay fixed; evaluate hardened knife insert separately (§6) |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate), 4140/4142 HT pre-hardened bar, 28-32 HRC as supplied and not heat treated, the bore and B reamed once to their printed bands (owner ruling 2026-11-10 (Pedro), #2334 option B1; supersedes the 2026-11-08 harden-less O1 ruling); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth .438 ±.002 (11.1252 ±0.0508), full thread .375 ±.005 (9.525 ±0.127); fully charged drill-point crown web 2.1060 (≥2.032), no break-in (conservative proof envelope Ø3.924, above accepted MAX Ø3.8989; point MIN 117°); one MHA-SM-VN-53 slip hole cut from the top seat to a flat floor 9.398 deep (owner ruling 2026-10-24, T+H3): datum B, a Ø.1280 ±.0007 blind flat-bottom reamed round hole 7.62 (.300) +X of the tap axis, ⊥Ø.001 to A. Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1) deletes the −X slot (datum C) and its notch: the bore carries ⌖Ø.008 to A and B (datum C) plus a separate ∥.002 to A, and the tap is cut on the part at ⌖Ø.005 | A | B | C▷ (owner ruling 2026-11-10 (Pedro), #2334, S1 and margin option 1a; formerly spotted through MHA-FR-02's #10 hole); the bore's yaw about B is set at MHA-SM-00 by a (Ø.4720) × 8.0 in gauge bar, .0002-.0017 diametral clearance in each bore, through both mounts' bores (#2334, S2): knife rock 7.76° worst against the 5.0° floor, the far-end offset 0.0469 being the bar's .0017 diametral clearance in the largest bore plus the lever ridge's yaw from that clearance over its 166.25 minimum mouth span (#1038: the front mount stands .25 in farther out); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | manual (×2). Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus .351 ±.005 in (8.9154 ±0.127); 46.70 nominal, printed (1.84) as a reference) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through a letter C drill Ø6.147 (.242) #10 clearance on D within ⌖ .010 | D (owner ruling 2026-11-06). Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block .XXX ±0.13) above faced underside. Nominal reach 8.9173, range 8.7884–9.0424; full-form engagement MIN 7.730067 ≥7.239, tip air MIN 0.3556. The bolt goes in plain, without threadlocker (coordinator ruling 2026-10-16: a doweled static clamp needs no lock). One MHA-SM-VN-53 dowel per mount (98381A473, 1/8 ×3/4) presses 11.94 to the floor of a Ø3.150 +0.013/0 blind ream in the crossbar's faced underside (0.015–0.033 interference), .300 ±.005 (7.62 ±0.127) +X of its bolt axis at the same Z and ⊥Ø0.025 (.001) to A (owner ruling 2026-11-06), pierced by a #51 (Ø1.70) knockout drilled up from its floor on the ream's axis; its proud end slips .0020–.0036 into the block's B, so the block fits one way round only (owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the −X reams and their ⌖ frames are deleted). The #10 holes' ⌖ .010 | D to the bar's two-face width median datum D limits their X shift to ±0.127, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The hanger clearance hole is a **letter C drill, Ø6.147 (.242)**, under the
 title block's DRILLED HOLES +0.10/0 row (Ø6.248 at most; owner ruling
@@ -769,7 +796,7 @@ left bosses' tangent: D's station is as cast and prints **9.18 ±.03** from
 the G plane on the CAST-DATUMS sheet (`build_fr_top_frame.D_STATION`), and
 the hole table's origin is the F|G (west, rear) corner. The hanger holes
 left the table; their front and rear Z stations print .XXX from the front
-socket axes (1.104 and 7.959) and remain ordinary toleranced dimensions.
+socket axes (.854 and 7.959) and remain ordinary toleranced dimensions.
 
 The mount's tap is cut on the part at **⌖Ø.005 | A | B | C▷**, datum C the
 reamed bore, which only clocks it about B (owner ruling 2026-11-10 (Pedro),
@@ -786,18 +813,18 @@ the same three block terms, and the turn the gauge bar gives the block
 about its dowel: the bar line runs through both bores, each off its station
 by the #10 hole's ⌖ .010 | D centring (0.127, owner ruling 2026-11-06), the
 ream's station, B's slip and simulator and the bore's ⌖Ø.008 radius (0.414
-in all), at opposite limits over the 174.12 station spacing, a **0.272°**
+in all), at opposite limits over the 180.47 station spacing, a **0.263°**
 turn; each block also turns on the bar by the bar's own .0017 maximum
 diametral clearance over its shortest 13.72 bore, a further **0.180°**
 (owner review of #2334). The tap, clocked to the bore, turns with the
-block through **0.453°**, moving 7.62 from B across by 0.0602:
-**hypot(0.2489, 0.3091) = 0.3969 mm**. Full-crossbar
+block through **0.443°**, moving 7.62 from B across by 0.0590:
+**hypot(0.2489, 0.3079) = 0.3959 mm**. Full-crossbar
 drill drift over the printed grip's thickest **36.63 mm** (36.50 + 0.13) is
-**0.1918 mm**; together they consume 0.5887 of the **0.6604 mm** radial
+**0.1918 mm**; together they consume 0.5877 of the **0.6604 mm** radial
 float (the C drill's Ø6.147 minimum less the bolt's 4.826 major, halved),
-leaving **0.0717 mm** (and a 0.160 washer ring inside the knockouts, up from 0.053 at Ø.008). The rear mount, re-hung on the lever's stub at MHA-SM-00
+leaving **0.0727 mm** (and a 0.162 washer ring inside the knockouts, up from 0.053 at Ø.008). The rear mount, re-hung on the lever's stub at MHA-SM-00
 step 6 and swung about its dowel until the rock gauge passes, may turn
-**1.114°** inside its bolt float, above the 0.453° the bar line and play can ask of
+**1.114°** inside its bolt float, above the 0.443° the bar line and play can ask of
 it (`build_sm_summing_assembly.KNIFE_REAR_YAW_RANGE_DEG`). The block
 carries no dowel-pattern frame: datum B is its round hole.
 
@@ -906,16 +933,16 @@ farm validation of the route is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.41×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.550 (.3760 +.0005/0) reamed through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.80 mm** (.071 MIN, RV-01); notch kerf **0.4 mm** (.014 in screw-slotting saw on a 1 in saw arbor, fragile crests; the saw is to buy, `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **manual** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed on the BS-0 (see [Cutter plan](#cutter-plan); wire-EDM = outsource); the cam turned about its offset axis and clocked to the teeth is **route not selected**: its eccentric fixture is not drawn ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); **hold the +Y phasing identical on all 20** |
+| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.41×3 + integral eccentric cam OD30.6×4.6228 (offset +Y 8.64); total H 7.62 (.3000, the channel pitch) | Ø9.550 (.3760 +.0005/0) reamed through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.80 mm** (.071 MIN, RV-01); notch kerf **0.4 mm** (.014 in screw-slotting saw on a 1 in saw arbor, fragile crests; the saw is to buy, `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **manual** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed on the BS-0 (see [Cutter plan](#cutter-plan); wire-EDM = outsource); the cam turned about its offset axis and clocked to the teeth is **route not selected**: its eccentric fixture is not drawn ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); **hold the +Y phasing identical on all 20** |
 | **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" faced to .240; 2D outline ~7.4×1.61; ring and shank .086, both faces at .077 / .163 ±.002 from the fork's datum face, fork .240 REF, all on one mid-plane; black finish | Ø1.213 +.003/0 strap bore (rides the Ø30.6 mm MHA-DT-12 cam); fork .390 wide, full R.195 crown on the pin, .710 long from the crown; tine .067 ±.002 from the datum face, slot .106 ±.002, .580 deep from the crown (#982); Ø.077 +.0009/+.0005 pin hole reamed through both tines (bought pin MHA-SH-VN-58 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **.067** (.065 MIN, owner-accepted RV-02) beside a .106 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin .086 shank ~6 long faced from 1/4 plate — chatter/curl); the ream must hold its .0004 band for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **manual**; the outline (ring, shank, fork) on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); face both sides to the two levels, slit the fork, drill + ream |
 
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal (`material_tip_specification`; the title block still prints `Brass`, [#1080](https://github.com/pedropaulovc/harmonic-analyzer/issues/1080)) | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0621 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
-| **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 6.8756 ±0.025, integral Ø.0625 in spigot × .71 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn, indexed leaves) | turning **route not selected**: no listed centre or steady fits the Ø.0625 stems ([#2468](https://github.com/pedropaulovc/harmonic-analyzer/issues/2468)); leaves with the custom ground tool DT6-FORM1, indexed ([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)) | 
-| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3355 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key); land 2 ends .025 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | none severe: the slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat | 
+| **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **7.4528 ±0.051** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal (`material_tip_specification`; the title block still prints `Brass`, [#1080](https://github.com/pedropaulovc/harmonic-analyzer/issues/1080)) | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0621 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
+| **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 7.4528 ±0.051, integral Ø.0625 in spigot × .76 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn, indexed leaves) | turning **route not selected**: no listed centre or steady fits the Ø.0625 stems ([#2468](https://github.com/pedropaulovc/harmonic-analyzer/issues/2468)); leaves with the custom ground tool DT6-FORM1, indexed ([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)) | 
+| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3355 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key); land 2 ends .030 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | none severe: the slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat | 
 | **`dt-cone-tip-bushing`** ×1 (MHA-DT-38) | C36000 brass bar; Ø.228 × .160 in | Ø.0615 in reamed bore, press fit on the MHA-DT-37 pivot; north face bears on MHA-DT-39 | wall .0805 in minimum | 1 (turn, ream, part) | manual lathe | 
 | **`dt-cone-tip-end-screw`** ×1 (MHA-DT-39) | McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 × 5/8 | drilled and reamed Ø.0630 × .12 in pivot hole concentric in the threaded end (running fit on the MHA-DT-37 pivot) | wall to the 2A thread root **.067 in MIN** (RV-01, rule 17 minor) | 1 (hold on the thread in a threaded collet or split nut) | manual lathe, centre drill, drill, ream | 
 
@@ -923,19 +950,19 @@ farm validation of the route is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-pivot-shaft`** ×1 | 1018 CF bar per its registry, or 1/4 ground stock as the print allows (stock allocation: [#2346](https://github.com/pedropaulovc/harmonic-analyzer/issues/2346)); Ø.2500 +0/−.0008 × 6.40 tip to tip | domed both ends; two set-screw flats in line, one side, one at each end | **L/D about 25:1** → whip; follow rest | 2 (turn, face and dome both ends; mill both flats in one setup) | manual lathe, chuck and tailstock centre with a follow rest, then mill |
-| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×166.6 | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±75.06 | **L/D 26:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
+| **`ch-pivot-shaft`** ×1 | 1018 CF bar per its registry, or 1/4 ground stock as the print allows (stock allocation: [#2346](https://github.com/pedropaulovc/harmonic-analyzer/issues/2346)); Ø.2500 +0/−.0008 × 6.85 tip to tip | domed both ends; two set-screw flats in line, one side, one at each end | **L/D about 27:1** → whip; follow rest | 2 (turn, face and dome both ends; mill both flats in one setup) | manual lathe, chuck and tailstock centre with a follow rest, then mill |
+| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×178.05 (7.01) | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±80.772 | **L/D 28:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
 
 The 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. The 20 rocker arms ride the
 pivot shaft and the 20 channel levers the fulcrum shaft on their own integral hubs, which stack face
-to face and set the 7.0565 channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
+to face and set the 7.62 (.300) channel pitch (`ch_rocker_arm_spec.HUB_LENGTH`,
 `ch_channel_lever_spec.HUB_LENGTH`).
 
 ### Rocker arms + support (T1 — built-up profile arm + cast bracket)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-rocker-arm`** ×20 | one piece from solid per its registry, or (sheet note 2, RV-06, owner route v3 2026-10-16) built up: strap MHA-CH-13 from 1018 CF 1/8 × 1-1/2 flat faced to .098 ±.001, about 292 long (11.494 REF), with hub MHA-CH-12 turned from 1018 round and pressed into the strap's reamed hole | **top edge = R800 concave arc** (BASIC R31.486 under a .020 profile, RV-02; the amplitude-bar rides ON it) — it is the **2D OUTLINE of the strap, NOT a concave pocket/face**; bottom edge R816 concentric; integral hub sets the 7.0565 channel pitch; reamed pivot bore through the hub, #47 rod-pin hole through the strap | thin strap faced from 1/8 bar ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); hub wall .064 MIN (RV-03); a manual mill moves one axis at a time, so the arcs need the jig | strap faced, sawn to a preform, then hub hole drilled and reamed and both arcs cut on the jig in one clamping; hub turned; bore and length finished on the joined arm | **manual**: arcs cut on the oblique jig MHA-CH-06-TL-00 (`ch-rocker-arm-tl-oblique-jig`) by the held reference route `cad/process/ch_rocker_arm/plan.toml`, not yet qualified (jig open items include [#2336](https://github.com/pedropaulovc/harmonic-analyzer/issues/2336) and [#2443](https://github.com/pedropaulovc/harmonic-analyzer/issues/2443)) |
+| **`ch-rocker-arm`** ×20 | one piece from solid per its registry, or (sheet note 2, RV-06, owner route v3 2026-10-16) built up: strap MHA-CH-13 from 1018 CF 1/8 × 1-1/2 flat faced to .098 ±.001, about 292 long (11.494 REF), with hub MHA-CH-12 turned from 1018 round and pressed into the strap's reamed hole | **top edge = R800 concave arc** (BASIC R31.486 under a .020 profile, RV-02; the amplitude-bar rides ON it) — it is the **2D OUTLINE of the strap, NOT a concave pocket/face**; bottom edge R816 concentric; integral hub sets the 7.62 (.300) channel pitch; reamed pivot bore through the hub, #47 rod-pin hole through the strap | thin strap faced from 1/8 bar ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); hub wall .064 MIN (RV-03); a manual mill moves one axis at a time, so the arcs need the jig | strap faced, sawn to a preform, then hub hole drilled and reamed and both arcs cut on the jig in one clamping; hub turned; bore and length finished on the joined arm | **manual**: arcs cut on the oblique jig MHA-CH-06-TL-00 (`ch-rocker-arm-tl-oblique-jig`) by the held reference route `cad/process/ch_rocker_arm/plan.toml`, not yet qualified (jig open items include [#2336](https://github.com/pedropaulovc/harmonic-analyzer/issues/2336) and [#2443](https://github.com/pedropaulovc/harmonic-analyzer/issues/2443)) |
 | **`fr-rocker-arm-support`** | modeled Gray Cast Iron; drawing permits gray iron casting or low-carbon steel stock; trapezoidal wedge, 6.35 mm shell/web | opposed 165.1 mm pockets with **R6.35** internal corners; through cavity with **R12.7** corners; **4× 5/16 through clearance drills** in the 6.35 mm foot for top-down 1/4-20 hex-head screws; .06 × 45° rim chamfer; 2× #8-32 bottoming-tapped seats in the top face, transferred from the MHA-CH-08 brackets at assembly | 6.35 mm web/shell; from solid stock, each pocket reaches about 28.6 mm at the wide foot. R6.35 is ordinary contour geometry on the PM-30MV and does not need square-corner EDM; a 1/8″ end mill can finish the radius, but its long reach in 1018 favors roughing with a stiffer cutter first | casting route: foot holes/rim; solid-stock route: **2 opposed pocket setups** + foot drilling | cast body, or rough both pockets from 1018 with a larger cutter and finish the R6.35 corners with a 1/8″ end mill; drill the clearance pattern from the seat face |
 
 ### Frame (T1 — cast top frame)
@@ -1000,7 +1027,7 @@ keeps D5's floor and the residual is the owner's
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 8.92 in from that edge) and both keeper feet (8.76 in) lie inside one pass of a facing cutter 2.85 in or wider, which the shop records do not yet list; the front hanger station (8.60) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G and transfer-bore the base from it (#2386) |
+| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the faced top carried into the two west bosses under the MHA-CH-07 keeper feet (the proud .18 removed inboard of a step .67 ±.01 from each socket axis, its floor one plane with the faced top because each foot's outboard end rests on it, root R.02 max so no root radius lies under a foot tip; owner ruling 2026-11-11, #1038, K5), the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 9.17 in from that edge) and both keeper feet (8.98 in) lie inside one pass of a facing cutter 3.35 in or wider, which the shop records do not yet list; the front hanger station (8.85) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G, then with the top up carry the faced top into the two west bosses to the step .67 from each bored socket axis (square-corner cutter, root R.02 max; pick the floor up on the faced top, so one plane lies under each keeper foot), and transfer-bore the base from it (#2386) |
 
 ---
 
@@ -1181,14 +1208,14 @@ so it does not give a six-tooth form.
 | part | teeth | form | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
 | `dt-crank-pinion` | 16 | straight spur | #7 | 2 turns + 10 on 20 |
-| `dt-crank-drive-gear` | 64 | straight teeth inclined 13.0011° right hand | #2 (virtual 69 teeth) | 10 on 16 |
+| `dt-crank-drive-gear` | 64 | straight teeth inclined 12.0247° right hand | #2 (virtual 68 teeth) | 10 on 16 |
 
 Owner ruling 2026-11-10 (#2332, option A) supersedes the earlier true right-hand helix (lead
 945.862 mm): the 64T has straight teeth inclined at the cone incline. The cutter is still the one
-chosen for its virtual tooth count, N / cos³ of the 13.0011° inclination, which lands in the #2
+chosen for its virtual tooth count, N / cos³ of the 12.0247° inclination, which lands in the #2
 range ([John F's workshop, helical gears](https://johnfsworkshop.org/home/making-other/gears-links/helical-gears-links/making-helical-gears-on-a-vertical-milling-machine/)).
 Tilt the installed Precision Matthews BS-0
-([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)) 13°, feed the #2 cutter in
+([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)) 12°, feed the #2 cutter in
 a straight line through each tooth space and plain-index between spaces. Set the cutter centre
 plane to cross the gear axis 1.778 mm (.07 in) north of the south (collar) face. No lead gearing
 or spiral-capable head is needed. The printed tooth data are unchanged; approval is conditional
@@ -1196,7 +1223,7 @@ on the straight model passing the drive-train interference and soundness gates.
 
 The tilt sense sets the hand, and every other printed number is the same for a left-hand gear.
 With the cutter on the vertical spindle's stub arbor (cutter plane horizontal) and the head at
-the left end of the table, raise the head's nose 13° and cut on the operator's side of the
+the left end of the table, raise the head's nose 12° and cut on the operator's side of the
 blank. Putting the head at the right end, or the cutter behind the blank, cuts a left-hand gear;
 doing both cuts a right-hand one again. Check the first scribed pass and the finished gear:
 stood on either face, the teeth nearest you rise to the right.

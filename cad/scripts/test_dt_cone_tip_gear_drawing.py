@@ -15,6 +15,7 @@ import pytest
 import _config
 import build_dt_cone_tip_gear as build
 import cone_tip_cluster as cluster
+import draw_dt_cone_gear
 import draw_dt_cone_tip_gear as drawing
 import dt_cone_gear_spec as family
 import dt_cone_tip_gear_notes as notes
@@ -114,7 +115,8 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     spigot = callouts["SpigotDia"]
     for mate in ("MHA-DT-04", "MHA-DT-03-T012", "MHA-DT-03-T018"):
         assert mate in spigot
-    assert spigot.startswith("BONDED FIT IN")
+    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints.
+    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, IN")
     pivot = callouts["PivotDia"]
     assert pivot == f"PRESS AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
@@ -129,11 +131,15 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in pivot_note
     assert spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM) in pivot_note
     assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
-    assert sheet[-2] == "3. CENTRES OK."
-    # The width's mate in a flagged note: its callout block fits between the
-    # extension lines the two stem lengths share.
-    assert callouts["FaceWidth"] == notes.FACE_NOTE_FLAG == "SEE NOTE 4"
-    assert sheet[-1] == "4. GEAR WIDTH: SETS THE CONE GEAR STACK ON MHA-DT-04."
+    assert sheet[-1] == "3. CENTRES OK."
+    # The width names its stack at the dimension, as the MHA-DT-03 sheets do;
+    # each line is shorter than the face it sits under.
+    assert callouts["FaceWidth"] == draw_dt_cone_gear.DIMENSION_CALLOUTS["FaceWidth"]
+    assert "MHA-DT-04" in callouts["FaceWidth"]
+    assert all(
+        len(line) * 2.6 < drawing.sheet_mm(spec.FACE_WIDTH) * 1000.0
+        for line in callouts["FaceWidth"].splitlines()
+    )
     text = "\n".join((*sheet, *callouts.values()))
     # No retired part, no solder, no D-flat, no stale tip collar.
     for retired in ("MHA-DT-VN-54", "MHA-DT-VN-55", "SOLDER", "FLAT", "COLLAR"):
@@ -359,24 +365,32 @@ def test_tooth_space_plot_stands_beside_the_table() -> None:
 
 
 # The lengths and the overall print at the title block's places with no
-# band of their own (``.25``, ``(1.23)``); every other value carries a
+# band of their own (``.25``, ``(1.30)``); every other value carries a
 # stacked band (``.0625 +.0000/-.0010``).
 _UNBANDED = {"PivotLength", "SpigotLength", "overall"}
+# A diameter's text hangs beside its vertical dimension line, not across it:
+# left of the line for the pivot and the tip, right of it for the spigot
+# (farm runs 20261111T234611671Z and 20261112T053742990Z: the spigot block
+# began 3 mm right of its line and, at .76 long, ended on the inner border
+# from a line 94 mm inside it).  The lengths' text is centred.
+_DIAMETER_TEXT_SIDE = {"PivotDia": -1, "BlankDia": -1, "SpigotDia": 1}
 
 
 def _dimension_box(name: str, center: tuple[float, float]) -> Box:
-    """A dimension's text block centred on its point: the value row (with a
-    stacked band), its callout rows and its above-text row."""
+    """A dimension's text block at its point: the value row (with a stacked
+    band), its callout rows and its above-text row; centred for a length,
+    beside the dimension line for a diameter."""
     lines = notes.DIMENSION_CALLOUTS.get(name, "").splitlines()
     above = [notes.CALLOUTS_ABOVE[name]] if name in notes.CALLOUTS_ABOVE else []
     value = 6 if name in _UNBANDED else 14
     width = max([value, *map(len, (*lines, *above))]) * DIM_CHAR
     height = (1.0 if name in _UNBANDED else 1.5) * DIM_ROW
     height += (len(lines) + len(above)) * DIM_ROW
+    middle = center[0] + _DIAMETER_TEXT_SIDE.get(name, 0) * width / 2.0
     return Box(
-        center[0] - width / 2.0,
+        middle - width / 2.0,
         center[1] - height / 2.0,
-        center[0] + width / 2.0,
+        middle + width / 2.0,
         center[1] + height / 2.0,
     )
 

@@ -91,9 +91,10 @@ retiredTooling.push(...[
 // the MHA-PD-VN-67 pivot shim to the arm's spot face (#290), the made
 // gooseneck spring screw to the purchased MHA-SM-VN-56 shoulder screw (owner
 // ruling 2026-11-08 (Pedro), #2144 item 11.4), the MHA-DT-28 anchor eye and
-// MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2), and the
+// MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2), the
 // MHA-DT-VN-54 stack collar and MHA-DT-VN-55 cup adjuster to the bonded cone
-// tip and its end screw (owner decision C1 keyed, 2026-11-09, PR #1992), and
+// tip and its end screw (owner decision C1 keyed, 2026-11-09, PR #1992),
+// the MHA-CH-14 and MHA-SM-VN-55 spring-hook jam nuts to bare hooks (#2326), and
 // the made MHA-CH-10 rod and MHA-CH-11 bar pivot pins to the purchased
 // MHA-SH-VN-58 dowel's RodPin and BarPin members (#2339).
 const retiredMachine = [{
@@ -130,6 +131,16 @@ const retiredMachine = [{
   old_stem: 'vn-cone-tip-adjuster',
   old_number: 'MHA-VN-017',
   new_identities: [{ parent: 'dt-drive-train', stem: 'dt-vn-cone-tip-adjuster', number: 'MHA-DT-VN-55' }],
+  status: 'retired',
+}, {
+  old_stem: 'ch-anchor-jam-nut',
+  old_number: 'MHA-CH-014',
+  new_identities: [{ stem: 'ch-anchor-jam-nut', number: 'MHA-CH-14' }],
+  status: 'retired',
+}, {
+  old_stem: 'vn-boss-hook-jam-nut',
+  old_number: 'MHA-VN-072',
+  new_identities: [{ parent: 'sm-summing', stem: 'sm-vn-boss-hook-jam-nut', number: 'MHA-SM-VN-55' }],
   status: 'retired',
 }, {
   old_stem: 'ch-rod-pivot-pin',

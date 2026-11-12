@@ -1,30 +1,24 @@
 """Manufacturing controls for the modified McMaster 9489T111 anchor.
 
-The anchor threads down through the summing lever's coefficient plate and is
-locked by the MHA-CH-14 round jam nut run up its cut end and jammed against
-the plate's underside (rule 23: the anchor rides the rocking lever under a
-cycling spring, and per-channel calibration turns it, so a seated thread
-alone is not a lock).
+The anchor threads down through the summing lever's coefficient plate and
+stays there bare: nothing torques it, so no jam nut (owner, #2326).
 
 Two facts set the finished length.  The anchor's Ø3.175 unthreaded neck
 cannot enter a #6-32 tap, so the neck shoulders on the plate's TOP face --
 the hard down-stop, where the installed thread starts.  Per-channel
 calibration then backs the anchor out up to ``ADJUSTMENT_TURNS`` counted
-turns (``ADJUSTMENT_TRAVEL_MM``) to trim the spring preload -- one turn is
-worth 0.139 N of the 2.71 N installed load, 5% of preload -- which lifts the
-cut end.  So the shank must cross the plate, carry the nut, and still show
-``FULL_THREADS_PAST_NUT`` full turns below the nut at the worst case: the
-shortest in-band anchor (title-block 1-place band) under the thickest in-band
-nut, its deburr at the adverse corner of its band, backed out the whole
+turns (``ADJUSTMENT_TRAVEL_MM``) to trim the spring preload -- one turn
+changes the load by the spring rate times the thread pitch -- which lifts
+the cut end. So the shank's full-form thread must still span the whole plate
+at the worst case: the shortest in-band anchor through the thickest in-band
+plate, its deburr at the adverse corner of its band, backed out the whole
 budget.
 
 The tap is engaged over its whole length at every pose (``THREAD_ENGAGEMENT_MM``
 is the uniform coefficient-plate thickness): backing out only lifts the neck
 off the plate top, it no longer trades engagement for eye lift.
 
-The fitter holds the eye at its clocking while the nut is tightened, so the
-trim survives the lock; re-trimming means slackening the nut first.  The
-top-level assembly (MHA-HA-00) prints the install steps.
+The top-level assembly (MHA-HA-00) prints the install steps.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  The two
 shop controls (the finished overall and the restored deburr) are authored as
@@ -36,7 +30,6 @@ import math
 
 import _config
 import sm_summing_lever_spec
-import ch_anchor_jam_nut_spec as jam_nut
 from _hole_spec import blind_cut_dia_mm
 from _package_units import drawing_unit
 from _printed_tolerance import angular_band_deg, printed_band_mm
@@ -51,27 +44,23 @@ _PITCH = ANCHOR_9489T111.thread_pitch_mm
 # calibration pose.
 THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.COEFFICIENT_T
 # The lever's 7.00 prints .28 under the title block's .XX band, and the
-# printed nominal is authoritative (rule 3), so the jam-nut seat moves over
+# printed nominal is authoritative (rule 3), so the plate underside moves over
 # the limits .28 admits -- the lever's COEFFICIENT_T_DEVIATIONS (code review
-# C10: sizing at nominal thickness left only 1.09 of full thread past the nut
-# at the thickest limit, under the 1.5875 floor). The trim is sized at the
-# thickest plate; the cut end hangs deepest under the thinnest.
+# C10). The trim is sized at the thickest plate; the cut end hangs deepest
+# under the thinnest.
 _SEAT_T_LOWER, _SEAT_T_UPPER = sm_summing_lever_spec.COEFFICIENT_T_DEVIATIONS
 SEAT_T_MAX_MM = THREAD_ENGAGEMENT_MM + _SEAT_T_UPPER
 SEAT_T_MIN_MM = THREAD_ENGAGEMENT_MM + _SEAT_T_LOWER
-# The finished overall is a functional length (the past-nut budget reads its
-# band), so it prints .XX, never the .X row.
+# The finished overall is a functional length (the engagement budget reads
+# its band), so it prints .XX, never the .X row.
 OVERALL_PLACES = 2
 FINISHED_OVERALL_TOLERANCE_MM = printed_band_mm(OVERALL_PLACES, unit=UNIT)
-# Owner ruling (C10): one more step of the printed overall's grid (.01) as
-# thread over the floor at that worst corner.
-PAST_NUT_MARGIN_MM = 0.254  # .01
 # The restored factory deburr on the .XX grid, at the title block's .XX
 # (#2314; rule 4: the loosest band that serves a chamfer): at its short limit
 # (.02) the cut end's flat (major radius - chamfer) still passes the #6-32 tap
 # drill it enters (MIN_CHAMFER_WIDTH_MM, .0158), so the deburr needs no band
-# of its own. The longer leg costs the past-nut budget more axial run, which
-# the trim takes (the counter anchor's and the knife hanger stud's pattern).
+# of its own. The longer leg costs the full-thread budget more axial run,
+# which the trim takes (the counter anchor's and the knife hanger stud's pattern).
 CHAMFER_WIDTH_PLACES = 2
 CHAMFER_WIDTH_MM = 0.762  # .03
 CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(CHAMFER_WIDTH_PLACES, unit=UNIT)
@@ -88,20 +77,14 @@ CHAMFER_AXIAL_MAX_MM = (CHAMFER_WIDTH_MM + CHAMFER_WIDTH_TOLERANCE_MM) / math.ta
 # A fitter counts whole turns; one turn of back-out is the calibration budget.
 ADJUSTMENT_TURNS = 1
 ADJUSTMENT_TRAVEL_MM = ADJUSTMENT_TURNS * _PITCH
-# Full-form thread showing below the jam nut at the worst case, so the nut's
-# last thread is never on the deburr.
-FULL_THREADS_PAST_NUT = 2
 # The band the fitter reads on the printed overall.
 LENGTH_BAND_WORST_MM = FINISHED_OVERALL_TOLERANCE_MM
 # Cut end below the thread start (= plate top when seated), nominal part,
-# seated: the thickest plate, thickest nut, two full turns and the ruled
-# margin, the deburr, then the back-out budget and the band the shortest
-# in-band part may give up.
+# seated: the thickest plate, the deburr, then the back-out budget and the
+# band the shortest in-band part may give up (#2326: the full thread then
+# just spans the plate at that worst corner).
 _END_BELOW_THREAD_START_MM = (
     SEAT_T_MAX_MM
-    + jam_nut.THICKNESS_MAX
-    + FULL_THREADS_PAST_NUT * _PITCH
-    + PAST_NUT_MARGIN_MM
     + CHAMFER_AXIAL_MAX_MM
     + ADJUSTMENT_TRAVEL_MM
     + LENGTH_BAND_WORST_MM
@@ -128,7 +111,7 @@ PROTRUSION_MM = (
 # seated under the thinnest in-band plate. The band's upper half stops at the
 # uncut 9489T111 shank, the longest part the stock can give. The
 # under-plate envelope (lever ribs, magnifier bracket flange) is checked
-# against this and the nut.
+# against this.
 PROTRUSION_MAX_MM = (
     min(SHANK_LENGTH_MM + LENGTH_BAND_WORST_MM, ANCHOR_9489T111.shank_length_mm)
     - ANCHOR_9489T111.unthreaded_shank_length_mm
@@ -136,35 +119,25 @@ PROTRUSION_MAX_MM = (
 )
 
 
-def full_threads_past_nut_mm(
+def full_thread_below_plate_mm(
     backed_out_mm: float, band_mm: float, seat_t_mm: float = SEAT_T_MAX_MM
 ) -> float:
-    """Full-form thread below the thickest in-band nut for a part ``band_mm``
-    off nominal (negative = short), backed out ``backed_out_mm`` from the
-    seated neck, through a plate ``seat_t_mm`` thick (default: the thickest
-    in-band plate)."""
+    """Full-form thread past the plate underside for a part ``band_mm`` off
+    nominal (negative = short), backed out ``backed_out_mm`` from the seated
+    neck, through a plate ``seat_t_mm`` thick (default: the thickest in-band
+    plate). Negative: the deburr ends inside the tap."""
     end_below_thread_start = (
         SHANK_LENGTH_MM
         + band_mm
         - ANCHOR_9489T111.unthreaded_shank_length_mm
         - backed_out_mm
     )
-    return (
-        end_below_thread_start
-        - seat_t_mm
-        - jam_nut.THICKNESS_MAX
-        - CHAMFER_AXIAL_MAX_MM
-    )
+    return end_below_thread_start - seat_t_mm - CHAMFER_AXIAL_MAX_MM
 
 
-# Two full pitches (1.5875 mm) below the thickest nut at the worst case,
-# plus the ruled margin.
-PAST_NUT_FLOOR_MM = FULL_THREADS_PAST_NUT * _PITCH
-if (
-    full_threads_past_nut_mm(ADJUSTMENT_TRAVEL_MM, -LENGTH_BAND_WORST_MM)
-    < PAST_NUT_FLOOR_MM + PAST_NUT_MARGIN_MM - 1e-9
-):
-    raise ValueError("the shortest in-band anchor loses its threads past the nut")
+# Full thread across the whole thickest plate at the worst case.
+if full_thread_below_plate_mm(ADJUSTMENT_TRAVEL_MM, -LENGTH_BAND_WORST_MM) < -1e-9:
+    raise ValueError("the shortest in-band anchor's full thread ends inside the plate")
 # The cut shank must come out of the purchased 9489T111: the coefficient-plate
 # tap length sets how much of it the anchor needs.
 if SHANK_LENGTH_MM >= ANCHOR_9489T111.shank_length_mm:
@@ -186,10 +159,8 @@ DIMENSION_TOLERANCE_TYPES = {
     "ChamferWidth": 11,
     "ChamferAngle": 11,
 }
-_NUT_NUMBER = _config.parts("ch-anchor-jam-nut")["number"]
-# Rule 7: the 1.23 overall takes the title block's band, so it carries no
-# reason; the nut's omission is the stock name's, its jam nut the MHA-HA-00
-# step's (ANCHOR_INSTALL_STEP).
+# Rule 7: the overall takes the title block's band, so it carries no reason;
+# the nut's omission is the stock name's.
 DRAWING_NOTES = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 3:1"
 

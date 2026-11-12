@@ -557,10 +557,12 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 3.4051, abs_tol=5e-4)
-    # Positive control: without the bank terms the row read 3.5785 on the 3.0
-    # face with the inch drum (#290); the .118 in face frees its 0.0028.
-    assert math.isclose(slack + g0_south, 3.5813, abs_tol=5e-4)
+    # #1038 re-pitch: the 6.06 in drum (the former 5.64 + 19 x 0.5635 = 6.0615,
+    # rounded down to the .01 in grid) gives up 0.0385 of the former 3.4051.
+    assert math.isclose(slack, 3.3666, abs_tol=5e-4)
+    # Positive control: without the bank terms the row reads 3.5428 on the 3.0
+    # face (3.5813 at the 5.64 drum; the .118 in face freed its 0.0028).
+    assert math.isclose(slack + g0_south, 3.5428, abs_tol=5e-4)
 
 
 def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
@@ -690,9 +692,12 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     block_east = drive.BLOCK_X - BLOCK_EAST
     assert block_east - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 19.0
     # The grip keeps opening from the crank cluster.  Nominal floor re-pinned
-    # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south);
-    # the worst case gates it (RIG_MARGINS' grip crossrod row, 11.112 vs 0.25).
-    assert drive._GRIP_ROD_Z[0] - seat_geometry.SEAT_FACE_Z >= 12.0
+    # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south)
+    # and for the #1038 re-pitch (12.0 -> 8.5: the drum's front end moves
+    # 5.033 south, g19 +5.636 north less the 6.06 drum's +10.668, so 13.877
+    # nominal reads 8.844); the worst case gates it (RIG_MARGINS' grip crossrod
+    # row, 7.082 vs 0.25).
+    assert drive._GRIP_ROD_Z[0] - seat_geometry.SEAT_FACE_Z >= 8.5
     assert (
         drive.RIG_MARGINS["grip crossrod to the crank chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
@@ -797,12 +802,11 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
         collar.LENGTH_FITTED_MIN <= paper.KNOB_COLLAR_FITTED_LENGTH <= collar.LENGTH_FITTED_MAX
     )
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot runs from the seat face; the body runs on to the boss's
-    # south face (owner ruling D1: no washer).
-    assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(crank_seat + cs.SPIGOT_LENGTH)
+    # The spigot runs from the seat face to the boss's south face (owner
+    # ruling D1: no washer).
     assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.0254)
-    body = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank collar body")
-    assert body[:3] == (drive.CRANK_SPIGOT_FRONT_Z, drive.CRANK_COLLAR_Z1, cs.COLLAR_DIA)
+    spigot = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank seat spigot")
+    assert spigot[:3] == (crank_seat, drive.CRANK_COLLAR_Z1, cs.SPIGOT_DIA)
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-183.0 + 25.146)
     assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST > 0.0
     # Negative control: the first seat (-152.5) against the moved collar.
@@ -932,8 +936,9 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     from dt_pinion_lever_geometry import BORE_DEPTH, BORE_DEPTH_PLACES, UNIT
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
+    # #1038 re-pitch: both grow by the 6.06 drum's .42 in (7.29 / 7.73 before).
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
-        (7.29 * 25.4, 7.73 * 25.4)
+        (7.71 * 25.4, 8.15 * 25.4)
     )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf

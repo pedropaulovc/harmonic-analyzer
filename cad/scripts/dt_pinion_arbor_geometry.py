@@ -48,9 +48,11 @@ def on_xx_grid(value_mm: float) -> float:
 # 5/16 in (owner ruling 2026-10-30): the arbor follows the owned .3135 over
 # reamer that cuts its strap and drum bores; 8 mm has no owned reamer.
 SHAFT_DIA = 7.9375
-# Origin to back-crown root: the back rim prints 8.93 (226.822) from the head
-# rear face at -0.66 (#290; was 226.25, 0.088 longer).
-SHAFT_LEN = 226.162
+# Origin to back-crown root: the back rim prints 9.35 (237.490) from the head
+# rear face at -0.66.  #1038 re-pitch: the 6.06 in drum moved the back land
+# .42 in aft (198.882 -> 209.550 from the head rear face), so the shaft grew
+# the same 10.668 (226.162 -> 236.830) to keep the land clear of the crown.
+SHAFT_LEN = 236.83
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Every other Ø5/16
 # span, the two MHA-DT-01 bond lands included, is 5/16 -.0004/-.0038 in: the
@@ -191,15 +193,18 @@ def worst_land_margins(
     before it and each strap's inner face sits its drum-end air away.  Every
     margin is linear in each input, so the corners bound it.  ``stop`` limits
     the float to one end of its range (the drum hard forward or hard aft).
+    Every land end prints as its own station from the head rear face (#1038
+    ruling: no length chained off a station), so each reads one band.
     """
     front, back = land_stations(journal_len)
     x = LINEAR_XX_BAND
     shares = (STOPS[stop],) if stop is not None else tuple(STOPS.values())
     worst = dict.fromkeys(LAND_ENDS, math.inf)
-    for a, b, length, strap, station, drum, total, share in product(
+    for a, f, b, e, strap, station, drum, total, share in product(
         (front - x, front + x),
+        (front + journal_len - x, front + journal_len + x),
         (back - x, back + x),
-        (journal_len - x, journal_len + x),
+        (back + journal_len - x, back + journal_len + x),
         STRAP_T_LIMITS,
         (DRUM_STATION - station_band, DRUM_STATION + station_band),
         (DRUM_LEN + DRUM_LEN_BAND[1], DRUM_LEN + DRUM_LEN_BAND[0]),
@@ -210,10 +215,10 @@ def worst_land_margins(
         front_inner = -share * total
         back_inner = drum + (1.0 - share) * total
         margins = {
-            "front inboard": shoulder + a + length - front_inner,
+            "front inboard": shoulder + f - front_inner,
             "front outboard": front_inner - strap - (shoulder + a),
             "back inboard": back_inner - (shoulder + b),
-            "back outboard": shoulder + b + length - (back_inner + strap),
+            "back outboard": shoulder + e - (back_inner + strap),
         }
         for key, value in margins.items():
             worst[key] = min(worst[key], value)
@@ -234,6 +239,16 @@ def land_margin_slack(journal_len: float) -> float:
 
 JOURNAL_LEN = 20.066  # .79
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
+# Repitch1038 ruling (#1038, machinist review of 057ffb6: the back land's .79
+# chained off its 8.25; review of 703211d, the front land's .79 chained off
+# its 1.82): each land's crown-side end prints as its own station from the
+# head rear face, 2.61 and 9.04.  Each land's length is then the difference
+# of two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
+FRONT_JOURNAL_END_FROM_HEAD_REAR = FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
+BACK_JOURNAL_END_FROM_HEAD_REAR = BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
+for _END in (FRONT_JOURNAL_END_FROM_HEAD_REAR, BACK_JOURNAL_END_FROM_HEAD_REAR):
+    if abs(on_xx_grid(_END) - _END) > 1e-9:
+        raise AssertionError("a land's end station is off the .01 in grid")
 LAND_MARGINS_AT_STOPS = {
     stop: worst_land_margins(JOURNAL_LEN, DRUM_STATION_BAND, stop=stop)
     for stop in STOPS
@@ -344,20 +359,17 @@ if BACK_JOURNAL_Z + JOURNAL_LEN >= SHAFT_LEN:
 # Worst case, the back land's far end plus its finishing run-out still stops
 # short of the back-crown root.
 if (
-    BACK_JOURNAL_FROM_HEAD_REAR
-    + JOURNAL_LEN
-    + 2.0 * LINEAR_XX_BAND
-    + LAND_FINISH_RUNOUT
+    BACK_JOURNAL_END_FROM_HEAD_REAR + LINEAR_XX_BAND + LAND_FINISH_RUNOUT
     > BACK_RIM_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 # --- Bond lands and middle relief (#2360; owner, 2026-11-11) -----------------
-# The 5.64 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
+# The 6.06 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
 # (about 4.25 in), so it is drilled and reamed from both ends and its two
 # halves meet near mid-length with whatever small step the re-chucking
 # leaves.  The owner's direction: hold the fit only at the two ends and let
 # the middle be clearance.  A recess in the drum's bore cannot be cut with
-# owned tools (it would need a boring bar reaching 2.9 in through a .3135
+# owned tools (it would need a boring bar reaching 3.0 in through a .3135
 # land), so the clearance is turned on the arbor instead: a plain relief
 # between two bond lands.  The drum then bears and bonds only on those lands,
 # and the long shaft no longer has to follow the bore's straightness over its
@@ -367,15 +379,17 @@ if (
 # check, made before bonding.  So a step under a land is harmless: it is at
 # most that .0014, under the land's .0014-.0053 bond clearance.
 #
-# The relief's front shoulder is located from the head rear face, the sheet's
+# Both relief shoulders are located from the head rear face, the sheet's
 # datum for every station (drawing-guidelines rules 10/11; machinist review
-# of 7454ba6d gated a chain off the front land), and its length is its own
-# size, as each journal's is.  Both at .XX.  The front land is the longer:
-# the operator's torque enters at the head and reaches the drum through it.
-# The back shoulder stands 15 mm ahead of the bond-zone diameter's witness
-# (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the back land.
+# of 7454ba6d gated a chain off the front land, and the review of 057ffb6 the
+# 2.60 length chained off the 4.20; Repitch1038 ruling, #1038).  Both at .XX,
+# so the relief's length is the difference, 2.60 -.02/+.02.  The front land
+# is the longer: the operator's torque enters at the head and reaches the
+# drum through it; it also carries the bond-zone diameter's witness
+# (BOND_ZONE_DIA_FROM_HEAD_REAR).
 BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
-BOND_RELIEF_LEN = 66.04  # 2.60
+BOND_RELIEF_BACK_FROM_HEAD_REAR = 172.72  # 6.80
+BOND_RELIEF_LEN = BOND_RELIEF_BACK_FROM_HEAD_REAR - BOND_RELIEF_FROM_HEAD_REAR
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
 # Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
 # relief's .29 maximum the radial air is .0118 in (0.30 mm), ten times the
@@ -390,24 +404,26 @@ if BOND_RELIEF_RADIAL_AIR < BOND_RELIEF_MIN_RADIAL_AIR:
         f"under {BOND_RELIEF_MIN_RADIAL_AIR}"
     )
 # Each drum end's bonded overlap, every printed band at its short corner: the
-# relief's front shoulder from the head rear face, its back shoulder that
-# plus the relief length; the drum from its station and length.
+# relief's shoulders from the head rear face; the drum from its station and
+# length.
 FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
     DRUM_STATION + DRUM_STATION_BAND
 )
 BACK_BOND_OVERLAP_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
-) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
+) - (BOND_RELIEF_BACK_FROM_HEAD_REAR + LINEAR_XX_BAND)
 # The relief spans the drum's mid-length, where halves reamed to about half
 # depth from each end meet.  This is not a requirement: a deeper pass (the
-# reamer's reach, about 4.25 in, puts the step anywhere from 3.79 to 6.65 in
-# from the head rear face) may leave the step under the front land, where
-# the slide check above already bounds it.
+# reamer's reach, about 4.25 in, puts the step anywhere from 4.21 to 6.65 in
+# from the head rear face) may leave the step under a land, where the slide
+# check above already bounds it.  #1038 re-pitch: the 6.06 in drum keeps
+# this relief; its mid moved 5.22 -> 5.43 in, the front land stays the longer
+# (1.80 in against the back land's 1.66, was 1.24) and both hold over three
+# times the hand torque.
 _DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
 if not (
     BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
-    and _DRUM_MID + DRUM_STATION_BAND
-    < BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN - 2.0 * LINEAR_XX_BAND
+    and _DRUM_MID + DRUM_STATION_BAND < BOND_RELIEF_BACK_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("the bond relief must span the drum's mid-length")
 # Torque: either land alone holds twice a hard hand twist on the MHA-DT-15
@@ -454,22 +470,31 @@ if (
 # a Top-plane reference sketch like the lands', not off the end-on shaft
 # circle: that circle sits in the neck face on the Front plane, so its
 # witnesses ran along the neck and out through the detail-A fence (run
-# 492a7be5).  The witness station lies on the back bond land, clear of the
-# relief and the back journal, so the diameter reads as the bond lands'.
-# Machinist review r1 of #1685: the callout hangs below the shaft in the open
-# run between the back land and the front land's diameter block.
-BOND_ZONE_DIA_FROM_HEAD_REAR = 188.0
+# 492a7be5).  The witness station lies on a bond land, clear of the relief
+# and the journal, so the diameter reads as the bond lands'.  Machinist
+# review r1 of #1685 hung the callout below the shaft over the back bond
+# land.  #1038 ruling (machinist review of 057ffb6 and 7c26893): the relief's
+# back shoulder prints as a station from the head rear face, which can stand
+# neither above the shaft (the collar pin hole's leader would cross it) nor
+# below with the callout there (its extension would drop through the block).
+# So the witness moves to the front bond land and the callout hangs above
+# the shaft, left of its line, between detail A's label and the front land.
+# At 75.0 (r5, 9dc1a4d) the block ended one character from the label's
+# SCALE 2 : 1 (review, clarity); 69.5, 3.2 off the front land's 2.61 end,
+# stands its line 4.2 mm short of that end and the block ~7 mm clear of the
+# label.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 69.5
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
-BOND_ZONE_LAND_CLEARANCE = 10.0
+BOND_ZONE_LAND_CLEARANCE = 3.0
 if not (
-    BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + BOND_ZONE_LAND_CLEARANCE
+    FRONT_JOURNAL_END_FROM_HEAD_REAR + BOND_ZONE_LAND_CLEARANCE
     <= BOND_ZONE_DIA_FROM_HEAD_REAR
-    <= min(BACK_JOURNAL_FROM_HEAD_REAR, DRUM_STATION + DRUM_LEN)
-    - BOND_ZONE_LAND_CLEARANCE
+    <= BOND_RELIEF_FROM_HEAD_REAR - BOND_ZONE_LAND_CLEARANCE
+    and BOND_ZONE_DIA_FROM_HEAD_REAR > DRUM_STATION + DRUM_STATION_BAND
 ):
     raise AssertionError(
-        "the bond-zone diameter must sit on the back bond land, clear of the "
-        "relief and the back journal"
+        "the bond-zone diameter must sit on the front bond land, clear of the "
+        "front journal and the relief"
     )
 
 # R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-33

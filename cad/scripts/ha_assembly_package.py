@@ -180,7 +180,6 @@ TOOLS: tuple[Tool, ...] = (
         "Drawn shop tools (each made to its own -TL- sheet)",
         r"MHA-[A-Z]{2}-\d{2}-TL-\d{2}",
     ),
-    Tool("Forked nut driver, ground from a screwdriver in the step", r"FORKED DRIVER"),
     Tool("Steel press sleeve, made in the step", r"STEEL SLEEVE"),
     # MHA-PD-00's only mandrel is the stub it turns in place.
     Tool(
@@ -327,11 +326,6 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment.toml:tools.torque-screwdriver",),
     ),
     Tool("Pliers", r"\bPLIERS\b", ("shop-equipment.toml:tools.pliers",)),
-    Tool(
-        "Flat screwdriver",
-        r"SCREWDRIVER",
-        ("shop-equipment.toml:tools.flat-screwdriver",),
-    ),
     Tool(
         "Hammer and centre punch (staking, peening)",
         r"\bSTAKE\b|\bPEEN\b",

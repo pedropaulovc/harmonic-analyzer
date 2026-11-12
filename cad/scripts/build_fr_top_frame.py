@@ -13,9 +13,13 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   x +/-214.1474, window x +/-179.8574. Front/rear rails (along X at
   z -/+112.014) 38.1 (1.50) wide -> outer faces z -/+131.064, window z -/+92.964.
 * Corner bosses O44.958 (1.77) spanning y 993.267..1040.765 (proud .18
-  above the rail top, hanging .253 below the underside, 1.87 overall). All
-  four upper/lower bosses use the smaller user-ruled diameter so the
-  outward keeper feet sit flat. The O25.5016 column bores and O27.5082 cap
+  above the rail top, hanging .253 below the underside, 1.87 overall), all
+  four cast alike (user ruling 2026-10-10). Owner ruling 2026-11-11 (#1038,
+  K5): at the .300 station pitch the outward keeper feet end where the two
+  WEST barrels stood proud, so each of those is machined back to the faced
+  rail top inboard of a chord .67 from its socket axis (a step .18 high,
+  5.46 off the barrel's edge; pattern unchanged, east bosses uncut), and
+  the feet sit flat on the faced top. The O25.5016 column bores and O27.5082 cap
   recesses follow the column and attachment specs. Four stock 1-3/4 in
   cross screws seat flush in front/rear O8.89 (.35) counterbores, pass a
   #10 close clearance through the near casting wall (owner ruling
@@ -33,7 +37,8 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   spanning the window along Z, flush with BOTH faces at its junctions (the
   faced underside 999.6932 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
-  junctions and, at z 3.088 -/+ 87.06, a plain #10 through-hole (C drill) per
+  junctions and, at z 3.088 - 93.41 (front; #1038, the summing plate's .25
+  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (C drill) per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
   washer on the faced top; each unchanged 98381A473 dowel presses into a
   blind flat-floor underside ream with a #51 knockout drilled up from its
@@ -97,7 +102,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   1/16 in, printed .06 at .XX) on the top-face rims --
   outer rail rim and both window rims -- then on every other external
   convex edge (flange undersides, web bottoms, lands, crossbar, hub rib,
-  boss rims), and .03 x 45 lead-ins on the bore TOP ends
+  boss rims), and .02 x 45 lead-ins on the bore TOP ends
   only. The R.885 bosses bulge 5.4 beyond the side rails and 3.4 beyond
   the front/rear rails, but do not reach the rectangular flange's plan
   corners (25.60 from their centres), so each corner is cropped back to its
@@ -128,9 +133,10 @@ bores -> gooseneck
 bore -> wizard holes (#10 C-drill hanger clearance holes) -> dowel reams ->
 dowel knockouts (wizard) -> wizard
 holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
-fillets (R.12) -> external top-rim breaks (1/16 in) -> .040 bore top lead-ins ->
+fillets (R.12) -> external top-rim breaks (1/16 in) -> .02 bore top lead-ins ->
 remaining external edge breaks (1/16 in, one feature per connected chain: rail
-runs, crossbar, west window, hub rail, hub set-screw boss, boss rims).
+runs, crossbar, west window, hub rail, hub set-screw boss, boss rims) -> the
+two keeper reliefs (machined, after the casting's own breaks).
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks follow the solid features.
 Analytic volume checks after every feature: each drafted prism's closed
@@ -216,6 +222,9 @@ from fr_top_frame_spec import (
     DRAWING_NOTES_B,
     DRAWING_NOTES_C,
     DRAWING_PRECISION,
+    KEEPER_BOSS_RELIEF_FROM_SOCKET,
+    KEEPER_BOSS_RELIEF_PLACES,
+    KEEPER_BOSS_RELIEF_ROOT_R_MAX,
     DRAWING_REFERENCE_PRECISION,
     DRAFT_ADDED_DEG_MIN,
     DRAFT_ANGLE_DIMENSIONS,
@@ -582,8 +591,8 @@ SIDE_CLEARANCE_SPEC = HoleSpec(
 # #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
 # lead at the sheet's general .X depth band. No assembly recipe dependency.
 KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
-KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -83.435
-KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.427
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -89.150
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +88.142
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
@@ -826,7 +835,12 @@ if TITLE_BLOCK_EDGE_BREAK_MAX >= KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:
         f"the title block's {TITLE_BLOCK_EDGE_BREAK_MAX:g} edge break reaches the"
         f" knife seats' {KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:g} edge-break clearance"
     )
-BORE_CHAMFER = 0.762  # .03 note 9: x 45 TOP-end bore lead-ins (non-functional); low ends take the title block's .010 break
+# .02 x 45 TOP-end bore lead-ins (non-functional); low ends take the title
+# block's .010 break.  It was .03 until the K5 keeper relief (#1038): at its
+# printed .04 that mouth left 1.803 of boss top between a west recess and
+# its relief step, under the .080 wall target (codjiflo, PR #2599;
+# KEEPER_RELIEF_RECESS_MOUTH_LAND).
+BORE_CHAMFER = 0.508
 # Owner ruling B4: the set boss's cast face stands .95 from the bore axis on
 # the faced top (its as-cast band) and recedes below it at its taken-out
 # draft, while the machined spot face prints .83 (.XX).  The spot face's
@@ -1192,10 +1206,10 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # (Pedro), #2144 item 11.3: one dowel, so the block fits one way round
 # only, its round hole (datum B) on the ream's pin.
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
-# The front hull overhangs the crossbar's side bottoms short of the gusset
-# legs (the 25.4-wide block on the 25.146-wide bar); the model leaves those
-# unbroken at .06 and the title block's .010 break applies
-# (TITLE_BLOCK_EDGE_BREAK_MAX, inside the 0.5 clearance).
+# The crossbar's front side bottoms short of the gusset legs stay unbroken
+# at .06 and take the title block's .010 break (TITLE_BLOCK_EDGE_BREAK_MAX):
+# the front hull overhung them until #1038 moved the front station .25 out
+# (owner ruling 4), and the cast edge is kept so the pattern does not change.
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Counter-clockwise convex hull (monotone chain) of plan points."""
     ordered = sorted(set(points))
@@ -1471,27 +1485,30 @@ if not (
     raise AssertionError(
         "top cross-tap ends are not contained in the far side-rail web"
     )
-# Both complete 14-wide feet clear the proud barrels, not just the tap
-# centres. The bank is centred at -0.504: front is now the tighter end.
+# Owner ruling 2026-11-11 (#1038, option K5): the two west barrels' proud
+# .18 is machined away inboard of a straight chord
+# KEEPER_BOSS_RELIEF_FROM_SOCKET from each socket axis, so the faced rail
+# top runs on under the outward keeper feet to that step and each foot's
+# outboard end rests on it inside the barrel's cast footprint.  Both complete
+# 14-wide feet clear the step, not just the tap centres: the cut crosses the
+# whole barrel square to the rail, so the foot's X station does not enter.
+# The bank is centred at -0.504: front is the tighter end.
 KEEPER_FOOT_TIP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_Z_OFF - FOOT_TIP_X
 KEEPER_FOOT_TIP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF + FOOT_TIP_X
-KEEPER_FOOT_NEAREST_BOSS_X = max(0.0, abs(KEEPER_TAP_X - COLUMN_X) - KEEPER_WIDTH / 2.0)
-KEEPER_FOOT_BOSS_MARGINS = tuple(
-    math.hypot(KEEPER_FOOT_NEAREST_BOSS_X, boss_z - tip_z) - BOSS_DIA / 2.0
-    for boss_z, tip_z in (
-        (FRONT_COLUMN_Z, KEEPER_FOOT_TIP_Z_FRONT),
-        (REAR_COLUMN_Z, KEEPER_FOOT_TIP_Z_REAR),
-    )
-)
+KEEPER_RELIEF_STEP_Z_FRONT = FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET  # -94.996
+KEEPER_RELIEF_STEP_Z_REAR = REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET  # +94.996
+KEEPER_FOOT_BOSS_MARGINS = (
+    KEEPER_FOOT_TIP_Z_FRONT - KEEPER_RELIEF_STEP_Z_FRONT,
+    KEEPER_RELIEF_STEP_Z_REAR - KEEPER_FOOT_TIP_Z_REAR,
+)  # 1.274, 2.282
 # The bench-pair-reamed keeper INNER faces are DRO-located from the front
 # socket at fit-up, then the frame taps are transferred through their feet.
 # Neither the foot-hole position nor a separate frame-tap station band
 # reaches the foot tip. The real stack is the printed INNER-face station
 # plus its DRO band, the keeper's printed overall length (inner lug face to
-# foot tip) and boss OD; the rear also loses the printed socket-pitch band.
-# Taking zero nearest-X distance is conservative for the complete foot,
-# whatever its X position.  The keeper's numbers print in its own sheet's
-# unit (MHA-CH-07 and its fit-up), read off its row.
+# foot tip) and the step's printed station from its own socket axis; the
+# rear also loses the printed socket-pitch band.  The keeper's numbers print
+# in its own sheet's unit (MHA-CH-07 and its fit-up), read off its row.
 _KEEPER_UNIT = drawing_unit("parts/ch-fulcrum-keeper", _config.parts("ch-fulcrum-keeper"))
 
 
@@ -1509,20 +1526,19 @@ def _keeper_printed(value: float, places: int, sign: float = 0.0) -> float:
 KEEPER_OVERALL_LENGTH_PLACES = KEEPER_DRAWING_PRECISION["OverallLengthReference"][
     "OverallLength"
 ]
-BOSS_DIA_BAND_MM = AS_CAST_BAND
 KEEPER_PRINTED_MAX_OUTBOARD_REACH = _keeper_printed(
     KEEPER_OVERALL_LENGTH, KEEPER_OVERALL_LENGTH_PLACES, 1.0
 )
-# The upper barrel is taken out: its largest Ø1.77 stands on the faced top
-# the feet sit on and narrows above it.  The feet are DRO-located from the
-# front socket, and the barrel's axis may stand off its socket's by the
-# bosses' position to the socket pattern, ⌖Ø.06|A|B (BOSS_POSITION_ZONE):
-# the sockets' Ø.06 to the cast targets does not hold it, F and G touching
-# the barrels 1.56 under the faced top, where a 2° ±1° barrel's radius runs
-# ±1.07 (-0.08 front / -0.34 rear without the frame).
-KEEPER_PRINTED_MAX_BOSS_RADIUS = (
-    _cast_limit(BOSS_DIA, 1.0) / 2.0 + BOSS_POSITION_ZONE / 2.0
-)
+# The step is machined from the socket axis the feet are DRO-located from,
+# at the title block's .XX: the as-cast barrel's ±.03, its ⌖Ø.06|A|B to the
+# socket pattern and its draft, which the unrelieved barrel charged here
+# (1.143 in all), no longer reach the foot.
+KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET = _printed_limit(
+    KEEPER_BOSS_RELIEF_FROM_SOCKET, KEEPER_BOSS_RELIEF_PLACES, 1.0
+)  # 17.272, .68
+KEEPER_PRINTED_MIN_RELIEF_FROM_SOCKET = _printed_limit(
+    KEEPER_BOSS_RELIEF_FROM_SOCKET, KEEPER_BOSS_RELIEF_PLACES, -1.0
+)  # 16.764, .66
 KEEPER_PRINTED_MIN_SOCKET_PITCH = (
     REAR_COLUMN_Z - FRONT_COLUMN_Z
 ) - SOCKET_PATTERN_REFINEMENT_ZONE
@@ -1530,32 +1546,77 @@ KEEPER_FOOT_PRINTED_BOSS_MARGINS = (
     _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0], KEEPER_FITUP_PLACES)
     - KEEPER_FITUP_LOCATION_BAND_MM
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
-    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
+    - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
     KEEPER_PRINTED_MIN_SOCKET_PITCH
     - _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1], KEEPER_FITUP_PLACES)
     - KEEPER_FITUP_LOCATION_BAND_MM
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
-    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
-)
-KEEPER_FOOT_RAIL_MARGINS = (
-    KEEPER_FOOT_TIP_Z_FRONT + INNER_Z,
-    INNER_Z - KEEPER_FOOT_TIP_Z_REAR,
-)
-KEEPER_TAP_BOSS_MARGINS = tuple(
-    math.hypot(KEEPER_TAP_X - COLUMN_X, boss_z - tap_z)
-    - BOSS_DIA / 2.0
-    - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0
-    for boss_z, tap_z in (
-        (FRONT_COLUMN_Z, KEEPER_TAP_Z_FRONT),
-        (REAR_COLUMN_Z, KEEPER_TAP_Z_REAR),
-    )
+    - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
+)  # 0.737, 1.499
+# The taps stand on the faced span too, their thread's major clear of the
+# step.
+KEEPER_TAP_BOSS_MARGINS = (
+    KEEPER_TAP_Z_FRONT - KEEPER_RELIEF_STEP_Z_FRONT - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0,
+    KEEPER_RELIEF_STEP_Z_REAR - KEEPER_TAP_Z_REAR - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0,
 )
 if min(KEEPER_FOOT_BOSS_MARGINS) < 1.0:
     raise AssertionError("keeper foot-tip-to-boss clearance is below 1 mm")
 if min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) <= 0.0:
     raise AssertionError("fit-up keeper foot hits a boss at the printed bands")
-if min(*KEEPER_FOOT_RAIL_MARGINS, *KEEPER_TAP_BOSS_MARGINS) <= 0.0:
-    raise AssertionError("keeper foot/tap does not clear the rail corner and boss")
+if min(KEEPER_TAP_BOSS_MARGINS) <= 0.0:
+    raise AssertionError("keeper tap does not clear the relieved boss")
+# The step's root radius lies under no foot: at the printed limits the foot
+# tip stands off the step by more than the largest printed root (the foot's
+# own edge break is not credited), so the whole foot bears on the flat.
+KEEPER_FOOT_RELIEF_ROOT_MARGIN = (
+    min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) - KEEPER_BOSS_RELIEF_ROOT_R_MAX
+)  # 0.229
+if KEEPER_FOOT_RELIEF_ROOT_MARGIN <= 0.0:
+    raise AssertionError("a keeper foot reaches the relief step's root radius")
+# What the step must leave standing (K5).  The chord lies inside the
+# smallest barrel its socket can carry, so a step exists, and the proud
+# barrel it cuts keeps .080 round the cap recess over that .18: the
+# most-inboard printed chord against the largest printed recess, the
+# recess's drawn axis the title block's implied ±.005 off the socket's.
+# On the boss top itself the recess's mouth lead-in takes its largest
+# printed leg from that wall, and the land left still meets the target.
+# The floor is the faced top itself, which carries the feet's outboard ends:
+# the cross screws' counterbores and taps lie wholly under it (their crowns
+# 15.9 down), the cast datum targets F and G stand on the lower barrels
+# under the faced underside, and nothing bears on a boss top, each
+# MHA-FR-VN-54 cap seating on its tube end (build_fr_frame_assembly) with
+# its skirt inside the recess.
+KEEPER_RELIEF_BARREL_OVERLAP = (
+    COUNTERBORE_MIN_BOSS_RADIUS
+    - _SOCKET_BARREL_OFFSET
+    - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET
+)  # 4.064
+KEEPER_RELIEF_CAP_RECESS_WALL = (
+    KEEPER_PRINTED_MIN_RELIEF_FROM_SOCKET
+    - CAP_RECESS_DIAMETER_MAX / 2.0
+    - PRINTED_LINEAR_BAND_MM[3]
+)  # 2.819, .111 (3.264 nominal)
+KEEPER_RELIEF_RECESS_MOUTH_LAND = KEEPER_RELIEF_CAP_RECESS_WALL - (
+    BORE_CHAMFER + PRINTED_LINEAR_BAND_MM[2]
+)  # 2.057, .081 (2.756 nominal)
+if KEEPER_RELIEF_BARREL_OVERLAP <= 0.0:
+    raise AssertionError("the keeper relief's chord misses its printed barrel")
+if KEEPER_RELIEF_RECESS_MOUTH_LAND < WALL_TARGET_MM:
+    raise AssertionError("the keeper relief leaves under .080 round the cap recess")
+# The model's cut overruns each barrel by this, across the rail and toward
+# mid-rail, through air over the faced top.
+KEEPER_RELIEF_OVERRUN = 1.0
+# The feet now end past the front and rear rails' window faces (front tip
+# -93.722 against INNER_Z 92.964): no edge of the faced top lies there.
+# Each foot stands on the WEST rail's own flange for its whole length: that
+# flange runs on under the barrel to the frame's corner, the end rails'
+# window faces exist only inboard of the west rail's window rim (which the
+# foot's inner side clears by the flat-top margin proved below), and the
+# whole top is one faced plane (owner rulings 2026-10-11/14, WHOLE TOP
+# EXCEPT 4 BOSSES).  So the faced span under a foot ends only at its step,
+# proved above, and at the rail's two rims, proved below.  The former
+# window-face margin (KEEPER_FOOT_RAIL_MARGINS) was the unrelieved barrel's
+# looser shadow and is retired with it.
 
 # X is set from the ACTUAL receiver web centre, not the opposite socket;
 # horizontal socket-pitch error therefore does not reach this ligament.
@@ -2147,6 +2208,18 @@ def _t_root_add() -> float:
     window = side + (side - rib) + 2.0 * (fr - (LAND_X1 - LAND_X0 + 2.0 * d))
     crossbar = 2.0 * 2.0 * (BAR_POCKET_Z - d)
     return area * (outer + window + crossbar)
+
+
+def _keeper_relief_removal() -> float:
+    """Volume the two keeper reliefs cut: each west barrel's proud band
+    inboard of its chord, under the rim break its top already carries."""
+    top = HALF_H + BOSS_ABOVE
+
+    def cap(y: float) -> float:
+        radius = min(_boss_radius(y), _boss_radius(top) - EDGE_CHAMFER + (top - y))
+        return _circle_cap_area(radius, KEEPER_BOSS_RELIEF_FROM_SOCKET)
+
+    return 2.0 * _simpson(cap, HALF_H, top, 8)
 
 
 def _bore_chamfer_removal() -> float:
@@ -2905,20 +2978,29 @@ def _qualify_machined_faces(adapter) -> None:
     the full analytic cylinder; the 5% band absorbs the cross-screw clearance
     and tap windows that break into the bores (~1.4% together) and the C1
     bore-top breaks.  Each boss top's is the annulus between its barrel's rim
-    break and its cap recess's mouth chamfer; the band absorbs which face of
-    the drafted rim takes the break's leg.
+    break and its cap recess's mouth chamfer, less on the two west tops the
+    cap their keeper relief cuts off; the band absorbs which face of the
+    drafted rim takes the break's leg.
     """
     faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in SURFACE_FINISHES},
     )
     socket_wall = math.pi * BORE_DIA * (CAP_RECESS_FLOOR_Y + HALF_H + BOSS_BELOW)
+    boss_top_rim = _boss_radius(HALF_H + BOSS_ABOVE) - EDGE_CHAMFER
     boss_top = math.pi * (
-        (_boss_radius(HALF_H + BOSS_ABOVE) - EDGE_CHAMFER) ** 2
-        - (CAP_RECESS_DIAMETER / 2.0 + BORE_CHAMFER) ** 2
+        boss_top_rim**2 - (CAP_RECESS_DIAMETER / 2.0 + BORE_CHAMFER) ** 2
+    )
+    relieved_top = boss_top - _circle_cap_area(
+        boss_top_rim, KEEPER_BOSS_RELIEF_FROM_SOCKET
     )
     for key, face in faces.items():
-        expected = boss_top if key.startswith("boss_top_") else socket_wall
+        if key.startswith("boss_top_west_"):
+            expected = relieved_top
+        elif key.startswith("boss_top_"):
+            expected = boss_top
+        else:
+            expected = socket_wall
         area = float(face.GetArea()) * 1e6
         if abs(area - expected) > 0.05 * expected:
             raise RuntimeError(
@@ -3035,6 +3117,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RailWSide", f"{RAIL_W_SIDE}mm")
     await set_global(adapter, "RailWFR", f"{RAIL_W_FR}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(
+        adapter, "KeeperReliefFromSocket", f"{KEEPER_BOSS_RELIEF_FROM_SOCKET}mm"
+    )
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "CapRecessDia", f"{CAP_RECESS_DIAMETER}mm")
     await set_global(adapter, "CapRecessDepth", f"{CAP_RECESS_DEPTH}mm")
@@ -4574,7 +4659,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top rim breaks", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
-    # 18. .03 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
+    # 18. .02 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
     # top; bore and counterbore low ends take the title block's .010 break.
     boss_top_y = HALF_H + BOSS_ABOVE
     r_gn = GOOSENECK_BORE_DIA / 2.0
@@ -4612,6 +4697,95 @@ async def build(adapter) -> dict[str, str]:
             volume - v_chain,
             0.03 * v_chain + 0.5 * EDGE_CHAMFER**3 * shared + 10.0,
         )
+
+    # 19. Keeper reliefs (owner ruling 2026-11-11, #1038, K5): machined after
+    #     the casting's own breaks.  On the boss-top plane, one rectangle
+    #     over each west barrel from its chord inboard, cut down the proud
+    #     .18 to the faced top, so the rail top's plane runs on under the
+    #     keeper feet to a plumb step KeeperReliefFromSocket from the socket
+    #     axis.  Each rectangle overruns the barrel, across the rail and
+    #     toward mid-rail, where only air stands over the faced top.
+    relief_half = BOSS_DIA / 2.0 + KEEPER_RELIEF_OVERRUN
+    relief_reach = relief_half - KEEPER_BOSS_RELIEF_FROM_SOCKET
+    step_y = abs(FRONT_COLUMN_Z) - KEEPER_BOSS_RELIEF_FROM_SOCKET
+    reliefs = SketchDims()
+    check(
+        "create_sketch keeper reliefs", await adapter.create_sketch(recess_plane_name)
+    )
+    # Sketch z flipped: (x, y) -> (X, -Z); the front barrel's step is its
+    # rectangle's upper edge, the rear barrel's its lower.
+    for n, (y_lo, y_hi, step_line) in enumerate(
+        (
+            (step_y - relief_reach, step_y, 2),
+            (-step_y, -step_y + relief_reach, 0),
+        )
+    ):
+        lines = await _plain_rectangle(
+            adapter,
+            [
+                (COLUMN_X - relief_half, y_lo),
+                (COLUMN_X + relief_half, y_lo),
+                (COLUMN_X + relief_half, y_hi),
+                (COLUMN_X - relief_half, y_hi),
+            ],
+            f"keeper relief {n}",
+        )
+        await across(
+            reliefs,
+            f"keeper relief {n} run",
+            f"{lines[0]}.start",
+            f"{lines[0]}.end",
+            "horizontal_distance",
+            2.0 * relief_half,
+            f"KR{n}Run",
+        )
+        await across(
+            reliefs,
+            f"keeper relief {n} reach",
+            f"{lines[1]}.start",
+            f"{lines[1]}.end",
+            "vertical_distance",
+            relief_reach,
+            f"KR{n}Reach",
+        )
+        await across(
+            reliefs,
+            f"keeper relief {n} outer end",
+            f"{lines[1]}.start",
+            "origin",
+            "horizontal_distance",
+            COLUMN_X + relief_half,
+            f"KR{n}X",
+        )
+        await across(
+            reliefs,
+            f"keeper relief {n} step",
+            f"{lines[step_line]}.start",
+            "origin",
+            "vertical_distance",
+            step_y,
+            f"KR{n}StepZ",
+            '"ColumnZ" - "KeeperReliefFromSocket"',
+        )
+    await ensure_fully_defined(adapter, "keeper relief sketch")
+    check("exit_sketch keeper reliefs", await adapter.exit_sketch())
+    name_last_feature(adapter, "KeeperBossReliefProfile")
+    drive_jobs += reliefs.apply(adapter, "KeeperBossReliefProfile")
+    check(
+        "cut keeper reliefs",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=BOSS_ABOVE, reverse_direction=False)
+        ),
+    )
+    name_last_feature(adapter, "KeeperBossRelief")
+    relief_depth_dim = name_dimensions(
+        adapter, "KeeperBossRelief", ["KeeperReliefDepth"]
+    )
+    drive_jobs.append((relief_depth_dim[0], '"BossAbove"'))
+    v_relief = _keeper_relief_removal()  # 911
+    volume = await volume_check(
+        adapter, "keeper reliefs", volume - v_relief, 0.05 * v_relief + 10.0
+    )
 
     # Deferred drive equations: after the whole model + a rebuild exist so
     # every target resolves; the re-check proves the equations are neutral.

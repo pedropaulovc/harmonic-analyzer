@@ -60,12 +60,13 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     )
     assert spec.CRANK_BOSS_HEAD_MARGIN_MM > 0.0
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
-    # v36 (user ruling 2026-09-28): the boss starts on the harvested head's
-    # tangent plane and runs the harvested 2.8360 in from there; the .XX head
-    # leaves that face (the 16T seat) where it was.
-    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753 >= spec.HEAD_DIA / 2.0
-    assert spec.CRANK_BOSS_START_Z == -21.3753
-    assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
+    # v36 (user ruling 2026-09-28): the boss starts at the harvested head's
+    # tangent plane, on the .XXX grid its station prints at, and runs the
+    # harvested 2.8360 in from there.
+    assert spec.CRANK_BOSS_NORTH_FACE == pytest.approx(0.842 * 25.4)
+    assert spec.CRANK_BOSS_NORTH_FACE >= spec.HEAD_DIA / 2.0
+    assert spec.CRANK_BOSS_START_Z == -spec.CRANK_BOSS_NORTH_FACE
+    assert spec.CRANK_BOSS_END_Z == pytest.approx((2.8360 - 0.842) * 25.4)
     assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
     from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
     from dt_post_mount_stack import POST_BODY_HEIGHT_MM
@@ -933,13 +934,13 @@ def test_turned_diameters_stand_clear_of_the_head() -> None:
 
 
 def test_plan_names_the_ray_its_basic_angle_runs_to() -> None:
-    """r13: the basic 13° ran to an unlabelled dash-dot ray.  A BASIC box
+    """r13: the basic 12° ran to an unlabelled dash-dot ray.  A BASIC box
     drops below-text, so a pointer note in the plan names the ray."""
     assert "InclineAngle" not in drawing.DIMENSION_CALLOUTS
     assert drawing.CONE_AXIS_LABEL == "CONE BORE AXIS"
     # The tip stays inside the head circle, where the ray is drawn alone.
     assert drawing.CONE_AXIS_LABEL_TIP_RADIUS_MM < spec.HEAD_DIA / 2.0
-    # The text right of the head circle, above the 13° box.
+    # The text right of the head circle, above the 12° box.
     assert (
         drawing.CONE_AXIS_LABEL_XY[0] > drawing.TOP_CENTER[0] + spec.HEAD_DIA / 2000.0
     )
@@ -954,7 +955,7 @@ def test_both_bores_read_size_then_ream_thru_and_flag_their_fit_note() -> None:
     reamers (.4500 and .4835, cone_pivot_post_spec), so each callout reads
     size, REAM, THRU and flags the numbered note that states its standard
     running fit.  The crank bore's process and flag share its one row under
-    the size: a third row dropped onto the head's top edge, and the 13° arc
+    the size: a third row dropped onto the head's top edge, and the 12° arc
     caps the block above (FRONT_KEEP)."""
     for name, note in (("CrankBoreDia", 1), ("JournalBoreDia", 2)):
         assert name not in drawing.DIMENSION_SUFFIXES
@@ -969,10 +970,10 @@ def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> Non
     MHA-DT-11 underline sat 0.8 mm over HeadHt's upper extension line (the
     head's top edge), parallel to it.  That render put the underline 7.31 mm
     under the requested y and the box 2.6 mm past its 156.3 mm right end, at
-    x 0.1330; View C's nearest text (the 1.697 block) starts at 180.6 mm.
+    x 0.1330; View C's nearest text (the 1.694 block) starts at 180.6 mm.
     The block keeps two rows.  Its second row, "REAM THRU, SEE NOTE 1", is
     four glyphs (~2.7 mm each, centred) wider than RUNS ON MHA-DT-11, and the
-    1.697 block lost its two word rows (5.5 mm each of its 19 mm), so the
+    1.694 block lost its two word rows (5.5 mm each of its 19 mm), so the
     crowding check asks that smaller block's height of air."""
     x, y = drawing.FRONT_KEEP["CrankBoreDia"]
     underline_y = y - 0.00731
@@ -1154,6 +1155,19 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
         round(spec.CRANK_ABOVE_CONE / 25.4, places) * 25.4
     )
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9
+    # The spacing is on its print grid, so the printed nominal is the model
+    # and the band's low corner is the mesh centre itself; the configured
+    # centre extension is what closes the two pitch radii on it.
+    assert crank_mesh_stack.SPACING_PRINTED == pytest.approx(spec.CRANK_ABOVE_CONE, abs=1e-9)
+    assert crank_mesh_stack.CLOSING_TERMS["crank bore spacing"] == pytest.approx(0.0, abs=1e-9)
+    import build_dt_drive_train_assembly as bdt
+
+    assert math.hypot(bdt._DX16, spec.CRANK_ABOVE_CONE) == pytest.approx(
+        crank_mesh_stack.R64
+        + crank_mesh_stack.R16
+        + _config.fit("crank_mesh", "c2c_slack_mm"),
+        abs=1e-9,
+    )
     assert crank_mesh_stack.standard_check().backlash_min_mm > 0.0
     # The foot-to-crank height stays on the front view only as a reference.
     assert "CrankAxisY" in drawing.FRONT_KEEP
@@ -1274,7 +1288,7 @@ def test_33_37_placement_fails_loud_without_its_line() -> None:
 
 def test_cone_axis_height_stands_on_its_own_line_clear_of_the_spacing() -> None:
     """r3 (View C): the 1.50's text, offset onto the line it shared with the
-    1.697, dropped a jogged leader down that line until the two merged.  Its
+    1.694, dropped a jogged leader down that line until the two merged.  Its
     own line now stands well left of the spacing's, its text on that line
     between the foot and the cone axis."""
     assert "JournalAxisY" not in drawing.JOURNAL_TEXT_OFFSETS
@@ -1321,7 +1335,7 @@ def _note(number: int) -> str:
 
 def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
     """Novice-rubric screen (rules 4, 7 and 26): the four location dimensions
-    carried their mates in words, the 1.697 named its mesh only by tooth
+    carried their mates in words, the 1.694 named its mesh only by tooth
     count, and the bores said RUNS ON with no fit.  Each bore's numbered note
     states the standard running fit on its shaft by drawing number with the
     clearance its printed limits give as REF, and the mates its locations
@@ -1340,7 +1354,7 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
             "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
             "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
             "   ITS COLLAR RUNS ON THE .827 FACE.",
-            "3. 1.697 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
+            "3. 1.694 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         )
     )
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
@@ -1394,7 +1408,7 @@ def test_locations_print_their_value_band_and_note_flag_only() -> None:
         assert callouts[name] == flag
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"CrankAboveCone"}
     assert _note(2).endswith("ITS COLLAR RUNS ON THE .827 FACE.")
-    assert _note(3).startswith("3. 1.697 AND .842 SET MESH")
+    assert _note(3).startswith("3. 1.694 AND .842 SET MESH")
     for name in ("JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
         assert name not in callouts
     for name in (*flagged, "JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):

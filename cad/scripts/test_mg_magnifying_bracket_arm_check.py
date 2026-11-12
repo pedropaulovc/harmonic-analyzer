@@ -35,8 +35,9 @@ _NOSE_LOCATION = (2.0 * (0.215 * IN - 5.5), 2.0 * (0.219 * IN - 5.5))
 
 def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
     assert arm.NECK == joint.BRACKET_ORIGIN
-    # Seat 3.95 +.01, both nose controls at .219, grip .125 -.005.
-    assert arm.ARM_SPAN == pytest.approx(3.96 * IN + _NOSE_LOCATION[1] - 0.120 * IN)
+    # Seat 3.70 +.01 (.25 in shorter: the lever's front end came out to meet
+    # it, #1038 owner ruling 4), both nose controls at .219, grip .125 -.005.
+    assert arm.ARM_SPAN == pytest.approx(3.71 * IN + _NOSE_LOCATION[1] - 0.120 * IN)
     assert arm.ARM_SPAN > joint.SIDE_PLATE_Z[0]
     assert arm.ARM_B == pytest.approx(0.48 * IN)  # neck .49 -.01
     assert arm.ARM_H == pytest.approx(2.0 * 0.215 * IN)  # nose R.217 -.002
@@ -46,7 +47,7 @@ def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
 
 def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
     for width, radius, seat, grip, nose_location in itertools.product(
-        (0.48 * IN, 0.50 * IN), (0.215 * IN, 0.219 * IN), (3.94 * IN, 3.96 * IN),
+        (0.48 * IN, 0.50 * IN), (0.215 * IN, 0.219 * IN), (3.69 * IN, 3.71 * IN),
         (0.120 * IN, 0.130 * IN), _NOSE_LOCATION,
     ):
         height = 2.0 * radius
@@ -54,7 +55,7 @@ def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
         assert arm.I_LATERAL <= height * width**3 / 12.0 + 1e-9
         assert arm.ARM_SPAN >= seat - grip + nose_location - 1e-9
     assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
-    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(3.96 * IN + _NOSE_LOCATION[1])
+    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(3.71 * IN + _NOSE_LOCATION[1])
 
 
 def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:
@@ -93,7 +94,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     assert (lever.KNIFE_LOCAL_X, lever.KNIFE_LOCAL_Y) == (215.0, 5.134)
     assert arm.JOINT == pytest.approx((
         sum(point[0] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
-        KNIFE_Y - 0.71,
+        KNIFE_Y + 0.25,
         joint.SEAT_PLANE_Z,
     ))
     assert arm.JOINT[1] == pytest.approx(
@@ -101,7 +102,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     )
     fx, fy, mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
     centered_row_mz = mz + (arm.NECK[0] - arm.JOINT[0]) * fy
-    assert arm.JOINT_MZ == pytest.approx(centered_row_mz - 0.71 * fx)
+    assert arm.JOINT_MZ == pytest.approx(centered_row_mz + 0.25 * fx)
     assert arm.JOINT_MZ != pytest.approx(centered_row_mz)
 
 
@@ -135,14 +136,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
         joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
     )
     nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
-    assert nominal_edge == pytest.approx(4.79)
-    # The 4.79 mm ordinate prints .189 with the shared mounting band.
-    row_min, row_max = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
+    assert nominal_edge == pytest.approx(5.25)
+    # The 5.75 mm lower-edge ordinate prints .226 with the mounting band.
+    row_min, row_max = (0.226 * IN - joint.BRACKET_POSITION_BAND, 0.226 * IN + joint.BRACKET_POSITION_BAND)
     nearest_edge = min(
         row_min,
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0] - row_max,
     )
-    assert nearest_edge == pytest.approx(row_min)
+    assert nearest_edge == pytest.approx(0.42 * IN - row_max)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)
@@ -168,12 +169,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
 def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
     # The lower-edge ordinate and overall .XX width are independent controls.
     # Width variation is not a symmetric displacement of both nominal edges.
-    rows = (0.189 * IN - joint.BRACKET_POSITION_BAND, 0.189 * IN + joint.BRACKET_POSITION_BAND)
+    rows = (0.226 * IN - joint.BRACKET_POSITION_BAND, 0.226 * IN + joint.BRACKET_POSITION_BAND)
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
         for width, row_from_lower in itertools.product((0.42 * IN, 0.44 * IN), rows)
     ]
-    assert (min(corner_arms), max(corner_arms)) == pytest.approx(rows)
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx(
+        (0.42 * IN - rows[1], 0.44 * IN - rows[0])
+    )
     corner_tensions = [
         abs(arm.JOINT_MX) / (2.0 * edge_arm)
         + abs(arm.JOINT_MY) / 13.7

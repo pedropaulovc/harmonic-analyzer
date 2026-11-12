@@ -606,6 +606,18 @@ HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
 GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
+# The .61 locates the groove: it runs from the spigot face to the centre
+# plane the groove, rim and spokes share (WEB_CENTRELINES), its extension
+# line ending on the lower groove's bottom.  Two machinist reviews still read
+# the groove as unlocated (integration proofs 20261109T105251629Z,
+# 20261112T153723793Z).  Rule 7 keeps the location dimension bare and puts
+# what it serves on the feature's size callout, so the groove's R says the
+# groove is centred on the rim, a drawn feature symmetric about the plane the
+# .61 dimensions, with no second value (rule 26: no number in a sentence,
+# and a plain feature name: the sheet names no web).  It stands on the R,
+# whose block has open sheet to its right: the groove bottom's Ø has about
+# 33 mm between the rim's two Ø lines.
+GROOVE_R_CALLOUT = f"{GROOVE_CALLOUT}\nCENTRED ON RIM"
 # The web plane's value is ".61 ±.03": its text is centred this many
 # characters (with the margin) right of the spigot face.
 _PLANE_VALUE_CHARS = 8
@@ -653,12 +665,13 @@ SECTION_KEEP = {
     ),
     # The groove's R up right, its leader down-left onto the groove at 35
     # deg, right of the axial rows' line ends; its shoulder over the top of
-    # the rim-bore round's R block (ROUND_TEXT_XY), under its note link.
-    # Its one-line value leaves the shoulder where the stacked band's block
-    # put it.
+    # the rim-bore round's R block (ROUND_TEXT_XY), under its two callout
+    # lines.  Its one-line value leaves the shoulder where the stacked band's
+    # block put it; the second callout line lifts the point half a line, so
+    # the shoulder stays.
     "GrooveR": (
         SECTION_CENTER[0] + 0.0344,
-        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP),
+        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP) + _TEXT_LINE / 2.0,
     ),
 }
 # The spigot's two-line block ("(Ø.499)" over its note link) hangs on an
@@ -722,7 +735,7 @@ DIMENSION_CALLOUTS = {
     "BoreDiaDim": BORE_CALLOUT,
     "SpigotDia": f"SEE NOTE {SPIGOT_FIT_NOTE}",
     "GrooveBottomDia": GROOVE_CALLOUT,
-    "GrooveR": GROOVE_CALLOUT,
+    "GrooveR": GROOVE_R_CALLOUT,
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",

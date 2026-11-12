@@ -22,10 +22,11 @@ Features, in order:
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 1.205 in,
    centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
-   plane through the blank to the OVERALL thickness z = 0..7.0565 (#743: the
-   overall thickness is the station pitch, so the bank stacks cam face on back
-   face and the cam fills the connecting-rod slot; the cam's own thickness,
-   4.0593, is a reference). Cam disc centred on the bore, offset +Y by the
+   plane through the blank to the OVERALL thickness z = 0..7.62 (#743: the
+   overall thickness is the station pitch, .300 in since the #1038 re-pitch,
+   so the bank stacks cam face on back face and the cam fills the
+   connecting-rod slot; the cam's own thickness, 4.6228, is a reference).
+   Cam disc centred on the bore, offset +Y by the
    eccentricity -- the
    lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
    at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
@@ -57,7 +58,7 @@ classified by that same finite repeated-tooth profile.
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
 Layout: gear axis = Z through the origin, gear z = 0..FACE_WIDTH, cam
-z = FACE_WIDTH..7.0565, cam lobe +Y, notch +Y (lobe on the notch side).
+z = FACE_WIDTH..7.62, cam lobe +Y, notch +Y (lobe on the notch side).
 
 Run (SolidWorks already open)::
 

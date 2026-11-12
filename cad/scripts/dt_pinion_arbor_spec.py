@@ -18,9 +18,11 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_arbor_geometry import (
     BACK_CAP_R as BACK_CAP_R,
     BACK_CAP_SAG as BACK_CAP_SAG,
+    BACK_JOURNAL_END_FROM_HEAD_REAR as BACK_JOURNAL_END_FROM_HEAD_REAR,
     BACK_JOURNAL_FROM_HEAD_REAR as BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z as BACK_JOURNAL_Z,
     BACK_RIM_FROM_HEAD_REAR as BACK_RIM_FROM_HEAD_REAR,
+    BOND_RELIEF_BACK_FROM_HEAD_REAR as BOND_RELIEF_BACK_FROM_HEAD_REAR,
     BOND_RELIEF_DIA as BOND_RELIEF_DIA,
     BOND_RELIEF_FROM_HEAD_REAR as BOND_RELIEF_FROM_HEAD_REAR,
     BOND_RELIEF_LEN as BOND_RELIEF_LEN,
@@ -51,6 +53,7 @@ from dt_pinion_arbor_geometry import (
     END_PLAY as END_PLAY,
     END_PLAY_SET_ERROR as END_PLAY_SET_ERROR,
     EXPOSED_SHAFT_LEN as EXPOSED_SHAFT_LEN,
+    FRONT_JOURNAL_END_FROM_HEAD_REAR as FRONT_JOURNAL_END_FROM_HEAD_REAR,
     FRONT_JOURNAL_FROM_HEAD_REAR as FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z as FRONT_JOURNAL_Z,
     HEAD_CAP_R as HEAD_CAP_R,
@@ -139,19 +142,27 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinStationReference": {"PinStationFromHeadRear"},
     "BackRimReference": {"BackRimFromHeadRear"},
     "OverallReference": {"OverallLen"},
+    # Repitch1038 ruling (#1038): each land's crown-side end prints as its own
+    # station from the head rear face, not as a length chained off its
+    # head-side station.  One 2X diameter on the back land sizes both lands
+    # (the front land's block had no open space between the 2.61 and 1.82
+    # witnesses under the shaft, nor above it under the collar pin's leader).
     "FrontJournalReference": {
         "FrontJournalFromHeadRear",
-        "FrontJournalLen",
-        "FrontJournalDia",
+        "FrontJournalEndFromHeadRear",
     },
     "BackJournalReference": {
         "BackJournalFromHeadRear",
-        "BackJournalLen",
+        "BackJournalEndFromHeadRear",
         "BackJournalDia",
     },
-    # #2360: the relief between the two MHA-DT-01 bond lands: its front
-    # shoulder from the head rear face, its length and its diameter.
-    "BondReliefProfile": {"BondReliefFromHeadRear", "BondReliefLen", "BondReliefDia"},
+    # #2360: the relief between the two MHA-DT-01 bond lands: both shoulders
+    # from the head rear face (#1038 ruling) and its diameter.
+    "BondReliefProfile": {
+        "BondReliefFromHeadRear",
+        "BondReliefBackFromHeadRear",
+        "BondReliefDia",
+    },
 }
 
 # The construction-only sketches that carry printed dimensions: the part saves
@@ -173,9 +184,9 @@ REFERENCE_SKETCHES = (
 # three on the bonded cross hole (.250 +.005/+.001); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
 # web and run-out stacks read them.  The crown sags, the overall and the drum
-# station are REFs; the overall prints one place, (9.6), because its rounded
-# chain (.05 + 8.93 + .48 + (.12)) sums to 9.58 and a two-place (9.57) read as
-# a mismatch.
+# station are REFs; the overall prints one place, (10.0), because its rounded
+# chain (.05 + 9.35 + .48 + (.12)) sums to 10.00 and a two-place (9.99) read
+# as a mismatch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 2},
     "NeckProfile": {"NeckDia": 2},
@@ -193,17 +204,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OverallReference": {"OverallLen": 1},
     "FrontJournalReference": {
         "FrontJournalFromHeadRear": 2,
-        "FrontJournalLen": 2,
-        "FrontJournalDia": 4,
+        "FrontJournalEndFromHeadRear": 2,
     },
     "BackJournalReference": {
         "BackJournalFromHeadRear": 2,
-        "BackJournalLen": 2,
+        "BackJournalEndFromHeadRear": 2,
         "BackJournalDia": 4,
     },
     "BondReliefProfile": {
         "BondReliefFromHeadRear": 2,
-        "BondReliefLen": 2,
+        "BondReliefBackFromHeadRear": 2,
         "BondReliefDia": 2,
     },
 }
@@ -253,12 +263,11 @@ BOND_ZONE_CALLOUT = (
     f"ALL EXCEPT JOURNALS;\n{DRUM_NUMBER} BOND ZONE,\nDRUM ENDS ON JOURNALS"
 )
 # Smallest overlap of each drum end on its land's inner end, every printed
-# band at its limit: the front land's inner end from its .XX station and .XX
-# length, the back land's from its .XX station, the drum from its .XX station
-# and its own sheet's length band.
-DRUM_FRONT_END_ON_JOURNAL_MIN = (
-    FRONT_JOURNAL_FROM_HEAD_REAR - LINEAR_XX_BAND + JOURNAL_LEN - LINEAR_XX_BAND
-) - (DRUM_STATION + DRUM_STATION_BAND)
+# band at its limit: each land's inner end from its own .XX station, the drum
+# from its .XX station and its own sheet's length band.
+DRUM_FRONT_END_ON_JOURNAL_MIN = (FRONT_JOURNAL_END_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
+    DRUM_STATION + DRUM_STATION_BAND
+)
 DRUM_BACK_END_ON_JOURNAL_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
 ) - (BACK_JOURNAL_FROM_HEAD_REAR + LINEAR_XX_BAND)
@@ -284,8 +293,15 @@ DRUM_STATION_CALLOUT = (
 # review r1 of #1685; the dt-crankshaft precedent: the title block's
 # edge-break radius, until #1625 puts the default in the title block).
 INSIDE_CORNER_R_MAX = edge_break_radius_mm(unit=UNIT)  # R.010
-DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX.".replace(
-    "R0.", "R."
+# Rule 11: a 10 in, 32:1 Ø5/16 bar is turned with tailstock support, and
+# nothing bears on either crown (the SR.43 head's apex stands proud of the
+# cross hole, the SR.28 back crown past the back land runs free), so a
+# centre hole in either does no harm (#1038 r8 machinist review; the
+# dt_pinion_pivot_shaft precedent).
+DRAWING_NOTES = (
+    f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX. CENTRES OK.".replace(
+        "R0.", "R."
+    )
 )
 # MHA-DT-00, the only sheet that prints this step, follows it with the sheet
 # that carries the DRUM STATION SETTING (draw_dt_drive_train_assembly).

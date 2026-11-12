@@ -4054,6 +4054,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_holes_thread_metadata.py",
         SCRIPTS_DIR / "test_define_circle.py",
         SCRIPTS_DIR / "test_rocker_bank_layout.py",
+        # #1038: every restated station pitch / station-0 copy equals the
+        # channel config (the lever hub literal had no offline guard).
+        SCRIPTS_DIR / "test_station_pitch_lockstep.py",
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",

@@ -98,6 +98,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
+from _printed_tolerance import printed_deviations
 from _title_block_units import LENGTH_UNITS, render_number
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
@@ -131,7 +132,9 @@ from ch_pivot_shaft_spec import (
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
+from ch_rocker_arm_notes import DRAWING_PRECISION as ARM_DRAWING_PRECISION
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
+from ch_rocker_arm_spec import UNIT as ARM_UNIT
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
@@ -215,19 +218,23 @@ VIEW_ARROW_TIP_GAP = 0.002
 VIEW_ARROW_RUN = 0.010
 
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
-# 10 mm below the sheet's middle, so the ring can grow at the top.
-EXPLODED_ISO_CENTER = (0.100, 0.140)
+# Centred between the borders: _assert_view_on_sheet grows the outline by
+# the balloon ring on all four sides, so either end is the first to reach a
+# border (point B at the .300 pitch: 0.2539 of the 0.254 between them, the
+# top 0.25 mm over at y 0.140).
+EXPLODED_ISO_CENTER = (0.100, _TEMPLATE.height_m / 2.0)
 # The lever balloon's leader runs along the bank axis, and the exploded fulcrum
 # shaft lies on that axis's south extension. The shaft has no hit-testable
 # edge, so SolidWorks picks where its leader lands (listed-edge), and that
 # landing moved 15 mm between r8 and r9. The view is tall and narrow, so 8 of
 # the 19 balloons crowd its top. At 14 mm the ring's push-apart swung balloon
 # 14 down over the shaft, and a south-end landing crossed leader 2 (r9 audit).
-# A replay of the ring with the anchor-nut balloon added covers every landing
-# on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
-# and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
-# leader 14 2.1-4.4 mm off the shaft, but the ring's centres ran 5.5 mm inside
-# the border at the top, so balloon 4's 5.6 mm circle touched it (machinist
+# A replay of the ring with the anchor-nut balloon (retired, #2326) added
+# covers every landing on the visible shaft, nut attachments at least 3.5 mm
+# below the anchor's, and balloon radius 5.0-5.6 mm. At 28 mm it crosses
+# nothing and keeps leader 14 2.1-4.4 mm off the shaft, but the ring's
+# centres ran 5.5 mm inside the border at the top, so balloon 4's 5.6 mm
+# circle touched it (machinist
 # review, #1660 r1). At 26 mm the top circle clears the border by about 2 mm;
 # _assert_view_on_sheet now grows the outline by the ring plus the largest
 # balloon radius, so a balloon circle can never reach the border.
@@ -348,7 +355,6 @@ BOM_QUANTITIES = {
     explode.BAR_PIN: CHANNELS,
     SPRING_STEM: CHANNELS,
     explode.HOOK: CHANNELS,
-    explode.ANCHOR_NUT: CHANNELS,
 }
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Rows bind to native (file, member) identities, never displayed Number: the
@@ -379,7 +385,6 @@ PART_ROWS = {
     explode.BAR_PIN: _config.parts("sh-vn-pivot-pin"),
     SPRING_STEM: _config.parts("ch-vn-channel-spring-installed"),
     "ch-vn-spring-hook": _config.parts("ch-vn-spring-hook"),
-    "ch-anchor-jam-nut": _config.parts("ch-anchor-jam-nut"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -448,7 +453,10 @@ NOTE_LINE_PITCH = 0.0045
 # A step is at most six printed lines (drawing-guidelines.md rule 22).
 STEP_MAX_LINES = 6
 STEPS_LEFT_X = 0.018
-STEPS_RIGHT_X = 0.214
+# Point B at the .300 pitch: view D's outline grew to 0.2013 wide at 1:1 (the
+# 6.85 pivot shaft), exactly the 0.2013 between the border and a column at
+# 0.214. At 0.222 the 64-character column ends at 0.399, inside the border.
+STEPS_RIGHT_X = 0.222
 STEPS_TOP_Y = 0.258
 # Columns stop this far above the title block or the bottom border.
 STEPS_FOOT_CLEARANCE = 0.005
@@ -532,11 +540,12 @@ ROCKER_BANK = BankView(
     "VIEW D",
     (1, 1),
     (_PIVOT_X, _PIVOT_Y, STACK_MID_Z),
-    # 188 mm wide at 1:1 (r5 outline 0.0111-0.1995 about x 0.105): centred
-    # between the left border and the steps column, and low enough that the
-    # view and its label sit in the middle of the sheet's left half (round 1
-    # review: no empty field beside a short column).
-    (0.111, 0.165),
+    # 201 mm wide at 1:1 at the .300 pitch (point B outline 0.0106-0.2120
+    # about x 0.111; 188 at 7.0565): centred between the left border and the
+    # steps column, and low enough that the view and its label sit in the
+    # middle of the sheet's left half (round 1 review: no empty field beside a
+    # short column).
+    (0.117, 0.165),
     frozenset(
         {
             "ch-pivot-shaft",
@@ -606,7 +615,9 @@ LEVER_BANK = BankView(
     "VIEW E",
     (1, 1),
     (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z),
-    (0.111, 0.195),
+    # Over view D's centre line, between the border and the steps column;
+    # 3 mm higher than at 7.0565 with view F below it (see KEEPER_PLAN_SOCKET_Y).
+    (0.117, 0.198),
     frozenset(
         {
             "ch-fulcrum-shaft",
@@ -624,15 +635,18 @@ LEVER_BANK = BankView(
 # and its X datum, the web centre, is no face to touch). The frame is not in
 # this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws the frame
 # features the settings run from (5d5245a review rule 10): in phantom, the
-# west front upper socket's bore and boss, the line of the upper socket
-# centres and the web centre line; as visible lines, the web faces the
-# centre line splits, each as far as it shows past the front keeper (r5
-# review: in phantom they read as hidden lines through it). It carries
+# west front upper socket's bore, boss and keeper relief step, the line of
+# the upper socket centres and the web centre line; as a visible line, the
+# inner web face, as far as it shows beside the front keeper (r5 review: in
+# phantom a face reads as a hidden line through it; the outer face lies
+# under the keeper from the boss on). It carries
 # the three settings (owner rulings X1+B1, X-A). Placed under the lever bank:
-# the socket line 0.120 up. The farm-measured outline (c80bb08be) ran 0.1051
-# below the socket line, so its bottom clears the border by 2.2 mm; the boss
-# now tops it 0.0113 above.
-KEEPER_PLAN_SOCKET_Y = 0.120
+# the socket line 0.123 up. The farm-measured outline (c80bb08be) ran 0.1051
+# below the socket line at 7.0565; at the .300 pitch the rear lug face moved
+# 7.1852 -> 7.4102 (+5.715, 2.86 at 1:2), so at 0.120 its bottom would cross
+# the border by 0.7 mm. At 0.123 it clears it by about 2.3 mm, and view E
+# rises 3 mm with it; the boss tops the outline 0.0113 above.
+KEEPER_PLAN_SOCKET_Y = 0.123
 _PLAN_CENTRE_Y = 0.070
 _TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 KEEPER_PLAN = BankView(
@@ -661,7 +675,7 @@ KEEPER_PLAN = BankView(
 
 # --- sheet 6: view G and the rest of the lever-bank steps --------------------
 # The front view of the spring hook-up: the fulcrum shaft, a lever, its
-# spring, anchor and jam nut, the 20 channels in line behind the nearest. The
+# spring and anchor, the 20 channels in line behind the nearest. The
 # summing plate the anchor threads into belongs to MHA-HA-00, not this
 # assembly. The view outline ran from model x 7.4 to 217.1 and y 955.6 to
 # 1078.6 (farm leaf on 06616793e): 210 x 123 mm, so at 1:2 about (0.315,
@@ -683,7 +697,6 @@ HOOKUP = BankView(
             "ch-channel-lever",
             SPRING_STEM,
             explode.HOOK,
-            explode.ANCHOR_NUT,
         }
     ),
     parts="SPRING HOOK-UP\nSUMMING PLATE NOT SHOWN",
@@ -716,7 +729,8 @@ PLAN_KEEP = {
 # The two frame datums the sketch draws, named where they are drawn (owner
 # ruling: the web centre is midway between both web faces), the texts
 # east of the view: the socket line's leader lands past the boss, the web
-# centre's inside the boss annulus, between the bore and the web faces.
+# centre's inside the boss annulus, between the bore and the keeper relief
+# step.
 PLAN_POINTERS = (
     (
         f"{_TOP_FRAME_NUMBER} LINE OF THE\nUPPER SOCKET CENTRES",
@@ -733,7 +747,7 @@ PLAN_POINTERS = (
         KEEPER_PLAN.plan_xy(
             asm.KEEPER_SOCKET_XZ[0],
             asm.KEEPER_SOCKET_XZ[1]
-            + (SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_WEB_FACE_FROM_SOCKET) / 2.0,
+            + (SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_RELIEF_FROM_SOCKET) / 2.0,
         ),
     ),
 )
@@ -1090,7 +1104,7 @@ def _fitup_text() -> dict[str, str]:
     arm, rod, bar = item("ch-rocker-arm"), item(explode.ROD), item(explode.BAR)
     lever, pin = item("ch-channel-lever"), item(explode.ROD_PIN)
     bar_pin, channel_spring = item(explode.BAR_PIN), item(SPRING_STEM)
-    anchor, anchor_nut = item(explode.HOOK), item(explode.ANCHOR_NUT)
+    anchor = item(explode.HOOK)
     rocker_view, lever_view = ROCKER_BANK.title, LEVER_BANK.title
     plan_view, hookup_view = KEEPER_PLAN.title, HOOKUP.title
     detail = f"{SOUTH_END.title}, SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1}"
@@ -1103,11 +1117,27 @@ def _fitup_text() -> dict[str, str]:
     # low limit: the stack can only be long, and the re-face step covers that.
     # It faces the longest hubs on the end away from datum G, the face each
     # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
-    # over its print.
-    if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
+    # over its print. Checked on the PRINTED limits, as a fitter reads both
+    # sheets (#2330): twenty .3000 hubs at their low limit make exactly the
+    # stack's printed 6.000 low limit.
+    hub_low_dev, _ = printed_deviations(
+        HUB_LENGTH,
+        ARM_DRAWING_PRECISION["Hub"]["HubLength"],
+        (HUB_LENGTH_BAND[1], HUB_LENGTH_BAND[0]),
+        unit=ARM_UNIT,
+    )
+    stack_low_dev, _ = printed_deviations(
+        STACK_L20_ACCEPT[0],
+        asm.DRAWING_PRECISION[asm.PIVOT_FEATURE][asm.STACK_LENGTH_DIMENSION],
+        asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION],
+        unit=asm.UNIT,
+    )
+    hub_low = HUB_LENGTH + hub_low_dev
+    stack_low = STACK_L20_ACCEPT[0] + stack_low_dev
+    if COUNT * hub_low < stack_low - 1e-9:
         raise AssertionError(
-            "the re-face step covers only a long stack, but the hub band "
-            "allows a stack under the acceptance's low limit"
+            "the re-face step covers only a long stack, but twenty hubs at "
+            "their printed low limit fall under the stack's printed low limit"
         )
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
@@ -1150,6 +1180,17 @@ def _fitup_text() -> dict[str, str]:
             "leave no gaugeable play in the shortest lug span"
         )
     end_play_text = render_number(end_play_leaf, asm.UNIT, FEELER_LEAF_PLACES)
+    # #2341: each bar's bow is accepted at the surface plate before it is
+    # pinned (no leaf of the allowed bow enters under either side face); the
+    # bank is then accepted on the bars' least running gap, at the worst case
+    # of every band with each bar at that bow, floored to .001 (the assembly
+    # spec's bar-gap budget): a bank inside its bands always passes.
+    bow_text = render_number(
+        asm.BAR_BOW_MAX_MM / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
+    )
+    bar_gap_text = render_number(
+        asm.BAR_GAP["leaf"] / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
+    )
     return {
         # The hub stack is proved on the shaft first, while the arms are
         # loose; each rod + arm pair is then pinned at the bench, before the
@@ -1188,9 +1229,13 @@ def _fitup_text() -> dict[str, str]:
             f"PIN OUT, REPLACE THE {rod} AND RETURN TO STEP "
             f"{n(steps.RODS_PINNED_KEY)}."
         ),
+        # The fitter leaves this list after the rod pins for the drive train's
+        # cylinder stack through its north-bracket set, then comes back here
+        # (#2330 machinist review, rule 22: the hand-off is printed).
         "north-bracket-held": (
-            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET AT "
-            f"{steps.NORTH_BRACKET_SET_REF}, DOES NOT TURN BY HAND."
+            f"AFTER {steps.CYLINDER_STACK_REF} THROUGH {steps.NORTH_BRACKET_SET_REF}, "
+            f"CHECK THE LEFT {bracket} OF {rocker_view}, SET THERE, DOES NOT TURN "
+            "BY HAND."
         ),
         "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
         "north-ear-datum": (
@@ -1328,6 +1373,14 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-unclamped": "REMOVE THE CLAMPS.",
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
+        "bars-straight": (
+            f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
+            f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT."
+        ),
+        "bar-straightened": (
+            f"STRAIGHTEN BY HAND, OR EXCHANGE, ANY {bar} BAR THE LEAF ENTERED AND "
+            f"RETURN TO STEP {n('bars-straight')}."
+        ),
         "bar-notches-set": (
             f"AT THE BENCH, SET THE TOP NOTCH OF EACH {bar} BAR ASTRIDE ONE "
             f"{lever} LEVER."
@@ -1344,7 +1397,7 @@ def _fitup_text() -> dict[str, str]:
         "bar-pin-remade": (
             f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
             f"THE PIN OUT, REPLACE THE {bar} AND RETURN TO STEP "
-            f"{n(steps.BARS_PINNED_KEY)}."
+            f"{n('bars-straight')}."
         ),
         "fulcrum-shaft-withdrawn": (
             f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
@@ -1357,6 +1410,10 @@ def _fitup_text() -> dict[str, str]:
         "bar-feet-seated": (
             f"SEAT THE FOOT NOTCH OF EACH {bar} ASTRIDE THE ARM OF THE {arm} "
             "BELOW IT."
+        ),
+        "bars-gapped": (
+            f"CHECK A {bar_gap_text} FEELER GAUGE LEAF PASSES BETWEEN EVERY "
+            f"ADJACENT PAIR OF {bar} BARS, TOP TO BOTTOM."
         ),
         "levers-swing": f"CHECK EVERY {lever} SWINGS FREE ON {fulcrum_shaft}.",
         "lever-bank-slides": (
@@ -1380,13 +1437,11 @@ def _fitup_text() -> dict[str, str]:
             f"HOOK THE TOP LOOP OF EACH {channel_spring} SPRING THROUGH THE "
             f"SPRING HOLE OF ITS {lever} ({hookup_view})."
         ),
-        # The anchors thread into the summing plate and are jammed by their
-        # nuts at MHA-HA-00, which owns that joint, its lock and its setting
-        # (rule 23 at the package boundary: cited by its step).
+        # The anchors thread into the summing plate at MHA-HA-00, which owns
+        # that joint and its setting (cited by its step).
         "spring-bottom-loops-left": (
             f"LEAVE EACH BOTTOM LOOP FREE: {steps.HA_ANCHORS_SET_REF} THREADS "
-            f"EACH {anchor} ANCHOR, JAMS IT WITH ITS {anchor_nut} NUT AND HOOKS "
-            "THE LOOP INTO IT."
+            f"EACH {anchor} ANCHOR AND HOOKS THE LOOP INTO IT."
         ),
     }
 

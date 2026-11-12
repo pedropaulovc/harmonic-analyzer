@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import build_sm_summing_lever as lever_build
 import sm_summing_lever_profile as profile
 import sm_summing_lever_spec as spec
 from test_pd_transgear_adapter_contract import (
@@ -149,6 +150,8 @@ class _SketchRecorder:
         self.dimensions = []
         self.distances = []
         self.records = []
+        self.construction = []
+        self.angles = []
 
     def _result(self, value):
         return SimpleNamespace(is_success=True, data=value, error=None)
@@ -195,7 +198,7 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
     elif mutation == "wrong_thickness":
         for node in ast.walk(helper):
             if isinstance(node, ast.Name) and node.id == "COEFFICIENT_T":
-                node.id = "COUNTER_WEB_T"
+                node.id = "RIB_T"
     elif mutation is not None:
         raise AssertionError(mutation)
     recorder = _SketchRecorder()
@@ -223,6 +226,8 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
     globals_ = {
         "math": math, "SketchDims": Dims, "check": check,
         "set_sketch_direct_db": lambda adapter, value: None,
+        "_as_construction": lambda adapter, entity: recorder.construction.append(entity),
+        "_add_driving_counter_angle": lambda adapter, flank, baseline: recorder.angles.append((flank, baseline)),
         "anchor_point_to_origin": anchor, "dimension_between": distance,
         "ensure_fully_defined": fully_defined,
         "name_last_feature": lambda adapter, name: None,
@@ -230,6 +235,7 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
         "ARC_R": section.wrap_radius, "TIP_X": spec.TIP_X,
         "COEFFICIENT_T": section.top_y - section.bottom_y,
         "COUNTER_WEB_T": spec.COUNTER_WEB_T, "RIB_BLEND_R": section.blend_radius,
+        "RIB_T": spec.RIB_T,
     }
     module = ast.Module(body=[
         ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), helper,
@@ -244,7 +250,7 @@ def _assert_recorded_sketch(
 ) -> None:
     lines = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "line"}
     arcs = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "arc"}
-    assert len(lines) == (5 if middle else 3)
+    assert len(lines) == (6 if middle else 3)
     assert len(arcs) == (4 if middle else 3)
     tangencies = [(a, b) for a, b, relation in recorder.constraints if relation == "tangent"]
     assert len(tangencies) == (6 if middle else 4)
@@ -281,7 +287,20 @@ def _assert_recorded_sketch(
     assert equations.count('"RibBlendR"') == 2
     assert equations.count('"ArcR"') == 1
     assert '"RibReach"' in equations and '"CoefficientTopY"' in equations and '"CoefficientT"' in equations
-    assert ('"SumH"' in equations) == middle
+    assert ('"CounterFlankAngle"' in equations) == middle
+    assert '"SumH"' not in equations
+    assert len(jobs) == (7 if middle else 6)
+    if middle:
+        assert len(recorder.angles) == 1
+        flank, baseline = recorder.angles[0]
+        assert recorder.construction == [baseline]
+        assert lines[baseline] == (spec.TIP_X, 0.0, 0.0, 0.0)
+        assert lines[flank][2:] == lines[baseline][:2]
+        assert (f"{baseline}.end", "origin", "coincident") in recorder.constraints
+        assert (baseline, None, "horizontal") in recorder.constraints
+        assert ("MiddleRibCounterAngle@MiddleRibProfile", '"CounterFlankAngle"') in jobs
+    else:
+        assert not recorder.angles and not recorder.construction
 
 
 @pytest.mark.parametrize("middle,stem", [(False, "EdgeRibFront"), (False, "EdgeRibBack"), (True, "MiddleRib")])
@@ -306,10 +325,105 @@ def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: st
         _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs)
 
 
+def test_counter_angle_global_uses_native_expression_after_its_lengths() -> None:
+    build = next(node for node in _tree(RECIPE).body if isinstance(node, Function) and node.name == "build")
+    globals_ = {
+        ast.literal_eval(call.args[1]): call
+        for call in ast.walk(build)
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+        and call.func.id == "set_global"
+    }
+    counter = globals_["CounterFlankAngle"]
+    expression = ast.literal_eval(counter.args[2])
+    assert isinstance(expression, str) and "deg" not in expression
+    assert globals_["ArcR"].lineno < counter.lineno
+    assert globals_["SumH"].lineno < counter.lineno
+    expression = expression.replace('"ArcR"', "radius").replace('"SumH"', "reach")
+    for radius, reach in ((spec.RIB_WRAP_R, abs(spec.TIP_X)), (0.6, 3.0)):
+        degrees = eval(expression, {"__builtins__": {}}, {
+            "radius": radius, "reach": reach, "sqr": math.sqrt,
+            "atn": lambda value: math.degrees(math.atan(value)),
+        })
+        assert degrees == pytest.approx(spec.COUNTER_FLANK_ANGLE_DEG, abs=1e-12)
+        assert -radius / math.sin(math.radians(degrees)) == pytest.approx(-reach, abs=1e-6)
+
+
+@pytest.mark.parametrize("equation_bound", [False, True])
+@pytest.mark.parametrize("damage", [
+    None, "rounded_upper", "rounded_lower", "missing_lower", "wrong_state", "wrong_angle", "missing_angle", "nan_angle",
+])
+def test_native_counter_profile_requires_both_nominal_planes_and_driver(damage, equation_bound) -> None:
+    faces = []
+
+    def plane(normal, point):
+        surface = SimpleNamespace(
+            IsPlane=lambda: True, PlaneParams=(*normal, *point),
+        )
+        faces.append(SimpleNamespace(GetSurface=lambda: surface))
+
+    for branch in (profile.UPPER, profile.LOWER):
+        plane((*branch.normal_xy, 0.0), (*(
+            value / 1000.0 for value in branch.wrap_xy
+        ), 0.0))
+        surface = SimpleNamespace(
+            IsPlane=lambda: False, IsCylinder=lambda: True,
+            CylinderParams=(
+                *(value / 1000.0 for value in branch.center_xy), 0.0,
+                0.0, 0.0, 1.0, spec.RIB_BLEND_R / 1000.0,
+            ),
+        )
+        faces.append(SimpleNamespace(GetSurface=lambda surface=surface: surface))
+    for sign, side in ((1.0, "upper"), (-1.0, "lower")):
+        if damage == "missing_lower" and side == "lower":
+            continue
+        angle = math.radians(11.537 if damage == f"rounded_{side}" else spec.COUNTER_FLANK_ANGLE_DEG)
+        normal = (-math.sin(angle), sign * math.cos(angle), 0.0)
+        plane(normal, tuple(spec.RIB_WRAP_R * value / 1000.0 for value in normal))
+    expected_state = 1 if equation_bound else 2
+    dimension = SimpleNamespace(
+        FullName="MiddleRibCounterAngle@MiddleRibProfile@sm-summing-lever.Part",
+        DrivenState=3 - expected_state if damage == "wrong_state" else expected_state,
+        SystemValue=math.radians(11.537 if damage == "wrong_angle" else spec.COUNTER_FLANK_ANGLE_DEG),
+    )
+    if damage == "nan_angle":
+        dimension.SystemValue = math.nan
+
+    def parameter(name):
+        assert name == "MiddleRibCounterAngle@MiddleRibProfile"
+        return None if damage == "missing_angle" else dimension
+
+    model = SimpleNamespace(
+        FeatureByName=lambda name: SimpleNamespace(GetFaces=lambda: faces),
+        Parameter=parameter,
+    )
+    namespace = _source_helpers(
+        ("_assert_native_rib_profile",),
+        UPPER=profile.UPPER, LOWER=profile.LOWER,
+        ARC_R=spec.RIB_WRAP_R, TIP_X=spec.TIP_X,
+        COUNTER_FLANK_ANGLE_DEG=spec.COUNTER_FLANK_ANGLE_DEG,
+    )
+    check = namespace["_assert_native_rib_profile"]
+    adapter = SimpleNamespace(currentModel=model)
+    if damage is None:
+        check(adapter, "MiddleRib", equation_bound=equation_bound)
+    else:
+        with pytest.raises(RuntimeError) as error:
+            check(adapter, "MiddleRib", equation_bound=equation_bound)
+        if damage in {"wrong_state", "wrong_angle", "nan_angle"}:
+            message = str(error.value)
+            assert dimension.FullName in message
+            assert f"DrivenState={dimension.DrivenState!r}, expected={expected_state}" in message
+            assert f"SystemValue={dimension.SystemValue!r} rad" in message
+            assert "delta=" in message
+
+
 def _source_helpers(names: tuple[str, ...], **bindings):
     """Extract exact helper bodies, substituting only their COM bind/import seam."""
     functions = []
-    dependencies = ("coefficient_underside_root_geometry",)
+    dependencies = (
+        "_circumcenter", "summation_side_z", "longitudinal_root_families",
+        "longitudinal_root_geometry", "counter_flank_crease_x", "knife_shoulder_picks",
+    )
     if "_assert_receiver_profile_walls" in names:
         dependencies += ("_assert_receiver_plate_backing",)
     for name in dict.fromkeys(dependencies + names):
@@ -337,8 +451,15 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_BLEND_R_PLACES": spec.RIB_BLEND_R_PLACES,
         "RIB_REACH": spec.RIB_REACH, "PLATE_W_DEVIATIONS": spec.PLATE_W_DEVIATIONS,
         "CYL_R": spec.CYL_R, "PLATE_L": spec.PLATE_L, "PLATE_W": spec.PLATE_W,
+        "PLATE_Z_MINUS": spec.PLATE_Z_MINUS, "PLATE_Z_PLUS": spec.PLATE_Z_PLUS,
         "RIB_T": spec.RIB_T, "SUM_H": spec.SUM_H,
-        "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.RIB_T,
+        "RIB_INNER_Z_MINUS": spec.PLATE_Z_MINUS + spec.RIB_T,
+        "RIB_INNER_Z_PLUS": spec.PLATE_Z_PLUS - spec.RIB_T,
+        "TIP_X": spec.TIP_X, "ANCHOR_R": spec.ANCHOR_R,
+        "COUNTER_FLANK_ANGLE_DEG": spec.COUNTER_FLANK_ANGLE_DEG,
+        "SUMMATION_SIDE_POINTS": lever_build.SUMMATION_SIDE_POINTS,
+        "HEX_W": spec.HEX_W, "HEX_H": spec.HEX_H,
+        "KNIFE_RIDGE_R": spec.KNIFE_RIDGE_R, "RIDGE_ANGLE_DEG": spec.RIDGE_ANGLE_DEG,
         "ExtrusionParameters": SimpleNamespace,
     }
     # The coefficient slab, counter web and all ribs retain separate authorities.
@@ -383,7 +504,8 @@ def test_extracted_all_three_rib_operations_share_depth_and_drive_equation(rib_t
 
     namespace = _source_helpers(
         ("_edge_rib", "_middle_rib"),
-        RIB_T=rib_t, RIB_OFFSET=spec.PLATE_L / 2.0 - rib_t,
+        RIB_T=rib_t, RIB_INNER_Z_MINUS=spec.PLATE_Z_MINUS + rib_t,
+        RIB_INNER_Z_PLUS=spec.PLATE_Z_PLUS - rib_t,
         _rib_profile_sketch=sketch, _measured_volume=measured,
         force_rebuild=rebuild, volume_check=gate,
         extrude_at_offset=lambda adapter, depth, offset, *, flip: extrusions.append(
@@ -400,11 +522,14 @@ def test_extracted_all_three_rib_operations_share_depth_and_drive_equation(rib_t
     for flip, stem in ((False, "EdgeRibFront"), (True, "EdgeRibBack")):
         asyncio.run(namespace["_edge_rib"](adapter, flip, stem, stem, jobs))
     asyncio.run(namespace["_middle_rib"](adapter, jobs))
-    offset = spec.PLATE_L / 2.0 - rib_t
+    # Each rib's inner cap stands one thickness inside its own body end; the
+    # -Z rib is the mirrored (flip) boss, so its offset is that cap's |Z|.
     assert extrusions == [
-        ("edge", rib_t, offset, False), ("edge", rib_t, offset, True),
+        ("edge", rib_t, spec.PLATE_Z_PLUS - rib_t, False),
+        ("edge", rib_t, -spec.PLATE_Z_MINUS - rib_t, True),
         ("middle", rib_t, True),
     ]
+    assert extrusions[1][2] - extrusions[0][2] == pytest.approx(6.35)
     assert profiles == [("EdgeRibFront", False), ("EdgeRibBack", False), ("MiddleRib", True)]
     assert jobs == [
         ("EdgeRibThickness@EdgeRibFront", '"RibT"'),
@@ -491,10 +616,11 @@ def _native_boss_face_graph():
     return namespace["_assert_boss_face_graph"], adapter, features
 
 
-def test_extracted_boss_face_graph_uses_real_asymmetric_plate_and_flush_web_faces() -> None:
+def test_extracted_boss_face_graph_uses_real_centred_plate_and_flush_web_faces() -> None:
     check, adapter, _features = _native_boss_face_graph()
     assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y
-    assert spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y == pytest.approx(6.985)
+    assert -spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_BOTTOM_Y
+    assert spec.ANCHOR_H / 2.0 - spec.COEFFICIENT_TOP_Y == pytest.approx(6.025)
     check(adapter)
 
 
@@ -534,16 +660,15 @@ def _native_slab_fixture():
     return adapter, features
 
 
-def test_extracted_front_slab_preserves_real_seats_and_owner_specific_native_dimensions() -> None:
+@pytest.mark.parametrize("obsolete_faces", [(2.54, -2.54), (2.54, -4.46)])
+def test_extracted_front_slab_preserves_real_seats_and_owner_specific_native_dimensions(obsolete_faces) -> None:
     namespace = _source_helpers(("_assert_coefficient_slab",))
     adapter, features = _native_slab_fixture()
     namespace["_assert_coefficient_slab"](adapter)
     features["CoefficientsPlate"].faces.reverse()
     namespace["_assert_coefficient_slab"](adapter)
-    # The old 5.08 bottom must fail even if every named parameter still agrees.
-    features["CoefficientsPlate"].faces = [
-        _plane_face(spec.COEFFICIENT_TOP_Y), _plane_face(-2.54),
-    ]
+    # Reject both old fixed-top slabs even when named parameters still agree.
+    features["CoefficientsPlate"].faces = [_plane_face(y) for y in obsolete_faces]
     with pytest.raises(RuntimeError, match="missing seat"):
         namespace["_assert_coefficient_slab"](adapter)
     # A correct value on the wrong feature is not persistent native ownership.
@@ -572,14 +697,49 @@ def test_extracted_front_slab_rejects_missing_or_changed_persistent_dimensions(o
         namespace["_assert_coefficient_slab"](adapter)
 
 
+def _z_cap(z_mm: float, normal_z: float = 1.0):
+    surface = SimpleNamespace(
+        IsPlane=lambda: True, PlaneParams=(0.0, 0.0, normal_z, 0.0, 0.0, z_mm / 1000.0),
+    )
+    return SimpleNamespace(GetSurface=lambda: surface)
+
+
+def test_offset_boss_end_planes_prove_which_side_of_the_front_plane_it_went() -> None:
+    """The body's -Z end is .25 in longer: a boss mirrored about the Front
+    plane has the same volume, so only its caps tell the two apart."""
+    namespace = _source_helpers(("_assert_z_end_planes",))
+    audit = namespace["_assert_z_end_planes"]
+    ends = (spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS)
+    good = [_z_cap(ends[0], -1.0), _z_cap(ends[1]), _plane_face(spec.COEFFICIENT_TOP_Y)]
+    audit(_feature_adapter(_NativeFeature(faces=good)), "CoefficientsPlate", ends)
+    mirrored = [_z_cap(-ends[1], -1.0), _z_cap(-ends[0])]
+    symmetric = [_z_cap(-ends[1], -1.0), _z_cap(ends[1])]
+    for faces in (mirrored, symmetric, good[:1], good + [_z_cap(0.0)]):
+        with pytest.raises(RuntimeError, match="native Z caps"):
+            audit(_feature_adapter(_NativeFeature(faces=faces)), "CoefficientsPlate", ends)
+    # A cap an earlier feature absorbed may be absent, never elsewhere.
+    audit(_feature_adapter(_NativeFeature()), "PivotCylinder", (), allowed=ends)
+    audit(_feature_adapter(_NativeFeature(faces=good[:2])), "PivotCylinder", (), allowed=ends)
+    with pytest.raises(RuntimeError, match="native Z caps"):
+        audit(_feature_adapter(_NativeFeature(faces=mirrored)), "PivotCylinder", (), allowed=ends)
+    with pytest.raises(RuntimeError, match="missing native feature"):
+        audit(
+            SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=lambda name: None)),
+            "HexKnife", ends,
+        )
+
+
 def test_extracted_root_picks_stay_inside_reach_and_off_entry_and_knife_caps() -> None:
     namespace = _source_helpers(("rib_root_edge_families",))
     families = namespace["rib_root_edge_families"]()
     assert families
-    for _, picks, length in families:
+    for name, picks, length in families:
         assert picks
         assert length > 0.0
-        assert all(-spec.PLATE_L / 2.0 < z < spec.PLATE_L / 2.0 for _, _, z in picks)
+        if name == "KnifeShoulderFillets":  # stub roots on the body end faces
+            assert {z for _, _, z in picks} == {spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS}
+        else:
+            assert all(spec.PLATE_Z_MINUS < z < spec.PLATE_Z_PLUS for _, _, z in picks)
         assert all(x < spec.RIB_REACH for x, _, _ in picks)
 
 
@@ -587,8 +747,8 @@ def _assert_lower_junction_picks_cover_both_runs(families, namespace) -> None:
     """Sample the actual lower intersection, excluding the three solid ribs."""
     radius, bottom = namespace["CYL_R"], namespace["COEFFICIENT_BOTTOM_Y"]
     starts_ends = (
-        (-namespace["RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
-        (namespace["RIB_T"] / 2.0, namespace["RIB_OFFSET"]),
+        (namespace["RIB_INNER_Z_MINUS"], -namespace["RIB_T"] / 2.0),
+        (namespace["RIB_T"] / 2.0, namespace["RIB_INNER_Z_PLUS"]),
     )
     picks = [point for _, points, _ in families for point in points]
     for start, end in starts_ends:
@@ -606,7 +766,10 @@ def test_lower_longitudinal_picks_cover_actual_junction_and_track_geometry_chang
     namespace = _source_helpers(("rib_root_edge_families",))
     for changes in (
         {},
-        {"COEFFICIENT_BOTTOM_Y": -5.0, "CYL_R": 13.0, "RIB_OFFSET": 70.0},
+        {
+            "COEFFICIENT_BOTTOM_Y": -5.0, "CYL_R": 13.0,
+            "RIB_INNER_Z_MINUS": -75.0, "RIB_INNER_Z_PLUS": 70.0,
+        },
     ):
         namespace.update(changes)
         families = namespace["rib_root_edge_families"]()
@@ -619,26 +782,95 @@ def test_lower_longitudinal_picks_cover_actual_junction_and_track_geometry_chang
         assert [length for _, _, length in families[:3]] == pytest.approx([
             4.0 * math.tau * namespace["CYL_R"], 4.0 * namespace["SUM_H"], 8.0 * namespace["RIB_REACH"],
         ])
+        underside = [name for name, _, _ in families].index("CoefficientUndersideRootFillets")
         for index in (0, 1):
             mutated = copy.deepcopy(families)
-            mutated[-1][1].pop(index)
+            mutated[underside][1].pop(index)
             with pytest.raises(AssertionError, match="uncovered"):
                 _assert_lower_junction_picks_cover_both_runs(mutated, namespace)
         mutated = copy.deepcopy(families)
-        mutated[-1][1][0][1] = namespace["COEFFICIENT_TOP_Y"]
+        mutated[underside][1][0][1] = namespace["COEFFICIENT_TOP_Y"]
         with pytest.raises(AssertionError, match="uncovered"):
             _assert_lower_junction_picks_cover_both_runs(mutated, namespace)
+
+
+def test_every_moved_plate_and_web_junction_is_picked_on_its_actual_run() -> None:
+    namespace = _source_helpers(("rib_root_edge_families",))
+    families = {name: picks for name, picks, _ in namespace["rib_root_edge_families"]()}
+    edge_x = -math.sqrt(spec.CYL_R**2 - 3.5**2)
+    web_ends = tuple(namespace["summation_side_z"](edge_x, side) for side in (-1.0, 1.0))
+    rib_ends = (spec.PLATE_Z_MINUS + spec.RIB_T, spec.PLATE_Z_PLUS - spec.RIB_T)
+    assert rib_ends[0] < web_ends[0] < -56.0 and 56.0 < web_ends[1] < rib_ends[1]
+    for name, x_sign, face_y in (
+        ("CoefficientUndersideRootFillets", 1.0, spec.COEFFICIENT_BOTTOM_Y),
+        ("CoefficientTopRootFillets", 1.0, spec.COEFFICIENT_TOP_Y),
+        ("CounterWebTopRootFillets", -1.0, spec.COUNTER_WEB_T / 2.0),
+        ("CounterWebUndersideRootFillets", -1.0, -spec.COUNTER_WEB_T / 2.0),
+    ):
+        ends = rib_ends if x_sign > 0.0 else web_ends
+        assert families[name] == [
+            [pytest.approx(x_sign * math.sqrt(spec.CYL_R**2 - face_y**2)), face_y, pytest.approx(z)]
+            for z in ((ends[0] - spec.RIB_T / 2.0) / 2.0, (ends[1] + spec.RIB_T / 2.0) / 2.0)
+        ]
+
+
+def test_boss_and_flank_crease_picks_lie_on_their_web_junctions() -> None:
+    namespace = _source_helpers(("rib_root_edge_families",))
+    families = {name: picks for name, picks, _ in namespace["rib_root_edge_families"]()}
+    web = spec.COUNTER_WEB_T / 2.0
+    boss = [[spec.TIP_X + spec.ANCHOR_R, web, 0.0], [spec.TIP_X + spec.ANCHOR_R, -web, 0.0]]
+    creases = [[spec.TIP_X, 0.0, spec.ANCHOR_R], [spec.TIP_X, 0.0, -spec.ANCHOR_R]]
+    # Each flank leaves the on-axis apex at the counter angle and meets a
+    # web face outside the boss, so no flank-to-boss junction remains.
+    flank_x = spec.TIP_X + web / math.tan(math.radians(spec.COUNTER_FLANK_ANGLE_DEG))
+    assert spec.TIP_X + spec.ANCHOR_R < flank_x < -spec.RIB_WRAP_R
+    flank = [[pytest.approx(flank_x), web, 0.0], [pytest.approx(flank_x), -web, 0.0]]
+    assert families["CounterWebJunctionFillets"] == boss + creases + flank
+    # Each web side arc ends on the boss's Z extreme on its own side.
+    for side in (1.0, -1.0):
+        assert namespace["summation_side_z"](spec.TIP_X, side) == pytest.approx(side * spec.ANCHOR_R)
+    # Each side arc leaves the pivot cylinder at the web's mid-plane, and
+    # starts on its own body end: the -Z one on the extended front end.
+    assert namespace["summation_side_z"](0.0, 1.0) == pytest.approx(spec.PLATE_Z_PLUS)
+    assert namespace["summation_side_z"](0.0, -1.0) == pytest.approx(spec.PLATE_Z_MINUS)
+    side_plus, side_minus = (namespace["summation_side_z"](-spec.CYL_R, side) for side in (1.0, -1.0))
+    assert 50.0 < side_plus < spec.PLATE_Z_PLUS - spec.RIB_T
+    assert spec.PLATE_Z_MINUS + spec.RIB_T < side_minus < -side_plus
+    assert families["CounterWebSideRootFillets"] == [
+        [-spec.CYL_R, 0.0, side_plus], [-spec.CYL_R, 0.0, side_minus],
+    ]
+    # Both arcs are one radius (the print's 2X R).
+    radii = []
+    for side in (1.0, -1.0):
+        start, interior, end = lever_build.SUMMATION_SIDE_POINTS[side]
+        centre = lever_build._circumcenter(start, end, interior)
+        radii.append(math.dist(centre, start))
+    assert radii[0] == pytest.approx(radii[1], abs=1e-9)
+
+
+def test_knife_shoulder_picks_lie_on_both_stub_roots() -> None:
+    namespace = _source_helpers(())
+    picks = namespace["knife_shoulder_picks"]()
+    assert len(picks) == 14
+    w2, h2, h4 = spec.HEX_W / 2.0, spec.HEX_H / 2.0, spec.HEX_H / 4.0
+    assert {z for _, _, z in picks} == {spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS}
+    for x, y, z in picks:
+        on_side = math.isclose(abs(x), w2) and abs(y) < h4
+        on_flank = math.isclose(abs(y), h4 + (h2 - h4) * (1.0 - abs(x) / w2)) and 0.0 < abs(x) < w2
+        on_round = x == 0.0 and h2 - 2.0 * spec.KNIFE_RIDGE_R < y < h2
+        assert on_side or on_flank or on_round
 
 
 @pytest.mark.parametrize("changes", [
     {"COEFFICIENT_BOTTOM_Y": 0.0}, {"COEFFICIENT_BOTTOM_Y": -20.0},
     {"RIB_BLEND_R": 0.0}, {"RIB_BLEND_R": math.nan},
-    {"RIB_OFFSET": 76.2}, {"RIB_OFFSET": 3.0},
+    {"RIB_INNER_Z_PLUS": spec.PLATE_Z_PLUS}, {"RIB_INNER_Z_PLUS": 3.0},
+    {"RIB_INNER_Z_MINUS": spec.PLATE_Z_MINUS}, {"RIB_INNER_Z_MINUS": -3.0},
 ])
 def test_lower_blend_geometry_fails_closed_outside_tangent_inboard_premises(changes) -> None:
     namespace = _source_helpers((), **changes)
     with pytest.raises(ValueError, match="premises"):
-        namespace["coefficient_underside_root_geometry"]()
+        namespace["longitudinal_root_geometry"](1.0, namespace["COEFFICIENT_BOTTOM_Y"])
 
 
 def _root_face(
@@ -677,8 +909,8 @@ def test_extracted_native_root_face_envelope_accepts_only_inboard_r1_surfaces(to
     namespace["_assert_root_feature_bounds"](_feature_adapter(feature), "RibRootFillets", 1)
     for bad_box in (
         (20.0, 2.54, -69.0, spec.RIB_REACH + 0.1, 3.54, -67.0),
-        (20.0, 2.54, -spec.PLATE_L / 2.0, 30.0, 3.54, -67.0),
-        (20.0, 2.54, -69.0, 30.0, 3.54, spec.PLATE_L / 2.0),
+        (20.0, 2.54, spec.PLATE_Z_MINUS, 30.0, 3.54, -67.0),
+        (20.0, 2.54, -69.0, 30.0, 3.54, spec.PLATE_Z_PLUS),
         (20.0, 2.54, -69.0, math.nan, 3.54, -67.0),
     ):
         feature.faces = [_root_face(bad_box, torus=torus)]
@@ -689,18 +921,17 @@ def test_extracted_native_root_face_envelope_accepts_only_inboard_r1_surfaces(to
         namespace["_assert_root_feature_bounds"](_feature_adapter(feature), "RibRootFillets", 1)
 
 
-def _underside_native_faces(namespace):
+def _junction_native_faces(namespace, x_sign=1.0, face_y=None):
     radius = namespace["RIB_BLEND_R"]
-    bottom = namespace["COEFFICIENT_BOTTOM_Y"]
+    face_y = namespace["COEFFICIENT_BOTTOM_Y"] if face_y is None else face_y
     cylinder = namespace["CYL_R"]
-    center = (math.sqrt((cylinder + radius)**2 - (bottom - radius)**2), bottom - radius)
+    center_y = face_y + math.copysign(radius, face_y)
+    center = (x_sign * math.sqrt((cylinder + radius)**2 - center_y**2), center_y)
     tangent = tuple(value * cylinder / (cylinder + radius) for value in center)
-    runs = (
-        (-namespace["RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
-        (namespace["RIB_T"] / 2.0, namespace["RIB_OFFSET"]),
-    )
+    *_, runs = namespace["longitudinal_root_geometry"](x_sign, face_y)
+    xs, ys = sorted((tangent[0], center[0])), sorted((tangent[1], face_y))
     boxes = [
-        (tangent[0], tangent[1], start + radius, center[0], bottom, end - radius)
+        (xs[0], ys[0], start + radius, xs[1], ys[1], end - radius)
         for start, end in runs
     ]
     return [_root_face(box, cylinder_center=center) for box in boxes], boxes, center
@@ -710,7 +941,7 @@ def test_lower_blend_is_additive_and_its_complete_envelope_cannot_shrink_pilot_w
     import magnifying_bracket_joint_layout as joint
 
     namespace = _source_helpers(())
-    edge_x, center, tangent, runs = namespace["coefficient_underside_root_geometry"]()
+    edge_x, center, tangent, runs = namespace["longitudinal_root_geometry"](1.0, spec.COEFFICIENT_BOTTOM_Y)
     cylinder, radius = spec.CYL_R, spec.RIB_BLEND_R
     assert edge_x**2 + spec.COEFFICIENT_BOTTOM_Y**2 == pytest.approx(cylinder**2)
     assert math.hypot(*center) == pytest.approx(cylinder + radius)
@@ -736,7 +967,7 @@ def test_lower_blend_is_additive_and_its_complete_envelope_cannot_shrink_pilot_w
         assert x_max < hole_x - joint.LINEAR_BAND - joint.POSITION_BAND - pilot_radius
     assert x_max < spec.RIB_REACH < spec.HOLE_X < spec.PLATE_W
     assert spec.COEFFICIENT_BOTTOM_Y + radius < spec.COEFFICIENT_TOP_Y
-    assert all(-spec.PLATE_L / 2.0 < start - radius < end + radius < spec.PLATE_L / 2.0 for start, end in runs)
+    assert all(spec.PLATE_Z_MINUS < start - radius < end + radius < spec.PLATE_Z_PLUS for start, end in runs)
     # Analytic negative control: a much larger round would enter
     # the pilot's protected X envelope; the native gate must refuse it.
     namespace = _source_helpers(("_assert_root_feature_bounds",), RIB_BLEND_R=3.0)
@@ -746,18 +977,96 @@ def test_lower_blend_is_additive_and_its_complete_envelope_cannot_shrink_pilot_w
         )
 
 
-def test_native_lower_blend_requires_both_longitudinal_cylinders_but_allows_bounded_corner_patches() -> None:
+@pytest.mark.parametrize("name,x_sign,face_y", [
+    ("CoefficientUndersideRootFillets", 1.0, spec.COEFFICIENT_BOTTOM_Y),
+    ("CoefficientTopRootFillets", 1.0, spec.COEFFICIENT_TOP_Y),
+    ("CounterWebTopRootFillets", -1.0, spec.COUNTER_WEB_T / 2.0),
+    ("CounterWebUndersideRootFillets", -1.0, -spec.COUNTER_WEB_T / 2.0),
+])
+def test_native_junction_blend_requires_both_longitudinal_cylinders_but_allows_bounded_corner_patches(
+    name, x_sign, face_y,
+) -> None:
     namespace = _source_helpers(("_assert_root_feature_bounds",))
     audit = namespace["_assert_root_feature_bounds"]
-    faces, boxes, _ = _underside_native_faces(namespace)
+    faces, boxes, _ = _junction_native_faces(namespace, x_sign, face_y)
     corner = _root_face(boxes[0], unknown=True)
     for ordered in (faces + [corner], [corner] + list(reversed(faces))):
-        audit(_feature_adapter(_NativeFeature(faces=ordered)), "CoefficientUndersideRootFillets", 2)
+        audit(_feature_adapter(_NativeFeature(faces=ordered)), name, 2)
     for incomplete in ([faces[0], faces[0]], [faces[1], faces[1]]):
         with pytest.raises(RuntimeError, match="missing native longitudinal blend run"):
-            audit(_feature_adapter(_NativeFeature(faces=incomplete)), "CoefficientUndersideRootFillets", 2)
+            audit(_feature_adapter(_NativeFeature(faces=incomplete)), name, 2)
     with pytest.raises(RuntimeError, match="only 0 native"):
-        audit(_feature_adapter(_NativeFeature(faces=[corner, corner])), "CoefficientUndersideRootFillets", 2)
+        audit(_feature_adapter(_NativeFeature(faces=[corner, corner])), name, 2)
+    # The opposite face's blend is not this junction's.
+    mirrored = [_root_face((b[0], -b[4], b[2], b[3], -b[1], b[5])) for b in boxes]
+    with pytest.raises(RuntimeError, match="escapes"):
+        audit(_feature_adapter(_NativeFeature(faces=mirrored)), name, 2)
+
+
+def test_native_web_junction_and_knife_shoulder_envelopes_refuse_escaped_faces() -> None:
+    namespace = _source_helpers(("_assert_root_feature_bounds",))
+    audit = namespace["_assert_root_feature_bounds"]
+    web, r = spec.COUNTER_WEB_T / 2.0, spec.RIB_BLEND_R
+    boss = (spec.TIP_X, web, -spec.ANCHOR_R, spec.TIP_X + spec.ANCHOR_R + r, web + r, spec.ANCHOR_R)
+    audit(_feature_adapter(_NativeFeature(faces=[_root_face(boss, torus=True)])), "CounterWebJunctionFillets", 1)
+    for escaped in (
+        (*boss[:4], spec.ANCHOR_H / 2.0, boss[5]),  # reaches the boss top seat
+        (*boss[:3], -10.0, *boss[4:]),  # runs on toward the pivot
+        (boss[0], boss[1], -spec.ANCHOR_R - 2.0 * r, *boss[3:]),
+    ):
+        with pytest.raises(RuntimeError, match="escapes"):
+            audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped)])), "CounterWebJunctionFillets", 1)
+    # Side-arc exits: nonanalytic faces suffice, but only inside their band.
+    side_z = namespace["summation_side_z"](-spec.CYL_R, 1.0)
+    exit_box = (-spec.CYL_R - 0.4, -0.5, side_z - 0.4, -spec.CYL_R + 0.3, 0.5, side_z + 0.4)
+    minus_z = namespace["summation_side_z"](-spec.CYL_R, -1.0)
+    minus_exit = (*exit_box[:2], minus_z - 0.4, *exit_box[3:5], minus_z + 0.4)
+    audit(_feature_adapter(_NativeFeature(
+        faces=[_root_face(exit_box, unknown=True), _root_face(minus_exit, unknown=True)],
+    )), "CounterWebSideRootFillets", 2)
+    # The -Z arc leaves the pivot farther out than its +Z twin: the mirror of
+    # the +Z exit is no longer on the -Z arc's root.
+    mirrored_exit = (*exit_box[:2], -exit_box[5], *exit_box[3:5], -exit_box[2])
+    with pytest.raises(RuntimeError, match="escapes"):
+        audit(_feature_adapter(_NativeFeature(
+            faces=[_root_face(exit_box, unknown=True), _root_face(mirrored_exit, unknown=True)],
+        )), "CounterWebSideRootFillets", 2)
+    for escaped in (
+        (*exit_box[:2], side_z - 5.0, *exit_box[3:]),  # down the side arc
+        (*exit_box[:5], side_z + 5.0),  # up the pivot
+        (-spec.CYL_R - 3.0, *exit_box[1:]),
+        (exit_box[0], -web - 2.0 * r, *exit_box[2:]),
+    ):
+        with pytest.raises(RuntimeError, match="escapes"):
+            audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped, unknown=True)])), "CounterWebSideRootFillets", 1)
+    with pytest.raises(RuntimeError, match=r"\(1 faces\)"):
+        audit(_feature_adapter(_NativeFeature(faces=[_root_face(exit_box, unknown=True)])), "CounterWebSideRootFillets", 2)
+    s = spec.RIB_BLEND_R
+    plus = spec.PLATE_Z_PLUS
+    side = (spec.HEX_W / 2.0, -spec.HEX_H / 4.0, plus, spec.HEX_W / 2.0 + s, spec.HEX_H / 4.0, plus + s)
+    roots = [_root_face(side, radius=s), _root_face((-side[3], *side[1:3], -side[0], *side[4:]), radius=s)]
+    audit(_feature_adapter(_NativeFeature(faces=roots)), "KnifeShoulderFillets", 2)
+    # The -Z stub's root is on the extended front end, not the +Z end's mirror.
+    minus_root = (*side[:2], spec.PLATE_Z_MINUS - s, *side[3:5], spec.PLATE_Z_MINUS)
+    audit(_feature_adapter(_NativeFeature(faces=[_root_face(minus_root, radius=s)])), "KnifeShoulderFillets", 1)
+    for escaped, match in (
+        ((*side[:2], -plus - s, *side[3:5], -plus), "stub root"),  # the old symmetric -Z end
+        ((*side[:5], plus + 2.0 * s), "stub root"),  # up the knife seat
+        ((side[0], side[1], plus - s, *side[3:]), "stub root"),  # into the body
+        ((*side[:3], spec.HEX_W / 2.0 + 2.0 * s, *side[4:]), "escapes"),
+    ):
+        with pytest.raises(RuntimeError, match=match):
+            audit(_feature_adapter(_NativeFeature(faces=[_root_face(escaped, radius=s)])), "KnifeShoulderFillets", 1)
+    # The roots meet mitred at the sharp bottom vertex, R/sin(half angle) below.
+    mitre = s / math.sin(math.radians(spec.RIDGE_ANGLE_DEG) / 2.0)
+    bottom = (0.0, -spec.HEX_H / 2.0 - mitre, plus, side[3], -spec.HEX_H / 4.0, side[5])
+    audit(_feature_adapter(_NativeFeature(faces=[_root_face(bottom, radius=s)])), "KnifeShoulderFillets", 1)
+    with pytest.raises(RuntimeError, match="escapes"):
+        audit(_feature_adapter(_NativeFeature(
+            faces=[_root_face((bottom[0], bottom[1] - 0.01, *bottom[2:]), radius=s)],
+        )), "KnifeShoulderFillets", 1)
+    with pytest.raises(RuntimeError, match="native root radius"):
+        audit(_feature_adapter(_NativeFeature(faces=[_root_face(side, radius=0.508)])), "KnifeShoulderFillets", 1)
 
 
 @pytest.mark.parametrize("mutation", [
@@ -766,7 +1075,7 @@ def test_native_lower_blend_requires_both_longitudinal_cylinders_but_allows_boun
 ])
 def test_native_lower_blend_rejects_wrong_junction_interface_and_incomplete_geometry(mutation) -> None:
     namespace = _source_helpers(("_assert_root_feature_bounds",))
-    faces, boxes, center = _underside_native_faces(namespace)
+    faces, boxes, center = _junction_native_faces(namespace)
     box = list(boxes[0])
     axis, radius = (0.0, 0.0, 1.0), spec.RIB_BLEND_R
     if mutation == "top_junction":
@@ -776,9 +1085,9 @@ def test_native_lower_blend_rejects_wrong_junction_interface_and_incomplete_geom
     elif mutation == "outer_plate_edge":
         box[3] = spec.PLATE_W
     elif mutation == "entry_cap":
-        box[2] = -spec.PLATE_L / 2.0
+        box[2] = spec.PLATE_Z_MINUS
     elif mutation == "knife_cap":
-        box[5] = spec.PLATE_L / 2.0
+        box[5] = spec.PLATE_Z_PLUS
     elif mutation == "wrong_axis":
         axis = (0.0, 1.0, 0.0)
     elif mutation == "wrong_center":
@@ -835,18 +1144,27 @@ def test_extracted_root_operations_disable_propagation_and_gate_actual_added_vol
         assert len(jobs) == len(families) and all(expression == '"RibBlendR"' for _, expression in jobs)
 
 
+@pytest.mark.parametrize("new_name", [
+    "CoefficientUndersideRootFillets", "CoefficientTopRootFillets",
+    "CounterWebTopRootFillets", "CounterWebUndersideRootFillets", "CounterWebJunctionFillets",
+    "CounterWebSideRootFillets", "KnifeShoulderFillets",
+])
 @pytest.mark.parametrize("increment", ["within", "zero", "negative", "excess"])
-def test_longitudinal_family_has_its_own_increment_bound_without_relaxing_old_roots(increment) -> None:
+def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_roots(
+    new_name, increment,
+) -> None:
     operations = []
     namespace = _source_helpers(("rib_root_edge_families",))
     families = namespace["rib_root_edge_families"]()
-    new_name, _, length = families[-1]
-    expected_length = (
-        2.0 * namespace["RIB_OFFSET"]
-        - namespace["RIB_T"] + 4.0 * namespace["RIB_BLEND_R"]
-    )
-    assert length == pytest.approx(expected_length)
-    upper = 2.0 * spec.RIB_BLEND_R**2 * expected_length
+    names = [name for name, _, _ in families]
+    index = names.index(new_name)
+    length = families[index][2]
+    if new_name.startswith("Coefficient"):
+        assert length == pytest.approx(
+            namespace["RIB_INNER_Z_PLUS"] - namespace["RIB_INNER_Z_MINUS"]
+            - namespace["RIB_T"] + 4.0 * namespace["RIB_BLEND_R"]
+        )
+    upper = 2.0 * spec.RIB_BLEND_R**2 * length
     additions = {"within": upper * 0.5, "zero": 0.0, "negative": -1.0, "excess": upper + 0.01}
 
     async def fillet(radius, picks, *, propagate):
@@ -865,12 +1183,14 @@ def test_longitudinal_family_has_its_own_increment_bound_without_relaxing_old_ro
         _assert_root_feature_bounds=lambda adapter, name, count: None,
     )
     adapter = SimpleNamespace(add_fillet=fillet)
+    applied = families
     if increment == "within":
         asyncio.run(namespace["_rib_root_fillets"](adapter, []))
     else:
         with pytest.raises(RuntimeError, match="outside"):
             asyncio.run(namespace["_rib_root_fillets"](adapter, []))
-    assert operations == [(spec.RIB_BLEND_R, picks, False) for _, picks, _ in families]
+        applied = families[:index + 1]  # No later operation after a refused one.
+    assert operations == [(spec.RIB_BLEND_R, picks, False) for _, picks, _ in applied]
 
 
 def test_every_modeled_root_including_lower_longitudinal_family_gets_native_max_band() -> None:
@@ -952,7 +1272,7 @@ def _receiver_faces(*, invalid=None, perturb: float = 0.0):
 
     cap = SimpleNamespace(
         GetSurface=lambda: SimpleNamespace(
-            IsPlane=lambda: True, PlaneParams=(0.0, 0.0, 1.0, 0.0, 0.0, -spec.PLATE_L / 2000.0),
+            IsPlane=lambda: True, PlaneParams=(0.0, 0.0, 1.0, 0.0, 0.0, spec.PLATE_Z_MINUS / 1000.0),
         ),
         GetClosestPointOn=no_cap_query,
     )
@@ -982,7 +1302,7 @@ def _receiver_adapter(rib_faces, *, damage=None):
             if damage == "invalid_point":
                 return (math.nan, 0.0, 0.0, 0.0, 0.0)
             point[axis] = level
-            z_max = tip_z - 0.1 if damage == "short_backing" else spec.PLATE_L / 2.0
+            z_max = tip_z - 0.1 if damage == "short_backing" else spec.PLATE_Z_PLUS
             point[2] = max(inner_z, min(z_max, point[2]))
             if damage == "gap" and math.isclose(point[2], (inner_z + tip_z) / 2.0):
                 point[2] += 0.1
@@ -1038,7 +1358,7 @@ def test_extracted_receiver_reads_both_trimmed_flanks_at_uniform_rib_mid_depth()
     assert len(queries) == 2 * len(joint.LEVER_HOLE_POINTS)
     for index, (x, y, _) in enumerate(joint.LEVER_HOLE_POINTS):
         for actual in queries[2 * index:2 * index + 2]:
-            assert actual == pytest.approx((x, y, -spec.PLATE_L / 2.0 + spec.RIB_T / 2.0))
+            assert actual == pytest.approx((x, y, spec.PLATE_Z_MINUS + spec.RIB_T / 2.0))
     assert backing_queries
     bad_faces, _ = _receiver_faces(perturb=0.1)
     bad_adapter, _ = _receiver_adapter(bad_faces)
@@ -1163,8 +1483,8 @@ def test_extracted_root_guard_rejects_wrong_radius_after_sufficient_valid_r1_fac
 
 @pytest.mark.parametrize("bad_box", [
     (20.0, 2.54, -69.0, spec.RIB_REACH + 0.1, 3.54, -67.0),
-    (20.0, 2.54, -spec.PLATE_L / 2.0, 30.0, 3.54, -67.0),
-    (20.0, 2.54, -69.0, 30.0, 3.54, spec.PLATE_L / 2.0),
+    (20.0, 2.54, spec.PLATE_Z_MINUS, 30.0, 3.54, -67.0),
+    (20.0, 2.54, -69.0, 30.0, 3.54, spec.PLATE_Z_PLUS),
     (20.0, 2.54, -69.0, math.nan, 3.54, -67.0),
 ], ids=["x-reach", "minus-z-entry", "plus-z-entry", "nonfinite"])
 def test_extracted_root_guard_bounds_unknown_patches_after_sufficient_valid_r1_faces(
@@ -1200,9 +1520,10 @@ def test_extracted_root_guard_accepts_inboard_unknown_patches_without_counting_t
 # --- Spring-row locators follow the spring-tap pattern's globals (#290). ---
 
 _SPRING_EXPRS = ("SPRING_ROW_X_EXPR", "SPRING_SEED_STATION_EXPR", "SPRING_PITCH_EXPR")
-_PATTERN_GLOBALS = {"HoleX", "ChannelZ0", "ChannelPitch", "HoleZOffset", "PlateL"}
+_PATTERN_GLOBALS = {"HoleX", "ChannelZ0", "ChannelPitch", "HoleZOffset", "PlateZPlus"}
 _BUILT_GLOBALS_MM = {
-    "PlateL": spec.PLATE_L, "HexDepth": spec.HEX_DEPTH, "HoleX": spec.HOLE_X,
+    "PlateL": spec.PLATE_L, "PlateZPlus": spec.PLATE_Z_PLUS,
+    "HexDepth": spec.HEX_DEPTH, "HoleX": spec.HOLE_X,
     "ChannelZ0": spec.CHANNEL_Z0, "ChannelPitch": spec.CHANNEL_PITCH,
     "HoleZOffset": spec.HOLE_Z_OFFSET,
 }
@@ -1332,8 +1653,12 @@ def test_spring_row_locators_are_driven_by_the_pattern_globals_and_evaluate_to_s
         assert _equation_value(expression, _BUILT_GLOBALS_MM) == pytest.approx(spec_value, abs=1e-9)
         assert built == pytest.approx(spec_value, abs=1e-9)
     assert namespace["SPRING_SEED_STATION_EXPR"] in dims["SpringStartZ"][0]
-    # Datum B, the +Z end of the symmetric "PlateL" plate, is a driven anchor too.
-    assert _equation_value(dims["SpringRowEndZ"][0], _BUILT_GLOBALS_MM) == pytest.approx(spec.PLATE_L / 2.0)
+    # Datum B, the +Z body end ("PlateZPlus" from the origin), is a driven anchor
+    # too; the -Z ridge mark follows the plate length from it.
+    assert _equation_value(dims["SpringRowEndZ"][0], _BUILT_GLOBALS_MM) == pytest.approx(spec.PLATE_Z_PLUS)
+    assert _equation_value(dims["SpringRowRidgeZ"][0], _BUILT_GLOBALS_MM) == pytest.approx(
+        -spec.PLATE_Z_MINUS + 0.3 * spec.HEX_DEPTH
+    )
     # Every drive is applied, then rebuilt, then natively read back.
     drives = [(f"{name}@SpringRowCoordinates", drive) for name, (drive, _) in dims.items() if drive]
     assert events == [("drive", *job) for job in drives] + [("rebuild",), ("readback", drives)]
@@ -1354,7 +1679,7 @@ def test_an_equations_edit_to_channel_pitch_moves_holes_and_locators_together(pi
     edited = {**_BUILT_GLOBALS_MM, "ChannelPitch": pitch}
     seed_z = _equation_value(namespace["SPRING_SEED_STATION_EXPR"], edited)
     second_z = seed_z - _equation_value(namespace["SPRING_PITCH_EXPR"], edited)
-    assert _equation_value(dims["SpringStartZ"][0], edited) == pytest.approx(spec.PLATE_L / 2.0 - seed_z)
+    assert _equation_value(dims["SpringStartZ"][0], edited) == pytest.approx(spec.PLATE_Z_PLUS - seed_z)
     assert _equation_value(dims["SpringPitch"][0], edited) == pytest.approx(seed_z - second_z)
     assert _equation_value(dims["SpringRowX"][0], edited) == pytest.approx(
         _equation_value(namespace["SPRING_ROW_X_EXPR"], edited)
