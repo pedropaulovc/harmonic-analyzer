@@ -266,14 +266,18 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
 def test_note_states_the_bend_acceptance_without_method_or_sizes() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    # Rule 7: four lines at most, each ending left of the title block
-    # (x 0.216) from NOTES_XY at the sheet's ~2.42 mm a character (farm run
-    # 20261028T005208028Z: the 80-character line ended at x 0.210).
     assert 1 <= len(lines) <= 4
     assert all(re.match(r"\d\. ", line) for line in lines)
-    assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
     assert "OVALITY 5% MAX" in notes and "NO KINKS" in notes
+    # Rule 7 (machinist review of the v49 release): the short acceptance
+    # prints at its leader on the bend, the part's note without its number
+    # and "BEND:", so no numbered note stands alone in the corner.
+    acceptance = " ".join(drawing.BEND_ACCEPTANCE.split())
+    assert notes == f"1. BEND: {acceptance}"
+    assert len(drawing.BEND_ACCEPTANCE.splitlines()) <= 2
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' not in source
     # Geometry, not method (rule 7): no tool, no bend order, no tail.
     for word in ("DIE", "SAW", "TAIL", "FACE", "THEN", "JOIN", "CURE"):
         assert word not in notes, word
@@ -349,13 +353,25 @@ def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() ->
     # The tube Ø crosses the leg on its left, level with the leg length.
     assert keep["TubeOdRef"][0] < drawing.LEG_AXIS_X < keep["LegLength"][0]
     assert keep["TubeOdRef"][1] == keep["LegLength"][1]
-    # The elevation's foot stands above the title block's top (y 0.066) and
-    # the note, which ends left of the elevation's arm end.
-    assert drawing.FOOT_Y > 0.066 > drawing.NOTES_XY[1]
-    note_end = drawing.NOTES_XY[0] + 0.00242 * max(
-        map(len, spec.DRAWING_NOTES.splitlines())
-    )
-    assert note_end < drawing.ARM_END_X
+    # The elevation's foot stands above the title block's top (y 0.066).
+    assert drawing.FOOT_Y > 0.066
+
+
+def test_bend_acceptance_leader_lands_on_the_bend_clear_of_the_tube() -> None:
+    tip_x, tip_y = drawing.BEND_NOTE_TIP
+    centre = (drawing._front_x(-geom.BEND_R), drawing._front_y(geom.LEG_TOP))
+    inner_r = (geom.BEND_R - geom.TUBE_DIA / 2.0) * drawing._S
+    assert math.dist((tip_x, tip_y), centre) == pytest.approx(inner_r)
+    assert tip_x > centre[0] and tip_y > centre[1]
+    # The two-row block (~2.42 mm a character, ~9 mm tall) stands inside
+    # the bend: left of the leg's inner edge, under the arm, over the tube
+    # Ø's text and right of the sheet's left border.
+    left, top = drawing.BEND_NOTE_XY
+    right = left + 0.00242 * max(map(len, drawing.BEND_ACCEPTANCE.splitlines()))
+    leg_inner = drawing.LEG_AXIS_X - geom.TUBE_DIA / 2.0 * drawing._S
+    assert 0.016 < left and right + 0.005 < leg_inner
+    assert top < drawing.ARM_AXIS_Y - geom.TUBE_DIA / 2.0 * drawing._S - 0.020
+    assert top - 0.009 > drawing.FRONT_KEEP["TubeOdRef"][1] + 0.010
 
 
 def _mass_adapter(volume: float):
