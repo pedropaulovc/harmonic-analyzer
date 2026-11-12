@@ -1,14 +1,15 @@
 """Record or replay one build's COM conversation.
 
-``record <script> --log P [--summary P] [--out-root DIR] [--callers MODE] [-- ARG...]``
+``record <script> --log P [--summary P] [--kind K] [--out-root DIR] [--callers MODE] [-- ARG...]``
     Run a build script against the live seat exactly as ``python <script>
     ARG...`` would (``run_build``: connect, discard, template pin, teardown),
-    recording its build window into ``P``. ``ARG...`` are the script's own
-    arguments (a drawing's artifact stem), kept in ``sys.argv`` around the
-    engine, whose ``run_script`` passes none. ``--summary`` writes the
-    recording's facts as JSON for dodo, with ``replay_gaps`` (what a replay of
-    this recording would need that the engine's replay lacks) and ``display``
-    (the window the build's sheet picks hit-tested in). ``--out-root``
+    recording its build window into ``P``. ``ARG...``, everything after the
+    first ``--``, are the script's own arguments (a drawing's artifact stem),
+    kept in ``sys.argv`` around the engine, whose ``run_script`` passes none.
+    ``--summary`` writes the recording's facts as JSON for dodo, with
+    ``replay_gaps`` (what a replay of this recording would need that the
+    engine's replay lacks) and, for ``--kind drawing``, ``display`` (the
+    window the build's sheet picks hit-tested in). ``--out-root``
     redirects the outputs (side-by-side diagnostic runs only; dodo's builds
     never pass it). ``--callers`` keeps the Python caller of every call
     (``full``), none (``divergence``: a replay names its own at a divergence)
@@ -57,10 +58,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import gzip
 import json
 import math
 import os
 import sys
+import types
 from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
@@ -99,11 +102,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    record = sub.add_parser("record", help="run a build on the live seat, recorded")
+    record = sub.add_parser(
+        "record",
+        help="run a build on the live seat, recorded",
+        epilog="ARG... after the first -- are the script's own arguments.",
+    )
     record.add_argument("script", type=Path)
-    record.add_argument("argv", nargs="*", help="the script's own arguments (after --)")
     record.add_argument("--log", type=Path, required=True)
     record.add_argument("--summary", type=Path, help="write the recording's facts")
+    record.add_argument(
+        "--kind",
+        choices=("part", "assembly", "drawing"),
+        default="part",
+        help="what the build makes (a drawing's summary reads its display)",
+    )
     record.add_argument("--out-root", type=Path, help="redirect the build's outputs")
     record.add_argument(
         "--callers",
@@ -146,6 +158,25 @@ def _parser() -> argparse.ArgumentParser:
     diff.add_argument("--base-sidecars", type=Path, help="the base's sidecar files")
     diff.add_argument("--new-sidecars", type=Path, help="the new build's sidecars")
     return parser
+
+
+def _arguments(argv: list[str]) -> argparse.Namespace:
+    """``argv`` parsed: this driver's own arguments before the first ``--``,
+    the recorded script's after it (``record``'s ``argv``). They are split
+    here rather than by argparse, whose handling of a ``*`` positional after
+    another one depends on the Python patch release: before 3.12.7 (CPython
+    gh-59317) it binds the positional to ``[]`` with the script's path and
+    then rejects ``-- ARG...`` as unrecognized arguments."""
+    own, scripts = argv, []
+    if "--" in argv:
+        at = argv.index("--")
+        own, scripts = argv[:at], argv[at + 1 :]
+    parser = _parser()
+    args = parser.parse_args(own)
+    if args.command != "record" and scripts:
+        parser.error(f"only record passes arguments to a script: {scripts}")
+    args.argv = scripts
+    return args
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -384,6 +415,27 @@ def _display(log: Any) -> dict[str, Any] | None:
     return found or None
 
 
+def _logged_display(log: Path) -> dict[str, Any] | None:
+    """:func:`_display` of the log at ``log`` without loading it, for the
+    record driver, which still holds the seat: only lines naming a probe site
+    are parsed, as ``_com_conversation.LogWriter`` writes them (``w`` the
+    site, ``a`` the arguments past an interned dispatch header, which holds no
+    float, ``r`` the answer; pinned against ``load`` by test)."""
+    probes = []
+    with gzip.open(log, "rt", encoding="utf-8") as stream:
+        for text in stream:
+            if _VISIBLE_BOX not in text and _PROJECT not in text:
+                continue
+            line = json.loads(text)
+            if line.get("w") in (_VISIBLE_BOX, _PROJECT):
+                probes.append(
+                    types.SimpleNamespace(
+                        site=line["w"], args=line.get("a"), result=line.get("r")
+                    )
+                )
+    return _display(types.SimpleNamespace(calls=probes))
+
+
 def _hex_floats(value: Any) -> list[float]:
     """Every logged float in ``value`` (``{"f": <hex>}``), in order."""
     if isinstance(value, dict):
@@ -538,10 +590,10 @@ def _record(args: argparse.Namespace, script: Path) -> int:
         )
     if args.summary is not None:
         display = None
-        if timing is not None and not faults:
-            # About 6 µs a call, on the seat: well under 0.1% of a build window.
+        if args.kind == "drawing" and timing is not None and not faults:
+            # On the seat: only the log's probe lines are parsed (_logged_display).
             try:
-                display = _display(conversation.load(args.log.resolve()))
+                display = _logged_display(args.log.resolve())
             except Exception as exc:  # noqa: BLE001 - never the summary's
                 _telemetry.warn(f"[com-replay] display not read from the log: {exc!r}")
         try:
@@ -559,7 +611,7 @@ def _record(args: argparse.Namespace, script: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    args = _arguments(sys.argv[1:] if argv is None else argv)
     if args.command == "record":
         # The build's process as unrecorded but for the recorder: its streams
         # are left as they are (run_build reconfigures them itself), and only

@@ -173,9 +173,15 @@ DEPENDENT_SECONDS = 60.0
 # Above this many logged calls in either recording the diff is skipped
 # (``oversize``): it holds both logs in memory.
 DIFF_CALLS_LIMIT = 500_000
-# A recording bundle above this many bytes is not published (``oversize``):
-# part bundles were 176 bytes per request (p95 680, largest 22 MB).
+# An assembly's or drawing's recording bundle above this many bytes (its
+# files' bytes on disk, :func:`bundle_size`) is never built, published or kept
+# (``oversize``): part bundles were 176 bytes per request (p95 680, largest
+# 22 MB).
 BUNDLE_LIMIT = 512 * 1024 * 1024
+# The ``publish`` outcomes of an assembly's or drawing's recording left
+# unpublished because another writer's bytes stand under its key, which
+# _keep_evidence keeps unless the split is a confirmed NOOP.
+EVIDENCE_OF = ("exists", "lost")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -370,6 +376,8 @@ class Recording:
             str(self.log),
             "--summary",
             str(self.summary_path),
+            "--kind",
+            self.kind.value,
             *(("--", *self.argv) if self.argv else ()),
         ]
 
@@ -662,24 +670,37 @@ def evidence_names(
     engine: str, stem: str, key: str, recording_id: str
 ) -> tuple[str, str]:
     """``(bundle, manifest)`` names of an assembly's or drawing's evidence
-    copy: a recording of ``key`` made after another writer's was published
-    under the key's names (:func:`_keep_evidence`). Outside ``manifest/``, so
-    no base lookup lists it; one per recording, so a second never collides."""
+    copy: a recording of ``key`` left unpublished because another writer's
+    bytes stand under the key (:func:`_keep_evidence`). Outside ``manifest/``,
+    so no base lookup lists it; one per recording, so a second never collides."""
     root = f"{BLOB_ROOT}/{engine[:16]}/{stem}/evidence/{key}/{recording_id}"
     return f"{root}.tar", f"{root}.json"
+
+
+def _bundle_files(recording: Recording) -> list[Path]:
+    """The files :func:`bundle` packs: the log, then its captures and sidecar
+    copies, sorted."""
+    files = [recording.log]
+    for directory in (recording.captures, recording.sidecar_copies):
+        if directory.is_dir():
+            files += sorted(p for p in directory.rglob("*") if p.is_file())
+    return files
+
+
+def bundle_size(recording: Recording) -> int:
+    """The bytes of the files :func:`bundle` would pack, read from disk without
+    packing them (the tar adds a header and padding per member): what
+    BUNDLE_LIMIT is checked against before a bundle is built in memory."""
+    return sum(path.stat().st_size for path in _bundle_files(recording))
 
 
 def bundle(recording: Recording) -> bytes:
     """The log, its captures and (an assembly's or drawing's) sidecar copies
     as one uncompressed tar (log and captures are gzip already): sorted
     members, no timestamps or owners."""
-    files = [recording.log]
-    for directory in (recording.captures, recording.sidecar_copies):
-        if directory.is_dir():
-            files += sorted(p for p in directory.rglob("*") if p.is_file())
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
-        for path in files:
+        for path in _bundle_files(recording):
             info = tarfile.TarInfo(path.relative_to(recording.directory).as_posix())
             info.size = path.stat().st_size
             info.mode = 0o644
@@ -699,7 +720,7 @@ def manifest(
     summary: dict[str, Any],
     inputs: dict[str, str],
     bundle_name: str,
-    bundle_bytes: bytes,
+    bundle_bytes: bytes | None,
     *,
     archive: tuple[str, int] | None = None,
     sw_build: str | None = None,
@@ -709,7 +730,9 @@ def manifest(
     the two key inputs that are not files. ``archive`` binds the recording to
     the archive its build stored under the key (``(sha256, size)``,
     :func:`_artifact_cache.publication`; None: unbound, never a reuse base);
-    ``sw_build`` is the recording machine's SolidWorks (:func:`seat_build`)."""
+    ``sw_build`` is the recording machine's SolidWorks (:func:`seat_build`).
+    ``bundle_bytes`` None: an assembly's or drawing's bundle past
+    BUNDLE_LIMIT, never built, whose manifest is never published."""
     settings = _cache.config_summary()
     return {
         "schema": MANIFEST_SCHEMA,
@@ -728,7 +751,9 @@ def manifest(
         "sw_revision": summary.get("sw_revision"),
         "sw_build": sw_build,
         "environment": summary.get("environment"),
-        "bundle": {
+        "bundle": None
+        if bundle_bytes is None
+        else {
             "name": bundle_name,
             "sha256": hashlib.sha256(bundle_bytes).hexdigest(),
             "size": len(bundle_bytes),
@@ -2537,7 +2562,10 @@ def _after_build(
         record["outcome"] = "inputs_moved"
         return
     inputs = dict(pairs)
-    data = bundle(recording)
+    # An assembly's or drawing's bundle past BUNDLE_LIMIT, by its files' bytes
+    # on disk, is never built in memory: neither published nor kept.
+    size = None if recording.kind is BuildKind.PART else bundle_size(recording)
+    data = None if size is not None and size > BUNDLE_LIMIT else bundle(recording)
     bundle_name, _ = blob_names(summary["engine"], recording.name, recording.key)
     stored = _cache.publication(recording.key)
     outcome = None if stored is None else stored[0]
@@ -2562,7 +2590,7 @@ def _after_build(
             # _display), to count seat windows without opening a bundle.
             display=summary.get("display"),
         )
-    record["bundle_bytes"] = len(data)
+    record["bundle_bytes"] = size if data is None else len(data)
     record["bound"] = bound_archive(published) is not None
     with _telemetry.span(f"replay.publish {label}", service=infra, label=label) as sp:
         # Only a build that stored the key's archive publishes its recording:
@@ -2573,12 +2601,12 @@ def _after_build(
         # assembly's or drawing's bundle past BUNDLE_LIMIT is not published.
         if outcome != "stored":
             record["publish"] = outcome or "unstored"
-        elif recording.kind is not BuildKind.PART and len(data) > BUNDLE_LIMIT:
+        elif data is None:
             record["publish"] = "oversize"
         else:
             record["publish"] = publish(recording, published, data)
         sp.set_attribute("replay.publish", record["publish"])
-        sp.set_attribute("replay.bundle_bytes", len(data))
+        sp.set_attribute("replay.bundle_bytes", record["bundle_bytes"])
         sp.set_attribute("replay.bound", bound_archive(published) is not None)
     if recording.mode not in (ReplayMode.SHADOW, ReplayMode.REUSE):
         record["outcome"] = "recorded"
@@ -2854,15 +2882,15 @@ def _judge_dependent(
     inputs: dict[str, str],
     published: dict[str, Any],
     record: dict[str, Any],
-    data: bytes,
+    data: bytes | None,
 ) -> None:
     """Mode ``shadow``, an assembly or drawing: find the nearest earlier
     recording of the stem under this cache salt made on the same children
     and compare this build's recording with it (:class:`Split`; a NOOP's
     :class:`OutputJudgement`). No replay stands in: the fresh recording is
     the ground truth of what the current source asked. ``data``: this
-    recording's bundle, for :func:`_keep_evidence`. Fills ``record``
-    (``outcome`` last)."""
+    recording's bundle (None past BUNDLE_LIMIT), for :func:`_keep_evidence`.
+    Fills ``record`` (``outcome`` last)."""
     label, infra = recording.label, _telemetry.BUILD_INFRA_SERVICE
     children = recording.children
     tally: Counter[str] = Counter()
@@ -3112,23 +3140,25 @@ def _compare_dependent(
 def _keep_evidence(
     recording: Recording,
     published: dict[str, Any],
-    data: bytes,
+    data: bytes | None,
     record: dict[str, Any],
 ) -> None:
     """An assembly's or drawing's recording that is not published because
-    the key's archive or recording names already held another writer's
-    (``publish`` ``exists``: a forced refresh, a rebuild of the same key) is
-    the only copy of what this build asked and answered: unless its split is
-    a confirmed NOOP, keep it create-only under :func:`evidence_names`
-    (bundle first, then the manifest naming it), for a judgement only the
-    pair can settle. ``record["evidence"]``: the outcome (``stored``,
-    ``exists``, ``error``, the cache's ``skip``/``off``, or ``oversize``
-    past BUNDLE_LIMIT, which is not stored)."""
-    if record.get("publish") != "exists":
+    another writer's bytes already stand under the key (:data:`EVIDENCE_OF`:
+    ``publish`` ``exists``, the key's recording names held another's, as on a
+    forced refresh; ``lost``, the key's archive committed by another build
+    first, as when two seats build one key) is the only copy of what this
+    build asked and answered: unless its split is a confirmed NOOP, keep it
+    create-only under :func:`evidence_names` (bundle first, then the manifest
+    naming it), for a judgement only the pair can settle.
+    ``record["evidence"]``: the outcome (``stored``, ``exists``, ``error``,
+    the cache's ``skip``/``off``, or ``oversize`` for a bundle past
+    BUNDLE_LIMIT, ``data`` None, never built)."""
+    if record.get("publish") not in EVIDENCE_OF:
         return
     if record.get("noop_judgement") == OutputJudgement.CONFIRMED:
         return
-    if len(data) > BUNDLE_LIMIT:
+    if data is None:
         record["evidence"] = "oversize"
         return
     label = recording.label

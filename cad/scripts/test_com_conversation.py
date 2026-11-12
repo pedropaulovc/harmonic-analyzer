@@ -3050,32 +3050,112 @@ def _projected(point: tuple[float, ...], x: str, y: str) -> conv.Call:
     )
 
 
+# ms_stop_plate's pass-1 answers: the origin's projection, and 1 mm along x.
+_LEFT, _BOTTOM = "0x1.f414141414143p+7", "0x1.4be629edb1754p+9"
+_X_AXIS = "0x1.f8ba7666bfeadp+7"
+
+
+def _probes(box: list[Any], x_axis: str = _X_AXIS) -> list[conv.Call]:
+    """One ``display_geometry`` probe: the window, then four projections."""
+    return [
+        _display_probe("IModelView.GetVisibleBox", result={"t": box}),
+        _projected((0.0, 0.0, 0.0), _LEFT, _BOTTOM),
+        _projected((1e-3, 0.0, 0.0), x_axis, _BOTTOM),
+        _projected((0.0, 1e-3, 0.0), _LEFT, "0x1.4abc9159067f9p+9"),
+        _projected((0.0, 0.0, 1e-3), _LEFT, _BOTTOM),
+    ]
+
+
 def test_the_seats_drawing_display_is_read_from_the_logs_own_answers():
     import com_replay
-
-    left, bottom = "0x1.f414141414143p+7", "0x1.4be629edb1754p+9"
-
-    def probe(box: list[Any], x_axis: str) -> list[conv.Call]:
-        return [
-            _display_probe("IModelView.GetVisibleBox", result={"t": box}),
-            _projected((0.0, 0.0, 0.0), left, bottom),
-            _projected((1e-3, 0.0, 0.0), x_axis, bottom),
-            _projected((0.0, 1e-3, 0.0), left, "0x1.4abc9159067f9p+9"),
-            _projected((0.0, 0.0, 1e-3), left, bottom),
-        ]
 
     def display(*calls: conv.Call) -> Any:
         return com_replay._display(types.SimpleNamespace(calls=list(calls)))
 
     # ms_stop_plate's pass 1 (its seat logged view_window=1010x678 px/mm=2.325).
-    first = probe([253, 36, 1263, 714], "0x1.f8ba7666bfeadp+7")
+    first = _probes([253, 36, 1263, 714])
     assert display(*first) == {"view_window": [1010, 678], "px_per_mm": 2.325}
     # The last probe is the display the build ended on.
-    narrower = probe([253, 36, 1263, 634], "0x1.f8ba7666bfeadp+7")
+    narrower = _probes([253, 36, 1263, 634])
     assert display(*first, *narrower)["view_window"] == [1010, 598]
     # An answer that cannot be read leaves its key out; no probe, no display.
-    assert display(*probe([253.0, 36, 1263, 714], left)) == {"px_per_mm": 2.325}
+    assert display(*_probes([253.0, 36, 1263, 714], _LEFT)) == {"px_per_mm": 2.325}
     assert display(*_echoing("Part24")) is None
+
+
+def test_a_drawings_display_is_streamed_from_the_lines_the_engine_wrote(
+    tmp_path, monkeypatch
+):
+    import com_replay
+
+    recorded, _, _, _ = _record(tmp_path / "header", monkeypatch)
+    log = tmp_path / "probed.jsonl.gz"
+    calls = [*_echoing("Part24"), *_probes([253, 36, 1263, 714])]
+    writer = conv.LogWriter(log)
+    writer.header(conv.read_header(recorded))
+    for seq, call in enumerate(calls):
+        writer.emit(dataclasses.replace(call, seq=seq))
+    writer.close({"status": "complete"})
+    # The writer interned each probe's dispatch header; the stream never sees it.
+    assert conv.load(log).calls[-1].args == calls[-1].args
+    assert com_replay._logged_display(log) == com_replay._display(conv.load(log))
+    assert com_replay._logged_display(log) == {
+        "view_window": [1010, 678],
+        "px_per_mm": 2.325,
+    }
+    assert com_replay._logged_display(recorded) is None
+
+
+def test_only_a_drawings_recording_reads_its_display_on_the_seat(tmp_path, monkeypatch):
+    import com_replay
+
+    timing = {"rc": 0, "trailer": {"status": "complete", "calls": 2, "inert_calls": 0}}
+    monkeypatch.setattr(conv, "record_build", lambda *_a, **_k: timing)
+    monkeypatch.setattr(conv, "record_faults", lambda: [])
+    monkeypatch.setattr(conv, "rerun_required", lambda: False)
+    read: list[Path] = []
+
+    def logged(log: Path) -> dict[str, Any]:
+        read.append(log)
+        return {"px_per_mm": 2.098}
+
+    monkeypatch.setattr(com_replay, "_logged_display", logged)
+    log = tmp_path / "L.jsonl.gz"
+
+    def display(kind: str) -> Any:
+        summary = tmp_path / f"{kind}.json"
+        argv = ["record", "s.py", "--log", str(log), "--summary", str(summary)]
+        assert com_replay.main([*argv, "--kind", kind]) == 0
+        return json.loads(summary.read_text("utf-8"))["display"]
+
+    # A part or an assembly never probes the display: its log is not re-read.
+    assert display("part") is None and display("assembly") is None and read == []
+    assert display("drawing") == {"px_per_mm": 2.098} and read == [log.resolve()]
+
+
+def test_a_scripts_arguments_are_everything_after_the_first_double_dash():
+    import com_replay
+
+    parse = com_replay._arguments
+    record = ["record", "draw_x.py", "--log", "L", "--summary", "S"]
+    # dodo's two shapes (Recording.command): a part's, and a drawing's stem.
+    assert parse([*record, "--kind", "part"]).argv == []
+    drawing = parse([*record, "--kind", "drawing", "--", "sh_widget"])
+    assert (drawing.script, drawing.kind, drawing.argv) == (
+        Path("draw_x.py"),
+        "drawing",
+        ["sh_widget"],
+    )
+    # Options before it are the driver's; whatever follows, the script's.
+    found = parse([*record, "--out-root", "O", "--", "--flag", "--", "x"])
+    assert (found.out_root, found.argv) == (Path("O"), ["--flag", "--", "x"])
+    # argparse never sees a script argument, so no patch release of it binds
+    # one: a bare one is the driver's error, and only record passes any.
+    with pytest.raises(SystemExit):
+        parse([*record, "sh_widget"])
+    assert parse(["diff", "a", "b", "--"]).argv == []
+    with pytest.raises(SystemExit):
+        parse(["diff", "a", "b", "--", "sh_widget"])
 
 
 def test_a_diff_reports_each_logs_own_display(tmp_path, monkeypatch):

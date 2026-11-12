@@ -13,12 +13,14 @@ import dataclasses
 import datetime
 import hashlib
 import importlib.util
+import io
 import itertools
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import types
@@ -3348,7 +3350,7 @@ def test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit(
     assert headroom >= _FARM_HEADROOM, (stem, len(path), path)
 
 
-def test_an_oversize_dependent_bundle_is_not_published(blob, tmp_path, monkeypatch):
+def test_an_oversize_dependent_bundle_is_never_built(blob, tmp_path, monkeypatch):
     monkeypatch.setenv(shadow.MODE_ENV, "record")
     monkeypatch.setattr(shadow, "BUNDLE_LIMIT", 16)
     script = tmp_path / f"draw_{_STEM}.py"
@@ -3357,12 +3359,23 @@ def test_an_oversize_dependent_bundle_is_not_published(blob, tmp_path, monkeypat
     key, _ = cache.key_inputs(deps, _digest)
     recording = _planned(_drawing(script), key)
     recording.log.write_bytes(b"log of " + key.encode())
+    recording.captures.mkdir()
+    (recording.captures / "000000.gz").write_bytes(b"pdf")
     recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    # The files' bytes on disk: what the tar's members hold.
+    with tarfile.open(fileobj=io.BytesIO(shadow.bundle(recording))) as tar:
+        members = sum(member.size for member in tar.getmembers())
+    assert shadow.bundle_size(recording) == members == len(key) + 10
+
+    def never(_recording: shadow.Recording) -> bytes:
+        raise AssertionError("a bundle past the limit is built in memory")
+
+    monkeypatch.setattr(shadow, "bundle", never)
     _stored(key)
     shadow.after_build(recording, deps, _digest)
     [record] = _events(tmp_path, "replay_shadow")
     assert (record["outcome"], record["publish"]) == ("recorded", "oversize")
-    assert blob.committed == {}
+    assert record["bundle_bytes"] == members and blob.committed == {}
 
 
 def test_a_dependent_comparison_past_a_bound_is_no_judgement(
@@ -3518,12 +3531,13 @@ def _judged_noop(
     found: shadow.Shadow,
     displays: tuple[Any, Any] = (None, None),
     publish: str = "stored",
-    data: bytes = b"bundle",
+    data: bytes | None = b"bundle",
 ) -> tuple[shadow.Recording, dict[str, Any], dict[str, Any]]:
     """``found`` as the comparison of a drawing against its one base on the
     same children, whose two logs held ``displays`` (base, new): the base's
-    manifest predates ``display``, as pass 1's do. RETURNS the recording,
-    its published manifest and the record."""
+    manifest predates ``display``, as pass 1's do. ``data`` None: a bundle
+    past BUNDLE_LIMIT, never built. RETURNS the recording, its published
+    manifest and the record."""
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
     other = {"schema": shadow.MANIFEST_SCHEMA, "salt": "s", "kind": "drawing"}
     base = shadow.Base(
@@ -3544,7 +3558,9 @@ def _judged_noop(
         "salt": "s",
         "recording_id": "fresh",
         "engine": _ENGINE,
-        "bundle": {"name": "bundle.tar", "sha256": "0" * 64, "size": len(data)},
+        "bundle": None
+        if data is None
+        else {"name": "bundle.tar", "sha256": "0" * 64, "size": len(data)},
     }
     record: dict[str, Any] = {"publish": publish}
     summary = {"engine": _ENGINE, "display": displays[1]}
@@ -3623,13 +3639,16 @@ def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
         assert "this build's 1010x598 px/mm=2.098" in warned
 
 
-def test_a_dependent_recording_whose_key_exists_is_kept_as_evidence(
-    blob, tmp_path, monkeypatch, spans, logged
+@pytest.mark.parametrize("publish", shadow.EVIDENCE_OF)
+def test_a_dependent_recording_another_writer_beat_is_kept_as_evidence(
+    blob, tmp_path, monkeypatch, spans, logged, publish
 ):
+    # ``exists``: the key's recording names held another's (a forced
+    # refresh); ``lost``: another seat committed the key's archive first.
     moved = _noop("different", answers="different", pdf="different")
     displays = (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["new"])
     recording, published, record = _judged_noop(
-        tmp_path, monkeypatch, moved, displays, publish="exists"
+        tmp_path, monkeypatch, moved, displays, publish=publish
     )
     assert record["evidence"] == "stored"
     bundle_name, manifest_name = shadow.evidence_names(
@@ -3650,21 +3669,22 @@ def test_a_dependent_recording_whose_key_exists_is_kept_as_evidence(
     [span] = spans.named("replay.evidence ")
     assert span["replay.evidence"] == "stored"
     line = shadow.report_line(f"drawing:{_STEM}", record)
-    assert " | publish=exists bytes=- evidence=stored | " in line
+    assert f" | publish={publish} bytes=- evidence=stored | " in line
     # Create-only: the same recording again finds its copy.
-    _, _, record = _judged_noop(
-        tmp_path, monkeypatch, moved, displays, publish="exists"
-    )
+    _, _, record = _judged_noop(tmp_path, monkeypatch, moved, displays, publish=publish)
     assert record["evidence"] == "exists"
-    # A confirmed no-op needs no evidence, nor does a published recording.
+    # A confirmed no-op needs no evidence, nor does a published recording or
+    # one whose store made nothing.
     same = _noop("same", pdf="same")
-    _, _, record = _judged_noop(tmp_path, monkeypatch, same, publish="exists")
+    _, _, record = _judged_noop(tmp_path, monkeypatch, same, publish=publish)
     assert "evidence" not in record
-    _, _, record = _judged_noop(tmp_path, monkeypatch, moved, publish="stored")
-    assert "evidence" not in record
-    # Bounded like the key's own publication.
-    monkeypatch.setattr(shadow, "BUNDLE_LIMIT", 3)
-    _, _, record = _judged_noop(tmp_path, monkeypatch, moved, publish="exists")
+    for unbeaten in ("stored", "error", "empty"):
+        _, _, record = _judged_noop(tmp_path, monkeypatch, moved, publish=unbeaten)
+        assert "evidence" not in record
+    # A bundle past BUNDLE_LIMIT was never built: nothing to keep.
+    _, _, record = _judged_noop(
+        tmp_path, monkeypatch, moved, publish=publish, data=None
+    )
     assert record["evidence"] == "oversize"
     assert len(spans.named("replay.evidence ")) == 2
 

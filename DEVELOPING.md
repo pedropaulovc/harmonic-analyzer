@@ -3181,9 +3181,12 @@ under the same driver as a part, planned by `_replay_shadow.plan_dependent`,
 which describes the build (script, argument, children, sidecars) only once the
 mode and cache role call for a recording; a description that raises builds
 unrecorded with a WARN.
-A drawing script keeps its argument: `com_replay.py record <script> ... --
-<artifact stem>` puts it back into `sys.argv` around the engine (whose
-`run_script` passes none), and a recorder fault's unrecorded re-run (exit 92)
+A drawing script keeps its argument: `com_replay.py record <script> ... --kind
+drawing -- <artifact stem>` puts it back into `sys.argv` around the engine
+(whose `run_script` passes none). The driver itself splits its arguments at
+the first `--` before argparse sees them: argparse before Python 3.12.7
+(CPython gh-59317) binds a `*` positional after the script's path to `[]` and
+rejects the stem. A recorder fault's unrecorded re-run (exit 92)
 is `python <script> <artifact stem>`. REFRESH tiers (`refresh_assembly.py
 <stem> <tier>`) are not recorded: another script and argument, which no FULL
 recording could be judged against, and the farm always builds FULL. A
@@ -3248,11 +3251,15 @@ signal's detail (`output_evidence` in the record). 2026-11-12,
 `display` is the window a drawing's sheet picks hit-test in, read from the
 recording's own answers to `_seat_forensics.display_geometry`'s inert probes
 (`com_replay._display`: `view_window` from `IModelView.GetVisibleBox`,
-`px_per_mm` from `IModelView.ProjectModelPoint`), so it costs no COM call; the
-summary and the manifest carry it, and `com_replay.py diff` reads it from both
-logs (`display`: `base`, `new`), so a base whose manifest predates it is
-judged too; the record carries the two (`display`, `base_display`:
-`<w>x<h> px/mm=<p>`). A log without a probe (an assembly's) has none.
+`px_per_mm` from `IModelView.ProjectModelPoint`), so it costs no COM call.
+Only a drawing's recording (`record --kind drawing`) reads it on the seat, and
+only from its probe lines (`com_replay._logged_display`, streaming the log
+without loading it: 3.9 ms against 33.9 ms for a full load on the 6,371-call
+log of the 10.97 MB `ms_measuring_stick_assembly` drawing bundle); a part's
+or an assembly's never does. The summary and the manifest carry it, and
+`com_replay.py diff` reads it from both logs, off the seat (`display`:
+`base`, `new`), so a base whose manifest predates it is judged too; the record
+carries the two (`display`, `base_display`: `<w>x<h> px/mm=<p>`).
 
 `title_echo` (`_com_outcome.title_echo`): the first difference was a title
 counter the script echoed (`truth_cause=response:title_counter`), and the
@@ -3260,17 +3267,19 @@ whole streams are the same requests once title counters are masked, every
 answer the same but for noise. The split is `noop`; `ground_truth=diverged`
 and the cause are kept, and the INFO line ends with `title_echo`.
 
-**Evidence copies.** A recording whose key's names already held another
-writer's (`publish=exists`: a forced refresh, a rebuild of the same key) is
-the only copy of that build's conversation. Unless its split is a `confirmed`
-`noop`, it is stored create-only under
+**Evidence copies.** A recording left unpublished because another writer's
+bytes already stand under its key (`_replay_shadow.EVIDENCE_OF`:
+`publish=exists`, the key's recording names held another's, as on a forced
+refresh; `publish=lost`, another build committed the key's archive first, as
+when two seats build one key) is the only copy of that build's conversation.
+Unless its split is a `confirmed` `noop`, it is stored create-only under
 `com-replay/<engine 16>/<kind>-<stem>/evidence/<key>/<recording id>.tar` and
 `.json` (`_replay_shadow.evidence_names`; the manifest names that bundle and
 carries `evidence_of`: split, judgement, cause, base key), outside
 `manifest/`, so no lookup ever lists it as a base, and within the same
 512 MiB bound. The record, the `replay.evidence` span and the INFO line
-(`publish=exists bytes=<n> evidence=<outcome>`) carry the outcome (`stored`,
-`exists`, `error`, the cache's `skip`/`off`, or `oversize`).
+(`publish=<exists|lost> bytes=<n> evidence=<outcome>`) carry the outcome
+(`stored`, `exists`, `error`, the cache's `skip`/`off`, or `oversize`).
 
 `own_differing` counts the differing key inputs that are not child
 identities. The seat path (`_com_outcome.seat_path`) is judged for these kinds
@@ -3292,7 +3301,9 @@ upper bound). Their counts size a second engine identity for these kinds.
 
 **Bounds and cost.** Every recording name fits the farm's path budget with 32
 characters to spare (`test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit`);
-a bundle over 512 MiB is not published (`publish=oversize`). On 788 recorded
+an assembly's or drawing's bundle whose files exceed 512 MiB on disk
+(`bundle_size`) is never built in memory, published or kept
+(`publish=oversize`). On 788 recorded
 part builds (2026-11-12) the recorder cost 1.8% of the window at p50 and 2.8%
 at p95, at 101 recipe requests per window second (p95 156) and 176 bundle
 bytes per request (p95 680); the diff took about 3 s plus 0.5 ms per request.

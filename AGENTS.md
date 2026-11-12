@@ -1100,13 +1100,17 @@ requests, answers, sidecar bytes; drawings: requests, answers, PDF ink). A
 WARN `output_nondeterminism` (`output_cause=seat_display` when the two logs'
 own answers report different drawing windows, else `answers`) or
 WARN `unexplained_output_divergence` (answers alike); `SOUNDNESS ALARM` is
-parts-only. A recording whose key already existed (`publish=exists`) and is
-no confirmed `noop` is kept create-only outside `manifest/` as evidence
-(`evidence=`). The comparison runs before the leaf's process reports, so it is
-capped at 60 s (`timeout`); a child token that holds no digest is named with
-its reason (WARN, `children_unreadable`). Manifests carry `replay_gaps` (what
-the engine's replay lacks for these kinds) and `display`. No output, exit
-code or cache key changes. See DEVELOPING.md "Assemblies and drawings".
+parts-only. A recording left unpublished because another writer's bytes stand
+under its key (`publish=exists|lost`) and that is no confirmed `noop` is kept
+create-only outside `manifest/` as evidence (`evidence=`); a bundle whose files
+pass 512 MiB on disk is never built. The comparison runs before the leaf's
+process reports, so it is capped at 60 s (`timeout`); a child token that holds
+no digest is named with its reason (WARN, `children_unreadable`). Manifests
+carry `replay_gaps` (what the engine's replay lacks for these kinds) and a
+drawing's `display`, streamed from its log's probe lines (never re-read for a
+part or an assembly). The record driver splits the script's arguments at the
+first `--` itself (argparse before 3.12.7 rejects them). No output, exit code
+or cache key changes. See DEVELOPING.md "Assemblies and drawings".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the
