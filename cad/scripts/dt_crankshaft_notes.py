@@ -56,16 +56,22 @@ CROSS_HOLE_NOTE = "\n".join(
     )
 )
 
-# Note 2: the seat spigot.  Its diameter (held under nominal) and its length
-# from the seat face are one feature with one reason: the #25 chain wrapping
-# the sprocket passes over the spigot and in front of the collar body
-# (dt_crankshaft_spec).  Rule 4: one feature's tight dimensions name the mate
-# once, on one numbered note linked to each; rule 26: never AIR for clearance.
+# Note 2: the seat spigot.  Its diameter is held under nominal for one
+# reason: the #25 chain wrapping the sprocket passes over the spigot
+# (dt_crankshaft_spec).  Rule 4: a tight dimension names its mate on a
+# numbered note linked to it; rule 26: never AIR for clearance.  The same
+# note names what the spigot's two faces meet, for the two three-place
+# stations that locate them (one feature, one linked note).
 SPIGOT_NOTE_NUMBER = 2
 SPIGOT_CALLOUT = see_note(SPIGOT_NOTE_NUMBER)
 # The chain by its drawing number, its catalogue size after it (rule 4).
-SPIGOT_NOTE = (
-    f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS CHAIN MHA-SH-VN-50 (#25) ON SPROCKET MHA-PD-09."
+# Two rows: on one, the row ran into the title block (machinist review of
+# 76e4489d85).
+SPIGOT_NOTE = "\n".join(
+    (
+        f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS CHAIN MHA-SH-VN-50 (#25); ITS FACES SEAT SPROCKET",
+        "   MHA-PD-09 AND BEAR ON MHA-DT-05.",
+    )
 )
 
 
@@ -120,11 +126,14 @@ FIT_NOTE = "\n".join(
 # The sheet's numbered notes, in one block under the general note.
 SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE))
 
-# The three-place far-end collar stations and the Depth name their stack on
-# their own row: a callout below would lift the value into the row above.
-# No AIR (rule 26).
-COLLAR_REAR_MATE = " BEARS ON MHA-DT-05"
-COLLAR_SEAT_MATE = " MHA-PD-09 SEAT"
+# The Depth names its stack on its own row: a callout below would lift the
+# value into the row above.  No AIR (rule 26).  The two three-place far-end
+# collar stations link note 2 the same way, which names the mate of each
+# face: words on a location dimension gated the machinist review of
+# d40d806387 (rule 7: a location carries its value and band; the mate sits
+# on a linked flag note).
+COLLAR_REAR_MATE = f" {SPIGOT_CALLOUT}"
+COLLAR_SEAT_MATE = f" {SPIGOT_CALLOUT}"
 SHAFT_LENGTH_MATE = " SETS CLEARANCE MHA-DT-31 TO MHA-PD-09"
 # The one Ø.375 ±.010 covers both bare necks by its count alone: a location
 # phrase (BEHIND COLLAR AND AT SEAT STEP) is a prose locator (round-3
@@ -205,7 +214,7 @@ PINION_PIN_CALLOUT = "\n".join(
 # unleadered "AT PLAIN END" row named an end the sheet never identified.  The
 # restriction is on the centre hole, a turning location: the dome's punched
 # witness (FIDUCIAL_NOTE) is a separate, required mark on the finished
-# sphere, which a centre hole would destroy. Keep the four-row text
-# unchanged when relocating its native leader: the drawing identifies the
-# plain end in FRONT, not by the isometric's apparent top/bottom orientation.
-CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNOT IN\nDOME"
+# sphere, which a centre hole would destroy. Two rows of words at most (rule
+# 7); the drawing identifies the plain end in FRONT, not by the isometric's
+# apparent top/bottom orientation.
+CENTRES_NOTE = "LATHE CENTRE OK,\nNOT IN DOME"

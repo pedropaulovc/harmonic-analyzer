@@ -112,7 +112,7 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
 
 def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     # The collar's front is the Ø17.5 seat spigot, whose face is the removable
-    # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
+    # sprocket's seat on the shared plane, the one diameter of the collar; its
     # rear face bears on the post boss's south face (owner ruling D1: no
     # washer), and stays short of the outboard journal land.
     import build_dt_drive_train_assembly as bdt
@@ -122,9 +122,9 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     # The inch spigot (.689) is the wheel's seat to within its print grid.
     assert spec.SPIGOT_DIA == pytest.approx(removable.SEAT_SPIGOT_DIA, abs=0.001)
-    assert spec.SPIGOT_DIA < spec.COLLAR_DIA
-    # The blind drive-pin holes end in the spigot, short of its step.
-    assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
+    assert not hasattr(spec, "COLLAR_DIA")
+    # The blind drive-pin holes end in the collar, short of its rear face.
+    assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.COLLAR_REAR
     # The rear face from the post's own boss face, floored to its .XX print.
     boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
     assert spec.POST_BOSS_SOUTH == pytest.approx(boss_south)
@@ -133,14 +133,19 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     assert pinion.prints_exactly(spec.COLLAR_LENGTH, places, spec.UNIT)
     assert 0.0 <= boss_south - spec.COLLAR_REAR < pinion.print_step(places, spec.UNIT)
     assert spec.COLLAR_BOSS_AIR == pytest.approx(boss_south - spec.COLLAR_REAR)
-    # The body keeps length at print-worst: both stations and the spigot.
-    body_worst = (
-        spec.COLLAR_LENGTH
-        - spec.SPIGOT_LENGTH
-        - 2.0 * spec.COLLAR_STATION_TOL
-        - spec.SPIGOT_LENGTH_TOL
+    # The collar's shortest printed length is both stations' bands off it,
+    # and its rear face keeps a bearing ring on the boss between the bore
+    # mouth's break and its own edge break (the hand crank's end thrust).
+    assert spec.COLLAR_LENGTH - 2.0 * spec.COLLAR_STATION_TOL - pinion.print_step(
+        places, spec.UNIT
+    ) < spec.COLLAR_LENGTH_MIN <= spec.COLLAR_LENGTH - 2.0 * spec.COLLAR_STATION_TOL + 1e-9
+    ring = (
+        (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0
+        - (post.CRANK_BORE_DIA + post.RUNNING_BORE_BAND[0]) / 2.0
+        - 2.0 * spec.BORE_MOUTH_BREAK_MAX
     )
-    assert body_worst > 0.0
+    assert spec.COLLAR_BEARING_RING_WORST <= ring + 1e-9
+    assert spec.COLLAR_BEARING_RING_WORST >= spec.WALL_TARGET_MM
     assert spec.COLLAR_REAR + spec.COLLAR_STATION_TOL < spec.JOURNAL_START
     # The bare land behind the collar spans the bore mouth's edge break at
     # print-worst, so the rear face seats flat on the boss.
@@ -180,9 +185,8 @@ def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     # Machinist review of f7c9771b3: the bare 3.95 read under the title
     # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
     # callout carries the cut's own band, the one the proud stack reads.
-    floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
-        spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
-    )
+    floor = spec.COLLAR_LENGTH_MIN - (spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL)
+    assert floor == pytest.approx(spec.DRIVE_PIN_FLOOR_WALL_WORST)
     assert floor >= spec.WALL_FLOOR_MM
     band = notes.DRIVE_PIN_DEPTH_BAND
     process = spec.DRIVE_PIN_HOLE_PROCESS
@@ -260,6 +264,14 @@ def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     assert not hasattr(spec, "CRANK_END_NOTE")
 
 
+def test_sheet_note_rows_end_left_of_the_title_block() -> None:
+    # The widest row proven on the farm sheet is note 1's second (73
+    # characters, ending 31 mm left of the title block); a 99-character note 2
+    # ran across the title block's border (machinist review of 76e4489d85).
+    rows = notes.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
+    assert max(len(row) for row in rows) <= 73
+
+
 def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
@@ -313,7 +325,7 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
     assert drawing.SIDE_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
     # The collar is the end view's largest circle.
-    end_radius = spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    end_radius = spec.SPIGOT_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert drawing.END_CENTER[0] + end_radius < drawing.DOME_TIP_X
 
 
@@ -334,12 +346,10 @@ def test_pin_locations_print_value_and_band_only() -> None:
         assert x + _PIN_VALUE_TEXT_WIDTH + 0.001 < drawing.DOME_TIP_X, name
 
 
-def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
-    # Machinist review of 19e33c6c2 read 5.75 - 4.05 = 1.70 behind the holes,
-    # taking the 5.80 spigot step for the end of material.  The holes lie
-    # wholly inside the spigot, and the Ø20.6 body continues behind it to the
-    # rear face: the floor is the collar's worst-case length less the
-    # deepest hole, over the 2.0 wall target.
+def test_blind_pin_holes_bottom_in_the_collar_short_of_its_rear_face() -> None:
+    # The holes lie wholly inside the spigot, which runs to the rear face:
+    # the floor is the collar's worst-case length less the deepest hole,
+    # over the 2.0 wall target.
     assert spec.DRIVE_PIN_CIRCLE_RADIUS + spec.DRIVE_PIN_HOLE_DIA / 2.0 < (
         spec.SPIGOT_DIA / 2.0
     )
@@ -402,12 +412,12 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
     # The collar's rear face runs on the thrust washer: its own control, its
     # leader landing on that face's edge-on line, clear of the corner it
-    # shares with the Ø20.6 OD and above the neck it steps down to.
+    # shares with the collar's OD and above the neck it steps down to.
     (washer_face,) = [c for c in spec.SURFACE_FINISHES if c.key not in lands]
     assert washer_face.key == "collar_rear_face"
     pick, _symbol = drawing.COLLAR_REAR_FINISH
     assert pick[0] == pytest.approx(drawing._sheet_x(washer_face.face.offset_mm))
-    corner_y = drawing._sheet_y(spec.COLLAR_DIA / 2.0)
+    corner_y = drawing._sheet_y(spec.SPIGOT_DIA / 2.0)
     assert drawing._sheet_y(spec.SHAFT_DIA / 2.0) < pick[1] <= corner_y - 0.0015
 
 
@@ -417,7 +427,7 @@ def test_collar_rear_finish_resolves_the_controlled_thrust_face_from_its_rim(
 ) -> None:
     from _gtol_face import SURFACE_CYLINDER, SURFACE_PLANE, FaceGeometry
 
-    rear_m, radius_m = spec.COLLAR_REAR / 1000.0, spec.COLLAR_DIA / 2000.0
+    rear_m, radius_m = spec.COLLAR_REAR / 1000.0, spec.SPIGOT_DIA / 2000.0
     thrust, od = object(), object()
     geometries = {
         thrust: FaceGeometry(
@@ -663,7 +673,10 @@ def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> 
     assert y1 == pytest.approx(
         drawing.ISO_NOTE_XY[1] - 2.0 * 0.005 - drawing.NOTE_TEXT_GAP
     )
-    assert drawing.CENTRES_NOTE_XY == (0.372, 0.093)
+    # Two rows at most (rule 7), a caption's height and more under the
+    # isometric caption's field so it does not read as part of it.
+    assert len(notes.CENTRES_NOTE.splitlines()) == 2
+    assert y1 - drawing.CENTRES_NOTE_XY[1] >= 0.005
     assert drawing._inside(drawing.CENTRES_NOTE_XY, field)
     assert len(notes.CENTRES_NOTE.splitlines()) <= TEXT_ROW_LIMIT
     # The whole text field and landing window stay below MATCH DRILL's

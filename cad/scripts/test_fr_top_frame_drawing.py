@@ -326,6 +326,18 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     )
     assert part.KEEPER_RELIEF_CAP_RECESS_WALL == pytest.approx(wall)
     assert wall >= part.WALL_TARGET_MM
+    # On the boss top the recess's mouth lead-in, at its largest printed
+    # leg, comes off that wall; the land left still meets the target.  The
+    # former .03 lead-in left 1.803 there (codjiflo, PR #2599).
+    assert part.BORE_CHAMFER / spec.IN == pytest.approx(0.02)
+    mouth_places = spec.DRAWING_REFERENCE_PRECISION["top bore mouth chamfer"]
+    mouth_max = part.BORE_CHAMFER + spec.PRINTED_LINEAR_BAND_MM[mouth_places]
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(wall - mouth_max)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(2.0574, abs=5e-4)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND >= part.WALL_TARGET_MM
+    assert wall - (0.03 * spec.IN + spec.PRINTED_LINEAR_BAND_MM[mouth_places]) < (
+        part.WALL_TARGET_MM
+    )
     assert chord - part.CAP_RECESS_DIAMETER / 2.0 == pytest.approx(3.2639)
     # The relief removes only the band over the faced top: the cross screws
     # and the cast datum targets lie under it.
@@ -334,6 +346,93 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     # Two caps of the proud band, less its taken-out draft and rim break.
     prism = 2.0 * part._circle_cap_area(part.BOSS_DIA / 2.0, chord) * part.BOSS_ABOVE
     assert 0.85 * prism < part._keeper_relief_removal() < prism
+    # Each foot's outboard end rests on the relief's floor, inside the
+    # barrel's cast footprint, so the floor is the faced top and the step's
+    # root is held under the foot tip's stand-off at the printed limits (the
+    # title block's R.040 would not be: codjiflo, PR #2599).
+    assert part.KEEPER_FOOT_TIP_Z_FRONT < part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0
+    assert part.KEEPER_FOOT_TIP_Z_REAR > part.REAR_COLUMN_Z - part.BOSS_DIA / 2.0
+    root = spec.KEEPER_BOSS_RELIEF_ROOT_R_MAX
+    assert root / spec.IN == pytest.approx(0.02)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(
+        min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) - root
+    )
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(0.2286, abs=5e-4)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN > 0.0
+    title_block_inside_corner = 0.040 * spec.IN
+    assert title_block_inside_corner > min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
+
+
+def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> None:
+    """The step prints .67, 2X, on A-A (the cut through the two west
+    bosses), native between the rear socket's axis and the step's cut-face
+    line, and nothing else rides on that location; the step's mate, floor
+    and root limit are its own leader callout on the front boss's step,
+    over the rail and under the mouth chamfer's parked text."""
+    label = "keeper relief step from socket axis"
+    places = spec.DRAWING_REFERENCE_PRECISION[label]
+    assert places == spec.KEEPER_BOSS_RELIEF_PLACES == 2
+    assert f"{spec.KEEPER_BOSS_RELIEF_FROM_SOCKET / spec.IN:.{places}f}" == "0.67"
+    # The printed band is the one the keeper foot's margin charges.
+    assert part.KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET == pytest.approx(
+        spec.KEEPER_BOSS_RELIEF_FROM_SOCKET + spec.PRINTED_LINEAR_BAND_MM[places]
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("    def keeper_relief_station()") :]
+    body = body[: body.index("    keeper_relief_station()")]
+    assert "entities=(bore_axes[1], steps[0])" in body
+    assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
+    assert 'suffix="2X",' in body
+    assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
+    # The step's callout: the mate by its drawing number (rule 4), the
+    # faced top it runs down to (the feet's outboard ends rest on it), the
+    # root's limit.  A leader note, so the location carries no requirement
+    # (machinist review, farm run 20261112T014216327Z), of two rows of
+    # words (rule 7; farm run 20261112T030307472Z).
+    assert drawing.KEEPER_RELIEF_CALLOUT == (
+        "2X MHA-CH-07 FOOT STEP TO\nFACED TOP, ROOT R.02 MAX"
+    )
+    assert "KEEPER_RELIEF_CALLOUT,\n            text_xy=KEEPER_RELIEF_NOTE_XY," in body
+    assert "HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
+    assert "view=detail_section," in body
+    scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
+    axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
+    step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
+    line_x, line_y = drawing.KEEPER_RELIEF_LINE_XY
+    assert line_x == pytest.approx((axis_x + step_x) / 2.0)
+    # Over the boss top by at least 5 mm of paper, 5 under the chamfer's
+    # dimension line (y 162) and its parked text.
+    boss_top_y = (
+        drawing.DETAIL_SECTION_CENTER[1] + (part.HALF_H + part.BOSS_ABOVE) * scale
+    )
+    assert line_y - boss_top_y > 0.005
+    assert 0.162 - line_y > 0.005
+    text_x, text_y = drawing.KEEPER_RELIEF_TEXT_XY
+    rail_top_y = drawing.DETAIL_SECTION_CENTER[1] + part.HALF_H * scale
+    chamfer_rows_bottom = drawing.BORE_CHAMFER_TEXT_OFFSET_XY[1] - 0.008
+    # Printed .12 text measures 2.7 mm a character, rows 5.3 mm apart (farm
+    # run 20261112T014216327Z).  The station's two rows (".67", "2X") stand
+    # about their centre just left of the step, under the chamfer's rows.
+    char_w, row_h = 0.0027, 0.0053
+    half_w = 3 * char_w / 2.0
+    assert text_x + half_w < step_x - 0.002
+    assert text_y - row_h > boss_top_y + 0.003
+    assert text_y + row_h < chamfer_rows_bottom
+    # The callout's two rows hang from its upper-left corner: clear of the
+    # station's text on the right and the front boss's recess witnesses on
+    # the left, over the rail top, under the chamfer's rows.
+    note_x, note_y = drawing.KEEPER_RELIEF_NOTE_XY
+    rows = drawing.KEEPER_RELIEF_CALLOUT.split("\n")
+    assert len(rows) == 2
+    note_w = max(map(len, rows)) * char_w
+    assert note_x + note_w < text_x - half_w - 0.003
+    front_axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.FRONT_COLUMN_Z * scale
+    front_step_x = front_axis_x + spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
+    assert front_step_x - front_axis_x > part.CAP_RECESS_DIAMETER / 2.0 * scale
+    # The leader runs down-left to the front step's root from past it.
+    assert note_x - front_step_x > 0.005
+    assert note_y - len(rows) * row_h > rail_top_y + 0.002
+    assert note_y < chamfer_rows_bottom - 0.002
 
 
 @pytest.mark.parametrize("front_station_direction", (-1, 1))
@@ -1039,15 +1138,17 @@ def test_knife_seat_footprints_cover_the_one_pin_and_its_yaw() -> None:
 
 
 def test_edge_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
-    # Every finished underside break band keeps 0.5 off both seats; the
-    # pocket ends bind the front seat.  Every gusset hypotenuse beyond the
+    # Every finished underside break band keeps 0.5 off both seats.  The
+    # front seat stands 6.35 further out since #1038 (owner ruling 4, the
+    # summing plate's front extension), clear of the pocket ends that bound
+    # it; the rear seat now binds.  Every gusset hypotenuse beyond the
     # pockets is an edge a break would put under a seat; the rear bar sides
     # stop short of the rear seat.
     _groups, clearance = part._external_edge_breaks()
     assert clearance == part.KNIFE_SEAT_EDGE_BREAK_CLEARANCE
     assert min(clearance.values()) >= part.KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE == 0.5
     assert clearance == pytest.approx(
-        {"front": 3.681334718490888, "rear": 4.263909177049044}
+        {"front": 3.681334718490888 + 6.35, "rear": 4.263909177049044}
     )
     # The printed worst leg, .06 + .01, never the model's 1.524.
     assert part.EDGE_BREAK_PRINTED == pytest.approx(1.524)
@@ -3866,10 +3967,11 @@ def test_hanger_frame_lands_on_the_rim_clear_of_the_callout_leader() -> None:
     radius = spec.HANGER_CLEARANCE_DIA / 2.0 * _S
     frame_start, r5_landing = R5_HANGER_FRAME_RUN
     # The logged runs, in R5's view: the Ø17 rim's diameter through the axis,
-    # and a run to the clearance rim, crossing where R5 reported.
+    # and a run to the clearance rim, crossing where R5 reported.  R5's front
+    # hanger stood 87.06 off the summing axis (before #1038's 93.41).
     r5_centre = (
         R5_PLAN_CENTER[0] + part.HANGER_X * _S,
-        R5_PLAN_CENTER[1] - part.STUD_Z_FRONT * _S,
+        R5_PLAN_CENTER[1] - (spec.SUMMING_Z - 87.06) * _S,
     )
     r5_a, r5_b = R5_HANGER_CALLOUT_RUN
     assert math.dist(((r5_a[0] + r5_b[0]) / 2.0, (r5_a[1] + r5_b[1]) / 2.0), r5_centre) < 0.0002
@@ -4329,6 +4431,13 @@ _R7_DATUM_D_ASKED = (0.1441, 0.124)
 _R7_BAR_WIDTH_ARROW_X = 0.1410842
 _R7_ROW_GLYPH = 0.0569868 / 21
 _R7_ROW_PITCH = 0.128 - 0.1224437
+# That run's underside view stood centred on x 150; the sheet's whole group
+# has since moved right with the view (rule 15 balance), its ink with it.
+_R7_VIEW_CENTRE_X = 0.150
+
+
+def _r7_sheet_shift() -> float:
+    return drawing.DATUM_BOTTOM_CENTER[0] - _R7_VIEW_CENTRE_X
 
 
 def _r7_datum_d_display_data():
@@ -4338,9 +4447,11 @@ def _r7_datum_d_display_data():
     width's rows stand about their offset, the value last, the callout's
     sized at that run's mean glyph."""
     asked_x, line_y = _R7_DATUM_D_ASKED
-    tag_dx = asked_x - drawing.CROSSBAR_MEDIAN_DATUM_XY[0]
+    shift = _r7_sheet_shift()
+    tag_dx = asked_x - (drawing.CROSSBAR_MEDIAN_DATUM_XY[0] - shift)
     tag_dy = drawing.DATUM_BOTTOM_KEEP["BarWidth"][1] - line_y
-    arrow_x, y = _R7_BAR_WIDTH_ARROW_X, 0.124 + tag_dy
+    arrow_x, y = _R7_BAR_WIDTH_ARROW_X + shift, 0.124 + tag_dy
+    tag_dx += shift
     x0, x1 = 0.1310683 + tag_dx, 0.1380683 + tag_dx
     datum = {
         "lines": [
@@ -4418,7 +4529,7 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     )
     assert asked[1] - 0.0035 - view_top >= drawing.INK_CLEARANCE
     scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
-    arrow_x = _R7_BAR_WIDTH_ARROW_X
+    arrow_x = _R7_BAR_WIDTH_ARROW_X + _r7_sheet_shift()
     assert arrow_x < asked[0] < arrow_x + (part.BAR_X1 - part.BAR_X0) * scale
     datum, rows = _r7_datum_d_display_data()
     tag_right = max(x for line in datum["lines"][1:] for x in (line[4], line[7]))
@@ -4935,7 +5046,16 @@ def test_dowel_press_ream_contract() -> None:
     # providers, not the builder; codjiflo, PR #1978); the builder reads
     # them too.
     assert spec.PIN_HOLE_X == pytest.approx(-7.38)
-    assert (spec.STUD_Z_FRONT, spec.STUD_Z_REAR) == pytest.approx((-83.972, 90.148), abs=5e-4)
+    # #1038, owner ruling 4: the front station follows the summing plate's
+    # .25 front extension, 93.41 off the summing axis; the rear keeps 87.06.
+    assert (spec.HEX_Z_MID_FRONT, spec.HEX_Z_MID_REAR) == (93.41, 87.06)
+    assert spec.HEX_Z_MID_FRONT - spec.HEX_Z_MID_REAR == pytest.approx(0.25 * spec.IN)
+    assert (spec.STUD_Z_FRONT, spec.STUD_Z_REAR) == pytest.approx(
+        (spec.SUMMING_Z - 93.41, spec.SUMMING_Z + 87.06)
+    )
+    assert (spec.STUD_Z_FRONT, spec.STUD_Z_REAR) == pytest.approx(
+        (-90.322, 90.148), abs=5e-4
+    )
     stations = ("HANGER_X", "PIN_HOLE_X", "STUD_Z_FRONT", "STUD_Z_REAR")
     for module in (part, drawing):
         for name in stations:
@@ -5332,7 +5452,7 @@ def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
         washer.ID_MAX / 2.0, clearance_r + offset
     )
     assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(ring)
-    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.15981340550531709)
+    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.16179812649087388)
     assert ring > 0.0
 
 
@@ -5382,9 +5502,10 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(24.1808)
     # Entry wander at the deepest pocket roof and the finished top.  Every
     # ream sits across the line at its implied-zero .XXX off the screw axis.
-    # The nearer station stands at its .XXX from the socket axes; a pocket
-    # end stands two as-cast bands out (its station from the front socket
-    # and the chained length).
+    # The nearer station (the rear one since #1038 moved the front one .25
+    # out) stands at its .XXX from the socket axes; a pocket end stands two
+    # as-cast bands out (its station from the front socket and the chained
+    # length).
     pocket = part.BAR_POCKET_HOLE_WALLS
     cast = spec.AS_CAST_BAND
     assert part._POCKET_STATION == pytest.approx(
@@ -5403,9 +5524,9 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         station - off - spec.HANGER_KNOCKOUT_DIA_MAX / 2.0
         - part.HANGER_KNOCKOUT_SHIFT_AT_TOP
     )
-    assert pocket["hanger clearance hole"] == pytest.approx(10.2100016289222)
-    assert pocket["dowel ream"] == pytest.approx(11.715424473468786)
-    assert pocket["dowel knockout"] == pytest.approx(12.13727308456292)
+    assert pocket["hanger clearance hole"] == pytest.approx(16.385177189775263)
+    assert pocket["dowel ream"] == pytest.approx(17.89060003432185)
+    assert pocket["dowel knockout"] == pytest.approx(18.312448645415984)
 
 
 def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
@@ -5459,11 +5580,11 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         math.atan(2.0 * line / (spec.STUD_Z_REAR - spec.STUD_Z_FRONT)) + play
     )
     assert part.HANGER_BAR_YAW_SHIFT == pytest.approx(yaw_shift)
-    assert yaw_shift == pytest.approx(0.06023, abs=5e-5)
+    assert yaw_shift == pytest.approx(0.05895, abs=5e-5)
     assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(
         math.hypot(block, block + yaw_shift)
     )
-    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.39690450081920764)
+    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.39591214032642924)
     assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(
         (spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA_MIN)/2,
     )
@@ -5477,7 +5598,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         + part.HANGER_DRIFT_AT_TOP
         + spec.HANGER_WASHER.OD_ID_RUNOUT_MAX
     )
-    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.4929237297420652)
+    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.4919313692492868)
     reach = spec.HANGER_WASHER.OD_MAX / 2.0 + part.HANGER_WASHER_OFFSET_MAX
     # Inside the top break's printed worst leg at the narrowest printed bar
     # half width, centred on D.
@@ -5488,7 +5609,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         - part.EDGE_BREAK_PRINTED_MAX
         - reach
     )
-    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.253576270257934)
+    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.254568630750713)
     # Clear of the outer front/rear rail ends: each washer's Z reach is its
     # station band plus the print-worst reach; the rail's outer face is the
     # narrowest printed half flange past its socket axis. The rear end binds,
@@ -5503,11 +5624,11 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     )
     assert rear_end_wall < front_end_wall
     assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(rear_end_wall)
-    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.739988489831397)
+    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.740980850324174)
     assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(
         spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - part.HANGER_WASHER_OFFSET_MAX
     )
-    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.669376270257935)
+    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.6703686307507133)
     assert part.HANGER_WASHER_BAR_TOP_MARGIN > 0.0 and part.HANGER_WASHER_BEARING_MIN > 0.0
     assert part.HANGER_WASHER_OUTER_END_WALL >= 2.032
     # The spotface guards are gone, not aliased.
@@ -6897,7 +7018,7 @@ def test_sheet_three_tabulates_its_sockets_basic_from_the_cast_datum_corner() ->
     assert [
         (f"{(z - part.FRONT_COLUMN_Z) / 25.4:.{spec.DRAWING_REFERENCE_PRECISION[label]}f}")
         for label, z in stations.items()
-    ] == ["1.104", "7.959"]
+    ] == ["0.854", "7.959"]
     # The band left of the title block, under the plan's rear bosses and
     # over the edge-break note, holds the table.
     table = _hole_table_box()
@@ -7470,12 +7591,13 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
-    # Owner ruling K5 (#1038): the feet end past the end rails' window faces,
-    # in the corners, where the end rail's own faced flange carries on under
-    # them to the relief step at every printed limit.
+    # Owner ruling K5 (#1038): the feet end past the end rails' window
+    # faces.  No edge of the faced top lies there: each foot stands on the
+    # west rail's own flange, which runs on under the barrel to the corner,
+    # its two sides inside that rail's rims (below).
     assert abs(part.KEEPER_FOOT_TIP_Z_FRONT) > part.INNER_Z
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN == pytest.approx(1.397)
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN > 0.0
+    assert not hasattr(part, "KEEPER_FOOT_CORNER_FLANGE_MARGIN")
+    assert part.KEEPER_TAP_X - 7.0 > part.INNER_X
     # Across it the widest printed foot (on the keeper's own sheet), at the
     # farthest printed fit-up offset from the web's median, stays inside the
     # narrowest as-cast flange less the largest printed top-rim break leg

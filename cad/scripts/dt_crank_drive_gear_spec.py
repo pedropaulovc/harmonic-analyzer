@@ -432,7 +432,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # independently of whichever recipe cuts the teeth, and
 # drawing-simplicity-policy.md `How the repository implements the guidelines` says model it rather than type it into the data block.
 # The tooth line has no native dimension: no view shows a tooth's line on a
-# drawn edge (machinist review of farm proof r3 on #2482 refused a 13 deg
+# drawn edge (machinist review of farm proof r3 on #2482 refused an angle
 # measured between construction rays in the bore), so its inclination, hand
 # and crossing station print in the gear data, as the helix angle did.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

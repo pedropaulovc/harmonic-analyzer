@@ -34,9 +34,10 @@ Geometry (mm), source casting with the corrected top-down hold-down interface
 Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
-  ``Z ±8.382`` (.330) at ``Y=+88.9``; mid-plane extrude 180.848 (7.12,
-  ``X ±90.424``): the source's 177.8, widened .06 an end for the pivot
-  brackets' feet (``fr_rocker_arm_support_spec.SUPPORT_HALF_MACHINE_Z``).
+  ``Z ±8.382`` (.330) at ``Y=+88.9``; mid-plane extrude 192.024 (7.56,
+  ``X ±96.012``): the source's 177.8, widened .28 an end for the pivot
+  brackets' feet at the .300 pitch (#1038;
+  ``fr_rocker_arm_support_spec.SUPPORT_HALF_MACHINE_Z``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
 * **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
@@ -58,14 +59,15 @@ Z = wall thickness):
   (Y=-82.55) at ``(X ±60.325, Z ±17.4498)`` (2.375, .687). One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
   into through-tapped seats in the harmonic base.
-* **RimChamfer** -- .06 / 45° on the 12 inner-frame opening edges, the +X
-  end face's foot and top edges, the two slant faces, the -X end face, and one
-  fillet face, with tangent propagation -- i.e. the whole window rim and all
-  twelve outside edges.
+* **RimChamfer** -- .06 / 45° on the 12 inner-frame opening edges, both end
+  faces' foot edges, the two slant faces and one fillet face, with tangent
+  propagation -- i.e. the whole window rim and ten of the twelve outside
+  edges; the end faces' top edges, under the MHA-CH-08 feet, keep the title
+  block's break so the bracket seats keep their end wall (#1038).
 * **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
   down from the top face on the centreline, under the MHA-CH-08 pivot
-  brackets' hold-down holes, each over a window side edge: the post outboard,
-  the web inboard (``rocker_bracket_seat_layout`` owns their stack; the print
+  brackets' hold-down holes, each wholly in an end post, outboard of the
+  cavity (``rocker_bracket_seat_layout`` owns their stack; the print
   transfers them from the set brackets at assembly).
 * **SeatStationReference** -- a blanked Top-plane sketch of two construction
   lines, each end face to its seat's centre, whose dimensions VIEW B prints as
@@ -165,7 +167,7 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (180.848, 7.12)
+BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (192.024, 7.56)
 # The source casting's length. The window and the cavity cut through the
 # wall's thickness inside the side posts, so the longer wall only thickens
 # both posts: every stage's measured volume gains the trapezoid's area times
@@ -348,8 +350,8 @@ RIM_CHAMFER_PLACES = 2
 # MHA-CH-08 seat stations (rocker_bracket_seat_layout), which flow through
 # from the channel and may sit off the .001 grid.
 SEAT_STATION_PLACES = 3
-# The cavity's and the pocket's end locations come off the 7.12 length's
-# half (3.56) less the centred 5.00 and 6.50 squares' halves (1.06, .31),
+# The cavity's and the pocket's end locations come off the 7.56 length's
+# half (3.78) less the centred 5.00 and 6.50 squares' halves (1.28, .53),
 # all .XX; the top and bottom locations, the web's location across the base
 # and each top-flat edge off its nearer web face are .XX too (1.00, .25,
 # 1.00, .08). The bracket feet stand on the flat and the transferred seats
@@ -465,9 +467,9 @@ SEAT_STATION_DRIVES = {
 # face from its edge (the profile's sharp, under the rim chamfer).
 REFERENCE_CHORD = 1.0
 REFERENCE_EDGE_STATION = 5.0
-CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.924, 1.06
+CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 32.512, 1.28
 CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4, 1.00
-POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.874, .31
+POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 13.462, .53
 POCKET_BOTTOM_STATION = HALF_Y - BIG  # 6.35, .25
 WEB_FACE_STATION = WIDE - WEB  # 25.4, 1.00
 LOCATION_DRIVES = {
@@ -515,11 +517,20 @@ SOURCE_CHAMFER = 1.27
 # on the web faces, the window rim on the slant faces), so it carries over;
 # a 45° chamfer's cross-section, so its removal, goes as the leg squared.
 RIM_CHAMFER_REMOVAL = SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
-RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - RIM_CHAMFER_REMOVAL
+# The two end faces' top edges stay off the chamfer (#1038: at the leg the
+# south bracket seat's thread came 1.51 from the chamfer's top edge, under
+# the rule-17 floor; rocker_bracket_seat_layout). Each edge spans the top flat (2 x
+# NARROW) and gives back its leg-squared-over-two prism; the corner mitres
+# with the slant faces' end edges are of order CHAMFER**3, inside the check.
+END_TOP_EDGE_CHAMFER_RELIEF = 2 * (2.0 * NARROW) * CHAMFER**2 / 2.0  # 38.9
+RIM_CHAMFER_VOLUME = (
+    FOOT_HOLED_VOLUME - RIM_CHAMFER_REMOVAL + END_TOP_EDGE_CHAMFER_RELIEF
+)
 # The rocker brackets' two bottoming-tapped seats, down from the top face on
 # the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
-# solid iron for its whole length: the post outboard of the window edge, the
-# web column (wider than the drill) inboard of it.
+# solid iron for its whole length: at 7.56 both lie wholly in the end posts,
+# outboard of the cavity (a seat over the window edge would have the web
+# column, wider than the drill, inboard of it).
 SEAT_POINTS = [[x, HALF_Y, 0.0] for x in SEAT_LOCAL_X]
 # Each seat's placement, in SEAT_POINTS order: sketch x is model X on the +Y
 # top face (harmonic-base's +Y deck seats map the same way) and the seats sit
@@ -539,12 +550,14 @@ BRACKET_SEATS_VOLUME = RIM_CHAMFER_VOLUME - len(SEAT_POINTS) * blind_hole_volume
 # chamfer size prints only where its edge is seen end-on. The +X end face's
 # foot edge (along Z) goes first, so the front view shows the size at the
 # view's bottom-right outside corner (r7 machinist review: the size sat on a
-# cavity rim no view shows plainly). That end face is therefore selected as
-# its two edges the slant faces do not already own (foot and top), not as a
-# face: same edges, same chamfer, same volume.
+# cavity rim no view shows plainly). Each end face is selected as the one
+# edge the slant faces do not already own and the chamfer breaks, its foot
+# edge: its top edge, under the MHA-CH-08 bracket foot, keeps only the title
+# block's edge break, so the bracket seat's end wall holds to the end face
+# (rocker_bracket_seat_layout.END_WALL_MIN).
 CHAMFER_EDGES = [
     [BOSS_DEPTH / 2.0, -HALF_Y, 0.0],  # +X end face's foot edge (sized)
-    [BOSS_DEPTH / 2.0, HALF_Y, 0.0],  # +X end face's top edge
+    [-BOSS_DEPTH / 2.0, -HALF_Y, 0.0],  # -X end face's foot edge
     # 12 inner-frame opening edges, both web faces (Z = ±WEB)
     [0.0, -63.5, -WEB],
     [63.5, 0.0, -WEB],
@@ -562,7 +575,6 @@ CHAMFER_EDGES = [
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
     [0.0, -85.0, _wall_half_z_at(-85.0)],
     [0.0, -85.0, -_wall_half_z_at(-85.0)],  # ±Z slant window surrounds
-    [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # back trapezoid (-X) face
     [59.78, -59.78, 0.0],  # one inner fillet face
 ]
 
@@ -1082,7 +1094,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # 1. Boss: trapezoid on the Right plane (sketch-x -> model Z, sketch-y ->
-    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 180.5
+    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 192.024
     #    along X. A polygon chain (two slanted sides) anchored at the foot's
     #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
     trap = SketchDims()
@@ -1248,10 +1260,11 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
-    # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and every
-    #    outside edge -- the +X end face's foot edge first (it carries the
-    #    size), its top edge, the 12 inner-frame opening edges, plus the
-    #    slant/back-end/fillet faces, tangent-propagated.
+    # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and ten
+    #    of the twelve outside edges -- the +X end face's foot edge first (it
+    #    carries the size), the -X end face's foot edge, the 12 inner-frame
+    #    opening edges, plus the slant/fillet faces, tangent-propagated; the
+    #    end faces' top edges keep the title block's break.
     check(
         "chamfer",
         await adapter.add_chamfer(
@@ -1263,8 +1276,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
     # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
-    #    down from the top face over the window's side edges. Located at their
-    #    nominal stations; the print says TRANSFER FROM MHA-CH-08 AT ASSEMBLY.
+    #    down from the top face into the end posts. Located at their nominal
+    #    stations; the print says TRANSFER FROM MHA-CH-08 AT ASSEMBLY.
     bracket_seats = wizard_holes(
         adapter,
         SEAT_SPEC,

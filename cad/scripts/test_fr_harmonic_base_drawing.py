@@ -967,6 +967,12 @@ NATIVE_R6_OBSTACLES = {
     ),
 }
 NATIVE_R6_STOP_TAG_XY = (0.247, 0.216)
+# The lock and stop rim centres R5/R6 were captured with (the .2778 pitch's
+# cone line). The #1038 re-pitch moved both seats; the R5/R6 replay keeps
+# its own captured geometry, and NATIVE_1038_* below is the native record at
+# the .300 pitch.
+NATIVE_R5_LOCK_CENTRE = (0.2543929295967363, 0.22294410265486017)
+NATIVE_R6_STOP_CENTRE = (0.24517984940151222, 0.1923943864498215)
 # PDF ink, NOT the leader-inclusive GetBox above. The audit log rounds each
 # edge to 0.1 mm; replay with half a quantum outward on every edge.
 NATIVE_R6_TAG_INK = {
@@ -978,9 +984,157 @@ NATIVE_R6_INK_PAD_M = 0.00005
 # upper bound, not a captured native font height or a different audit threshold.
 NATIVE_R6_PITCH_UPPER_M = 0.005405
 
+# Native #1038 r1 (run 20261112T033928433Z, commit 100f7d0a20, the .300 pitch's
+# moved pedestal, block, spring and swing seats): the four callouts' display
+# data (layout-audit report, 0.1 um) and the HOLES-SOCKETS callout check's
+# logged boxes and obstacles, verbatim. Every tag kept its R6 station.
+NATIVE_1038_CALLOUTS = {
+    "MHA-DT-18 block transfer": (
+        [0.272, 0.252],
+        [
+            (0.2791263, 0.2180152, 0.3047521, 0.2408608),
+            (0.2784816, 0.2174405, 0.2791263, 0.2180152),
+            (0.3047521, 0.2408608, 0.2408354, 0.2408608),
+        ],
+        [
+            ("4X ", [0.2501205, 0.257583, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.2568434, 0.2575295, -0.00635], 0.0035),
+            (" .136 THRU ALL", [0.2621219, 0.257583, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-18", [0.2408354, 0.2519733, -0.00635], 0.0035),
+            ("AFTER MHA-DT-00 STEP 19;", [0.2431906, 0.246417, -0.00635], 0.0035),
+            (" 8-32 UNC THRU ALL", [0.2501955, 0.2408608, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-DT-02 pedestal transfer": (
+        [0.2, 0.252],
+        [
+            (0.2645432, 0.2195031, 0.2327521, 0.2408608),
+            (0.26526, 0.2190215, 0.2645432, 0.2195031),
+            (0.2327521, 0.2408608, 0.1688354, 0.2408608),
+        ],
+        [
+            ("2X ", [0.1781205, 0.257583, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.1848434, 0.2575295, -0.00635], 0.0035),
+            (" .136 THRU ALL", [0.1901219, 0.257583, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-02", [0.1688354, 0.2519733, -0.00635], 0.0035),
+            ("AT ASSEMBLY;", [0.1847458, 0.246417, -0.00635], 0.0035),
+            (" 8-32 UNC THRU ALL", [0.1781955, 0.2408608, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-DT-24 spring transfer": (
+        [0.315, 0.1428],
+        [
+            (0.271776, 0.1741974, 0.2822479, 0.1316608),
+            (0.2716409, 0.1747462, 0.271776, 0.1741974),
+            (0.2822479, 0.1316608, 0.3461646, 0.1316608),
+        ],
+        [
+            ("<MOD-DIAM>", [0.296482, 0.1483295, -0.00635], 0.0035),
+            (" .089 THRU ALL", [0.3017604, 0.148383, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-24", [0.2838354, 0.1427733, -0.00635], 0.0035),
+            ("AFTER MHA-DT-00 STEP 19;", [0.2861906, 0.137217, -0.00635], 0.0035),
+            (" 4-40 UNC THRU ALL", [0.2931955, 0.1316608, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-FR-04 nameplate transfer": (
+        [0.362, 0.255],
+        [
+            (0.3197763, 0.2068067, 0.3233538, 0.2466389),
+            (0.3197257, 0.2062438, 0.3197763, 0.2068067),
+            (0.3233538, 0.2466389, 0.3990587, 0.2466389),
+        ],
+        [
+            ("4X ", [0.3401205, 0.2578049, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.3468434, 0.2577514, -0.00635], 0.0035),
+            (" .089 THRU ALL", [0.3521219, 0.2578049, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-FR-04", [0.3310177, 0.2521951, -0.00635], 0.0035),
+            ("AT ASSEMBLY; 4-40 UNC THRU ALL", [0.3249413, 0.2466389, -0.00635], 0.0035),
+        ],
+    ),
+}
+NATIVE_1038_CALLOUT_BOXES = {
+    "MHA-DT-18 block transfer": (0.24083541718125345, 0.24086076360940933, 0.3047520828187466, 0.2610829862249084),
+    "MHA-DT-02 pedestal transfer": (0.16883541718125344, 0.24086076360940933, 0.23275208281874651, 0.2610829862249084),
+    "MHA-DT-24 spring transfer": (0.2822479171812534, 0.13166076360940931, 0.3461645828187465, 0.15188298622490837),
+    "MHA-FR-04 nameplate transfer": (0.32335381875038144, 0.24663888860493902, 0.3990586812496185, 0.26130486122937885),
+}
+NATIVE_1038_OBSTACLES = {
+    "frame left": (0.0, 0.0, 0.0127, 0.2794),
+    "frame right": (0.41910000000000003, 0.0, 0.4318, 0.2794),
+    "frame bottom": (0.0, 0.0, 0.4318, 0.0127),
+    "frame top": (0.0, 0.2667, 0.4318, 0.2794),
+    "title block": (0.216, 0.0, 0.4318, 0.066),
+    "view holes top": (0.22285000000000002, 0.15909075, 0.33715, 0.23090925000000004),
+    "view section A-A": (0.36903099999999983, 0.09909074999999999, 0.3817310000000005, 0.17090925000000004),
+    "origin X axis": (0.21935000000000002, 0.14209575, 0.24240100000000003, 0.14909575),
+    "origin Y axis": (0.205855, 0.15559075, 0.21285500000000002, 0.17864175000000002),
+    "section A arrow 1": (0.3272506, 0.153, 0.3432506, 0.157),
+    "section A arrow 2": (0.3272506, 0.233, 0.3432506, 0.23700000000000002),
+    "label section A 1": (0.34315687424749164, 0.15365396989966557, 0.34950687424749166, 0.16000396989966556),
+    "label section A 2": (0.34315687424749164, 0.23365396989966558, 0.34950687424749166, 0.24000396989966558),
+    "note DetailItem244 'LOW-CARBON STEEL OR GRAY IRON'": (0.21780627424749155, 0.026753250836120457, 0.27118195317725746, 0.030089230769230813),
+    "note DetailItem245 'fr-harmonic-base'": (0.31026057525083606, 0.037714327759197364, 0.3531517458193979, 0.04295658193979937),
+    "note DetailItem246 'v49'": (0.37316762541806014, 0.02246413377926426, 0.3836521337792641, 0.02865952508361208),
+    "label DetailItem247 'DO NOT SCALE DRAWING\\r\\nBUILD '": (0.23257989966555176, 0.01388589966555187, 0.2583146020066889, 0.018175016722408066),
+    "note DetailItem248 'MHA-FR-01'": (0.31026057525083606, 0.022940702341137154, 0.342190668896321, 0.02913609364548503),
+    "note DetailItem260 'UNLESS OTHERWISE SPECIFIED, TOLERANCES'": (0.21780627424749155, 0.061542755852842856, 0.26546313043478253, 0.06440216722408032),
+    "label DetailItem261 'SCALE: 1:4'": (0.39699605351170564, 0.030565799331103705, 0.4131993846153845, 0.03390177926421409),
+    "note DetailItem263 'REV'": (0.37316762541806014, 0.031518936454849544, 0.3793630167224079, 0.03485491638795993),
+    "note DetailItem264 'DWG.  NO.'": (0.31026057525083606, 0.030565799331103705, 0.3278936120401337, 0.03390177926421409),
+    "note DetailItem267 'PART'": (0.31026057525083606, 0.04390971906354521, 0.3178856722408026, 0.047245698996655566),
+    "note DetailItem277 'ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID'": (0.21780627424749155, 0.03485491638795993, 0.2897681270903009, 0.04105030769230775),
+    "note DetailItem278 'FINISH'": (0.21780627424749155, 0.04200344481605356, 0.22304852842809358, 0.0443862876254181),
+    "note DetailItem279 'MATERIAL'": (0.21780627424749155, 0.030565799331103705, 0.22733764548494978, 0.033425210702341196),
+    "note DetailItem280 'DRAWN PER ASME Y14.100\\r\\nDIMENSIONING AND TOLERANCING PER ASME Y14.5-2018'": (0.2182828428093645, 0.020081290969899745, 0.2726116588628762, 0.025323545150501725),
+    "note DetailItem312 'SHEET 2 OF 5'": (0.39508977926421396, 0.01483903678929771, 0.4151056588628762, 0.018175016722408066),
+    "note DetailItem314 '.XXX\\r\\n±.005'": (0.2444941137123745, 0.053917658862876305, 0.25021293645484943, 0.059636481605351205),
+    "note DetailItem315 '.XX\\r\\n±.01'": (0.2330564682274247, 0.053917658862876305, 0.23734558528428085, 0.059636481605351205),
+    "note DetailItem316 '<GGTOL-ANGULAR>\\r\\n±1°'": (0.27547107023411366, 0.053917658862876305, 0.28023675585284274, 0.059636481605351205),
+    "note DetailItem319 'INSIDE CORNERS R.040 MAX\\r\\nTHREADS UNC/UNF CLASS 2A/2B\\r\\nREMOVE BURRS AND BREAK SHARP EDGES R.010 OR CHAMFER .010 MAX'": (0.21732970568561866, 0.045815993311036834, 0.2888149899665551, 0.052011384615384654),
+    "note DetailItem320 '© 2026 Pedro Paulo Vezza Campos'": (0.31026057525083606, 0.01483903678929771, 0.363159685618729, 0.018175016722408066),
+    'note DetailItem321 "Albert Michelson\'s Harmonic Analyzer\\r\\nA Project For Hobby Machinists\\r\\nharmonicanalyzer.com"': (0.3202685150501671, 0.04819883612040138, 0.4074805618729096, 0.06440216722408032),
+    "note DetailItem323 'CAST/MACHINED'": (0.2854790100334447, 0.05773020735785958, 0.30597145819397986, 0.060113050167224125),
+    "note DetailItem326 'A'": (0.0028738528428093324, 0.030565799331103705, 0.00906924414715718, 0.03819089632107028),
+    "note DetailItem327 'A'": (0.42225418729096975, 0.030565799331103705, 0.4284495785953176, 0.03819089632107028),
+    "note DetailItem328 'B'": (0.003826989966555172, 0.10014480936454853, 0.00859267558528426, 0.108246474916388),
+    "note DetailItem329 'B'": (0.4227307558528427, 0.10014480936454853, 0.42749644147157184, 0.108246474916388),
+    "note DetailItem330 'C'": (0.0028738528428093324, 0.17020038795986625, 0.009545812709030072, 0.1778254849498328),
+    "note DetailItem331 'C'": (0.4217776187290969, 0.17020038795986625, 0.4284495785953176, 0.1778254849498328),
+    "note DetailItem332 'D'": (0.0028738528428093324, 0.23977939799331105, 0.00906924414715718, 0.2478810635451505),
+    "note DetailItem333 'D'": (0.42225418729096975, 0.23977939799331105, 0.4284495785953176, 0.2478810635451505),
+    "note DetailItem334 '4'": (0.05148384615384613, 0.00197168561872918, 0.0557729632107023, 0.00959678260869573),
+    "note DetailItem335 '4'": (0.05148384615384613, 0.26837351170568563, 0.0557729632107023, 0.2764751772575251),
+    "note DetailItem336 '3'": (0.1596649096989966, 0.00197168561872918, 0.1639540267558528, 0.00959678260869573),
+    "note DetailItem337 '3'": (0.1596649096989966, 0.26837351170568563, 0.1639540267558528, 0.2764751772575251),
+    "note DetailItem338 '2'": (0.26736940468227416, 0.00197168561872918, 0.27165852173913035, 0.00959678260869573),
+    "note DetailItem339 '2'": (0.26736940468227416, 0.26837351170568563, 0.27165852173913035, 0.2764751772575251),
+    "note DetailItem340 '1'": (0.37555046822742466, 0.00197168561872918, 0.37983958528428086, 0.00959678260869573),
+    "note DetailItem341 '1'": (0.37555046822742466, 0.26837351170568563, 0.37983958528428086, 0.2764751772575251),
+    "note DetailItem342 'DRILLED HOLES\\r\\n+.004 / 0'": (0.2554551906354514, 0.053917658862876305, 0.27213509030100325, 0.059636481605351205),
+    "note DetailItem345 '.X\\r\\n±.1'": (0.22114225418060196, 0.053917658862876305, 0.22400166555183942, 0.059636481605351205),
+    "note DetailItem346 'UNIT: in'": (0.39937889632107015, 0.02198756521739137, 0.41129311036789284, 0.025323545150501725),
+    "note DetailItem419 'A1'": (0.22829078260869556, 0.15113764548494987, 0.23496274247491633, 0.16400499665551843),
+    "note DetailItem420 'A2'": (0.22829078260869556, 0.2078493043478261, 0.23496274247491633, 0.22024008695652175),
+    "note DetailItem428 'A3'": (0.331706160535117, 0.16543470234113716, 0.34981576588628754, 0.17639577926421407),
+    "note DetailItem429 'A4'": (0.331706160535117, 0.21070871571906358, 0.34981576588628754, 0.22119322408026756),
+    "note DetailItem421 'B1'": (0.2449706822742474, 0.19116940468227428, 0.25211921070234106, 0.2121384214046823),
+    "note DetailItem422 'C1'": (0.24211127090301, 0.21881038127090302, 0.25450205351170563, 0.22405263545150503),
+    "note DetailItem424 'C2'": (0.2940572441471571, 0.17973175919732443, 0.3031120468227424, 0.18973969899665555),
+    "note DetailItem425 'C3'": (0.2888149899665551, 0.2016539130434783, 0.29548694983277585, 0.20975557859531774),
+    "note DetailItem426 'C4'": (0.3026354782608695, 0.16877068227424752, 0.3183622408026755, 0.17973175919732443),
+    "note DetailItem427 'C5'": (0.3026354782608695, 0.20975557859531774, 0.3183622408026755, 0.21404469565217393),
+    "note DetailItem423 'D1'": (0.24544725083612035, 0.15066107692307695, 0.2583146020066889, 0.1673409765886288),
+    "note DetailItem431 '1. D1: TRANSFER FROM MHA-DT-20 PIVOT BORE AT ASSEMBLY;\\r\\nD1 TABLE X/Y ARE REFERENCE.'": (0.019553752508361166, 0.09109000668896325, 0.1553757926421404, 0.10014480936454853),
+    "note DetailItem432 '2. A1-A4: MATCHED FIT TO MHA-FR-03 TUBE: SLIDES IN BY HAND, NO ROCK.\\r\\nPATTERN MATCHES MHA-FR-02 SOCKETS. TABLE <MOD-DIAM> IS REFERENCE.'": (0.019553752508361166, 0.07107412709030106, 0.18492304347826083, 0.08012892976588634),
+    "note DetailItem434 'TOP VIEW'": (0.16967284949832773, 0.2326308695652174, 0.19111843478260865, 0.2373965551839465),
+    "note DetailItem435 'ORIGIN: FLANGE\\r\\nOUTER SHARP\\r\\nCORNER (X0 Y0)'": (0.16490716387959858, 0.16400499665551843, 0.20160294314381266, 0.1778254849498328),
+    "table DetailItem430": (0.018, 0.16737522039776861, 0.16276338643434313, 0.26),
+}
 
-def _native_r5_r6_callout_layout():
-    """Reconstruct the four unchanged plan callouts from their actual display data."""
+
+def _native_callout_layout(native_callouts, native_boxes):
+    """Reconstruct the four plan callouts from a render's actual display data
+    (NATIVE_R5_* or NATIVE_1038_*), each box checked against its native one."""
     import draw_fr_harmonic_base as sheet
 
     anchors = {
@@ -989,12 +1143,12 @@ def _native_r5_r6_callout_layout():
         "MHA-DT-24 spring transfer": sheet.SPRING_CALLOUT_XY,
         "MHA-FR-04 nameplate transfer": sheet.NAMEPLATE_CALLOUT_XY,
     }
-    assert set(anchors) == set(NATIVE_R5_CALLOUTS) == set(NATIVE_R5_CALLOUT_BOXES)
+    assert set(anchors) == set(native_callouts) == set(native_boxes)
     callouts, leaders, own_rows = {}, {}, {}
-    for label, (anchor, lines, texts) in NATIVE_R5_CALLOUTS.items():
+    for label, (anchor, lines, texts) in native_callouts.items():
         assert tuple(anchor) == anchors[label]  # no callout moves to make this pass
         callouts[label] = sheet.callout_text_box(anchor, lines, texts, label)
-        assert callouts[label] == pytest.approx(NATIVE_R5_CALLOUT_BOXES[label])
+        assert callouts[label] == pytest.approx(native_boxes[label])
         leaders[label] = sheet.leader_segments(lines)
         own_rows[label] = sheet.callout_text_rows(lines, texts, label)
     return callouts, leaders, own_rows
@@ -1004,7 +1158,9 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     """Observed R5/R6, then a conditional stop placement, not native after-fix proof."""
     import draw_fr_harmonic_base as sheet
 
-    callouts, leaders, own_rows = _native_r5_r6_callout_layout()
+    callouts, leaders, own_rows = _native_callout_layout(
+        NATIVE_R5_CALLOUTS, NATIVE_R5_CALLOUT_BOXES
+    )
     text_obstacles = {
         name: box for name, box in NATIVE_R5_OBSTACLES.items()
         if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
@@ -1034,8 +1190,7 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     x, y = sheet.HOLE_TAG_STATION_POSITIONS[sheet.LOCK_KNOB_XZ]
     assert (x, y) == (0.2425, 0.2230)
     text_box = (x - 0.0005, y - height - 0.0005, x + width + 0.0005, y + 0.0005)
-    centre = sheet._plan_xy(*sheet.LOCK_KNOB_XZ, center=sheet.HOLE_TOP_CENTER)
-    assert centre == pytest.approx((0.2543929295967363, 0.22294410265486017), abs=1e-12)
+    centre = NATIVE_R5_LOCK_CENTRE
     # Native table's rounded-up 5.11 mm drill encloses the source drill.
     assert sheet.LOCK_SCREW_HOLE_DIA <= 5.11
     radius = 5.11 * sheet.VIEW_SCALE / 2000.0
@@ -1110,7 +1265,7 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
         ink[0] - NATIVE_R6_INK_PAD_M, ink[1] + dy - NATIVE_R6_INK_PAD_M,
         ink[2] + NATIVE_R6_INK_PAD_M, ink[3] + dy + NATIVE_R6_INK_PAD_M,
     )
-    centre = sheet._plan_xy(*sheet.STOP_SCREW_XZ, center=sheet.HOLE_TOP_CENTER)
+    centre = NATIVE_R6_STOP_CENTRE
     radius = sheet.STOP_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
     stop_rim = (
         centre[0] - radius, centre[1] - radius,
@@ -1168,13 +1323,57 @@ def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() ->
     ) == []
 
 
+def test_native_1038_holes_sheet_callouts_and_tags_clear_at_the_300_pitch() -> None:
+    """#1038 re-pitch (.300 in, bank centred): the pedestal, block, spring,
+    lock, stop and pivot seats all moved. The native r1 render kept every
+    tag at its R6 station and its HOLES-SOCKETS callout check passed; replay
+    that logged layout with the same predicates, and the tags' attached
+    native boxes against every other text."""
+    import draw_fr_harmonic_base as sheet
+
+    # The render is of the live seat geometry.
+    lock = sheet._plan_xy(*sheet.LOCK_KNOB_XZ, center=sheet.HOLE_TOP_CENTER)
+    stop = sheet._plan_xy(*sheet.STOP_SCREW_XZ, center=sheet.HOLE_TOP_CENTER)
+    assert lock == pytest.approx((0.25460630038649007, 0.2242407680043104), abs=1e-12)
+    assert stop == pytest.approx((0.24556631653186178, 0.19123944393353662), abs=1e-12)
+    assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.LOCK_KNOB_XZ] == (0.2425, 0.2230)
+    assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.STOP_SCREW_XZ] == (0.247, 0.212)
+    callouts, leaders, own_rows = _native_callout_layout(
+        NATIVE_1038_CALLOUTS, NATIVE_1038_CALLOUT_BOXES
+    )
+    text_obstacles = {
+        name: box
+        for name, box in NATIVE_1038_OBSTACLES.items()
+        if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
+    }
+    texts = {f"callout {label}": box for label, box in callouts.items()}
+    texts.update(text_obstacles)
+    assert sheet.find_callout_clashes(callouts, NATIVE_1038_OBSTACLES) == []
+    assert sheet.find_merged_blocks(callouts) == []
+    assert sheet.find_tall_callouts(own_rows) == []
+    assert sheet.find_leader_crossings(leaders, texts, own_rows) == []
+    # The swing-hardware and pivot tags (leader-inclusive native boxes) clear
+    # every other text on the sheet.
+    tags = (
+        "note DetailItem421 'B1'",
+        "note DetailItem422 'C1'",
+        "note DetailItem423 'D1'",
+    )
+    for tag in tags:
+        others = {name: box for name, box in text_obstacles.items() if name != tag}
+        tag_box = NATIVE_1038_OBSTACLES[tag]
+        assert sheet.find_callout_clashes({tag: tag_box}, others) == []
+
+
 def test_native_r6_stop_lock_ink_blocks_require_stop_station_shift() -> None:
     """Replay the enforced shared predicate, not the recipe's callout-only rule."""
     import draw_fr_harmonic_base as sheet
     from _layout_audit import AuditAnnotation, ROW_PITCH_HEIGHTS, find_merged_blocks
     from _layout_geometry import Box, DrawableRegion, Segment, SheetGeometry
 
-    _callouts, _leaders, own_rows = _native_r5_r6_callout_layout()
+    _callouts, _leaders, own_rows = _native_callout_layout(
+        NATIVE_R5_CALLOUTS, NATIVE_R5_CALLOUT_BOXES
+    )
     callout_annotations = tuple(
         AuditAnnotation(
             label=f"hole-callout {label}", kind="hole-callout", owner="callout replay",

@@ -10,7 +10,7 @@ dt-cone-swing-platform:
   # form onto a second line, so the full wording lives in the spec below.
   material: 1018 CF FLAT 1/4 x 2-1/2 in
   material_specification: ASTM A108 1018 cold-finished flat bar, 1/4 x 2-1/2 in; thickness as supplied
-  finish: MIL-DTL-13924 Class 1 black oxide with oil seal; all surfaces
+  finish: MIL-DTL-13924 Class 1 black oxide with oil seal; Ø.0630 hole bare, oiled
   quantity: 1
   tolerance_class: machined_block
   process: "machined from supplied steel flat bar"
