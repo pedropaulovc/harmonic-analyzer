@@ -224,6 +224,7 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION,
     KEEPER_BOSS_RELIEF_FROM_SOCKET,
     KEEPER_BOSS_RELIEF_PLACES,
+    KEEPER_BOSS_RELIEF_ROOT_R_MAX,
     DRAWING_REFERENCE_PRECISION,
     DRAFT_ADDED_DEG_MIN,
     DRAFT_ANGLE_DIMENSIONS,
@@ -1482,7 +1483,8 @@ if not (
 # Owner ruling 2026-11-11 (#1038, option K5): the two west barrels' proud
 # .18 is machined away inboard of a straight chord
 # KEEPER_BOSS_RELIEF_FROM_SOCKET from each socket axis, so the faced rail
-# top runs on under the outward keeper feet to that step.  Both complete
+# top runs on under the outward keeper feet to that step and each foot's
+# outboard end rests on it inside the barrel's cast footprint.  Both complete
 # 14-wide feet clear the step, not just the tap centres: the cut crosses the
 # whole barrel square to the rail, so the foot's X station does not enter.
 # The bank is centred at -0.504: front is the tighter end.
@@ -1558,16 +1560,25 @@ if min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) <= 0.0:
     raise AssertionError("fit-up keeper foot hits a boss at the printed bands")
 if min(KEEPER_TAP_BOSS_MARGINS) <= 0.0:
     raise AssertionError("keeper tap does not clear the relieved boss")
+# The step's root radius lies under no foot: at the printed limits the foot
+# tip stands off the step by more than the largest printed root (the foot's
+# own edge break is not credited), so the whole foot bears on the flat.
+KEEPER_FOOT_RELIEF_ROOT_MARGIN = (
+    min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) - KEEPER_BOSS_RELIEF_ROOT_R_MAX
+)  # 0.229
+if KEEPER_FOOT_RELIEF_ROOT_MARGIN <= 0.0:
+    raise AssertionError("a keeper foot reaches the relief step's root radius")
 # What the step must leave standing (K5).  The chord lies inside the
 # smallest barrel its socket can carry, so a step exists, and the proud
 # barrel it cuts keeps .080 round the cap recess over that .18: the
 # most-inboard printed chord against the largest printed recess, the
 # recess's drawn axis the title block's implied ±.005 off the socket's.
-# The floor is the faced top itself: the cross screws' counterbores and taps
-# lie wholly under it (their crowns 15.9 down), the cast datum targets F and
-# G stand on the lower barrels under the faced underside, and nothing bears
-# on a boss top, each MHA-FR-VN-54 cap seating on its tube end
-# (build_fr_frame_assembly) with its skirt inside the recess.
+# The floor is the faced top itself, which carries the feet's outboard ends:
+# the cross screws' counterbores and taps lie wholly under it (their crowns
+# 15.9 down), the cast datum targets F and G stand on the lower barrels
+# under the faced underside, and nothing bears on a boss top, each
+# MHA-FR-VN-54 cap seating on its tube end (build_fr_frame_assembly) with
+# its skirt inside the recess.
 KEEPER_RELIEF_BARREL_OVERLAP = (
     COUNTERBORE_MIN_BOSS_RADIUS
     - _SOCKET_BARREL_OFFSET

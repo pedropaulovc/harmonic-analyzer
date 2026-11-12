@@ -334,6 +334,21 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     # Two caps of the proud band, less its taken-out draft and rim break.
     prism = 2.0 * part._circle_cap_area(part.BOSS_DIA / 2.0, chord) * part.BOSS_ABOVE
     assert 0.85 * prism < part._keeper_relief_removal() < prism
+    # Each foot's outboard end rests on the relief's floor, inside the
+    # barrel's cast footprint, so the floor is the faced top and the step's
+    # root is held under the foot tip's stand-off at the printed limits (the
+    # title block's R.040 would not be: codjiflo, PR #2599).
+    assert part.KEEPER_FOOT_TIP_Z_FRONT < part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0
+    assert part.KEEPER_FOOT_TIP_Z_REAR > part.REAR_COLUMN_Z - part.BOSS_DIA / 2.0
+    root = spec.KEEPER_BOSS_RELIEF_ROOT_R_MAX
+    assert root / spec.IN == pytest.approx(0.02)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(
+        min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) - root
+    )
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(0.2286, abs=5e-4)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN > 0.0
+    title_block_inside_corner = 0.040 * spec.IN
+    assert title_block_inside_corner > min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
 
 
 def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> None:
@@ -356,9 +371,11 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
     assert "suffix=KEEPER_RELIEF_CALLOUT," in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
-    # The depth is the words: the floor is the faced top the 4X .18 locates.
-    # The mate is named by its drawing number (rule 4).
-    assert drawing.KEEPER_RELIEF_CALLOUT == "2X MHA-CH-07 FOOT\nRELIEF TO FACED TOP"
+    # The words: the floor is the faced top itself (the plane the 4X .18
+    # locates), the mate by its drawing number (rule 4), the root's limit.
+    assert drawing.KEEPER_RELIEF_CALLOUT == (
+        "2X FACED TOP TO STEP FOR\nMHA-CH-07 FOOT, ROOT R.02 MAX"
+    )
     scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
     axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
     step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
@@ -372,10 +389,16 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert line_y - boss_top_y > 0.005
     assert 0.162 - line_y > 0.005
     text_x, text_y = drawing.KEEPER_RELIEF_TEXT_XY
-    # Three rows of .12 text about the centre (19 characters at 2.2 mm):
-    # left of the step, over the rail top, under the chamfer's parked rows.
-    half_w, half_h = 0.021, 0.0075
+    # Three rows of .12 text about the centre (29 characters at 2.45 mm):
+    # left of the step, right of the front boss's recess witnesses, over the
+    # rail top, under the chamfer's parked rows.
+    half_w, half_h = 0.0355, 0.0075
     assert text_x + half_w < step_x - 0.005
+    front_recess_x = (
+        drawing.DETAIL_SECTION_CENTER[0]
+        + (part.FRONT_COLUMN_Z + part.CAP_RECESS_DIAMETER / 2.0) * scale
+    )
+    assert text_x - half_w > front_recess_x + 0.010
     rail_top_y = drawing.DETAIL_SECTION_CENTER[1] + part.HALF_H * scale
     assert text_y - half_h > rail_top_y + 0.003
     chamfer_rows_bottom = drawing.BORE_CHAMFER_TEXT_OFFSET_XY[1] - 0.008

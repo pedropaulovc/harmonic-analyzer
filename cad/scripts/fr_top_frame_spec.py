@@ -139,10 +139,12 @@ BOSS_DIA = 44.958  # 1.77 user ruling 2026-10-10: all four upper/lower bosses, a
 # ruling on the two WEST (fulcrum-side) bosses only: at the .300 station
 # pitch the MHA-CH-07 keepers stand 5.715 further out per side, and their
 # outward feet (kept, as on the original) would run into the proud barrels.
-# The faced rail top is carried into each of the two barrels by a machined
-# step: an end-mill pass across the rail, square to it, that removes the
-# proud .18 of the barrel inboard of a straight chord and leaves the rail
-# top's own plane as its floor.  The casting pattern is unchanged (all four
+# The faced rail top is carried into each of the two barrels to a machined
+# step: a pass across the rail, square to it, that removes the proud .18 of
+# the barrel inboard of a straight chord.  Its floor IS the faced top, one
+# plane with it, because each foot's outboard end rests there (the foot tips
+# stand 4.19 / 3.18 inside the barrels' cast edges).  The casting pattern is
+# unchanged (all four
 # barrels are still cast Ø1.77): a cast-in flat would carry its own draft,
 # ±.03 band and position zone, which the foot margin cannot pay at this
 # depth, and would change the pattern print.
@@ -159,6 +161,13 @@ KEEPER_BOSS_RELIEF_DEPTH = (
 KEEPER_BOSS_RELIEF_HALF_CHORD = sqrt(
     (BOSS_DIA / 2.0) ** 2 - KEEPER_BOSS_RELIEF_FROM_SOCKET**2
 )  # 14.687 across the rail, either side of the socket axis, on the faced top
+# The step's root: the title block's R.040 inside corner would reach under a
+# foot tip that stands .029 off the step at the printed limits and lift it
+# off the faced top, so the root prints its own limit (codjiflo, PR #2599;
+# ``build_fr_top_frame.KEEPER_FOOT_RELIEF_ROOT_MARGIN``).  The model's root
+# is sharp.
+KEEPER_BOSS_RELIEF_ROOT_R_MAX = 0.508  # .02
+KEEPER_BOSS_RELIEF_ROOT_R_PLACES = 2
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
 # MHA-CH-00 draws the west rail's web faces from it).  As cast it prints
