@@ -512,7 +512,10 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # mm a character, rows 4.4 apart, measured on farm run
 # 20261112T030307472Z), 65 x 9 mm, its foot 7 over the rail top and its
 # head 6 under the chamfer text's underline, pointing at the FRONT boss's
-# step root so its leader crosses neither the station nor its text.
+# step root so its leader crosses neither the station nor its text.  The
+# station's rows stand 1 mm over its own line: asked 1.5 lower (y 157.5)
+# the lower row's box began at y 153.0 and the line (y 153.5) ran 2.2 mm
+# through it (layout audit, farm run 20261112T041757594Z).
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
@@ -521,7 +524,7 @@ KEEPER_RELIEF_LINE_XY = (
     / 1000.0,
     0.1535,
 )
-KEEPER_RELIEF_TEXT_XY = (0.331, 0.1575)
+KEEPER_RELIEF_TEXT_XY = (0.331, 0.159)
 KEEPER_RELIEF_NOTE_XY = (0.250, 0.160)
 
 
