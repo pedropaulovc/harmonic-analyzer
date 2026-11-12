@@ -161,7 +161,7 @@ SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 FRONT_CENTER = (0.105, 0.150)
 # Projection-aligned with the front view's bore axis (codex, 2026-09-23: the
 # 0.140 offset that cleared FaceWidth from Gear Data broke the alignment).
-# x 0.246: the #1038 face (7.4528) is 0.29 mm wider each side at T084's 2:1,
+# x 0.246: the #1038 face (7.4528) is 0.58 mm wider each side at T084's 2:1,
 # and the thickness shelf keeps its 3 mm off the view's left edge there.
 RIGHT_CENTER = (0.246, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
