@@ -1975,9 +1975,9 @@ def _rewrite_manifest(blob, key: str, rewrite: Any) -> None:
 
 
 def _case_no_bound_base(shop, monkeypatch, blob):
-    # The only recording is 66def8bddb's manifest of a reused key: no base.
+    # The only recording was made under another cache salt: no base.
     key = _edited(shop)
-    _rewrite_manifest(blob, key, lambda m: {**m, "reused_from": "f" * 64})
+    _rewrite_manifest(blob, key, lambda m: {**m, "salt": "a-throwaway-proof-salt"})
 
 
 def _case_legacy_unbound(shop, monkeypatch, blob):

@@ -837,8 +837,22 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
         "    sys.exit(run_build(scenario))\n",
         encoding="utf-8",
     )
-    # The log names the recording's script; the replay runs this one.
+    # The log names the recording's script; the replay runs this one. The
+    # driver counts every parse of a log.
+    counting = (
+        "import sys\n"
+        f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+        "import _com_conversation as conv\n"
+        "load = conv.load\n"
+        "def counted(path):\n"
+        "    sys.stderr.write(f'parsed {path}\\n')\n"
+        "    return load(path)\n"
+        "conv.load = counted\n"
+        "import com_replay\n"
+        "sys.exit(com_replay.main(sys.argv[1:]))\n"
+    )
     results = {}
+    parsed = {}
     # Writes outside scratch anywhere else: test_a_replay_refuses_writes_outside_its_roots.
     escapes = ("", "dispatch", "write", "network")
     for escape in escapes:
@@ -848,7 +862,8 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
         proc = subprocess.run(
             [
                 sys.executable,
-                str(SCRIPTS / "com_replay.py"),
+                "-c",
+                counting,
                 "replay",
                 str(script),
                 "--log",
@@ -872,8 +887,14 @@ def test_cli_replays_a_recorded_build_in_a_sandboxed_subprocess(tmp_path, monkey
             proc.returncode,
             json.loads(result.read_text(encoding="utf-8")),
         )
+        parsed[escape] = [
+            line for line in proc.stderr.splitlines() if line.startswith("parsed ")
+        ]
     rc, clean = results[""]
     assert rc == 0 and clean["verdict"] == "noop", clean
+    # One parse of the base log serves the replay and the fields read after it.
+    assert parsed[""] == [f"parsed {log.resolve()}"]
+    assert clean["solidworks_inputs"] == [] and clean["title_echoes"]["count"] == 0
     assert clean["com_outputs"] == captured
     assert (
         "py-output.json" in clean["py_outputs"] and clean["py_output_mismatches"] == {}
@@ -1263,6 +1284,45 @@ def test_answers_to_one_request_within_float_noise_are_one_answer():
     assert _answers([_closest(4, *_CLOSEST)], [_closest(4, *_CLOSEST[:3])])[0] == (
         "different"
     )
+
+
+def test_answers_pairing_works_only_on_the_answers_that_differ(monkeypatch):
+    # One request (a face's area) answered 50,000 times, faces listed in
+    # another order, five answers moved by float noise beyond REL_TOL: the
+    # exact answers cancel and only those five are paired.
+    def area(handle: int, value: float) -> conv.Call:
+        return conv.Call(
+            0,
+            handle,
+            "InvokeTypes",
+            [],
+            "IFace2.GetArea",
+            result={"t": [{"f": value.hex()}, {"f": (1.0).hex()}]},
+        )
+
+    areas = [i * 1e-5 for i in range(50_000)]
+    noisy = {7, 4_321, 20_000, 33_333, 49_999}
+    base = [area(i, v) for i, v in enumerate(areas)]
+    new = [area(i, v + 3e-9 if i in noisy else v) for i, v in enumerate(areas)][::-1]
+    compared = 0
+    close = _com_outcome._answer_close
+
+    def counted(a: Any, b: Any) -> bool:
+        nonlocal compared
+        compared += 1
+        return close(a, b)
+
+    monkeypatch.setattr(_com_outcome, "_answer_close", counted)
+    assert _answers(base, new) == (
+        "same",
+        {"IFace2.GetArea": "5 answers within 33554432 ulps of the other build's"},
+    )
+    assert compared <= len(noisy) ** 2 + len(noisy)
+    # One of them past the bound: different, with the same bounded work.
+    compared = 0
+    new[0] = area(0, areas[-1] + 1e-8)
+    assert _answers(base, new)[0] == "different"
+    assert compared <= len(noisy) ** 2 + len(noisy)
 
 
 def _echoing(title: str, equation: str = "DivisionSpacing", handle: int = 4):

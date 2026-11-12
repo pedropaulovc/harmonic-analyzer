@@ -420,16 +420,30 @@ def main(argv: list[str] | None = None) -> int:
     # replay's audit hook starts refusing writes outside the scratch root.
     _telemetry.info(f"com_replay replay {script.name} <- {args.log}")
     python_files = _python_files(script, args.scratch.resolve())
-    result = conversation.replay_build(
-        script,
-        args.log.resolve(),
-        args.scratch.resolve(),
-        args.base_outputs.resolve() if args.base_outputs else None,
-        capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
-        seat_log=args.seat_log.resolve(),
-    )
+    log_path = args.log.resolve()
+    # The trailer and calls read below are the log replay_build parses: keep
+    # what it loads instead of parsing the log a second time.
+    loaded: dict[Path, Any] = {}
+    load = conversation.load
+
+    def keeping(path: Path) -> Any:
+        loaded[path] = found = load(path)
+        return found
+
+    conversation.load = keeping
+    try:
+        result = conversation.replay_build(
+            script,
+            log_path,
+            args.scratch.resolve(),
+            args.base_outputs.resolve() if args.base_outputs else None,
+            capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
+            seat_log=args.seat_log.resolve(),
+        )
+    finally:
+        conversation.load = load
     files = python_files()
-    log = conversation.load(args.log.resolve())
+    log = loaded[log_path]
     solidworks_inputs, solidworks_out_inputs = _solidworks_inputs(log)
     _write_json(
         args.result,

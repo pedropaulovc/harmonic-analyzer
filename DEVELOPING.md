@@ -2670,12 +2670,11 @@ declines with its reason:
 1. Not a forced refresh (`forced_refresh`; the refresh revokes what it
    replaces, see "Revocation"), and the inputs still make the key
    (`inputs_moved`).
-2. A base: the nearest recording of the stem under this engine made by a
-   real build (no `reused_from`, which only manifests 66def8bddb published
-   for reused keys carry), whose manifest is bound to its archive
-   (`archive`), made under this cache salt (keys are revision-agnostic only
-   within a salt) and of another key; the usual 8-manifest, 3 s lookup
-   (`no_base`; `no_bound_base` when recordings exist but none qualifies,
+2. A base: the nearest recording of the stem under this engine (only real
+   builds publish one) whose manifest is bound to its archive (`archive`),
+   made under this cache salt (keys are revision-agnostic only within a
+   salt) and of another key; the usual 8-manifest, 3 s lookup (`no_base`;
+   `no_bound_base` when recordings exist but none qualifies,
    without replaying; `time_cap`). The base must not be revoked
    (`revoked_base`, without replaying; a revocation that cannot be read
    declines `fault`).
@@ -2915,20 +2914,32 @@ A recorded part task pays on its own wall clock in up to three places:
    a declined attempt adds it, and a replay that ran is not repeated after
    the build (only the comparison runs).
 
-Per build, the added task time is the sum of these over the part tasks that
-actually build under `rw` (part cache misses and forced refreshes): their count
-times the mean seat-held overhead plus the mean `replay.after_build` duration.
-Part cache hits, assemblies, drawings, gates and every task under `ro`/`off`
-add nothing. How much of that sum reaches a build's wall clock depends on how
-many part leaves run at once and which of them are on the critical path; the
-farm's slot time grows by the whole sum.
+Per build, the added task time is a sum over the part tasks under `rw` that
+miss (or are forced refreshes). In mode `reuse`, every miss that makes an
+attempt (a forced refresh makes none) adds the mean `replay.reuse` duration
+over those attempts. Every task that then builds on the seat (declined,
+audited, or no attempt) adds the mean seat-held overhead plus the mean
+`replay.after_build` duration; after an attempt that already replayed,
+`replay.after_build` holds only the comparison. A reused task runs neither:
+its seat build and `replay.after_build` are replaced by its `replay.reuse`
+span plus the store, so it costs that and saves the build. Part cache hits,
+assemblies, drawings, gates and every task under `ro`/`off` add nothing. How
+much of that sum reaches a build's wall clock depends on how many part
+leaves run at once and which of them are on the critical path; the farm's
+slot time grows by the whole sum.
 
 ```kusto
 dependencies
-| where timestamp > ago(7d) and name startswith "replay.after_build "
-| extend outcome=tostring(customDimensions["replay.outcome"]), s=duration / 1000.0
-| summarize tasks=count(), p50_s=percentile(s, 50), p95_s=percentile(s, 95),
-            max_s=max(s), total_s=sum(s) by outcome
+| where timestamp > ago(7d)
+      and (name startswith "replay.reuse " or name startswith "replay.after_build ")
+| extend step=tostring(split(name, " ")[0]),
+         result=iff(name startswith "replay.reuse ",
+                  tostring(customDimensions["replay.reuse_decision"]),
+                  tostring(customDimensions["replay.outcome"])),
+         s=duration / 1000.0
+| summarize tasks=count(), mean_s=avg(s), p50_s=percentile(s, 50),
+            p95_s=percentile(s, 95), max_s=max(s), total_s=sum(s) by step, result
+| order by step asc, total_s desc
 ```
 
 ### Where results land

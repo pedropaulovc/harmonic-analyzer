@@ -597,32 +597,38 @@ def _answers_signal(
 ) -> tuple[Signal, dict[str, Any] | None]:
     """The multiset of (request, answer) keys (:func:`_keyed_calls`, per call
     of ``calls_a`` and ``calls_b``; no answer key: no signal). Keys that
-    differ are not yet another answer: per request (member and arguments)
-    whose answer keys differ, every answer of one build must pair one-to-one
-    with one of the other's to that request (:func:`_unassigned`) within
-    float noise (:func:`_answer_close`); a request answered more often in one
-    build, or an answer left unpaired, is different (:func:`_multiset_signal`'s
-    detail). Same after pairing: per member, how many answers were paired."""
+    differ are not yet another answer: the keys both builds have cancel
+    (their multiset intersection), and per request (member and arguments)
+    the answers left over in one build must pair one-to-one with the other's
+    left over to that request (:func:`_unassigned`) within float noise
+    (:func:`_answer_close`). A request with more answers left over in one
+    build (answered more often), or an answer left unpaired, is different
+    (:func:`_multiset_signal`'s detail). Pairing only the leftovers keeps
+    the work to the answers that differ, whatever the request's count; a
+    leftover that only some exactly matched answer could have absorbed stays
+    unpaired (different: the safe direction). Same after pairing: per member,
+    how many answers were paired."""
     left = [(k, c) for k, c in zip(a, calls_a, strict=True) if k[2] is not None]
     right = [(k, c) for k, c in zip(b, calls_b, strict=True) if k[2] is not None]
     signal, detail = _multiset_signal([k for k, _ in left], [k for k, _ in right])
     if signal is Signal.SAME:
         return signal, detail
     keys_a, keys_b = Counter(k for k, _ in left), Counter(k for k, _ in right)
-    unpaired = keys_a - keys_b
-    requests = {key[:2] for key in [*unpaired, *(keys_b - keys_a)]}
+    leftover = (keys_a - keys_b, keys_b - keys_a)
     answers: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {
-        request: ([], []) for request in requests
+        key[:2]: ([], []) for over in leftover for key in over
     }
     for side, items in enumerate((left, right)):
+        wanted = Counter(leftover[side])
         for key, call in items:
-            if key[:2] in answers:
+            if wanted[key] > 0:
+                wanted[key] -= 1
                 answers[key[:2]][side].append(_erased(_answer(call)))
     for xs, ys in answers.values():
         if len(xs) != len(ys) or _unassigned(xs, ys, _answer_close) is not None:
             return signal, detail
     paired: Counter[str] = Counter()
-    for key, count in unpaired.items():
+    for key, count in leftover[0].items():
         paired[key[0]] += count
     return Signal.SAME, {
         member: f"{count} answers within {_ANSWER_ULPS} ulps of the other build's"

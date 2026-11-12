@@ -1709,11 +1709,8 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
     salt = str(_cache.config_summary()["salt"])
 
     def usable(record: dict[str, Any]) -> bool:
-        # Only a real build's recording is a base: 66def8bddb published
-        # manifests for reused keys too (``reused_from``); none is one.
         return (
             bound_archive(record) is not None
-            and "reused_from" not in record
             and record.get("salt") == salt
             and record.get("key") != part.key
         )
@@ -2401,22 +2398,16 @@ def _after_build(
 
 
 def _revoke_alarmed(engine: str, stem: str, base: dict[str, Any]) -> str:
-    """A soundness alarm against ``base``: revoke it, and the real build a
-    66def8bddb manifest of a reused key names (``origin_key``). The base's
+    """A soundness alarm against ``base``: revoke it. The revocation's
     outcome, or ``error`` after a WARN (the alarm itself is already raised)."""
-    keys = [str(key) for key in (base.get("key"), base.get("origin_key")) if key]
     try:
-        outcomes = [
-            revoke(engine, stem, key, "a SOUNDNESS ALARM against it")
-            for key in dict.fromkeys(keys)
-        ]
+        return revoke(engine, stem, str(base["key"]), "a SOUNDNESS ALARM against it")
     except Exception as exc:  # noqa: BLE001 - the alarm is raised either way
         _telemetry.warn(
             f"[com-replay] part:{stem}: SOUNDNESS ALARM base not revoked: {exc!r}",
             label=f"part:{stem}",
         )
         return "error"
-    return outcomes[0] if outcomes else "error"
 
 
 def _write_shadow(recording: Recording, record: dict[str, Any]) -> None:
