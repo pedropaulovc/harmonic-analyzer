@@ -2112,6 +2112,11 @@ def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
     assert steps["18B"].startswith("18B. IF ") and steps["18C"].startswith("18C. IF ")
     assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
     assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
+    # The strap cut's depth is printed from the seated strap: past its
+    # underside by more than the breakthrough budget, well above the groove floor.
+    low, high = spec.STRAP_CUT_OVERTRAVEL
+    assert spec.holding.TOOL_OVERTRAVEL_BUDGET < low < high < spec.RISER_GROOVE_DEPTH - spec.RISER_GROOVE_BAND
+    assert f"{spec._length(low, 2)}-{spec._length(high, 2)} BELOW" in steps["21E"]
 
 
 def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:

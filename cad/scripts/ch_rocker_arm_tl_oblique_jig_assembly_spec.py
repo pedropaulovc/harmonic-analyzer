@@ -2300,6 +2300,11 @@ if (
 # number. Top-level numbers 1-13 keep their former meaning (MHA-CH-06-TL-21
 # and the carriage screw's sheet cite steps 5 and 10); the former P, F, HD
 # and O series are folded in where they are done.
+# The strap cut's depth (TL-00 machinist review of afe1018: the retired
+# MHA-CH-06 plan carried it): the cutter's end goes past the strap's
+# underside by more than the breakthrough budget and stays well clear of the
+# step 18 groove floor (checked against RISER_GROOVE_DEPTH below).
+STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.10 * trammel.INCH)
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
@@ -2555,6 +2560,8 @@ if _GROOVE_MAX >= riser.THICKNESS - riser.THICKNESS_BAND:
     raise AssertionError("the riser groove can cut through to the carrier")
 if _GROOVE_MIN <= holding.TOOL_OVERTRAVEL_BUDGET:
     raise AssertionError("the riser groove leaves no breakthrough room")
+if not holding.TOOL_OVERTRAVEL_BUDGET < STRAP_CUT_OVERTRAVEL[0] < STRAP_CUT_OVERTRAVEL[1] <= _GROOVE_MIN / 2:
+    raise AssertionError("the strap cut misses breakthrough or nears the groove floor")
 _GROOVE = (
     f"{_length(RISER_GROOVE_DEPTH, 3)} DEEP",
     f"{_length(_GROOVE_MIN, 3)}-{_length(_GROOVE_MAX, 3)}",
@@ -2697,7 +2704,9 @@ OPERATION_STEPS = (
     "21C. REPEAT STEPS 17-17A WITH THE WASHER AND 3 CLAMP SCREWS FITTED.",
     "21D. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
     f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
-    "21E. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
+    f"21E. SET THE CUTTER'S END {_length(STRAP_CUT_OVERTRAVEL[0], 2)}-"
+    f"{_length(STRAP_CUT_OVERTRAVEL[1], 2)} BELOW THE SEATED STRAP'S UNDERSIDE, "
+    "GAUGED FROM ITS TOP AND MEASURED THICKNESS, NOT FROM THE "
     "REFERENCE HEIGHTS.",
     "21F. CUT THE STRAP'S INNER EDGE OVER THE INNER PASS, ALL 3 CLAMP SCREWS "
     "IN PLACE.",
