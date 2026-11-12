@@ -107,27 +107,37 @@ keeps its own thin-only bands (thickness +0/−0.04 mm, OD +0/−0.02 mm). Close
 running fits elsewhere use the ordinary H7/g6 class (`_fit_ream_h7.py`,
 `_fit_close_running.py`).
 
-The cone centre distance is not fixed. It is set at assembly, so the gate is
-written for a set mesh (`cone_set_stack`, `dt_mesh_checks`,
+The cone centre distance is not fixed. The operator sets it by feel at
+assembly (owner direction 2026-11-11, #2365), so the gate is written for what
+a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
 `test_standard_mesh_checks`):
 
-- Cones T012–T120 must reach a contact ratio of at least 1.0 at the nominal
-  set centre, and show no binding and no interference at the RSS corner of the
-  centre and tooth bands. Nominal ratios run from 1.05 (T012) up to about 1.19.
+- No binding is what the feel set itself guarantees. Check 4 taps each
+  pedestal in until the gears at its end just bind, then swings the set in
+  until a gear just binds and eases it out only until the gears turn. No pair
+  runs tighter than its own first bind, so at the tightest gear the backlash
+  is at least zero (`cone_check` reports it; it is not a separate gate).
+- Against coming loose, cones T012–T120 must reach a contact ratio of at least
+  1.0 at the loosest centre a feel set leaves them: the highest first bind of
+  any pair, opened by both gears' running runout, plus a 0.04 mm allowance
+  for the felt ease (`cone_set_stack.FEEL_EASE_MM`). Nominal ratios at the
+  ceiling run from 1.07 (T012) up to about 1.20.
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
-  ratio of 1 against the 20° 120T drum, so T006 is gated instead on its
-  DT6-FORM1 relief standing at least 0.010 mm clear of every printed drum-tip
-  path over the RSS centre range, with at least 0.02 mm backlash. Its contact
-  ratio, 0.775 at nominal and 0.766 at the RSS corner, is reference only.
+  ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
+  least 0.010 mm clear of every printed drum-tip path where the swing locks
+  and at the loosest running centre, so the relief never holds the swing out
+  further than the flanks do. Its contact ratio, 0.774 nominal and 0.765 at
+  the printed corners, and its backlash where the swing locks (0.036 mm at the
+  printed corners) are reference only: the 0.02 mm backlash of the
+  2026-10-10 feeler set has no counterpart once the swing locks wherever no
+  gear binds.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
   1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
   Its open-corner ratio is reference only.
 
-Everything else these drive-train checks print is reference (REF): the RSS-corner
-contact ratios and the arithmetic worst-corner interference. Among T012–T120 only T012
-overlaps at the arithmetic worst corner, by 0.322 mm. That is a fit-up note on
-the assembly sheet: if T012 binds after the set, back the swing off or stone
-the T012 tip.
+Everything else these drive-train checks print is reference (REF): the
+printed-corner contact ratios and the backlash at the loosest centre. A gear
+that binds is cleared by easing the swing, never by stoning a tip.
 
 The alignment pinion only meshes while the readout is zeroed, with the notches
 set by eye. It must not bind; its contact ratio is reported, not gated.
@@ -184,25 +194,40 @@ function: no tight spot, and no skipped tooth with the platen pushed by hand.
 
 ### Setting the cone mesh
 
-The cone set swings on a platform. The cone-lock knob, MHA-DT-VN-51, sets and
-locks the engaged mesh at assembly. The swing stop screw, the shared MHA-SH-VN-52 in its swing-stop occurrence, only
+The cone set swings on a platform. The cone-lock knob, MHA-DT-VN-51, locks
+the engaged mesh at assembly. The swing stop screw, the shared MHA-SH-VN-52 in its swing-stop occurrence, only
 limits how far the set swings out when disengaged; it plays no part in the
-mesh. The order, from MHA-DT-00 sheet 13, check 4 (CONE SWING SET):
+mesh. As on the original, where a knob is loosened to swing the cone set
+out for zeroing and back in, the operator swings the set in and out many
+times and locks it by feel where the gears do not bind (owner direction
+2026-11-11, #2365). No feeler, gauge or engaged stop is used. The order,
+from MHA-DT-00 check 4 (CONE SWING SET):
 
-1. Ease the arbor-pedestal screws to snug-loose.
-2. Swing in on radial shims, cone tip to drum root, using the separate T012
-   and T120 gap callouts in that step (`cone_set_stack.feeler_gap_mm(12)` and
-   `feeler_gap_mm(120)`), so the arbor lines up with the cone line. Tighten the
+1. Ease the arbor-pedestal screws until the pedestals move under light taps.
+2. Hold the cone set swung in and tap each pedestal in until the gears at its
+   end just bind, so the arbor lies on the binds at both ends. Tighten the
    pedestal screws.
-3. Swing out and remove the alignment shims. Swing in until the T120 feeler
-   specified in that step is snug between the T120 tip and the drum root,
-   hold it there, and lock MHA-DT-VN-51.
-4. Do not loosen the pedestals after the set. If you do, redo both steps.
+3. Swing out, swing in until a gear just binds, ease out only until the gears
+   turn freely through one turn of the cone set, hold it there, and lock
+   MHA-DT-VN-51.
+4. Turn the crank through one turn of every MHA-DT-12 (80 crank turns): no
+   gear binds. If one does, loosen the knob there and ease out again.
+5. Do not loosen the pedestals after the set. If you do, redo both settings.
 
-The set cannot correct a pivot that moves sideways, so the platform pivot is
+The zeroing (check 5) ends by setting the swing the same way and cranking on
+until every notch is back: 80 crank turns turn every MHA-DT-12 a whole number
+of times, so the zero returns. The set
+absorbs the pivot's play and the gears' seat floats, which take the mesh
+load the same way when set as when running; the platform pivot is still
 reamed Ø6.350 H7 (6.350–6.365 mm) on the stock 91829A560 shoulder, and the
 base's pivot seat is held ±0.05 mm from the pedestal seats, machined in one
 setup.
+
+The CAD places every cone 0.20 mm above standard centre
+(`cone_drum_oblique_mesh.edge_slack_mm`). A feel set runs tighter than that,
+its tightest gear at zero backlash; `cone_set_stack.SWING_SET_FROM_PLACEMENT_MM`
+books the largest departure at T120 in the swing's clearance stacks
+(`dt_cone_tip_air`, `dt_cylinder_end_disc_clearance`).
 
 ### Undercut
 
