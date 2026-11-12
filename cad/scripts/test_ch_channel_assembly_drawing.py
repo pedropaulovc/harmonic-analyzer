@@ -1048,11 +1048,15 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     files = {
         drawing.BOM_COMPONENT_IDENTITIES[key][0] for key in drawing.BOM_COMPONENTS
     }
-    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(files) == 18
+    # The one file with two member rows is the pin; every other row is its
+    # own file (S0 retired the jam nut after #2593 counted 18 files).
+    shared = {("sh-vn-pivot-pin", "RodPin"), ("sh-vn-pivot-pin", "BarPin")}
+    expected_files = len(drawing.BOM_COMPONENTS) - (len(shared) - 1)
+    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(files) == expected_files
     assert {
         drawing.BOM_COMPONENT_IDENTITIES[key]
         for key in (drawing.explode.ROD_PIN, drawing.explode.BAR_PIN)
-    } == {("sh-vn-pivot-pin", "RodPin"), ("sh-vn-pivot-pin", "BarPin")}
+    } == shared
     assert (
         drawing.BOM_PART_NUMBERS[drawing.explode.ROD_PIN]
         == drawing.BOM_PART_NUMBERS[drawing.explode.BAR_PIN]
