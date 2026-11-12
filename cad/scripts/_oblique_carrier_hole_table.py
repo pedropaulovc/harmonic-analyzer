@@ -406,9 +406,12 @@ def _group_spans(
 
 
 def _merged(table: Any, row: int) -> bool:
-    """Whether ``row``'s NOTE cell is merged (IsCellMerged's BOOL; the
-    WithRow/WithColumn outputs are not relied on)."""
-    state = table.IsCellMerged(row, NOTE_COLUMN)
+    """Whether ``row``'s NOTE cell is merged. The generated binding declares
+    WithRow/WithColumn [in,out] VT_BYREF|VT_I4, so they are passed (0, like
+    GetSplitInformation's) and come back with the BOOL as one tuple; farm
+    20261112T125911703Z refused the two-argument call ('Type mismatch').
+    The WithRow/WithColumn outputs are not relied on."""
+    state = table.IsCellMerged(row, NOTE_COLUMN, 0, 0)
     return bool(state[0] if isinstance(state, tuple) else state)
 
 

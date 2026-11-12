@@ -213,7 +213,10 @@ class NativeCells:
     def DisplayedText2(self, row, col, include_hidden):
         return self.cells[row][self._physical(col, include_hidden)]
 
-    def IsCellMerged(self, row, col):
+    def IsCellMerged(self, row, col, with_row, with_col):
+        # The generated binding's WithRow/WithColumn are [in,out]: a call
+        # without them is the farm's 'Type mismatch'.
+        assert (with_row, with_col) == (0, 0)
         return (col == table.NOTE_COLUMN and row in self.merged, row, col)
 
     def ColumnHidden(self, col):
