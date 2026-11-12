@@ -202,14 +202,21 @@ reaches the pinion's flank below its
 base circle before the flanks wedge, at 0.069 mm of tooth-centred backlash, so
 the stack starts from that later bind, where every corner keeps the 0.25 mm
 root clearance. The run's tight spot sets the arm, so every other station runs
-looser by at most the rack's index error and the feed's lateral terms (along
-the rack) and the pinion's toothspace runout (radial): 0.225 mm of backlash at
-the loosest feel set. Against coming loose and for a feed at constant speed,
-every printed corner must keep a contact ratio of at least 1.0 there; it is
-1.068 (`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). The 1.0 floor is a
-delegated ruling (Main, 2026-11-11, under the owner's #2416 direction; owner
-review #2144): continuous conjugate action is what "paper advances at constant
-speed" asks, and the 1.1 of the removed .003 leaf fallback is not kept. Easing
+looser by the rack's index error and the feed's lateral terms (along the rack),
+the pinion's toothspace runout and the rack's crest drift along the run, up to
+twice the rack-soldered ±.002 crest band (radial). These are independent, and
+the loose side takes their root sum square: 0.188 mm of backlash at the
+loosest feel set. Against coming loose and for a feed at constant speed, every
+printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
+(`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). If every term stacks
+(0.299 mm, reported only as `FEED_WORST_CASE_MESH`), the contact ratio is 0.942,
+a slight hitch in the feed at that station, which the steady-advance check
+catches. The 1.0 floor and the root sum square are delegated rulings (Main,
+2026-11-11, under the owner's #2416 direction; owner review #2144):
+continuous conjugate action is what "paper advances at constant speed" asks,
+and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
+is used because the setting is by feel and the acceptance is functional, an
+exception to the worst-case mesh stacks limited to this mesh. Easing
 past the bind is not booked: the remedy stops where the teeth just turn free,
 and the no-skip check only guards against the mesh coming loose. The builder's
 0.12–0.14 datum band remains the design proof of the modelled mesh
