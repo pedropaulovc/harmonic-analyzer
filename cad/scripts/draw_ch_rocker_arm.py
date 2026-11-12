@@ -198,7 +198,7 @@ part_metadata(
 FRONT_CENTER = (0.180, 0.175)
 # View F (3:1) stands alone in the free band left of the front view, between
 # the 292.5 row's left witness (x 0.107) and the border, above the notes.
-RIGHT_CENTER = (0.075, 0.195)
+RIGHT_CENTER = (0.074, 0.195)
 RIGHT_SCALE = (rocker_notes.RIGHT_VIEW_SCALE, 1)
 ISO_CENTER = (0.345, 0.205)
 ROD_HOLE = requirement(
@@ -2003,8 +2003,8 @@ END_KEEP = {
     "RodTipLen": (0.377, 0.128),
     "TipLandAngle": (0.372, 0.082),
 }
-# View F at 3:1 (RIGHT_CENTER; strap faces x 0.0713/0.0788, hub ends
-# 0.0644/0.0856, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
+# View F at 3:1 (RIGHT_CENTER; strap faces x 0.0703/0.0777, hub ends
+# 0.0626/0.0854 at the .300 hub, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
 # value-plus-three-row block on its request and runs the dimension line under
 # the block (r4: the 2.500 line at the block's bottom, 158 mm, through the
 # hub). Both blocks sit left of the view, clear of the border (0.0125):
@@ -2023,16 +2023,17 @@ STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
 HUB_LENGTH_TEXT = rocker_notes.HUB_LENGTH_CALLOUT
 # Two rows under the value: one row lower than the four-row block's seat keeps
 # its line (~0.142) where it was, under the strap's bottom edge.
-HUB_LENGTH_TEXT_XY = (0.040, 0.1519)
+HUB_LENGTH_TEXT_XY = (0.039, 0.1519)
 # The value plus two rows (#2136 r3: with three rows its top met the strap's
 # position frame), centred under that frame and left of the hub end.
-HUB_ROOT_TEXT_XY = (0.041, 0.199)
+HUB_ROOT_TEXT_XY = (0.039, 0.199)
 # Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face
 # each arm registers on in the 20X stack, one a shop can set up on, where the
 # hub-width centre plane it replaces could only be derived. The strap frame's
 # ⌖0.10|G holds the strap's centre plane at a BASIC from that face to view
 # F's centreline. Both stand in the view's one free column, right of the -Z
-# face (x ~0.0856) and short of the front view's 132.8 left witness
+# face (x ~0.0854: view F stands 1 mm left of 0.075 so the boxed .1500
+# still fits beside the .300 hub, r1 leaf 20261111T225635Z) and short of the front view's 132.8 left witness
 # (FRONT_LEFT_WITNESS_X): G's triangle on the face's lower half, its box
 # straight out right; the BASIC's line above the hub (top ~0.190), its boxed
 # text out right of the face.
@@ -2841,7 +2842,7 @@ def _strap_centre_plane(adapter: Any, view: Any) -> Any:
 
 
 # G's BASIC: the -Z hub face to the strap's centre plane, both off the face
-# requirements (the half hub length, 3.52825, printed at its places).
+# requirements (the half hub length, 3.81, printed at its places: .1500).
 HUB_FACE_BASIC_MM = (
     STRAP_FACES.fields["upper_z"][0] + STRAP_FACES.fields["lower_z"][0]
 ) / 2.0 - HUB_FACES.fields["lower_z"][0]

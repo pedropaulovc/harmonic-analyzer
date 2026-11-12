@@ -60,8 +60,8 @@ SUPPLY_LENGTH_MIN = round(
     math.ceil((HUB_LENGTH + HUB_LENGTH_BAND[0] + 2.0 * FACE_STOCK) / _STEP - 1e-9)
     * _STEP,
     6,
-)  # 8.128, .32
-SUPPLY_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".32 MIN"
+)  # 8.89, .35
+SUPPLY_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".35 MIN"
 
 # Wall between the smallest land and the largest supply bore: .0754 against
 # the .060 floor (under the .080 target; the joined part reams it thinner).

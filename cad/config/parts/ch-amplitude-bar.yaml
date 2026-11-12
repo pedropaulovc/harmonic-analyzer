@@ -8,7 +8,7 @@ ch-amplitude-bar:
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
-  process: "machined (steel)"
+  process: "machined (steel); as-supplied 1/4 CF square (bows about .013 over 31.82) straightened or selected to the MHA-CH-00 straightness check"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

@@ -128,7 +128,7 @@ ARM_THICKNESS = 2.4892  # .098; ch14: p.27 photo callout 2.5 mm (plate thickness
 # The hub length IS the station pitch: hub faces of neighbouring arms touch.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
-HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
+HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.5654 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
 # The lower arc's midpoint below the pivot axis: ArmDepth under the top edge.

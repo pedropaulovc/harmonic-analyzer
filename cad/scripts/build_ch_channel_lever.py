@@ -5,7 +5,7 @@ pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
 design), channel-spring pull from its rounded end (Ø4 hook hole at
 175.05), driven in between by its amplitude bar pinned Ø2 at 127
-(5"). Section 11.0 tall x 3.0 thick: 20 levers at the 7.0565 channel
+(5"). Section 11.0 tall x 3.0 thick: 20 levers at the 7.62 (.300) channel
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
 3.0 lets the bar's 3.15 top slot straddle the lever at the pin. The
 height was 9.5; the owner ruled the lever gray cast iron and its arm

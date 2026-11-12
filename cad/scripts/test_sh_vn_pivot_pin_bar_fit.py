@@ -74,8 +74,9 @@ def test_worst_case_joint_budget() -> None:
     # Running fit in the lever's #47 hole.
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
     assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
-    # Flush ends leave the #1038 top-notch gap untouched.
-    assert b["neighbour_clearance_min"] == pytest.approx(0.1223, abs=1e-6)
+    # Flush ends leave the #1038 top-notch gap untouched: at the .300 pitch
+    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
+    assert b["neighbour_clearance_min"] == pytest.approx(0.6858, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
     # The .55 roof under the .43 lever turned the full relative swing.
     assert b["notch_roof_clearance_min"] == pytest.approx(0.9907, abs=1e-4)
@@ -121,7 +122,7 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
         + 2.0 * lever.PLATE_OFFSET_TOLERANCE
         + 2.0 * pin.PIN_END_PROUD_MAX
     ) == pytest.approx(b["neighbour_clearance_min"])
-    # 7.0565 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
+    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016 = 0.6858.
     assert (notch_max, lever_min) == pytest.approx((3.3274, 2.9464))
 
 

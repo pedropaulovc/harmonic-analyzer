@@ -83,7 +83,9 @@ SHEET_SCALE = (1.0, 1.0)
 # on its top silhouette. An end view would carry nothing, so this sheet has
 # none; the north end's flat and dome go to DETAIL A, and the bar is the same
 # either way round, so they print once for BOTH ENDS.
-PROFILE_CENTER = (0.150, 0.190)
+# Left of 0.150 so the 6.85 bar (#1038 .300 pitch) keeps its diameter
+# callout, east of the south end, short of DETAIL A's fence.
+PROFILE_CENTER = (0.144, 0.190)
 _MM = SHEET_SCALE[0] / 1000.0
 # The view centres on the bar's bounding box, domes included.
 _OVERALL = PIVOT_SHAFT_LENGTH + 2.0 * DOME_HEIGHT
