@@ -13,7 +13,12 @@ import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
 from pd_paper_drive_assembly_steps import knob_setting_ref
-from pd_transgear_arm_geometry import PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES
+from pd_transgear_arm_geometry import (
+    PIN_HOLE_DEPTH,
+    PIN_HOLE_DEPTH_PLACES,
+    PIVOT_BORE_DIAMETRAL_CLEARANCE,
+    PIVOT_FIT_CLEARANCE_PLACES,
+)
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_arm_spec import (
     LATCH_PIN_NUMBER,
@@ -21,8 +26,6 @@ from pd_transgear_arm_spec import (
     LATCH_PIN_WALL_PRINTED,
     LOCATOR_PRESS_INTERFERENCE,
     PIN_PRESS_INTERFERENCE,
-    PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_FIT_CLEARANCE_PLACES,
 )
 
 
@@ -47,7 +50,7 @@ def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
 _PLATE = _config.parts("pd-transgear-arm-plate")
 _SPRING = _config.parts("pd-vn-transgear-pivot-spring")
 _PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
-PIVOT_NOTE, LOCATOR_NOTE, LATCH_PIN_NOTE, SPRING_NOTE = 1, 2, 3, 4
+PIVOT_NOTE, LOCATOR_NOTE, LATCH_PIN_NOTE, SPRING_NOTE, PIN_NOTE = 1, 2, 3, 4, 5
 NOTES_SHEET = 2
 
 
@@ -58,8 +61,8 @@ def see_note(number: int) -> str:
 
 NOTES = (
     f"{PIVOT_NOTE}. PIVOT BORE: RUNNING FIT ON PIVOT SCREW {_PIVOT_SCREW['number']}"
-    " SHOULDER, REAMED TO\n"
-    "   THE MEASURED SHOULDER (CLEARANCE "
+    " SHOULDER\n"
+    "   (CLEARANCE "
     f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
     f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER}"
     f" (INTERFERENCE {_inch_range(LOCATOR_PRESS_INTERFERENCE)}).\n"
@@ -72,15 +75,17 @@ NOTES = (
     f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
+    # The arm is reamed first; the pin's land is turned to the measured ream
+    # (MHA-PD-23 note 1), so the interference band is the matched fit's, not
+    # the two parts' printed limits (machinist review, run
+    # 20261111T201934013Z).
+    f"{PIN_NOTE}. PIN BORE: PRESS FIT ON PIN {PIN.PIN_NUMBER}, ITS LAND TURNED TO\n"
+    f"   THE MEASURED REAM (INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)}).",
 )
 NOTES_TEXT = "\n".join(NOTES)
 
-PIVOT_BORE_CALLOUT = f"REAM, {see_note(PIVOT_NOTE)}"
-PIN_BORE_CALLOUT = "\n".join((
-    "REAM THRU",
-    f"PRESS FIT ON PIN {PIN.PIN_NUMBER}",
-    f"(INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)})",
-))
+PIVOT_BORE_CALLOUT = f"REAM THRU, {see_note(PIVOT_NOTE)}"
+PIN_BORE_CALLOUT = f"REAM THRU, {see_note(PIN_NOTE)}"
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"

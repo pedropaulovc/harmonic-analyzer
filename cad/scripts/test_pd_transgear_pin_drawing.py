@@ -118,14 +118,14 @@ def test_the_seat_root_radius_leaves_the_head_a_flat_seat() -> None:
     """Machinist review round 4: the head's seat gets its own root radius,
     well inside the .0375 step, so the head still bears on the arm's rear
     face past the ream mouth's break and its own rim break."""
-    step = (spec.HEAD_DIA - spec.DIA_MAX) / 2.0
+    step = (spec.HEAD_DIA - spec.PRESS_LAND_DIA_MAX) / 2.0
     assert 0.0 < spec.SEAT_FILLET_R < step / 4.0
     contact = (
         (spec.HEAD_DIA - printed_band_mm(2, unit=spec.UNIT)) / 2.0
         - edge_break_chamfer_mm(unit=spec.UNIT)
         - max(
             arm.PIN_BORE_DIA_MAX / 2.0 + arm.PIN_MOUTH_CHAMFER_LIMITS[1],
-            spec.DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
+            spec.PRESS_LAND_DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
         )
     )
     assert spec.SEAT_CONTACT_WIDTH_MIN == pytest.approx(contact)
@@ -243,12 +243,19 @@ def test_the_dome_heights_and_the_overall_print_as_references() -> None:
     """Rule 10: the overall and both dome heights read off the sheet, as
     references the radii and lands already set."""
     assert callouts.REFERENCE_TEXT == {
-        (feature, name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
-        for feature, name in (
-            ("HeadDomeProfile", "HeadDomeSagDim"),
-            ("TipDomeProfile", "TipDomeSagDim"),
-            ("PinProfile", "FrontLand"),
-        )
+        **{
+            (feature, name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
+            for feature, name in (
+                ("HeadDomeProfile", "HeadDomeSagDim"),
+                ("TipDomeProfile", "TipDomeSagDim"),
+                ("PinProfile", "FrontLand"),
+            )
+        },
+        # #2415: the press land is made to the measured ream (note 1).
+        ("PinProfile", "LandDia"): {
+            callouts.TEXT_PREFIX: "(<MOD-DIAM>",
+            callouts.TEXT_SUFFIX: ")",
+        },
     }
     assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 2
     assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 2
@@ -277,21 +284,32 @@ def test_notes_fit_the_sheet_limits() -> None:
     assert all(len(line) <= 70 for line in lines)
 
 
-def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
-    """The +.0000/-.0002 shank against the arm's .124 REAM_H7: smallest pin
-    in the largest ream and the reverse, flagged at the Ø it serves (rule 4),
-    with the bores that run on it, so the Ra 63 reads as their bearing
-    surface (rule 6).  The general notes no longer carry the fit."""
-    loosest = spec.DIA_MIN - arm.PIN_BORE_DIA_MAX
-    tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
-    assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
-    callout = _below("ShankDia")
-    assert callout == callouts.SHANK_CALLOUT == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+def test_the_land_presses_and_the_shank_only_runs() -> None:
+    """#2415: the short land under the head is the only length pressed into
+    the arm's ream, at a light drive fit turned to the measured ream; the
+    journal passes the ream clear, ends inside the thinnest arm and runs in
+    its three mates.  Both Ø link note 1 (rule 4)."""
+    loosest, tightest = spec.PRESS_INTERFERENCE
+    assert 0.0 < loosest < tightest <= 0.0005 * 25.4 + 1e-9
+    assert spec.DIA_MAX < arm.PIN_BORE_DIA_MIN
+    assert spec.PRESS_LAND_DIA_MAX == pytest.approx(arm.PIN_BORE_DIA_MAX + tightest)
+    assert spec.PRESS_LAND_LENGTH_MAX < arm.THICKNESS - arm.THICKNESS_BAND
+    assert 0.0 < spec.PRESS_LAND_GRIP_MIN < spec.PRESS_LAND_LENGTH
+    for name in ("ShankDia", "LandDia"):
+        assert (
+            _below(name)
+            == callouts.SHANK_CALLOUT
+            == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+        )
+    assert callouts.authored_by_name()["LandDia"][callouts.TEXT_PREFIX].startswith("(")
     assert callouts.DRAWING_NOTES.startswith(f"{callouts.SHANK_FIT_NOTE}. ")
     assert spec.ARM_NUMBER in callouts.DRAWING_NOTES
     assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
     assert "GROUND" not in callouts.DRAWING_NOTES
+    # The shank's named running clearance is its mates' (the sleeve's bore).
+    import pd_transgear_feed_pinion_spec as sleeve
+
+    assert callouts.RUNNING_CLEARANCE == pytest.approx(sleeve.BORE_DIAMETRAL_CLEARANCE)
 
 
 def test_registry_row_is_the_turned_steel_mha_179() -> None:
