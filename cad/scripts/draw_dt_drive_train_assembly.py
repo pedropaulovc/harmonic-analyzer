@@ -563,6 +563,50 @@ CLUSTER_BALLOON_CLEARANCE = {
     "pinion-rig": 0.008,
 }
 
+# --- sheet 4: the cone tip's enlarged exploded detail ------------------------
+# Machinist review of PR #2640 (r3, r7, r8; gating in r8, rules 15 and 22):
+# at the cone set's 1:3 the tip parts are a few pixels across and balloons 37
+# (MHA-DT-37) and 38 (MHA-DT-38) landed on one tip.  The six tip parts are
+# ballooned instead on an enlarged copy of the same exploded view, isolated
+# to them, in the sheet's empty right half; its boundary circle and letter
+# sit on the 1:3 view (draw_ch_channel_assembly's exploded detail C).  The
+# explode keeps MHA-DT-38 pressed on the MHA-DT-37 pivot (the built pair), so
+# the scale, not the explode, tells them apart: 6T tips 4.31 mm, bushing
+# 5.79 mm (dt_cone_tip_gear_spec, dt_cone_tip_bushing_spec).  Letters A, C,
+# D and E are taken here and B is MHA-FR-05's VIEW B, cited in step 10E.
+CONE_TIP_DETAIL_LETTER = "F"
+CONE_TIP_DETAIL_STEMS = frozenset(
+    {
+        "dt-cone-tip-block",
+        "dt-vn-locating-pin",
+        "dt-cone-tip-end-screw",
+        "dt-vn-cone-tip-pinch-screw",
+        "dt-cone-tip-gear",
+        "dt-cone-tip-bushing",
+    }
+)
+# Largest first; the fit steps down only if the ring would not fit.
+CONE_TIP_DETAIL_SCALE_LADDER: tuple[tuple[float, float], ...] = (
+    (1.0, 1.0),
+    (2.0, 3.0),
+    (1.0, 2.0),
+)
+CONE_TIP_DETAIL_BALLOON_MARGIN = CLUSTER_BALLOON_MARGINS["cone-set"]
+CONE_TIP_DETAIL_REACH = CONE_TIP_DETAIL_BALLOON_MARGIN + BALLOON_DIAMETER / 2.0
+# Air between the 1:3 view's balloon ring and the detail's.
+CONE_TIP_DETAIL_RING_GAP = 0.005
+# One caption line under the detail's ring, above the title block.
+CONE_TIP_DETAIL_CAPTION_ALLOWANCE = 0.010
+# Seed spot: the empty right half above the title block; the fit re-centres it.
+CONE_TIP_DETAIL_SEED = (0.350, 0.170)
+# The boundary letter's air outside its circle (draw_ch_channel_assembly
+# DETAIL_LETTER_OFFSET), at the circle's lower left, the side the tip parts'
+# balloons left when they moved to the detail.
+CONE_TIP_DETAIL_LETTER_OFFSET = 0.002
+# The boundary circle's radius beyond the parts' half-diagonal, at the parent's
+# scale, so its line clears their ink.
+CONE_TIP_DETAIL_BOUNDARY_PAD = 0.002
+
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
 # Tops sit under the one-line sheet heading at HEADING_XY.  Sheet 7's right
 # field (the only user of NOTE_FIELD_RIGHT's foot) runs down to the title
@@ -1110,7 +1154,9 @@ FEELER_STACK_ROWS = _feeler_stack_rows()
 # would move both ends).  Y is never adjusted in 4E: by then MHA-DT-13 ties
 # both pedestals into one frame, so a Y out means the frame slid while
 # MHA-DT-VN-62 was eased, and the front one is tapped back to the Y
-# indicator's 4B zero.
+# indicator's 4B zero.  A remedy names the part it remakes: the one its
+# measurement finds out of print (machinist review r7/r8 of PR #2640: "ONE OUT"
+# named none).
 PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
 PEDESTAL_RECHECK_HEADER = (
     "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
@@ -1121,14 +1167,14 @@ PEDESTAL_RECHECK_ROWS = (
         _step_ref("cylinder-stack-accepted", "Z"),
         "", "", "",
         BANK_X_LIMITS,
-        "MIKE GEAR 0 + T120 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+        "MIC GEAR 0 + T120 TIPS, BORE HEIGHT; REMAKE ANY OUT OF PRINT",
     ),
     (
         "BACK MHA-DT-02, X",
         _step_ref("cylinder-bank-located", "Q"),
         "", "", "",
         BANK_X_LIMITS,
-        "MIKE GEAR 19 + MHA-DT-37 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+        "MIC GEAR 19 + MHA-DT-37 TIPS, BORE HEIGHT; REMAKE ANY OUT OF PRINT",
     ),
     (
         "FRONT MHA-DT-02, Y",
@@ -1139,11 +1185,13 @@ PEDESTAL_RECHECK_ROWS = (
     ),
     # Both X ends' parts in print: the remaining one-end causes are the
     # cone-line seats on the swing platform (DtFeel2365, check 4's author;
-    # the stack past them is #2587's).
+    # the stack past them is #2587's).  The row is the X rows' remedy carried
+    # on, so it records nothing: its label is its trigger (machinist review
+    # r7/r8 of PR #2640: "X, ALL IN PRINT" read as a row with no trigger).
     (
-        "X, ALL IN PRINT",
-        "", "", "", "", "",
-        "CHECK MHA-DT-05 + MHA-DT-21 SEATS ON MHA-DT-20; REMAKE ONE OUT",
+        "X, PARTS IN PRINT",
+        "-", "-", "-", "-", "-",
+        "MIC MHA-DT-05 + MHA-DT-21 SEATS ON MHA-DT-20; REMAKE ANY OUT",
     ),
 )
 
@@ -1310,6 +1358,14 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
     )
 
 
+# Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
+# is a slip fit, so each pressed pin's check is followed by this one remedy,
+# the sheet 1 LOCTITE 638 note's bond (2X-2Y, 4T-4U, 4A-4B, 6A-6B, 6E-6F).
+SLIP_FIT_BOND = "BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE."
+# MHA-DT-29's acceptance and flush condition, as both part sheets print them.
+PIN_FIT_ACCEPTANCE, PIN_FIT_FLUSH = pinion.PIN_FIT_LINES[1].split(", ")
+
+
 # Every step does one thing in six printed lines or fewer, and a check and its
 # remedy are separate steps (drawing-guidelines rule 22; rubric sample review
 # of v47).  A step's number is the registry's (dt_drive_train_steps, which
@@ -1346,13 +1402,13 @@ CONE_CRANK_STEPS = _note_text(
         "1C. SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER.",
         "1D. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY.",
         "1E. PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024.",
-        f"1F. MEASURE T120 FRONT TO MHA-DT-37 LEAVES' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
+        f"1F. MEASURE T120 FRONT TO MHA-DT-37 TEETH' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
         "1G. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
         "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
         "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
         "1K. TAKE MHA-DT-37, T018, T012 AND T024 OFF.",
         # Rule 23: the press fit's bench acceptance and its slip-fit remedy.
-        "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS LEAVES.",
+        "1L. PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT, AGAINST ITS TEETH.",
         "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND.",
         "1N. IF IT DOES, BOND IT ON WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
         # #2470: T024 slides back along its coated land onto the feeler, so
@@ -1460,7 +1516,7 @@ CONE_CRANK_STEPS = _note_text(
         # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
         # is a slip fit, and the step says what to do then (as 4A-4B).
         "2X. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
-        "2Y. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        f"2Y. IF IT DOES, {SLIP_FIT_BOND}",
         "2Z. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
         # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
@@ -1491,7 +1547,7 @@ CONE_CRANK_STEPS = _note_text(
         # Rule 23 (rubric sample round 5): the press fit's bench acceptance
         # and its slip-fit remedy, the sheet 1 LOCTITE 638 note.
         "4A. CHECK THAT NEITHER MHA-DT-VN-67 TURNS OR PULLS OUT BY HAND.",
-        "4B. IF ONE DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        f"4B. IF ONE DOES, {SLIP_FIT_BOND}",
         "4C. FIT MHA-DT-11 IN THE MHA-DT-05 CRANK BORE.",
         "4D. SLIDE MHA-DT-10 ON WITHOUT ITS PIN, A TOOTH IN A GAP OF MHA-DT-07.",
         # Owner ruling D1 (2026-10-15): the collar bears on the boss with no
@@ -1517,13 +1573,18 @@ CONE_CRANK_STEPS = _note_text(
         # Rule 4 (8a1a516): a standard fit name; the part sheets' shared
         # "LIGHT HAMMER FIT" (pinion.PIN_FIT_LINES) is a drive fit.
         f"4R. REAM TO FIT PIN {pinion.PIN_NUMBER}, A DRIVE FIT.",
-        f"4S. TAP {pinion.PIN_NUMBER} IN: {pinion.PIN_FIT_LINES[1]}.",
-        "4T. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
-        "4U. CHECK THAT THE MHA-DT-11 END STANDS "
+        # Rule 23 (machinist review r8 of PR #2640): the drive fit's bench
+        # check and slip-fit remedy, as every other pressed pin's, worded from
+        # the part sheets' shared fit line (PIN_FIT_LINES).
+        f"4S. TAP {pinion.PIN_NUMBER} IN {PIN_FIT_FLUSH}.",
+        f"4T. CHECK THAT {pinion.PIN_NUMBER} IS {PIN_FIT_ACCEPTANCE}.",
+        f"4U. IF IT IS, {SLIP_FIT_BOND}",
+        "4V. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
+        "4W. CHECK THAT THE MHA-DT-11 END STANDS "
         # A stack result, not a set window: rounded outward (Codjiflo, #2194).
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF MHA-DT-10.",
-        "4V. DO NOT FACE THAT END.",
+        "4X. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
@@ -1533,45 +1594,50 @@ CONE_CRANK_STEPS = _note_text(
         "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER: FACES FLUSH.",
         # Rule 23 (rubric sample round 13, #3): the press's slip-fit remedy.
         "6A. CHECK THAT MHA-DT-31 DOES NOT SLIDE IN MHA-DT-06 BY HAND.",
-        "6B. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        f"6B. IF IT DOES, {SLIP_FIT_BOND}",
         "6C. MATCH-REAM THE MHA-DT-31/MHA-DT-06 SEAM PIN HOLE PER MHA-DT-31.",
         # FoDtVn1 (#2270): which end goes out moved here from the pin's sheet;
         # the faced cut end stays flush, the supplier's chamfer leads in
         # (dt_vn_crank_hub_pin_spec).
         "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH, FACED END OUT.",
+        # Rule 23 (machinist review r8 of PR #2640): the seam pin's press fit
+        # (dt_crank_hub_notes: LIGHT DRIVE FIT) gets the check and remedy
+        # pair every other pressed pin has.
+        "6E. CHECK THAT MHA-DT-VN-59 DOES NOT SLIDE BY HAND.",
+        f"6F. IF IT DOES, {SLIP_FIT_BOND}",
         # Round 17 (#0): the fit's parts by drawing number.
-        "6E. SLIDE MHA-DT-06 ONTO MHA-DT-11: MHA-DT-31 FRONT FACE FLUSH WITH",
+        "6G. SLIDE MHA-DT-06 ONTO MHA-DT-11: MHA-DT-31 FRONT FACE FLUSH WITH",
         f"   THE {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
         # Rule 23 (rubric sample round 14, #0): the step 5 wheel is captured
         # between the MHA-DT-11 seat collar and the MHA-DT-31 hub rear face
         # (build_dt_drive_train_assembly CRANK_HUB_SPROCKET_AIR, open at the
         # SeatCollar band); this is its bench acceptance.  Round 15 (#1, 2/3
         # runs): the 2X MHA-DT-VN-67 stop it turning, so it only slides.
-        f"6F. CHECK THAT {CRANK_CHAIN_WHEEL} SLIDES FREELY ON THE 2X MHA-DT-VN-67 WITH END",
+        f"6H. CHECK THAT {CRANK_CHAIN_WHEEL} SLIDES FREELY ON THE 2X MHA-DT-VN-67 WITH END",
         "   PLAY BETWEEN THE MHA-DT-11 COLLAR AND THE MHA-DT-31 HUB.",
         # Round 17 (#2): the ream's functional stop (Main's ruling): the
         # driven pin's MHA-DT-27 ring clears the hub (dt_crank_hub_notes,
         # dt_crank_pin_ring_spec.PIN_PROUD), stated without a typed number.
-        "6G. TAPER-REAM 1:48 THRU MHA-DT-31 AND MHA-DT-11 UNTIL MHA-DT-09",
+        "6J. TAPER-REAM 1:48 THRU MHA-DT-31 AND MHA-DT-11 UNTIL MHA-DT-09",
         "   PUSHED IN BY HAND LEAVES ITS MHA-DT-27 RING HOLE CLEAR OF THE HUB.",
-        "6H. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
+        "6K. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
         # Owner ruling 2026-11-08 (#2144 item 9.2): one open strand of jack
         # chain, its end link screwed flat to the arm through its eye, the
         # ring closed with pliers through the far link's eye; the cut length
         # prints on MHA-DT-VN-65's own sheet.
-        "6J. SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO MHA-DT-06 WITH MHA-DT-VN-70",
+        "6L. SCREW THE END LINK OF MHA-DT-VN-65 FLAT TO MHA-DT-06 WITH MHA-DT-VN-70",
         "   THROUGH ITS EYE.",
         # Rule 23 (integration proof run 20261109T062834910Z): the anchor
         # screw's bench acceptance.
-        "6K. CHECK THAT MHA-DT-VN-70 IS SEATED AND DOES NOT TURN BY HAND.",
-        "6L. THREAD MHA-DT-27 THROUGH THE MHA-DT-09 CROSS-HOLE AND THE FAR LINK'S EYE.",
-        "6M. CLOSE MHA-DT-27 WITH PLIERS: BUTT GAP 0-"
+        "6M. CHECK THAT MHA-DT-VN-70 IS SEATED AND DOES NOT TURN BY HAND.",
+        "6N. THREAD MHA-DT-27 THROUGH THE MHA-DT-09 CROSS-HOLE AND THE FAR LINK'S EYE.",
+        "6P. CLOSE MHA-DT-27 WITH PLIERS: BUTT GAP 0-"
         + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
         + ".",
-        "6N. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
+        "6Q. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
         # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
         # bench acceptance.
-        "6P. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
+        "6R. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
@@ -1681,10 +1747,14 @@ BANK_STEPS = _note_text(
         # Round 11: the length plainly, both domes counted.
         f"9S. TURN MHA-DT-13 TO THE 9R SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
         f"({inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END).",
-        # Round 18: one line, so the fields keep room for step 23's transfer.
+        # The arbor and the setting mandrel are both 3/8 (dt_cylinder_gear_shaft_
+        # spec SHAFT_DIA): pushed in end to end, the arbor drives the mandrel
+        # out the front and every gear passes onto it in place (machinist
+        # review r7/r8 of PR #2640: no step removed the mandrel).
         "9T. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS "
-        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD.",
-        "9U. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
+        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD: IT DRIVES THE MANDREL OUT THE "
+        "FRONT AND THE GEARS PASS ONTO IT.",
+        "9U. SPOT MHA-DT-13 THROUGH EACH MHA-DT-02 SET-SCREW TAP WITH A #43 DRILL, .02 DEEP.",
         "9V. BLOW OUT THE CHIPS.",
         "9W. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
         "9X. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
@@ -1779,6 +1849,9 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
         # Rubric sample round 13 (rule 26): "the drum bond" was a private label.
         ("BEFORE THE DRUM BOND: ", f"BEFORE STEP {steps.step_number('drum-bonded')}: "),
         ("PIN STATION; DRIVE ", "PIN STATION.\nDRIVE "),
+        # Machinist review r8 of PR #2640 (rule 26): "crown end" was a private
+        # label; the back end is plain.
+        ("FROM ITS BACK CROWN END", "FROM ITS BACK END"),
         ("THRU BOTH, BOTH ENDS SUB-FLUSH AND", "THRU BOTH: BOTH ENDS SUB-FLUSH,"),
         ("OF EACH OTHER; THEN SLIDE ", "OF EACH OTHER.\nSLIDE "),
     ),
@@ -1894,7 +1967,10 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # (build_harmonic_base), so the sheet names the print, never a copy.
         # Rubric sample round 13 (#0, rule 22): as the bank does at 8U-8X, the
         # rig and spring come off for the drilling, go back at their 18-19
-        # settings, and those settings are rechecked once screwed down.
+        # settings, and those settings are rechecked once screwed down.  The
+        # 7A-7E reset eases only the MHA-DT-VN-57 rig screws, which cannot move
+        # the MHA-DT-24 pad: its 19B gap is reset on its own foot screw
+        # (machinist review r8 of PR #2640).
         (
             "rig-seats-transferred",
             f"SPOT MHA-FR-01 THRU {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 FOOT HOLE.\n"
@@ -1904,8 +1980,12 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"{steps.step_number('rig-set')}B SETTINGS.\n"
             f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-SH-VN-52 AT THE SPRING FOOT.\n"
             f"RECHECK THE {steps.step_number('rig-located')}E TIP GAP AND THE "
-            f"{steps.step_number('rig-set')}-{steps.step_number('rig-set')}B LEAVES.\n"
-            "IF ONE IS OUT, RESET IT AS CHECKS 7A-7E.",
+            f"{steps.step_number('rig-set')}-{steps.step_number('rig-set')}A FEELER GAPS.\n"
+            "IF ONE IS OUT, RESET IT AS CHECKS 7A-7E.\n"
+            f"RECHECK THE {steps.step_number('rig-set')}B PAD GAP.\n"
+            "IF IT IS OUT, LOOSEN THE SPRING-FOOT MHA-SH-VN-52.\n"
+            f"RESET THE PAD AS {steps.step_number('rig-set')}B.\n"
+            "TIGHTEN THE SPRING-FOOT MHA-SH-VN-52.",
         ),
         # The cams' phase is set with the lever parked; the cam set then sets
         # each cam along the rod, tightens its set screw and stakes the tap.
@@ -2114,7 +2194,7 @@ CHECKS = _note_text(
         f"7B. REFIT THE STEP {steps.step_number('rig-set')} LEAVES SNUG.",
         f"7C. RE-SET THE RIG AS STEP {steps.step_number('rig-located')}F.",
         "7D. TIGHTEN MHA-DT-VN-57.",
-        "7E. RECHECK THOSE LEAVES.",
+        "7E. RECHECK THOSE GAPS.",
         "7F. REPEAT CHECKS 6 AND 7.",
     )
 )
@@ -2140,7 +2220,7 @@ INTERFACE_NOTES = _note_text(
         f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} CHAIN WHEEL ON MHA-DT-11,",
         # Rubric sample round 14 (rule 23): its retention and acceptance.
         "   PINNED BY 2X MHA-DT-VN-67, HELD ENDWISE BY MHA-DT-31 (STEP "
-        f"{steps.step_number('crank-hub-fitted')}F).",
+        f"{steps.step_number('crank-hub-fitted')}H).",
         # Rubric sample round 13 (rule 4): check 5's feed sense names it.
         f"   ITS {PLATEN_NUMBER} PLATEN FEEDS AS CHECK 5 STATES.",
         "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE BACK MHA-CH-08 "
@@ -2165,7 +2245,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2Y, 4B, 6B, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2Y, 4B, 4U, 6B, 6F, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
@@ -2227,7 +2307,7 @@ _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
 BANK_CONTINUED_FROM = str(steps.step_number("cylinder-bank-located"))
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}W"
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}U"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
@@ -2235,16 +2315,17 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
 )
 # Rounds 19-20: step 23's pivot-seat transfer moved each rig split on; #2470
 # moved step 6 to sheet 8, so the bank and rig splits moved on to refill
-# sheets 9-11 (16C, 18E, 23J).  Step 18E stays on CONTINUATION_SHEET, where
-# the checks' tip-gap reset cites it.
+# sheets 9-11.  Machinist review r8 of PR #2640 lengthened 9T and step 20,
+# so the splits moved back (9U, 16, 18D, 23).  Step 18E stays on
+# CONTINUATION_SHEET, where the checks' tip-gap reset cites it.
 RIG_SPLITS = (
-    (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
+    (str(steps.step_number("straps-pinned-to-torque-shaft")), RIG_SEQUENCE_HEADING),
     (
-        f"{steps.step_number('rig-located')}E",
+        f"{steps.step_number('rig-located')}D",
         f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
     ),
     (
-        f"{steps.step_number('other-base-mounting')}G",
+        str(steps.step_number("other-base-mounting")),
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )
@@ -2517,6 +2598,85 @@ def fit_cluster_ring(
     if cluster in RAISED_RING_CLUSTERS:
         return raised_ring_fit(outline, cluster)
     return cluster_ring_fit(outline, CLUSTER_RING_REGIONS[cluster])
+
+
+def cone_tip_detail_region(
+    parent_outline: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Where the cone tip detail's balloon ring may stand on sheet 4, as
+    (x0, y0, x1, y1): right of the fitted 1:3 view's ring, over the title
+    block plus a caption line, and inside the frame by the clearance
+    RAISED_RING_TOP keeps."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    parent_reach = CLUSTER_BALLOON_MARGINS["cone-set"] + BALLOON_DIAMETER / 2.0
+    return (
+        parent_outline[2] + parent_reach + CONE_TIP_DETAIL_RING_GAP,
+        template.title_block_top_m
+        + CLUSTER_TITLE_BLOCK_CLEARANCE
+        + CONE_TIP_DETAIL_CAPTION_ALLOWANCE,
+        template.width_m - (template.height_m - RAISED_RING_TOP),
+        RAISED_RING_TOP,
+    )
+
+
+def cone_tip_detail_fit(
+    outline: tuple[float, float, float, float],
+    placed: tuple[float, float],
+    region: tuple[float, float, float, float],
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The largest CONE_TIP_DETAIL_SCALE_LADDER scale, from ``placed`` down,
+    whose balloon ring fits ``region``, and the shift that centres the ring
+    there.  ``outline`` is the view's at ``placed``; only its size matters.
+    Raises naming every scale's overflow when even the last does not fit."""
+    x0, y0, x1, y1 = outline
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    findings = []
+    ladder = CONE_TIP_DETAIL_SCALE_LADDER
+    for scale in ladder[ladder.index(placed) :]:
+        k = (scale[0] / scale[1]) / (placed[0] / placed[1])
+        hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
+        shift, overflows = ring_fit_shift(
+            (cx - hw, cy - hh, cx + hw, cy + hh), region, grow=CONE_TIP_DETAIL_REACH
+        )
+        if not overflows:
+            return scale, shift
+        findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
+    raise ValueError(
+        f"cone tip detail: no ladder scale fits its balloon ring right of the 1:3 view "
+        f"({' | '.join(findings)})"
+    )
+
+
+def cone_tip_detail_boundary(
+    detail_outline: tuple[float, float, float, float],
+    detail_origin: tuple[float, float],
+    parent_origin: tuple[float, float],
+    ratio: float,
+) -> tuple[tuple[float, float], float]:
+    """The detail's boundary circle on the 1:3 view: (centre, radius), sheet m.
+
+    Both views show one explode in one orientation, so the parts' outline
+    centre, read from the model origin's projection in the detail
+    (``detail_origin``), lies ``ratio`` (parent scale over detail scale) as
+    far from that origin's projection in the parent; the circle takes the
+    outline's half-diagonal at that ratio plus its pad."""
+    x0, y0, x1, y1 = detail_outline
+    centre = (
+        parent_origin[0] + ((x0 + x1) / 2.0 - detail_origin[0]) * ratio,
+        parent_origin[1] + ((y0 + y1) / 2.0 - detail_origin[1]) * ratio,
+    )
+    half_diagonal = math.hypot(x1 - x0, y1 - y0) / 2.0
+    return centre, half_diagonal * ratio + CONE_TIP_DETAIL_BOUNDARY_PAD
+
+
+def cone_tip_detail_caption(
+    scale: tuple[float, float], sheet_scale: tuple[float, float]
+) -> str:
+    """Its label (rule 9: the scale only where it differs from the sheet's);
+    it shows the BOM's teeth- and thread-free configuration, which sheet 1's
+    heading promises only at 1:2 and smaller, so it says so."""
+    name = view_label(f"DETAIL {CONE_TIP_DETAIL_LETTER}", scale, sheet_scale)
+    return f"{name} - TEETH AND THREADS OMITTED"
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -4299,6 +4459,17 @@ def _fit_cluster_view(
     return scale
 
 
+def _cluster_balloon_anchors(cluster: Cluster, facts: SourceFacts) -> dict[str, Any]:
+    """A cluster's frozen balloon anchors, each pinned instance named by its
+    source reference name."""
+    return {
+        stem: replace(anchor, instance=facts.reference_names[anchor.instance])
+        if anchor.instance in COMPONENT_IDENTITIES
+        else anchor
+        for stem, anchor in DRIVE_TRAIN_BALLOON_ANCHORS[cluster].items()
+    }
+
+
 def _balloon_cluster_sheet(
     adapter: Any,
     cluster: Cluster,
@@ -4308,9 +4479,11 @@ def _balloon_cluster_sheet(
     *,
     bom_name: str,
     items: dict[str, str],
+    elsewhere: frozenset[str] = frozenset(),
 ) -> tuple[dict[str, Any], list[BalloonLanding]]:
     """Link one fitted cluster view (``_fit_cluster_view``) to the BOM and
-    balloon it; return its balloons by note name, and their landings for
+    balloon every family but those ``elsewhere`` (ballooned on a detail of
+    it); return its balloons by note name, and their landings for
     ``finalize_drawing`` to prove again after the last rebuild."""
     number = CLUSTER_SHEETS[cluster]
     _activate_sheet(adapter, SHEET_NAMES[number - 1])
@@ -4318,7 +4491,11 @@ def _balloon_cluster_sheet(
     names = frozenset(facts.clusters[cluster])
     _link_view_to_bom(view, bom_name, label=label)
     stems = sorted(
-        {instance.stem for instance in facts.instances if instance.name in names},
+        {
+            instance.stem
+            for instance in facts.instances
+            if instance.name in names and instance.stem not in elsewhere
+        },
         key=lambda stem: int(items[stem]),
     )
     balloon_items = tuple((stem, items[stem]) for stem in stems)
@@ -4326,12 +4503,7 @@ def _balloon_cluster_sheet(
         adapter,
         view,
         items=balloon_items,
-        anchors={
-            stem: replace(anchor, instance=facts.reference_names[anchor.instance])
-            if anchor.instance in COMPONENT_IDENTITIES
-            else anchor
-            for stem, anchor in DRIVE_TRAIN_BALLOON_ANCHORS[cluster].items()
-        },
+        anchors=_cluster_balloon_anchors(cluster, facts),
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGINS[cluster],
     )
@@ -4349,6 +4521,213 @@ def _balloon_cluster_sheet(
     _uncross_balloon_leaders(adapter, balloons, label=label)
     _verify_balloon_attachments(balloons, balloon_items, label=label)
     _heading(adapter, number, cluster_heading(cluster))
+    return _balloon_annotations(balloons), landings
+
+
+def cone_tip_detail_names(facts: SourceFacts) -> frozenset[str]:
+    """The cone set's instances of the detail's six families; refuses a
+    family the cone set does not carry."""
+    cone_set = frozenset(facts.clusters["cone-set"])
+    names = frozenset(
+        instance.name
+        for instance in facts.instances
+        if instance.name in cone_set and instance.stem in CONE_TIP_DETAIL_STEMS
+    )
+    shown = {instance.stem for instance in facts.instances if instance.name in names}
+    if shown != CONE_TIP_DETAIL_STEMS:
+        raise RuntimeError(
+            f"cone tip detail: the cone set lacks {sorted(CONE_TIP_DETAIL_STEMS - shown)}"
+        )
+    return names
+
+
+def _reference_bom_configuration(adapter: Any, view: Any, *, label: str) -> str:
+    """Point the cone tip detail at the cluster views' and the BOM's
+    teeth- and thread-free configuration, whatever its scale, and read it
+    back.  A balloon on a view of another configuration than its BOM's
+    resolves item '*' (paper-drive native run 20261023T205501918Z), so the
+    scale policy's full-detail Default would leave the six tip balloons
+    unnumbered (apply_view_configuration's policy, bypassed for this view
+    alone)."""
+    bound = _early_bound(view, "IView")
+    if str(bound.ReferencedConfiguration) != SIMPLIFIED_VIEW_CONFIGURATION:
+        bound.ReferencedConfiguration = SIMPLIFIED_VIEW_CONFIGURATION
+        rebuild_drawing(adapter, label=f"{label} configuration")
+    current = str(bound.ReferencedConfiguration)
+    if current != SIMPLIFIED_VIEW_CONFIGURATION:
+        raise RuntimeError(
+            f"{label}: view references {current!r} after setting "
+            f"{SIMPLIFIED_VIEW_CONFIGURATION!r}"
+        )
+    return current
+
+
+def _place_cone_tip_detail(adapter: Any) -> Any:
+    """Place the cone tip detail at its ladder's top scale, collapsed, on the
+    BOM's configuration, with the cluster views: every configuration switch
+    comes before every explode and the BOM (``_place_package``)."""
+    _activate_sheet(adapter, SHEET_NAMES[CLUSTER_SHEETS["cone-set"] - 1])
+    label = "cone tip detail"
+    view = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *CONE_TIP_DETAIL_SEED,
+        scale=CONE_TIP_DETAIL_SCALE_LADDER[0],
+    )
+    set_hidden_lines_removed(adapter, view)
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    configuration = _reference_bom_configuration(adapter, view, label=label)
+    set_view_exploded_state(adapter, view, False, configuration=configuration, label=label)
+    return view
+
+
+def _fit_cone_tip_detail(
+    adapter: Any, view: Any, parent: Any, facts: SourceFacts
+) -> tuple[tuple[float, float], tuple[float, float, float, float], tuple[float, float]]:
+    """Explode the detail, isolate it to the six tip parts and fit its ring
+    right of the fitted 1:3 view (after ``_fit_cluster_view``, before the
+    BOM).  Returns its scale, and its outline and the model origin's
+    projection in it, both read before it moves (``cone_tip_detail_boundary``
+    needs only their difference)."""
+    _activate_sheet(adapter, SHEET_NAMES[CLUSTER_SHEETS["cone-set"] - 1])
+    label = "cone tip detail"
+    set_view_exploded_state(
+        adapter, view, True, configuration=SIMPLIFIED_VIEW_CONFIGURATION, label=label
+    )
+    view = set_drawing_view_instance_visibility(
+        adapter, view, cone_tip_detail_names(facts), mode="show", label=label
+    )
+    placed = CONE_TIP_DETAIL_SCALE_LADDER[0]
+    region = cone_tip_detail_region(_view_outline(parent))
+    placed_outline = _view_outline(view)
+    scale, _predicted = cone_tip_detail_fit(placed_outline, placed, region)
+    if scale != placed:
+        _set_view_scale(adapter, view, scale, label=label)
+    # The projection is read behind the display-geometry barrier
+    # (_drawing_detail_projection), the outline at the same moment.
+    _early_bound(view, "IView").UpdateViewDisplayGeometry()
+    outline = _view_outline(view)
+    origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label=f"{label} model origin")
+    shift, overflows = ring_fit_shift(outline, region, grow=CONE_TIP_DETAIL_REACH)
+    _telemetry.event(
+        "drawing.cone_tip_detail_fit",
+        scale=_scale_text(scale),
+        placed_outline_mm=tuple(value * 1000.0 for value in placed_outline),
+        outline_mm=tuple(value * 1000.0 for value in outline),
+        region_mm=tuple(value * 1000.0 for value in region),
+        shift_mm=tuple(value * 1000.0 for value in shift),
+        overflows=tuple(overflows),
+    )
+    if overflows:
+        raise RuntimeError(
+            f"{label}: at {_scale_text(scale)} its balloon ring overflows the room right "
+            f"of the 1:3 view ({'; '.join(overflows)})"
+        )
+    _shift_view(adapter, view, shift, label=f"{label} ring fit")
+    return scale, outline, origin
+
+
+def _balloon_cone_tip_detail(
+    adapter: Any,
+    parent: Any,
+    detail: Any,
+    facts: SourceFacts,
+    *,
+    scale: tuple[float, float],
+    parent_scale: tuple[float, float],
+    outline: tuple[float, float, float, float],
+    origin: tuple[float, float],
+    bom_name: str,
+    items: dict[str, str],
+) -> tuple[dict[str, Any], list[BalloonLanding]]:
+    """Mark the cone tip detail's boundary and letter on the ballooned 1:3
+    view, balloon the six tip families on the detail and caption it under its
+    ring; return its balloons by note name and their landings."""
+    sheet_name = SHEET_NAMES[CLUSTER_SHEETS["cone-set"] - 1]
+    _activate_sheet(adapter, sheet_name)
+    label = "cone tip detail"
+    configuration = str(_early_bound(parent, "IView").ReferencedConfiguration)
+    actual = str(_early_bound(detail, "IView").ReferencedConfiguration)
+    if actual != configuration:
+        raise RuntimeError(
+            f"{label}: references {actual!r}, the ballooned 1:3 view {configuration!r}"
+        )
+    # After the 1:3 view's balloons, so no anchor there can pick the circle
+    # as a part's edge.
+    _early_bound(parent, "IView").UpdateViewDisplayGeometry()
+    parent_origin = model_point_in_view(
+        adapter, parent, (0.0, 0.0, 0.0), label=f"{label} boundary origin"
+    )
+    ratio = (parent_scale[0] / parent_scale[1]) / (scale[0] / scale[1])
+    centre, radius = cone_tip_detail_boundary(outline, origin, parent_origin, ratio)
+    _setting_circle(adapter, parent, centre, radius)
+    adapter.currentModel.ClearSelection2(True)
+    # The letter is the 1:3 view's own note, as DETAIL A's is its parent's.
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
+        view_name(adapter, parent)
+    ):
+        raise RuntimeError(f"cannot activate the cone set view for the {label} letter")
+    letter = _add_note_block(adapter, CONE_TIP_DETAIL_LETTER, centre, label=f"{label} letter")
+    letter_extent = _note_extent(adapter, letter, label=f"{label} letter")
+    reach = (radius + CONE_TIP_DETAIL_LETTER_OFFSET) / math.sqrt(2.0)
+    _anchor_note(
+        adapter,
+        letter,
+        (centre[0] - reach - (letter_extent[2] - letter_extent[0]), centre[1] - reach),
+        label=f"{label} letter",
+    )
+    _telemetry.event(
+        "drawing.cone_tip_detail_boundary",
+        centre_mm=(centre[0] * 1000.0, centre[1] * 1000.0),
+        radius_mm=radius * 1000.0,
+        ratio=ratio,
+    )
+    _activate_sheet(adapter, sheet_name)
+    _link_view_to_bom(detail, bom_name, label=label)
+    balloon_items = tuple(
+        (stem, items[stem]) for stem in sorted(CONE_TIP_DETAIL_STEMS, key=lambda s: int(items[s]))
+    )
+    landings = add_component_bom_balloons(
+        adapter,
+        detail,
+        items=balloon_items,
+        anchors=_cluster_balloon_anchors("cone-set", facts),
+        label=f"drive-train {label} BOM coverage",
+        margin=CONE_TIP_DETAIL_BALLOON_MARGIN,
+    )
+    balloons = [landing.note for landing in landings]
+    _spread_balloons(
+        adapter,
+        detail,
+        balloons,
+        margin=CONE_TIP_DETAIL_BALLOON_MARGIN,
+        clearance=CLUSTER_BALLOON_CLEARANCE["cone-set"],
+    )
+    rebuild_drawing(adapter, label=f"{label} ring")
+    _uncross_balloon_leaders(adapter, balloons, label=label)
+    _verify_balloon_attachments(balloons, balloon_items, label=label)
+    # Under the ring: the ring's lowest circle reaches CONE_TIP_DETAIL_REACH
+    # below the outline.
+    _activate_sheet(adapter, sheet_name)
+    _early_bound(detail, "IView").UpdateViewDisplayGeometry()
+    placed = _view_outline(detail)
+    caption = _add_note_block(
+        adapter,
+        cone_tip_detail_caption(scale, parent_scale),
+        (placed[0], placed[1]),
+        label=f"{label} caption",
+    )
+    extent = _note_extent(adapter, caption, label=f"{label} caption")
+    _anchor_note(
+        adapter,
+        caption,
+        (
+            (placed[0] + placed[2]) / 2.0 - (extent[2] - extent[0]) / 2.0,
+            placed[1] - CONE_TIP_DETAIL_REACH - VIEW_CAPTION_GAP,
+        ),
+        label=f"{label} caption",
+    )
     return _balloon_annotations(balloons), landings
 
 
@@ -5015,25 +5394,65 @@ def _place_package(
     for cluster in CLUSTER_SHEETS:
         cluster_views[cluster] = _place_cluster_view(adapter, cluster)
         step(f"{cluster} view")
+    tip_detail = _place_cone_tip_detail(adapter)
+    step("cone tip detail view")
     cluster_scales = {}
     for cluster, view in cluster_views.items():
         cluster_scales[cluster] = _fit_cluster_view(adapter, cluster, view, facts)
         step(f"{cluster} fit")
+    tip_scale, tip_outline, tip_origin = _fit_cone_tip_detail(
+        adapter, tip_detail, cluster_views["cone-set"], facts
+    )
+    step("cone tip detail fit")
     bom_name, items = _insert_bom(adapter, bom_view, facts)
     step("BOM table")
-    placed = {}
+    # (sheet, balloons, landings) per ring: the cone set's sheet carries two,
+    # each uncrossed on its own.
+    placed = []
     for cluster, view in cluster_views.items():
-        placed[SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]] = _balloon_cluster_sheet(
-            adapter, cluster, view, facts, cluster_scales[cluster], bom_name=bom_name, items=items
+        sheet_name = SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]
+        placed.append(
+            (
+                sheet_name,
+                *_balloon_cluster_sheet(
+                    adapter,
+                    cluster,
+                    view,
+                    facts,
+                    cluster_scales[cluster],
+                    bom_name=bom_name,
+                    items=items,
+                    elsewhere=CONE_TIP_DETAIL_STEMS if cluster == "cone-set" else frozenset(),
+                ),
+            )
         )
         step(f"{cluster} balloons")
+        if cluster == "cone-set":
+            placed.append(
+                (
+                    sheet_name,
+                    *_balloon_cone_tip_detail(
+                        adapter,
+                        view,
+                        tip_detail,
+                        facts,
+                        scale=tip_scale,
+                        parent_scale=cluster_scales[cluster],
+                        outline=tip_outline,
+                        origin=tip_origin,
+                        bom_name=bom_name,
+                        items=items,
+                    ),
+                )
+            )
+            step("cone tip detail balloons")
     assert_full_detail_view(adapter, label="drive-train package")
-    for sheet_name, (sheet_balloons, _landings) in placed.items():
+    for sheet_name, sheet_balloons, _landings in placed:
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     step("balloon uncross")
     _check_package_layout(adapter, findings)
     step("layout check")
-    landings = [landing for _balloons, sheet in placed.values() for landing in sheet]
+    landings = [landing for _sheet, _balloons, ring in placed for landing in ring]
     return package_sheet_scales(cluster_scales, full_detail), landings, settings_settled
 
 

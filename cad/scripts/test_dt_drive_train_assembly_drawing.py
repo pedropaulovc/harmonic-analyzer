@@ -1600,6 +1600,101 @@ def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> 
     assert drawing.package_sheet_scales(drawing.CLUSTER_SCALES) == drawing.SHEET_SCALES
 
 
+# The cone set's view as fitted at 1:3 on sheet 4 (machinist review r8 of
+# PR #2640, run 20261112T124601584Z, layout audit outline).
+R8_CONE_SET_OUTLINE = (0.1464, 0.0820, 0.2696, 0.2227)
+
+
+def test_the_cone_tip_detail_balloons_the_tip_families_the_1_3_view_drops() -> None:
+    """r3, r7 and r8 of PR #2640: balloons 37 and 38 met on one tip at 1:3.
+    The six tip families are the cone set's own, each has a frozen anchor,
+    and the 1:3 view keeps every other cone-set family, so each BOM item is
+    still ballooned once on sheet 4."""
+    facts = _drawing_facts()
+    names = drawing.cone_tip_detail_names(facts)
+    assert names <= frozenset(facts.clusters["cone-set"])
+    shown = {i.stem for i in facts.instances if i.name in names}
+    assert shown == drawing.CONE_TIP_DETAIL_STEMS
+    assert {"dt-cone-tip-gear", "dt-cone-tip-bushing"} <= shown
+    assert drawing.CONE_TIP_DETAIL_STEMS <= set(drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cone-set"])
+    cone_set = {i.stem for i in facts.instances if i.name in facts.clusters["cone-set"]}
+    assert cone_set - drawing.CONE_TIP_DETAIL_STEMS, "the 1:3 view keeps balloons"
+    arrows = (letter for letter, _y in drawing.SHEET1_VIEW_ARROWS)
+    taken = {drawing.FULL_DETAIL_VIEW_LETTER, "A", "B", *arrows}
+    assert drawing.CONE_TIP_DETAIL_LETTER not in taken
+
+
+def test_a_cone_tip_detail_with_no_tip_family_in_the_cone_set_is_refused() -> None:
+    facts = _drawing_facts()
+    facts.clusters = {**facts.clusters, "cone-set": ()}
+    with pytest.raises(RuntimeError, match="cone tip detail"):
+        drawing.cone_tip_detail_names(facts)
+
+
+def _ring(box: tuple[float, ...], reach: float) -> tuple[float, ...]:
+    return (box[0] - reach, box[1] - reach, box[2] + reach, box[3] + reach)
+
+
+@pytest.mark.parametrize(
+    ("size_mm", "expected"),
+    [((52.0, 85.0), (1.0, 1.0)), ((120.0, 120.0), (2.0, 3.0)), ((180.0, 300.0), (1.0, 2.0))],
+)
+def test_the_cone_tip_detail_ring_fits_right_of_the_cone_set_ring(size_mm, expected) -> None:
+    """The detail takes the largest ladder scale whose balloon ring stands in
+    the empty right half: clear of the 1:3 view's ring, the title block plus
+    its caption line, and the frame.  r8's tip parts spanned about 17 x 28 mm
+    at 1:3, so they read at 1:1."""
+    region = drawing.cone_tip_detail_region(R8_CONE_SET_OUTLINE)
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    parent_reach = drawing.CLUSTER_BALLOON_MARGINS["cone-set"] + drawing.BALLOON_DIAMETER / 2
+    assert region[0] > R8_CONE_SET_OUTLINE[2] + parent_reach
+    assert region[1] >= template.title_block_top_m + drawing.CLUSTER_TITLE_BLOCK_CLEARANCE
+    assert region[2] < template.width_m - 0.0127 and region[3] < template.height_m - 0.0127
+    outline = _outline_mm(*size_mm)
+    scale, shift = drawing.cone_tip_detail_fit(outline, (1.0, 1.0), region)
+    assert scale == expected
+    k = scale[0] / scale[1]
+    cx, cy = (outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2
+    hw, hh = (outline[2] - outline[0]) / 2 * k, (outline[3] - outline[1]) / 2 * k
+    box = (cx - hw + shift[0], cy - hh + shift[1], cx + hw + shift[0], cy + hh + shift[1])
+    ring = _ring(box, drawing.CONE_TIP_DETAIL_REACH)
+    assert region[0] - 1e-9 <= ring[0] and ring[2] <= region[2] + 1e-9
+    assert region[1] - 1e-9 <= ring[1] and ring[3] <= region[3] + 1e-9
+
+
+def test_a_cone_tip_detail_no_ladder_scale_fits_raises() -> None:
+    region = drawing.cone_tip_detail_region(R8_CONE_SET_OUTLINE)
+    with pytest.raises(ValueError, match="cone tip detail.*1:2"):
+        drawing.cone_tip_detail_fit(_outline_mm(400.0, 400.0), (1.0, 1.0), region)
+
+
+def test_the_cone_tip_boundary_circles_the_detail_parts_on_the_1_3_view() -> None:
+    """A point of the detail lies, from the model origin's projection, one
+    third as far on the 1:3 view; the circle holds the parts' whole box."""
+    outline = (0.300, 0.100, 0.352, 0.185)
+    detail_origin = (0.296, 0.1545)
+    parent_origin = (0.180, 0.120)
+    ratio = 1.0 / 3.0
+    centre, radius = drawing.cone_tip_detail_boundary(outline, detail_origin, parent_origin, ratio)
+    assert centre == pytest.approx((0.190, 0.116))
+    for x in (outline[0], outline[2]):
+        for y in (outline[1], outline[3]):
+            mapped = (
+                parent_origin[0] + (x - detail_origin[0]) * ratio,
+                parent_origin[1] + (y - detail_origin[1]) * ratio,
+            )
+            gap = radius - math.dist(mapped, centre)
+            assert gap == pytest.approx(drawing.CONE_TIP_DETAIL_BOUNDARY_PAD)
+
+
+def test_the_cone_tip_detail_caption_names_its_scale_and_what_it_omits() -> None:
+    """Rule 9 prints its scale against the 1:3 sheet; sheet 1 promises the
+    teeth- and thread-free configuration only at 1:2 and smaller."""
+    caption = drawing.cone_tip_detail_caption((1.0, 1.0), (1.0, 3.0))
+    assert caption.startswith(f"DETAIL {drawing.CONE_TIP_DETAIL_LETTER} 1:1")
+    assert "TEETH" in caption and "THREADS" in caption
+
+
 def _outline_mm(width: float, height: float) -> tuple[float, float, float, float]:
     """An outline of the given size (mm) somewhere off the sheet."""
     return (0.5, 0.5, 0.5 + width / 1000.0, 0.5 + height / 1000.0)

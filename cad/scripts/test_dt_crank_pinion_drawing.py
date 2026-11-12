@@ -233,8 +233,9 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
     assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
-    assembly_source = Path(assembly.__file__).read_text(encoding="utf-8")
-    assert "IN: {pinion.PIN_FIT_LINES[1]}." in assembly_source
+    # MHA-DT-00's 4S-4U: tapped in flush, then the hand check its remedy needs.
+    assert f"TAP {spec.PIN_NUMBER} IN FLUSH BOTH SIDES." in assembly.CONE_CRANK_STEPS
+    assert f"CHECK THAT {spec.PIN_NUMBER} IS NOT REMOVABLE BY HAND." in assembly.CONE_CRANK_STEPS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
     assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
         "\r\n", "\n"

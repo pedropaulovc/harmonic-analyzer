@@ -78,7 +78,7 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     )
     assert f"SLIDE MHA-DT-07 ON {key}" in stack
     # The decimal-inch window rounds inward, a thousandth inside each limit.
-    printed = re.search(r"MHA-DT-37 LEAVES' BACK: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
+    printed = re.search(r"MHA-DT-37 TEETH' BACK: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
     assert printed is not None
     first, last = (float(value) * 25.4 for value in printed.groups())
     assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
