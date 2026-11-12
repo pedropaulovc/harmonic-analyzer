@@ -6,8 +6,10 @@ sm-summing-lever:
   tolerance_class: machined_block
   drawing_unit: in
   process: "machined from solid stock"
-  # #2129: uniform coefficient slab X0..1.75, Y-.138..+.138, Z+/-3.00 (.276
-  # thick) and the .276 counter web, both centred on the pivot/knife axis.
+  # #2129: uniform coefficient slab X0..1.75, Y-.138..+.138 (.276 thick) and
+  # the .276 counter web, both centred on the pivot/knife axis. #1038 (owner
+  # ruling 2026-11-11, question 4): Z-3.25..+3.00, the front end .25 longer so
+  # the .300 spring row keeps its rule-17 end walls (spec guard at import).
   # Shared positive rib: R.60 wrap, tangent flanks and R.040
   # blends into both coefficient faces at X1.41. The title block owns the
   # R.040 MAX ceiling; bounded native profile-blend and rib inner-cap-root guards
@@ -15,8 +17,8 @@ sm-summing-lever:
   # cylinder families, the boss/crease and side-arc web families and the knife-stub roots
   # join every remaining inside corner without tangent propagation.
   # No R.040 blend reaches the receiver entry caps; the knife seat clears the stub roots.
-  # Spring seats rise .038 (0.96 mm) with the plate top; the #1769 footprint is
-  # unchanged and the spring pattern is Ø.010 (#2326).
+  # Spring seats rise .038 (0.96 mm) with the plate top; the spring pattern
+  # is Ø.010 (#2326).
   # The .354 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge and sharp-junction (former RV-02) exceptions are eliminated.
   # Knife hardness debt (#1611) stays separate.

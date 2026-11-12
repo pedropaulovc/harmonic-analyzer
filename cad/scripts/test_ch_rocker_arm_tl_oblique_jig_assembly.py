@@ -1928,10 +1928,10 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
     assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
     assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
-    assert "RECORD" in steps["10E"] and "STEP 20" in steps["10E"]
-    assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
+    assert "RECORD" in steps["10E"] and "STEPS 19E AND 20" in steps["10E"]
+    assert carrier.HUB_THREAD in steps["10G"] and "NO COUNTERBORE" in steps["10F"]
     assert "STEP 10E" in steps["20"]
-    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
+    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F", "10G"))
     # The origin stops hold through step 14's recheck (as in step 6H, which
     # returns by them); every move uses its own setting stop and indicator.
     assert "UNTIL STEP 14 PASSES" in steps["6A"]
@@ -2058,25 +2058,46 @@ def test_step_6_places_the_origin_from_the_middle_t_slot() -> None:
     assert -trammel.TABLE_CENTRE_Y == pytest.approx(1.244 * trammel.INCH, abs=0.0005 * trammel.INCH)
 
 
-def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
+def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> None:
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     numbers = list(dict.fromkeys(re.match(r"\d+", head).group(0) for head in steps))
     assert numbers == [str(n) for n in range(15, 22)]
-    assert spec.PROCESS_PLAN == "MHA-CH-06 PLAN"
-    # The riser is cut before the first strap; the strap is prepared, drilled
-    # and reamed, then cut per the plan's sections.
+    # #2443: no step cites the retired MHA-CH-06 plan; the blank's layout,
+    # saw corridor, clamp holes, hub drilling and both passes are steps.
+    assert not any("PLAN" in text for text in steps.values())
     assert "BEFORE THE FIRST STRAP" in steps["18"]
-    assert "PLAN S0-S1 AND S2 OP20" in steps["19"]
-    assert "PLAN S2 OP30-OP40" in steps["20A"]
-    assert "PLAN S3 OP10-OP20" in steps["21F"]
+    # The blanks are cut and faced at steps 1M-1N, before the bars fill the table.
+    assembly = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._BLANK_LENGTH in assembly["1M"] and spec.strap.NUMBER in assembly["1N"]
+    assert list(assembly).index("1N") < list(assembly).index("3C")
+    # Every layout mark is a table row (both signs by the title), never a
+    # ± sentence; the steps cite the table.
+    rows = {(chain, x, y) for chain, x, y in spec.BLANK_LAYOUT_ROWS}
+    for chain in ("inner", "outer"):
+        for x, y in spec.blank.LAYOUT_MARKS[chain]:
+            assert (chain.upper(), spec._length(abs(x), 3) if x else "0", spec._length(y, 3)) in rows
+    assert not any("±" in cell for row in spec.BLANK_LAYOUT_ROWS for cell in row)
+    assert spec._SAW_CORRIDOR in steps["19D"] and float(spec._SAW_CORRIDOR) * spec.trammel.INCH <= spec.blank.SAW_EDGE_TOLERANCE
+    # The clamp holes are piloted from the carrier's own taps (a pilot under
+    # the tap drill), then opened to the clearance drill.
+    assert spec.riser.SCREW_DRILL in steps["19H"] and spec.blank.CLAMP_DRILL in steps["19K"]
+    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19L"]
+    order = list(steps)
+    # The pilot is drilled with the carrier lifted (19G) and opened after
+    # it is refitted (19J), before the clamp screws replace the clamp.
+    assert [order.index(k) for k in ("19D", "19E", "19F", "19G", "19H", "19J", "19K", "19L")] == sorted(
+        order.index(k) for k in ("19D", "19E", "19F", "19G", "19H", "19J", "19K", "19L")
+    )
+    # #2444: the hub hole is opened in steps, the last one the pre-ream drill,
+    # then reamed to the strap's hub hole.
+    assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
+    assert spec.strap.NUMBER in steps["20B"] and order.index("20A") < order.index("20B")
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
     assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
     assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
     assert spec._item(spec.HUB_WASHER) in steps["21"]
     for text in steps.values():
-        # The plan prints the blank, chords and the hub tool envelope.
         assert "350 MM" not in text and "REAMER" not in text
-    assert f"{spec._CLAMP_SCREW} {spec._item(spec.RAIL_SCREW)}" in steps["19B"]
     assert "ALL 3 CLAMP SCREWS" in steps["21F"]
 
 
@@ -2087,10 +2108,16 @@ def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
     inch = spec.trammel.INCH
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert ".215 DEEP FROM THE RISER TOP" in steps["18"]
-    assert steps["18A"].startswith("18A. CHECK") and ".205-.225" in steps["18A"]
-    assert steps["18B"].startswith("18B. IF ") and steps["18C"].startswith("18C. IF ")
+    assert "INNER PASS" in steps["18"] and "OUTER PASS" in steps["18B"]
+    assert steps["18D"].startswith("18D. CHECK") and ".205-.225" in steps["18D"]
+    assert steps["18E"].startswith("18E. IF ") and steps["18F"].startswith("18F. IF ")
     assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
     assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
+    # The strap cut's depth is printed from the seated strap: past its
+    # underside by more than the breakthrough budget, well above the groove floor.
+    low, high = spec.STRAP_CUT_OVERTRAVEL
+    assert spec.holding.TOOL_OVERTRAVEL_BUDGET < low < high < spec.RISER_GROOVE_DEPTH - spec.RISER_GROOVE_BAND
+    assert f"{spec._length(low, 2)}-{spec._length(high, 2)} BELOW" in steps["21E"]
 
 
 def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
@@ -2498,6 +2525,21 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     assert " MM MIN" not in preparation
 
 
+def test_rail_trim_uses_a_rated_recorded_abrasive_tool_after_the_carriages_come_off() -> None:
+    # #2446: no owned saw cuts the hardened rail; the trim is cut long with
+    # the recorded grinder's cut-off wheel and ground flush (owner ruling
+    # #2144 item 13.1 A), carriages off before any cutting.
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    record = spec._RAIL_TRIM_GRINDER
+    assert {"cut-off", "grinding"} <= set(record["wheels"])
+    assert all(wheel["max_rpm"] >= record["max_rpm"] for wheel in record["wheels"].values())
+    # The cut allowance is printed as a decimal and the trim cuts happen
+    # between moving the carriages off and fitting the rails to their bars.
+    assert spec.RAIL_CUT_OFF_ALLOWANCE_IN.startswith(".") and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
+    order = list(steps)
+    assert order.index("1C") < order.index("1E") < order.index("1F") < order.index("2A")
+
+
 def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:
     # TL-00 review 62753c5e: items 1 and 2 share TL-20's Number; the note
     # names them as its two configurations, each on its own sheet.
@@ -2520,13 +2562,13 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     # screwed down with the leadscrew still in it.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     heads = list(steps)
-    sequence = ("7B", "7C", "7D", "7E", "7F", "8A", "8B", "8C", "8D", "8E", "8F",
+    sequence = ("7B", "7C", "7D", "7E", "7F", "7G", "8A", "8B", "8C", "8D", "8E", "8F",
                 "8G", "8H", "8J", "8K", "8L", "8M", "8N", "8P", "8Q", "8R", "8S")
     assert [head for head in heads if head in sequence] == list(sequence)
     assert spec._item(spec.FEED_NUT) in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE == f"{feed_nut.NUMBER} SHEET {feed_nut.REWORK_SHEET}"
-    assert steps["7C"].startswith("7C. IF ") and steps["7F"].startswith("7F. IF ")
+    assert steps["7C"].startswith("7C. IF ") and steps["7G"].startswith("7G. IF ")
     # Codjiflo P2 and 4475311251: every receipt and rework limit is the kit
     # sheet's native dimension, not TL-00 text.
     limits = {
@@ -2534,7 +2576,7 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
         for nominal, lower, upper, places in feed_nut.NATIVE_CONTROLS.values()
         for deviation in (lower, upper)
     }
-    preparation = " ".join(steps[head] for head in ("7B", "7C", "7D", "7E", "7F"))
+    preparation = " ".join(steps[head] for head in ("7B", "7C", "7D", "7E", "7F", "7G"))
     for typed in (
         *limits,
         f"Ø{feed_nut.CSK_DIA:.1f}", feed_nut.CSK_CUTTER_TEXT,
@@ -2543,7 +2585,7 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
         assert typed not in preparation, typed
     # Rule 25: the faced length is checked once, after the rework.
     assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
-    assert "FACED LENGTH" in steps["7E"] and "FACE" in steps["7D"]
+    assert "FACED LENGTH" in steps["7F"] and "FACE" in steps["7D"]
     # Codjiflo 4477879822/4477879826 on #2187: every hole is set within
     # TL-32's native NutClock, cited and never typed.
     assert feed_block.NUT_CLOCK_REFERENCE == f"{feed_block.NUMBER} SHEET 2 VIEW D"
@@ -2556,8 +2598,8 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
     assert spec.NUMBER_DRILL_MM[spec._TAP_DRILL] == feed_block.NUT_TAP_DRILL
-    assert spec._SPOT_DRILL in steps["8J"]
-    assert spec._TAP_DRILL in steps["8K"] and feed_nut.SCREW_THREAD in steps["8K"]
+    assert spec._SPOT_DRILL in steps["8J"] and spec._TAP_DRILL in steps["8J"]
+    assert feed_nut.SCREW_THREAD in steps["8K"]
     # Owner ruling 2026-11-04 (#2177 option 3): the nut screws' heads are
     # calipered to the limit TL-32's head-to-body stack-up is built on; an
     # oversize head is replaced, the nut body never cut.
@@ -2849,8 +2891,11 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     )
     washer = spec._component_local_boxes()[spec.HUB_WASHER]
     assert washer[2] == (-spec.hub_washer.SPIGOT_LENGTH, spec.hub_washer.THICK)
-    assert "THE STOP PIN TOPS STAND TALLEST" in spec.REFERENCE_HEIGHTS
-    assert f"FIXTURE TOP {spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
+    # Both tops print: the true fixture top (the feed-lever heads) and the
+    # stop pins, tallest over the strap.
+    assert spec.LEVER_HEAD_TOP_Z > spec.TOOLING_TOP_Z_MAX
+    assert spec._length(spec.LEVER_HEAD_TOP_Z, 3) in spec.REFERENCE_HEIGHTS
+    assert f"{spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert "BOTH STOP PINS AT FULL HEIGHT" in steps["17A"]
     # Q5 (Owner ruling 2026-11-08 (Pedro), #2144 item 13.2): the washer clearance prints inch,

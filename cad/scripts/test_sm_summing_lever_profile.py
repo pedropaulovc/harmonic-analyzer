@@ -93,17 +93,19 @@ def test_counter_angle_preserves_the_nominal_apex_without_display_rounding() -> 
 
 
 def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() -> None:
-    assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 152.4, 12.7))
-    assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.52825))
-    assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-67.1, 7.0565))
+    # #1038: .300 in pitch; the body's -Z end .25 in longer (owner ruling 4).
+    assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 158.75, 12.7))
+    assert (spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS) == pytest.approx((-82.55, 76.2))
+    assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.81))
+    assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-72.1715, 7.62), abs=5e-4)
     assert (spec.HEX_W, spec.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
     assert (spec.TIP_X, spec.ANCHOR_H) == pytest.approx((-76.2, 19.05))
     # The lever's taps sit at the nearest .001 in (1.120 / .581, .128).
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
     assert all(point[1] == pytest.approx(0.2488) for point in joint.LEVER_HOLE_POINTS)
-    assert all(point[2] == pytest.approx(-76.2) for point in joint.LEVER_HOLE_POINTS)
+    assert all(point[2] == pytest.approx(-82.55) for point in joint.LEVER_HOLE_POINTS)
     assert (spec.RIB_T, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (5.08, 6.604, 4.95)
-    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
+    assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-77.47)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
     assert joint.BRACKET_ORIGIN == (40.0, KNIFE_Y, -173.5192)
@@ -465,13 +467,15 @@ def _rib_prism_change(thickness: float) -> tuple[profile.SectionMoments, float]:
         edge.scaled(2.0 * thickness - back_before - front_before)
         + positive.scaled(thickness - middle_before)
     )
-    half_length = spec.PLATE_L / 2.0
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
     old_axial_moment = (
-        back_before * (-half_length + back_before / 2.0)
-        + front_before * (half_length - front_before / 2.0)
+        back_before * (z_minus + back_before / 2.0)
+        + front_before * (z_plus - front_before / 2.0)
     )
-    # Equal end depths and a centred middle leave zero new axial first moment.
-    return delta, -edge.area_mm2 * old_axial_moment
+    # Equal end depths on unequal ends: the pair's axial first moment is the
+    # depth times the ends' sum; the centred middle rib adds none.
+    new_axial_moment = thickness * (z_minus + z_plus)
+    return delta, edge.area_mm2 * (new_axial_moment - old_axial_moment)
 
 
 @pytest.mark.parametrize("thickness", [4.80, spec.RIB_T, 5.30])
@@ -487,11 +491,11 @@ def test_all_three_uniform_rib_prisms_recompute_material_not_receiver_extension_
         section.upper.flank_xy[0], section.lower.flank_xy[0], section.reach,
     ]
     # Independent axial spans, rather than the analytic helper's coefficients.
-    half = spec.PLATE_L / 2.0
-    old_spans = ((-half, -half + 9.0), (-5.08 / 2.0, 5.08 / 2.0), (half - 5.08, half))
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
+    old_spans = ((z_minus, z_minus + 9.0), (-5.08 / 2.0, 5.08 / 2.0), (z_plus - 5.08, z_plus))
     new_spans = (
-        (-half, -half + thickness), (-thickness / 2.0, thickness / 2.0),
-        (half - thickness, half),
+        (z_minus, z_minus + thickness), (-thickness / 2.0, thickness / 2.0),
+        (z_plus - thickness, z_plus),
     )
 
     def slice_change(x: float, kind: str) -> float:
@@ -529,19 +533,21 @@ def test_uniform_thickness_perturbation_charges_both_edges_and_middle_branch() -
         assert getattr(changed - baseline, field) == pytest.approx(
             getattr(derivative, field) * 0.10, abs=1e-10,
         )
-    assert changed_z == baseline_z
+    assert changed_z - baseline_z == pytest.approx(
+        edge.area_mm2 * 0.10 * (spec.PLATE_Z_MINUS + spec.PLATE_Z_PLUS)
+    )
     assert edge.area_mm2 == pytest.approx(profile.edge_rib_added_area_mm2())
     assert negative.area_mm2 > 0.0
     assert negative.x_mm3 < 0.0
 
 
 def test_uniform_rib_axial_spans_preserve_both_end_faces_and_centre() -> None:
-    half = spec.PLATE_L / 2.0
+    z_minus, z_plus = spec.PLATE_Z_MINUS, spec.PLATE_Z_PLUS
     spans = (
-        (-half, -half + spec.RIB_T), (-spec.RIB_T / 2.0, spec.RIB_T / 2.0),
-        (half - spec.RIB_T, half),
+        (z_minus, z_minus + spec.RIB_T), (-spec.RIB_T / 2.0, spec.RIB_T / 2.0),
+        (z_plus - spec.RIB_T, z_plus),
     )
-    assert spans[0] == pytest.approx((-76.2, -71.12))
+    assert spans[0] == pytest.approx((-82.55, -77.47))
     assert spans[1] == pytest.approx((-2.54, 2.54))
     assert spans[2] == pytest.approx((71.12, 76.2))
     assert all(end - start == pytest.approx(5.08) for start, end in spans)

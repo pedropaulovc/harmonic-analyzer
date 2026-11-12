@@ -130,14 +130,14 @@ import build_sm_summing_assembly as s
 expect(
     "sm-summing",
     "sm-knife-mount-1",
-    [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z + s.HEX_Z_MID],
+    [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.KNIFE_MOUNT_Z_PLUS],
     IDENTITY,
     "knife-mount front",
 )
 expect(
     "sm-summing",
     "sm-knife-mount-2",
-    [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z - s.HEX_Z_MID],
+    [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.KNIFE_MOUNT_Z_MINUS],
     IDENTITY,
     "knife-mount back",
 )

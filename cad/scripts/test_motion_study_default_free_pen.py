@@ -12,7 +12,7 @@ import spring_mount_geom as mounts
 
 def test_lumped_spring_datum_keeps_the_installed_anchor_eye_height() -> None:
     """The qualitative endpoint follows the centred plate's authored top face."""
-    assert springs.SUM_LEVER_EYE == pytest.approx((39.85, 13.025, -70.62825))
+    assert springs.SUM_LEVER_EYE == pytest.approx((39.85, 13.025, -75.9815))
     world_eye = (
         mounts.KNIFE[0] + springs.SUM_LEVER_EYE[0],
         mounts.KNIFE[1] + springs.SUM_LEVER_EYE[1],

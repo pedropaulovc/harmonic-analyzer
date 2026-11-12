@@ -271,10 +271,13 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:10] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET)
-    # The owner's linear-motion sheet is appended: no cited sheet number moves.
-    assert drawing.SHEET_NAMES[10:] == (drawing.LINEAR_MOTION_SHEET,)
-    assert len(drawing.SHEET_NAMES) == 11
+    assert drawing.SHEET_NAMES[7:11] == (
+        drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET, drawing.CUTTING_SHEET,
+    )
+    # The owner's linear-motion sheet stays last; nothing cites its number, so
+    # the strap cutting sheet (#2443) goes before it and no cited number moves.
+    assert drawing.SHEET_NAMES[11:] == (drawing.LINEAR_MOTION_SHEET,)
+    assert len(drawing.SHEET_NAMES) == 12
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -283,6 +286,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.FIT_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.HOLDING_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.CUTTING_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.LINEAR_MOTION_SHEET] == drawing.LINEAR_MOTION_SCALE
     assert drawing.LINEAR_MOTION_SCALE in drawing.CLUSTER_SCALE_LADDER
     assert all(
@@ -433,8 +437,8 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
     assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(first.split())
 
 
-def test_every_instruction_prints_once_in_order_across_sheets_7_to_10() -> None:
-    assert tuple(layout.sheet for layout in drawing.STEPS_SHEETS) == drawing.SHEET_NAMES[6:10]
+def test_every_instruction_prints_once_in_order_across_sheets_7_to_11() -> None:
+    assert tuple(layout.sheet for layout in drawing.STEPS_SHEETS) == drawing.SHEET_NAMES[6:11]
     printed = " ".join(
         " ".join(column.split())
         for layout in drawing.STEPS_SHEETS
@@ -3037,7 +3041,7 @@ def test_pivot_balloon_recipe_requests_each_new_family_once_and_refuses_missing(
 
 def test_steps_flow_whole_and_in_order_over_every_sheet_keeping_the_view_room():
     # Spaced, each one-line step takes two lines (pitch and blank).
-    steps = tuple(f"{index}. STEP-{index}." for index in range(1, 121))
+    steps = tuple(f"{index}. STEP-{index}." for index in range(1, 171))
     sheets = drawing.steps_sheets(steps)
     assert sheets[0].left.startswith(drawing.STEPS_HEADING + "\n")
     assert all(
