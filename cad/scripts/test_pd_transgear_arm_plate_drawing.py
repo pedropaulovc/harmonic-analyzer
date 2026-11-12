@@ -261,7 +261,11 @@ def test_the_three_place_section_sizes_name_their_function() -> None:
     # is free (Codjiflo, #2148).
     callout = drawing.SECTION_CALLOUTS["ThicknessOverArm"]
     assert _config.parts("pd-transgear-arm")["number"] in callout
-    assert max(map(len, drawing.SECTION_CALLOUTS["ThicknessOverArm"].splitlines())) <= 12
+    # The value-and-callout block, centred on its text point, stands clear of
+    # the hub-to-boss dimension's boss-face witness line (at +6 that line ran
+    # through the text: machinist review of ae9ed661a).
+    half = _half_width_model("X" * max(map(len, callout.splitlines())))
+    assert drawing.SECTION_KEEP["ThicknessOverArm"][2] - half - geometry.BOSS_FACE_Z >= 5.0
     assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["NotchDepth"] == 2
     assert round(geometry.NOTCH_DEPTH / 25.4, 2) == pytest.approx(geometry.NOTCH_DEPTH / 25.4)
@@ -563,14 +567,14 @@ def _printed(value: float, name: str) -> str:
 
 def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameters() -> None:
     """Outward from each face: its symbol and caption, then its diameter's
-    text; the hub's stand outside the hub diameter's witness lines, the
-    boss's inside the boss diameter's."""
+    text; each caption stands directly over its own symbol, inside its face
+    diameter's witness lines as the symbol does."""
     for key, face_z, name, value, outward in (
         ("hub_face", geometry.HUB_FACE_Z, "HubDia", geometry.HUB_DIA, -1.0),
         ("boss_face", geometry.BOSS_FACE_Z, "BossDia", geometry.BOSS_DIA, 1.0),
     ):
         _pick, symbol, caption = drawing.FACE_FINISHES[key]
-        width = max(map(len, spec.FINISH_CAPTIONS[key].splitlines()))
+        width = max(map(len, drawing.FACE_FINISH_CAPTIONS[key].splitlines()))
         caption_near = outward * (caption[2] - face_z)
         if outward < 0.0:
             caption_near -= 2.0 * _half_width_model("X" * width)
@@ -581,13 +585,21 @@ def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameter
         text_near = outward * (drawing.SECTION_KEEP[name][2] - face_z)
         text_near -= _half_width_model(text)
         assert text_near > caption_far, key
-    hub_pick, hub_symbol, hub_caption = drawing.FACE_FINISHES["hub_face"]
-    assert hub_symbol[1] == hub_pick[1]
-    assert hub_caption[1] < -geometry.HUB_DIA / 2.0
-    boss_caption = drawing.FACE_FINISHES["boss_face"][2]
-    lines = len(spec.FINISH_CAPTIONS["boss_face"].splitlines())
-    assert boss_caption[1] < geometry.BOSS_DIA / 2.0
-    assert boss_caption[1] - lines * _LINE_MODEL > drawing.FACE_FINISHES["boss_face"][1][1]
+    # Each caption reads as its symbol's words (machinist review, run
+    # 20261112T165728270Z: the hub caption under the Ø.52 witness line read
+    # as loose text): its foot stands over the symbol's top by less than one
+    # caption text height, its span covers the symbol's anchor, and no
+    # witness line runs between them (both inside the face diameter's).
+    text_height = _CAPTION_HEIGHT / drawing.SHEET_SCALE[0] * 1000.0
+    for key, face_dia in (("hub_face", geometry.HUB_DIA), ("boss_face", geometry.BOSS_DIA)):
+        pick, symbol, caption = drawing.FACE_FINISHES[key]
+        assert symbol[1] == pick[1], key
+        symbol_top = symbol[1] + drawing.FINISH_SYMBOL_HEIGHT
+        foot = caption[1] - drawing.CAPTION_BLOCK_HEIGHT
+        assert 0.0 < foot - symbol_top < text_height, key
+        assert -face_dia / 2.0 < symbol[1] and caption[1] < face_dia / 2.0, key
+        width = max(map(len, drawing.FACE_FINISH_CAPTIONS[key].splitlines()))
+        assert caption[2] < symbol[2] < caption[2] + 2.0 * _half_width_model("X" * width), key
 
 
 def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
@@ -600,9 +612,40 @@ def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
         pick = drawing.FACE_FINISHES[key][0]
         assert pick[2] == face_z, key
         assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
-        caption = spec.FINISH_CAPTIONS[key]
+        caption = drawing.FACE_FINISH_CAPTIONS[key]
         assert caption.startswith("THRUST FACE"), key
         assert caption.endswith(_config.parts(mate)["number"]), key
+
+
+_PROCESS_LINE_HEADS = ("REAM THRU", "DRILL THRU")
+
+
+def _word_lines(text: str) -> list[str]:
+    """A callout's lines of words: not its size and process lines (the
+    hole's REAM / DRILL THRU line, the countersink's form)."""
+    return [
+        line for line in text.splitlines()
+        if not line.startswith(_PROCESS_LINE_HEADS) and "<HOLE-SINK>" not in line
+    ]
+
+
+def test_no_callout_or_caption_prints_more_than_two_lines_of_words() -> None:
+    """Rule 7: a callout carries at most two lines of words (machinist
+    review, run 20261112T153723793Z: the .197 callout and both thrust-face
+    captions printed three).  The spec's three-line strings print re-wrapped,
+    every word and drawing number kept in order."""
+    printed = {
+        **drawing.DIMENSION_CALLOUTS,
+        **{f"{key} caption": text for key, text in drawing.FACE_FINISH_CAPTIONS.items()},
+    }
+    for name, text in printed.items():
+        assert 1 <= len(_word_lines(text)) <= 2, name
+    sources = {
+        drawing.SECTION_CALLOUTS["ThicknessOverArm"]: spec.THICKNESS_CALLOUT,
+        **{drawing.FACE_FINISH_CAPTIONS[key]: text for key, text in spec.FINISH_CAPTIONS.items()},
+    }
+    for wrapped, source in sources.items():
+        assert wrapped.split() == source.split(), source
 
 
 def test_the_hole_height_text_stands_right_of_the_edge() -> None:

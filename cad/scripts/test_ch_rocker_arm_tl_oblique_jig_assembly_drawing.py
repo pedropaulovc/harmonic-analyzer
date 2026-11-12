@@ -471,6 +471,20 @@ def test_station_s_is_defined_in_one_line_before_the_steps_use_it() -> None:
     assert spec.trammel.rail_point(1, 0.0) == spec.trammel.rail_point(2, 0.0) == (0.0, 0.0)
 
 
+def test_the_strap_blank_key_names_mha_ch_13_and_its_count_not_its_stock() -> None:
+    """Sheet 7 names the blank the strap steps cut by MHA-CH-13's drawing
+    number and count from its registry row (#2642); its grade and section
+    stay on MHA-CH-13's own drawing (rule 24, run 20261112T153723793Z)."""
+    strap = _config.parts("ch-rocker-strap")
+    key = drawing.STRAP_BLANK_KEY
+    assert key in drawing.INSTRUCTION_LINES
+    assert f"{str(strap['number']).upper()}, {int(strap['quantity'])} OFF" in key
+    assert "STOCK" not in key
+    material = str(strap["material_specification"]).upper()
+    for word in material.replace(",", " ").split():
+        assert word not in key.split(), word
+
+
 def _setting_table_boxes() -> list[tuple[float, float, float, float]]:
     """Each setting table's title and native table at the BOM row height,
     stacked down the setting sheet's right column (sheet metres)."""
