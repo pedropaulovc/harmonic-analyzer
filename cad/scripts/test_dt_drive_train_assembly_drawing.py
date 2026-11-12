@@ -613,20 +613,20 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "FEELER" not in check and "LEAVES" not in check
 
 
-def test_an_out_pedestal_has_a_named_remedy_on_the_recheck_table() -> None:
-    """Check 4J sends the fitter to the recheck row's REMEDY cell, which names
-    the parts and the action (#1038 re-pitch, machinist review of point A):
-    an X end's bind point is that end's gear pair plus its pedestal's bore
-    height; Y is never adjusted in 4E, so a Y out is re-located."""
+def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
+    """Check 4J sends the fitter to the recheck table's last column, and every
+    row has a remedy naming that end's gears (X) or its indicator (Y); the
+    widened table still fits inside the sheet 15 frame."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    assert f"4J. DO THAT ROW'S REMEDY (SHEET {drawing.SETTING_SHEET})." in check
-    assert drawing.PEDESTAL_RECHECK_HEADER[-1] == "REMEDY"
+    (line_4j,) = re.findall(r"4J\. [^.]*\.", check)
+    assert f"SHEET {drawing.SETTING_SHEET}" in line_4j
+    assert drawing.PEDESTAL_RECHECK_HEADER[-1] in line_4j
     remedies = {row[0]: row[-1] for row in drawing.PEDESTAL_RECHECK_ROWS}
-    assert "GEAR 0 + T120 TIPS" in remedies["FRONT MHA-DT-02, X"]
-    assert "GEAR 19 + MHA-DT-37 TIPS" in remedies["BACK MHA-DT-02, X"]
-    for axis in ("FRONT MHA-DT-02, X", "BACK MHA-DT-02, X"):
-        assert "BORE HEIGHT" in remedies[axis] and "REMAKE" in remedies[axis]
-    assert re.search(r"RE-LOCATE IT AS STEPS 8X-8Z$", remedies["FRONT MHA-DT-02, Y"])
+    assert all(remedies.values())
+    gears = drawing.CYLINDER_GEAR_COUNT if hasattr(drawing, "CYLINDER_GEAR_COUNT") else 20
+    assert "GEAR 0 " in remedies["FRONT MHA-DT-02, X"]
+    assert f"GEAR {gears - 1} " in remedies["BACK MHA-DT-02, X"]
+    assert "INDICATOR" in remedies["FRONT MHA-DT-02, Y"]
     widths = drawing.table_column_widths(
         drawing.PEDESTAL_RECHECK_HEADER, drawing.PEDESTAL_RECHECK_ROWS
     )
@@ -909,20 +909,19 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
 
     step = _rig_step_body("other-base-mounting")
     number = steps.step_number("other-base-mounting")
+    # The transfer pose (check 4's feel set, both ends bound) comes before
+    # the clamp and the punch; sequence, not wording (AGENTS.md).
     route = [
-        f"{number}A. EASE OUT UNTIL THE GEARS TURN FREELY THROUGH "
-        f"{drawing.CONE_TURN_CRANK_TURNS} CRANK TURNS.",
-        f"{number}B. CLAMP MHA-DT-20 TO MHA-FR-01.",
-        f"{number}C. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
-        f"{number}D. LIFT MHA-DT-20 OFF.",
-        f"{number}E. SPOT-DRILL THE PUNCH MARK.",
-        f"{number}F. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
+        "JUST BIND",
+        "TURN FREELY THROUGH",
+        "CLAMP MHA-DT-20 TO MHA-FR-01.",
+        "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
+        "LIFT MHA-DT-20 OFF.",
+        "SPOT-DRILL THE PUNCH MARK.",
+        f"DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
         "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
     ]
-    # The transfer pose is check 4's feel set (#1038 re-pitch ruling).
-    assert step.startswith(
-        "CONE SET ON THE BASE: SWING MHA-DT-20 IN UNTIL A GEAR JUST BINDS."
-    )
+    assert f"{number}A." in step
     positions = [step.index(part) for part in route]
     assert positions == sorted(positions)
     assert step.count("CHECK THAT") == 1

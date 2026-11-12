@@ -1103,18 +1103,17 @@ FEELER_STACK_ROWS = _feeler_stack_rows()
 
 # Check 4 re-reads the pedestals after the cone swing's shims: each recorded
 # DRO value plus its indicator reading must stay in its setting-table range.
-# Its REMEDY column is check 4J's remedy (Repitch1038 ruling, #1038 re-pitch,
-# on machinist review of the point A sheet: 4J named no part).  One end's
-# bind point is that end's gear pair plus its pedestal's bore height (a
-# common-mode cone-axis error would move both ends); Y is never adjusted in
-# 4E, so a Y out means the pedestal crept and is re-located.
+# Its REMEDY column is check 4J's remedy: delegated ruling 2026-11-12
+# (Repitch1038, #2144), no precedent; #1038 re-pitch, on machinist review of
+# the point A sheet (4J named no part).  One end's bind point is that end's
+# gear pair plus its pedestal's bore height (a common-mode cone-axis error
+# would move both ends).  Y is never adjusted in 4E: by then MHA-DT-13 ties
+# both pedestals into one frame, so a Y out means the frame slid while
+# MHA-DT-VN-62 was eased, and the front one is tapped back to the Y
+# indicator's 4B zero.
 PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
 PEDESTAL_RECHECK_HEADER = (
     "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
-)
-_RELOCATE_REFS = (
-    f"{_step_ref('cylinder-stack-accepted', 'X')}-"
-    f"{_step_ref('cylinder-stack-accepted', 'Z')}"
 )
 PEDESTAL_RECHECK_ROWS = (
     (
@@ -1136,7 +1135,15 @@ PEDESTAL_RECHECK_ROWS = (
         _step_ref("cylinder-stack-accepted", "Z"),
         "", "", "",
         FRONT_STRAP_Y_WINDOW,
-        f"IT CREPT: RE-LOCATE IT AS STEPS {_RELOCATE_REFS}",
+        "IT SLID: TAP IT BACK IN Y TO ITS INDICATOR ZERO",
+    ),
+    # Both X ends' parts in print: the remaining one-end causes are the
+    # cone-line seats on the swing platform (DtFeel2365, check 4's author;
+    # the stack past them is #2587's).
+    (
+        "X, ALL IN PRINT",
+        "", "", "", "", "",
+        "CHECK MHA-DT-05 + MHA-DT-21 SEATS ON MHA-DT-20; REMAKE ONE OUT",
     ),
 )
 
@@ -1925,7 +1932,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # working position: punch, lift off, spot-drill, drill and tap.  That
         # position is found by feel, where the gears mesh without binding
         # (owner direction 2026-11-11, #2365, superseding the check 4D
-        # leaves).  The swing check (23K) is the only acceptance, and
+        # leaves).  The swing check (23L) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
         # Check 4 then sets the swing and clamps it.  PR 2 machinist review
@@ -1934,13 +1941,19 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # are recorded before the screw goes in; checks 4W and 4Y take the
         # lesser of the two.  The transfer pose is check 4's feel set (4M-4N:
         # in to the first bind, eased out until the gears turn freely), so
-        # the permanent pivot is punched where check 4 will set the swing
-        # (Repitch1038 ruling, #1038 re-pitch, on machinist review of point A:
-        # "WHERE NO GEAR BINDS" gave no pose and no check).
+        # the permanent pivot is punched where check 4 will set the swing.
+        # With no pivot yet the plate is free in the base plane, so the gears
+        # bind at both ends (fixing its yaw and offset) with each cone gear
+        # centred on its MHA-DT-12 (fixing its slide along the axis).
+        # Delegated ruling 2026-11-12 (Repitch1038, #2144); precedent: the
+        # owner's by-feel direction of 2026-11-11 (#2365).  #1038 re-pitch,
+        # on machinist review of point A ("WHERE NO GEAR BINDS" gave no pose
+        # and no check).
         (
             "other-base-mounting",
-            "CONE SET ON THE BASE: SWING MHA-DT-20 IN UNTIL A GEAR JUST BINDS.\n"
-            f"EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
+            "CONE SET ON THE BASE: CENTRE THE CONE GEARS ON THEIR MHA-DT-12.\n"
+            "SWING MHA-DT-20 IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
+            f"EASE IT OUT SQUARE UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
             "CRANK TURNS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
@@ -2056,11 +2069,11 @@ CHECKS = _note_text(
         "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'G')}-{_step_ref('other-base-mounting', 'H')}.",
+        f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')}.",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'L')}-{_step_ref('other-base-mounting', 'M')}.",
+        f"{_step_ref('other-base-mounting', 'M')}-{_step_ref('other-base-mounting', 'N')}.",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
@@ -2228,7 +2241,7 @@ RIG_SPLITS = (
         f"{RIG_SEQUENCE_HEADING} {CODE_KEY_POINTER}",
     ),
     (
-        f"{steps.step_number('other-base-mounting')}J",
+        f"{steps.step_number('other-base-mounting')}G",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )
