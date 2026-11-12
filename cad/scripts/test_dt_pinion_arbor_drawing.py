@@ -201,7 +201,6 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
-        ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
     }
     lands = {
@@ -221,8 +220,12 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     # callout names a running fit and flags note 1: the matched route (turn
     # to the measured MHA-DT-14 bore) and the clearance the limits give.
     assert drawing.JOURNAL_CALLOUT == "RUNNING FIT,\nSEE NOTE 1"
-    for key in ("FrontJournalDia", "BackJournalDia"):
-        assert drawing.DIMENSION_CALLOUTS[key] is drawing.JOURNAL_CALLOUT
+    # #1038 ruling: one 2X diameter on the back land sizes both lands; the
+    # front land prints only its two stations.
+    assert drawing.DIMENSION_CALLOUTS["BackJournalDia"] is drawing.JOURNAL_CALLOUT
+    assert sheet.JOURNAL_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert "FrontJournalDia" not in sheet.DRAWING_PRECISION_BY_NAME
+    assert "FrontJournalDia" not in drawing.DIMENSION_CALLOUTS
     note_1 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[0].split())
     assert note_1 == (
         "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14 PINION BRACKET STRAP, "
@@ -341,7 +344,7 @@ def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
         "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
         "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
-        "FrontJournalLen": spec.JOURNAL_LEN,
+        "FrontJournalEndFromHeadRear": spec.FRONT_JOURNAL_END_FROM_HEAD_REAR,
         "BackJournalEndFromHeadRear": spec.BACK_JOURNAL_END_FROM_HEAD_REAR,
         "BondReliefFromHeadRear": spec.BOND_RELIEF_FROM_HEAD_REAR,
         "BondReliefBackFromHeadRear": spec.BOND_RELIEF_BACK_FROM_HEAD_REAR,
@@ -364,22 +367,23 @@ def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["OverallLen"] == 1
 
 
-def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> None:
+def test_the_land_diameter_is_measured_a_short_extension_from_its_line() -> None:
     """Main (aab2b98b): the land diameters were measured at the land's
     head-side end, so their extensions ran 18-25 mm along the flank to the
-    text.  Each is now measured at a witness just inside the crown-side end
-    and its line stands 1 mm from it, so the extension cannot grow back."""
+    text.  The back land's 2X diameter, which sizes both lands, is measured
+    at a witness just inside its crown-side end and its line stands 1 mm
+    from it, so the extension cannot grow back."""
     assert part.JOURNAL_DIA_POINT_FROM_CROWN_END == drawing.JOURNAL_DIA_POINT_FROM_CROWN_END
     assert 0.0 < part.JOURNAL_DIA_POINT_FROM_CROWN_END <= 3.0
-    for key, land_z in (("Front", spec.FRONT_JOURNAL_Z), ("Back", spec.BACK_JOURNAL_Z)):
-        point_x = drawing._sheet_x(
-            land_z + spec.JOURNAL_LEN - part.JOURNAL_DIA_POINT_FROM_CROWN_END
-        )
-        line_x = drawing.PRINCIPAL_KEEP[f"{key}JournalDia"][0]
-        assert abs(line_x - point_x) <= 0.0015, key
-        crown_end = drawing._sheet_x(land_z + spec.JOURNAL_LEN)
-        head_end = drawing._sheet_x(land_z)
-        assert min(crown_end, head_end) < line_x < max(crown_end, head_end), key
+    land_z = spec.BACK_JOURNAL_Z
+    point_x = drawing._sheet_x(
+        land_z + spec.JOURNAL_LEN - part.JOURNAL_DIA_POINT_FROM_CROWN_END
+    )
+    line_x = drawing.PRINCIPAL_KEEP["BackJournalDia"][0]
+    assert abs(line_x - point_x) <= 0.0015
+    crown_end = drawing._sheet_x(land_z + spec.JOURNAL_LEN)
+    head_end = drawing._sheet_x(land_z)
+    assert crown_end < line_x < head_end
 
 
 def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> None:
@@ -396,9 +400,10 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     # their right edge, 1.4 mm right of the rim witness).
     assert x - (_RIM_WITNESS_X_MM + 1.4) / 1000.0 >= 0.010
     detail_left = drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH
-    # The two-line callout (r1 of #1685) is ~23 mm wider; the label's own
-    # text measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
-    assert detail_left - (x + width) >= 0.006
+    # The two-line callout (r1 of #1685) is ~23 mm wider, and its "2X " (one
+    # size for both lands, #1038 ruling) adds ~6.7 mm; the label's own text
+    # measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
+    assert detail_left - (x + width + _COUNT_PREFIX_MM / 1000.0) >= 0.006
     # #1038 ruling: the land's crown end prints as its own station in the
     # rows below the shaft, between the 8.25 and 9.35 rows, its text right
     # of its own witness.
@@ -416,7 +421,7 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     shaft nothing rises from the back land, so the symbol hangs there."""
     edge_z, (symbol_x, symbol_y), flank = drawing.JOURNAL_FINISHES["back_journal"]
     assert flank == "upper"
-    assert drawing.JOURNAL_FINISHES["front_journal"][2] == "lower"
+    assert drawing.JOURNAL_FINISHES["front_journal"][2] == "upper"
     head_end = drawing._sheet_x(spec.BACK_JOURNAL_Z)
     crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
     arrow_x = drawing._sheet_x(edge_z)
@@ -440,14 +445,38 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
+def test_front_ra_symbol_hangs_above_its_land() -> None:
+    """#1038 ruling (review of 703211d): the 2.61 row runs below the shaft
+    where the front symbol hung (y 0.124, its leader rising to the land), so
+    the symbol hangs above the land, where the .79 length used to be, right
+    of the bond-zone diameter's line (its gap to the collar pin hole's
+    leader: test_collar_pin_leader_slopes_clear_of_the_station_witnesses)."""
+    edge_z, (symbol_x, symbol_y), flank = drawing.JOURNAL_FINISHES["front_journal"]
+    assert flank == "upper"
+    head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
+    crown_end = drawing._sheet_x(
+        spec.HEAD_REAR_Z + spec.FRONT_JOURNAL_END_FROM_HEAD_REAR
+    )
+    arrow_x = drawing._sheet_x(edge_z)
+    # The arrow lands on the land, clear of the split-line ring at its end.
+    assert crown_end + 0.0015 <= arrow_x < head_end
+    left, _right, _top = drawing.RA_SYMBOL_EXTENT
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    assert symbol_y - shaft_top >= 0.004
+    # The shoulder runs head side from the arrow; the symbol stays over the
+    # land's span, clear of the bond-zone line and its left-hung block.
+    assert arrow_x < symbol_x
+    assert symbol_x + left - drawing.BOND_ZONE_LINE_X >= 0.005
+
+
 def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> None:
     """At 63468ee9 the BOND ZONE shelf ended 1 mm short of the front JOURNAL
     shelf below the shaft, so a novice could read -0.01/-0.10 as the
     journal's (Main, Fable).  #1038 ruling: below the shaft the relief's
     back-shoulder station must drop through where the callout hung, so its
     witness moves to the front bond land and the callout hangs above, left of
-    its line, between detail A's label and the front land's length witnesses
-    and under the collar pin hole's callout."""
+    its line, between detail A's label and the front land and under the
+    collar pin hole's callout."""
     _width, height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     assert x == pytest.approx(drawing.BOND_ZONE_LINE_X)
@@ -457,7 +486,7 @@ def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> No
     # Short witnesses: the block starts a few mm over the silhouette.
     assert 0.003 <= bottom - shaft_top <= 0.008
     # The text hangs left of its line: the line stands crown side of the
-    # measuring point, as the front journal's does.
+    # measuring point.
     assert x < drawing._sheet_x(spec.BOND_ZONE_DIA_Z)
     label_text_right = (
         drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH - 0.0049
@@ -465,13 +494,15 @@ def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> No
     # r5 (9dc1a4d): one character from the label read as one line; keep a
     # clear gap.
     assert drawing.BOND_ZONE_BLOCK_LEFT_X - label_text_right >= 0.005
-    front_land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
+    front_land_crown_end = drawing._sheet_x(
+        spec.HEAD_REAR_Z + spec.FRONT_JOURNAL_END_FROM_HEAD_REAR
+    )
     assert front_land_crown_end - (x + drawing.JOURNAL_DIA_TEXT_OVERHANG) >= 0.003
     # Under the collar pin hole's two-row callout (underline ~3 mm under its
     # text position).
     assert drawing.PRINCIPAL_KEEP["PinHoleDia"][1] - 0.006 - top >= 0.004
-    # Its arrows sit between the flanks: an outside tail would drop into the
-    # front journal's diameter block under the shaft.
+    # Its arrows sit between the flanks: an outside tail would hang into the
+    # station rows under the shaft.
     assert "BondZoneDia" in drawing.ARROWS_INSIDE
 
 
@@ -508,18 +539,20 @@ def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
 
 def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     """The relief's front station runs in the station rows below the shaft,
-    between the 1.82 and 8.25 rows and under the front Ra symbol; its back
+    under the 1.82 and 2.61 rows, its text left of the 2.61 witness; its back
     station (#1038 ruling) runs in the next row down, where nothing hangs
     under the shaft across its witness now that the bond-zone callout stands
-    above; its diameter hangs below, clear of the front journal's block and of
-    both shoulder witnesses."""
+    above; its diameter hangs below, clear of both shoulder witnesses."""
     x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
     front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
+    end_row_y = drawing.PRINCIPAL_KEEP["FrontJournalEndFromHeadRear"][1]
     back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
-    assert back_row_y + 0.006 <= y <= front_row_y - 0.015
-    ra_x, ra_y = drawing.FRONT_RA_XY
-    assert y < ra_y
-    assert drawing.RELIEF_FRONT_X + 0.010 < x < ra_x + drawing.RA_SYMBOL_EXTENT[0] - 0.020
+    assert back_row_y + 0.006 <= y <= end_row_y - 0.006 <= front_row_y - 0.012
+    front_land_crown_end = drawing._sheet_x(
+        spec.HEAD_REAR_Z + spec.FRONT_JOURNAL_END_FROM_HEAD_REAR
+    )
+    # Its text (~8.6 mm wide about its position) left of the 2.61 witness.
+    assert drawing.RELIEF_FRONT_X + 0.010 < x < front_land_crown_end - 0.008
     back_x, back_y = drawing.PRINCIPAL_KEEP["BondReliefBackFromHeadRear"]
     assert back_row_y + 0.006 <= back_y <= y - 0.006
     assert drawing.RELIEF_BACK_X + 0.010 < back_x < drawing.RELIEF_FRONT_X
@@ -537,11 +570,9 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     assert text_right <= drawing.RELIEF_FRONT_X - 0.001
     # Rule 7: at most two word rows under the size line.
     assert drawing.BOND_ZONE_CALLOUT.count("\n") <= 1
-    _, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
-    _, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
-    # Its text sits under the front journal's block, over the station row's
-    # line.
-    assert dia_y + 0.004 <= front_y - journal_height / 2.0
+    # Its text sits under the shaft, over the station row's line.
+    shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
+    assert dia_y + 0.010 <= shaft_bottom
     assert dia_y - 0.004 >= y
 
 
@@ -811,9 +842,16 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert _config.parts("dt-pinion-arbor-collar")["number"] == drawing.COLLAR_NUMBER
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
-    front_min = (
-        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_XX_BAND
-    ) - (spec.DRUM_STATION + spec.DRUM_STATION_BAND)
+    # #1038 ruling: the front land's inner end is its own 2.61 station, one
+    # band (it read the 1.82 and the .79, two bands, before).
+    front_min = (spec.FRONT_JOURNAL_END_FROM_HEAD_REAR - spec.LINEAR_XX_BAND) - (
+        spec.DRUM_STATION + spec.DRUM_STATION_BAND
+    )
+    assert front_min == pytest.approx(
+        (
+            spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_XX_BAND
+        ) - (spec.DRUM_STATION + spec.DRUM_STATION_BAND) + spec.LINEAR_XX_BAND
+    )
     back_min = (
         spec.DRUM_STATION
         - spec.DRUM_STATION_BAND
@@ -825,13 +863,13 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert min(front_min, back_min) > 0.0
     # So the drum covers exactly the span between the journals, and the
     # collar's span by the head (its pin hole) lies outside the drum.
-    front_land_end = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN
+    front_land_end = spec.FRONT_JOURNAL_END_FROM_HEAD_REAR
     assert spec.DRUM_STATION < front_land_end
     assert spec.DRUM_STATION + geometry.DRUM_LEN > spec.BACK_JOURNAL_FROM_HEAD_REAR
     assert spec.PIN_STATION_FROM_HEAD_REAR < spec.FRONT_JOURNAL_FROM_HEAD_REAR
     station = spec.BOND_ZONE_DIA_FROM_HEAD_REAR
     clear = spec.BOND_ZONE_LAND_CLEARANCE
-    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
+    assert front_land_end + clear <= station
     assert station <= spec.BACK_JOURNAL_FROM_HEAD_REAR - clear
     assert spec.DRUM_STATION < station < spec.DRUM_STATION + geometry.DRUM_LEN
     text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
@@ -1009,26 +1047,47 @@ def test_lengths_carry_their_value_and_band_only() -> None:
     for name in (
         "BackRimFromHeadRear", "OverallLen", "BackCapSagDim",
         "PinStationFromHeadRear", "FrontJournalFromHeadRear",
-        "BackJournalFromHeadRear",
+        "FrontJournalEndFromHeadRear", "BackJournalFromHeadRear",
+        "BackJournalEndFromHeadRear",
     ):
         assert name not in drawing.DIMENSION_CALLOUTS, name
 
 
-def test_front_journal_diameter_text_clears_the_drum_station_witness() -> None:
-    """Run 059b5b0f: the drum station's witness (x 246.0) ran through the
-    front land's "Ø8.00 -0.01/-0.03 JOURNAL", whose text hangs left of its
-    line.  The line now stands on the land just inside its crown end."""
-    x, _ = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
-    land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
-    land_head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
-    assert land_crown_end + 0.0008 <= x < land_head_end  # on the land
-    width, _height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
-    left = x - width
-    # The bond-zone block now hangs above the shaft (#1038 ruling), so the
-    # front journal's block below has the run to itself.
-    assert drawing.PRINCIPAL_KEEP["BondZoneDia"][1] > drawing.PRINCIPAL_CENTER[1]
-    assert drawing.PRINCIPAL_KEEP["FrontJournalDia"][1] < drawing.PRINCIPAL_CENTER[1]
-    assert left > drawing.RELIEF_FRONT_X
+def test_front_land_ends_are_baseline_stations_in_an_open_row() -> None:
+    """Machinist review of 703211d (rules 10/11, 2 of 3 runs): the front
+    land's crown-side end was located only by the .79 chained off the 1.82.
+    Repitch1038 ruling (a): it prints as its own 2.61 station from the head
+    rear face, as the back land's 9.04 does; the land's length is the
+    difference of two .XX stations."""
+    assert spec.DRAWING_DIMENSIONS["FrontJournalReference"] == {
+        "FrontJournalFromHeadRear",
+        "FrontJournalEndFromHeadRear",
+    }
+    assert "FrontJournalLen" not in sheet.DRAWING_PRECISION_BY_NAME
+    assert spec.FRONT_JOURNAL_END_FROM_HEAD_REAR == pytest.approx(66.294)  # 2.61
+    band = spec.LINEAR_XX_BAND
+    shortest = (spec.FRONT_JOURNAL_END_FROM_HEAD_REAR - band) - (
+        spec.FRONT_JOURNAL_FROM_HEAD_REAR + band
+    )
+    assert shortest == pytest.approx(spec.JOURNAL_LEN - 2.0 * band)  # .79 -.02
+    # The land's inner end reads one band: its worst margin over the strap,
+    # drum hard forward, is the drum's front-end overlap on it.
+    front_inboard = min(m["front inboard"] for m in spec.LAND_MARGINS_AT_STOPS.values())
+    assert front_inboard == pytest.approx(spec.DRUM_FRONT_END_ON_JOURNAL_MIN)
+    assert front_inboard >= spec.LAND_OVER_STRAP_REQUIRED
+    # The 2.61 row runs between the 1.82's and the 4.20's, its text right of
+    # the 1.82's head-end witness and left of the neck-end witness.
+    x, y = drawing.PRINCIPAL_KEEP["FrontJournalEndFromHeadRear"]
+    _, front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"]
+    _, relief_row_y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
+    assert relief_row_y + 0.006 <= y <= front_row_y - 0.006
+    assert drawing._sheet_x(spec.FRONT_JOURNAL_Z) + 0.006 <= x
+    assert x <= drawing._sheet_x(spec.NECK_END_Z) - 0.008
+    # Nothing hangs under the land between its two station witnesses: one 2X
+    # diameter on the back land sizes both lands, and the front Ra symbol
+    # hangs above the shaft.
+    assert "FrontJournalDia" not in drawing.PRINCIPAL_KEEP
+    assert drawing.JOURNAL_FINISHES["front_journal"][2] == "upper"
 
 
 def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
@@ -1401,10 +1460,10 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
 
 
 def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> None:
-    """Below the shaft at x 0.269 is the front land's Ra symbol, so the pin
-    hole's station and diameter both stand above it: the station over the
-    Ø15's text row, the diameter's leader left of the station witness and
-    above the 19.0 land length."""
+    """Below the shaft x 0.269 lies inside every head-rear station's span, so
+    the pin hole's station and diameter both stand above it: the station
+    over the Ø15's text row, the diameter's underline well over the front
+    land's Ra symbol (#1038 ruling: now above the land)."""
     pin_x = drawing._sheet_x(spec.PIN_Z)
     head_rear_x = drawing._sheet_x(spec.HEAD_REAR_Z)
     axis_y = drawing.PRINCIPAL_CENTER[1]
@@ -1414,7 +1473,8 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert station_y > drawing.DIAMETER_POSITIONS["HeadDia"][1] + 0.010
     assert dia_x < pin_x
     assert dia_y > station_y + 0.010
-    assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.030
+    ra_top = drawing.FRONT_RA_XY[1] + drawing.RA_SYMBOL_EXTENT[2]
+    assert dia_y + PIN_CALLOUT_UNDERLINE_FROM_POSITION > ra_top + 0.025
     assert min(station_y, dia_y) > axis_y
 
 
@@ -1455,8 +1515,8 @@ def test_collar_pin_leader_slopes_clear_of_the_station_witnesses() -> None:
     """The callout's x follows its width: the bend stands PIN_HOLE_LEADER_RUN
     left of the hole.  Machinist review r1 of #1685: bent square over the
     hole, the leader ran down the 38.0's hole-end witness; sloped, it meets
-    the 38.0 line well inside that witness and passes right of the 19.0's
-    head-end witness."""
+    the 38.0 line well inside that witness and passes right of the front
+    land's Ra symbol (#1038 ruling: above the land)."""
     elbow_x, _ = _pin_leader_elbow(drawing.PRINCIPAL_KEEP["PinHoleDia"])
     arrow_x = drawing._sheet_x(spec.PIN_Z) + drawing.PIN_HOLE_LEADER_ARROW_DX
     assert elbow_x == pytest.approx(arrow_x - drawing.PIN_HOLE_LEADER_RUN, abs=1e-9)
@@ -1464,10 +1524,11 @@ def test_collar_pin_leader_slopes_clear_of_the_station_witnesses() -> None:
     station_line_y = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"][1] - 0.0056
     pin_dia_xy = drawing.PRINCIPAL_KEEP["PinHoleDia"]
     assert hole_x - _pin_leader_x_at(pin_dia_xy, station_line_y) >= 0.006
-    land_line_y = drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] - 0.0028
-    head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
-    assert _pin_leader_x_at(pin_dia_xy, land_line_y) - head_end >= 0.003
-    assert {"PinStationFromHeadRear", "FrontJournalLen"} <= set(drawing.ARROWS_INSIDE)
+    ra_x, ra_y = drawing.FRONT_RA_XY
+    _left, right, top = drawing.RA_SYMBOL_EXTENT
+    for y in (ra_y, ra_y + top):
+        assert _pin_leader_x_at(pin_dia_xy, y) - (ra_x + right) >= 0.003
+    assert "PinStationFromHeadRear" in drawing.ARROWS_INSIDE
     # The underline starts right of detail A's view box (r1 of #1685: its
     # outline ended at x 192.8).
     assert elbow_x - drawing.PIN_HOLE_CALLOUT_WIDTH > 0.1928

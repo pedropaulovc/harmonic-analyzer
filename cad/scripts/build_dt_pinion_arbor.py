@@ -65,6 +65,7 @@ from dt_pinion_arbor_spec import (
     DRAWING_NOTES,
     DRUM_STATION,
     EXPOSED_SHAFT_LEN,
+    FRONT_JOURNAL_END_FROM_HEAD_REAR,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
     HEAD_CAP_R,
@@ -96,6 +97,7 @@ from dt_pinion_arbor_notes import (
     BOND_ZONE_DIA_PREFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    JOURNAL_DIA_PREFIX,
     REFERENCE_SKETCHES,
     SPAN_REFERENCES,
 )
@@ -128,12 +130,12 @@ V_BOND_RELIEF = math.pi * (SHAFT_R**2 - BOND_RELIEF_R**2) * BOND_RELIEF_LEN
 # the whole Ø5/16 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
 JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
-# Each land's diameter is measured at a short construction witness this far
-# in from the land's crown-side end, so the sheet's diameter line stands 1 mm
-# from it and its extensions are ~1 mm, not a run along the flank from the
-# land's head-side end (Main, 2026-09-24).  Just inside the end rather than on
-# it: the drum-station witness sits 4.4 mm head side of the front land's
-# crown end, and the text hangs away from the side its extensions come from.
+# The back land's 2X diameter (one size for both lands) is measured at a
+# short construction witness this far in from the land's crown-side end, so
+# the sheet's diameter line stands 1 mm from it and its extensions are ~1 mm,
+# not a run along the flank from the land's head-side end (Main,
+# 2026-09-24).  Just inside the end rather than on it: the text hangs away
+# from the side its extensions come from.
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_POINT_LEN = 1.0
 # The drum station has no feature on the shaft, so its far end is a short
@@ -298,18 +300,19 @@ async def _add_journal_land(
     prefix: str,
     journal_z: float,
     station_expression: str,
-    end_station_expression: str | None = None,
+    end_station_expression: str,
+    diameter: bool,
 ) -> list[tuple[str, str]]:
     """Split one MHA-DT-14 journal land off the Ø5/16 shaft and dimension it.
 
     One Top-plane sketch owns the land: two real cross lines at its ends
     (projected both ways they cut the cylinder into its own face), a
-    construction witness on the flank between them, and the three native
-    dimensions the sheet prints -- station from the head shoulder, land
-    length, and the diameter that carries the journal band (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    With ``end_station_expression`` the land's crown-side end prints as a
-    second station from the head shoulder instead of the length (#1038
-    ruling: baseline axial lengths from one faced end).
+    construction witness on the flank between them, and the native
+    dimensions the sheet prints -- both ends as stations from the head
+    shoulder (#1038 ruling: baseline axial lengths from one faced end) and,
+    with ``diameter``, the diameter that carries the journal band
+    (drawing-simplicity-policy.md `How the repository implements the guidelines`).
+    One 2X diameter sizes both lands, so only one land carries it.
     """
     feature_name = f"{prefix}Reference"
     start_v = -journal_z
@@ -334,13 +337,18 @@ async def _add_journal_land(
         f"{feature_name} flank witness",
         await adapter.add_line(SHAFT_R, start_v, SHAFT_R, end_v),
     )
-    dia_v = end_v + JOURNAL_DIA_POINT_FROM_CROWN_END
-    dia_witness = check(
-        f"{feature_name} diameter witness",
-        await adapter.add_line(SHAFT_R, dia_v, SHAFT_R, dia_v + JOURNAL_DIA_POINT_LEN),
-    )
+    constructions = [witness]
+    if diameter:
+        dia_v = end_v + JOURNAL_DIA_POINT_FROM_CROWN_END
+        dia_witness = check(
+            f"{feature_name} diameter witness",
+            await adapter.add_line(
+                SHAFT_R, dia_v, SHAFT_R, dia_v + JOURNAL_DIA_POINT_LEN
+            ),
+        )
+        constructions.append(dia_witness)
     set_sketch_direct_db(adapter, False)
-    for construction in (witness, dia_witness):
+    for construction in constructions:
         segment = _early_bound(adapter._sketch_entities[construction], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
@@ -387,57 +395,49 @@ async def _add_journal_land(
         ),
     )
     dims.record(f"{prefix}FromHeadRear", station_expression)
-    if end_station_expression is None:
-        check(
-            f"{feature_name} length",
-            await adapter.add_sketch_dimension(
-                f"{witness}.start", f"{witness}.end", "vertical_distance", JOURNAL_LEN
-            ),
-        )
-        dims.record(f"{prefix}Len", '"JournalLen"')
-    else:
-        check(
-            f"{feature_name} end station",
-            await adapter.add_sketch_dimension(
-                f"{axis}.start",
-                f"{witness}.end",
-                "vertical_distance",
-                journal_z + JOURNAL_LEN - HEAD_REAR_Z,
-            ),
-        )
-        dims.record(f"{prefix}EndFromHeadRear", end_station_expression)
     check(
-        f"{feature_name} diameter witness on the flank",
-        await adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
-    )
-    check(
-        f"{feature_name} diameter witness station",
+        f"{feature_name} end station",
         await adapter.add_sketch_dimension(
+            f"{axis}.start",
             f"{witness}.end",
-            f"{dia_witness}.start",
             "vertical_distance",
-            JOURNAL_DIA_POINT_FROM_CROWN_END,
+            journal_z + JOURNAL_LEN - HEAD_REAR_Z,
         ),
     )
-    dims.record(None, None)
-    check(
-        f"{feature_name} diameter witness length",
-        await adapter.add_sketch_dimension(
+    dims.record(f"{prefix}EndFromHeadRear", end_station_expression)
+    if diameter:
+        check(
+            f"{feature_name} diameter witness on the flank",
+            await adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
+        )
+        check(
+            f"{feature_name} diameter witness station",
+            await adapter.add_sketch_dimension(
+                f"{witness}.end",
+                f"{dia_witness}.start",
+                "vertical_distance",
+                JOURNAL_DIA_POINT_FROM_CROWN_END,
+            ),
+        )
+        dims.record(None, None)
+        check(
+            f"{feature_name} diameter witness length",
+            await adapter.add_sketch_dimension(
+                f"{dia_witness}.start",
+                f"{dia_witness}.end",
+                "vertical_distance",
+                JOURNAL_DIA_POINT_LEN,
+            ),
+        )
+        dims.record(None, None)
+        await add_diametric_linear_dimension(
+            adapter,
+            axis,
             f"{dia_witness}.start",
-            f"{dia_witness}.end",
-            "vertical_distance",
-            JOURNAL_DIA_POINT_LEN,
-        ),
-    )
-    dims.record(None, None)
-    await add_diametric_linear_dimension(
-        adapter,
-        axis,
-        f"{dia_witness}.start",
-        (SHAFT_R + 5.0, dia_v),
-        f"{prefix}Dia",
-    )
-    dims.record(f"{prefix}Dia", '"ShaftDia"')
+            (SHAFT_R + 5.0, dia_v),
+            f"{prefix}Dia",
+        )
+        dims.record(f"{prefix}Dia", '"ShaftDia"')
     await ensure_fully_defined(adapter, feature_name)
     check(f"exit sketch {feature_name}", await adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
@@ -712,8 +712,8 @@ async def build(adapter) -> dict[str, str]:
         "CrossHoleStation": CROSS_HOLE_STATION,
         "BackRimFromHeadRear": BACK_RIM_FROM_HEAD_REAR,
         "OverallLen": OVERALL_LEN,
-        "JournalLen": JOURNAL_LEN,
         "FrontJournalFromHeadRear": FRONT_JOURNAL_FROM_HEAD_REAR,
+        "FrontJournalEndFromHeadRear": FRONT_JOURNAL_END_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": BACK_JOURNAL_FROM_HEAD_REAR,
         "BackJournalEndFromHeadRear": BACK_JOURNAL_END_FROM_HEAD_REAR,
         "DrumStationFromHeadRear": DRUM_STATION,
@@ -1059,6 +1059,8 @@ async def build(adapter) -> dict[str, str]:
         prefix="FrontJournal",
         journal_z=FRONT_JOURNAL_Z,
         station_expression='"FrontJournalFromHeadRear"',
+        end_station_expression='"FrontJournalEndFromHeadRear"',
+        diameter=False,
     )
     drive_jobs += await _add_journal_land(
         adapter,
@@ -1066,6 +1068,7 @@ async def build(adapter) -> dict[str, str]:
         journal_z=BACK_JOURNAL_Z,
         station_expression='"BackJournalFromHeadRear"',
         end_station_expression='"BackJournalEndFromHeadRear"',
+        diameter=True,
     )
     if len(_shaft_faces(adapter)) != 6:
         raise RuntimeError(
@@ -1115,21 +1118,15 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter,
-        "FrontJournalReference",
-        "FrontJournalDia",
-        *deviations(JOURNAL_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
         "BackJournalReference",
         "BackJournalDia",
         *deviations(JOURNAL_DIA_BAND),
         display_unit=UNIT,
     )
-    # A diametric linear dimension on a side-view sketch prints no Ø by itself.
-    for prefix in ("FrontJournal", "BackJournal"):
-        set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
+    # One size for both journal lands (dt_pinion_arbor_notes).
+    set_dimension_prefix(
+        adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_PREFIX
+    )
     # One size for both MHA-DT-01 bond lands (dt_pinion_arbor_notes).
     set_dimension_prefix(adapter, "BondZoneReference", "BondZoneDia", BOND_ZONE_DIA_PREFIX)
     set_dimension_prefix(adapter, "BondReliefProfile", "BondReliefDia", "<MOD-DIAM>")

@@ -226,11 +226,11 @@ DONOR_KEEP = {
 }
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
 # x = 0.19467 - (z - 111.731) / 1000.  The lands are centred on their straps,
-# so their centres (x 0.252 front, 0.0875 back) hold whatever the derived land
-# length; only their ends move.  The front land's length rides above the
-# shaft and its diameter hangs below; the back land's are swapped (see
-# BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
-# below the shaft.
+# so their centres (x 0.2505 front, 0.0875 back) hold whatever the derived
+# land length; only their ends move.  Both lands' ends are stations from the
+# Ø15 head rear face, which stack below the shaft; one 2X diameter hangs
+# above the back land (see BACK_JOURNAL_TEXT_X) and each land's Ra symbol
+# hangs above its own land.
 # SolidWorks centres the view on the part's extent: the anchor sits 0.625
 # aft of the crown-to-crown mid-length (106.725 measured at the 11.5 head),
 # so it follows the head's growth forward at r5 of #1685.
@@ -241,7 +241,7 @@ def _sheet_x(model_z: float) -> float:
     return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
 
 
-# Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
+# The back land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
 # head-side end, and its symbol hangs RA_SHOULDER further head side on a short
 # bent-leader shoulder.  At c6eb7f6f the back symbol hung below the shaft and
 # its shoulder ran through the 199.9 / 19.0 witness there (Main).  Nothing
@@ -251,18 +251,20 @@ def _sheet_x(model_z: float) -> float:
 RA_ARROW_FROM_HEAD_END = 2.0
 RA_SYMBOL_OFFSET = 0.0033
 RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
-# The front land is walled below the shaft by the drum-station witness (x
-# ~0.2458) and the 46.3 station witness at its head end (x ~0.2606), 14.8 mm
-# apart -- narrower than the 16.9 mm symbol.  Hung beside the land at y 0.150
-# its shoulder ran back across the 46.3 witness (audit leader-crosses-line).
-# So the symbol drops UNDER that witness's end (the 46.3 row rises to y 0.140
-# to make room): the ▽ sits right of the witness at y 0.124, 6.6 mm over the
-# 61.05 line, and the shoulder runs left beneath the witness end onto a steep
-# leader that stays inside the pocket, 2.7 mm off the witness and 2.9 mm off
-# the 46.3 arrow. Landing 7 mm in from the head end (x ~0.2533) keeps that
-# leader 7.5 mm clear of the drum-station witness.
-FRONT_RA_ARROW_FROM_HEAD_END = 7.0
-FRONT_RA_XY = (_sheet_x(FRONT_JOURNAL_Z) + 0.0048, 0.124)
+# #1038 ruling (review of 703211d): the front land's crown end prints as its
+# own 2.61 station, whose row runs below the shaft between the 1.82 and 4.20
+# rows, where the front symbol hung (y 0.124, x ~0.2529-0.270): its line
+# would cross the symbol and its leader.  Above the shaft the land is open
+# now that its .79 length is gone, so the front symbol hangs there as the
+# back one does, at the same height: the arrow 2 mm in from the land's
+# crown end, the symbol RA_SYMBOL_OFFSET head side of it over the land.  Its
+# right end (~0.2612) then stands ~3.8 mm left of the collar pin hole's
+# sloping leader at the symbol's top (r6 layout audit: the leader ran
+# (268.2, 170.8) -> (258.7, 215.4) mm) and its left end ~7.6 mm right of the
+# bond-zone diameter's line.
+FRONT_RA_ARROW_FROM_CROWN_END = 2.0
+FRONT_RA_ARROW_Z = FRONT_JOURNAL_Z + JOURNAL_LEN - FRONT_RA_ARROW_FROM_CROWN_END
+FRONT_RA_XY = (_sheet_x(FRONT_RA_ARROW_Z) + RA_SYMBOL_OFFSET, 0.179)
 BACK_RA_XY = (
     _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
     0.179,
@@ -272,17 +274,18 @@ BACK_RA_XY = (
 # on the c6eb7f6f sheet.
 RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
 FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
-# Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
-# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
-# test), and its line stands 1 mm from that point, so its extensions are ~1 mm
-# rather than a run along the flank (Main, 2026-09-24).  The text hangs away
-# from the side its extensions come from: left of the front line, right of the
-# back one.
+# The back land's 2X diameter (one size for both lands, #1038 ruling) is
+# measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
+# crown-side end (build_pinion_arbor, pinned equal by test), and its line
+# stands 1 mm from that point, so its extensions are ~1 mm rather than a run
+# along the flank (Main, 2026-09-24).  The text hangs away from the side its
+# extensions come from: right of the line.  Under the shaft the front land's
+# own block (r6 of #1038, 703211d) had no open space between its 2.61 and
+# 1.82 station witnesses, 20 mm apart, and above it the collar pin hole's
+# leader closes the land's head side, so the 2X carries both lands as the
+# back stub's carries both spans outside them.
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_LINE_OFFSET = 0.001
-FRONT_JOURNAL_DIA_POINT_X = _sheet_x(
-    FRONT_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
-)
 BACK_JOURNAL_DIA_POINT_X = _sheet_x(
     BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
 )
@@ -318,20 +321,18 @@ def _diameter_block_size(callout: str) -> tuple[float, float]:
     return (max(width, _callout_width(callout)), height + CALLOUT_LINE_PITCH * lines)
 
 
-# The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
-# measured at 4e97c4d8).  Its line stands on the land 1 mm crown side of its
-# measuring point.
+# A diameter's text hung LEFT of its line overhangs the line by this much
+# (x-0.026 .. x+0.001, measured at 4e97c4d8).
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
-FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # The bond-zone diameter (#1038 ruling: its witness now on the front bond
 # land, BOND_ZONE_DIA_FROM_HEAD_REAR) hangs ABOVE the shaft, its line 1 mm
-# crown side of its measuring point so its text hangs LEFT of the line, as
-# the front journal's does: in the open run between detail A's label and the
-# front land's length witnesses, 5 mm over the shaft and well under the
-# collar pin hole's callout.  Below the shaft (r1 of #1685 to r3 of #1038) it
-# sat over the back bond land, where the relief's back-shoulder station must
-# now drop.  Its arrows sit inside the flanks (ARROWS_INSIDE): an outside
-# tail would drop into the front journal's diameter block under the shaft.
+# crown side of its measuring point so its text hangs LEFT of the line: in
+# the open run between detail A's label and the front land, 5 mm over the
+# shaft and well under the collar pin hole's callout.  Below the shaft (r1
+# of #1685 to r3 of #1038) it sat over the back bond land, where the
+# relief's back-shoulder station must now drop.  Its arrows sit inside the
+# flanks (ARROWS_INSIDE): outside, its lower tail would hang into the
+# station rows under the shaft.
 BOND_ZONE_LINE_X = _sheet_x(BOND_ZONE_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
 BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1893)
 # The block's widest row ends at its line: on the r5 sheet of #1038
@@ -440,7 +441,6 @@ PIN_HOLE_CALLOUT_X = (
 # 3.6 mm arrowheads).
 ARROWS_INSIDE = (
     "PinStationFromHeadRear",
-    "FrontJournalLen",
     "BondZoneDia",
     # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
     # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
@@ -450,10 +450,10 @@ ARROWS_INSIDE = (
 # #2360: the relief between the bond lands.  Its front shoulder's station
 # from the head rear face (machinist review of 7454ba6d: a chain off the
 # front land left the back shoulder four links from the datum) runs in the
-# stations' rows below the shaft, between the 1.82 and 8.25 rows and under
-# the front land's Ra symbol (tip ~0.124): the line ~2.8 mm under the text
-# position runs at ~0.1185, 6 mm over the 8.25's, its text left of the Ra
-# in the open run under the front land's diameter block.  Its back
+# stations' rows below the shaft, under the 1.82 and 2.61 rows and over the
+# 8.25's: the line ~2.8 mm under the text position runs at ~0.1185, 6 mm
+# over the 8.25's, its text left of the 2.61 witness in the open run under
+# the front bond land.  Its back
 # shoulder's station (#1038 ruling: the 2.60 length chained off the 4.20,
 # machinist review of 057ffb6) runs in the next row down, where the 8.25
 # stood: above the shaft the collar pin hole's leader crossed it (review of
@@ -472,23 +472,24 @@ RELIEF_DIA_TEXT_EXTENT = (-0.0131, 0.0143)
 RELIEF_DIA_LINE_OFFSET = 0.0155
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
-    "FrontJournalLen": (0.252, 0.188),
+    # #1038 ruling (review of 703211d): the front land's crown-side end, its
+    # own station from the head rear face, in a row between the 1.82's and
+    # the 4.20's (lines ~0.1372 / ~0.1278 / ~0.1185), its text centred on its
+    # span right of the 1.82's head-end witness (x ~0.2602, which stops at
+    # ~0.1362) and left of the neck-end witness (x 0.296).
+    "FrontJournalEndFromHeadRear": (0.273, 0.1306),
     # #1038 ruling: the back land's crown-side end, its own station from the
     # head rear face, in the row under the 8.25 (its line ~0.0996, 2.8 mm
     # over the 9.35 text), its text clear of every witness below the shaft.
     "BackJournalEndFromHeadRear": (0.125, 0.1024),
-    # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
-    # station's text.
-    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
     "BondReliefBackFromHeadRear": RELIEF_BACK_STATION_TEXT_XY,
     "BondReliefDia": RELIEF_DIA_XY,
-    # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
-    # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
-    # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.
+    # y 0.140: its dimension line at ~0.1372, the top row under the shaft;
+    # its head-end witness stops at ~0.1362, over the 2.61 row's text.
     "FrontJournalFromHeadRear": (0.283, 0.140),
     "BackJournalFromHeadRear": (0.160, 0.1087),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
@@ -499,10 +500,11 @@ PRINCIPAL_KEEP = {
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
     "BackCapR": (BACK_RIM_X - 0.0353, 0.140),
-    # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
-    # so both its dimensions stand ABOVE the shaft: the station from the head
-    # rear face in a row over the Ø15's, and the hole's leader rising left of
-    # that row's witness, above the 19.0's right arrow tail.  The hole's
+    # R1a's collar pin hole (x 0.269) sits inside every head-rear station's
+    # span under the shaft, so both its dimensions stand ABOVE the shaft: the
+    # station from the head rear face in a row over the Ø15's, and the hole's
+    # leader rising left of that row's witness, right of the front Ra symbol.
+    # The hole's
     # underline stands clear above detail A's (3.0): at y 0.222 (pc-r11) it
     # ran 0.7 mm over that text's top and began 0.9 mm right of it, so the
     # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) it
@@ -595,7 +597,6 @@ def _detail_x(model_z: float) -> float:
 
 DIMENSION_CALLOUTS = {
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
-    "FrontJournalDia": JOURNAL_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
     "BackStubDia": SPAN_CALLOUT,
@@ -624,14 +625,10 @@ PRINTED_PRECISION_BY_NAME = {
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
-# Each land's Ra symbol hangs off one flank on the land's head side of its
-# diameter line, clear of the split-line rings at the land ends.
+# Each land's Ra symbol hangs off its upper flank over the land, clear of the
+# split-line rings at the land ends.
 JOURNAL_FINISHES = {
-    "front_journal": (
-        FRONT_JOURNAL_Z + FRONT_RA_ARROW_FROM_HEAD_END,
-        FRONT_RA_XY,
-        "lower",
-    ),
+    "front_journal": (FRONT_RA_ARROW_Z, FRONT_RA_XY, "upper"),
     "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),
 }
 

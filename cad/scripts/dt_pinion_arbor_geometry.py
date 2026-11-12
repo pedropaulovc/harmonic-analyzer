@@ -193,19 +193,18 @@ def worst_land_margins(
     before it and each strap's inner face sits its drum-end air away.  Every
     margin is linear in each input, so the corners bound it.  ``stop`` limits
     the float to one end of its range (the drum hard forward or hard aft).
-    The front land prints its station and length, so its outboard end reads
-    two bands from the head rear face; the back land prints both ends as
-    stations from that face (#1038 ruling), one band each.
+    Every land end prints as its own station from the head rear face (#1038
+    ruling: no length chained off a station), so each reads one band.
     """
     front, back = land_stations(journal_len)
     x = LINEAR_XX_BAND
     shares = (STOPS[stop],) if stop is not None else tuple(STOPS.values())
     worst = dict.fromkeys(LAND_ENDS, math.inf)
-    for a, b, e, length, strap, station, drum, total, share in product(
+    for a, f, b, e, strap, station, drum, total, share in product(
         (front - x, front + x),
+        (front + journal_len - x, front + journal_len + x),
         (back - x, back + x),
         (back + journal_len - x, back + journal_len + x),
-        (journal_len - x, journal_len + x),
         STRAP_T_LIMITS,
         (DRUM_STATION - station_band, DRUM_STATION + station_band),
         (DRUM_LEN + DRUM_LEN_BAND[1], DRUM_LEN + DRUM_LEN_BAND[0]),
@@ -216,7 +215,7 @@ def worst_land_margins(
         front_inner = -share * total
         back_inner = drum + (1.0 - share) * total
         margins = {
-            "front inboard": shoulder + a + length - front_inner,
+            "front inboard": shoulder + f - front_inner,
             "front outboard": front_inner - strap - (shoulder + a),
             "back inboard": back_inner - (shoulder + b),
             "back outboard": shoulder + e - (back_inner + strap),
@@ -241,13 +240,15 @@ def land_margin_slack(journal_len: float) -> float:
 JOURNAL_LEN = 20.066  # .79
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
 # Repitch1038 ruling (#1038, machinist review of 057ffb6: the back land's .79
-# chained off its 8.25): the back land's crown-side end prints as its own
-# station from the head rear face, 9.04.  Its length is then the difference of
-# two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
+# chained off its 8.25; review of 703211d, the front land's .79 chained off
+# its 1.82): each land's crown-side end prints as its own station from the
+# head rear face, 2.61 and 9.04.  Each land's length is then the difference
+# of two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
+FRONT_JOURNAL_END_FROM_HEAD_REAR = FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
 BACK_JOURNAL_END_FROM_HEAD_REAR = BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
-_END = BACK_JOURNAL_END_FROM_HEAD_REAR
-if abs(on_xx_grid(_END) - _END) > 1e-9:
-    raise AssertionError("the back land's end station is off the .01 in grid")
+for _END in (FRONT_JOURNAL_END_FROM_HEAD_REAR, BACK_JOURNAL_END_FROM_HEAD_REAR):
+    if abs(on_xx_grid(_END) - _END) > 1e-9:
+        raise AssertionError("a land's end station is off the .01 in grid")
 LAND_MARGINS_AT_STOPS = {
     stop: worst_land_margins(JOURNAL_LEN, DRUM_STATION_BAND, stop=stop)
     for stop in STOPS
@@ -477,16 +478,16 @@ if (
 # neither above the shaft (the collar pin hole's leader would cross it) nor
 # below with the callout there (its extension would drop through the block).
 # So the witness moves to the front bond land and the callout hangs above
-# the shaft, left of its line, between detail A's label and the front land's
-# length witnesses.  At 75.0 (r5, 9dc1a4d) the block ended one character
-# from the label's SCALE 2 : 1 (review, clarity); 69.5, 3.2 off the front
-# land, stands its line 4.2 mm short of the land's length witness and the
-# block ~7 mm clear of the label.
+# the shaft, left of its line, between detail A's label and the front land.
+# At 75.0 (r5, 9dc1a4d) the block ended one character from the label's
+# SCALE 2 : 1 (review, clarity); 69.5, 3.2 off the front land's 2.61 end,
+# stands its line 4.2 mm short of that end and the block ~7 mm clear of the
+# label.
 BOND_ZONE_DIA_FROM_HEAD_REAR = 69.5
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
 BOND_ZONE_LAND_CLEARANCE = 3.0
 if not (
-    FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN + BOND_ZONE_LAND_CLEARANCE
+    FRONT_JOURNAL_END_FROM_HEAD_REAR + BOND_ZONE_LAND_CLEARANCE
     <= BOND_ZONE_DIA_FROM_HEAD_REAR
     <= BOND_RELIEF_FROM_HEAD_REAR - BOND_ZONE_LAND_CLEARANCE
     and BOND_ZONE_DIA_FROM_HEAD_REAR > DRUM_STATION + DRUM_STATION_BAND

@@ -53,6 +53,7 @@ from dt_pinion_arbor_geometry import (
     END_PLAY as END_PLAY,
     END_PLAY_SET_ERROR as END_PLAY_SET_ERROR,
     EXPOSED_SHAFT_LEN as EXPOSED_SHAFT_LEN,
+    FRONT_JOURNAL_END_FROM_HEAD_REAR as FRONT_JOURNAL_END_FROM_HEAD_REAR,
     FRONT_JOURNAL_FROM_HEAD_REAR as FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z as FRONT_JOURNAL_Z,
     HEAD_CAP_R as HEAD_CAP_R,
@@ -141,14 +142,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinStationReference": {"PinStationFromHeadRear"},
     "BackRimReference": {"BackRimFromHeadRear"},
     "OverallReference": {"OverallLen"},
+    # Repitch1038 ruling (#1038): each land's crown-side end prints as its own
+    # station from the head rear face, not as a length chained off its
+    # head-side station.  One 2X diameter on the back land sizes both lands
+    # (the front land's block had no open space between the 2.61 and 1.82
+    # witnesses under the shaft, nor above it under the collar pin's leader).
     "FrontJournalReference": {
         "FrontJournalFromHeadRear",
-        "FrontJournalLen",
-        "FrontJournalDia",
+        "FrontJournalEndFromHeadRear",
     },
-    # Repitch1038 ruling (#1038): the back land's crown-side end prints as its
-    # own station from the head rear face, not as a length chained off its
-    # head-side station; the front land keeps #2556's station and length.
     "BackJournalReference": {
         "BackJournalFromHeadRear",
         "BackJournalEndFromHeadRear",
@@ -202,8 +204,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OverallReference": {"OverallLen": 1},
     "FrontJournalReference": {
         "FrontJournalFromHeadRear": 2,
-        "FrontJournalLen": 2,
-        "FrontJournalDia": 4,
+        "FrontJournalEndFromHeadRear": 2,
     },
     "BackJournalReference": {
         "BackJournalFromHeadRear": 2,
@@ -262,12 +263,11 @@ BOND_ZONE_CALLOUT = (
     f"ALL EXCEPT JOURNALS;\n{DRUM_NUMBER} BOND ZONE,\nDRUM ENDS ON JOURNALS"
 )
 # Smallest overlap of each drum end on its land's inner end, every printed
-# band at its limit: the front land's inner end from its .XX station and .XX
-# length, the back land's from its .XX station, the drum from its .XX station
-# and its own sheet's length band.
-DRUM_FRONT_END_ON_JOURNAL_MIN = (
-    FRONT_JOURNAL_FROM_HEAD_REAR - LINEAR_XX_BAND + JOURNAL_LEN - LINEAR_XX_BAND
-) - (DRUM_STATION + DRUM_STATION_BAND)
+# band at its limit: each land's inner end from its own .XX station, the drum
+# from its .XX station and its own sheet's length band.
+DRUM_FRONT_END_ON_JOURNAL_MIN = (FRONT_JOURNAL_END_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
+    DRUM_STATION + DRUM_STATION_BAND
+)
 DRUM_BACK_END_ON_JOURNAL_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
 ) - (BACK_JOURNAL_FROM_HEAD_REAR + LINEAR_XX_BAND)

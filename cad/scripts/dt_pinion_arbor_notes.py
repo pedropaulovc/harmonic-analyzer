@@ -29,6 +29,10 @@ BACK_STUB_DIA_Z = spec.HEAD_REAR_Z + BACK_STUB_DIA_FROM_HEAD_REAR
 BACK_STUB_DIA_PREFIX = "2X <MOD-DIAM>"
 # One size for both MHA-DT-01 bond lands either side of the relief (#2360).
 BOND_ZONE_DIA_PREFIX = "2X <MOD-DIAM>"
+# One size for both journal lands, on the back land (#1038 ruling: under the
+# shaft the front land's block had no open space between its 2.61 and 1.82
+# station witnesses).  Note 1 names them.
+JOURNAL_DIA_PREFIX = "2X <MOD-DIAM>"
 _NEW_SPANS = (
     ("BackStubReference", "BackStubDia", BACK_STUB_DIA_FROM_HEAD_REAR, SPAN_WITNESS_LEN),
 )
