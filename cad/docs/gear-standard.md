@@ -178,19 +178,54 @@ hidden `KnobSettingReference` sketch), printed in sheet 6's DETAIL K: the S-K
 centre distance toleranced 43.794 +0.050/-0, the two DRO coordinates as
 references.
 
-The paper feed mesh (12T feed pinion on the purchased rack) is set at assembly
-on a feeler leaf, not on a number (owner direction on #2416, 2026-11-11: the
-mesh must not bind, must not come loose, and must feed steadily; backlash is
-not a function). MHA-PD-00 step 24 wedges a .0025 leaf in the teeth with the
-arm, clamps the arm and draws the leaf out. That leaves 2t/cos 20° = 0.135 mm
-of tooth-centred datum backlash whatever play lies behind the pinion, inside
-the builder's 0.12–0.14 design band and its opposite-flank budget. Only if
-that run shows a tight spot is the arm re-set once on a .003 leaf (0.162 mm).
-Its contact ratio is 1.177. That is below 1.2 but above the 1.1 continuous-
-action floor, which is the floor the owner's option C accepts at the loose
-end (`pd_paper_drive_assembly_steps.FEED_MESH_LEAF_BACKLASH_MM` and
-`FEED_FALLBACK_CONTACT_RATIO_FLOOR`). The latched mesh is then accepted on
-function: no tight spot, and no skipped tooth with the platen pushed by hand.
+The paper feed mesh (12T feed pinion on the purchased rack) is set by feel at
+assembly, not on a number (owner direction on #2416, 2026-11-11: the mesh must
+not bind, must not come loose, and must feed steadily; backlash is not a
+function). As on the original, MHA-PD-00 step 24 swings the arm up until the
+teeth are fully engaged without binding and clamps it there; the latch is then
+match-drilled at that mesh. No feeler, gauge or stop is used. A tight spot is
+cleared by easing the arm off at it only until the teeth just turn free there,
+which keeps the set at that spot's bind. Before the hook is drilled, the
+platen is pushed firmly by hand with the knob held and must skip no tooth; a
+skip sends the fitter to the parts.
+The latched mesh is then accepted on function: no tight spot over the whole
+engaged feed, no skipped tooth, a steady advance.
+
+No binding is what the feel set itself guarantees, at the pinion/rack phase
+felt in step 24: the arm sits at the first bind. A later re-latch enters at
+another tooth offset, and the pinion's toothspace runout can then bring its
+high tooth to the tightest station, up to one TIR (0.051 mm) radial past the
+felt bind, about 0.037 mm of backlash. That residual is accepted under the
+ruling below: a bind there is felt in service and cured by re-setting the arm
+(step 25's remedy), as on the original. At some printed corners a rack crest
+reaches the pinion's flank below its
+base circle before the flanks wedge, at 0.069 mm of tooth-centred backlash, so
+the stack starts from that later bind, where every corner keeps the 0.25 mm
+root clearance. The run's tight spot sets the arm, so every other station runs
+looser by the rack's index error and the feed's lateral terms (along the rack),
+the pinion's toothspace runout and the rack's crest drift along the run, up to
+twice the rack-soldered ±.002 crest band (radial). These are independent, and
+the loose side takes their root sum square: 0.188 mm of backlash at the
+loosest feel set. Against coming loose and for a feed at constant speed, every
+printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
+(`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). If every term stacks
+(0.299 mm, reported only as `FEED_WORST_CASE_MESH`), the contact ratio is 0.942,
+a slight hitch in the feed at that station, which the steady-advance check
+catches. The 1.0 floor and the root sum square are delegated rulings (Main,
+2026-11-11, under the owner's #2416 direction; owner review #2144):
+continuous conjugate action is what "paper advances at constant speed" asks,
+and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
+is used because the setting is by feel and the acceptance is functional, an
+exception to the worst-case mesh stacks limited to this mesh. A hitch with every
+part inside its sheet is cured by re-soldering the rack with its crests reading
+the same at both ends, which leaves at most one .001 division of drift; with
+that the arithmetic worst case keeps contact ratio 1.0 (1.037,
+`FEED_LEVEL_RACK_WORST_CASE_MESH`), and the mesh is set again by feel on a new
+hook. Easing
+past the bind is not booked: the remedy stops where the teeth just turn free,
+and the no-skip check only guards against the mesh coming loose. The builder's
+0.12–0.14 datum band remains the design proof of the modelled mesh
+(`paper_drive_rack_setup`).
 
 ### Setting the cone mesh
 
