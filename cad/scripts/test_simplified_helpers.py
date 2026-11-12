@@ -82,6 +82,9 @@ class FakeView:
         self.mode = mode
         return changed
 
+    def UpdateViewDisplayGeometry(self) -> bool:
+        return True
+
     @property
     def ReferencedConfiguration(self) -> str:
         return self.configuration
@@ -758,12 +761,18 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         record("balloons")()
         return []
 
+    def isolate(_adapter, view, *_args, **_kwargs):
+        # The isolated view is the one passed: the cone set's sheet also
+        # carries the cone tip detail.
+        record("isolate")()
+        return view
+
     idle = lambda *_args, **_kwargs: None  # noqa: E731
     for name, stub in {
         "_activate_sheet": activate,
         "place_view": place,
         "set_high_quality_shaded_with_edges": idle,
-        "set_drawing_view_instance_visibility": record("isolate"),
+        "set_drawing_view_instance_visibility": isolate,
         "_link_view_to_bom": record("bom link"),
         "_view_outline": lambda _view: (0.0, 0.0, 0.1, 0.1),
         "cluster_ring_scale": lambda _outline, preferred, **_kwargs: fitted_for(preferred),
@@ -772,7 +781,8 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         "_shift_view": idle,
         "add_component_bom_balloons": ballooned,
         "_spread_balloons": idle,
-        "rebuild_drawing": idle,
+        # A rebuild lands a pending configuration switch, as EditRebuild3 does.
+        "rebuild_drawing": lambda _adapter, **_kwargs: fake.EditRebuild3(),
         "_uncross_balloon_leaders": idle,
         "_verify_balloon_attachments": record("balloon read-back"),
         "_heading": idle,
@@ -911,6 +921,12 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         return idle
 
     idle = lambda *_args, **_kwargs: None  # noqa: E731
+    detail_at_balloons: list[tuple[str, str | None]] = []
+
+    def tip_balloons(_adapter, _parent, detail, _facts, **_kwargs):
+        detail_at_balloons.append((detail.configuration, detail.exploded_in))
+        return {}, []
+
     for name, stub in {
         "_create_package_sheets": idle,
         "_place_assembled_sheet": assembled,
@@ -928,6 +944,9 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         "assert_full_detail_view": idle,
         "_final_balloon_uncross": idle,
         "_check_package_layout": idle,
+        "cone_tip_detail_names": lambda _facts: frozenset(),
+        "model_point_in_view": lambda *_args, **_kwargs: (0.0, 0.0),
+        "_balloon_cone_tip_detail": tip_balloons,
     }.items():
         monkeypatch.setattr(drawing, name, stub)
 
@@ -937,10 +956,22 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
     fake = adapter.currentModel
     assert fake.dirtied_source == []
     assert views_at_bom == fake.views
-    assert exploded_at_bom == [len(drawing.CLUSTER_SHEETS)]
+    # Every cluster view and the cone tip detail are exploded before the BOM.
+    assert exploded_at_bom == [len(drawing.CLUSTER_SHEETS) + 1]
     exploded = [view for view in fake.views if view.IsExploded()]
-    assert len(exploded) == len(drawing.CLUSTER_SHEETS)
+    assert len(exploded) == len(drawing.CLUSTER_SHEETS) + 1
+    (detail,) = [
+        view
+        for view in fake.views
+        if view.orientation == "*Isometric"
+        and view.ScaleRatio == drawing.CONE_TIP_DETAIL_SCALE_LADDER[0]
+    ]
+    # The detail is enlarged past 1:2 yet keeps the BOM's simplified
+    # configuration and its explode, so its balloons resolve their items.
+    assert detail_at_balloons == [(SIMPLIFIED_VIEW_CONFIGURATION,) * 2]
     for view in fake.views:
+        if view is detail:
+            continue
         wanted = view_configuration(
             view.ScaleRatio,
             view.mode,
