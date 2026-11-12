@@ -78,7 +78,7 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     # Engagement (#2411): the shortest screw (B18.6.3: +0/-0.03 in to 1 in
     # long) through the thickest sheet and plate still stands its incomplete
     # lead out of the platen's back face, so the platen's tap holds the
-    # thinnest plate less both .004 mouth breaks of full thread.
+    # thinnest plate less both title-block .010 mouth breaks of full thread.
     proud_min = (
         spec.SHANK_LEN
         - 0.03 * IN
@@ -87,10 +87,12 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     )
     assert clip.CLIP_SCREW_TIP_PROUD_MIN == pytest.approx(proud_min)
     assert proud_min >= 1.5 * spec.PITCH
-    engaged = pd_platen_spec.PLATE_THICKNESS_MIN - 2.0 * 0.004 * IN
+    engaged = pd_platen_spec.PLATE_THICKNESS_MIN - 2.0 * 0.010 * IN
     assert pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(engaged)
-    assert engaged == pytest.approx(0.139 * IN, abs=1e-4)
-    assert engaged >= 1.5 * THREAD_MAJOR_MM[spec.THREAD]
+    assert engaged == pytest.approx(0.127 * IN, abs=1e-4)
+    # Under 1.5D (pd-platen RV-03), above the owner-accepted floor.
+    assert engaged < 1.5 * THREAD_MAJOR_MM[spec.THREAD]
+    assert engaged >= pd_platen_spec.ENGAGEMENT_ACCEPTED_FLOOR_D * THREAD_MAJOR_MM[spec.THREAD]
     # Tip: the nominal screw through the nominal sheet and plate stands
     # .066 proud of the platen's back face, .073 at most.
     proud = spec.SHANK_LEN - clip.SHEET_T - pd_platen_spec.PLATE_THICKNESS

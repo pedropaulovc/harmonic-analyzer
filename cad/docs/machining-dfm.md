@@ -1252,10 +1252,12 @@ cut on the shop-made arbor in `shop-equipment.toml` (`fixtures.pd-rack-pinion-cu
 stop .036 in under the least root, clamped by the arbor nut, and the arbor runs in the BS-0
 chuck with the tailstock centre in its end. The bore is reamed with the owned .501 reamer
 (the hub spigot is turned to Ø.498 to keep the centring clearance), so the journal is turned
-to slide in that bore. Face the blank to .118 on the same arbor before cutting the teeth.
+to slide in that bore. Before the arbor, hold the sawn Ø3.25 blank in the lathe chuck: face one
+side, bore and ream it, turn it over and face it to .118, so both faces are finished across the
+bore before the teeth are cut.
 The disc's blank is 1/8 × 4 in C360 flat (`[[stock]]`).
 The knob shaft's #8-32 stud is single-pointed before the 15T is cut, with the tip carried on a
-tailstock centre in sacrificial length parted off afterwards; the Ø.110/.115 relief is the stud's
+tailstock centre in sacrificial length parted off afterwards; the Ø.113 relief (.108 at its least) is the stud's
 least section under the tool (#2419).
 The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),

@@ -65,7 +65,6 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _document_units import apply_package_model_units
@@ -90,7 +89,6 @@ from pd_platen_spec import (
     PLATE_THICKNESS,
     PLATE_THICKNESS_MAX,
     PLATE_THICKNESS_MIN,
-    SOCKET_THREAD_ENGAGEMENT_MIN,
 )
 
 PART_NAME = "pd-platen-clip"
@@ -246,7 +244,8 @@ CLIP_SCREW_TIP_PROUD_MAX = SHANK_LEN - SHEET_T_MIN - PLATE_THICKNESS_MIN
 # of the head for No. 5 and smaller up to 3D long) stays inside the thinnest
 # sheet, so the screw is full thread through the whole plate and the
 # platen's receiver sets the engagement: its thinnest printed plate less both
-# .004 tap mouth breaks (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN).
+# tap mouths' title-block breaks (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN,
+# 1.47D, pd-platen RV-03).
 TIP_INCOMPLETE_THREAD_MAX = 1.5 * PITCH
 HEAD_INCOMPLETE_THREAD_MAX = PITCH
 # The overall width prints .XX from the outer edge, as the slit (SLIT_PLACES)
@@ -484,7 +483,7 @@ if BEND_RADIUS <= SHEET_T / 2.0:
     raise AssertionError("platen clip bend radius must exceed half the sheet")
 # Heads seat directly on the sheet; the tip's incomplete thread clears the
 # platen's back face and the head's stays in the sheet, so the platen's
-# receiver holds the whole engagement (its own 1.5D check).
+# receiver holds the whole engagement (pd_platen_spec checks its floor).
 if CLIP_SCREW_TIP_PROUD_MIN < TIP_INCOMPLETE_THREAD_MAX:
     raise AssertionError(
         f"clip screw tip stands only {CLIP_SCREW_TIP_PROUD_MIN:.3f} proud at the "
@@ -494,11 +493,6 @@ if CLIP_SCREW_TIP_PROUD_MIN < TIP_INCOMPLETE_THREAD_MAX:
 if SHANK_LEN > 3.0 * SHANK_DIA or HEAD_INCOMPLETE_THREAD_MAX > SHEET_T_MIN:
     raise AssertionError(
         "the clip screw's under-head incomplete thread reaches into the platen's tap"
-    )
-if SOCKET_THREAD_ENGAGEMENT_MIN + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
-    raise AssertionError(
-        f"clip {THREAD} worst-case engagement {SOCKET_THREAD_ENGAGEMENT_MIN:.3f} < 1.5D "
-        "(drawing-guidelines.md rule 18 (thread engagement))"
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock clip-screw shank does not clear the clip")

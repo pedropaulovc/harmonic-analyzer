@@ -2110,7 +2110,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="clips-fitted",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each brass paper clip to the platen, and both travel together as one body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
-        axial_capture="pan head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #2 clearance and the platen's through #2-56 tap (no rear boss, #2411), 3.53 mm full thread at the worst case with both tap mouths broken .004 MAX (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN, 1.62D), tip proud of the platen's back face (build_pd_platen_clip.CLIP_SCREW_TIP_PROUD)",
+        axial_capture="pan head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #2 clearance and the platen's through #2-56 tap (no rear boss, #2411), 3.22 mm full thread at the worst case, the plate alone less both title-block tap mouth breaks (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN, 1.47D, accepted as pd-platen RV-03), tip proud of the platen's back face (build_pd_platen_clip.CLIP_SCREW_TIP_PROUD)",
         lock=Lock.NONE,
         evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #2-56 engagement, tip proud) and _assert_lock_station_sweep (clip-screw tips); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #2-56 through; build_pd_platen_clip.CLIP_THICKNESS",
     ),

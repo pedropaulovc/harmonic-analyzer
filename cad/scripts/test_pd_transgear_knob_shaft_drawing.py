@@ -181,14 +181,17 @@ def test_single_point_thread_retains_the_functional_relief() -> None:
 
 
 def test_the_stud_neck_is_no_longer_the_weak_section_under_the_tool() -> None:
-    # #2419: the stud hangs from the relief while it is single-pointed.  The
-    # least relief carries at least 1.7x the bending section of the Ø.090
-    # neck the .XX-row Ø.10 relief allowed, and prints as native LIMITS.
+    # #2419: the relief is the stud's least section while it is threaded.
+    # At the title block's row its least carries at least 1.7x the bending
+    # section of the Ø.090 the .XX-row Ø.10 relief allowed, with no band
+    # tighter than the row (rule 4); the .XX row could not hold the root.
     old_least = 0.090 * spec.MM_PER_IN
     assert (spec.RELIEF_DIA_MIN / old_least) ** 3 >= 1.7
-    assert spec.RELIEF_DIA_TOL_TYPE == 3
-    assert spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[1] == pytest.approx(spec.RELIEF_DIA_MIN)
-    assert spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0] == pytest.approx(spec.RELIEF_DIA_MAX)
+    assert spec.RELIEF_DIA_PLACES == 3
+    assert spec.RELIEF_DIA_MAX - spec.RELIEF_DIA_MIN == pytest.approx(
+        2.0 * printed_band_mm(3, unit=spec.UNIT)
+    )
+    assert spec.RELIEF_DIA + printed_band_mm(2, unit=spec.UNIT) > spec.THREAD_ROOT_2A_MIN
 
 
 def test_machine_and_float_stations_are_unchanged() -> None:
@@ -434,7 +437,6 @@ def test_the_tool_end_keeps_its_native_limits(monkeypatch) -> None:
     part._apply_neck_and_flat_limits(object())
     assert limits == [
         ("StudProfile", "FrontReliefDia", 3),
-        ("StudProfile", "ReliefDia", 3),
         ("StudProfile", "FrontCornerRadius", 6),
         ("CoreFlatProfile", "FlatEnd", 3),
         ("CoreFlatProfile", "FlatToolRadius", 6),

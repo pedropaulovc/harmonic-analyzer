@@ -6,12 +6,14 @@ import ast
 import inspect
 import math
 import re
+from pathlib import Path
 
 import pytest
 
 import _config
 import build_pd_platen as build
 import draw_pd_platen as draw
+import pd_platen_callouts as callouts
 import pd_platen_spec as spec
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import SharedCoordinate
@@ -20,8 +22,10 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_deviations,
 )
+from machinist_exceptions import load_exceptions
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
+CONFIG_ROOT = Path(__file__).resolve().parents[1] / "config"
 # ASME B landscape field and title block (sheet metres).
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
@@ -104,24 +108,34 @@ def test_no_socket_boss_feature_or_dimension_remains():
     assert draw._DEPTH_SPAN == spec.PLATE_THICKNESS
 
 
-def test_socket_taps_engage_one_and_a_half_diameters_with_their_mouth_limit():
+def test_socket_engagement_shortfall_is_stated_floored_and_accepted():
     # Rule 18: the clip screw's tip stands out of the back face, so the full
-    # thread is the thinnest printed plate less both tap mouths' breaks.
+    # thread is the thinnest printed plate less both tap mouths' title-block
+    # breaks; it falls under 1.5D (no band is tightened to rescue it, rule 4).
     thinnest = _limits(spec.PLATE_THICKNESS, spec.DRAWING_PRECISION_BY_NAME["Depth"])[0]
     major = THREAD_MAJOR_MM[spec.SOCKET_SPEC.size]
     assert spec.PLATE_THICKNESS_MIN == pytest.approx(thinnest)
-    engaged = thinnest - 2.0 * spec.SOCKET_MOUTH_BREAK_MAX
-    assert spec.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(engaged)
-    assert engaged >= 1.5 * major
-    # Negative control: the title block's own break at both mouths would not.
     title_block = max(
         edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT)
     )
-    assert title_block > spec.SOCKET_MOUTH_BREAK_MAX
-    assert thinnest - 2.0 * title_block < 1.5 * major
-    # So the socket callout states the tighter limit the engagement assumes.
-    (printed,) = re.findall(r"BREAK EDGES (\.\d+) MAX", draw.SOCKET_CALLOUT_PROCESS)
-    assert float(printed) * 25.4 == pytest.approx(spec.SOCKET_MOUTH_BREAK_MAX)
+    engaged = thinnest - 2.0 * title_block
+    assert spec.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(engaged)
+    assert spec.SOCKET_ENGAGEMENT_MIN_D == pytest.approx(engaged / major)
+    assert engaged < 1.5 * major
+    # It stays above the owner-accepted fleet floor (fr-nameplate RV-03).
+    assert engaged / major >= spec.ENGAGEMENT_ACCEPTED_FLOOR_D
+    # Rule 20: the socket callout states it, between the mate and the tap,
+    # never overstating the worst case.
+    lines = draw.SOCKET_CALLOUT_PROCESS.split("\n")
+    assert lines[0].startswith("PATTERN MATCHES ") and lines[-1] == "TAP"
+    assert callouts.SOCKET_ENGAGEMENT_LINE in lines
+    (printed,) = re.findall(r"(\d+\.\d+)D MIN", callouts.SOCKET_ENGAGEMENT_LINE)
+    assert engaged / major - 0.01 < float(printed) <= engaged / major
+    # pd-platen RV-03 accepts the shortfall as minor, citing that line.
+    rows = {row.id: row for row in load_exceptions(CONFIG_ROOT, "pd_platen", "part")}
+    assert rows["RV-03"].kind == "minor"
+    assert callouts.SOCKET_ENGAGEMENT_LINE in rows["RV-03"].where
+    assert "PATTERN MATCHES" in rows["RV-01"].where
 
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():

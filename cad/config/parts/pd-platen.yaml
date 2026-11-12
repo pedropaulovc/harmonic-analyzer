@@ -18,3 +18,8 @@ pd-platen:
       where: "section A-A, the counterbore floor reference (.037) C'BORE FLOOR .027 MIN WORST CASE"
       finding: "counterbore floor below the .060 in wall floor (rule 17)"
       reason: ".027 MIN at the worst printed limits (.037 nominal) under each #4 guide-screw head; the plate is brass and the screws are hand-tight, so the floor's shear ring under the head (about .012 in^2) carries only that clamp, with the plate thickness and the sub-flush head recess unchanged (owner-ruled shortfall, restated in inch 2026-10-31)"
+    - id: "RV-03"
+      kind: "minor"
+      where: "the TAP 2-56 UNC THRU ALL callout's line THREAD ENGAGEMENT 1.47D MIN on the four clip-screw through taps"
+      finding: "clip-screw thread engagement below 1.5D at the worst case (rule 18)"
+      reason: "Delegated ruling 2026-11-12 (Main, #2411 brief: 'at least ~1.5 d or state why less holds a paper clip'), no geometry escape short of the deleted bosses (#2411); precedent fr-nameplate RV-03 (owner ruling 2026-11-01, 1.19D below 1.5D accepted as minor); owner review #2144. The four #2-56 brass screws carry only the clip's spring preload on paper and are never loaded in service; 1.53D nominal (.127 MIN full thread: the thinnest .147 plate less both tap mouths' .010 title-block breaks)."

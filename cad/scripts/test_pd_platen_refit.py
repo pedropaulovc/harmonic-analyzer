@@ -202,7 +202,10 @@ def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> Non
         clip_screw.SHANK_LEN - clip.SHEET_T_MIN - platen.PLATE_THICKNESS_MIN
     )
     assert clip.CLIP_SCREW_TIP_PROUD_MIN >= 1.5 * clip_screw.PITCH
-    assert platen.SOCKET_THREAD_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
+    assert (
+        platen.SOCKET_THREAD_ENGAGEMENT_MIN
+        >= platen.ENGAGEMENT_ACCEPTED_FLOOR_D * THREAD_MAJOR_MM["#2-56"]
+    )
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
@@ -339,11 +342,15 @@ def test_outboard_clip_sockets_hold_their_edges_at_the_printed_worst_case() -> N
         # The clip's outer edge stays on the plate.
         assert distance - clip_hole_y_max > 0.0, side
     # The station moves nothing along the screw: the engagement is the
-    # thinnest plate less both tap mouth breaks, at least 1.5D.
+    # thinnest plate less both tap mouth breaks, above the accepted floor
+    # (pd-platen RV-03).
     assert platen.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(
-        platen.PLATE_THICKNESS_MIN - 2.0 * platen.SOCKET_MOUTH_BREAK_MAX
+        platen.PLATE_THICKNESS_MIN - 2.0 * platen.SOCKET_MOUTH_BREAK
     )
-    assert platen.SOCKET_THREAD_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
+    assert (
+        platen.SOCKET_THREAD_ENGAGEMENT_MIN
+        >= platen.ENGAGEMENT_ACCEPTED_FLOOR_D * THREAD_MAJOR_MM["#2-56"]
+    )
 
 
 def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:

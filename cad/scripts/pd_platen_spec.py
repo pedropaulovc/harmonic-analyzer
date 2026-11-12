@@ -21,7 +21,11 @@ import math
 import _config
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 UNIT = drawing_unit("parts/pd-platen", _config.parts("pd-platen"))
@@ -203,17 +207,25 @@ CBORE_FLOOR_CALLOUT = (
 # Socket thread engagement (rule 18).  The clip screw's tip stands out of the
 # back face with its incomplete lead beyond the plate (build_pd_platen_clip
 # asserts it at the worst case), so the thinnest printed plate less both tap
-# mouths' breaks is all full thread.  The title block's .010 break at both
-# mouths would leave .127, under 1.5D (.129), so the socket callout limits
-# both to SOCKET_MOUTH_BREAK_MAX (MHA-PD-06's BREAK EDGES .004 MAX on its
-# #0-80 taps is the precedent): .139, 1.62D.
-SOCKET_MOUTH_BREAK_MAX = 0.1016  # .004
-SOCKET_THREAD_ENGAGEMENT_MIN = PLATE_THICKNESS_MIN - 2.0 * SOCKET_MOUTH_BREAK_MAX
-if SOCKET_THREAD_ENGAGEMENT_MIN < 1.5 * THREAD_MAJOR_MM[SOCKET_SPEC.size]:
+# mouths' title-block breaks is all full thread: .127, 1.47D (1.53D
+# nominal), under rule 18's 1.5D with no geometry escape short of the deleted
+# bosses.  pd-platen RV-03 (minor) accepts it and the socket callout states
+# it (rule 20, pd_platen_callouts); it may never fall below the fleet's
+# owner-accepted floor (fr-nameplate RV-03, owner ruling 2026-11-01, 1.19D).
+SOCKET_MOUTH_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+SOCKET_THREAD_ENGAGEMENT_MIN = PLATE_THICKNESS_MIN - 2.0 * SOCKET_MOUTH_BREAK
+SOCKET_ENGAGEMENT_MIN_D = SOCKET_THREAD_ENGAGEMENT_MIN / THREAD_MAJOR_MM[SOCKET_SPEC.size]
+ENGAGEMENT_ACCEPTED_FLOOR_D = 1.19
+if SOCKET_ENGAGEMENT_MIN_D < ENGAGEMENT_ACCEPTED_FLOOR_D:
     raise AssertionError(
-        f"clip-screw socket engagement {SOCKET_THREAD_ENGAGEMENT_MIN:.3f} < 1.5D "
+        f"clip-screw socket engagement {SOCKET_ENGAGEMENT_MIN_D:.3f}D under the "
+        f"owner-accepted {ENGAGEMENT_ACCEPTED_FLOOR_D}D floor "
         "(drawing-guidelines.md rule 18 (thread engagement))"
     )
+# The callout prints it floored to .XX diameters, so it never overstates it.
+SOCKET_ENGAGEMENT_PRINTED_D = math.floor(SOCKET_ENGAGEMENT_MIN_D * 100.0 + 1e-9) / 100.0
+if SOCKET_ENGAGEMENT_PRINTED_D > SOCKET_ENGAGEMENT_MIN_D:
+    raise AssertionError("the printed clip-screw engagement overstates the worst case")
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # The right view shows no hidden lines (r4): section A-A draws the counterbore

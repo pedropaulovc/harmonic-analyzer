@@ -86,7 +86,7 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from _title_block_units import LENGTH_UNITS
-from pd_platen_callouts import SOCKET_MOUTH_BREAK_LINE
+from pd_platen_callouts import SOCKET_ENGAGEMENT_LINE
 from pd_platen_spec import (
     CBORE_DEPTH,
     CBORE_FLOOR_CALLOUT,
@@ -346,10 +346,10 @@ SOCKET_EDGE_XY = (
 )
 SOCKET_CALLOUT_HALF_WIDTH = 0.035
 SOCKET_CALLOUT_XY = (0.226, 0.252)
-# The mouth-break line limits both tap mouths so the plate alone holds the
-# clip screws' rule-18 engagement (pd_platen_callouts, #2411).
-SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01
-    f"PATTERN MATCHES {CLIP_NUMBER}\n{SOCKET_MOUTH_BREAK_LINE}\nTAP"
+# The engagement line states the clip screws' worst-case full thread in the
+# plate, under 1.5D (rule 20, pd_platen_callouts; pd-platen RV-03, #2411).
+SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01, RV-03
+    f"PATTERN MATCHES {CLIP_NUMBER}\n{SOCKET_ENGAGEMENT_LINE}\nTAP"
 )
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view

@@ -9,11 +9,9 @@ printed here is read from it.
 
 from __future__ import annotations
 
-from pd_platen_spec import SOCKET_MOUTH_BREAK_MAX
+from pd_platen_spec import SOCKET_ENGAGEMENT_PRINTED_D
 
-# Both clip-screw tap mouths break SOCKET_MOUTH_BREAK_MAX at most, not the
-# title block's .010: the clip screws' rule-18 engagement is the plate less
-# both breaks (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN, #2411).
-SOCKET_MOUTH_BREAK_LINE = (
-    f"BREAK EDGES {f'{SOCKET_MOUTH_BREAK_MAX / 25.4:.3f}'.lstrip('0')} MAX"
-)
+# The clip screws' full-thread engagement in the plate alone, less both tap
+# mouths' title-block breaks, falls under rule 18's 1.5D; the tap callout
+# states its worst case as plain fact (rule 20, pd-platen RV-03, #2411).
+SOCKET_ENGAGEMENT_LINE = f"THREAD ENGAGEMENT {SOCKET_ENGAGEMENT_PRINTED_D:.2f}D MIN"
