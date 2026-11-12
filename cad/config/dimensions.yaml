@@ -735,7 +735,7 @@ sections:
         - selected design; native realization pending farm proof
       - - '`dt-cone-tip-bushing` (MHA-DT-38, end-play thrust bushing)'
         - 'C36000 brass Ø5.7912 (.228 in) × 4.064 (.160 in), reamed Ø1.5621 (.0615 in) bore pressed on the MHA-DT-37 pivot (.0002–.0010 in interference) against the T006 leaves; its north face bears on the MHA-DT-39 end screw.'
-        - 'Coaxial on the pivot; least air to drum gear G19 over the P1 swing 0.112 mm worst case (dt_cone_tip_air).'
+        - 'Coaxial on the pivot; least air to drum gear G19 over the P1 swing 0.125 mm worst case (dt_cone_tip_air).'
         - 'cone_tip_cluster / dt_cone_tip_bushing_spec (owner decision C1 keyed, 2026-11-09, PR #1992)'
         - selected design; native realization pending farm proof
       - - '`dt-cone-tip-end-screw` (MHA-DT-39, axial end-play screw)'

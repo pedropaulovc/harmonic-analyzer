@@ -10,6 +10,14 @@ until a gear just binds, ease out only until the gears turn freely, and lock
 the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
+The ease out of the bind (check 4N) is neither printed nor measured, and no
+number is booked for it: delegated ruling 2026-11-12 (Main), following the
+delegated ruling of 2026-11-11 on the paper-feed rack mesh (PR #2617,
+PD-00-feed-mesh-by-feel) under the owner's direction on #2416; owner review
+#2144, pending owner confirmation. An allowance for it would be an invented
+number. The stack books the first bind and the real stack terms, and the
+not-coming-loose gate is the nominal contact ratio there.
+
 The swing stops where the first pair binds: its backlash closes, a tip
 reaches the mate's base tangent, or a tip meets the mate's root (T006's
 ground relief takes the drum tip below its base circle; its own clearance is

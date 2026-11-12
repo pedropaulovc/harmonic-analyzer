@@ -830,7 +830,7 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # both ends of each narrow floor window print without rounding inward.  The
 # tip diameter prints four too, and every blank is floored to that grid, so
 # the printed size is the modelled one.  The face width prints four, like the
-# cylinder gear's OverallThickness: three would round its nominal by a sixth
+# cylinder gear's OverallThickness: three would round its nominal by a fifth
 # of the +/-.002 band.  The keyway's width and T print at
 # cone_land_key's places.  RV-03's T012 web prints its ruled .0646 MIN at
 # four.

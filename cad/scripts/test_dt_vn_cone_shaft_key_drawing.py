@@ -15,10 +15,8 @@ import pytest
 import _config
 import build_dt_vn_cone_shaft_key as part
 import cone_land_key
-import cone_tip_cluster
 import draw_dt_vn_cone_shaft_key as drawing
 import dt_cone_gear_shaft_spec as shaft
-import dt_cone_gear_stack
 import dt_vn_cone_shaft_key_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
@@ -27,7 +25,7 @@ from _mcmaster_98830a511 import LENGTH as STOCK_LENGTH, LENGTH_BAND, SIZE, SIZE_
 from _printed_tolerance import printed_band_mm
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98830A511 as recipe
-from dt_cone_gear_spec import FACE_WIDTH, FACE_WIDTH_BAND
+from dt_cone_gear_spec import FACE_WIDTH
 
 _STEM = "dt-vn-cone-shaft-key"
 _IN = 25.4
@@ -96,30 +94,6 @@ def test_key_lies_on_land_1_driving_the_64t_through_t030_short_of_t024() -> None
     assert north <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
     assert north + set_band + band < t024_south
     assert north - set_band - band > t030_south + FACE_WIDTH / 2.0
-
-
-def test_the_key_still_drives_t030_at_print_worst() -> None:
-    """The reach the shaft spec proves at import (#1038): keyseat end set and
-    key length at their low limits, T030 floated north against T024 with
-    T024's south face at the top of its stack-and-feeler band and T030 at its
-    thinnest.  The key keeps at least half T030's face."""
-    band = printed_band_mm(spec.LENGTH_PLACES, unit=spec.UNIT)
-    set_low = shaft.printed_length_deviations("Sec1KeyseatEndSet")[0]
-    assert set_low < 0.0
-    north_min = (
-        shaft.COLLAR_END_STATION + spec.END_SET_MM + set_low + spec.LENGTH - band
-    )
-    t024_south_max = (
-        shaft.FRONT_STUB
-        + shaft.gear_faces(16)[0]
-        + cone_tip_cluster.TIP_SET_SHIFT_MM
-        + dt_cone_gear_stack.face_band(16, "south")[0]
-    )
-    t030_south_max = t024_south_max - (FACE_WIDTH + FACE_WIDTH_BAND[1])
-    assert shaft.KEY_T030_ENGAGEMENT_MIN_MM == pytest.approx(north_min - t030_south_max)
-    assert shaft.KEY_T030_ENGAGEMENT_FLOOR_MM == FACE_WIDTH / 2.0
-    assert shaft.KEY_T030_ENGAGEMENT_MIN_MM >= shaft.KEY_T030_ENGAGEMENT_FLOOR_MM
-    assert shaft.KEY_NORTH_END_STATION <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
 
 
 _SPEC_WITH_KEY_LENGTH = (

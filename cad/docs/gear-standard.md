@@ -119,10 +119,15 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout. No allowance is added for
-  the ease itself (#1038): check 4N stops where the gears first turn freely,
-  which is that first bind. Nominal ratios there run from 1.07 (T012) up to
-  about 1.20.
+  any pair, opened by both gears' running runout. Check 4N then eases the set
+  out of the bind only until the gears turn freely. That ease is neither
+  printed nor measured, and no number is booked for it (delegated ruling
+  2026-11-12, Main, following the feed-rack ruling of PR #2617 under the
+  owner's direction on #2416; owner review
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144),
+  pending owner confirmation): the 0.04 mm allowance #2557 carried for it had
+  no source. Nominal ratios at the loosest centre run from 1.07 (T012) up to
+  about 1.20; T012 keeps a ratio of 1.0 for a further 0.04 mm of centre (REF).
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
   ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
   least 0.010 mm clear of every printed drum-tip path where the swing locks
