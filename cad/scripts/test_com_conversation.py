@@ -1129,15 +1129,18 @@ def test_an_outcome_without_mass_or_stl_is_unknown_unless_something_differs(
         base = _shaped(tmp_path / name / "a", monkeypatch, **kwargs)
         new = _shaped(tmp_path / name / "b", monkeypatch, _REORDERED, **kwargs)
         diff = _diff(base, new, tmp_path / name / "diff.json")
-        return {k: diff[k] for k in ("outcome", "outcome_signals")}
+        return {k: diff[k] for k in ("outcome", "outcome_signals", "judge_faults")}
 
+    # A signal neither log holds is absent, and no fault of the judge.
     assert outcome("unmeasured", measure=False) == {
         "outcome": "unknown",
         "outcome_signals": {**_ALL_SAME, "mass": "absent"},
+        "judge_faults": [],
     }
     assert outcome("unexported", export=False) == {
         "outcome": "unknown",
         "outcome_signals": {**_ALL_SAME, "stl": "absent"},
+        "judge_faults": [],
     }
     # Absent signals never hide a difference.
     base = _shaped(tmp_path / "c", monkeypatch, measure=False, export=False)
@@ -1361,10 +1364,16 @@ def _stl(*triangles: tuple[tuple[float, ...], ...], normal=(0.0, 0.0, 0.0)) -> b
     return b"fake STL".ljust(80) + struct.pack("<I", len(triangles)) + body
 
 
-def _geometry(a: list[tuple], b: list[tuple]) -> str | None:
-    return _com_outcome._mesh_difference(
-        _com_outcome._mesh(_stl(*a)), _com_outcome._mesh(_stl(*b))
+def _compared(a: bytes, b: bytes) -> tuple[bool, str | None]:
+    return _com_outcome._stl_comparison(
+        _com_outcome._triangles(a), _com_outcome._triangles(b)
     )
+
+
+def _geometry(a: list[tuple], b: list[tuple]) -> str | None:
+    """What differs between two STLs' geometry, ``None`` for nothing."""
+    same, detail = _compared(_stl(*a), _stl(*b))
+    return None if same else detail
 
 
 def _tilted(x: float, y: float) -> tuple[float, float, float]:
@@ -1389,12 +1398,9 @@ def test_stl_geometry_ignores_how_a_planar_face_is_triangulated():
     # Triangle order, corner rotation and facet normals are no geometry.
     shuffled = [(c, a, b) for a, b, c in reversed(fan)]
     assert _stl(*fan) != _stl(*shuffled, normal=(1.0, 2.0, 3.0))
-    assert (
-        _com_outcome._mesh_difference(
-            _com_outcome._mesh(_stl(*fan)),
-            _com_outcome._mesh(_stl(*shuffled, normal=(1.0, 2.0, 3.0))),
-        )
-        is None
+    assert _compared(_stl(*fan), _stl(*shuffled, normal=(1.0, 2.0, 3.0))) == (
+        True,
+        None,
     )
     # A moved vertex, or the same face inside out, is other geometry.
     moved = [*hexagon[:2], _tilted(5.0, 0.001), *hexagon[3:]]
@@ -1446,26 +1452,105 @@ def test_stl_geometry_of_a_curved_face_is_its_facets():
     )
     # Anything but a well-formed binary STL is compared byte for byte.
     text = b"solid fake\nendsolid fake\n"
-    assert _com_outcome._mesh(text).startswith("bytes:")
-    assert (
-        _com_outcome._mesh_difference(
-            _com_outcome._mesh(text), _com_outcome._mesh(text)
-        )
-        is None
-    )
-    assert (
-        _com_outcome._mesh_difference(
-            _com_outcome._mesh(text), _com_outcome._mesh(text + b" ")
-        )
-        == "bytes"
-    )
+    assert _com_outcome._triangles(text).startswith("bytes:")
+    assert _compared(text, text) == (True, None)
+    assert _compared(text, text + b" ") == (False, "bytes")
     # A right-sized binary STL with a NaN or an infinity is its digest.
     corners = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
-    finite = _com_outcome._mesh(_stl(tuple(corners)))
+    finite = _stl(tuple(corners))
     for bad in (math.nan, math.inf, -math.inf):
-        broken = _com_outcome._mesh(_stl((corners[0], corners[1], (bad, 1.0, 0.0))))
-        assert broken.startswith("bytes:"), bad
-        assert _com_outcome._mesh_difference(finite, broken) == "bytes"
+        broken = _stl((corners[0], corners[1], (bad, 1.0, 0.0)))
+        assert _com_outcome._triangles(broken).startswith("bytes:"), bad
+        assert _compared(finite, broken) == (False, "bytes")
+
+
+def _nudged(point: tuple[float, ...], axis: int, ulps: int) -> tuple[float, ...]:
+    """``point`` as float32 with one coordinate ``ulps`` float32 steps away."""
+    bits = struct.unpack("<i", struct.pack("<f", point[axis]))[0]
+    moved = struct.unpack("<f", struct.pack("<i", bits + ulps))[0]
+    return tuple(moved if i == axis else c for i, c in enumerate(point))
+
+
+def _plate(columns: int, *flipped: int) -> list[tuple]:
+    """A tilted plate of unit squares, each split along one diagonal (the
+    other for the ``flipped`` ones)."""
+    found = []
+    for x in range(columns):
+        a, b, c, d = _tilted(x, 0), _tilted(x + 1, 0), _tilted(x + 1, 1), _tilted(x, 1)
+        found += [(a, b, d), (b, c, d)] if x in flipped else [(a, b, c), (a, c, d)]
+    return found
+
+
+def _moved(triangles: list[tuple], points: dict[tuple, tuple]) -> list[tuple]:
+    return [tuple(points.get(p, p) for p in triangle) for triangle in triangles]
+
+
+def _float32(point: tuple[float, ...]) -> tuple[float, ...]:
+    return struct.unpack("<3f", struct.pack("<3f", *point))
+
+
+def _eps(triangles: list[tuple]) -> float:
+    largest = max(abs(c) for triangle in triangles for p in triangle for c in p)
+    ulp = math.ldexp(1.0, math.frexp(largest)[1] - 24)
+    return _com_outcome._STL_VERTEX_ULPS * ulp
+
+
+def test_stl_vertices_within_float32_noise_are_one():
+    plate = _plate(4)
+    corners = sorted({p for triangle in plate for p in triangle})
+    # 2026-11-12, fr_nameplate: the same model wrote 415-458 of 25348
+    # vertices 1-3 float32 ulps of the coordinate off, or 2e-16 where the
+    # other wrote 0.
+    noise = {p: _nudged(p, k % 2, 1 + k % 3) for k, p in enumerate(corners) if k % 2}
+    same, detail = _compared(_stl(*plate), _stl(*_moved(plate, noise)))
+    assert same
+    assert detail.startswith(f"{len(noise)} vertices paired within eps")
+    # The same, re-triangulated: still the same geometry.
+    assert _compared(_stl(*_plate(4)), _stl(*_moved(_plate(4, 1, 2), noise)))[0]
+    # Exact zeros against float64 residues, re-triangulated: both STLs take
+    # one representative, so the residue moves no triangle to another plane.
+    flat = [(float(x), float(y), 0.0) for x, y in ((0, 0), (5, 0), (5, 3), (0, 3))]
+    square = [(flat[0], flat[1], flat[2]), (flat[0], flat[2], flat[3])]
+    other = [(flat[1], flat[2], flat[3]), (flat[1], flat[3], flat[0])]
+    residue = {flat[2]: (5.0, 3.0, 2.0**-52), flat[3]: (0.0, 3.0, -(2.0**-50))}
+    assert _compared(_stl(*square), _stl(*_moved(square, residue)))[0]
+    assert _compared(_stl(*square), _stl(*_moved(other, residue)))[0]
+    assert _compared(_stl(*_moved(other, residue)), _stl(*square))[0]
+
+
+def test_stl_vertices_beyond_eps_or_paired_ambiguously_are_other_geometry():
+    plate = _plate(4)
+    eps = _eps(plate)
+    p = _tilted(2, 1)
+    x, y, z = _float32(p)
+    detail = _geometry(plate, _moved(plate, {p: (x + 2 * eps, y, z)}))
+    assert detail.startswith("vertices: 1 base only, 1 new only: one with 0 within")
+    # A vertex split in two within eps: a vertex more.
+    split = plate[:3] + _moved(plate[3:], {p: _nudged(p, 0, 1)})
+    assert _geometry(plate, split) == "vertices: 0 base only, 1 new only"
+    # Two of the other STL's vertices within eps of one.
+    a, b, c, far = _tilted(0, 0), _tilted(1, 0), _tilted(0, 1), _tilted(9, 9)
+    q = _float32(_tilted(1, 1))
+    base = [(a, b, q), (a, c, far)]
+    two = [(a, b, _nudged(q, 1, 1)), (a, c, _nudged(q, 1, -1))]
+    assert "one with 2 within eps" in _geometry(base, two)
+    # One within eps of a vertex both STLs have.
+    near = [(a, b, q), (a, c, _nudged(q, 1, 2))]
+    assert "of a matched vertex" in _geometry(near, [(a, b, q), (a, c, far)])
+    # One whose counterpart is also within eps of another of its own.
+    crowded = [(a, b, _nudged(q, 1, -1)), (a, c, _nudged(q, 1, 1))]
+    assert "not mutually unique" in _geometry(crowded, [(a, b, q), (a, c, far)])
+
+
+def test_stl_noise_does_not_hide_a_moved_hole():
+    def strip(*squares: int) -> list[tuple]:
+        return [t for x in squares for t in _plate(4)[2 * x : 2 * x + 2]]
+
+    corners = sorted({p for triangle in strip(0, 2, 3) for p in triangle})
+    noise = {p: _nudged(p, 1, 1) for p in corners[::3]}
+    detail = _geometry(strip(0, 1, 3), _moved(strip(0, 2, 3), noise))
+    assert detail.startswith("plane outlines: 1 base only, 1 new only (")
+    assert f"({len(noise)} vertices paired within eps" in detail
 
 
 def _corrupt_stl_record(log: Path) -> None:
@@ -1494,6 +1579,7 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome"] == "unknown"
     assert diff["outcome_signals"] == {**_ALL_SAME, "stl": "absent"}
     assert diff["outcome_details"]["stl"]["error"] == "KeyError: 'file'"
+    assert diff["judge_faults"] == [{"step": "stl", "error": "KeyError: 'file'"}]
 
     # Any fault of the judgement: unknown, recorded, the divergence kept.
     def fault(*args: Any) -> Any:
@@ -1505,6 +1591,7 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome_details"]["mass"] == {
         "error": "RuntimeError: injected judge fault"
     }
+    assert [fault["step"] for fault in diff["judge_faults"]] == ["mass", "stl"]
     monkeypatch.setattr(_com_outcome, "outcome", fault)
     monkeypatch.setattr(_com_outcome, "truth_cause", fault)
     diff = _diff(base, reordered, tmp_path / "all.json")
@@ -1513,6 +1600,10 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome"] == "unknown"
     assert set(diff["outcome_signals"].values()) == {"absent"}
     assert diff["outcome_details"]["truth_cause"]["error"].startswith("RuntimeError")
+    assert [fault["step"] for fault in diff["judge_faults"]] == [
+        "truth_cause",
+        "outcome",
+    ]
 
 
 def test_caller_capture_modes(tmp_path, monkeypatch):
