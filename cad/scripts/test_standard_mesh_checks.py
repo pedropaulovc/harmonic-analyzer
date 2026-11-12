@@ -48,8 +48,7 @@ def _require_no_bind(check) -> None:
 @pytest.mark.parametrize("teeth", CONE_TEETH)
 def test_cone_drum_mesh_keeps_contact_at_the_loosest_feel_set(teeth: int) -> None:
     check = dt_mesh_checks.cone_check(teeth)
-    # The ceiling plus the felt ease (cone_set_stack.FEEL_EASE_MM).
-    assert check.contact_ratio_eased >= CONE_NOMINAL_CONTACT_RATIO_MIN, check.text()
+    assert check.contact_ratio_nominal >= CONE_NOMINAL_CONTACT_RATIO_MIN, check.text()
 
 
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:

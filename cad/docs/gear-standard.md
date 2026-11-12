@@ -119,9 +119,10 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout, plus a 0.04 mm allowance
-  for the felt ease (`cone_set_stack.FEEL_EASE_MM`). Nominal ratios at the
-  ceiling run from 1.07 (T012) up to about 1.20.
+  any pair, opened by both gears' running runout. No allowance is added for
+  the ease itself (#1038): check 4N stops where the gears first turn freely,
+  which is that first bind. Nominal ratios there run from 1.07 (T012) up to
+  about 1.20.
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
   ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
   least 0.010 mm clear of every printed drum-tip path where the swing locks
