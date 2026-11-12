@@ -65,9 +65,13 @@ CROSS_HOLE_NOTE = "\n".join(
 SPIGOT_NOTE_NUMBER = 2
 SPIGOT_CALLOUT = see_note(SPIGOT_NOTE_NUMBER)
 # The chain by its drawing number, its catalogue size after it (rule 4).
-SPIGOT_NOTE = (
-    f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS CHAIN MHA-SH-VN-50 (#25); "
-    "ITS FACES SEAT SPROCKET MHA-PD-09 AND BEAR ON MHA-DT-05."
+# Two rows: on one, the row ran into the title block (machinist review of
+# 76e4489d85).
+SPIGOT_NOTE = "\n".join(
+    (
+        f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS CHAIN MHA-SH-VN-50 (#25); ITS FACES SEAT SPROCKET",
+        "   MHA-PD-09 AND BEAR ON MHA-DT-05.",
+    )
 )
 
 

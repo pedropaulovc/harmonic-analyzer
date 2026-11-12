@@ -264,6 +264,14 @@ def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     assert not hasattr(spec, "CRANK_END_NOTE")
 
 
+def test_sheet_note_rows_end_left_of_the_title_block() -> None:
+    # The widest row proven on the farm sheet is note 1's second (73
+    # characters, ending 31 mm left of the title block); a 99-character note 2
+    # ran across the title block's border (machinist review of 76e4489d85).
+    rows = notes.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
+    assert max(len(row) for row in rows) <= 73
+
+
 def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
