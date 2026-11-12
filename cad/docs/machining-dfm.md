@@ -83,7 +83,7 @@ its first-root position; no second general note restates that location.
   | family | qty | repeat risk and route |
   |---|---|---|
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Teeth with the stock #2 cutter on the BS-0; the cam's throw and phase need an eccentric fixture that is not drawn, so the cam route is **not selected** ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); the notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
-  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt; the cutters and arbors are not yet in the inventory ([#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
+  | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt. T030–T120 are bored and broached first, then cut on the keyed arbor MHA-DT-03-TL-03 (fitting sheet MHA-DT-03-TL-05), which clocks each blank by its keyway. The cutters, cutter arbors and broach are recorded to buy, not owned (`shop-equipment.toml`, "gear cutting kit"; the purchase is the owner's decision on [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
   | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.62 (.300) channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
   | `ch-connecting-rod` | 20 | flat outline from 1018 plate, stepped both faces, slotted fork; the outline on the manual mill is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)) |
@@ -942,7 +942,7 @@ farm validation of the route is claimed here.
 |---|---|---|---|---|---|
 | **`dt-cone-gear`** ×19 (T012→T120) | round brass bar, extruded disc, face **7.4528 ±0.051** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`); tip gears T012–T024 harder yellow metal (`material_tip_specification`; the title block still prints `Brass`, [#1080](https://github.com/pedropaulovc/harmonic-analyzer/issues/1080)) | T030+ round Ø9.525 bore broached for the land-1 1/16 key (1/16 A broach, 3/8 A bushing; keyway on +X, clocked to the phase-0 tooth); T024 reamed round Ø6.350 (+.0018/+.0010 in) and T012/T018 reamed Ø1.5875 (+.0005/−0 in), bonded slip fits (owner decision C1 keyed, 2026-11-09, PR #1992); 12–120 involute teeth PA20, tooth thickness ±0.075, 2.5D through-cut | **T012 web 1.641 mm (.0646 in) minimum** over its reamed bore (RV-03); T030 keyway-corner web .0621 in (RV-07); whole gear tiny → difficult workholding | ≥2 (turn/bore, indexed teeth) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)). Measure the keyed faces 64T–T030 as one stack and T024–T006 as the bonded tip | 
 | **`dt-cone-tip-gear`** ×1 (T006, MHA-DT-37) | C67500 bar; six leaves Ø4.31 +0/−0.02 OD, face 7.4528 ±0.051, integral Ø.0625 in spigot × .76 south and Ø.0625 in pivot × .25 north | DT6-FORM1 leaves, tooth thickness +0/−0.04; spigot bonded in MHA-DT-04's socket and through T012/T018; pivot carries the pressed MHA-DT-38 bushing (made to its measured bore) and runs in MHA-DT-39 | spigot L/D about 12 whips; ~4 mm gear hard to grip; the cutter must run off over both stems | ≥2 (turn, indexed leaves) | turning **route not selected**: no listed centre or steady fits the Ø.0625 stems ([#2468](https://github.com/pedropaulovc/harmonic-analyzer/issues/2468)); leaves with the custom ground tool DT6-FORM1, indexed ([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)) | 
-| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3355 +0/−.0040 in, width .0625 +.0020/−0 in; carries the MHA-DT-VN-71 key); land 2 ends .030 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | none severe: the slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat | 
+| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2555 post journal, thrust collar then Ø9.525 keyed land 1 and Ø6.35 round land 2 | turned steps plus **a 1/16 square keyseat milled along the Ø9.525 land on +X** (S .3355 +0/−.0040 in, width .0625 +.0020/−.0010 in; carries the MHA-DT-VN-71 key); land 2 ends .030 in inside the bonded T024's bore with a reamed Ø.0625 × .20 in socket for the MHA-DT-37 spigot. Finish the post journal for its printed running clearance | the keyseat is 4.53 in long and one 1/16 end mill wide: a cutter broken in the slot scraps the shaft, and a long slot down one side can bow the Ø.375 land. The slender terminal land, its D-flats and the tailstock note are gone (C1 keyed) | lathe + 1 milling setup (keyseat) | manual lathe, drill and ream the end socket, then mill the keyseat before the post journal is finished to size: the land on V-blocks or on parallels in the vise, supported along its length, the 1/16 two-flute end mill (`shop-equipment.toml` `tools.keyseat-endmill-1-16`; measure it first) at the mill's top speed, full depth in two passes. Try the key: if it does not enter, take a second pass a few tenths to one side by the DRO, or dress the key's sides (the width's lower limit allows a keyseat up to .001 under the largest key, [#2467](https://github.com/pedropaulovc/harmonic-analyzer/issues/2467)). Check the land for bow afterwards | 
 | **`dt-cone-tip-bushing`** ×1 (MHA-DT-38) | C36000 brass bar; Ø.228 × .160 in | Ø.0615 in reamed bore, press fit on the MHA-DT-37 pivot; north face bears on MHA-DT-39 | wall .0805 in minimum | 1 (turn, ream, part) | manual lathe | 
 | **`dt-cone-tip-end-screw`** ×1 (MHA-DT-39) | McMaster-Carr 91794A558 18-8 slotted fillister 1/4-28 × 5/8 | drilled and reamed Ø.0630 × .12 in pivot hole concentric in the threaded end (running fit on the MHA-DT-37 pivot) | wall to the 2A thread root **.067 in MIN** (RV-01, rule 17 minor) | 1 (hold on the thread in a threaded collet or split nut) | manual lathe, centre drill, drill, ream | 
 
@@ -1133,6 +1133,17 @@ and are still sold today ([C.R.Tools](https://crtoolsuk.com/product/diametrical-
 [Newman Tools chart](https://www.newmantools.com/cutters/gear.htm)). Module cutters number the
 same ranges in reverse, so order by DP.
 
+The kit to buy is recorded in `cad/config/shop-equipment.toml` under "gear cutting kit", none of
+it owned: eleven Travers TTC 20° cutters (48DP #1 to #8, 24DP #2 and #7, 32DP #8), a stub arbor
+for each cutter hole (the 48DP cutters have a 7/8 in hole, the 24DP and 32DP ones a 1 in hole),
+the 1/16-A keyway broach with its 3/8-A bushing, and the keyseat end mill
+(`test_gear_cutting_kit.py` checks the records against the gear specs). No R8 stub arbor with a
+7/8 in pilot is sold, so the 48DP cutters run on a straight-shank stub arbor in a 3/4 in collet.
+McMaster's 48DP cutters are 14½° and do not suit this train. Whether to buy the kit, or
+catalogue gears instead, is the owner's decision on
+[#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356); the comparison is in
+`research/3-detailed-design/gear-train-purchase-options/`.
+
 Indexing assumes a 40:1 head, the ratio of the shop's Precision Matthews BS-0, so one tooth is
 40/N crank turns. The hole circles are the standard Brown & Sharpe plates (15, 16, 17, 18, 19,
 20, 21, 23, 27, 29, 31, 33, 37, 39, 41, 43, 47, 49), from
@@ -1184,8 +1195,11 @@ on the printed limits, plus the SolidWorks assembly interference gate
 ([`gear-standard.md`](./gear-standard.md#how-the-meshes-are-accepted)). Cut and roll one gear per
 cutter before committing a set all the same.
 
-Boston Y48120 is a catalogue brass 48DP PA20 120T spur. Using it as a donor for the cylinder-gear
-teeth is possible in principle, but the part is not designed around it.
+Boston Y48120 is a catalogue brass 48DP PA20 120T spur with a .125 in face and a .3125 in bore.
+As a donor for the cylinder-gear teeth it would turn the integral cam into a separate bonded part,
+and twenty cost about fourteen times the brass bar; the part is not designed around it. Catalogue
+48DP PA20 brass gears exist for fourteen of the cone's tooth counts, all with a .125 in face
+against the cone's .2934 (the comparison is in the folder named above).
 
 ### T006 special cutter
 
