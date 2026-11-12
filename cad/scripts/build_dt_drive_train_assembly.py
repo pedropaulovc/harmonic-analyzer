@@ -1025,10 +1025,6 @@ from dt_cone_swing_platform_crank_axis import (  # noqa: E402
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
 )
 from dt_cone_swing_platform_geometry import (  # noqa: E402
-    EAST_HALF_S as PLAT_EAST_S,
-    HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
-    # the lock-slot side keeps its full seat; feeds the stop-screw/containment
-    # east-edge math)
     WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (the trim;
     # feeds ONLY the west-edge sweep. Aliasing it into the east math shifted
     # the derived stop point -- Codex catch, 2026-07-05)
@@ -1500,15 +1496,20 @@ def _plat_side_half_widths(s: float) -> dict[str, float]:
     (west) and -x (east) sides, keyed by the sign a rider placed with the
     plate's ROT_Y_INCLINE shares; both negative if s is off the plate, so a
     rider run past either end fails its containment check instead of reading
-    extrapolated edges."""
+    extrapolated edges.  The edges are PLAT_OUTLINE's sloped sides crossing
+    the station, so the south-east chamfer (#2600) bounds the east side
+    where it runs (#2611)."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
-    if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
+    crossings = [
+        ax + (bx - ax) * (z_local - az) / (bz - az)
+        for (_a, ax, az), (_b, bx, bz) in zip(
+            PLAT_OUTLINE, PLAT_OUTLINE[1:] + PLAT_OUTLINE[:1], strict=True
+        )
+        if az != bz and min(az, bz) - 1e-9 <= z_local <= max(az, bz) + 1e-9
+    ]
+    if not crossings:
         return {"+X": -1.0, "-X": -1.0}
-    frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
-    return {
-        "+X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
-        "-X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
-    }
+    return {"+X": max(crossings), "-X": -min(crossings)}
 
 
 def _plat_half_width(s: float) -> float:
@@ -1520,18 +1521,52 @@ def _plat_half_width(s: float) -> float:
     return min(_plat_side_half_widths(s).values())
 
 
+def _plat_round_foot_containment_mm(station: float, radius: float) -> float:
+    """Least plate left outside a round foot of ``radius`` centred on the
+    shaft plan line (local x 0) at cone station ``station``: the smallest
+    signed normal distance from its centre to PLAT_OUTLINE's edges, less the
+    radius (negative once the foot crosses an edge).  The convex outline's
+    sharp vertices bound the plate (its corner rounds lie inside)."""
+    centre = (0.0, station - PIVOT_STATION)
+    vertices = [(x, z) for _label, x, z in PLAT_OUTLINE]
+    inside = (
+        sum(x for x, _z in vertices) / len(vertices),
+        sum(z for _x, z in vertices) / len(vertices),
+    )
+
+    def _signed(point: tuple[float, float], a, b) -> float:
+        (px, pz), (ax, az), (bx, bz) = point, a, b
+        return ((bx - ax) * (pz - az) - (bz - az) * (px - ax)) / math.hypot(
+            bx - ax, bz - az
+        )
+
+    return (
+        min(
+            _signed(centre, a, b) * math.copysign(1.0, _signed(inside, a, b))
+            for a, b in zip(vertices, vertices[1:] + vertices[:1], strict=True)
+        )
+        - radius
+    )
+
+
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
-# frame: both are centred on the shaft-axis plan line, so only the along-axis
-# span and the half-width at each end matter), each face at least
+# frame: both are centred on the shaft-axis plan line), each face at least
 # PLATFORM_CONTAINMENT_FLOOR_MM inside the plate's edge.
 PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
-# Each rider's foot: label -> (south station, north station, half-width).
+# The pivot post's foot is round: held as the circle it is against every
+# outline edge, the south-east chamfer included (#2611), not as a square
+# span of its radius (which the chamfered corner cannot hold).
+POST_PLATFORM_CONTAINMENT_MM = _plat_round_foot_containment_mm(
+    POST_STATION, POST_BLOCK_DIA / 2.0
+)
+if POST_PLATFORM_CONTAINMENT_MM < PLATFORM_CONTAINMENT_FLOOR_MM:
+    raise AssertionError(
+        f"pivot post overhangs the swing platform: {POST_PLATFORM_CONTAINMENT_MM:.3f}"
+        f" mm inside its outline"
+    )
+# Each rectangular rider's foot: label -> (south station, north station,
+# half-width); the plate's edges are straight between its end stations.
 PLATFORM_RIDER_SPANS: dict[str, tuple[float, float, float]] = {
-    "pivot post": (
-        POST_STATION - POST_BLOCK_DIA / 2.0,
-        POST_STATION + POST_BLOCK_DIA / 2.0,
-        POST_BLOCK_DIA / 2.0,
-    ),
     # The straight prism's foot is its full plan section.
     "tip block": (
         TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0,
