@@ -161,7 +161,9 @@ SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 FRONT_CENTER = (0.105, 0.150)
 # Projection-aligned with the front view's bore axis (codex, 2026-09-23: the
 # 0.140 offset that cleared FaceWidth from Gear Data broke the alignment).
-RIGHT_CENTER = (0.245, FRONT_CENTER[1])
+# x 0.246: the #1038 face (7.4528) is 0.58 mm wider each side at T084's 2:1,
+# and the thickness shelf keeps its 3 mm off the view's left edge there.
+RIGHT_CENTER = (0.246, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 # The keyed bore (T030..T120) prints in its own enlarged view: a *Front model
 # view of the sheet's configuration, cropped by a circle round the bore (the
@@ -255,8 +257,6 @@ SHAFT_NAME = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
 _TIP_GEAR = _config.parts("dt-cone-tip-gear")
 TIP_GEAR_MATE = str(_TIP_GEAR["number"]).strip().upper()  # MHA-DT-37
 TIP_GEAR_NAME = str(_TIP_GEAR["title"]).upper()
-# The land T024 is bonded on (MHA-DT-04's SECTIONS: journal, land 1, land 2).
-BONDED_LAND = 2
 CYLINDER_MATE = "MHA-DT-12"
 # Land 1's key (owner decision 2026-11-09, C1 keyed, PR #1992), named by
 # number like the shaft.
@@ -337,7 +337,11 @@ def bonded_fit_note(teeth: int) -> str:
     if teeth in SPIGOT_TEETH:
         mate = f"{TIP_GEAR_NAME} {TIP_GEAR_MATE} SPIGOT"
     else:
-        mate = f"{SHAFT_NAME} {SHAFT_MATE}, LAND {BONDED_LAND}"
+        # The land by its diameter, as the keyed sheets name theirs: "LAND 2"
+        # was a label no sheet defined (rule 26; machinist review, farm run
+        # 20261112T035245975Z).
+        land = f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND"
+        mate = f"{SHAFT_NAME} {SHAFT_MATE}, {land}"
     return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate}."
 
 

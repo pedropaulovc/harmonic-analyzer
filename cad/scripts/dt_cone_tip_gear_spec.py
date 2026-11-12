@@ -187,7 +187,7 @@ DRAWING_REFERENCE_PRECISION = STEM_LENGTH_PLACES
 
 
 def inch_text(value_mm: float, places: int) -> str:
-    """Decimal-inch print text, the family's form (``.0625``, ``1.23``)."""
+    """Decimal-inch print text, the family's form (``.0625``, ``1.30``)."""
     return family.inch_text(value_mm, places)
 
 
