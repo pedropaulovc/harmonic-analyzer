@@ -1103,14 +1103,41 @@ FEELER_STACK_ROWS = _feeler_stack_rows()
 
 # Check 4 re-reads the pedestals after the cone swing's shims: each recorded
 # DRO value plus its indicator reading must stay in its setting-table range.
+# Its REMEDY column is check 4J's remedy (Repitch1038 ruling, #1038 re-pitch,
+# on machinist review of the point A sheet: 4J named no part).  One end's
+# bind point is that end's gear pair plus its pedestal's bore height (a
+# common-mode cone-axis error would move both ends); Y is never adjusted in
+# 4E, so a Y out means the pedestal crept and is re-located.
 PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
 PEDESTAL_RECHECK_HEADER = (
-    "PEDESTAL, AXIS", "RECORDED AT", "RECORDED VALUE", "INDICATOR READING", "SUM", "ACCEPT"
+    "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
+)
+_RELOCATE_STEPS = (
+    f"{_step_ref('cylinder-stack-accepted', 'X')}-"
+    f"{_step_ref('cylinder-stack-accepted', 'Z')}"
 )
 PEDESTAL_RECHECK_ROWS = (
-    ("FRONT MHA-DT-02, X", _step_ref("cylinder-stack-accepted", "Z"), "", "", "", BANK_X_LIMITS),
-    ("BACK MHA-DT-02, X", _step_ref("cylinder-bank-located", "Q"), "", "", "", BANK_X_LIMITS),
-    ("FRONT MHA-DT-02, Y", _step_ref("cylinder-stack-accepted", "Z"), "", "", "", FRONT_STRAP_Y_WINDOW),
+    (
+        "FRONT MHA-DT-02, X",
+        _step_ref("cylinder-stack-accepted", "Z"),
+        "", "", "",
+        BANK_X_LIMITS,
+        "MIKE GEAR 0 + T120 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+    ),
+    (
+        "BACK MHA-DT-02, X",
+        _step_ref("cylinder-bank-located", "Q"),
+        "", "", "",
+        BANK_X_LIMITS,
+        "MIKE GEAR 19 + MHA-DT-37 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+    ),
+    (
+        "FRONT MHA-DT-02, Y",
+        _step_ref("cylinder-stack-accepted", "Z"),
+        "", "", "",
+        FRONT_STRAP_Y_WINDOW,
+        f"IT CREPT: RE-LOCATE IT AS STEPS {_RELOCATE_STEPS}",
+    ),
 )
 
 # Step 7's bond and release agents, named so the fitter buys the right ones.
@@ -1999,13 +2026,14 @@ CHECKS = _note_text(
         "4E. TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. TIGHTEN MHA-DT-VN-62.",
         "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
-        f"{SETTING_SHEET}): EACH RECORDED VALUE PLUS ITS INDICATOR READING MUST BE IN "
+        f"{SETTING_SHEET}): EACH DRO VALUE PLUS ITS INDICATOR READING MUST BE IN "
         "ITS ACCEPT RANGE.",
         # A pedestal outside its range after 4E means a part is out of print:
         # resetting it by indicator would take that end off its binds, so
-        # the part is corrected and the alignment redone (Codjiflo r2, #2557).
+        # the part is corrected and the alignment redone (Codjiflo r2, #2557);
+        # the recheck table's REMEDY cell names the part (#1038 re-pitch).
         "4H. IF A PEDESTAL IS OUT, SWING THE CONE SET OUT.",
-        "4J. CORRECT THE OUT-OF-PRINT PART AT THAT END.",
+        f"4J. DO THAT ROW'S REMEDY (SHEET {SETTING_SHEET}).",
         "4K. REDO 4C-4G.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
