@@ -899,6 +899,13 @@ _UNEXPLAINED = {
     "truth_cause": "request",
     "outcome": "same",
 }
+# The same, but judging the divergence's cause raised: nothing establishes
+# that every earlier answer was alike.
+_UNJUDGED = {
+    "request_divergence": {"index": 9, "field": "args"},
+    "truth_cause": "error:RuntimeError",
+    "outcome": "same",
+}
 
 
 def _verdict(name: str) -> dict[str, Any]:
@@ -914,6 +921,7 @@ def _verdict(name: str) -> dict[str, Any]:
         (0, _NOOP, _REORDERED, "noop", "diverged", "noop", "seat"),
         (0, _NOOP, _UNMEASURED, "noop", "same", "noop", "unknown"),
         (0, _NOOP, _UNEXPLAINED, "noop", "diverged", "noop", "unexplained"),
+        (0, _NOOP, _UNJUDGED, "noop", "diverged", "noop", "unknown"),
         # No comparison at all: a noop nothing confirms.
         (0, _NOOP, None, "noop", "unknown", "noop", "unknown"),
         (91, _DIVERGED, _UNEXPLAINED, "diverged", "diverged", "divergence", ""),
@@ -981,7 +989,7 @@ def test_every_noop_is_judged_exactly_once():
     for verdict, truth, cause, outcome in itertools.product(
         [*shadow.VERDICT_CLASSES, "garbled"],
         ("same", "diverged", "unknown"),
-        (None, "request", "response:IFace2.Normal"),
+        (None, "request", "response:IFace2.Normal", "error:RuntimeError"),
         ("same", "different", "unknown"),
     ):
         found = shadow.Shadow(
@@ -1000,6 +1008,14 @@ def test_every_noop_is_judged_exactly_once():
         "noop", ground_truth="diverged", truth_cause="request", outcome="same"
     ).noop_judgement
     assert judgement is shadow.NoopJudgement.UNEXPLAINED_DIVERGENCE
+    # A fault judging the cause establishes nothing about earlier answers.
+    judgement = shadow.Shadow(
+        "noop",
+        ground_truth="diverged",
+        truth_cause="error:RuntimeError",
+        outcome="same",
+    ).noop_judgement
+    assert judgement is shadow.NoopJudgement.OUTCOME_UNKNOWN
 
 
 def test_every_verdict_has_a_class():

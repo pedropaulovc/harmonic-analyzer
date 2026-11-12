@@ -689,7 +689,8 @@ class NoopJudgement(StrEnum):
     # input the replay does not pin is left (Python's own nondeterminism).
     UNEXPLAINED_DIVERGENCE = "noop_unexplained_divergence"
     # Nothing to judge by: a log without a mass-property snapshot or an STL
-    # export, or no comparison at all.
+    # export, no comparison at all, or a divergence whose cause could not be
+    # judged (``truth_cause`` ``error:<type>``, _com_outcome.judge).
     OUTCOME_UNKNOWN = "noop_outcome_unknown"
 
 
@@ -737,8 +738,11 @@ class Shadow:
             return NoopJudgement.OUTCOME_UNKNOWN
         if self.ground_truth == "same":
             return NoopJudgement.CONFIRMED
-        if (self.truth_cause or "").startswith("response:"):
+        cause = self.truth_cause or ""
+        if cause.startswith("response:"):
             return NoopJudgement.SEAT_NONDETERMINISM
+        if cause.startswith("error:"):
+            return NoopJudgement.OUTCOME_UNKNOWN
         return NoopJudgement.UNEXPLAINED_DIVERGENCE
 
     @property
@@ -764,8 +768,9 @@ class Shadow:
     @property
     def noop_outcome_unknown(self) -> bool:
         """A replay NOOP whose outcome could not be compared (a log without a
-        mass-property snapshot or an STL export, or no comparison): neither an
-        alarm nor evidence of soundness. Counted apart."""
+        mass-property snapshot or an STL export, or no comparison), or whose
+        divergence's cause could not be judged: neither an alarm nor evidence
+        of soundness. Counted apart."""
         return self.noop_judgement is NoopJudgement.OUTCOME_UNKNOWN
 
     @property

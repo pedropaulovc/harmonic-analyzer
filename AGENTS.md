@@ -1030,15 +1030,18 @@ and `_supplier_spring_reference.py:376` order COM requests by iterating sets
 of str, and are left unchanged because fixing them re-keys 147 part leaves.
 The soundness alarm is a replay `noop` whose build made another part than the
 base (`outcome=different`: mass-property measurements in any order, request
-and answer multisets, STL geometry whatever its triangulation), not a request
+and answer multisets, STL geometry whatever its triangulation, vertices within
+4 float32 ulps of the STL's largest coordinate as one), not a request
 divergence: SolidWorks lists one body's faces, and one part's bodies, in
-another order from run to run, and re-triangulates planar faces, so two
+another order from run to run, re-triangulates planar faces, and writes some
+STL vertices up to 7.2e-7 mm apart (fr_nameplate, 2026-11-12), so two
 builds of the same source can issue their requests in another order and
 still make the same part
 (`seat_nondeterminism`, counted, never an alarm). The same part from requests
 that diverged with no earlier answer differing is
-`noop_unexplained_divergence` (counted, logged at WARN). See DEVELOPING.md
-"COM conversation recording (shadow)".
+`noop_unexplained_divergence` (counted, logged at WARN); one whose cause could
+not be judged (`truth_cause=error:<type>`) is `noop_outcome_unknown`. See
+DEVELOPING.md "COM conversation recording (shadow)".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

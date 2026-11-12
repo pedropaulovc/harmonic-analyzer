@@ -2505,7 +2505,8 @@ not held. Next, the base log is compared with this build's own fresh recording
   their value's largest float. The named answer need not have steered the
   request: when a source edit follows a reordering, the reordering is named.
   `error:<type>` means judging the cause raised (message in
-  `outcome_details.truth_cause`).
+  `outcome_details.truth_cause`); on a `noop` that is `noop_outcome_unknown`,
+  never `noop_unexplained_divergence`.
 - `artefact_outcome`: whether the fresh build made the base's part, from four
   signals that do not depend on call order (`outcome_signals`):
 
@@ -2514,7 +2515,7 @@ not held. Next, the base log is compared with this build's own fresh recording
   | `mass` | every mass-property measurement, as a multiset per kind: one `*.GetMassProperties*` answer (one body), or every answer read from one `IMassProperty` object, in the order read (so a volume stays paired with its own centre and inertia). Each measurement must pair with one of the other build's within tolerance, by an assignment (Kuhn's augmenting paths; closeness is not transitive, so pairing greedily or by a sort key could strand one). A documented `*.GetMassProperties*` array (centre of mass x/y/z, volume or area or length, area or circumference, mass, six moments, an optional accuracy, per the API reference) is compared quantity by quantity, each within 1e-9 of its own largest component; any other answer within 1e-9 of its largest component. A centre of mass is also within 1e-9 of the part's length (cube root of its largest volume), since a symmetric part's centre is noise around zero. The first measurement the assignment cannot pair is reported with the other build's unpaired measurement nearest to it (in tolerances) and the quantity farthest beyond tolerance against that one |
   | `requests` | the multiset of recipe requests, handles erased, noise normalised |
   | `answers` | the multiset of (request, answer) pairs, but for mass properties and answers about the session (`IModelDoc2.SummaryInfo` dates, `ISldWorks.GetUserPreference*`) |
-  | `stl` | each exported STL's geometry, whatever its triangulation: the same set of float32 vertices and, per plane, the same outline (the edges just one of the plane's triangles uses, in its winding) and the same area within 1e-9 of the total. A plane is the triangles whose unit normal (to 1e-4) and offset (to 1e-3 mm) bins touch. A curved face has no plane: each flat facet is one, so a curved face re-tessellated over the same vertices compares `different` (a missed reuse, never an unsound one). Triangle order, corner rotation, facet normals and the header are no part of it; a file that is not a well-formed binary STL of finite coordinates is compared byte for byte |
+  | `stl` | each exported STL's geometry, whatever its triangulation and float32 noise. Each vertex one STL lacks pairs one-to-one with the other's within eps, 4 float32 ulps of the STL's largest \|coordinate\| (Chebyshev distance; 3.05e-5 mm on a 100 mm part); a vertex with no counterpart within eps, several, one both STLs have, or a counterpart another vertex is also within eps of compares `different`. Both STLs then take one representative per pair, and per plane must have the same outline (the edges just one of the plane's triangles uses, in its winding) and the same area within 1e-9 of the total. A plane is the triangles whose unit normal (to 1e-4) and offset (to 1e-3 mm) bins touch. A curved face has no plane: each flat facet is one, so a curved face re-tessellated over the same vertices compares `different` (a missed reuse, never an unsound one). Triangle order, corner rotation, facet normals and the header are no part of it; a file that is not a well-formed binary STL of finite coordinates is compared byte for byte. A path whose vertices were paired reports the count, eps and the largest shift, `same` or not |
 
   `same`: all four are present and agree. `different`: one differs, or is in
   one log only. `unknown`: nothing differs, but neither log holds a
@@ -2523,6 +2524,12 @@ not held. Next, the base log is compared with this build's own fresh recording
   `outcome_details` entry; the diff's result and request divergence are
   kept). SLDPRT and BMP captures are no signal: a part file's bytes differ on
   every save, a screenshot's with the seat.
+
+  What the STL tolerance can hide: a change that moves every vertex it moves
+  by less than eps (31 nm on fr_nameplate's 100 mm), keeps the vertex count
+  and keeps every plane's outline. `mass` still catches such a move of any
+  face larger than 1e-9 of the volume over eps (0.18 mm² on fr_nameplate);
+  `requests` and `answers` add nothing when the requests are identical.
 
 Every verdict has a `verdict_class`:
 
@@ -2563,7 +2570,9 @@ oracle. Every `noop` gets exactly one `noop_judgement`; each but `confirmed`
   divergence, which contradicts the premise above (an input the replay does
   not pin). It is counted and logged at WARN with the same bounded evidence.
 - `noop_outcome_unknown` is a `noop` whose outcome is `unknown` or was never
-  compared: neither an alarm nor evidence of soundness, counted apart.
+  compared, or whose divergence's cause could not be judged
+  (`truth_cause=error:<type>`): neither an alarm nor evidence of soundness,
+  counted apart.
 - A `divergence`-class verdict with `ground_truth=same` is a
   `false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
   infrastructure verdicts are never false divergences; count them by
@@ -2601,6 +2610,20 @@ same-part recording pairs, all 26 request-identical pairs and both reordered
 configuration edit compares `different`, including the property-only edits.
 The re-triangulated platform pair and the reordered chain-link pair compare
 `same`.
+
+On 2026-11-12 a `fr_nameplate` build raised an alarm with the base's exact
+requests and answers: 458 of its 25348 STL vertices differed. 455 differed by
+float64 residues on the top face, 0 against ±2e-16 to 9e-16 mm (float32 keeps
+them at zero), and 3 by 1-2 float32 ulps (at most 4.8e-7 mm); same body, all
+291 face normals byte-identical, mass properties within 5 float64 ulps. Of
+the 13 fresh builds of it then kept in the remote cache, 10 on five workers
+wrote byte-identical STLs and 3 (on three of those workers) each moved
+415-458 vertices, by at most 7.2e-7 mm: run-to-run noise, not a worker's.
+With the vertex tolerance all 13 compare `same`. Over 101 saved recording
+pairs it changes only that alarm's verdict (now `same`): all 56
+request-identical pairs compare `same`, and the 45 diverged pairs keep their
+verdicts, the 7 with a real STL change (vertex sets 9.5e-4 and 0.025 mm
+apart, Hausdorff) still `different`.
 
 ### What it costs a task
 
