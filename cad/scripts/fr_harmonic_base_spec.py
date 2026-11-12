@@ -186,18 +186,11 @@ UNDERSIDE_LOCATION_PREFIXES: dict[tuple[str, str], str] = {
     )
     for name in names
 }
-# The pivot is located from the nearer transferred MHA-DT-02 seat, not the
-# table origin. The model's point-only PivotSeatReference sketch owns the offsets.
+# The pivot seat D1 is transferred from the MHA-DT-20 pivot bore at assembly
+# (MHA-DT-00 step 23), never located from the MHA-DT-02 seats. The model's
+# point-only PivotSeatReference sketch keeps its nominal offsets from the
+# nearer pedestal seat as an untoleranced reference; the sheet prints neither.
 PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
-
-
-def pivot_seat_step(tag: str) -> str:
-    """Identify the physical pivot using its current native hole-table tag."""
-    return (
-        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
-        "DRILL AND TAP AT ASSEMBLY.\n"
-        f"{tag} TABLE X/Y ARE REFERENCE."
-    )
 
 # Both heights are baselines from the same faced underside, never a chain
 # through the flange thickness and deck rise (#1321). Both print the
@@ -297,7 +290,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PocketX": 2,
         "PocketY": 2,
     },
-    # Flow-through offsets from the MHA-DT-02 seats, with their own band.
+    # Nominal offsets from the nearer MHA-DT-02 seat; reference only.
     "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 3),
     "TopRimBreaks": {"TopRimChamfer": 2},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 2},
@@ -337,12 +330,6 @@ DRAWING_REFERENCE_PRECISION = 2
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
 # general band is wrong in one direction here. The model carries the band.
 SPOTFACE_DEPTH_BAND_MM = (0.508, 0.0)  # +.020/0 (upper, lower), like _fit_deviations
-
-# The MHA-FR-01 pivot seat is located from the MHA-DT-02 pedestal seats in one
-# setup (Main ruling 2026-10-10), +- this band. cone_set_stack books the same
-# value as its pivot-seat-position term, so the sheet prints what the stack
-# assumes.
-PIVOT_SEAT_POSITION_BAND_MM = 0.0508  # .002
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

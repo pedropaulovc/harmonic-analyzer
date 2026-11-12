@@ -57,12 +57,27 @@ from cone_pitch import SEAT_PITCH
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 from dt_cylinder_gear_spec import BORE_DIAMETRAL_CLEARANCE_MM as DRUM_SEAT_CLEARANCE
 from dt_cylinder_gear_spec import TEETH as DRUM_TEETH
-from fr_harmonic_base_spec import PIVOT_SEAT_POSITION_BAND_MM
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 from standard_mesh_checks import PlaneGear, backlash, interference_margin, plane_gear, root_clearance
 
 SET_ABOVE_STANDARD_MM = float(_config.fit("cone_drum_oblique_mesh", "edge_slack_mm"))
-PIVOT_SEAT_POSITION_MM = PIVOT_SEAT_POSITION_BAND_MM  # MHA-FR-01 owns the band
+# The D1 pivot seat in MHA-FR-01 is transfer-punched through MHA-DT-20's
+# reamed pivot bore with the plate at check 4's feel-set pose, then spotted,
+# drilled and tapped with the base still on the mill (MHA-DT-00 step 23,
+# owner ruling 2026-11-08). The seat is never located from the MHA-DT-02
+# pedestal seats, so it carries no band from them (#2366): it lands off the
+# bore it was punched through by the punch's radial play in that bore and by
+# picking the punch mark up under the spindle.
+# Transfer punch: the stock 1/4 in punch, ground under by .0025 ±.0005 (Precise
+# spotter sets, 2.5 mm to 17/32 in; Penn Tool listing read 2026-11-12).
+TRANSFER_PUNCH_DIA_MIN_MM = (0.25 - 0.0025 - 0.0005) * 25.4
+PIVOT_TRANSFER_PUNCH_PLAY_MM = (
+    platform.PIVOT_HOLE_DIA + platform.PIVOT_HOLE_BAND[0] - TRANSFER_PUNCH_DIA_MIN_MM
+) / 2.0
+# AUTHOR'S CHOICE (#2366): centring the spindle on the punch mark to spot it,
+# .002 in.
+PUNCH_MARK_PICKUP_MM = 0.002 * 25.4
+PIVOT_SEAT_TRANSFER_MM = PIVOT_TRANSFER_PUNCH_PLAY_MM + PUNCH_MARK_PICKUP_MM
 TOOTH_RUNOUT_TIR_MM = float(
     _config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm")
 )
