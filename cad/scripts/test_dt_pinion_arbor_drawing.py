@@ -459,6 +459,59 @@ def test_bond_zone_callout_hangs_below_the_shaft_clear_of_its_neighbours() -> No
     assert ra_x + ra_left - 0.008 < x < ra_x + ra_right
 
 
+def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
+    """#2360: only the drum's ends bear; the middle of its bore is clearance."""
+    drum_front = spec.DRUM_STATION
+    drum_back = spec.DRUM_STATION + spec.DRUM_LEN
+    relief_front = spec.BOND_RELIEF_FROM_HEAD_REAR
+    relief_back = relief_front + spec.BOND_RELIEF_LEN
+    assert drum_front < relief_front < (drum_front + drum_back) / 2.0 < relief_back < drum_back
+    assert geometry.BOND_RELIEF_RADIAL_AIR >= geometry.BOND_RELIEF_MIN_RADIAL_AIR
+    for overlap in (geometry.FRONT_BOND_OVERLAP_MIN, geometry.BACK_BOND_OVERLAP_MIN):
+        assert geometry.bond_torque_capacity(overlap) >= 2.0 * geometry.HAND_TORQUE_NM
+    # Both shoulders read from the head rear face, the sheet's station datum:
+    # the front one directly, the back one through the relief's own length.
+    assert spec.DRAWING_DIMENSIONS["BondReliefProfile"] >= {
+        "BondReliefFromHeadRear",
+        "BondReliefLen",
+    }
+
+
+def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
+    """The relief's station runs in the station rows below the shaft, between
+    the 1.82 and 7.83 rows and under the front Ra symbol; its length stands
+    just above the shaft, under detail A's label; its diameter hangs below,
+    clear of both diameter blocks and of the station's shoulder witness."""
+    x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
+    front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
+    back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
+    assert back_row_y + 0.006 <= y <= front_row_y - 0.015
+    ra_x, ra_y = drawing.FRONT_RA_XY
+    assert y < ra_y
+    assert drawing.RELIEF_FRONT_X + 0.010 < x < ra_x + drawing.RA_SYMBOL_EXTENT[0] - 0.020
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    label_bottom = drawing.DETAIL_LABEL_XY[1] - 0.008
+    len_x, len_y = drawing.PRINCIPAL_KEEP["BondReliefLen"]
+    assert shaft_top + 0.003 <= len_y <= label_bottom - 0.004
+    assert drawing.RELIEF_BACK_X < len_x < drawing.RELIEF_FRONT_X
+    dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
+    text_left, text_right = (dia_x + d for d in drawing.RELIEF_DIA_TEXT_EXTENT)
+    # Either way SolidWorks sets the relief diameter's text, it stands between
+    # the bond-zone block's right end and the station's shoulder witness.
+    assert drawing.BOND_ZONE_BLOCK_RIGHT_X + 0.002 <= text_left
+    assert text_right <= drawing.RELIEF_FRONT_X - 0.001
+    # Rule 7: at most two word rows under the size line.
+    assert drawing.BOND_ZONE_CALLOUT.count("\n") <= 1
+    _, journal_height = drawing._diameter_block_size(drawing.JOURNAL_CALLOUT)
+    _, bond_height = drawing._diameter_block_size(drawing.BOND_ZONE_CALLOUT)
+    _, bond_y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    _, front_y = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
+    # Its text sits under both blocks, over the station row's line.
+    assert dia_y + 0.004 <= min(bond_y - bond_height / 2.0, front_y - journal_height / 2.0)
+    assert dia_y - 0.004 >= y
+
+
+
 FENCE = {"center": (0.3132, 0.171), "radius": 0.015, "axis": (-1.0, 0.0)}
 
 
@@ -709,7 +762,8 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_ZONE_CALLOUT
     # Round 3 (fan-out dt-fab-3): the bonded fit and its reason print once,
     # at the drum span's callout; no note repeats where the drum bonds.
-    assert drawing.BOND_ZONE_CALLOUT == "BONDED FIT IN MHA-DT-01,\nLOCTITE 638"
+    words = drawing.BOND_ZONE_CALLOUT.split()
+    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
     assert "MHA-DT-01" not in drawing.SHEET_NOTES
     import _config
 

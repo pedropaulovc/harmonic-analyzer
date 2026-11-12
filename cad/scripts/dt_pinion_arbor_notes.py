@@ -25,6 +25,8 @@ BACK_STUB_DIA_FROM_HEAD_REAR = 221.0
 BACK_STUB_DIA_Z = spec.HEAD_REAR_Z + BACK_STUB_DIA_FROM_HEAD_REAR
 # One size for both spans outside the journals.
 BACK_STUB_DIA_PREFIX = "2X <MOD-DIAM>"
+# One size for both MHA-DT-01 bond lands either side of the relief (#2360).
+BOND_ZONE_DIA_PREFIX = "2X <MOD-DIAM>"
 _NEW_SPANS = (
     ("BackStubReference", "BackStubDia", BACK_STUB_DIA_FROM_HEAD_REAR, SPAN_WITNESS_LEN),
 )
