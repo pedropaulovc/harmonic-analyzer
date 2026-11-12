@@ -384,12 +384,13 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
     assert 'suffix="2X",' in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
-    # The step's callout: the mate by its drawing number (rule 4), the floor
-    # the faced top's plane (the feet's outboard ends rest on it), the
+    # The step's callout: the mate by its drawing number (rule 4), the
+    # faced top it runs down to (the feet's outboard ends rest on it), the
     # root's limit.  A leader note, so the location carries no requirement
-    # (machinist review, farm run 20261112T014216327Z).
+    # (machinist review, farm run 20261112T014216327Z), of two rows of
+    # words (rule 7; farm run 20261112T030307472Z).
     assert drawing.KEEPER_RELIEF_CALLOUT == (
-        "2X STEP FOR MHA-CH-07 FOOT,\nFLOOR FLUSH WITH FACED TOP,\nROOT R.02 MAX"
+        "2X MHA-CH-07 FOOT STEP TO\nFACED TOP, ROOT R.02 MAX"
     )
     assert "KEEPER_RELIEF_CALLOUT,\n            text_xy=KEEPER_RELIEF_NOTE_XY," in body
     assert "HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
@@ -417,12 +418,12 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert text_x + half_w < step_x - 0.002
     assert text_y - row_h > boss_top_y + 0.003
     assert text_y + row_h < chamfer_rows_bottom
-    # The callout's three rows hang from its upper-left corner: clear of the
+    # The callout's two rows hang from its upper-left corner: clear of the
     # station's text on the right and the front boss's recess witnesses on
     # the left, over the rail top, under the chamfer's rows.
     note_x, note_y = drawing.KEEPER_RELIEF_NOTE_XY
     rows = drawing.KEEPER_RELIEF_CALLOUT.split("\n")
-    assert len(rows) == 3
+    assert len(rows) == 2
     note_w = max(map(len, rows)) * char_w
     assert note_x + note_w < text_x - half_w - 0.003
     front_axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.FRONT_COLUMN_Z * scale
@@ -430,7 +431,7 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert front_step_x - front_axis_x > part.CAP_RECESS_DIAMETER / 2.0 * scale
     # The leader runs down-left to the front step's root from past it.
     assert note_x - front_step_x > 0.005
-    assert note_y - 3 * row_h > rail_top_y + 0.002
+    assert note_y - len(rows) * row_h > rail_top_y + 0.002
     assert note_y < chamfer_rows_bottom - 0.002
 
 

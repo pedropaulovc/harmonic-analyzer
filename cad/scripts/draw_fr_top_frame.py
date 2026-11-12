@@ -506,11 +506,11 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # from its socket axis reads over the boss top, under the mouth chamfer's
 # parked text; 8.5 mm of paper cannot hold its two rows, so they park just
 # left of the step.  The step's own callout (the spec's rows) stands over
-# the rail, upper-left at KEEPER_RELIEF_NOTE_XY: three .12 rows, 73 x 16 mm
-# as printed (2.7 mm a character, rows 5.3 apart, measured on farm run
-# 20261112T014216327Z), its foot 3 over the rail top and its head 2.7 under
-# the chamfer text's underline, pointing at the FRONT boss's step root so
-# its leader crosses neither the station nor its text.
+# the rail, upper-left at KEEPER_RELIEF_NOTE_XY: two rows of note text (2.6
+# mm a character, rows 4.4 apart, measured on farm run
+# 20261112T030307472Z), 65 x 9 mm, its foot 7 over the rail top and its
+# head 6 under the chamfer text's underline, pointing at the FRONT boss's
+# step root so its leader crosses neither the station nor its text.
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
@@ -520,7 +520,7 @@ KEEPER_RELIEF_LINE_XY = (
     0.1535,
 )
 KEEPER_RELIEF_TEXT_XY = (0.331, 0.1575)
-KEEPER_RELIEF_NOTE_XY = (0.250, 0.163)
+KEEPER_RELIEF_NOTE_XY = (0.250, 0.160)
 
 
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).

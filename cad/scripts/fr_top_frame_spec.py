@@ -168,14 +168,15 @@ KEEPER_BOSS_RELIEF_HALF_CHORD = sqrt(
 # is sharp.
 KEEPER_BOSS_RELIEF_ROOT_R_MAX = 0.508  # .02
 KEEPER_BOSS_RELIEF_ROOT_R_PLACES = 2
-# The step's own leader callout on section A-A: the mate by its drawing
-# number (machinist review, farm run 20261111T233555541Z: "KEEPER" alone
-# named no drawing), the floor the faced top's plane (the one the 4X .18
-# locates), and the root's limit.  It is not the .67 station's text: a
-# location carrying the floor's words read as a depth (machinist review,
-# farm run 20261112T014216327Z).
+# The step's own leader callout on section A-A, two rows of words (rule 7;
+# machinist review, farm run 20261112T030307472Z, gated three): the mate by
+# its drawing number (farm run 20261111T233555541Z: "KEEPER" alone named
+# no drawing), the plane the step runs down to (the faced top the 4X .18
+# locates, which the section draws as the one line), and the root's limit.
+# It is not the .67 station's text: a location carrying the floor's words
+# read as a depth (farm run 20261112T014216327Z).
 KEEPER_RELIEF_CALLOUT = (
-    "2X STEP FOR MHA-CH-07 FOOT,\nFLOOR FLUSH WITH FACED TOP,\nROOT "
+    "2X MHA-CH-07 FOOT STEP TO\nFACED TOP, ROOT "
     f"R{render_number(KEEPER_BOSS_RELIEF_ROOT_R_MAX / IN, UNIT, KEEPER_BOSS_RELIEF_ROOT_R_PLACES)} MAX"
 )
 BORE_DIA = COLUMN_SOCKET_DIAMETER
