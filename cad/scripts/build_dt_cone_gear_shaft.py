@@ -502,8 +502,9 @@ if cone_land_key.KEY_END_SET_MM <= cone_land_key.KEYSEAT_WIDTH_MM / 2.0:
         "the keyseat's end radius reaches the collar face in the model"
     )
 # The keyseat's PRINTED width band (#2467).  cone_land_key.KEYSEAT_WIDTH_BAND
-# (+.0020/-.0000) is the width the largest key slides into; a stock 1/16 end
-# mill is ground at or under size, so one pass can leave the keyseat under
+# (+.0020/-.0000) is the width the largest key slides into; most catalogue
+# 1/16 end mills are ground at or under size (shop-equipment.toml
+# tools.keyseat-endmill-1-16), so one pass can leave the keyseat under
 # .0625 and that band rejected a keyseat the key still seats in.  The print
 # keeps that band's upper limit (the guards that read it: the key's seat
 # depth at its edge, the end radius's clearance to the collar face) and
