@@ -168,6 +168,14 @@ KEEPER_BOSS_RELIEF_HALF_CHORD = sqrt(
 # is sharp.
 KEEPER_BOSS_RELIEF_ROOT_R_MAX = 0.508  # .02
 KEEPER_BOSS_RELIEF_ROOT_R_PLACES = 2
+# The rows section A-A's native step station carries: the floor is the faced
+# top itself (the plane the 4X .18 locates), the mate by its drawing number
+# (machinist review, farm run 20261111T233555541Z: "KEEPER" alone named no
+# drawing), and the root's limit.
+KEEPER_RELIEF_CALLOUT = (
+    "2X FACED TOP TO STEP FOR\nMHA-CH-07 FOOT, ROOT "
+    f"R{render_number(KEEPER_BOSS_RELIEF_ROOT_R_MAX / IN, UNIT, KEEPER_BOSS_RELIEF_ROOT_R_PLACES)} MAX"
+)
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
 # MHA-CH-00 draws the west rail's web faces from it).  As cast it prints

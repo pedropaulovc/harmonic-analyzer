@@ -191,8 +191,7 @@ from fr_top_frame_spec import (
     HUB_SET_SPOT_PLACES,
     IN,
     KEEPER_BOSS_RELIEF_FROM_SOCKET,
-    KEEPER_BOSS_RELIEF_ROOT_R_MAX,
-    KEEPER_BOSS_RELIEF_ROOT_R_PLACES,
+    KEEPER_RELIEF_CALLOUT,
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_X,
     SCREW_AXIS_BELOW_RAIL_TOP,
@@ -506,18 +505,8 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # the boss top (owner ruling 2026-11-11, #1038, K5).  The rear one's station
 # from its socket axis reads over the boss top, under the mouth chamfer's
 # parked text; 8.5 mm of paper cannot hold the value and its words, so they
-# park left of the step over the rail.  The words carry the rest: the floor
-# is the faced top itself (one plane, the one the 4X .18 locates), since
-# each foot's outboard end rests on it; the mate by its number (machinist
-# review, farm run 20261111T233555541Z: "KEEPER" alone named no drawing);
-# and the root's own limit, under the title block's R.040 (codjiflo, PR
-# #2599: the larger root would lie under the foot tip).
-KEEPER_RELIEF_ROOT_TEXT = (
-    f"R{KEEPER_BOSS_RELIEF_ROOT_R_MAX / IN:.{KEEPER_BOSS_RELIEF_ROOT_R_PLACES}f} MAX"
-).replace("R0.", "R.")
-KEEPER_RELIEF_CALLOUT = (
-    f"2X FACED TOP TO STEP FOR\nMHA-CH-07 FOOT, ROOT {KEEPER_RELIEF_ROOT_TEXT}"
-)
+# park left of the step over the rail (the rows are the spec's: the faced
+# top carried to the step, the mate's number, the root's limit).
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
