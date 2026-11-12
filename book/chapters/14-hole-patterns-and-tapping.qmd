@@ -31,7 +31,7 @@ TODO
 
 TODO
 
-## The 20-hole spring pattern in the summing lever at 7.0565 mm pitch
+## The 20-hole spring pattern in the summing lever at .300 in (7.62 mm) pitch
 
 TODO
 

@@ -2229,10 +2229,12 @@ sections:
 
       The drive-train entries below preserve dated research/reconstruction history,
       not active cutting dimensions or current qualification. In particular, the
-      DP30/PA14.5 inference in item 1, channel/incline arithmetic in item 3,
-      old stack and 1/16 in terminal in items 6–7, and fixed-axis/ideal-helix
-      studies in item 9 are superseded by the source-attributed Chapter 11–13/25
-      rows above. Item 10 preserves restoration history, not current rig sizes.
+      DP30/PA14.5 inference in item 1, the M6/M6.7 channel/incline arithmetic
+      quoted as history in item 3 (whose opening paragraph is the current
+      2026-11-11 pitch ruling and its provenance), old stack and 1/16 in
+      terminal in items 6–7, and fixed-axis/ideal-helix studies in item 9 are
+      superseded by the source-attributed Chapter 11–13/25 rows above. Item 10
+      preserves restoration history, not current rig sizes.
       Historical observations and their original wording are retained below.
 
       1. **Gear module + pressure angle** (ch. 12/13/25) — **RESOLVED in M4 prep:
@@ -2253,8 +2255,34 @@ sections:
       2. **Pinion tooth count** (ch. 25) — **32 teeth, user-authoritative
          correction 2026-09-22.** This supersedes the prior video-frame count;
          no historical photo justification overrides the corrected count.
-      3. **Channel pitch** — **RESOLVED in M6: 7.5 mm along the cone axis,
-         7.06 mm projected on the machine depth (Z)**, uniform with the gear
+      3. **Channel pitch** — **RE-RESOLVED 2026-11-11 by owner ruling on
+         #1038: .300 in (7.62 mm) along the machine depth (Z)**
+         (`channels.station_pitch_mm`). The bank stays centred: station 9,
+         the rocker/lever hub bank mid, is kept at Z −0.504, so station 0
+         moved 9 × (7.62 − 7.0565) = 5.0715 mm to the front, to Z −69.0839
+         (`channels.station_z0_mm`). The cone incline follows by exact
+         tracking, arcsin(1.5875/7.62) = 12.0247°, seat pitch 7.4528
+         (`cone_incline.yaml`, `cone_line`). Evidence (re-pitch plan
+         2026-11-11, #1038): eleven photo/callout reads of the original weigh
+         to 7.555 ±0.048 mm (single reads 7.38 to 7.93: 20 bars at the feet in
+         the ch30 side elevation 7.58; the 14 bar feet in ch15
+         `page002_img01` 7.57 at bar/pitch 0.838 against the .250 bar, an
+         earlier 0.80 edge read of the same photo giving 7.9; the p.18 cone
+         set's 150 mm over 20 seats 7.67 along the drum), and a blind second
+         measurer gives 7.50 ±0.15. .300 in is the smallest round value that
+         closes the #1038 bar-foot gap with the existing bands (least gap
+         +0.127 against the 0.10 floor) and prints the gear, the hubs and the
+         20-hub stack as .3000 and 6.0000 in. The former 7.0565 mm was not a
+         measurement and no owner ruling fixed it: the p.28 arm-tip read below,
+         which already lies along Z, was relabelled "along the cone axis" and
+         cosine-projected (7.5 cos 18.7° = 7.10, then 7.5 cos 19.8° = 7.057,
+         typed as 7.0565), and M6.7 then held that grid as "frame-locked" and
+         took a second cosine for the seat pitch. The 139.7 mm "gates' clear
+         span" that locked it was a legacy CAD number (10.5 in top plate less
+         two 2.5 in gate bases), not the original's, and that two-gate frame
+         no longer exists (one rocker support at Z 0). History, superseded, in
+         its original M6/M6.7 wording: RESOLVED in M6: 7.5 mm along the cone
+         axis, 7.06 mm projected on the machine depth (Z), uniform with the gear
          stack (vertical connecting rods, no splay). Measured on all four p.28
          end-view strips (400 dpi extraction): arm-end tip pitch ≈ 60 px vs tip
          width ≈ 20 px = the 2.5 mm arm plate (annotated p.27) → pitch ≈ 3.0 ×

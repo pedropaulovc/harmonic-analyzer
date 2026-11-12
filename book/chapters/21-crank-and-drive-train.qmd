@@ -30,7 +30,7 @@ One input, and the 4:1 reduction that feeds the cone gear set.
 
 ## What will fight you
 
-The crank mesh is a crossed-axis pair: the 64T's straight teeth are inclined 13° right hand, at the cone incline (owner ruling 2026-11-10, #2332, superseding the earlier true helix) — see `memory/crank-mesh-crossed-helical.md`. The swing platform carries the whole cone set and pivots to disengage.
+The crank mesh is a crossed-axis pair: the 64T's straight teeth are inclined 12.02° right hand, at the cone incline (owner ruling 2026-11-10, #2332, superseding the earlier true helix; the incline is arcsin(1.5875/7.62) at the .300 in channel pitch, `dt_crank_drive_gear_spec.TOOTH_INCLINATION_DEG`) — see `memory/crank-mesh-crossed-helical.md`. The swing platform carries the whole cone set and pivots to disengage.
 
 ## Making each part
 
