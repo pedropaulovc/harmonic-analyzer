@@ -654,6 +654,7 @@ def test_frozen_rows_refuse_a_size_group_that_is_not_merged():
     native.merged.clear()
     assert set(table._frozen_rows(native, generated, grouped=False, stage="now")) == set(TABLED)
 
+
 def test_merge_probe_reads_the_visible_note_position_once_size_is_hidden():
     """Farm 20261112T130432678Z: every group read merged at physical NOTE 4
     before SIZE was hidden, and unmerged at 4 at settled readback, once it
@@ -663,8 +664,7 @@ def test_merge_probe_reads_the_visible_note_position_once_size_is_hidden():
     native.SetColumnHidden(table.SIZE_COLUMN, True)
     assert table._merged(native, 2)
     assert set(table._frozen_rows(native, generated, grouped=True, stage="now")) == set(TABLED)
-    assert not native.IsCellMerged(2, table.NOTE_COLUMN, 0, 0)[0]  # the physical index misreads
-
+    assert native.IsCellMerged(2, table.NOTE_COLUMN - 1, 0, 0)[0]
 
 
 def _strip_leading_zero(text):
