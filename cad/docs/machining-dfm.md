@@ -82,7 +82,7 @@ its first-root position; no second general note restates that location.
 - **The repeat families (make N identical by hand: the shop is manual, so fixtures, stops and indexing carry the repeatability):**
   | family | qty | repeat risk and route |
   |---|---|---|
-  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Teeth with the stock #2 cutter on the BS-0; the cam's throw and phase need an eccentric fixture that is not drawn, so the cam route is **not selected** ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); the notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
+  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Bore and OD first, then teeth and notch together on an arbor with the stock #2 cutter on the BS-0, then the cam on the lathe fixture MHA-DT-12-TL-01 (fitting sheet MHA-DT-12-TL-00): its stub sets the throw and its clock pin, in the notched tooth space, sets the phase, once for all 20 (see [Cylinder-gear cam](#cylinder-gear-cam)). The notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
   | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt. T030–T120 are bored and broached first, then cut on the keyed arbor MHA-DT-03-TL-03 (fitting sheet MHA-DT-03-TL-05), which clocks each blank by its keyway. The cutters, cutter arbors and broach are recorded to buy, not owned (`shop-equipment.toml`, "gear cutting kit"; the purchase is the owner's decision on [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
   | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.62 (.300) channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
@@ -1233,12 +1233,46 @@ and twenty cost about fourteen times the brass bar; the part is not designed aro
 48DP PA20 brass gears exist for fourteen of the cone's tooth counts, all with a .125 in face
 against the cone's .2934 (the comparison is in the folder named above).
 
+### Keyed cone gears on the arbor
+
+T030 to T120 and the 64T are bored Ø.375 and broached before their teeth are cut, then cut on the
+keyed arbor MHA-DT-03-TL-03 (kit MHA-DT-03-TL-05: arbor, key MHA-DT-03-TL-06, three backing
+collars MHA-DT-03-TL-04 and a 1/4-28 nut). The arbor's key carries the blank's clock: set the key
+on the cutter's centreline, then index half a pitch before the first gap, so the keyway stands on
+a tooth's centreline as the gear sheets draw it. Use the largest collar under the blank's root
+(Ø.50 for T030 to T048, Ø1.00 for T054 to T084, Ø1.75 for T090 to T120 and the 64T) and feed
+toward the collar. The cone gears run between the BS-0's centres. For the 64T the head is tilted
+and there is no tail centre: grip the arbor's Ø.62 end in the head's chuck against its step,
+which leaves the blank more than .75 in clear of the jaws for the cutter to run out, and indicate
+the seat within the sheet's setup allowance before cutting.
+
+### Cylinder-gear cam
+
+The cam is turned last, on the fixture MHA-DT-12-TL-01. The body is gripped in the four-jaw chuck,
+indicated true once on its register diameter and left there for all 20 gears. Each gear goes on
+the fixture's Ø3/8 stub by its reamed bore, with the notched tooth space over the clock pin, is
+turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 2) and is clamped
+by the screw in the stub's end. One screw and a Ø.0375 pin hold it, and the cut is interrupted
+until the cam cleans up, so rough each cam close to size before it goes on the fixture and take
+light finishing cuts there. Check the throw with a micrometer over the cam and a Ø.376 pin in the
+bore: 1.1307 in nominal, ±.002. The fixture's own errors are the same for every gear; from gear
+to gear the cam's phase to the notch scatters by up to .24° (bore clearance on the stub, pin play
+in the tooth space), inside the printed ±.25°. Adding the fixture's fixed error gives .37° worst
+case against the same band, which is open with the owner
+([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)).
+
 ### T006 special cutter
 
-No range cutter reaches 6 teeth, so T006 needs a tool made in the shop: DT6-FORM1, a custom
-ground form tool. Sheet 2 of the MHA-DT-37 package defines the T006 tooth space it is ground to,
-point by point with its form tolerance; the tool itself (blank, rake, relief, holder) is not drawn,
-and the form band has no gauge the shop owns
+No range cutter reaches 6 teeth, so T006 needs a tool made in the shop: DT6-FORM1, a single-point
+form tool. It is drawn as MHA-DT-37-TL-01 (the bit: Ø1/8 O1 drill rod, zero top rake, so the
+form on its face is the T006 tooth space), held in the cutter bar MHA-DT-37-TL-02 and set by the
+fitting sheet MHA-DT-37-TL-00. Sheet 2 of the MHA-DT-37 package still defines the tooth space
+point by point; the bit is built from the same curves. The form has no tolerance band of its own:
+the shop owns nothing finer than a 10× loupe with a .1 mm reticle, so the tool is accepted by the
+gear it cuts. Before hardening, compare the bit's face with a printed enlargement of sheet 2
+under the loupe and try its tip and widths with pin gauges; then make a trial cut in brass and
+measure it over pins against the MHA-DT-37 gear data. Final acceptance is the cut gear's
+over-pins size and its mesh at assembly
 ([#2358](https://github.com/pedropaulovc/harmonic-analyzer/issues/2358)). T006 has no bore since owner
 decision C1 keyed (2026-11-09, PR #1992), so the cutter leaves no root-to-bore web; it runs off over
 the integral spigot and pivot (.011 in radial).
