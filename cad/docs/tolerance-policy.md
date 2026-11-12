@@ -720,7 +720,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   including its −0.71 mm relocation rather than the old nominal row.
   Section calculations use minimum accepted **11.7 × 10.9 mm**, not nominal
   12.5 × 11.0; the longest printed seat distance, independent head locations
-  and shortest grip bound the arm span at **97.965 mm**. The force directions
+  and shortest grip bound the arm span at **91.311 mm** (#1038: the lever's
+  front end stands .25 in nearer the nose). The force directions
   and X/Y load stations remain the nominal A1 installation, not an
   all-geometric-variation or native articulation certificate.
   Its material report remains a load-demand estimate with assumed elastic

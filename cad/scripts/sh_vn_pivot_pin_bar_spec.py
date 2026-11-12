@@ -5,7 +5,9 @@ PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the
 pattern). The part build (``build_sh_vn_pivot_pin.py``), the channel assembly
 and ``test_sh_vn_pivot_pin_bar_fit`` import it; it reads only the two parts it
 joins and the purchased pin (``sh_vn_pivot_pin_spec``), so the pin never
-re-keys on bank layout or config.
+re-keys on bank layout or config. The
+channel assembly spec carries the same bar-to-bar gap down the bank to the
+foot (``ch_channel_assembly_spec.bar_gap_budget``, #1038, #2341).
 
 The joint: each amplitude bar's top notch (``ch_amplitude_bar_spec``)
 straddles its channel lever (``ch_channel_lever_spec``) at the lever's
@@ -54,9 +56,9 @@ PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # both faces before dressing: the shortest pin over the widest bar leaves the
 # stock both dressed ends share.
 PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
-# Dressed ends stand nothing proud of the bar faces: the top-notch stack
-# below leaves 0.1065 against the 0.10 running floor (#1038, owner ruling
-# 2026-10-15 option 2).
+# Dressed ends stand nothing proud of the bar faces: at the .300 pitch the
+# top-notch stack below leaves 0.6858 against the 0.10 running floor (#1038;
+# owner rulings 2026-10-15 option 2 and 2026-11-11).
 PIN_END_PROUD_MAX = 0.0
 
 # --- The bar's reamed press hole (the bar spec owns it; restated here so the

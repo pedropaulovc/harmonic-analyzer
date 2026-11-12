@@ -218,7 +218,8 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         ("rod-pin-remade", steps.RODS_PINNED_KEY),
         ("bank-spring-replaced", "bank-spring-checked"),
         ("south-bracket-reset", "south-bracket-spring-set"),
-        ("bar-pin-remade", steps.BARS_PINNED_KEY),
+        ("bar-pin-remade", "bars-straight"),
+        ("bar-straightened", "bars-straight"),
     ):
         assert steps.step_number(target) < steps.step_number(key)
         assert f"STEP {steps.step_number(target)}." in _step_body(key)
@@ -1048,11 +1049,15 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     files = {
         drawing.BOM_COMPONENT_IDENTITIES[key][0] for key in drawing.BOM_COMPONENTS
     }
-    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(files) == 18
+    # The one file with two member rows is the pin; every other row is its
+    # own file (S0 retired the jam nut after #2593 counted 18 files).
+    shared = {("sh-vn-pivot-pin", "RodPin"), ("sh-vn-pivot-pin", "BarPin")}
+    expected_files = len(drawing.BOM_COMPONENTS) - (len(shared) - 1)
+    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(files) == expected_files
     assert {
         drawing.BOM_COMPONENT_IDENTITIES[key]
         for key in (drawing.explode.ROD_PIN, drawing.explode.BAR_PIN)
-    } == {("sh-vn-pivot-pin", "RodPin"), ("sh-vn-pivot-pin", "BarPin")}
+    } == shared
     assert (
         drawing.BOM_PART_NUMBERS[drawing.explode.ROD_PIN]
         == drawing.BOM_PART_NUMBERS[drawing.explode.BAR_PIN]
@@ -1266,20 +1271,20 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert [z - asm.KEEPER_SOCKET_XZ[1] for z in asm.LUG_INNER_FACE_Z] == pytest.approx(
         [front, rear]
     )
-    # The bands' functions (Main's ruling, 2026-10-16): the right face's band
-    # keeps its foot off the front socket boss at the printed worst case
-    # (build_fr_top_frame), and the lug centre's band is charged in the
-    # transferred foot tap's wall to the rail web (#1660 r6).  The cast
-    # boss's own ⌖ Ø.06 | A | B (#2333, MHA-FR-02 RV-11) leaves the south
-    # foot .009, which is what the title block's band would spend in the
-    # location band's place: that band is what holds the foot off the boss.
+    # The bands' functions (Main's ruling, 2026-10-16): the lug centre's band
+    # is charged in the transferred foot tap's wall to the rail web (#1660
+    # r6), and the inner faces' band is the shaft flats' (ch_fulcrum_shaft_spec).
+    # At the .300 pitch the south foot stands over the K5 relief machined on
+    # the front socket boss (#1038, fr_top_frame_spec KEEPER_BOSS_RELIEF_*),
+    # so it clears the relief step at the printed worst case even at the
+    # title block's band: the boss no longer sets the location band.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
     band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
     title_block_band = top.PRINTED_LINEAR_BAND_MM[keeper.KEEPER_FITUP_PLACES]
-    assert south_margin == pytest.approx(0.2286)
-    assert south_margin + band - title_block_band == pytest.approx(0.0, abs=1e-9)
+    assert south_margin == pytest.approx(0.737, abs=5e-4)
+    assert south_margin + band - title_block_band > 0.0
     assert north_margin > 10 * band
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
 
@@ -1333,10 +1338,11 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
     # A bought pin cannot be remade: each remedy replaces the part whose
-    # reamed hole let the pin slide, and sends the fitter back to its press.
+    # reamed hole let the pin slide, and sends the fitter back to its press;
+    # a replacement bar first passes the straightness check (#2341).
     for remedy, host, pinned in (
         ("rod-pin-remade", drawing.explode.ROD, steps.RODS_PINNED_KEY),
-        ("bar-pin-remade", drawing.explode.BAR, steps.BARS_PINNED_KEY),
+        ("bar-pin-remade", drawing.explode.BAR, "bars-straight"),
     ):
         body = _step_body(remedy)
         assert f"REPLACE THE {drawing.item(host)} " in body, remedy
@@ -1449,3 +1455,46 @@ def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() ->
     seeds = assembly_contract("ch-channel").flip_invert
     assert {f"sh vn arbor set screw datum {axis}" for axis in "xyz"} <= seeds
     assert not any(seed.startswith("ch vn arbor set screw datum ") for seed in seeds)
+
+def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
+    """#2341: once every foot is seated the bars hang side by side at the
+    .300 pitch; the bank is accepted on the least worst-case gap (the foot,
+    each bar at the bow the surface-plate check allows), floored to the .001
+    leaf a bank inside its bands always passes, checked before the levers
+    are proved free."""
+    import sh_vn_pivot_pin_bar_spec as pin
+
+    order = ["bar-feet-seated", "bars-gapped", "levers-swing"]
+    numbers = [steps.step_number(key) for key in order]
+    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    gaps = drawing.asm.BAR_GAP
+    leaf = gaps["leaf"]
+    least = min(v for k, v in gaps.items() if k not in ("leaf", "mid_span"))
+    assert pin.RUNNING_FLOOR <= leaf <= least
+    assert leaf == pytest.approx(0.005 * 25.4)
+    body = _step_body("bars-gapped")
+    assert "A .005 FEELER GAUGE LEAF" in body
+    assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body
+
+
+def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
+    """#2341 (Repitch1038 2026-11-11): the bow is controlled by acceptance,
+    not a frame on MHA-CH-01. Before the bars are pinned, each lies on the
+    surface plate on each side face in turn and the allowed bow's leaf must
+    not enter; a bar it enters is straightened by hand or exchanged. Two
+    neighbours each at that bow keep the mid-span running floor."""
+    asm = drawing.asm
+    straight = steps.step_number("bars-straight")
+    assert straight == steps.step_number("bar-notches-set") - 2
+    assert straight < steps.step_number(steps.BARS_PINNED_KEY)
+    assert asm.BAR_BOW_MAX_MM == pytest.approx(0.005 * 25.4)
+    assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
+    body = _step_body("bars-straight")
+    assert "SURFACE PLATE ON EACH SIDE FACE" in body
+    assert "A .005 FEELER GAUGE LEAF MUST NOT ENTER" in body
+    # Rule 22: the remedy is its own step and loops back to the check.
+    assert "STRAIGHTEN" not in body
+    assert steps.step_number("bar-straightened") == straight + 1
+    remedy = _step_body("bar-straightened")
+    assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
+    assert f"RETURN TO STEP {straight}." in remedy

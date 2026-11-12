@@ -60,10 +60,10 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.FOOT_TIP_X == 12.446
     assert spec.SCREW_X == pytest.approx(spec.FOOT_TIP_X - spec.SCREW_FROM_TIP)
     assert spec.SCREW_X == pytest.approx(7.874)
-    assert spec.KEEPER_Z_OFF == 75.057
-    assert spec.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(141.986)
+    assert spec.KEEPER_Z_OFF == 80.772
+    assert spec.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(153.416)
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(spec.KEEPER_Z_OFF + spec.SCREW_X)
-    assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(82.931)
+    assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(88.646)
     # Plain reamed bore on the plain Ø6.35 shaft: a running band, cut by one
     # made-to-order 0.2515 in reamer through both keepers at their installed
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).

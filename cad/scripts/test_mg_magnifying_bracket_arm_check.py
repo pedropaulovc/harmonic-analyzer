@@ -35,8 +35,9 @@ _NOSE_LOCATION = (2.0 * (0.215 * IN - 5.5), 2.0 * (0.219 * IN - 5.5))
 
 def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
     assert arm.NECK == joint.BRACKET_ORIGIN
-    # Seat 3.95 +.01, both nose controls at .219, grip .125 -.005.
-    assert arm.ARM_SPAN == pytest.approx(3.96 * IN + _NOSE_LOCATION[1] - 0.120 * IN)
+    # Seat 3.70 +.01 (.25 in shorter: the lever's front end came out to meet
+    # it, #1038 owner ruling 4), both nose controls at .219, grip .125 -.005.
+    assert arm.ARM_SPAN == pytest.approx(3.71 * IN + _NOSE_LOCATION[1] - 0.120 * IN)
     assert arm.ARM_SPAN > joint.SIDE_PLATE_Z[0]
     assert arm.ARM_B == pytest.approx(0.48 * IN)  # neck .49 -.01
     assert arm.ARM_H == pytest.approx(2.0 * 0.215 * IN)  # nose R.217 -.002
@@ -46,7 +47,7 @@ def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
 
 def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
     for width, radius, seat, grip, nose_location in itertools.product(
-        (0.48 * IN, 0.50 * IN), (0.215 * IN, 0.219 * IN), (3.94 * IN, 3.96 * IN),
+        (0.48 * IN, 0.50 * IN), (0.215 * IN, 0.219 * IN), (3.69 * IN, 3.71 * IN),
         (0.120 * IN, 0.130 * IN), _NOSE_LOCATION,
     ):
         height = 2.0 * radius
@@ -54,7 +55,7 @@ def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
         assert arm.I_LATERAL <= height * width**3 / 12.0 + 1e-9
         assert arm.ARM_SPAN >= seat - grip + nose_location - 1e-9
     assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
-    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(3.96 * IN + _NOSE_LOCATION[1])
+    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(3.71 * IN + _NOSE_LOCATION[1])
 
 
 def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:

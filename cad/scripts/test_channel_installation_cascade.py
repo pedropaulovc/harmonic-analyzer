@@ -25,7 +25,7 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     assert channel.X_DRUM == DRUM_X
     # #743 solid stack: the ring rides the middle of its closed cam slot.
     assert channel.CAM_DZ == pytest.approx(cam_plane.CAM_MID_DZ)
-    assert channel.CAM_DZ == pytest.approx(-7.0565 / 2.0)
+    assert channel.CAM_DZ == pytest.approx(-7.62 / 2.0)
 
     phase = math.radians(channel.GEAR_PHASE_DEG)
     assert channel.RING_CENTER == (

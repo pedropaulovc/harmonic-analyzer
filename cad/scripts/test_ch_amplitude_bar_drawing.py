@@ -606,6 +606,7 @@ def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor")' in source
     assert "add_datum_feature(" not in source
+    # #2341: the bars' bow is accepted on MHA-CH-00, not by a frame here.
     assert "add_feature_control_frame(" not in source
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025
     # The channel/magnifier/summing closure imports amplitude_bar_spec; the
@@ -695,8 +696,8 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     )
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
-    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000 (the
-    # inch band that keeps the neighbour gap); the foot an interim +.010/.000.
+    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000; the
+    # foot +.010/.000 (user ruling 2026-09-27), both kept at the .300 pitch.
     assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
     assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.010 * 25.4, 0.0))
     for width, (_upper, lower), plate, tolerance in (
@@ -732,7 +733,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
 
 def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
-    .118 +/-.002 plate leaves the 0.7065 side gap its running floor; the full
+    .118 +/-.002 plate leaves the side gap its running floor; the full
     stack, with both ledges and plate offsets, is
     sh_vn_pivot_pin_bar_spec.joint_budget's neighbour_clearance_min."""
     import sh_vn_pivot_pin_bar_spec as pin
@@ -746,24 +747,68 @@ def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     assert pin.BUDGET["neighbour_clearance_min"] >= bank.RUNNING_FLOOR
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#1038: at the printed bands a bar's foot-notch float can close "
-    "the 0.7065 side gap to its neighbour (user ruling 2026-09-27: ship as a "
-    "known issue with interim bands)",
-)
-def test_neighbouring_bars_keep_a_running_gap_at_the_foot() -> None:
-    """Bars 6.35 wide sit at the 7.0565 station pitch. Each floats on its
-    straddled strap by (notch max - strap min); two neighbours floating toward
-    each other close the side gap by that much."""
-    import rocker_bank_layout as bank
+def _foot_gap(pitch: float) -> float:
+    """The least side gap between two neighbouring bars at their feet (mm),
+    every term at the printed worst case on the real MHA-CH-06 strap."""
+    import ch_rocker_arm_spec as rocker
 
     spec = ch_amplitude_bar_spec
-    gap = bank.PITCH - spec.BAR_WIDTH
-    float_max = (spec.BOTTOM_NOTCH_WIDTH + spec.BOTTOM_NOTCH_WIDTH_BAND[0]) - (
-        spec.STRAP_THICKNESS - spec.STRAP_THICKNESS_TOLERANCE
-    )
-    assert gap - float_max >= bank.RUNNING_FLOOR
+    notch_max = spec.BOTTOM_NOTCH_WIDTH + spec.BOTTOM_NOTCH_WIDTH_BAND[0]
+    strap_min = rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
+    # Each bar floats on its strap; two neighbours float toward each other.
+    float_max = notch_max - strap_min
+    # Each notch's ledge prints from one bar face: one neighbour's at one end
+    # of its band, the other's at the other.
+    ledges = 2.0 * spec.NOTCH_OFFSET_TOLERANCE_MM
+    # Each strap stands half its position zone off its hub's mid-plane.
+    straps = 2.0 * (rocker.STRAP_HUB_SYMMETRY / 2.0)
+    return pitch - spec.BAR_WIDTH - float_max - ledges - straps
+
+
+def test_neighbouring_bars_keep_a_running_gap_at_the_foot() -> None:
+    """#1038 (owner ruling 2026-11-11, pitch .300 in): bars 6.35 wide, the
+    rocker hubs setting the pitch never short. At the foot each bar floats on
+    its .098 +/-.001 strap by (notch max - strap min), and the ledges and the
+    straps' position zones add their bands; the least gap still holds the
+    running floor, as the spec's own fail-loud budget says. At the former
+    7.0565 pitch the same stack closed to -0.4365 (bars overlapping)."""
+    import ch_channel_assembly_spec as asm
+    import rocker_bank_layout as bank
+
+    least = _foot_gap(bank.PITCH)
+    assert least >= bank.RUNNING_FLOOR
+    assert least == pytest.approx(asm.BAR_GAP["foot"])
+    assert least == pytest.approx(0.127, abs=1e-9)
+    assert _foot_gap(7.0565) < bank.RUNNING_FLOOR
+
+
+def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
+    """#2341: two neighbouring bars, straight between their end gaps, leave at
+    least the mean of the top and foot least gaps at mid-span; each may then
+    bow the allowed bow MHA-CH-00 accepts toward the other and the running
+    floor still holds. The bank's feeler leaf is the least gap floored to the
+    .001 grid, so a bank inside its bands passes it, and it proves the floor.
+    MHA-CH-01 carries no frame for it (Repitch1038 2026-11-11)."""
+    import sh_vn_pivot_pin_bar_spec as pin
+    import ch_channel_assembly_spec as asm
+    import rocker_bank_layout as bank
+
+    top = pin.BUDGET["neighbour_clearance_min"]
+    foot = _foot_gap(bank.PITCH)
+    assert top == pytest.approx(0.6858, abs=1e-9)
+    mid = (top + foot) / 2.0
+    assert mid == pytest.approx(0.4064, abs=1e-9)
+    assert asm.BAR_BOW_MAX_IN == 0.005
+    bowed = mid - 2.0 * asm.BAR_BOW_MAX_MM
+    assert bowed >= bank.RUNNING_FLOOR
+    assert bowed == pytest.approx(asm.BAR_GAP["mid_span_bowed"])
+    leaf = asm.BAR_GAP["leaf"]
+    assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
+    assert leaf / 25.4 == pytest.approx(0.005)
+    # .006 is the widest bow on the .001 grid that still closes; .005 keeps a
+    # thousandth in hand.
+    assert mid - 2.0 * 0.006 * 25.4 >= bank.RUNNING_FLOOR
+    assert mid - 2.0 * 0.007 * 25.4 < bank.RUNNING_FLOOR
 
 
 def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:

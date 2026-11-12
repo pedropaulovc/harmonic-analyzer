@@ -14,7 +14,6 @@ import _mg_magnifier_interference as magnifier_interference
 from _interference_common import smooth_annulus_limit_mm3
 import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
-import build_sm_summing_assembly as summing
 import _cone_axis_constants as installation
 import magnifying_bracket_joint_layout as joint
 import sm_knife_mount_spec as knife_mount
@@ -27,10 +26,12 @@ from spring_mount_geom import KNIFE
 
 
 def test_part_recipe_seat_literals_match_the_live_installation() -> None:
+    # The seat is the lever body's -Z (front) end: .25 in farther out than
+    # the +Z end since #1038 owner ruling 4.
     assert joint.SEAT_PLANE_Z == pytest.approx(
-        installation.SUMMING_Z - lever.PLATE_L / 2.0
+        installation.SUMMING_Z + lever.PLATE_Z_MINUS
     )
-    assert joint.LEVER_FRONT_LOCAL_Z == pytest.approx(-lever.PLATE_L / 2.0)
+    assert joint.LEVER_FRONT_LOCAL_Z == lever.PLATE_Z_MINUS == pytest.approx(-82.55)
     assert joint.LEVER_ORIGIN_X == KNIFE[0]
     assert joint.BRACKET_ORIGIN == (
         magnifier.BRACKET_X,
@@ -62,7 +63,7 @@ def test_side_plate_is_flush_and_matches_neck_width_without_moving_the_arm() -> 
     assert back - front == pytest.approx(joint.SIDE_PLATE_THICKNESS)
     assert joint.SIDE_PLATE_MACHINE_X == tuple(joint.BRACKET_ORIGIN[0] + x for x in bracket.FLANGE_X)
     mount_back = (
-        installation.SUMMING_Z - summing.HEX_Z_MID + knife_mount.SUPPORT_Z_THICK / 2.0
+        installation.SUMMING_Z + lever.KNIFE_SEAT_Z_MINUS + knife_mount.SUPPORT_Z_THICK / 2.0
     )
     assert front - mount_back == pytest.approx(0.6985, abs=1e-4)
     # Their plan projections may overlap; positive axial air keeps them separate.
@@ -80,7 +81,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.LEVER_RECEIVER_ROW_FROM_TOP_IN == 0.128
     assert tuple(point[0] for point in joint.LEVER_HOLE_POINTS) == (16.002, 29.6926)
     for point in joint.LEVER_HOLE_POINTS:
-        assert point[1:] == pytest.approx((0.2488, -76.2))
+        assert point[1:] == pytest.approx((0.2488, lever.PLATE_Z_MINUS))
     assert joint.LEVER_STATION_OFFSET_MAX == pytest.approx(math.hypot(0.0074, 0.0012))
     for bracket_point, lever_point, pose in zip(
         joint.BRACKET_HOLE_POINTS,
@@ -193,7 +194,7 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.0508
     assert lever.RIB_T == 5.08
-    assert joint.LEVER_FRONT_LOCAL_Z + lever.RIB_T == pytest.approx(-71.12)
+    assert joint.LEVER_FRONT_LOCAL_Z + lever.RIB_T == pytest.approx(-77.47)
     assert lever.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0097)  # .125 +/-.005 grip
     # The lever prints the drill depth .26 +/-.01 about the 6.604 model depth.

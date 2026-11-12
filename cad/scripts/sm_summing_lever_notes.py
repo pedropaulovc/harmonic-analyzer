@@ -131,7 +131,7 @@ BRACKET_TAP_CALLOUT_PROCESS = f"SPOT THRU {BRACKET_NUMBER} AT ASSEMBLY\n"
 
 # --- Decimal places, #290. ---
 # The spring pattern's BASIC row X, start Z and pitch are calibrated stations
-# (1.5689 / .5022 / .2778): four places hold them to under .00005 in.  They
+# (1.5689 / .2914 / .3000): four places hold them to under .00005 in.  They
 # are native model dimensions of the part's hidden SpringRowCoordinates
 # sketch, which owns their BASIC type, places and 19X count.  The drawing's
 # own boss-top (.24) and knife-ridge (.06) locations of the coefficient top

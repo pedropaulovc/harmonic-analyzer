@@ -25,7 +25,8 @@ from __future__ import annotations
 import math
 
 import _config
-from _hole_spec import HoleSpec
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     inside_corner_radius_mm,
@@ -43,7 +44,15 @@ UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
 # --- Nominal geometry (mm); plate/web centring per owner issue #2129. ---
 PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
-PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
+# Owner ruling 4 (#1038, 2026-11-11): the .300 station pitch lengthens the tap
+# row 134.07 -> 144.78, so the plate's front (-Z) end is extended .25 in. The
+# rear (+Z) end, datum B, the local origin (the installed SUMMING_Z station),
+# the counter boss and the middle rib stay: the body is no longer symmetric
+# about the origin, and every Z station is one of these two ends, never a
+# half length.
+PLATE_Z_PLUS = 3.0 * MM_PER_IN  # +76.20 rear body end, datum B
+PLATE_Z_MINUS = -3.25 * MM_PER_IN  # -82.55 front body end
+PLATE_L = PLATE_Z_PLUS - PLATE_Z_MINUS  # 158.75 plate / pivot length (Z), 6.25
 COEFFICIENT_T = 7.0  # uniform plate centred on the pivot/trunnion axis
 COUNTER_WEB_T = COEFFICIENT_T  # negative-X web shares the plate's two faces
 COEFFICIENT_TOP_Y = COEFFICIENT_T / 2.0  # +3.50 spring-anchor seats
@@ -127,7 +136,7 @@ KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
 # KNIFE_RIDGE_CONTACT_SPAN apart; their relative offset skews the knife axis
 # and spreads the spring hook arms by up to KNIFE_HOOK_ARM_SPREAD_MAX.
 KNIFE_STUB_RIDGE_OFFSET_MAX = 2.0 * RIDGE_FROM_SIDE_TOL  # 0.1016
-KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 174.117 stub mid to stub mid
+KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 180.467 stub mid to stub mid
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
@@ -146,7 +155,7 @@ SURFACE_FINISHES = (
         PlanarFace(
             KNIFE_FACE_NORMAL,
             KNIFE_FACE_OFFSET,
-            contains_z_mm=(PLATE_L + HEX_DEPTH) / 2.0,
+            contains_z_mm=PLATE_Z_PLUS + HEX_DEPTH / 2.0,
         ),
         display_unit=UNIT,
     ),
@@ -157,7 +166,7 @@ SURFACE_FINISHES = (
         PlanarFace(
             KNIFE_FACE_NORMAL,
             KNIFE_FACE_OFFSET,
-            contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+            contains_z_mm=PLATE_Z_MINUS - HEX_DEPTH / 2.0,
         ),
         display_unit=UNIT,
     ),
@@ -209,11 +218,16 @@ COUNTER_FLANK_ANGLE_DEG = math.degrees(math.asin(RIB_WRAP_R / abs(TIP_X)))
 HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
 HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
-HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
-HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
-HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
-# The between-stub ridge offset's hook-arm spread over the hole column (0.077).
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST - PLATE_Z_MINUS  # 6.5685 from the -Z end
+HOLE_END_OFFSET_LAST = PLATE_Z_PLUS - HOLE_Z_LAST  # 7.4015 from the +Z end
+# Each trunnion's inboard face is flush with its body end; its outboard face
+# overhangs HEX_DEPTH (-104.267 / +97.917). The ridges rest on the knife
+# mounts at the stubs' mid-lengths (-93.4085 / +87.0585).
+HEX_Z_OUTER_PLUS = PLATE_Z_PLUS + HEX_DEPTH
+HEX_Z_OUTER_MINUS = PLATE_Z_MINUS - HEX_DEPTH
+KNIFE_SEAT_Z_PLUS = PLATE_Z_PLUS + HEX_DEPTH / 2.0
+KNIFE_SEAT_Z_MINUS = PLATE_Z_MINUS - HEX_DEPTH / 2.0
+# The between-stub ridge offset's hook-arm spread over the hole column (0.082).
 KNIFE_HOOK_ARM_SPREAD_MAX = (
     KNIFE_STUB_RIDGE_OFFSET_MAX
     * (HOLE_Z_LAST - HOLE_Z_FIRST)
@@ -282,3 +296,45 @@ GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
+
+# --- Spring-tap end walls (drawing-guidelines rule 17), at the printed limits. ---
+# The tap row follows the channel stations (CHANNEL_Z0, CHANNEL_PITCH) while
+# the plate ends are this part's own, so a station or pitch change can walk an
+# end tap out of the plate with every other check green (#1038: at the .300
+# pitch the front tap stood 0.22 from the 6.00 plate's end).  Each end tap's
+# thread major -- the purchased hook's shank and neck are no larger -- keeps
+# the rule-17 wall target to its plate end at the worst printed case: the
+# pattern's position zone at both ends and, at the -Z end, the plate length's
+# printed band too (the +Z end face is datum B, which the row's start Z is
+# BASIC from).
+SPRING_TAP_WALL_RADIUS = (
+    max(
+        THREAD_MAJOR_MM[HOLE_SPEC.size],
+        ANCHOR_9489T111.thread_major_dia_mm,
+        ANCHOR_9489T111.neck_dia_mm or 0.0,
+    )
+    / 2.0
+)
+_SPRING_TAP_POSITION_RADIUS = (
+    GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"] / 2.0
+)
+SPRING_TAP_END_WALL_PLUS = (
+    HOLE_END_OFFSET_LAST - _SPRING_TAP_POSITION_RADIUS - SPRING_TAP_WALL_RADIUS
+)
+SPRING_TAP_END_WALL_MINUS = (
+    HOLE_END_OFFSET_FIRST
+    + PLATE_L_DEVIATIONS[0]
+    - _SPRING_TAP_POSITION_RADIUS
+    - SPRING_TAP_WALL_RADIUS
+)
+SPRING_TAP_END_WALL_MIN = WALL_TARGET_MM
+for _end, _wall in (
+    ("+Z", SPRING_TAP_END_WALL_PLUS),
+    ("-Z", SPRING_TAP_END_WALL_MINUS),
+):
+    if _wall < SPRING_TAP_END_WALL_MIN:
+        raise AssertionError(
+            f"spring-tap row: the {_end} end tap keeps {_wall:.3f} mm of wall to "
+            f"the plate end at the printed limits, under "
+            f"{SPRING_TAP_END_WALL_MIN} mm"
+        )

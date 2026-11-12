@@ -288,7 +288,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     # moving across by it.  The bar line runs through both bores, each off
     # its station by the #10 hole's centring on D (.005, ⌖.010|D, owner
     # ruling 2026-11-06), the ream station, B's slip and simulator and the
-    # bore's ⌖Ø.008|A|B radius, at opposite limits over the 174.12 station
+    # bore's ⌖Ø.008|A|B radius, at opposite limits over the 180.47 station
     # spacing.  Owner ruling 2026-11-10 (Pedro), #2334, S1: the tap is cut
     # on the part, clocked by the bore, so it turns with the block and its
     # zone's radius is charged once; margin option 1a of the same date makes
@@ -297,7 +297,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.0254)
     assert top_frame.HANGER_PIN_X_TOL == pytest.approx(0.127)
     station_spacing = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT
-    assert station_spacing == pytest.approx(174.12)
+    assert station_spacing == pytest.approx(180.47)
     block = (
         top_frame.HANGER_PIN_X_TOL
         + knife_mount.STUD_TAP_POSITION_TOL / 2.0
@@ -316,7 +316,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert asm.KNIFE_BAR_YAW_DEG == pytest.approx(
         math.degrees(math.atan(2.0 * asm.KNIFE_BORE_LINE_OFFSET / station_spacing))
     )
-    assert asm.KNIFE_BAR_YAW_DEG == pytest.approx(0.2724721, abs=5e-7)
+    assert asm.KNIFE_BAR_YAW_DEG == pytest.approx(0.2628850, abs=5e-7)
     # Each block also turns on the bar by the bar's .0017 maximum diametral
     # clearance over its shortest bore (owner review of #2334).
     assert asm.KNIFE_BAR_PLAY_YAW_DEG == pytest.approx(
@@ -334,10 +334,10 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert asm.KNIFE_BAR_YAW_SHIFT == pytest.approx(
         knife_mount.PIN_HOLE_X * math.tan(math.radians(asm.KNIFE_TAP_YAW_DEG))
     )
-    assert asm.KNIFE_BAR_YAW_SHIFT == pytest.approx(0.0602272, abs=5e-7)
+    assert asm.KNIFE_BAR_YAW_SHIFT == pytest.approx(0.0589521, abs=5e-7)
     assert asm.HANGER_SCREW_MISMATCH_X == pytest.approx(0.24892)
     assert asm.HANGER_SCREW_MISMATCH_Z == pytest.approx(0.24892 + asm.KNIFE_BAR_YAW_SHIFT)
-    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.39690450082, abs=1e-9)
+    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.39591214033, abs=1e-9)
     # FR-02 replicates the same mismatch for its washer stack.
     assert build_fr_top_frame.HANGER_BAR_YAW_SHIFT == pytest.approx(
         asm.KNIFE_BAR_YAW_SHIFT, abs=1e-12
@@ -349,7 +349,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
         * (top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL)
     )
     assert asm.HANGER_SCREW_DRIFT == pytest.approx(0.19177922892, abs=1e-9)
-    assert asm.HANGER_SCREW_FLOAT_SPARE == pytest.approx(0.07171627026, abs=1e-9)
+    assert asm.HANGER_SCREW_FLOAT_SPARE == pytest.approx(0.07270863075, abs=1e-9)
     assert (
         asm.HANGER_SCREW_MISMATCH + asm.HANGER_SCREW_DRIFT
         < top_frame.HANGER_SCREW_FLOAT
@@ -361,7 +361,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert asm.KNIFE_REAR_YAW_RANGE_DEG > asm.KNIFE_TAP_YAW_DEG
 
     # The tap zone closes with spare: the stack, each mismatch carrying the
-    # zone's radius, closes at Ø0.229, so Ø.008 just fits (0.018, the margin
+    # zone's radius, closes at Ø0.230, so Ø.008 just fits (0.019, the margin
     # option 1a tightened away) and Ø.010 overruns the float.
     def spare_at(zone: float) -> float:
         shift = (zone - knife_mount.STUD_TAP_POSITION_TOL) / 2.0
@@ -371,12 +371,12 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
         return top_frame.HANGER_SCREW_FLOAT - mismatch - asm.HANGER_SCREW_DRIFT
 
     assert spare_at(0.127) == pytest.approx(asm.HANGER_SCREW_FLOAT_SPARE, abs=1e-12)
-    assert spare_at(0.1016) == pytest.approx(0.08956820, abs=1e-7)
-    assert spare_at(0.1524) == pytest.approx(0.05385497, abs=1e-7)
-    assert spare_at(0.1778) == pytest.approx(0.03598545, abs=1e-7)
-    assert spare_at(0.2032) == pytest.approx(0.01810870, abs=1e-7)
-    assert spare_at(0.254) == pytest.approx(-0.01766333, abs=1e-7)
-    assert spare_at(0.3048) == pytest.approx(-0.05345581, abs=1e-7)
+    assert spare_at(0.1016) == pytest.approx(0.09056458, abs=1e-7)
+    assert spare_at(0.1524) == pytest.approx(0.05484363, abs=1e-7)
+    assert spare_at(0.1778) == pytest.approx(0.03697070, abs=1e-7)
+    assert spare_at(0.2032) == pytest.approx(0.01909079, abs=1e-7)
+    assert spare_at(0.254) == pytest.approx(-0.01668689, abs=1e-7)
+    assert spare_at(0.3048) == pytest.approx(-0.05248429, abs=1e-7)
     assert (
         spare_at(0.3048)
         < spare_at(0.254)
@@ -393,18 +393,18 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     half_zone_max = (
         -(x0 + z0) + math.sqrt((x0 + z0) ** 2 - 2.0 * (x0**2 + z0**2 - reach**2))
     ) / 2.0
-    assert 2.0 * half_zone_max == pytest.approx(0.22892028, abs=1e-7)
+    assert 2.0 * half_zone_max == pytest.approx(0.23031050, abs=1e-7)
     assert spare_at(2.0 * half_zone_max) == pytest.approx(0.0, abs=1e-12)
     assert 0.2032 < 2.0 * half_zone_max < 0.254
-    # The C drill (owner ruling 2026-11-06) keeps the 0.072 spare; the #10
-    # loose row's Ø.238 would leave only 0.021.
+    # The C drill (owner ruling 2026-11-06) keeps the 0.073 spare; the #10
+    # loose row's Ø.238 would leave only 0.022.
     loose_float = (CLEARANCE_MM[("#10", "loose")] - screw.SHANK_DIA) / 2.0
     assert loose_float == pytest.approx(0.6095)
     assert loose_float - (
         asm.HANGER_SCREW_MISMATCH + asm.HANGER_SCREW_DRIFT
-    ) == pytest.approx(0.02081627, abs=1e-7)
+    ) == pytest.approx(0.02180863, abs=1e-7)
     # Inheriting the general symmetric .XXX hole band would allow an
-    # undersize hole leaving only 0.008; the explicit +.005/0 band keeps 0.072.
+    # undersize hole leaving only 0.009; the explicit +.005/0 band keeps 0.073.
     undersize_float = (
         top_frame.HANGER_CLEARANCE_DIA
         - top_frame.PRINTED_LINEAR_BAND_MM[3]
@@ -413,7 +413,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert undersize_float == pytest.approx(0.5969)
     assert undersize_float - (
         asm.HANGER_SCREW_MISMATCH + asm.HANGER_SCREW_DRIFT
-    ) == pytest.approx(0.00821627, abs=1e-7)
+    ) == pytest.approx(0.00920863, abs=1e-7)
     # Standard normal-fit #10 clearance cannot take this complete mismatch.
     normal_float = (CLEARANCE_MM[("#10", "normal")] - screw.SHANK_DIA) / 2.0
     assert normal_float == pytest.approx(0.3935)
@@ -636,11 +636,11 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
         assert wall >= 2.032, label
     lands = {
         "knockout to top-rim break": (build_fr_top_frame.KNOCKOUT_TOP_BREAK_LAND, 1.316861),
-        "washer to bar top break": (build_fr_top_frame.HANGER_WASHER_BAR_TOP_MARGIN, 2.253576),
-        "washer bearing annulus": (build_fr_top_frame.HANGER_WASHER_BEARING_MIN, 1.669376),
+        "washer to bar top break": (build_fr_top_frame.HANGER_WASHER_BAR_TOP_MARGIN, 2.254569),
+        "washer bearing annulus": (build_fr_top_frame.HANGER_WASHER_BEARING_MIN, 1.670369),
         "washer ring inside knockouts": (
             build_fr_top_frame.HANGER_WASHER_KNOCKOUT_RING_MIN,
-            0.159813,
+            0.161798,
         ),
     }
     for label, (land, expected) in lands.items():
@@ -652,9 +652,9 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     # from the front one, stands two ±.03 bands out.
     pocket = build_fr_top_frame.BAR_POCKET_HOLE_WALLS
     assert set(pocket) == {"hanger clearance hole", "dowel ream", "dowel knockout"}
-    assert pocket["dowel ream"] == pytest.approx(11.715424, abs=5e-6)
-    assert pocket["dowel knockout"] == pytest.approx(12.137273, abs=5e-6)
-    assert pocket["hanger clearance hole"] == pytest.approx(10.210002, abs=5e-6)
+    assert pocket["dowel ream"] == pytest.approx(17.890600, abs=5e-6)
+    assert pocket["dowel knockout"] == pytest.approx(18.312449, abs=5e-6)
+    assert pocket["hanger clearance hole"] == pytest.approx(16.385177, abs=5e-6)
     # Owner ruling 2026-10-27, option (c): the knockout prints plain #51
     # DRILL, Ø.067 at three places (MAX .071 with the drilled-hole band),
     # drawn coaxial to its ream, so it may stand the implied .XXX .005 off
@@ -741,12 +741,12 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     }
     assert knife_mount.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert knife_mount.KNIFE_BORE_PARALLELISM_TOL == pytest.approx(0.0508)
-    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.396905, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.759310, abs=5e-6)
+    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.395912, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.760722, abs=5e-6)
 
     # The bore's position zone enters the screw float only through the bar
     # line's turn about the dowel, on top of the bar's own play.  Ø.008
-    # closes with 0.072 spare; the float holds up to about Ø.087.
+    # closes with 0.073 spare; the float holds up to about Ø.091.
     hole_perp = knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL
     block = asm.KNIFE_BLOCK_SHIFT
     spacing = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT
@@ -770,9 +770,9 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert spare_at_bore(0.008 * inch) == pytest.approx(
         asm.HANGER_SCREW_FLOAT_SPARE, abs=1e-12
     )
-    assert spare_at_bore(0.016 * inch) == pytest.approx(0.06475103, abs=1e-7)
-    assert spare_at_bore(0.050 * inch) == pytest.approx(0.03436206, abs=1e-7)
-    assert spare_at_bore(0.088 * inch) < 0.0 < spare_at_bore(0.087 * inch)
+    assert spare_at_bore(0.016 * inch) == pytest.approx(0.06600037, abs=1e-7)
+    assert spare_at_bore(0.050 * inch) == pytest.approx(0.03674984, abs=1e-7)
+    assert spare_at_bore(0.092 * inch) < 0.0 < spare_at_bore(0.091 * inch)
 
     # The bar-set far-end offset is the bar's diametral clearance in the
     # largest bore plus the ridge's yaw over the mouth span; the bore's
@@ -792,9 +792,9 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert rock_at_clearance(asm.KNIFE_BAR_CLEARANCE) == pytest.approx(
         asm.KNIFE_FREE_ROCK_WORST_DEG
     )
-    assert rock_at_clearance(0.0035 * inch) == pytest.approx(7.278251, abs=5e-6)
-    assert rock_at_clearance(0.0100 * inch) == pytest.approx(5.512383, abs=5e-6)
-    assert rock_at_clearance(0.0120 * inch) == pytest.approx(4.960333, abs=5e-6)
+    assert rock_at_clearance(0.0035 * inch) == pytest.approx(7.281181, abs=5e-6)
+    assert rock_at_clearance(0.0100 * inch) == pytest.approx(5.520964, abs=5e-6)
+    assert rock_at_clearance(0.0120 * inch) == pytest.approx(4.970705, abs=5e-6)
     assert (
         rock_at_clearance(0.0120 * inch)
         < asm.KNIFE_FREE_ROCK_FLOOR_DEG
@@ -861,15 +861,15 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     assert asm.KNIFE_RIDGE_MOUTH_SPAN_MIN == pytest.approx(
         top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT - block_depth
     )
-    assert asm.KNIFE_RIDGE_MOUTH_SPAN_MIN == pytest.approx(159.896)
+    assert asm.KNIFE_RIDGE_MOUTH_SPAN_MIN == pytest.approx(166.246)
     assert asm.KNIFE_RIDGE_YAW_OFFSET == pytest.approx(
         block_depth * asm.KNIFE_BAR_CLEARANCE / asm.KNIFE_RIDGE_MOUTH_SPAN_MIN
     )
-    assert asm.KNIFE_RIDGE_YAW_OFFSET == pytest.approx(0.0038412, abs=5e-7)
+    assert asm.KNIFE_RIDGE_YAW_OFFSET == pytest.approx(0.0036945, abs=5e-7)
     assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(
         asm.KNIFE_BAR_CLEARANCE + asm.KNIFE_RIDGE_YAW_OFFSET
     )
-    assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(0.0470212, abs=5e-7)
+    assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(0.0468745, abs=5e-7)
     # Code review C09 (owner ruling T1): the print holds the ridge .159
     # +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg to its
     # side face.  The worst shoulder is .161 (4.0894) out on a flank 58.1 deg
@@ -877,7 +877,7 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     assert lever.KNIFE_SHOULDER_X_MAX == pytest.approx(4.0894)
     assert lever.KNIFE_FLANK_HALF_MAX_DEG == pytest.approx(58.1)
     assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(2.545427, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.759310, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(7.760722, abs=5e-6)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG >= asm.KNIFE_FREE_ROCK_FLOOR_DEG == 5.0
     assert knife_mount.BORE_R_MIN == pytest.approx(5.9944)
 
@@ -911,7 +911,7 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     # face, so no split past 0.5 deg passes the print.
     widest_half = (lever.HEX_W + lever.HEX_BAND) / 2.0
     split_rock = {}
-    for split, expected in ((2.0, 6.5920), (3.0, 5.8395), (5.0, 4.2971)):
+    for split, expected in ((2.0, 6.5934), (3.0, 5.8409), (5.0, 4.2986)):
         flank_to_side = 180.0 - (lever.RIDGE_ANGLE_DEG / 2.0 + split)
         split_rock[split] = rock(widest_half, flank_to_side)
         assert split_rock[split] == pytest.approx(expected, abs=5e-4)
