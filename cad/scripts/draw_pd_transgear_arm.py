@@ -61,7 +61,6 @@ from _drawing_dimensions import (
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
-    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
@@ -915,7 +914,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _reference_linear_dimensions(adapter, annotations)
     _set_stock_text(adapter, annotations)
     _end_radius_to_arc(adapter, annotations)

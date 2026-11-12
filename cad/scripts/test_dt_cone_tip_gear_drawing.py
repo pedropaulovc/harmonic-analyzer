@@ -198,7 +198,14 @@ def test_tooth_space_sheet_defines_the_space_point_by_point() -> None:
     )
     data = "\n".join([*lines, *(" ".join(row) for row in table)])
     assert notes.CYLINDER_MATE_NUMBER not in data and "BACKLASH" not in data
-    assert "(REF)" not in data and "TIF" not in data
+    assert "TIF" not in data
+    # Derived values read as reference: the R column and the station radii.
+    assert notes_text.startswith("R (REF)")
+    assert all(
+        text.startswith("(R")
+        for text, _xy in drawing.form_plot_labels()
+        if text.lstrip("(").startswith("R.")
+    )
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
     zones = [text for text, _xy, _tip in drawing.form_zone_labels()]
     assert zones == [

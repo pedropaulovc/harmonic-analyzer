@@ -38,8 +38,8 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
+    _set_tolerance_precision,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _simplified_part import (
     assert_simplified_configurations,
@@ -350,6 +350,38 @@ def _set_gap_floor_limits(adapter: Any) -> None:
                 f"{floor_limits_mm(teeth)} mm"
             )
     _telemetry.success(f"FloorDia: LIMIT set in {len(CONFIGS)} configurations")
+
+
+def _set_keyway_t_limits(adapter: Any, places: int) -> None:
+    """Print KeywayT as stacked limits, .4065 over .3995: the envelope of
+    cone_land_key.KEYWAY_T_BAND (#2519; T MAX and the T030 web unchanged).
+    As +/-.0035 the band read as a converted value, not an inch step
+    (machinist review of PR #2557, 3 of 3 runs).  One SetValues for every
+    configuration, the form set_dimension_symmetric_tolerance used here."""
+    lower, upper = deviations(cone_land_key.KEYWAY_T_BAND)
+    display, dimension = _named_dimension(adapter, KEYED_BORE_SKETCH, "KeywayT")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"KeywayT: SetValues rejected the limits {lower}/{upper} mm")
+    if int(tolerance.Type) != _TOL_LIMIT:
+        raise RuntimeError("KeywayT: LIMIT tolerance type did not persist")
+    observed = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if any(abs(o - e) > 1e-6 for o, e in zip(observed, (lower, upper))):
+        raise RuntimeError(
+            f"KeywayT: limits read back {observed} mm, expected {(lower, upper)}"
+        )
+    _set_tolerance_precision(
+        display,
+        (lower, upper),
+        display_unit=UNIT,
+        label="KeywayT",
+        places=places,
+    )
+    _telemetry.success(f"KeywayT: LIMIT {lower:+g}/{upper:+g} mm")
 
 
 def _set_configuration_bands(adapter: Any) -> None:
@@ -1112,13 +1144,7 @@ async def build(adapter) -> dict[str, str]:
         *deviations(cone_land_key.KEYWAY_WIDTH_BAND),
         places=places["KeywayWidth"], display_unit=UNIT,
     )
-    keyway_t_lower, keyway_t_upper = deviations(cone_land_key.KEYWAY_T_BAND)
-    if keyway_t_lower != -keyway_t_upper:
-        raise AssertionError("the keyway's T band must be symmetric")
-    set_dimension_symmetric_tolerance(
-        adapter, KEYED_BORE_SKETCH, "KeywayT", keyway_t_upper,
-        places=places["KeywayT"], display_unit=UNIT,
-    )
+    _set_keyway_t_limits(adapter, places["KeywayT"])
     set_dimension_bilateral_tolerance(
         adapter,
         TOOTH_REFERENCE_SKETCH,

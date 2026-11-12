@@ -166,10 +166,11 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "pd-support-bar",
         smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8128),
     ),
-    # MHA-PD-23 (pd_transgear_pin_spec, Ø.125) pressed through the arm's .124
-    # ream (pd_transgear_arm_geometry) over the whole 7.9375 stock: the press.
+    # MHA-PD-23's press land (pd_transgear_pin_spec, Ø.1266 REF) pressed into
+    # the arm's .126 ream (pd_transgear_arm_geometry) over its 7.366 length:
+    # the press (#2415; the journal passes the ream clear).
     frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): smooth_annulus_limit_mm3(
-        3.175, 3.1496, 7.9375
+        3.21564, 3.2004, 7.366
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
     # 3/32 = Ø2.38125 model) pressed into the arm's Ø2.3622 through reams

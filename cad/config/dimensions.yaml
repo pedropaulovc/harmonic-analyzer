@@ -299,7 +299,7 @@ sections:
       pivot 75 mm below the crankshaft axis with the grip axis parallel to the shaft.
 - heading: Chapter 12 — Cone Gear Set (pp. 16–21)
   elements:
-  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, with actual finite stock/custom cutter authority rather than ideal actual-count involutes. Historical photo measurements and prior reconstruction choices remain identified as such, not current cutting dimensions. T006 is cut by the custom DT6-FORM1 finite N6PA20 tool, option (a) (user ruling 2026-10-10): root R1.10, a drum-tip trochoid relief below the true-involute start, tool thickness 0.872 and blank Ø4.31, on the 1/32 in terminal journal. The cone centre is set at assembly on T120 (cone_set_stack); cones T012..T120 are accepted at nominal contact ratio >= 1.0 with no binding and no interference at the RSS corner (RSS contact ratio and arithmetic worst-corner interference are REF). T006 is pending exception ruling #971: relief >= 10 um clear of every drum-tip path, backlash >= 0.02, contact ratio REF (~0.77).'
+  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, with actual finite stock/custom cutter authority rather than ideal actual-count involutes. Historical photo measurements and prior reconstruction choices remain identified as such, not current cutting dimensions. T006 is cut by the custom DT6-FORM1 finite N6PA20 tool, option (a) (user ruling 2026-10-10): root R1.10, a drum-tip trochoid relief below the true-involute start, tool thickness 0.872 and blank Ø4.31, on the 1/32 in terminal journal. The cone centre is set by feel at assembly where the gears do not bind (owner direction 2026-11-11, #2365; cone_set_stack); cones T012..T120 are accepted at nominal contact ratio >= 1.0 at the loosest centre a feel set leaves them, the feel set itself keeping backlash >= 0 at the tightest gear (the printed-corner contact ratio there is REF). T006 is pending exception ruling #971: relief >= 10 um clear of every drum-tip path at the loosest feel set and running centres, contact ratio REF (~0.77).'
   - table:
       columns:
       - dim
@@ -537,12 +537,12 @@ sections:
       64T gear's solid root and the engaged alignment-pinion drum.
       dt_cylinder_end_disc_clearance derives the reduced disc's arithmetic
       worst-case envelopes from the actual printed size limits, the 64T's
-      chamfer-shortened bore support, T120 feeler/set and seat floats, tooth
+      chamfer-shortened bore support, the feel set's swing departure and seat floats, tooth
       runout, compensated south datum and all disc tilt permitted by its bore.
-      The 64T separating-plane air is 0.553834 mm, the engaged pinion's
-      enclosing-sphere radial air 3.496162 mm; both exceed 0.10 running air
+      The 64T separating-plane air is 0.667328 mm, the engaged pinion's
+      enclosing-sphere radial air 3.738593 mm; both exceed 0.10 running air
       plus 0.25 spare. Minimum projected retaining land beyond the farthest
-      accepted rod-ring bore edge is 2.549601 mm. Covering the entire ring
+      accepted rod-ring bore edge is 2.954126 mm. Covering the entire ring
       outer rim is neither required nor claimed; continuous axial capture is.
       All 20 cone gears share the drive axis: their maximum printed tip radius
       is 32.175 mm (T120), below the 64T's 35.570 mm maximum by 3.395 mm.
@@ -638,7 +638,7 @@ sections:
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear pitch section crosses x = −92.674686190 at the reference contact azimuth; X_PITCH follows drum x −60.393602135 and the retained placement contract, not a finite-tool tooth-tip boundary'
-        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference; ADDENDUM and WORKING_DEPTH are pitch-based references. Reference depth 1.058333333 mm, edge slack 0.20 mm (the T120 set point above standard, cone_set_stack), drum face 3.0 mm and incline 12.0246991805658° place the family (x = −92.703856638 at the former 13.0011073536895°, before #1038). Actual material tips, finite support and contact domains belong to the gear specs and stock_form_cutter; the placement identity is not mesh qualification.'
+        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference; ADDENDUM and WORKING_DEPTH are pitch-based references. Reference depth 1.058333333 mm, edge slack 0.20 mm (the CAD placement above standard; the feel set runs tighter, cone_set_stack), drum face 3.0 mm and incline 12.0246991805658° place the family (x = −92.703856638 at the former 13.0011073536895°, before #1038). Actual material tips, finite support and contact domains belong to the gear specs and stock_form_cutter; the placement identity is not mesh qualification.'
         - low
       - - Cone big-end (T120) gear centre
         - '(x, z) = (−123.728023971, −62.469328886) = (X_PITCH − 31.75 cos i, Z_DRUM0 + 31.75 sin i)'
@@ -1857,7 +1857,7 @@ sections:
         - scaled
         - med
       - - Transgear pin, bushings and ring (MHA-PD-23..25 and MHA-PD-VN-61, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
-        - 'plain steel pin `pd-transgear-pin` (MHA-PD-23, Ø.125 +.0000/-.0002) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.4625; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-24, printed length); steel feed sleeve MHA-PD-10, with .125 REAM_SLIDE bore (+.0015/+.0010) and step seating the hub''s Ø.501 spigot (+.0000/-.0008); the 150T disc pilots on that spigot, clamped by the hub flange, while the hub''s Ø.313 bore (+.0010/+.0005) and D-flat mate with the sleeve boss; brass `pd-transgear-front-bushing` (MHA-PD-25, printed length) on the sleeve nose; side-mount ring `pd-vn-transgear-retaining-ring` (MHA-PD-VN-61, McMaster 97431A240) in the pin''s groove. Between the arm front face and the rear bushing, 0 to 5 McMaster 94773A606 .005 shims `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; the model carries 2) set the end float at MHA-PD-00 (owner ruling 2026-11-01, #2038, superseding the 2026-10-28 nothing-faced stack): the fitter reads the ring gap against VIEW E''s window, the disc end float is `transgear_cluster_fit.END_FLOAT_RANGE`, and collar-to-disc air is accepted at assembly by the full-turn inspection (model: cluster rearward).'
+        - 'plain steel pin `pd-transgear-pin` (MHA-PD-23, journal Ø.125 +.0000/-.0002) pressed from the rear into the arm''s .126 +.0005/0 ream at S by its (Ø.1266) REF press land, .29 long under the head and turned to the measured ream for .0002-.0005 interference; the journal passes the ream clear (#2415). Its domed head is seated on the arm''s rear face −116.4625; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-24, printed length); steel feed sleeve MHA-PD-10, with .125 REAM_SLIDE bore (+.0015/+.0010) and step seating the hub''s Ø.501 spigot (+.0000/-.0008); the 150T disc pilots on that spigot, clamped by the hub flange, while the hub''s Ø.313 bore (+.0010/+.0005) and D-flat mate with the sleeve boss; brass `pd-transgear-front-bushing` (MHA-PD-25, printed length) on the sleeve nose; side-mount ring `pd-vn-transgear-retaining-ring` (MHA-PD-VN-61, McMaster 97431A240) in the pin''s groove. Between the arm front face and the rear bushing, 0 to 5 McMaster 94773A606 .005 shims `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; the model carries 2) set the end float at MHA-PD-00 (owner ruling 2026-11-01, #2038, superseding the 2026-10-28 nothing-faced stack): the fitter reads the ring gap against VIEW E''s window, the disc end float is `transgear_cluster_fit.END_FLOAT_RANGE`, and collar-to-disc air is accepted at assembly by the full-turn inspection (model: cluster rearward).'
         - —
         - 'ruling R9-68 (rev 5, candidate B); `pd_transgear_pin_spec`, `transgear_cluster_fit`, `pd_transgear_rear_bushing_spec`, `pd_transgear_front_bushing_spec`, `pd_vn_transgear_retaining_ring_spec`; ch23 p.59 page002_img04'
         - derived

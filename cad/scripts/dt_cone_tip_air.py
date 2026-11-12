@@ -37,7 +37,7 @@ fastener/thread class, read from the spec the drawing prints it from:
   its printed depth and its square, along the axis; across it, the same
   stations move the face in plan, which can carry more of it over G19;
 * the swing: the reamed pivot on the stock shoulder, the base pivot seat to
-  the pedestal seats, the pivot thread and the T120 set (cone_set_stack);
+  the pedestal seats, the pivot thread and the feel set (cone_set_stack);
 * the bank: the south strap/disc datum chain, accepted full-stack length and
   G19's cock in its running fit.
 
@@ -321,7 +321,7 @@ INDEPENDENT_TOLERANCES = frozenset(
         "tip block square on its one screw",
         "tip block depth",
         "base pivot seat to the pedestal seats",
-        "T120 set of the swing",
+        "swing feel set",
         "bushing outside diameter",
         "bushing length",
         "end screw set end play",
@@ -534,10 +534,13 @@ def pivot_reach_mm(tier: str, angle_deg: float) -> float:
 def _common_terms(tier: str, fixed: DrumTier, angle_deg: float) -> dict[str, float]:
     """The swing's, the bank's and G19's own closing terms."""
     terms = dict(SWING_TERMS_MM)
-    # The T120 feeler sets the swing angle to T120_SET_MM at T120; the
-    # tier turns with it about the pivot.
-    set_angle = cone_set_stack.T120_SET_MM / cone_set_stack.pivot_distance_mm(120)
-    terms["T120 set of the swing"] = pivot_reach_mm(tier, angle_deg) * set_angle
+    # The feel set leaves T120 up to SWING_SET_FROM_PLACEMENT_MM off its CAD
+    # placement; the tier turns with the swing about the pivot.
+    set_angle = (
+        cone_set_stack.SWING_SET_FROM_PLACEMENT_MM
+        / cone_set_stack.pivot_distance_mm(120)
+    )
+    terms["swing feel set"] = pivot_reach_mm(tier, angle_deg) * set_angle
     # G19 is the free end: its north face carries the accepted full stack
     # deviation as well as the south datum chain.
     terms.update(
