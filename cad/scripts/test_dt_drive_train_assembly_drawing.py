@@ -601,10 +601,10 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     (hold,) = re.findall(r"4D\. [^.]*\.", check)
     (taps,) = re.findall(r"4E\. [^.]*\.", check)
     (ease,) = re.findall(r"4N\. [^.]*\.", check)
-    assert "BINDS" in hold and "HOLD" in hold
+    assert "BIND" in hold and "HOLD" in hold
     assert " IN " in taps and " OUT " in taps
     assert "AT ITS END" in taps
-    assert "STOP" in ease and "FIRST" in ease
+    assert "SMALL STEPS" in ease and "FIRST" in ease
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
