@@ -140,7 +140,10 @@ def judge(
     Never raises. A fault of this judgement costs only what it judges: the
     cause reads ``error:<type>``, a signal ``absent`` (so the outcome is at
     best ``unknown``), each with its message in ``outcome_details``. The
-    diff's result, whose request divergence is the ground truth, is kept."""
+    diff's result, whose request divergence is the ground truth, is kept.
+    ``judge_faults`` lists every fault (``step``: ``truth_cause``, a signal,
+    or ``outcome`` for all of them; ``error``), so a signal absent because its
+    judgement raised is told from one absent from both logs."""
     cause, cause_error = _attempt(
         lambda: truth_cause(
             conv.recipe_calls(base.calls), conv.recipe_calls(new.calls), divergence
@@ -152,10 +155,12 @@ def judge(
             "outcome": Outcome.UNKNOWN.value,
             "outcome_signals": {name: Signal.ABSENT.value for name in _SIGNALS},
             "outcome_details": {name: {"error": error} for name in _SIGNALS},
+            "judge_faults": [{"step": "outcome", "error": error}],
         }
     if cause_error is not None:
         cause = "error:" + cause_error.split(":", 1)[0]
         found["outcome_details"]["truth_cause"] = {"error": cause_error}
+        found["judge_faults"].insert(0, {"step": "truth_cause", "error": cause_error})
     return {"truth_cause": cause, **found}
 
 
@@ -183,8 +188,9 @@ def outcome(
     new_captures: Path,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
-    :class:`Signal` (``outcome_signals``) and what differed
-    (``outcome_details``). Signals, all order-independent:
+    :class:`Signal` (``outcome_signals``), what differed
+    (``outcome_details``) and the signals whose judgement raised
+    (``judge_faults``). Signals, all order-independent:
 
     * ``mass``: every mass-property measurement, matched as a multiset
       within :data:`REL_TOL` (:func:`_mass_signal`);
@@ -216,11 +222,13 @@ def outcome(
     }
     signals: dict[str, Signal] = {}
     details: dict[str, Any] = {}
+    faults: list[dict[str, str]] = []
     for name, compute in attempts.items():
         keyed_only = keyed_error is not None and name in ("requests", "answers")
         result, error = (None, keyed_error) if keyed_only else _attempt(compute)
         if error is not None:
             result = Signal.ABSENT, {"error": error}
+            faults.append({"step": name, "error": error})
         signals[name], details[name] = result
     found = Outcome.SAME
     if Signal.ABSENT in signals.values():
@@ -231,6 +239,7 @@ def outcome(
         "outcome": found.value,
         "outcome_signals": {name: signal.value for name, signal in signals.items()},
         "outcome_details": details,
+        "judge_faults": faults,
     }
 
 

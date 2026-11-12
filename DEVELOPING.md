@@ -2577,11 +2577,18 @@ oracle. Every `noop` gets exactly one `noop_judgement`; each but `confirmed`
   `false_divergence`, meaning a missed reuse that is not unsafe. Refusals and
   infrastructure verdicts are never false divergences; count them by
   `verdict_class`.
+- `judge_fault`, on any verdict, is a judgement that raised: a
+  `truth_cause` of `error:<type>` or a signal `absent` because judging it
+  raised (the diff's `judge_faults`, each a `step` and its `error`), not
+  because neither log holds it; it is counted (the marker, `judge_fault` and
+  the faulted steps as `judge_faults` in the record and span) and logged at
+  WARN with the bounded evidence, so a judge that faults on every build does
+  not pass for no-ops that are legitimately unknown.
 
 The bounded evidence lists the short fields first (verdict, served and
-recorded counts, ground truth, truth cause, outcome and signals, where the
-requests diverged, the differing inputs) and the outcome details last, clipped
-to what is left of 4000 characters.
+recorded counts, ground truth, truth cause, outcome and signals, judge
+faults, where the requests diverged, the differing inputs) and the outcome
+details last, clipped to what is left of 4000 characters.
 
 The work directory is removed afterwards.
 
@@ -2671,7 +2678,7 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`), `replay.bundle_bytes` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
-| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.wall_s` |
+| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -2694,15 +2701,15 @@ and ends with one INFO line in the task log, for example:
 ```
 
 (`-` marks a step the build never reached). A `SOUNDNESS ALARM`,
-`seat_nondeterminism`, `noop_unexplained_divergence` or `noop_outcome_unknown`
-marker ends the line when it applies. On a farm leaf `cache.jsonl` stays on
-the worker, so use Application Insights for fleet-wide results. The
-`replay_shadow` record's outcome fields are `artefact_outcome` and
-`truth_cause`: `outcome` is the step's.
+`seat_nondeterminism`, `noop_unexplained_divergence`, `noop_outcome_unknown`
+or `judge_fault` marker ends the line when it applies. On a farm leaf
+`cache.jsonl` stays on the worker, so use Application Insights for fleet-wide
+results. The `replay_shadow` record's outcome fields are `artefact_outcome`
+and `truth_cause`: `outcome` is the step's.
 
 Verdict classes, alarms, seat nondeterminism, unexplained divergences,
-unconfirmed no-ops and false divergences per stem (drop `by stem` for the
-fleet total):
+unconfirmed no-ops, false divergences and judge faults per stem (drop
+`by stem` for the fleet total):
 
 ```kusto
 dependencies
@@ -2714,6 +2721,7 @@ dependencies
          unknown=tolower(tostring(customDimensions["replay.noop_outcome_unknown"])) == "true",
          unexplained=tolower(tostring(customDimensions["replay.noop_unexplained_divergence"])) == "true",
          false_divergence=tolower(tostring(customDimensions["replay.false_divergence"])) == "true",
+         judge_fault=tolower(tostring(customDimensions["replay.judge_fault"])) == "true",
          wall=todouble(customDimensions["replay.wall_s"])
 | summarize evaluated=count(), noop=countif(kind == "noop"),
             divergence=countif(kind == "divergence"),
@@ -2723,6 +2731,7 @@ dependencies
             noop_unexplained_divergence=countif(unexplained),
             noop_outcome_unknown=countif(unknown),
             false_divergences=countif(false_divergence),
+            judge_faults=countif(judge_fault),
             p50_wall_s=percentile(wall, 50), p95_wall_s=percentile(wall, 95)
             by stem
 | order by alarms desc, evaluated desc
@@ -2740,7 +2749,8 @@ dependencies
             max_pct=max(pct), p95_engine_s=percentile(engine, 95) by stem
 ```
 
-Recorder faults, soundness alarms and unexplained divergences (log records):
+Recorder faults, soundness alarms, unexplained divergences and judge faults
+(log records):
 
 ```kusto
 traces
@@ -2749,6 +2759,7 @@ traces
          recovery=tostring(customDimensions.recovery),
          kind=case(message has "SOUNDNESS ALARM", "alarm",
                    message has "noop_unexplained_divergence", "unexplained",
+                   message startswith "[com-replay] judge_fault ", "judge_fault",
                    message has "recorder fault", "record_fault", "other")
 | summarize count(), last=max(timestamp), example=take_any(message)
             by kind, recovery, label
@@ -2770,6 +2781,7 @@ jq -s '
     seat_nondeterminism: [$s[] | select(.seat_nondeterminism == true)] | length,
     noop_unexplained_divergence: [$s[] | select(.noop_unexplained_divergence == true)] | length,
     noop_outcome_unknown: [$s[] | select(.noop_outcome_unknown == true)] | length,
+    judge_faults: [$s[] | select(.judge_fault == true) | {label, key, base_key, verdict, judge_faults}],
     per_stem: ($s | group_by(.label) | map({
       label: .[0].label,
       verdicts: (group_by(.verdict // .outcome)

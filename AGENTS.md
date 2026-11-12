@@ -1040,8 +1040,9 @@ still make the same part
 (`seat_nondeterminism`, counted, never an alarm). The same part from requests
 that diverged with no earlier answer differing is
 `noop_unexplained_divergence` (counted, logged at WARN); one whose cause could
-not be judged (`truth_cause=error:<type>`) is `noop_outcome_unknown`. See
-DEVELOPING.md "COM conversation recording (shadow)".
+not be judged (`truth_cause=error:<type>`) is `noop_outcome_unknown`. A judge
+that raised, on any verdict, is also `judge_fault` (counted, logged at WARN).
+See DEVELOPING.md "COM conversation recording (shadow)".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

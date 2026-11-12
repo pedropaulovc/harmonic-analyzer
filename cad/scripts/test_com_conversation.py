@@ -1129,15 +1129,18 @@ def test_an_outcome_without_mass_or_stl_is_unknown_unless_something_differs(
         base = _shaped(tmp_path / name / "a", monkeypatch, **kwargs)
         new = _shaped(tmp_path / name / "b", monkeypatch, _REORDERED, **kwargs)
         diff = _diff(base, new, tmp_path / name / "diff.json")
-        return {k: diff[k] for k in ("outcome", "outcome_signals")}
+        return {k: diff[k] for k in ("outcome", "outcome_signals", "judge_faults")}
 
+    # A signal neither log holds is absent, and no fault of the judge.
     assert outcome("unmeasured", measure=False) == {
         "outcome": "unknown",
         "outcome_signals": {**_ALL_SAME, "mass": "absent"},
+        "judge_faults": [],
     }
     assert outcome("unexported", export=False) == {
         "outcome": "unknown",
         "outcome_signals": {**_ALL_SAME, "stl": "absent"},
+        "judge_faults": [],
     }
     # Absent signals never hide a difference.
     base = _shaped(tmp_path / "c", monkeypatch, measure=False, export=False)
@@ -1576,6 +1579,7 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome"] == "unknown"
     assert diff["outcome_signals"] == {**_ALL_SAME, "stl": "absent"}
     assert diff["outcome_details"]["stl"]["error"] == "KeyError: 'file'"
+    assert diff["judge_faults"] == [{"step": "stl", "error": "KeyError: 'file'"}]
 
     # Any fault of the judgement: unknown, recorded, the divergence kept.
     def fault(*args: Any) -> Any:
@@ -1587,6 +1591,7 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome_details"]["mass"] == {
         "error": "RuntimeError: injected judge fault"
     }
+    assert [fault["step"] for fault in diff["judge_faults"]] == ["mass", "stl"]
     monkeypatch.setattr(_com_outcome, "outcome", fault)
     monkeypatch.setattr(_com_outcome, "truth_cause", fault)
     diff = _diff(base, reordered, tmp_path / "all.json")
@@ -1595,6 +1600,10 @@ def test_a_judge_fault_costs_its_signal_never_the_ground_truth(tmp_path, monkeyp
     assert diff["outcome"] == "unknown"
     assert set(diff["outcome_signals"].values()) == {"absent"}
     assert diff["outcome_details"]["truth_cause"]["error"].startswith("RuntimeError")
+    assert [fault["step"] for fault in diff["judge_faults"]] == [
+        "truth_cause",
+        "outcome",
+    ]
 
 
 def test_caller_capture_modes(tmp_path, monkeypatch):

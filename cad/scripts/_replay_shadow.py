@@ -722,6 +722,9 @@ class Shadow:
     outcome: str = "unknown"
     outcome_signals: dict[str, str] = field(default_factory=dict)
     outcome_details: dict[str, Any] | None = None
+    # What the comparison's judge raised (_com_outcome.judge ``judge_faults``:
+    # ``step``, ``error``).
+    judge_faults: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -772,6 +775,16 @@ class Shadow:
         divergence's cause could not be judged: neither an alarm nor evidence
         of soundness. Counted apart."""
         return self.noop_judgement is NoopJudgement.OUTCOME_UNKNOWN
+
+    @property
+    def judge_fault(self) -> bool:
+        """Judging this build's recording against the base raised (a
+        ``truth_cause`` of ``error:<type>``, or a signal absent because its
+        judgement raised, not because neither log holds it): what it judged
+        is unknown, the request divergence is kept. Any verdict; counted and
+        logged at WARN, so a judge that faults every time stands out from
+        no-ops legitimately unknown."""
+        return bool(self.judge_faults) or (self.truth_cause or "").startswith("error:")
 
     @property
     def false_divergence(self) -> bool:
@@ -942,6 +955,7 @@ def shadow_of(
         shadow.outcome = str(diff.get("outcome") or "unknown")
         shadow.outcome_signals = dict(diff.get("outcome_signals") or {})
         shadow.outcome_details = diff.get("outcome_details")
+        shadow.judge_faults = list(diff.get("judge_faults") or [])
     return shadow
 
 
@@ -1000,8 +1014,8 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     served of recorded, seconds; the ground truth from this build's own
     requests; the outcome against the base's and the truth's cause; then the
     markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
-    ``noop_unexplained_divergence``, ``noop_outcome_unknown``). ``-`` marks a
-    step the build never reached."""
+    ``noop_unexplained_divergence``, ``noop_outcome_unknown``,
+    ``judge_fault``). ``-`` marks a step the build never reached."""
 
     def shown(name: str, unit: str = "") -> str:
         value = record.get(name)
@@ -1034,6 +1048,8 @@ def report_line(label: str, record: dict[str, Any]) -> str:
         segments.append("noop_unexplained_divergence")
     if record.get("noop_outcome_unknown"):
         segments.append("noop_outcome_unknown")
+    if record.get("judge_fault"):
+        segments.append("judge_fault")
     return " | ".join(segments)
 
 
@@ -1050,7 +1066,7 @@ _DIVERGENCE_SUMMARY = (
 
 
 def _evidence(base: Base, shadow: Shadow) -> str:
-    """Bounded evidence of a no-op's judgement: the short fields first, the
+    """Bounded evidence of a shadow's judgement: the short fields first, the
     outcome details last and clipped to the room left, so the cut at
     :data:`EVIDENCE_CHARS` only ever shortens the details."""
     divergence = shadow.request_divergence
@@ -1063,6 +1079,7 @@ def _evidence(base: Base, shadow: Shadow) -> str:
         "truth_cause": shadow.truth_cause,
         "outcome": shadow.outcome,
         "outcome_signals": shadow.outcome_signals,
+        "judge_faults": shadow.judge_faults,
         "request_divergence": {
             name: divergence.get(name) for name in _DIVERGENCE_SUMMARY
         }
@@ -1213,6 +1230,11 @@ def _after_build(
             "noop_outcome_unknown": shadow.noop_outcome_unknown,
             "noop_judgement": shadow.noop_judgement,
             "false_divergence": shadow.false_divergence,
+            "judge_fault": shadow.judge_fault,
+            "judge_faults": ",".join(
+                str(fault.get("step")) for fault in shadow.judge_faults
+            )
+            or None,
             "wall_s": wall,
         }
         for name, value in _attributes("replay", fields).items():
@@ -1244,6 +1266,14 @@ def _after_build(
             "SolidWorks answer the same: neither the source nor SolidWorks "
             "explains it (an input the replay does not pin?): "
             f"{_evidence(base, shadow)}",
+            label=label,
+            base_key=key,
+        )
+    if shadow.judge_fault:
+        _telemetry.warn(
+            f"[com-replay] judge_fault {label}: judging this build's recording "
+            f"against base {key[:12]} raised, so what it judged is unknown (the "
+            f"request divergence is kept): {_evidence(base, shadow)}",
             label=label,
             base_key=key,
         )

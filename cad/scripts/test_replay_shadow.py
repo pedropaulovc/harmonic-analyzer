@@ -905,6 +905,15 @@ _UNJUDGED = {
     "request_divergence": {"index": 9, "field": "args"},
     "truth_cause": "error:RuntimeError",
     "outcome": "same",
+    "judge_faults": [{"step": "truth_cause", "error": "RuntimeError: x"}],
+}
+# Diverged requests whose STL judgement raised: unknown, and a judge fault
+# whatever the verdict (an STL neither build wrote is no fault: _UNMEASURED).
+_FAULTED = {
+    "request_divergence": {"index": 9, "field": "args"},
+    "truth_cause": "request",
+    "outcome": "unknown",
+    "judge_faults": [{"step": "stl", "error": "KeyError: 'file'"}],
 }
 
 
@@ -921,12 +930,14 @@ def _verdict(name: str) -> dict[str, Any]:
         (0, _NOOP, _REORDERED, "noop", "diverged", "noop", "seat"),
         (0, _NOOP, _UNMEASURED, "noop", "same", "noop", "unknown"),
         (0, _NOOP, _UNEXPLAINED, "noop", "diverged", "noop", "unexplained"),
-        (0, _NOOP, _UNJUDGED, "noop", "diverged", "noop", "unknown"),
+        (0, _NOOP, _UNJUDGED, "noop", "diverged", "noop", "unknown judge"),
+        (0, _NOOP, _FAULTED, "noop", "diverged", "noop", "unknown judge"),
         # No comparison at all: a noop nothing confirms.
         (0, _NOOP, None, "noop", "unknown", "noop", "unknown"),
         (91, _DIVERGED, _UNEXPLAINED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _REORDERED, "diverged", "diverged", "divergence", ""),
+        (91, _DIVERGED, _FAULTED, "diverged", "diverged", "divergence", "judge"),
         (91, _DIVERGED, _SAME, "diverged", "same", "divergence", "false"),
         (91, _verdict("exhausted"), _SAME, "exhausted", "same", "divergence", "false"),
         (
@@ -969,8 +980,9 @@ def test_a_shadow_folds_replay_ground_truth_and_outcome(
         "unexplained": result.noop_unexplained_divergence,
         "unknown": result.noop_outcome_unknown,
         "false": result.false_divergence,
+        "judge": result.judge_fault,
     }
-    assert flags_of == {name: name == flags for name in flags_of}
+    assert flags_of == {name: name in flags.split() for name in flags_of}
 
 
 _NOOP_MARKERS = {
@@ -1132,7 +1144,12 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
             "| noop_unexplained_divergence",
         ),
         (
-            {"ground_truth": "same", "outcome": "unknown"},
+            # No STL captured: the signal is absent, and no judge fault.
+            {
+                "ground_truth": "same",
+                "outcome": "unknown",
+                "outcome_signals": {"mass": "same", "stl": "absent"},
+            },
             "noop_outcome_unknown",
             "| truth=same | outcome=unknown cause=- | noop_outcome_unknown",
         ),
@@ -1161,6 +1178,63 @@ def test_a_noop_the_outcome_does_not_contradict_is_counted_never_an_alarm(
     [span] = spans.named("replay.shadow ")
     assert span[f"replay.{marker}"] is True and span["replay.soundness_alarm"] is False
     assert span["replay.noop_judgement"] == marker
+    assert logged["info"][-1].endswith(line_end)
+    assert record["judge_fault"] is False and span["replay.judge_fault"] is False
+    assert "replay.judge_faults" not in span
+    assert not [m for m in logged["warn"] if m.startswith("[com-replay] judge_fault ")]
+
+
+@pytest.mark.parametrize(
+    ("verdict", "found", "steps", "line_end"),
+    [
+        (
+            "diverged",
+            {
+                "ground_truth": "diverged",
+                "truth_cause": "request",
+                "outcome": "unknown",
+                "outcome_signals": {"mass": "same", "stl": "absent"},
+                "outcome_details": {"stl": {"error": "KeyError: 'file'"}},
+                "judge_faults": [{"step": "stl", "error": "KeyError: 'file'"}],
+            },
+            "stl",
+            "| truth=diverged | outcome=unknown cause=request | judge_fault",
+        ),
+        (
+            "noop",
+            {
+                "ground_truth": "diverged",
+                "truth_cause": "error:RuntimeError",
+                "outcome": "same",
+                "judge_faults": [
+                    {"step": "truth_cause", "error": "RuntimeError: injected"}
+                ],
+            },
+            "truth_cause",
+            "| truth=diverged | outcome=same cause=error:RuntimeError "
+            "| noop_outcome_unknown | judge_fault",
+        ),
+    ],
+)
+def test_a_judge_fault_is_counted_and_warned_whatever_the_verdict(
+    blob, tmp_path, monkeypatch, spans, logged, verdict, found, steps, line_end
+):
+    def evaluate(recording, base, summary):
+        return shadow.Shadow(verdict, recorded=10, served=10, **found)
+
+    monkeypatch.setattr(shadow, "evaluate", evaluate)
+    base = _two_builds(tmp_path, monkeypatch)
+    assert logged["error"] == []
+    [warned] = [m for m in logged["warn"] if m.startswith("[com-replay] judge_fault ")]
+    fault = found["judge_faults"][0]
+    assert base.key[:12] in warned
+    assert f'"judge_faults": [{{"step": "{steps}", "error": ' in warned
+    assert json.dumps(fault["error"]) in warned
+    record = _events(tmp_path, "replay_shadow")[-1]
+    assert (record["judge_fault"], record["judge_faults"]) == (True, steps)
+    [span] = spans.named("replay.shadow ")
+    assert (span["replay.judge_fault"], span["replay.judge_faults"]) == (True, steps)
+    assert span["replay.soundness_alarm"] is False
     assert logged["info"][-1].endswith(line_end)
 
 
