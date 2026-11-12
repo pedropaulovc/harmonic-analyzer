@@ -82,6 +82,7 @@ if __package__:
 else:
     import _script_paths  # noqa: F401
 from _check import check, log  # noqa: E402
+import _config  # noqa: E402
 from _com import _flag_only  # noqa: E402
 from _session import run_build  # noqa: E402
 from _cwm import (  # noqa: E402
@@ -105,7 +106,7 @@ PIVOT_Y = PIVOT_MID_Y  # 8.0 -- rocker pivot bore at local (0, 8)
 # refs is -Z (measured: seeding at +Z0 raised flip-seed MISS off by 2*Z0), so
 # the design frame marches -Z. Don't touch the channel flip seeds for a diagnostic.
 Z0 = 10.0  # seed station depth (shaft spans +/-101.6, stations stay inside)
-PITCH = 7.0565
+PITCH = _config.machine("channels", "station_pitch_mm")
 ROD_DZ = 2.5  # rod Front plane offset off the rocker's (production J2 axial)
 PREFIXES = {"ch-rocker-arm", "ch-connecting-rod", "ch-pivot-shaft"}
 TOL_MM = 0.1
