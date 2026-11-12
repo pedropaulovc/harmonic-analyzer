@@ -286,10 +286,10 @@ SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
 # its edges (r743-p1s-B2 render). The callout text sits right of VIEW B,
 # between the hole table and the title block; its rows centre on its y.
 # The 7.56 length (#1038) grew VIEW B 5.6 mm on the sheet: between the
-# bottom view's and the hole table's 10 mm lanes it fits at 211.4 only with
+# bottom view's and the hole table's 10 mm lanes it fits at 211.2 only with
 # the table 3.5 mm further right than for the 7.12, which also gives the
 # east REF station room left of the table.
-VIEW_B_CENTER = (0.2114, 0.108)
+VIEW_B_CENTER = (0.2112, 0.108)
 VIEW_B_CROP_HALF_Z_MM = 12.0
 FOOT_HOLE_INNER_Z = min(abs(z) for _, z in HOLES) - HOLE_DIA / 2.0
 if not NARROW < VIEW_B_CROP_HALF_Z_MM < FOOT_HOLE_INNER_Z:
@@ -309,7 +309,7 @@ SEAT_CALLOUT_XY = (0.300, 0.081)
 # east text clears the hole table's left edge; the west one the front view's
 # pocket-width extension lines and the section label.
 VIEW_B_REF_RISE = 0.0055
-VIEW_B_REF_OUTBOARD = 0.004
+VIEW_B_REF_OUTBOARD = 0.0045
 VIEW_B_KEEP = {
     name: (
         VIEW_B_CENTER[0]

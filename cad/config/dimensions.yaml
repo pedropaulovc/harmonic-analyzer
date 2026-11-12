@@ -111,7 +111,10 @@ sections:
       `BLOCK_SCREW_XZ` reads `pinion_rig_park_geometry.PIVOT_X` and
       `pinion_rig_layout.BLOCK_SEAT_Z`; `FOOT_SCREW_XZ` reads that same pivot
       and `SPRING_PAD_Z`. Pedestal seats remain at X = −60.393602135 and
-      Z = −90.518912220 / +92.061087780, through `PEDESTAL_SCREW_XZ`.
+      sit at Z = −97.049312220 / +97.194687780 through `PEDESTAL_SCREW_XZ`
+      since the #1038 re-pitch to .300 in (centred bank; were −91.414312220 /
+      +91.559687780), leaving 26.25 of deck land at the transfer envelope
+      (was 31.89).
       The former block X = −21.412205567 / −4.412205567 and spring-foot
       X = −32.912205567 describe the earlier ideal-tooth parked rig; they are
       historical reconstruction coordinates, not current drilling inputs.
