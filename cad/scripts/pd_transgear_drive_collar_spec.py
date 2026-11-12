@@ -649,13 +649,14 @@ BORE_CALLOUT = (
 # size carries the depth as a REF from the section's (nominal fitted) rear
 # face (rule 26: a depth is never left to the view; REF because the rear is
 # faced to fit after reaming).  Under the size, two lines of words (rule 7):
-# its pin, pressed for good so collar and pin are one permanent pair (rule
-# 16), and why its location is tight (rule 4): the crest drives the shaft.
+# its pin and fit, and why its location is tight (rule 4): the crest drives
+# the shaft.  That the pin is pressed for good, collar and pin one permanent
+# pair (rule 16), is part note 2, beside its web.
 # An above-callout prints only on one line.
 FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
 FLAT_PIN_HOLE_SUFFIX = f" <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
 FLAT_PIN_HOLE_CALLOUT_ABOVE = "BLIND REAM"
-FLAT_PIN_HOLE_CALLOUT = f"PERMANENT PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
+FLAT_PIN_HOLE_CALLOUT = f"PRESS FIT, PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
 # The rear break prints its leg and angle on one line, then the mate it
 # clears (rule 4) on two short rows under it; the clearance is the spec's
 # assertion (FLAT_PIN_CREST_CORNER_AIR_MIN).
@@ -857,6 +858,6 @@ FIT_UP_NOTE = "\n".join(
 # (draw_pd_transgear_drive_collar.FIT_NOTES).
 DRAWING_NOTES = (
     f"1. DRIVE-PIN HOLE TO COLLAR RIM {inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
-    f"2. {FLAT_PIN_NUMBER} PIN HOLE TO DRIVE-PIN HOLE "
+    f"2. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
     f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN."
 )

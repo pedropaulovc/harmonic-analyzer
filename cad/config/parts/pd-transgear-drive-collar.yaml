@@ -21,7 +21,7 @@ pd-transgear-drive-collar:
       reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out F4). The band is the shared #25 sprocket seat's (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL), set by the dowel slip budget: the 3/32 dowels pressed here enter MHA-PD-09's holes with .0039 diametral slip, and the pin and hole location bands spend .0036 of it, so neither can loosen; a cross-part transfer route was not taken now because it re-keys MHA-DT-11, MHA-PD-09 and both assemblies"
     - id: "RV-03"
       kind: "minor"
-      where: "sheet note 2: MHA-PD-VN-70 PIN HOLE TO DRIVE-PIN HOLE .076 MIN."
+      where: "sheet note 2: PERMANENT PIN MHA-PD-VN-70: HOLE TO DRIVE-PIN HOLE .076 MIN."
       finding: "web from the Ø.0615 flat-pin ream (.118 ±.002 from the bore axis) to the -Y Ø.0930 drive-pin ream at the worst centres and largest holes below the .080 target, above the .060 floor (rules 17, 20)"
       reason: "Delegated ruling 2026-11-11 (Main), #2409; precedent band .060-.080: owner ruling 2026-11-08 #2144 item 3.2 / RV-02 on MHA-PD-17. The flat pin's centre is set by its crest over the knob shaft's D-flat and the drive-pin circle by the shared #25 sprocket seat, so neither can move to widen the web"
     - id: "RV-04"

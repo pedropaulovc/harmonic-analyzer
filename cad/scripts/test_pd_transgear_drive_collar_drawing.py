@@ -538,7 +538,9 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # its crest drives the shaft (named there): two lines of words (rule 7).
     pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
     assert len(pin_rows) == 2
-    assert "PERMANENT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
+    assert "PRESS FIT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
+    # rule 16: the package declares the pin permanent, in the part notes.
+    assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
     assert pin_rows[1] == f"CREST DRIVES {shaft_number}"
     # The ream is blind, on one line over the value (an above-callout with a
