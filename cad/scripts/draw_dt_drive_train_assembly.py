@@ -1925,7 +1925,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # working position: punch, lift off, spot-drill, drill and tap.  That
         # position is found by feel, where the gears mesh without binding
         # (owner direction 2026-11-11, #2365, superseding the check 4D
-        # leaves).  The swing check (23J) is the only acceptance, and
+        # leaves).  The swing check (23K) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
         # Check 4 then sets the swing and clamps it.  PR 2 machinist review
