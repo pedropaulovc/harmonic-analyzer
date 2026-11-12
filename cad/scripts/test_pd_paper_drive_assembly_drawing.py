@@ -2429,10 +2429,11 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
     hook = _step_body("hook-pin-hole-match-drilled")
-    # #2416 (owner direction 2026-11-11): the mesh is set on the derived
-    # feeler leaves, and no backlash window for it prints any more.
-    for leaf in steps.FEED_MESH_LEAF_TEXTS:
-        assert f"{leaf} " in mesh
+    # #2416 (owner direction 2026-11-11): the mesh is set by feel, so the step
+    # prints no setting value; the engaged-feed window is its only number.
+    assert not re.search(
+        r"\.\d{3}", mesh.replace(drawing.engaged_feed_text(domain), "")
+    )
     assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
@@ -2447,19 +2448,19 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
 
 
-def test_the_first_feeler_leaf_sets_the_feed_mesh_inside_its_design_band() -> None:
-    """Codjiflo P1 on e690ffe and 5972cc9, P2 on 2ba1416: a leaf wedged in
-    the teeth sets the gap at the mesh itself, so the as-set mesh is the one
-    the builder proves: the first leaf lands in the design band (opposite-flank
-    budget included), and only the once-used second leaf goes looser."""
+def test_the_feel_set_starts_at_the_worst_corners_first_bind() -> None:
+    """#2416 (owner direction 2026-11-11; codjiflo P3s on 2f5bac993 and
+    c4e3ec5b4): zero backlash passes the interference point, so the felt bind
+    at the worst corner comes before the flanks wedge. The stack starts there:
+    just short of it a corner still reaches past that point, and a feel set
+    runs looser than the builder's design band."""
     import paper_drive_mesh_check as mesh_check
 
-    first, second = steps.FEED_MESH_LEAF_BACKLASH_MM
-    low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
-    assert low <= first <= high < second
-    # What the replaced readings could reach: no mesh backlash left, where the
-    # feed teeth pass the interference point.
-    assert mesh_check.feed_rack_mesh((0.0, 0.0)).interference_margin_min_mm < 0.0
+    bind = steps.FEED_FIRST_BIND_BACKLASH_MM
+    short = mesh_check.feed_rack_mesh((bind - 1e-4,) * 2)
+    assert short.interference_margin_min_mm < 0.0
+    assert mesh_check.feed_rack_mesh((bind,) * 2).interference_margin_min_mm >= 0.0
+    assert steps.FEED_LOOSEST_BACKLASH_MM > rack_setup.RACK_DATUM_BACKLASH_RANGE[1]
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:
@@ -2598,10 +2599,10 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"WITH THE {_number('pd-vn-transgear-disc-screw')} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 1)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 1)}, "
-        f"{drawing.sub_step('disc-taps-transferred', 7)} AND "
-        f"{drawing.sub_step('disc-taps-transferred', 10)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 14)} ON A NEW "
+        f"{drawing.sub_step('disc-taps-transferred', 2)}, "
+        f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
+        f"{drawing.sub_step('disc-taps-transferred', 12)}-"
+        f"{drawing.sub_step('disc-taps-transferred', 16)} ON A NEW "
         f"{_number('pd-transgear-feed-pinion')}, THEN FROM {trial}.",
         f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
     ):
@@ -2617,7 +2618,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"IF A DOWEL SLIDES IN BY HAND, REPEAT FROM STEP {steps.step_number('latch-pin-pressed')} "
         f"WITH A NEW {_number('pd-transgear-arm')} ARM, {_number('pd-transgear-arm-plate')} PLATE,"
     ) in fitted
-    assert "CLAMP THE ARM FRONT UP ON THE SAME PARALLELS" in fitted
+    assert "ARM CLAMPED FRONT UP ON THE SAME PARALLELS" in fitted
     # A failed doweled re-read is cleaned and read again before the set is
     # scrapped, each its own sub-step.
     assert fitted.index("CLEAN THE TEETH AND SEATS AND REPEAT") < fitted.index("IF A CHECK STILL FAILS")

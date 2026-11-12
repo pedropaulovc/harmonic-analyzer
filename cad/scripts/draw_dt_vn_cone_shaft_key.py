@@ -59,14 +59,18 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Every view at the sheet's 2:1: the side view's 4.52 key spans 230 mm of the
+# Every view at the sheet's 2:1: the side view's 4.86 key spans 247 mm of the
 # B sheet's field, the end view sits left of it in line, the isometric under
-# it, clear of the title block (x >= 216 mm, y <= 66 mm).
+# it, clear of the title block (x >= 216 mm, y <= 66 mm).  The #1038 key is
+# 17 mm longer on the sheet than the 4.52 one: the side view and the
+# isometric stand 8 mm further right, so the end view keeps its open field,
+# and the row 8 mm (the isometric 6 mm) higher, so the longer isometric
+# keeps its air under the length's text and over the title block.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
-FRONT_CENTER = (0.040, 0.200)
-RIGHT_CENTER = (0.200, 0.200)
-ISO_CENTER = (0.200, 0.125)
+FRONT_CENTER = (0.040, 0.208)
+RIGHT_CENTER = (0.208, 0.208)
+ISO_CENTER = (0.208, 0.131)
 HALF_SIZE = SIZE * VIEW_SCALE[0] / 2000.0
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0
 # The end view's height (model X, horizontal) above it, its width (model Y,
@@ -76,7 +80,7 @@ HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0
 # line stops at the value: centred between them, both extension lines and
 # the dimension line struck the fraction (machinist review of PR #2331 head
 # 7f1dedc, r1-r3; draw_dt_pinion_lift_rod's PinHoleZ precedent).  Its line
-# stands RIGHT of the square, toward the side view's 44 mm of open field:
+# stands RIGHT of the square, toward the side view's 43 mm of open field:
 # left of it, the value's ~12 mm shelf ran out through the inner border
 # (rule 13; review of 5994f29, r1-r3, render at x 11.3-24.0 mm).
 WIDTH_TEXT_DROP = 0.012

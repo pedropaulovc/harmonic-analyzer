@@ -6,6 +6,10 @@ MHA-DT-04's land-1 keyseat drives the 64T and T030..T120.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 import _config
@@ -90,6 +94,39 @@ def test_key_lies_on_land_1_driving_the_64t_through_t030_short_of_t024() -> None
     assert north <= shaft.SECTION_ENDS[shaft.KEYED_LAND]
     assert north + set_band + band < t024_south
     assert north - set_band - band > t030_south + FACE_WIDTH / 2.0
+
+
+_SPEC_WITH_KEY_LENGTH = (
+    "import sys; import cone_land_key; "
+    "cone_land_key.KEY_LENGTH_MM = float(sys.argv[1]); "
+    "import dt_cone_gear_shaft_spec"
+)
+
+
+def _shaft_spec_refusal(key_length_mm: float) -> str:
+    """What a fresh import of the shaft spec raises with the key that long
+    ('' when it imports)."""
+    result = subprocess.run(
+        [sys.executable, "-c", _SPEC_WITH_KEY_LENGTH, repr(key_length_mm)],
+        cwd=Path(shaft.__file__).parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return ""
+    return result.stderr.strip().splitlines()[-1]
+
+
+def test_a_key_that_loses_t030_or_leaves_land_1_cannot_import() -> None:
+    """Mutation proof of the reach guard: the pre-#1038 4.52 in key passed the
+    old T024 margin at the .300 pitch while ending a face short of T030."""
+    assert _shaft_spec_refusal(spec.LENGTH) == ""
+    assert "the key drives T030 over -" in _shaft_spec_refusal(4.52 * _IN)
+    # One cone face short: the key ends about T030's south face.
+    assert "the key drives T030 over" in _shaft_spec_refusal(spec.LENGTH - FACE_WIDTH)
+    # The next .XX length up leaves land 1.
+    assert "overhangs land 1's end" in _shaft_spec_refusal(spec.LENGTH + 0.01 * _IN)
 
 
 def test_the_cut_clears_the_bar_by_a_key_size_off_its_cut_face() -> None:

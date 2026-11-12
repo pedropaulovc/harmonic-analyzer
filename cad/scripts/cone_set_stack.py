@@ -10,6 +10,14 @@ until a gear just binds, ease out only until the gears turn freely, and lock
 the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
+The ease out of the bind (check 4N) is neither printed nor measured, and no
+number is booked for it: delegated ruling 2026-11-12 (Main), following the
+owner's direction of 2026-11-11 on #2416 (the gears must not bind and must
+not come loose; backlash is not a function); owner review #2144, pending
+owner confirmation. An allowance for it would be an invented
+number. The stack books the first bind and the real stack terms, and the
+not-coming-loose gate is the nominal contact ratio there.
+
 The swing stops where the first pair binds: its backlash closes, a tip
 reaches the mate's base tangent, or a tip meets the mate's root (T006's
 ground relief takes the drum tip below its base circle; its own clearance is
@@ -145,11 +153,6 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 # and every pair lies between the pairs that hold the swing, none above this
 # at its tightest phase.
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
-# The felt ease past the first bind (check 4N: "until the gears turn
-# freely"): not printed or measured, so the contact-ratio gate holds it as an
-# allowance past the ceiling (dt_mesh_checks.contact_ratio_eased); the
-# loosest-meshing T012 keeps a contact ratio above 1.0 for ~0.042 mm there.
-FEEL_EASE_MM = 0.04
 # The far phase of the running runout: the set is felt at the tightest phase
 # of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)
 # open the centre by up to 2 x TIR at the opposite phase.
@@ -183,10 +186,9 @@ def cone_centre(teeth: int) -> ConeCentre:
 
 # The T120 centre's largest departure from the CAD placement under a feel
 # set: the swing's angle error at T120.  The bore centres sit at the
-# effective (tooth-contact) bind on the tight side and up to one TIR above it,
-# plus the felt ease, on the loose side, where the two eccentricities point at
-# each other.
+# effective (tooth-contact) bind on the tight side and up to one TIR above it
+# on the loose side, where the two eccentricities point at each other.
 SWING_SET_FROM_PLACEMENT_MM = max(
     abs(min(first_bind_offsets_mm(120)) - SET_ABOVE_STANDARD_MM),
-    abs(SET_OFFSET_MAX_MM + TOOTH_RUNOUT_TIR_MM + FEEL_EASE_MM - SET_ABOVE_STANDARD_MM),
+    abs(SET_OFFSET_MAX_MM + TOOTH_RUNOUT_TIR_MM - SET_ABOVE_STANDARD_MM),
 )

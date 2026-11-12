@@ -22,9 +22,13 @@ On conflict, the book wins over any derivative file.
 
 - **Cylinder gear tooth count = 120**, derived: the 1/4 input reduction and the per-channel
   ratio `[120 − 6j : 120]` force `T = 120` for a unit-fundamental channel.
-- **Cone incline 13.0011°**, derived from exact tracking `sin i = 3m / 7.0565`: each 6-tooth
-  step adds 3m of pitch radius per 7.0565 mm channel pitch, with the 48DP module
-  `m = 25.4 / 48` mm.
+- **Channel station pitch .300 in (7.62 mm)**, owner ruling 2026-11-11 (#1038): the original
+  measures 7.5 to 7.6 mm (eleven photo/callout reads, 7.555 ±0.048 mm), and .300 in is the
+  smallest round value that keeps the amplitude bars' least foot gap above its floor. The former
+  7.0565 mm was a doubled cosine error, not a measurement (`dimensions.yaml` Appendix C #3).
+- **Cone incline 12.0247°**, derived from exact tracking `sin i = 3m / 7.62`: each 6-tooth
+  step adds 3m of pitch radius per 7.62 mm channel pitch, with the 48DP module
+  `m = 25.4 / 48` mm (13.0011° at the former 7.0565 mm pitch).
 - **Gear standard: 48DP / 20° train, normal 24DP / 20° crank pair, 48DP and 32DP / 20° paper
   drive.** A deliberate anachronism. The original's pitch and pressure angle are not recorded;
   the earlier DP 49.82 was back-calculated from a scaled photo and the 14.5° was assumed. See

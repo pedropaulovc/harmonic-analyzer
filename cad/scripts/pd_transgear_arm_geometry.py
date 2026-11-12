@@ -282,8 +282,6 @@ if not (
 ):
     raise AssertionError("the printed locating ream leaves the interface's press limits")
 LOCATOR_HOLE_PRINTED_LIMITS_MM = (min(_LOCATOR_PRINTED), max(_LOCATOR_PRINTED))
-LOCATOR_PROUD_MM = LOCATING_PIN.PROUD_MM
-LOCATOR_PROUD_BAND_MM = LOCATING_PIN.PROUD_TOLERANCE_MM
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
 # The tap mouths take the title block's ordinary edge break (.010 chamfer):
 # no band is tightened to protect the thread (fan-out screen, gating); the

@@ -166,13 +166,17 @@ COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
 # of the MATERIAL cell, with the collar's two limits tighter than the title
 # block at the feature they govern (rule 3: never in a note) and their one
-# reason naming both faces' mates once by drawing number.  The OD edge break
-# keeps the MHA-DT-05 thrust ring above its floor (above); the sharp roots
-# let both faces seat.  Two lines of words (rule 7).
+# reason: the collar's two faces are thrust faces, and the first line names
+# their mates once by drawing number.  The OD edge break keeps the MHA-DT-05
+# thrust ring above its floor (above); the sharp roots let both faces seat.
+# The limits follow the words THRUST FACES so neither reads as a bare
+# tightening of the title block's break (machinist review, farm run
+# 20261112T024253735Z).  Two lines of words (rule 7).
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
-        f"5/8 BAR AS SUPPLIED, EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
-        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX, SEATS MHA-DT-05 AND MHA-DT-07",
+        "5/8 BAR AS SUPPLIED, SEATS MHA-DT-05 AND MHA-DT-07",
+        f"THRUST FACES: EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX, "
+        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
@@ -250,8 +254,9 @@ if not (
 # T030's north face (j = 15), inside T030's bore.  T030 then overhangs land 1
 # by the setback; T024 sits wholly on land 2.  The import-time proof below
 # the precision table shows the step and its root fillet stay south of T024
-# at print-worst.
-SEAT_STEP_SETBACK = 1.0
+# at print-worst.  1.1 mm books the cone gears' +/-.002 faces (#2314); T030's
+# 7.45 mm face still carries the step well inside its bore.
+SEAT_STEP_SETBACK = 1.1
 SEAT_STEP_GEAR = 15
 
 
@@ -449,8 +454,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title-block .XXX general grade (+-.005) and no explicit band.  This is a
 # location requirement, not a spelling: the step sits SEAT_STEP_SETBACK
 # behind T024's south face, and the proof below books the step's printed
-# limit with the stack's and the fillet's in that 1.0 mm; the .XX grade
-# (+-.01) alone would take half of it.
+# limit with the stack's and the fillet's in that setback; the .XX grade
+# (+-.01) alone would take a quarter of it.
 #
 # Tip Sec2End (collar's tip-side face to the end): three places, the .XXX
 # grade, booked in the recess proof below (the end stays inside T024's bore
@@ -665,10 +670,14 @@ if SOCKET_WALL_MIN_MM < WALL_TARGET_MM:
 # The key's north end at the far printed limits of the keyseat end's .XX
 # location and the key's .XX length stays south of T024 (gear 16), bonded on
 # land 2 one feeler north of T030: the key sits between the keyseat's end and
-# T024.
+# T024, whose south face stands at its modelled (feeler-set) station less
+# the stack's shortfall with the stack pushed onto the collar
+# (dt_cone_gear_stack.face_band), as in the setback proof.
 KEY_NORTH_MARGIN_MM = (
     FRONT_STUB
-    + gear_faces(16)[0]
+    + gear_faces(T024_SEAT)[0]
+    + cone_tip_cluster.TIP_SET_SHIFT_MM
+    + face_band(T024_SEAT, "south")[1]
     - (
         COLLAR_END_STATION
         + cone_land_key.KEY_END_SET_MM
@@ -680,6 +689,44 @@ KEY_NORTH_MARGIN_MM = (
 if KEY_NORTH_MARGIN_MM <= 0.0:
     raise AssertionError(
         f"the key reaches T024 at print-worst ({KEY_NORTH_MARGIN_MM} mm)"
+    )
+
+# The key's reach (#1038).  The margin above only stops the key SHORT of
+# T024; a key a whole face short passed it and silently dropped T030 (at the
+# .300 pitch the 4.52 key ended 9.3 south of T024).  So the other end is
+# proved too: at nominal the key's north end lies on land 1, and at
+# print-worst it still drives T030, the last keyed gear, over at least half
+# its face.  Worst case: the keyseat end's .XX location and the key's .XX
+# length at their low limits, T030 as far north as it goes -- floated
+# against T024, T024's south face at the north end of its stack and feeler
+# band (dt_cone_gear_stack.face_band), T030 at its thinnest.
+_KEY_SOUTH_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
+KEY_NORTH_END_STATION = _KEY_SOUTH_END_STATION + cone_land_key.KEY_LENGTH_MM
+if KEY_NORTH_END_STATION > SECTION_ENDS[KEYED_LAND]:
+    raise AssertionError(
+        f"the key's north end {KEY_NORTH_END_STATION:.4f} overhangs land 1's end "
+        f"{SECTION_ENDS[KEYED_LAND]:.4f}"
+    )
+KEY_T030_ENGAGEMENT_FLOOR_MM = CONE_GEAR_FACE_WIDTH / 2.0
+_T030_SOUTH_FACE_MAX_STATION = (
+    FRONT_STUB
+    + gear_faces(T024_SEAT)[0]
+    + cone_tip_cluster.TIP_SET_SHIFT_MM
+    + face_band(T024_SEAT, "south")[0]
+    - _FACE_WIDTH_LIMITS[0]
+)
+KEY_T030_ENGAGEMENT_MIN_MM = (
+    KEY_NORTH_END_STATION
+    + printed_length_deviations("Sec1KeyseatEndSet")[0]
+    - printed_band_mm(cone_land_key.KEY_LENGTH_PLACES, unit=UNIT)
+    - _T030_SOUTH_FACE_MAX_STATION
+)
+if KEY_T030_ENGAGEMENT_MIN_MM < KEY_T030_ENGAGEMENT_FLOOR_MM:
+    raise AssertionError(
+        "the key drives T030 over "
+        f"{KEY_T030_ENGAGEMENT_MIN_MM:.4f} mm at print-worst, under half its "
+        f"face ({KEY_T030_ENGAGEMENT_FLOOR_MM:.4f}); a negative reach is a "
+        "gear the key no longer drives"
     )
 
 # The keyseat's end at its printed low limit, cut by the widest end mill
