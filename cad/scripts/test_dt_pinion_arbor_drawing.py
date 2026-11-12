@@ -462,9 +462,11 @@ def test_bond_zone_callout_hangs_above_the_shaft_clear_of_its_neighbours() -> No
     label_text_right = (
         drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH - 0.0049
     )
-    assert drawing.BOND_ZONE_BLOCK_LEFT_X - label_text_right >= 0.003
+    # r5 (9dc1a4d): one character from the label read as one line; keep a
+    # clear gap.
+    assert drawing.BOND_ZONE_BLOCK_LEFT_X - label_text_right >= 0.005
     front_land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
-    assert front_land_crown_end - (x + drawing.JOURNAL_DIA_TEXT_OVERHANG) >= 0.005
+    assert front_land_crown_end - (x + drawing.JOURNAL_DIA_TEXT_OVERHANG) >= 0.003
     # Under the collar pin hole's two-row callout (underline ~3 mm under its
     # text position).
     assert drawing.PRINCIPAL_KEEP["PinHoleDia"][1] - 0.006 - top >= 0.004

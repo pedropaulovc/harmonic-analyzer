@@ -478,11 +478,13 @@ if (
 # below with the callout there (its extension would drop through the block).
 # So the witness moves to the front bond land and the callout hangs above
 # the shaft, left of its line, between detail A's label and the front land's
-# length witnesses; 8.0 off the front land keeps the block 4 mm clear of the
-# label.
-BOND_ZONE_DIA_FROM_HEAD_REAR = 75.0
+# length witnesses.  At 75.0 (r5, 9dc1a4d) the block ended one character
+# from the label's SCALE 2 : 1 (review, clarity); 69.5, 3.2 off the front
+# land, stands its line 4.2 mm short of the land's length witness and the
+# block ~7 mm clear of the label.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 69.5
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
-BOND_ZONE_LAND_CLEARANCE = 8.0
+BOND_ZONE_LAND_CLEARANCE = 3.0
 if not (
     FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN + BOND_ZONE_LAND_CLEARANCE
     <= BOND_ZONE_DIA_FROM_HEAD_REAR

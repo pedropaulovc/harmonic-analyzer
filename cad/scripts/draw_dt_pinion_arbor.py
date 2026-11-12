@@ -334,10 +334,10 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # tail would drop into the front journal's diameter block under the shaft.
 BOND_ZONE_LINE_X = _sheet_x(BOND_ZONE_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
 BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1893)
-# The block's widest row ends at its line: on the r2 sheet of #2360
-# (755e192b) "BONDED FIT IN MHA-DT-01," ran 59.3 mm, 2.47 mm a character, so
-# the 20-character "BONDED IN MHA-DT-01," starts ~49.4 mm left of the line.
-BOND_ZONE_CHAR_ADVANCE = 0.00247
+# The block's widest row ends at its line: on the r5 sheet of #1038
+# (9dc1a4d) "BONDED IN MHA-DT-01," ran 52.5 mm left of the line, 2.625 mm a
+# character (r2 of #2360, 755e192b, read 2.47 right of it).
+BOND_ZONE_CHAR_ADVANCE = 0.002625
 BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - BOND_ZONE_CHAR_ADVANCE * max(
     map(len, BOND_ZONE_CALLOUT.split("\n"))
 )
