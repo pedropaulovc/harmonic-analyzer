@@ -2459,10 +2459,10 @@ def _step_text(
         # there by feel, with no gauge, and accepted on function; a tight spot
         # is cleared by easing the arm off at it. The band stays the builder's
         # design proof (paper_drive_rack_setup); what a feel set leaves is
-        # steps.FEED_LOOSEST_MESH's. Nothing bounds the ease by number, so the
-        # no-skip check bounds it by function before the hook is drilled: an
-        # arm eased so far that the platen skips, or a tight spot that easing
-        # cannot clear, sends the fitter to the parts (codjiflo P2 on 2f5bac993).
+        # steps.FEED_LOOSEST_MESH's. The ease stops where the teeth just turn
+        # free at the tight spot, which keeps the set at that spot's bind; the
+        # no-skip check before the hook is drilled only guards against the
+        # mesh coming loose (codjiflo P2 on 2f5bac993, P3 on da9bf7c5e).
         "hanger-meshed": (
             f"SWING THE ARM UP UNTIL THE {n['pd-transgear-feed-pinion']} TEETH ARE "
             f"FULLY ENGAGED IN THE {n['pd-platen-rack']} RACK WITHOUT BINDING.",
@@ -2471,12 +2471,14 @@ def _step_text(
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
             "CHECK: NO TIGHT SPOT.",
             "IF IT HAS A TIGHT SPOT, STOP THE PLATEN AT IT.",
-            "UNCLAMP THE ARM.",
-            "EASE THE ARM DOWN UNTIL THE TEETH JUST TURN FREE THERE.",
-            f"REPEAT {s('hanger-meshed', 1)}-{s('hanger-meshed', 3)}.",
+            "WITH THE PLATEN AT THE TIGHT SPOT, UNCLAMP THE ARM.",
+            "WITH THE ARM UNCLAMPED, EASE IT DOWN UNTIL THE TEETH JUST TURN FREE "
+            "AT THE TIGHT SPOT.",
+            f"AFTER EASING, REPEAT {s('hanger-meshed', 1)}-{s('hanger-meshed', 6)} "
+            "UNTIL THE RUN HAS NO TIGHT SPOT.",
             "CHECK: KNOB HELD, PUSHED FIRMLY BY HAND EACH WAY AT BOTH ENDS AND THE "
             "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
-            "IF IT SKIPS OR STILL HAS A TIGHT SPOT, INSPECT THE "
+            "IF IT SKIPS, INSPECT THE "
             f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-platen-rack']} RACK "
             "TO THEIR SHEETS.",
             f"REPLACE THE PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",

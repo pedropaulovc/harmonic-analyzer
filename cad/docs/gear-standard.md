@@ -184,9 +184,10 @@ not bind, must not come loose, and must feed steadily; backlash is not a
 function). As on the original, MHA-PD-00 step 24 swings the arm up until the
 teeth are fully engaged without binding and clamps it there; the latch is then
 match-drilled at that mesh. No feeler, gauge or stop is used. A tight spot is
-cleared by easing the arm off at it. Before the hook is drilled, the platen is
-pushed firmly by hand with the knob held and must skip no tooth; an arm eased
-that far, or a tight spot easing cannot clear, sends the fitter to the parts.
+cleared by easing the arm off at it only until the teeth just turn free there,
+which keeps the set at that spot's bind. Before the hook is drilled, the
+platen is pushed firmly by hand with the knob held and must skip no tooth; a
+skip sends the fitter to the parts.
 The latched mesh is then accepted on function: no tight spot over the whole
 engaged feed, no skipped tooth, a steady advance.
 
@@ -203,7 +204,8 @@ every printed corner must keep a contact ratio of at least 1.0 there; it is
 delegated ruling (Main, 2026-11-11, under the owner's #2416 direction; owner
 review #2144): continuous conjugate action is what "paper advances at constant
 speed" asks, and the 1.1 of the removed .003 leaf fallback is not kept. Easing
-past the bind is not booked; the no-skip check bounds it. The builder's
+past the bind is not booked: the remedy stops where the teeth just turn free,
+and the no-skip check only guards against the mesh coming loose. The builder's
 0.12–0.14 datum band remains the design proof of the modelled mesh
 (`paper_drive_rack_setup`).
 

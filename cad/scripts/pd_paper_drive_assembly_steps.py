@@ -225,9 +225,10 @@ RACK_CREST_TOL = 0.0508  # .002
 # runs looser by at most the rack's relative index error and the feed's
 # lateral terms (along the rack) and the pinion's toothspace runout over a
 # turn (radial). The loosest feel set books those from the later of the two
-# binds. Easing past the bind is not booked: the no-skip check that follows
-# the ease is what catches an over-eased arm (draw_pd_paper_drive_assembly,
-# "hanger-meshed"), and it sends the fitter to the parts.
+# binds. Easing past the bind is not booked: the remedy eases the arm only
+# until the teeth just turn free at the tight spot, which keeps the set at that
+# spot's bind (draw_pd_paper_drive_assembly, "hanger-meshed"); the no-skip
+# check before the hook is drilled only guards against the mesh coming loose.
 
 
 def _feed_first_bind_backlash_mm() -> float:
