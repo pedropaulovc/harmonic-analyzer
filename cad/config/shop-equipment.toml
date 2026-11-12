@@ -176,6 +176,7 @@ present = false
 name = "Arbor press"
 kind = "press"
 present = false
+note = "Also pushes the 1/16-A keyway broach (tools.keyway-broach-1-16-a, #2465): about 100 lbf on a cone gear's face, 390 lbf catalogue at the broach's longest cut, so a 1-ton press is ample. The 5 in broach, a gear and the bushing collar stand about 5.4 in: check the ram's open height before buying. A candidate, not a choice: Harbor Freight 59766, 1 ton, $79.99, maximum height 5-1/2 in (listing read live 2026-11-12), which only just takes that stack."
 
 # Long enough for the tallest height an assembly sheet reads with a rule; the 6
 # in rule the archived inventory lists (Starrett C604R-6) cannot read the
@@ -405,6 +406,151 @@ thickness_in = 0.014
 bore_in = 1.0
 teeth = 72
 
+# --- gear cutting kit (#2356, #2465, #2467) ----------------------------------
+
+# The gear train as designed is cut in the shop (cad/docs/machining-dfm.md,
+# "Cutter plan"): eleven stock 20-degree involute form cutters cover every
+# gear but T006, whose form tool is shop-made (MHA-DT-37-TL-01). Nothing here
+# is owned. Every SKU and price below was read live on its vendor page on
+# 2026-11-12, before shipping and tax; the purchase itself is the owner's
+# decision on #2356 (the catalogue-gear alternative is costed there). The
+# 48DP cutters have a 7/8 in hole and the 24DP and 32DP ones a 1 in hole, so
+# the kit needs both arbors. McMaster's 48DP cutters are 14-1/2 degree only
+# and do not suit this train.
+[tools.gear-cutters-48dp-20pa]
+name = "TTC 48DP 20 deg PA involute gear cutters, HSS, 1-3/4 OD x 7/8 hole"
+kind = "involute_gear_cutter_set"
+make = "TTC"
+source = "https://www.travers.com/product/ttc-10-289-482-involute-style-gear-cutter-10-289-482"
+purchase = "Travers 10-289-481 to -488, eight cutters, $977.47 in all (listings read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+diametral_pitch = 48
+pressure_angle_deg = 20.0
+bore_in = 0.875
+
+[tools.gear-cutters-48dp-20pa.members]
+1 = { sku = "10-289-481", teeth = [135, 100000], price_usd = 126.48, use = "pd-rack-pinion 150T" }
+2 = { sku = "10-289-482", teeth = [55, 134], price_usd = 122.61, use = "dt-cone-gear T060-T120, dt-cylinder-gear x20" }
+3 = { sku = "10-289-483", teeth = [35, 54], price_usd = 126.48, use = "dt-cone-gear T036-T054" }
+4 = { sku = "10-289-484", teeth = [26, 34], price_usd = 122.61, use = "dt-cone-gear T030, dt-alignment-pinion 32T" }
+5 = { sku = "10-289-485", teeth = [21, 25], price_usd = 122.61, use = "dt-cone-gear T024" }
+6 = { sku = "10-289-486", teeth = [17, 20], price_usd = 122.61, use = "dt-cone-gear T018" }
+7 = { sku = "10-289-487", teeth = [14, 16], price_usd = 122.61, use = "pd-transgear-knob-shaft 15T" }
+8 = { sku = "10-289-488", teeth = [12, 13], price_usd = 111.46, use = "dt-cone-gear T012" }
+
+[tools.gear-cutters-24dp-20pa]
+name = "TTC 24DP 20 deg PA involute gear cutters, HSS, 2-1/4 OD x 1 hole"
+kind = "involute_gear_cutter_set"
+make = "TTC"
+source = "https://www.travers.com/product/ttc-10-289-242-involute-style-gear-cutter-10-289-242"
+purchase = "Travers 10-289-242 and 10-289-247, $137.59 each (listings read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+diametral_pitch = 24
+pressure_angle_deg = 20.0
+bore_in = 1.0
+
+[tools.gear-cutters-24dp-20pa.members]
+2 = { sku = "10-289-242", teeth = [55, 134], price_usd = 137.59, use = "dt-crank-drive-gear 64T (virtual 68 teeth)" }
+7 = { sku = "10-289-247", teeth = [14, 16], price_usd = 137.59, use = "dt-crank-pinion 16T" }
+
+[tools.gear-cutters-32dp-20pa]
+name = "TTC 32DP 20 deg PA involute gear cutter, HSS, 2-1/4 OD x 1 hole"
+kind = "involute_gear_cutter_set"
+make = "TTC"
+source = "https://www.travers.com/product/ttc-10-289-328-involute-style-gear-cutter-10-289-328"
+purchase = "Travers 10-289-328, $126.48 (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+diametral_pitch = 32
+pressure_angle_deg = 20.0
+bore_in = 1.0
+
+[tools.gear-cutters-32dp-20pa.members]
+8 = { sku = "10-289-328", teeth = [12, 13], price_usd = 126.48, use = "pd-transgear-feed-pinion 12T" }
+
+# No R8 stub arbor with a 7/8 in pilot was found on sale (Travers, KBC and
+# Victor list 1 in only, read 2026-11-12), so the 48DP cutters run on a
+# straight-shank stub arbor. Its 3/4 in shank goes in an R8 3/4 collet
+# (McMaster 3257A319, $15.08, read live 2026-11-12) if the shop has none.
+[tools.gear-cutter-arbor-7-8]
+name = "HHIP 3900-0162 stub milling arbor, 7/8 in arbor x 3/4 in straight shank, keyed, 1 in shoulder to nut"
+kind = "cutter_arbor"
+make = "HHIP"
+sku = "3900-0162"
+source = "https://shoptoolusa.com/7-8-arbor-x-3-4-straight-shank-stub-mill-arbor-3900-0162/"
+purchase = "shoptoolusa 3900-0162, $69.03, in stock (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+use = "the eight 48DP cutters"
+bore_in = 0.875
+
+# The archived inventory's R8 one-inch-pilot saw arbor was a #1413 trial
+# placeholder, not a shop fact (tools.cylinder-notch-saw above); if one is on
+# the shelf and takes a cutter this thick, this arbor is not bought.
+[tools.gear-cutter-arbor-1]
+name = "TTC 67-600-016 R8 stub milling arbor, 1 in, spacer type, 2 in shoulder to nut"
+kind = "cutter_arbor"
+make = "TTC"
+sku = "67-600-016"
+source = "https://www.travers.com/product/ttc-67-600-016-spacer-type-milling-machine-arbor-67-600-016"
+purchase = "Travers 67-600-016, $76.05, 18 in stock (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+use = "the 24DP and 32DP cutters"
+bore_in = 1.0
+
+# Hub keyways of the 16 keyed cone gears T030-T120 and the 64T (#2465;
+# cone_land_key). One pass, no shims; catalogue (duMONT "Stock Keyway
+# Broaches", read 2026-11-12): cuts .0625-.0635 wide, length of cut 13/64 to
+# 1-1/8 in, 390 lbf at the longest cut. The gears' faces are inside that
+# range. One style-A bushing serves every style-A broach; the 3/8 one is
+# bought for the Ø.375 bores.
+[tools.keyway-broach-1-16-a]
+name = "Keyway broach, 1/16 in, style A, HSS, 1/8 x 5 in body (duMONT 22201 / Hassay Savage 10104)"
+kind = "keyway_broach"
+sku = "3153A12"
+source = "https://www.mcmaster.com/3153A12/"
+purchase = "McMaster-Carr 3153A12, $100.33 (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+use = "1/16 keyways, MHA-DT-03 T030-T120 and MHA-DT-07"
+width_in = [0.0625, 0.0635]
+length_of_cut_in = [0.203125, 1.125]
+length_in = 5.0
+
+[tools.broach-bushing-3-8-a]
+name = "Collared broach bushing, style A, 3/8 in bore, 1-1/8 in long"
+kind = "broach_bushing"
+sku = "3151A109"
+source = "https://www.mcmaster.com/3151A109/"
+purchase = "McMaster-Carr 3151A109, $23.85 (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+use = "guides the 1/16-A broach in the Ø.375 bores"
+bore_in = 0.375
+
+# Shaft keyseat on MHA-DT-04 (#2467): 1/16 wide, .0395 deep, 4.53 in long.
+# The sheet prints the width .0625 +.0020/-.0010. Catalogue 1/16 end mills
+# are ground to one side of size: this one 0/+.002 (.0625-.0645), the HSS
+# stub 2802A14 -.0015/0 and the carbide 8876A11 -.002/0 (McMaster, read live
+# 2026-11-12). Measure the cutter before the cut: one at .0640 or under
+# leaves runout room below the .0645 limit; with an undersize cutter, take a
+# second pass a few tenths to one side by the DRO until the key enters.
+# Double-ended, so two pieces are four cutting ends.
+[tools.keyseat-endmill-1-16]
+name = "HSS 2-flute end mill, 1/16 in, double-end, 3/16 shank, 7/32 length of cut, diameter 0/+.002"
+kind = "endmill"
+sku = "2802A81"
+source = "https://www.mcmaster.com/2802A81/"
+purchase = "McMaster-Carr 2802A81, $36.05 each (listing read live 2026-11-12); buy two"
+present = false
+status = "not owned: to buy (owner decision pending, #2356)"
+use = "MHA-DT-04 land-1 keyseat"
+flutes = 2
+dia_in = [0.0625, 0.0645]
+
 # Engraving bit for every MHA-MS-01 (ms-stick) graduation and numeral (#2433):
 # a 30-degree included V cuts the printed .016 MIN / .024 MAX tick at its face
 # plunged .021-.033 deep (.020 MIN deep, .080 MIN stock under at the .113
@@ -534,6 +680,38 @@ section_mm = [12.7, 9.525]
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
+
+# Gear blanks (#2356): the make route's bar, not ordered (owner decision
+# pending on #2356). Lengths: each blank's length plus .14 in to part and
+# face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,
+# catalogue nominals; prices read live 2026-11-12, $439.04 for the six
+# brass bars. The pd-rack-pinion disc's bar has its own row (#2412).
+[[stock]]
+form = "round_bar"
+material = "C36000 free-cutting brass, H02"
+note = "To order, six bars: 2-5/8 x 12 in (T108, T114, T120 and the 20 dt-cylinder-gear blanks, $239.15, pid 21928); 2-1/4 x 3 in (T084-T102, $70.25, pid 19930); 1-3/4 x 3 in (T072, T078, $41.36, pid 1277); 1-1/2 x 3 in (T054-T066, $36.22, pid 1274); 1-1/8 x 3 in (T036-T048, $24.97, pid 7568); 3/4 x 12 in (T030 and the dt-alignment-pinion drum, $27.09, pid 1266). Not owned."
+dia_in = [2.625, 2.25, 1.75, 1.5, 1.125, 0.75]
+length_in = [12.0, 3.0, 3.0, 3.0, 3.0, 12.0]
+on_hand = false
+cite = ["OnlineMetals C360 round bar, standard lengths and the Custom Cut calculator, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+[[stock]]
+form = "round_bar"
+material = "C67500 manganese bronze"
+note = "To order: 5/8 in round, at least 6 in. Allocation: dt-cone-gear T012, T018, T024 and dt-cone-tip-gear (MHA-DT-37). Neither McMaster-Carr nor OnlineMetals lists C67500 rod (read 2026-11-12); Atlas Bronze lists Ø.625 as 6750S-5 with no online price, and the other mills found sell it by quotation, so no price is recorded. Not owned."
+dia_in = [0.625]
+length_in = [6.0]
+on_hand = false
+cite = ["https://www.atlasbronze.com/C67500-Product-Sheet-s/1934.htm read 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3 in x 2 in (dt-crank-drive-gear 64T, $18.22, pid 7566) and 7/8 x 12 in (dt-crank-pinion 16T, $9.14, pid 4796). Not owned."
+dia_in = [3.0, 0.875]
+length_in = [2.0, 12.0]
+on_hand = false
+cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
 
 # MHA-SM-02 knife mounts (owner ruling 2026-11-10 (Pedro), #2334 option B1).
 [[stock]]

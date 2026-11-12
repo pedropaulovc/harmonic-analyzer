@@ -1189,15 +1189,15 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '("Sec1KeyseatWidth", KEYSEAT_WIDTH_PRINT_BAND)' in source
-    # #2467: the printed width admits the keyseat one pass of a stock 1/16 end
-    # mill leaves (ground at or under size), keeps the upper limit the key's
-    # seat-depth and collar-clearance guards read, and never asks more of the
-    # key than ANSI B17.1 Class 2's .001 side interference (Machinery's
-    # Handbook, Table 4, printed p. 2367).
+    # #2467: the printed width admits a keyseat cut under nominal (catalogue
+    # 1/16 end mills are ground to one side of size; the recorded cutter's own
+    # band is checked in test_gear_cutting_kit), keeps the upper limit the
+    # key's seat-depth and collar-clearance guards read, and never asks more
+    # of the key than ANSI B17.1 Class 2's .001 side interference
+    # (Machinery's Handbook, Table 4, printed p. 2367).
     width_min, width_max = key.limits(key.KEYSEAT_WIDTH_MM, part.KEYSEAT_WIDTH_PRINT_BAND)
     assert width_max == key.limits(key.KEYSEAT_WIDTH_MM, key.KEYSEAT_WIDTH_BAND)[1]
-    end_mill_min = key.KEYSEAT_WIDTH_MM - 0.0254  # 1/16 end mill, +.000/-.001
-    assert width_min <= end_mill_min + 1e-9
+    assert width_min < key.KEYSEAT_WIDTH_MM
     key_min, key_max = key.limits(key.KEY_SIZE_MM, key.KEY_STOCK_BAND)
     assert key_min <= width_min + 1e-9  # undersize stock enters as supplied
     assert key_max - width_min == pytest.approx(part.KEY_DRESS_MAX_MM)
