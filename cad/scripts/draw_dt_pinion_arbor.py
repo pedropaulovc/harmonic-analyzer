@@ -43,6 +43,7 @@ from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
@@ -1531,11 +1532,18 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     tags = _span_tag_picks(adapter, principal)
     for key, (face, landing, text, note_xy) in tags.items():
+        # The part's face is not IsSame to its drawing-view selection (r10
+        # leaf: "selection changed before landing"); the tag is held to the
+        # view's own face, as add_surface_finish holds its symbol.
+        view_face = _select_view_entity(
+            adapter, principal, "FACE", None, label=f"arbor {key} tag", entity=face
+        )
         add_attached_note(
             adapter,
             principal,
             text=text,
             entity=face,
+            attached_to=view_face,
             entity_type="FACE",
             leader_attach_xy=landing,
             note_xy=note_xy,
