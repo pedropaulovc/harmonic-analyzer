@@ -160,6 +160,8 @@ _INSERTED_SOURCES = {
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
     "dt_cone_tip_gear_tl_cutter": "dt_cone_tip_gear_tl_cutter_bar dt_cone_tip_gear_tl_form_cutter "
     "sh_vn_arbor_set_screw",
+    "dt_cone_gear_tl_arbor": "dt_cone_gear_tl_keyed_arbor dt_cone_gear_tl_arbor_collar "
+    "dt_cone_gear_tl_arbor_key dt_cone_gear_tl_vn_arbor_nut",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
