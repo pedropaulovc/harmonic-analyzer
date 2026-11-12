@@ -293,7 +293,11 @@ manufactured XY; its native callout stays on the HUB CLAMP sheet. The
 generated TAG/X/Y/SIZE cells are not replaced by typed values. Physical
 source-body correspondence, source/view configuration and units, all table
 rows and attached tags, the A1 origin and three-place location precision are
-read back after the final rebuild.
+read back after the final rebuild. Each size group's count, size, process and
+mate print once, in one NOTE cell merged across the group's rows, which also
+flags NOTE 1 or NOTE 2 (`SEE NOTE n`) where either governs; the rows carry
+only their tag and X/Y. HUB shares the CL/CR #8-32 run; its cell names the
+bench-drilled CL, CR and that HUB is made at assembly (#2649, rule 10).
 
 Carrier **RV-02** permits exactly one flagged local-control note:
 `A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE`. The builder stores those
