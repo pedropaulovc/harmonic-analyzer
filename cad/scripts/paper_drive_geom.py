@@ -81,7 +81,7 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
     value theorem. They are displacement enclosures, NOT a force counterexample
     or a qualification of the physical contact carrier.
     """
-    clearance_low, clearance_high = arm.pivot_running_clearance_mm()
+    clearance_low, clearance_high = arm.PIVOT_BORE_DIAMETRAL_CLEARANCE
     if not 0.0 < clearance_low <= clearance_high:
         raise ValueError("source pivot running clearance must be positive and ordered")
     radius = clearance_high / 2.0

@@ -102,9 +102,9 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
 
 def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     allowed = _allowed()
-    # The pin presses through the arm's reamed bore over the whole stock.
+    # #2415: only the pin's press land grips the arm's reamed bore.
     assert allowed[_pair("pd-transgear-pin-1", "pd-transgear-arm-1")] == pytest.approx(
-        _annulus(pin.DIA, arm.PIN_BORE_DIA, arm.THICKNESS)
+        _annulus(pin.PRESS_LAND_DIA, arm.PIN_BORE_DIA, pin.PRESS_LAND_LENGTH)
     )
     # Each #0-80 is cut to fit (R9-47): it fills the disc's tap from the
     # flange's front face to its cut end, inside the disc's rear face.

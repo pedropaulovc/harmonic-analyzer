@@ -285,8 +285,8 @@ for _ok, _what in (
     ),
     (
         # Codjiflo P2 on #2124: the smallest shim bore never binds on the
-        # largest pin (line-on-line at worst; the press in the arm's .124
-        # ream keeps the pin's floor at .1248).
+        # largest pin (line-on-line at worst; the running fits and the
+        # collar air keep the pin's floor at .1248).
         SHIM.ID_MIN >= PIN.DIA_MAX - 1e-9,
         f"the MHA-PD-VN-68 shim's smallest bore {SHIM.ID_MIN} binds on the "
         f"pin's largest shank {PIN.DIA_MAX}",
