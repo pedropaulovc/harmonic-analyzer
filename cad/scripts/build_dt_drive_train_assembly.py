@@ -535,6 +535,7 @@ from dt_crankshaft_spec import (  # noqa: E402
     WHEEL_SEAT_FLOAT,
 )
 from dt_crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
+from dt_crank_handle_spec import HANDLE_MAX_DIA  # noqa: E402
 from dt_crank_handle_ferrule_spec import (  # noqa: E402
     INSTALLED_CONFIG as HANDLE_FERRULE_INSTALLED_CONFIG,
 )
@@ -1300,6 +1301,7 @@ from build_dt_cone_pivot_post import (  # noqa: E402
 )
 from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
+    CRANK_BOSS_DIA as POST_CRANK_BOSS_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     UNIT as POST_UNIT,
 )
@@ -4397,6 +4399,130 @@ SWING_OCCUPANT_CLEARANCE = require_swing_clearance(SWING_FOOTPRINTS, SWING_ROUND
 SWING_NEAREST_OCCUPANT: tuple[float, str] = min(
     (gap, name) for name, (gap, _swing) in SWING_OCCUPANT_CLEARANCE.items()
 )
+
+
+# #2616: what the plate carries swings with it.  The pivot post, tip block and
+# every other rider standing inside the plate's plan outline are covered by
+# the outline sweep above; the bodies that overhang it in plan are swept here
+# against the same occupants over the same certified SWING_ANGLES, with the
+# same SWING_SEAT_RUNNING_CLEARANCE: the crank column (post crank boss, seat
+# spigot, chain wheel, hub, pinion, and the arm-and-handle sweep about the
+# crank axis) and the cone-shaft gears (the 64T and the 20 cone gears), each
+# by its plan section.  Plan-only and at full height, so conservative whatever
+# the heights: frame column 0's tube stands at crank height for its whole
+# length.  Before #2616 this sweep did not exist and the stop's certified
+# swing ran to 12.38 deg, where the post crank boss overlaps column 0.
+def _swung(point: Plan, swing_deg: float) -> Plan:
+    """An engaged machine plan point carried ``swing_deg`` past the engaged
+    incline about the pivot, as plate_vertices_machine turns the plate."""
+    angle = math.radians(swing_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    dx, dz = point[0] - _PPIVOT[0], point[1] - _PPIVOT[2]
+    return (_PPIVOT[0] + dx * c + dz * s, _PPIVOT[2] - dx * s + dz * c)
+
+
+def _crank_section(z0: float, z1: float, radius: float) -> tuple[Plan, ...]:
+    return _plan_box(X_CRANK - radius, X_CRANK + radius, z0, z1)
+
+
+_CONE_AXIS_U = tuple(
+    (b - a) / math.dist(cone_seat(0), cone_seat(19))
+    for a, b in zip(cone_seat(0), cone_seat(19))
+)
+
+
+def _cone_axis_section(centre: Plan, face: float, radius: float) -> tuple[Plan, ...]:
+    ux, uz = _CONE_AXIS_U
+    return tuple(
+        (
+            centre[0] + ux * along * face / 2.0 - uz * across * radius,
+            centre[1] + uz * along * face / 2.0 + ux * across * radius,
+        )
+        for along, across in ((-1, -1), (1, -1), (1, 1), (-1, 1))
+    )
+
+
+_GEAR64_PLAN = cone_station(GEAR64_CENTRE_STATION)
+SWING_RIDERS: dict[str, tuple[Plan, ...]] = {
+    "post crank boss": _crank_section(
+        _POST_BOSS_SOUTH, _POST_BOSS_NORTH, POST_CRANK_BOSS_DIA / 2.0
+    ),
+    **{
+        what: _crank_section(lo, hi, dia / 2.0)
+        for lo, hi, dia, what in CRANK_COLUMN_BANDS
+    },
+    "crank hub": _crank_section(CRANK_HUB_Z0, CRANK_HUB_REAR_Z, HUB_BARREL_DIA / 2.0),
+    "crank pinion": _crank_section(_PINION_SOUTH, _PINION_NORTH, _PINION_TIP_R_MAX),
+    "crank arm and handle sweep": _crank_section(
+        CRANK_ARM_Z0 - HANDLE_BASIC_LENGTH,
+        CRANK_ARM_ORIGIN_Z,
+        ARM_C2C + HANDLE_MAX_DIA / 2.0,
+    ),
+    "64T gear": _cone_axis_section(
+        (_GEAR64_PLAN[0], _GEAR64_PLAN[2]), GEAR64_FACE, _GEAR64_TIP_R
+    ),
+    **{
+        f"cone gear {j}": _cone_axis_section(
+            cone_seat(j), CONE_FACE, _cone_tip_radius_max(120 - 6 * j)
+        )
+        for j in range(20)
+    },
+}
+
+
+def swing_rider_clearances(
+    riders: dict[str, tuple[Plan, ...]],
+    footprints: dict[str, tuple[Plan, ...]],
+    round_occupants: dict[str, tuple[Plan, float]],
+) -> dict[tuple[str, str], tuple[float, float]]:
+    """Each (rider, occupant) pair's least plan clearance over SWING_ANGLES
+    and the swing angle (deg) where it occurs: the same minimum as evaluating
+    every sample, refined as swing_occupant_clearances refines the plate (no
+    rider point moves faster than its farthest vertex's reach per radian)."""
+    step = math.radians(SWING_ANGLES[1] - SWING_ANGLES[0])
+    coarse = list(range(0, len(SWING_ANGLES), SWING_COARSE))
+    if coarse[-1] != len(SWING_ANGLES) - 1:
+        coarse.append(len(SWING_ANGLES) - 1)
+    worst: dict[tuple[str, str], tuple[float, float]] = {}
+    for rider, section in riders.items():
+        reach = step * max(math.dist(p, (_PPIVOT[0], _PPIVOT[2])) for p in section)
+        polys: dict[int, tuple[Plan, ...]] = {}
+        for name in (*footprints, *round_occupants):
+
+            def gap_at(k: int) -> float:
+                if k not in polys:
+                    polys[k] = tuple(
+                        _swung(point, SWING_ANGLES[k]) for point in section
+                    )
+                poly = polys[k]
+                if name in footprints:
+                    return _plan_gap_polygons(poly, footprints[name])
+                xz, radius = round_occupants[name]
+                nearest = min(_point_segment_gap(xz, a, b) for a, b in _edges(poly))
+                return (-nearest if _point_in_polygon(xz, poly) else nearest) - radius
+
+            gaps = {k: gap_at(k) for k in coarse}
+            least = min(gaps.values())
+            for a, b in zip(coarse, coarse[1:]):
+                if (gaps[a] + gaps[b] - reach * (b - a)) / 2.0 >= least:
+                    continue
+                for k in range(a + 1, b):
+                    gaps[k] = gap_at(k)
+                    least = min(least, gaps[k])
+            k = min(sorted(gaps), key=gaps.__getitem__)
+            worst[(rider, name)] = (gaps[k], SWING_ANGLES[k])
+    return worst
+
+
+SWING_RIDER_CLEARANCE = swing_rider_clearances(
+    SWING_RIDERS, SWING_FOOTPRINTS, SWING_ROUND_OCCUPANTS
+)
+for (_rider, _occupant), (_gap, _swing) in SWING_RIDER_CLEARANCE.items():
+    if _gap < SWING_SEAT_RUNNING_CLEARANCE:
+        raise AssertionError(
+            f"swinging {_rider} within {_gap:.3f} of the {_occupant} at swing "
+            f"{_swing:.3f} deg (needs >= {SWING_SEAT_RUNNING_CLEARANCE})"
+        )
 # The MHA-DT-33 collar can share the front pivot block's z band; its underside
 # must then clear the block's flat top.
 if (
