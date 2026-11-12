@@ -2429,10 +2429,14 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
     hook = _step_body("hook-pin-hole-match-drilled")
-    # #2416 (owner direction 2026-11-11): the mesh is set on the derived
-    # feeler leaves, and no backlash window for it prints any more.
-    for leaf in steps.FEED_MESH_LEAF_TEXTS:
-        assert f"{leaf} " in mesh
+    # #2416 (owner direction 2026-11-11): the mesh is set by feel, with no
+    # gauge and no number, and no backlash window for it prints any more.
+    for gauge_word in ("FEELER", "LEAF", "GAUGE", "INDICATOR"):
+        assert gauge_word not in mesh
+    assert not re.search(
+        r"\.\d{3}", mesh.replace(drawing.engaged_feed_text(domain), "")
+    )
+    assert "WITHOUT BINDING" in mesh
     assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
@@ -2447,19 +2451,26 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
 
 
-def test_the_first_feeler_leaf_sets_the_feed_mesh_inside_its_design_band() -> None:
-    """Codjiflo P1 on e690ffe and 5972cc9, P2 on 2ba1416: a leaf wedged in
-    the teeth sets the gap at the mesh itself, so the as-set mesh is the one
-    the builder proves: the first leaf lands in the design band (opposite-flank
-    budget included), and only the once-used second leaf goes looser."""
+def test_the_loosest_feel_set_keeps_the_feed_mesh_in_contact() -> None:
+    """#2416 (owner direction 2026-11-11): the arm is swung up until the teeth
+    are fully engaged without binding, so the floor is the feel's own (no
+    corner past its first bind) and the stack books only how loose a feel set
+    can leave the mesh. There it still keeps one pair in contact at every
+    corner, and the remedy for a tight spot is easing the arm, not a gauge."""
     import paper_drive_mesh_check as mesh_check
 
-    first, second = steps.FEED_MESH_LEAF_BACKLASH_MM
-    low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
-    assert low <= first <= high < second
-    # What the replaced readings could reach: no mesh backlash left, where the
-    # feed teeth pass the interference point.
+    bind = steps.FEED_FIRST_BIND_BACKLASH_MM
+    # Zero backlash passes the interference point, so the feel's first bind
+    # at some corners comes before the flanks wedge, and the stack starts there.
     assert mesh_check.feed_rack_mesh((0.0, 0.0)).interference_margin_min_mm < 0.0
+    assert mesh_check.feed_rack_mesh((bind, bind)).interference_margin_min_mm >= 0.0
+    assert steps.FEED_LOOSEST_BACKLASH_MM > rack_setup.RACK_DATUM_BACKLASH_RANGE[1]
+    loosest = mesh_check.feed_rack_mesh((bind, steps.FEED_LOOSEST_BACKLASH_MM))
+    assert loosest.contact_ratio_min >= steps.FEED_CONTACT_RATIO_FLOOR >= 1.0
+    meshed = _step_body("hanger-meshed")
+    assert "EASE THE ARM" in meshed
+    hook = _step_body("hook-pin-hole-match-drilled")
+    assert "LEAF" not in hook
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:

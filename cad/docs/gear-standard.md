@@ -178,19 +178,29 @@ hidden `KnobSettingReference` sketch), printed in sheet 6's DETAIL K: the S-K
 centre distance toleranced 43.794 +0.050/-0, the two DRO coordinates as
 references.
 
-The paper feed mesh (12T feed pinion on the purchased rack) is set at assembly
-on a feeler leaf, not on a number (owner direction on #2416, 2026-11-11: the
-mesh must not bind, must not come loose, and must feed steadily; backlash is
-not a function). MHA-PD-00 step 24 wedges a .0025 leaf in the teeth with the
-arm, clamps the arm and draws the leaf out. That leaves 2t/cos 20° = 0.135 mm
-of tooth-centred datum backlash whatever play lies behind the pinion, inside
-the builder's 0.12–0.14 design band and its opposite-flank budget. Only if
-that run shows a tight spot is the arm re-set once on a .003 leaf (0.162 mm).
-Its contact ratio is 1.177. That is below 1.2 but above the 1.1 continuous-
-action floor, which is the floor the owner's option C accepts at the loose
-end (`pd_paper_drive_assembly_steps.FEED_MESH_LEAF_BACKLASH_MM` and
-`FEED_FALLBACK_CONTACT_RATIO_FLOOR`). The latched mesh is then accepted on
-function: no tight spot, and no skipped tooth with the platen pushed by hand.
+The paper feed mesh (12T feed pinion on the purchased rack) is set by feel at
+assembly, not on a number (owner direction on #2416, 2026-11-11: the mesh must
+not bind, must not come loose, and must feed steadily; backlash is not a
+function). As on the original, MHA-PD-00 step 24 swings the arm up until the
+teeth are fully engaged without binding and clamps it there; the latch is then
+match-drilled at that mesh. No feeler, gauge or stop is used. The mesh is
+accepted on function: no tight spot over the whole engaged feed, no skipped
+tooth with the platen pushed by hand, a steady advance. A tight spot is
+cleared by easing the arm off and re-locking it.
+
+No binding is what the feel set itself guarantees: the arm locks short of the
+first bind. At some printed corners a rack crest reaches the pinion's flank
+below its base circle before the flanks wedge, at 0.069 mm of tooth-centred
+backlash, so the stack starts from that later bind. Against coming loose, the
+feed must keep a contact ratio of at least 1.0 at every printed corner at the
+loosest centre a feel set leaves: that bind, opened along the rack by the
+rack's index error and the feed's lateral terms (the run's tight spot, where
+the set is felt, against its loosest station) and radially by the pinion's
+toothspace runout and the 0.04 mm felt ease the cone set also books. That is
+0.255 mm of backlash, contact ratio 1.019
+(`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). The builder's 0.12–0.14
+datum band remains the design proof of the modelled mesh
+(`paper_drive_rack_setup`).
 
 ### Setting the cone mesh
 
