@@ -2481,7 +2481,8 @@ def _step_text(
             "IF IT SKIPS, INSPECT THE "
             f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-platen-rack']} RACK "
             "TO THEIR SHEETS.",
-            f"REPLACE ANY PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",
+            "IF IT SKIPPED, REPLACE ANY PART FOUND OUTSIDE AND REPEAT FROM "
+            f"{s('hanger-meshed', 0)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2522,10 +2523,14 @@ def _step_text(
             # drift, by re-soldering the rack level; that the loop then ends is
             # steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen comes off
             # for the rework as in lock-seats-faced (codjiflo P3 on 6c847adb0).
+            # Machinist review r8 (59eb13ee2): a pass exit first, so a builder
+            # whose checks all passed does not read on into the rework.
+            "IF EVERY CHECK PASSES, GO TO STEP "
+            f"{steps.step_number('fitup-pose-set')}.",
             f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
             f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS, AND THE RACK AND "
             "GUIDES FOR LOOSENESS.",
-            f"THEN UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
+            f"AFTER INSPECTING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
             "REPLACE ANY PART FOUND OUTSIDE OR LOOSE, PER ITS STEP "
