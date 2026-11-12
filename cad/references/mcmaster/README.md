@@ -49,6 +49,10 @@ recipes:
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | — (retired TL-VN-68, 2026-11-07: the CR clamp takes the common 91251A197; catalogue-only diagnostic removed) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A337 | `dt-cylinder-gear-tl-vn-cam-clamp-screw` (MHA-DT-12-TL-VN-52; shop fixture; catalogue-only, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 92141A011 | `dt-cylinder-gear-tl-vn-cam-clamp-washer` (MHA-DT-12-TL-VN-53; shop fixture; catalogue-only, no vendor model) | 18-8 Stainless Steel Washer |
+| 97175A344 | `dt-cylinder-gear-tl-vn-cam-stub` (MHA-DT-12-TL-VN-50; shop fixture; catalogue-only, no vendor model) | Pull-Out Dowel Pin |
+| 23065A503 | `dt-cylinder-gear-tl-vn-cam-clock-pin` (MHA-DT-12-TL-VN-51; shop fixture; ordered at .0375 and cut to length, built as its own part; no recipe) | Class Z Plug Gauge |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
@@ -498,6 +502,21 @@ joint. The diagnostic mentioned below was removed; this is not a live recipe.
   split). No vendor model was downloaded, so it is not replica-gated: the
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
+- [97175A344](https://www.mcmaster.com/97175A344/),
+  [23065A503](https://www.mcmaster.com/23065A503/),
+  [91251A337](https://www.mcmaster.com/91251A337/) and
+  [92141A011](https://www.mcmaster.com/92141A011/) (the cylinder gears' cam
+  turning fixture kit MHA-DT-12-TL-00, issue #2361) were read live on
+  November 12, 2026. 97175A344: 4140 pull-out dowel, 3/8 x 3/4, tapped 10-32,
+  +0.0001/+0.0003 in, Rockwell C47, ASME B18.8.2, $3.81 each; the page gives
+  no tapped depth, so the model takes ASME B18.8.2's 0.255 in full-thread
+  minimum (HVH Industrial data sheet). 23065A503: class Z no-go plug gauge,
+  0.0110-0.0605 in by 0.0005 in, -0.0001/0 in, 2 in long, Rockwell C60,
+  $7.50 each; ordered at 0.0375 in and cut to 0.28 in. 91251A337: 10-32 x
+  5/16 black-oxide alloy socket head screw, head 5/16 x 0.19, 5/32 hex,
+  class 3A, $22.41 per 50. 92141A011: 18-8 No. 10 washer, ID 0.203, OD
+  0.438, thickness 0.017-0.047 in, $3.79 per 100. No vendor model was
+  downloaded; the dowel, screw and washer recipes are catalogue-only.
 
 ### Historical non-McMaster captured-pivot purchases (retired 2026-10-23)
 

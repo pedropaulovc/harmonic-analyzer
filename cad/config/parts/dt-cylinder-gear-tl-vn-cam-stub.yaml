@@ -1,0 +1,16 @@
+dt-cylinder-gear-tl-vn-cam-stub:
+  title: Cylinder Gear Cam Fixture Stub
+  # Shop fixture: the parent MHA-DT-12 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Issue #2361: pressed in the MHA-DT-12-TL-01 body at the cam throw; the gear's
+  # bore slides on it and the clamp screw threads into its tapped end.
+  number: MHA-DT-12-TL-VN-50
+  stock_name: Pull-Out Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: ["97175A344"]
+  material: Alloy Steel
+  material_specification: "High-strength 4140 alloy steel pull-out dowel, 3/8 x 3/4, tapped 10-32, Rockwell C47 min, ASME B18.8.2; McMaster-Carr 97175A344"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in
