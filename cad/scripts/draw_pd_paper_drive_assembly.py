@@ -2514,14 +2514,24 @@ def _step_text(
             "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",
-            # Codjiflo P2 on 6abe1aa7f: a re-seat moves the rack against the
-            # match-drilled latch, and a hitch with every part in its sheet is
-            # the feel set's own; either way the mesh is set again by feel on a
-            # new hook.
+            # Codjiflo P2s on 6abe1aa7f and aa3c6786c: a re-seat moves the rack
+            # against the match-drilled latch, so the mesh is set again by feel
+            # on a new hook. A feel set always lands at the run's tight-spot
+            # bind, so with every part inside its sheet the remedy takes out
+            # the one term the fitter controls, the crest drift (re-soldered
+            # level, the arithmetic worst case passes:
+            # steps.FEED_LOOSE_TERMS_MM), before setting it again.
             "IF A CHECK FAILS, RE-SEAT ANY LOOSE RACK OR GUIDE (STEPS "
             f"{steps.step_number('rack-soldered')} AND "
             f"{steps.step_number('guides-screwed')}).",
-            f"THEN FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
+            f"IF NONE IS LOOSE, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH AND "
+            f"THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
+            "REPLACE ANY PART FOUND OUTSIDE.",
+            "IF ALL ARE INSIDE, RE-SOLDER THE RACK PER STEP "
+            f"{steps.step_number('rack-soldered')}, ITS CRESTS READING THE SAME AT "
+            "BOTH ENDS.",
+            "REMOVE THE PAPER.",
+            f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)}.",
             f"WITH THE NEW HOOK, REPEAT {s('hanger-meshed', 0)}-"
             f"{s('loaded-rack-geometry-checked', 4)}.",

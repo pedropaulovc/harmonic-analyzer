@@ -304,11 +304,25 @@ if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
     )
 # If every term stacks, the contact ratio falls just under 1.0: a slight hitch
 # in the feed at that station, which the steady-advance check
-# ("loaded-rack-geometry-checked") catches; its remedy sets the mesh again by
-# feel on a new hook (from "hanger-meshed").
+# ("loaded-rack-geometry-checked") catches. Its remedy re-solders the rack
+# with its crests level, the one term the fitter controls, before setting the
+# mesh again by feel on a new hook; without that term even the arithmetic
+# worst case keeps the floor, so the loop ends.
 FEED_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_WORST_CASE_BACKLASH_MM)
 )
+FEED_LEVEL_RACK_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
+    (
+        FEED_FIRST_BIND_BACKLASH_MM,
+        FEED_WORST_CASE_BACKLASH_MM
+        - FEED_LOOSE_TERMS_MM["rack crest drift along the run"],
+    )
+)
+if not FEED_LEVEL_RACK_WORST_CASE_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
+    raise AssertionError(
+        "a level-soldered rack still leaves the feed mesh: "
+        f"{FEED_LEVEL_RACK_WORST_CASE_MESH.summary}"
+    )
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
