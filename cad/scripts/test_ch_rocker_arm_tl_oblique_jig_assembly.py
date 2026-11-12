@@ -2108,8 +2108,9 @@ def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
     inch = spec.trammel.INCH
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert ".215 DEEP FROM THE RISER TOP" in steps["18"]
-    assert steps["18A"].startswith("18A. CHECK") and ".205-.225" in steps["18A"]
-    assert steps["18B"].startswith("18B. IF ") and steps["18C"].startswith("18C. IF ")
+    assert "INNER PASS" in steps["18"] and "OUTER PASS" in steps["18B"]
+    assert steps["18D"].startswith("18D. CHECK") and ".205-.225" in steps["18D"]
+    assert steps["18E"].startswith("18E. IF ") and steps["18F"].startswith("18F. IF ")
     assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
     assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
     # The strap cut's depth is printed from the seated strap: past its
@@ -2597,8 +2598,8 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
     assert spec.NUMBER_DRILL_MM[spec._TAP_DRILL] == feed_block.NUT_TAP_DRILL
-    assert spec._SPOT_DRILL in steps["8J"]
-    assert spec._TAP_DRILL in steps["8K"] and feed_nut.SCREW_THREAD in steps["8K"]
+    assert spec._SPOT_DRILL in steps["8J"] and spec._TAP_DRILL in steps["8J"]
+    assert feed_nut.SCREW_THREAD in steps["8K"]
     # Owner ruling 2026-11-04 (#2177 option 3): the nut screws' heads are
     # calipered to the limit TL-32's head-to-body stack-up is built on; an
     # oversize head is replaced, the nut body never cut.
