@@ -77,7 +77,7 @@ def sheet_notes() -> str:
             f"   ITS END RUNS IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE} "
             f"(DIAMETRAL CLEARANCE {clearance}).",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
-            "THEN BY BACKLASH AT ASSEMBLY,",
+            "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
             "3. CENTRES OK.",
         )

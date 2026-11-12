@@ -604,7 +604,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "BIND" in hold and "HOLD" in hold
     assert " IN " in taps and " OUT " in taps
     assert "AT ITS END" in taps
-    assert "SMALL STEPS" in ease and "FIRST" in ease
+    assert "SMALL STEPS" in ease and "RUN FREE" in ease
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
@@ -1001,7 +1001,7 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     # the clamp and the punch; sequence, not wording (AGENTS.md).
     route = [
         "JUST BIND",
-        "TURN FREELY THROUGH",
+        "RUN FREE",
         "CLAMP MHA-DT-20 TO MHA-FR-01.",
         "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
         "LIFT MHA-DT-20 OFF.",

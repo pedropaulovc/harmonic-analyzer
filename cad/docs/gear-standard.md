@@ -251,12 +251,12 @@ times and locks it by feel where the gears do not bind (owner direction
 from MHA-DT-00 check 4 (CONE SWING SET):
 
 1. Ease the arbor-pedestal screws until the pedestals move under light taps.
-2. Hold the cone set swung in and tap each pedestal in until the gears at its
-   end just bind, so the arbor lies on the binds at both ends. Tighten the
-   pedestal screws.
-3. Swing out, swing in until a gear just binds, ease out only until the gears
-   turn freely through one turn of the cone set, hold it there, and lock
-   MHA-DT-VN-51.
+2. Hold the cone set swung in at the first bind and tap each pedestal in or
+   out until the gears at its end just bind, so the arbor lies on a bind near
+   each end (a gear past a hold: owner question #2584). Tighten the pedestal
+   screws.
+3. Swing out, swing in until a gear just binds, ease out in small steps until
+   four crank turns run free, hold it there, and lock MHA-DT-VN-51.
 4. Turn the crank through one turn of every MHA-DT-12 (80 crank turns): no
    gear binds. If one does, loosen the knob there and ease out again.
 5. Do not loosen the pedestals after the set. If you do, redo both settings.

@@ -359,7 +359,8 @@ def sheet_notes(teeth: int) -> str:
     2026-11-09, C1 keyed, PR #1992): the note names the fit, its mate and
     its diametral clearance (rule 23).
     Note 2 names the mesh and the fit route of the tip, thickness and root
-    bands: the over-pins and assembly backlash acceptances in GEAR DATA; it
+    bands: over pins, then the feel set at assembly (MHA-DT-00 check 4;
+    GEAR DATA carries the backlash as REF, #2586); it
     carries the teeth's do-not-cut, flagged to them rather than in a general
     block.
     """
@@ -378,7 +379,7 @@ def sheet_notes(teeth: int) -> str:
     return "\n".join((
         *fit,
         f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS, "
-        "THEN BY BACKLASH AT ASSEMBLY,",
+        "THEN BY FEEL AT ASSEMBLY,",
         f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
     ))
 

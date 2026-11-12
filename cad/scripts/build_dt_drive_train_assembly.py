@@ -515,6 +515,8 @@ from dt_crank_arm_spec import (  # noqa: E402
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_THICKNESS,
+    END_RADIUS as ARM_END_RADIUS,
+    UNIT as ARM_UNIT,
 )
 from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
@@ -4443,6 +4445,12 @@ def _cone_axis_section(centre: Plan, face: float, radius: float) -> tuple[Plan, 
 
 
 _GEAR64_PLAN = cone_station(GEAR64_CENTRE_STATION)
+# The crank-arm band carries both the arm's handle-end semicircle (its
+# printed largest radius about the handle pivot) and the handle grip.
+_ARM_SWEEP_R = ARM_C2C + max(
+    ARM_END_RADIUS + printed_deviations(ARM_END_RADIUS, 2, unit=ARM_UNIT)[1],
+    HANDLE_MAX_DIA / 2.0,
+)
 SWING_RIDERS: dict[str, tuple[Plan, ...]] = {
     "post crank boss": _crank_section(
         _POST_BOSS_SOUTH, _POST_BOSS_NORTH, POST_CRANK_BOSS_DIA / 2.0
@@ -4456,7 +4464,7 @@ SWING_RIDERS: dict[str, tuple[Plan, ...]] = {
     "crank arm and handle sweep": _crank_section(
         CRANK_ARM_Z0 - HANDLE_BASIC_LENGTH,
         CRANK_ARM_ORIGIN_Z,
-        ARM_C2C + HANDLE_MAX_DIA / 2.0,
+        _ARM_SWEEP_R,
     ),
     "64T gear": _cone_axis_section(
         (_GEAR64_PLAN[0], _GEAR64_PLAN[2]), GEAR64_FACE, _GEAR64_TIP_R

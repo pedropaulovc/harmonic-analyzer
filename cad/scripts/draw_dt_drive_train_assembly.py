@@ -2039,7 +2039,8 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # each blind seat's full-thread depth and its screw's thread length
         # are recorded before the screw goes in; checks 4W and 4Y take the
         # lesser of the two.  The transfer pose is check 4's feel set (4M-4N:
-        # in to the first bind, eased out until the gears turn freely), so
+        # in to the first bind, eased out in small steps to the first free
+        # run, #2585), so
         # the permanent pivot is punched where check 4 will set the swing.
         # With no pivot yet the plate is free in the base plane: gears 0 and
         # 19 sitting fully on their cone gears' faces fixes its slide along
@@ -2055,8 +2056,8 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "CONE SET ON THE BASE: SLIDE MHA-DT-20 UNTIL GEARS 0 AND 19 SIT FULLY ON THEIR "
             "CONE GEARS' FACES (LOOK FROM ABOVE).\n"
             "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
-            f"EASE IT OUT SQUARE UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
-            "CRANK TURNS.\n"
+            f"EASE IT OUT SQUARE IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS "
+            "RUN FREE.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
@@ -2161,7 +2162,7 @@ CHECKS = _note_text(
         "4K. REDO 4C-4G.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
-        f"4N. EASE OUT IN SMALL STEPS TO THE FIRST FREE {CONE_TURN_CRANK_TURNS} CRANK TURNS.",
+        f"4N. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
         "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
         "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",

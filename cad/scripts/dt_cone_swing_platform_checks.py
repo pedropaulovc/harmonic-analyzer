@@ -462,7 +462,9 @@ def manufactured_p1_stop_enclosure() -> dict:
                     f"engagement >= {pivot_stock.MIN_USEFUL_ENGAGEMENT_MM:.2f} mm, "
                     "shoulder fully seated; stop full-form engagement >= "
                     f"{stop_stock.MIN_USEFUL_ENGAGEMENT_MM:.2f} mm, head fully "
-                    "seated; platform remains seated throughout P1; not stock inspection evidence"
+                    "seated, its true position per "
+                    f"{STOP_HEAD_POSITION_SOURCE}; platform remains seated "
+                    "throughout P1; not stock inspection evidence"
                 ),
             }
     raise ValueError(

@@ -168,11 +168,11 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
     )
 
 
-# The highest first bind of any pair: check 4 taps each pedestal in to the
-# first bind at its end and swings the set in to the first bind, easing out
-# only until the gears turn, so the arbor line lies on the binds at both ends
-# and every pair lies between the pairs that hold the swing, none above this
-# at its tightest phase.
+# The highest first bind of any pair: check 4 lays the arbor line on a bind
+# near each end and swings the set in to the first bind.  Every pair taken to
+# lie between the pairs that hold the line sits no higher than this at its
+# tightest phase; a gear past a hold is the open owner question (#2584, see
+# the module docstring).
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
 # The far phase of the running runout: the set is felt at the tightest phase
 # of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)
