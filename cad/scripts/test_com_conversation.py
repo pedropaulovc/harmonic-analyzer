@@ -1188,6 +1188,83 @@ def test_outcome_noise_is_title_counters_provenance_and_last_bits():
     )
 
 
+# dt_crank_drive_gear's audit, 2026-11-12: one planar face's closest point to
+# one query point, on an edge of the face, in two builds of the same part.
+_QUERY = (0.03469681472658223, 0.0011400111338435352, 0.0049854)
+_CLOSEST = (
+    0.03440920666204291,
+    0.0017941457814243432,
+    1.3010426069826053e-18,
+    0.03440920666204291,
+    0.0017941457814243432,
+)
+_NOISY = (
+    0.03440920659643762,
+    0.0017941457525791945,
+    0.0,
+    0.03440920659643762,
+    0.0017941457525791945,
+)
+
+
+def _closest(handle: int, *point: float, query=_QUERY) -> conv.Call:
+    return conv.Call(
+        0,
+        handle,
+        "InvokeTypes",
+        [{"f": v.hex()} for v in query],
+        "IFace2.GetClosestPointOn",
+        result={"t": [{"f": v.hex()} for v in point]},
+    )
+
+
+def _answers(a: list[conv.Call], b: list[conv.Call]) -> tuple[str, Any]:
+    keyed_a, keyed_b = _com_outcome._keyed_calls(a), _com_outcome._keyed_calls(b)
+    signal, detail = _com_outcome._answers_signal(keyed_a, keyed_b, a, b)
+    return signal.value, detail
+
+
+def test_answers_to_one_request_within_float_noise_are_one_answer():
+    noise = "1 answers within 33554432 ulps of the other build's"
+    # 6.6e-11 m apart (9.5e6 ulps): beyond REL_TOL, so the aligned rule calls
+    # them different, but one answer to the answers signal. Handles are erased.
+    base, noisy = _closest(4, *_CLOSEST), _closest(9, *_NOISY)
+    assert not _com_outcome._close(base.result, noisy.result)
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(9, *_NOISY)]) == (
+        "same",
+        {"IFace2.GetClosestPointOn": noise},
+    )
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(9, *_CLOSEST)]) == (
+        "same",
+        None,
+    )
+    # Paired by assignment within one request, in any order.
+    other = (0.0335, *_CLOSEST[1:])
+    assert _answers(
+        [_closest(4, *_CLOSEST), _closest(4, *other)],
+        [_closest(9, *other), _closest(9, *_NOISY)],
+    ) == ("same", {"IFace2.GetClosestPointOn": noise})
+    # Just past the bound, or noise-close to another request's answer only,
+    # or once more in one build: different.
+    scale = _CLOSEST[0]
+    past = (scale + 1.01 * 2**25 * math.ulp(scale), *_CLOSEST[1:])
+    elsewhere = (0.03, *_QUERY[1:])
+    for new in (
+        [_closest(9, *past)],
+        [_closest(9, *_NOISY, query=elsewhere)],
+        [_closest(9, *_NOISY), _closest(9, *_NOISY)],
+    ):
+        signal, detail = _answers([_closest(4, *_CLOSEST)], new)
+        assert signal == "different" and "IFace2.GetClosestPointOn" in detail
+    # Only floats are noise: another string or structure is another answer.
+    named = conv.Call(0, 4, "InvokeTypes", [], "IBody2.Name", result="Boss1")
+    renamed = conv.Call(0, 4, "InvokeTypes", [], "IBody2.Name", result="Boss2")
+    assert _answers([named], [renamed])[0] == "different"
+    assert _answers([_closest(4, *_CLOSEST)], [_closest(4, *_CLOSEST[:3])])[0] == (
+        "different"
+    )
+
+
 def _echoing(title: str, equation: str = "DivisionSpacing", handle: int = 4):
     """ms_stick's shape (2026-11-12): the document's title and a dimension's
     full name, both carrying the seat's document counter, then that full name

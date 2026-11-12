@@ -99,6 +99,17 @@ _TOUCHING = tuple(d for d in itertools.product((-1, 0, 1), repeat=4) if any(d))
 # 7.2e-7 mm: float64 residues of 2e-16 to 9e-16 mm where the value is exactly
 # 0 (float32 keeps them there), elsewhere 1-3 float32 ulps of the coordinate.
 _STL_VERTEX_ULPS = 4
+# Two builds' answers to one request (member and arguments) whose floats lie
+# within this many ulps of the answer's largest |float| are one answer
+# (:func:`_answers_signal`). Measured basis, 2026-11-12: over 57 pairs of fleet
+# recordings, 553,379 answers to requests both builds made at the same point
+# were bit-identical, within REL_TOL, or a billion tolerances and more apart
+# (bodies or faces listed in another order, which the multiset pairs); the one
+# exception, dt_crank_drive_gear's IFace2.GetClosestPointOn onto an edge of a
+# planar face, lay up to 9.5e6 ulps (6.6e-11 m, 1.9 REL_TOL) apart. 2**25 ulps
+# is 3.5 times that: at most 2**-27 (7.5e-9) of the answer's largest float,
+# 0.23 nm on a 34 mm coordinate.
+_ANSWER_ULPS = 2**25
 _NEIGHBOURS = tuple(itertools.product((-1, 0, 1), repeat=3))
 _LISTED = 10
 # Bound on a judge fault's message recorded in the result.
@@ -267,7 +278,8 @@ def outcome(
       within :data:`REL_TOL` (:func:`_mass_signal`);
     * ``requests``: the multiset of recipe requests;
     * ``answers``: the multiset of (request, answer) pairs, but for mass
-      properties and answers about the session (``_SESSION_SITE``);
+      properties and answers about the session (``_SESSION_SITE``); answers
+      to one request within float noise are one (:func:`_answers_signal`);
     * ``stl``: the geometry of every STL file SolidWorks wrote, vertices
       within float32 noise as one (:func:`_stl_comparison`; last write per
       path).
@@ -285,10 +297,7 @@ def outcome(
             [(site, request) for site, request, _ in keyed[0]],
             [(site, request) for site, request, _ in keyed[1]],
         ),
-        "answers": lambda: _multiset_signal(
-            [item for item in keyed[0] if item[2] is not None],
-            [item for item in keyed[1] if item[2] is not None],
-        ),
+        "answers": lambda: _answers_signal(keyed[0], keyed[1], a, b),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
     }
     signals: dict[str, Signal] = {}
@@ -578,6 +587,73 @@ def _multiset_signal(
         members.setdefault(item[0], [0, 0])[1] += count
     ranked = sorted(members.items(), key=lambda item: (-sum(item[1]), item[0]))
     return Signal.DIFFERENT, dict(ranked[:_LISTED])
+
+
+def _answers_signal(
+    a: Sequence[tuple[str, str, str | None]],
+    b: Sequence[tuple[str, str, str | None]],
+    calls_a: Sequence[conv.Call],
+    calls_b: Sequence[conv.Call],
+) -> tuple[Signal, dict[str, Any] | None]:
+    """The multiset of (request, answer) keys (:func:`_keyed_calls`, per call
+    of ``calls_a`` and ``calls_b``; no answer key: no signal). Keys that
+    differ are not yet another answer: per request (member and arguments)
+    whose answer keys differ, every answer of one build must pair one-to-one
+    with one of the other's to that request (:func:`_unassigned`) within
+    float noise (:func:`_answer_close`); a request answered more often in one
+    build, or an answer left unpaired, is different (:func:`_multiset_signal`'s
+    detail). Same after pairing: per member, how many answers were paired."""
+    left = [(k, c) for k, c in zip(a, calls_a, strict=True) if k[2] is not None]
+    right = [(k, c) for k, c in zip(b, calls_b, strict=True) if k[2] is not None]
+    signal, detail = _multiset_signal([k for k, _ in left], [k for k, _ in right])
+    if signal is Signal.SAME:
+        return signal, detail
+    keys_a, keys_b = Counter(k for k, _ in left), Counter(k for k, _ in right)
+    unpaired = keys_a - keys_b
+    requests = {key[:2] for key in [*unpaired, *(keys_b - keys_a)]}
+    answers: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {
+        request: ([], []) for request in requests
+    }
+    for side, items in enumerate((left, right)):
+        for key, call in items:
+            if key[:2] in answers:
+                answers[key[:2]][side].append(_erased(_answer(call)))
+    for xs, ys in answers.values():
+        if len(xs) != len(ys) or _unassigned(xs, ys, _answer_close) is not None:
+            return signal, detail
+    paired: Counter[str] = Counter()
+    for key, count in unpaired.items():
+        paired[key[0]] += count
+    return Signal.SAME, {
+        member: f"{count} answers within {_ANSWER_ULPS} ulps of the other build's"
+        for member, count in sorted(paired.items())
+    }
+
+
+def _answer_close(a: Any, b: Any) -> bool:
+    """Two answers (handles erased) equal but for float noise: the same
+    structure and normalised strings, every float within
+    :data:`_ANSWER_ULPS` ulps of the largest finite |float| of either."""
+    left: list[float] = []
+    right: list[float] = []
+    if not _same_shape(a, b, left, right):
+        return False
+    tolerance = _ANSWER_ULPS * math.ulp(_scale(iter([*left, *right])))
+    return all(
+        x == y or abs(x - y) <= tolerance for x, y in zip(left, right, strict=True)
+    )
+
+
+def _erased(value: Any) -> Any:
+    """``value`` with handles erased (the interface type kept), as
+    :func:`_shape` erases them, and nothing else changed."""
+    if isinstance(value, list):
+        return [_erased(item) for item in value]
+    if not isinstance(value, dict) or _is_float(value):
+        return value
+    if "h" in value:
+        return {"h": value.get("p", "")}
+    return {name: _erased(item) for name, item in value.items()}
 
 
 _Point = tuple[float, float, float]
