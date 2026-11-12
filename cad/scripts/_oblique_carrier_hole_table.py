@@ -132,8 +132,6 @@ PIN_MATE = f"RUNNING FIT ON {_short(spec.PIN_NUMBER)}"
 OUTER_PAIR = ("A2", "B2")
 if not spec.OUTER_Y_NOTE.startswith(f"{', '.join(OUTER_PAIR)}: "):
     raise AssertionError("NOTE 1 no longer names the outer pair it governs")
-if spec.HUB_THREAD != spec.CLAMP_THREAD or spec.TABLE_HOLES["HUB"][2] != spec.CLAMP_TAP_DRILL:
-    raise AssertionError("the HUB is no longer the end clamps' #8-32 tap")
 _RISERS = tuple(f"R{i}" for i in range(1, 5))
 _LEVERS = tuple(f"L{i}" for i in range(1, 3))
 
@@ -152,11 +150,13 @@ def _see_notes(tags: tuple[str, ...]) -> str:
 # callout. Each size group's size, process and mate are stated once, in one
 # NOTE cell merged across the group's rows, with its count; the rows carry
 # only their tag and X/Y (the jig steps cite the tags individually). The
-# native table orders its rows by size, so every group is a contiguous run
-# (_group_spans refuses one that is not). The HUB is the end clamps' #8-32
-# tap, drilled and tapped at assembly (TL-00 step 10).
+# table is sorted by TAG, so every group is a contiguous run (TAG_ORDER;
+# _group_spans refuses one that is not). The HUB keeps its own row: it is
+# drilled and tapped at assembly (TL-00 step 10), so it never joins the
+# bench-drilled CL/CR group (farm review 20261112T131117993Z read a 3X
+# group with 'HUB AT ASSEMBLY' as all three made at assembly).
 _PINS = tuple(spec.PIN_HOLES)
-_CLAMPS = (*spec.END_CLAMPS, "HUB")
+_CLAMPS = tuple(spec.END_CLAMPS)
 NOTE_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (_PINS,
      f"<MOD-DIAM>{spec.inch_text(spec.PIN_HOLE_DIA + min(spec.PIN_HOLE_BAND), 4)}-"
@@ -164,7 +164,9 @@ NOTE_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
      f"{len(_PINS)}X REAM THRU\n{PIN_MATE}{_see_notes(_PINS)}"),
     (_CLAMPS,
      f"{_drill_and_tap(len(_CLAMPS), spec.CLAMP_TAP_DRILL, spec.CLAMP_THREAD)}\n"
-     f"CLAMPS {spec.STRAP_NUMBER}\nHUB AT ASSEMBLY{_see_notes(_CLAMPS)}"),
+     f"CLAMPS {spec.STRAP_NUMBER}{_see_notes(_CLAMPS)}"),
+    (("HUB",),
+     f"{spec.HUB_THREAD.lstrip('#')} UNC AT ASSEMBLY\nCLAMPS {spec.STRAP_NUMBER} HUB"),
     (_RISERS,
      f"{_drill_and_tap(len(_RISERS), spec.RISER_TAP_DRILL, spec.RISER_THREAD)}\n"
      f"HOLDS {_short(spec.RISER_NUMBER)}{_see_notes(_RISERS)}"),
@@ -172,14 +174,20 @@ NOTE_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
      f"{_drill_and_tap(len(_LEVERS), spec.LEVER_TAP_DRILL, spec.LEVER_THREAD)}\n"
      f"HOLDS {_short(FEED_LEVER_NUMBER)}{_see_notes(_LEVERS)}"),
 )
+# The rows' order after the ascending TAG sort (IHoleTableAnnotation.Sort).
+TAG_ORDER = tuple(sorted(TABLED_HOLES))
 _grouped = [tag for tags, _note in NOTE_GROUPS for tag in tags]
 if sorted(_grouped) != sorted(TABLED_HOLES) or any(
     len(note.splitlines()) > NOTE_LINES_PER_ROW * len(tags)
     or any(len(line.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS
            for line in note.splitlines())
+    or sorted(map(TAG_ORDER.index, tags))
+    != list(range(min(map(TAG_ORDER.index, tags)), min(map(TAG_ORDER.index, tags)) + len(tags)))
     for tags, note in NOTE_GROUPS
 ):
-    raise AssertionError("every tabled hole needs one size group whose note fits its NOTE cell")
+    raise AssertionError(
+        "every tabled hole needs one size group, contiguous in TAG order, whose note fits its NOTE cell"
+    )
 # SolidWorks may read the diameter code back as its glyph (the riser's
 # native SIZE cells: draw_ch_rocker_arm_tl_oblique_riser), and a cell's
 # line break as CR LF.
@@ -393,7 +401,7 @@ def _group_spans(
 ) -> list[tuple[int, int, tuple[str, ...], str]]:
     """Each size group's (top row, bottom row, tags, note) in the current table.
 
-    The native table orders its rows by size, so a group's rows are one
+    The table is sorted by TAG (TAG_ORDER), so a group's rows are one
     contiguous run; anything else is refused rather than merged across
     another group's rows."""
     spans = []
@@ -729,7 +737,17 @@ def create_carrier_hole_table(
     origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
     _assign_tags(feature, table)
     rebuild_drawing(adapter, label="carrier owner tags")
+    # Ascending TAG order makes every size group one run of rows (CL, CR,
+    # then HUB). "Sorting Tables": a hole table sorts on its Tag column,
+    # IHoleTableAnnotation.Sort(0, True).
+    if not _early_bound(table, "IHoleTableAnnotation").Sort(0, True):
+        raise RuntimeError("carrier table refused the ascending TAG sort")
+    rebuild_drawing(adapter, label="carrier TAG sort")
     rows = _rows(table)
+    # Recorded; the requirement itself (each group one run) is _group_spans'.
+    _telemetry.info(
+        f"carrier table rows after the TAG sort: {tuple(sorted(rows, key=lambda tag: rows[tag][0]))!r}"
+    )
     generated = {tag: cells[:4] for tag, (_row, cells) in rows.items()}
     # The native SIZE readback, raw and semantic, for the record: a zero
     # band stack is accepted as the plain size (a7547069 printed one on the
