@@ -360,7 +360,7 @@ BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip 
 # 2 and T018/T012 on MHA-DT-37's spigot; T030..T120 still float on the key.
 # The face is SEAT_PITCH floored to four millimetre places, so the modelled
 # stack closes without interference; it is a stack closure, so it is not
-# snapped to the inch grid and prints .2707 at four inch places, inside its
+# snapped to the inch grid and prints .2934 at four inch places, inside its
 # band.  Every gear grew SOUTH: its north face stays on the station layout
 # (cone_line).  The band is the cylinder bank's L20 d' rule (+/-.001 in per
 # gear, the 20-gear stack accepted at +/-0.20 mm), so it is faced to a
