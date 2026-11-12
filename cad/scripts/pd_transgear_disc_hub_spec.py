@@ -617,7 +617,7 @@ COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 HUB_DIA_CALLOUT_BELOW = "\n".join(
     (
         f"WALL {inch_text(DISC.inch_floor_mm(KEY_PIN_WALL_WORST, 3), 3)} MIN",
-        "TO KEY-PIN REAM",
+        "TO PIN REAM",
     )
 )
 # The bore is reamed through and slides on the sleeve's boss: the process,
@@ -661,7 +661,7 @@ SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
         f"MATCH-DRILL WITH {SLEEVE_NUMBER}",
-        "INTO BORE, OPPOSITE KEY PIN",
+        "INTO BORE",
     )
 )
 # The chord hole prints in section A-A, cut through its station: the ream's
