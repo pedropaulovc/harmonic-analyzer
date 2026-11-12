@@ -8,9 +8,10 @@ top-frame casting's integral crossbar by one knife-hanger screw and located
 by one pressed dowel, and counter-balanced from above by the
 boss-hook / counter-spring / gooseneck chain.
 
-* knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
-  ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``; each top seat is clamped
-  to the crossbar underside (``MOUNT_GAP`` 0).
+* knife-mount x2 -- the bearing supports, one per hex trunnion, at
+  ``KNIFE_MOUNT_Z_PLUS`` and ``KNIFE_MOUNT_Z_MINUS`` (the trunnions'
+  mid-lengths); each top seat is clamped to the crossbar underside
+  (``MOUNT_GAP`` 0).
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
   plus the .351 +/-.005 in fit-up reach (46.70 mm nominal under the head);
@@ -130,13 +131,19 @@ from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_sm_knife_mount) -----------------------------
 from sm_summing_lever_spec import (  # noqa: E402
-    HEX_Z_INNER,
-    HEX_Z_OUTER,
+    KNIFE_SEAT_Z_MINUS,
+    KNIFE_SEAT_Z_PLUS,
     KNIFE_SHOULDER_DROP_MIN,
     KNIFE_SHOULDER_X_MAX,
 )
 
-HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
+# Each mount stands at its trunnion's mid-length.  The lever's -Z end is
+# extended .25 in (owner ruling 4, #1038), so the two stations are not
+# mirrored about SUMMING_Z: +90.146 and -90.321, the crossbar's
+# ``fr_top_frame_spec.STUD_Z_REAR`` / ``STUD_Z_FRONT`` hanger holes.  This
+# assembly's labels call the +Z mount "front" and the -Z one "back".
+KNIFE_MOUNT_Z_PLUS = SUMMING_Z + KNIFE_SEAT_Z_PLUS
+KNIFE_MOUNT_Z_MINUS = SUMMING_Z + KNIFE_SEAT_Z_MINUS
 
 # --- knife-hanger hardware (two #10-24 hex bolts, washers and dowels) ---------
 # The top-frame, knife-mount and purchased hardware specs own every term.
@@ -226,12 +233,12 @@ KNIFE_DOWEL_X_OFFSETS = (knife_mount.PIN_HOLE_X,)
 # hole's centring to datum D (⌖.010|D, owner ruling 2026-11-06: 0.127), the
 # ream's .XXX station, B's slip and simulator and the bore's ⌖Ø.008|A|B
 # zone radius (0.102), 0.414, at opposite limits over the stations'
-# spacing (174.12): a 0.27 deg turn, plus the bar's play in the bore below
-# (0.18 deg), moving the tap 0.060.  The
+# spacing (180.47): a 0.26 deg turn, plus the bar's play in the bore below
+# (0.18 deg), moving the tap 0.059.  The
 # rear mount, re-hung on the lever's stub at MHA-SM-00 and swung about its
 # dowel until the rock gauge passes, needs that same turn (the lever's
 # ridge lies along the bar-set front bore); KNIFE_REAR_YAW_RANGE_DEG is the
-# turn its bolt float allows.  hypot(0.249, 0.309) = 0.397.
+# turn its bolt float allows.  hypot(0.249, 0.308) = 0.396.
 _KNIFE_DOWEL_SLIP_MAX = knife_dowel.SLIP_CLEARANCE_MAX
 KNIFE_BLOCK_SHIFT = (
     top_frame.HANGER_PIN_X_TOL
@@ -246,10 +253,10 @@ KNIFE_BORE_LINE_OFFSET = (
     + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
     + knife_mount.KNIFE_BORE_POSITION_TOL / 2.0
 )  # 0.4140
-_KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 174.12
+_KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 180.47
 KNIFE_BAR_YAW_DEG = math.degrees(
     math.atan(2.0 * KNIFE_BORE_LINE_OFFSET / _KNIFE_STATION_SPACING)
-)  # 0.272
+)  # 0.263
 # The bar's own diametral clearance in each bore (sheet 5B's matched fit,
 # .0017 max) lets each block turn on the bar by that clearance over its
 # shortest bore: atan(0.0432 / 13.716) = 0.180 deg (owner review of #2334
@@ -261,7 +268,7 @@ _KNIFE_BLOCK_DEPTH_MIN = knife_mount.SUPPORT_Z_THICK - knife_mount.BLOCK_SIZE_TO
 KNIFE_BAR_PLAY_YAW_DEG = math.degrees(
     math.atan(KNIFE_BAR_CLEARANCE / _KNIFE_BLOCK_DEPTH_MIN)
 )  # 0.180
-KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.453
+KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.443
 KNIFE_BAR_YAW_SHIFT = knife_mount.PIN_HOLE_X * math.tan(math.radians(KNIFE_TAP_YAW_DEG))
 HANGER_SCREW_MISMATCH_X = KNIFE_BLOCK_SHIFT
 HANGER_SCREW_MISMATCH_Z = KNIFE_BLOCK_SHIFT + KNIFE_BAR_YAW_SHIFT
@@ -270,7 +277,7 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # crossbar body to the hole's top end at the faced top, at the longest
 # printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 C drill
 # hole's 0.6604 radial float covers this plus the station mismatch,
-# 0.3969, with 0.0717 spare (HANGER_SCREW_FLOAT_SPARE).
+# 0.3959, with 0.0727 spare (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -299,8 +306,8 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # is the bar's diametral clearance in the largest bore, .4735 - (.4720 -
 # .0002) = .0017 (0.0432), and the lever's ridge, spanning both bores, adds
 # its yaw over the shortest mouth-to-mouth run (codjiflo, PR #1978): that
-# clearance walked across the deepest .XX block, 14.224 * 0.0432 / 159.9 =
-# 0.0038.  t 0.047 leaves about 7.76 deg.  The bore's ∥.002|A is its
+# clearance walked across the deepest .XX block, 14.224 * 0.0432 / 166.2 =
+# 0.0037.  t 0.047 leaves about 7.76 deg.  The bore's ∥.002|A is its
 # pitch, which the lateral rock model (free_rock_deg) does not read.  The
 # rear mount's yaw is accepted by the rock gauge itself
 # (sm_summing_assembly_spec.BOSS_ROCK_TRAVEL, sheet check 2): the fitter
@@ -313,10 +320,10 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
 # ``KNIFE_SHOULDER_DROP_MIN``).
 _KNIFE_BLOCK_DEPTH_MAX = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
-KNIFE_RIDGE_MOUTH_SPAN_MIN = _KNIFE_STATION_SPACING - _KNIFE_BLOCK_DEPTH_MAX  # 159.90
+KNIFE_RIDGE_MOUTH_SPAN_MIN = _KNIFE_STATION_SPACING - _KNIFE_BLOCK_DEPTH_MAX  # 166.25
 # Owner ruling 2026-11-10 (Pedro), #2334, S2: the gauge bar spans both
-# mounts' outer faces (7.41 in at the thickest .XX blocks) with its 8.0 in.
-KNIFE_MOUNT_OUTER_SPAN_MAX = _KNIFE_STATION_SPACING + _KNIFE_BLOCK_DEPTH_MAX  # 188.34
+# mounts' outer faces (7.67 in at the thickest .XX blocks) with its 8.0 in.
+KNIFE_MOUNT_OUTER_SPAN_MAX = _KNIFE_STATION_SPACING + _KNIFE_BLOCK_DEPTH_MAX  # 194.69
 KNIFE_GAUGE_BAR_LENGTH = knife_mount.KNIFE_GAUGE_BAR_LENGTH_IN * 25.4  # 203.2
 KNIFE_RIDGE_YAW_OFFSET = (
     _KNIFE_BLOCK_DEPTH_MAX * KNIFE_BAR_CLEARANCE / KNIFE_RIDGE_MOUTH_SPAN_MIN
@@ -788,7 +795,7 @@ async def build(adapter) -> dict[str, str]:
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
-    # body at SUMMING_Z +/- HEX_Z_MID). The front support is FIRST so the auto-fixed assembly
+    # body at KNIFE_MOUNT_Z_PLUS / _MINUS). The front support is FIRST so the auto-fixed assembly
     # seed is structure, not the mated summing lever. Each support's circular
     # bore is much larger than the hex, so only the trunnion's top vertex line
     # (the knife edge) nears the upper inner wall. The named "knife axis" is that
@@ -796,7 +803,7 @@ async def build(adapter) -> dict[str, str]:
     km = await place_component(
         adapter,
         "sm-knife-mount",
-        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z + HEX_Z_MID],
+        [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_PLUS],
         [0.0, 0.0, 0.0],
         IDENTITY,
         label="knife-mount (front)",
@@ -804,7 +811,7 @@ async def build(adapter) -> dict[str, str]:
     await place_component(
         adapter,
         "sm-knife-mount",
-        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z - HEX_Z_MID],
+        [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_MINUS],
         [0.0, 0.0, 0.0],
         IDENTITY,
         label="knife-mount (back)",
@@ -819,8 +826,8 @@ async def build(adapter) -> dict[str, str]:
     hanger_washers: list[str] = []
     knife_dowels: list[str] = []
     for side, station_z in (
-        ("front", SUMMING_Z + HEX_Z_MID),
-        ("back", SUMMING_Z - HEX_Z_MID),
+        ("front", KNIFE_MOUNT_Z_PLUS),
+        ("back", KNIFE_MOUNT_Z_MINUS),
     ):
         hanger_washers.append(
             await place_component(
@@ -886,7 +893,7 @@ async def build(adapter) -> dict[str, str]:
         hanger_screws,
         hanger_washers,
         station_dowels,
-        (SUMMING_Z + HEX_Z_MID, SUMMING_Z - HEX_Z_MID),
+        (KNIFE_MOUNT_Z_PLUS, KNIFE_MOUNT_Z_MINUS),
         strict=True,
     ):
         screw_o = _assert_hanger_seat_placement(

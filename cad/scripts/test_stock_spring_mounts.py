@@ -38,7 +38,7 @@ def test_centred_plate_places_the_anchor_on_its_authored_face() -> None:
     lever_origin = (*spring_mount_geom.KNIFE, SUMMING_Z)
     for index in range(lever.HOLE_COUNT):
         local_hole_z = lever.HOLE_Z_FIRST + lever.CHANNEL_PITCH * index
-        assert local_hole_z == pytest.approx(-70.62825 + 7.0565 * index)
+        assert local_hole_z == pytest.approx(-75.9815 + 7.62 * index)
         world_station = channel.z_station(index) + channel.ARM_MID_DZ
         assert world_station - lever_origin[2] == pytest.approx(local_hole_z)
         # The mounting tuple used by the channel assembly's grounded

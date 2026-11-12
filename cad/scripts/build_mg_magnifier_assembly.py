@@ -138,7 +138,7 @@ from _transforms import (
 )
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
 from frame_column_stations import COLUMN_X  # the WEST column (machine +x is west; the crank side -x is east)
-from sm_summing_lever_spec import PLATE_L
+from sm_summing_lever_spec import PLATE_Z_MINUS
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
@@ -257,7 +257,7 @@ assert THUMB_SCREW_RAIL_CLEARANCE_WORST >= _MIN_THUMB_RAIL_CLEARANCE, (
 # magnification range (Ry(180): machine x = LEVER_X0 - local x).
 CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
 BRACKET_X = LEVER_X0 - BRACKET_LOCAL_X  # 40
-assert math.isclose(SEAT_PLANE_Z, SUMMING_Z - PLATE_L / 2.0, abs_tol=1e-9), (
+assert math.isclose(SEAT_PLANE_Z, SUMMING_Z + PLATE_Z_MINUS, abs_tol=1e-9), (
     "magnifying-bracket seat drifted from the summing-lever front face"
 )
 assert all(

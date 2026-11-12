@@ -17,6 +17,7 @@ import _drawing_edge_dimensions
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges
 from _hole_spec import blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
@@ -57,11 +58,80 @@ def test_spring_hole_column_rides_the_channel_arm_plane() -> None:
     for j in (0, spec.HOLE_COUNT - 1):
         hole_z = spec.CHANNEL_Z0 + spec.CHANNEL_PITCH * j + spec.HOLE_Z_OFFSET
         assert hole_z + SUMMING_Z == pytest.approx(rocker_bank_layout.hub_mid_z(j))
-    assert spec.HOLE_END_OFFSET_FIRST == pytest.approx(5.572, abs=5e-4)
-    assert spec.HOLE_END_OFFSET_LAST == pytest.approx(12.755, abs=5e-4)
-    # drawing-guidelines.md rule 17 (walls and webs): the j=0 tap keeps a 2.0 wall to the -Z plate end.
-    tap_r = blind_cut_dia_mm(spec.HOLE_SPEC) / 2.0
-    assert spec.HOLE_END_OFFSET_FIRST - tap_r >= 2.0
+    # At .300 in pitch the row spans 144.78; the body's -Z end stands .25 in
+    # farther out than its +Z end (#1038 owner ruling 4), so both end taps
+    # keep more than the old j=0 end distance (5.572).
+    assert spec.PLATE_Z_PLUS == pytest.approx(76.2)
+    assert spec.PLATE_Z_MINUS == pytest.approx(-82.55)
+    assert spec.HOLE_END_OFFSET_FIRST == pytest.approx(6.5685, abs=5e-4)
+    assert spec.HOLE_END_OFFSET_LAST == pytest.approx(7.4015, abs=5e-4)
+    # drawing-guidelines.md rule 17 (walls and webs): each end tap keeps the
+    # .080 target to its plate end at the printed length, position and thread
+    # limits; the spec refuses at import below it.
+    assert spec.SPRING_TAP_END_WALL_MIN == WALL_TARGET_MM
+    assert spec.SPRING_TAP_END_WALL_MINUS == pytest.approx(4.4349, abs=5e-4)
+    assert spec.SPRING_TAP_END_WALL_PLUS == pytest.approx(5.5219, abs=5e-4)
+    assert min(spec.SPRING_TAP_END_WALL_MINUS, spec.SPRING_TAP_END_WALL_PLUS) >= WALL_TARGET_MM
+
+
+def _spec_with_values(**values):
+    """Run the real spec, and so its import-time guards, with changed inputs."""
+    path = Path(sm_summing_lever_spec.__file__)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    replaced = set()
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in values:
+                    node.value = ast.parse(repr(values[target.id]), mode="eval").body
+                    replaced.add(target.id)
+    assert replaced == values.keys()
+    namespace = {"__name__": "sm_summing_lever_spec_mutant"}
+    exec(compile(ast.fix_missing_locations(tree), str(path), "exec"), namespace)
+    return namespace
+
+
+@pytest.mark.parametrize(("values", "end"), [
+    # The 6.00 plate the .300 in row outgrew (#1038 conflict 3).
+    ({"PLATE_Z_MINUS": -76.2}, "-Z"),
+    ({"PLATE_Z_PLUS": 72.0}, r"\+Z"),
+    # The channel stations walk the whole row toward either end.
+    ({"CHANNEL_Z0": -76.0}, "-Z"),
+    ({"CHANNEL_Z0": -66.0}, r"\+Z"),
+    ({"CHANNEL_PITCH": 8.0}, r"\+Z"),
+])
+def test_spec_refuses_an_end_tap_without_its_rule_17_wall(values, end) -> None:
+    with pytest.raises(AssertionError, match=rf"spring-tap row: the {end} end tap keeps"):
+        _spec_with_values(**values)
+
+
+def test_end_wall_guard_charges_length_band_position_zone_and_thread_major() -> None:
+    spec = sm_summing_lever_spec
+    unchanged = _spec_with_values(PLATE_Z_MINUS=spec.PLATE_Z_MINUS)
+    assert unchanged["SPRING_TAP_END_WALL_MINUS"] == spec.SPRING_TAP_END_WALL_MINUS
+    # #6-32 major .138 in, over the purchased hook's shank and neck.
+    assert spec.SPRING_TAP_WALL_RADIUS == pytest.approx(0.138 * 25.4 / 2.0)
+    assert spec.SPRING_TAP_WALL_RADIUS >= ANCHOR_9489T111.thread_major_dia_mm / 2.0
+    charged = (
+        spec.SPRING_TAP_WALL_RADIUS
+        + 0.005 * 25.4  # half the Ø.010 position zone
+    )
+    # Datum B's end carries no length band (the row is BASIC from it); the
+    # -Z end is also short by the 6.25 length's .XX band.
+    assert spec.SPRING_TAP_END_WALL_PLUS == pytest.approx(spec.HOLE_END_OFFSET_LAST - charged)
+    assert spec.SPRING_TAP_END_WALL_MINUS == pytest.approx(
+        spec.HOLE_END_OFFSET_FIRST - charged - 0.01 * 25.4
+    )
+    # Walk the row to each end's limit: 1 um inside passes, 1 um past refuses.
+    for end, wall, toward in (
+        ("-Z", spec.SPRING_TAP_END_WALL_MINUS, -1.0),
+        (r"\+Z", spec.SPRING_TAP_END_WALL_PLUS, 1.0),
+    ):
+        spare = wall - WALL_TARGET_MM
+        assert spare > 0.0
+        _spec_with_values(CHANNEL_Z0=spec.CHANNEL_Z0 + toward * (spare - 1e-3))
+        with pytest.raises(AssertionError, match=f"the {end} end tap keeps"):
+            _spec_with_values(CHANNEL_Z0=spec.CHANNEL_Z0 + toward * (spare + 1e-3))
 
 
 def _line(start, end):
@@ -71,7 +141,7 @@ def _line(start, end):
 def test_end_face_edge_rejects_inboard_flange_and_hidden_underside() -> None:
     """Datum B and the start-Z BASIC belong to the physical +Z end face."""
     spec = sm_summing_lever_spec
-    z = spec.PLATE_L / 2.0
+    z = spec.PLATE_Z_PLUS
     top = _line((0.0, 15.24, z), (30.0, 6.0, z))
     flange = _line((0.0, 15.24, z - spec.RIB_T), (30.0, 6.0, z - spec.RIB_T))
     underside = _line((30.0, spec.COEFFICIENT_BOTTOM_Y, z), (0.0, -15.24, z))
@@ -138,7 +208,7 @@ def test_pitch_proof_rejects_an_equal_pitch_between_other_holes(identity) -> Non
             label="spring-hole pitch", entities=(seed, second),
         )
     # Identity passes, the value still has to match.
-    with pytest.raises(RuntimeError, match=r"measures 7\.0565 mm, expected 8\.43"):
+    with pytest.raises(RuntimeError, match=r"measures 7\.62\d* mm, expected 8\.43"):
         assert_dimension_measures(
             identity, _dimension(pitch, (seed, second)), expected_mm=8.43,
             label="spring-hole start Z", entities=(seed, second),
@@ -163,12 +233,12 @@ def _native_boss_face_location(monkeypatch, identity):
         None,
     )
     plate = _line(
-        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
-        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_PLUS),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_PLUS),
     )
     inboard = _line(
-        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
-        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_PLUS - spec.RIB_T),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_PLUS - spec.RIB_T),
     )
     state = SimpleNamespace(
         edges=[lower, wrong_axis, inboard, plate, upper],
@@ -307,8 +377,8 @@ def _native_knife_height(monkeypatch, identity):
     point, edge = selectable("height.end"), selectable("plate top")
     plate = ViewEdge(
         edge,
-        ((spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0),
-         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0)),
+        ((spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_MINUS),
+         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_Z_MINUS)),
         None, None,
     )
     state.attached = (point, edge)
@@ -683,8 +753,8 @@ def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
     segment = drawing._receiver_axis_centerline(adapter, back)
     assert activated == ["VIEW F"]
     assert projected_points == [
-        pytest.approx((0.0316926, 0.0002488, -0.0762)),
-        pytest.approx((0.014002, 0.0002488, -0.0762)),
+        pytest.approx((0.0316926, 0.0002488, -0.08255)),
+        pytest.approx((0.014002, 0.0002488, -0.08255)),
     ]
     assert created_lines == [pytest.approx((
         origin[0] - scale * 0.0316926 + 0.03,
@@ -1211,7 +1281,7 @@ def test_local_witness_placement_rebuilds_and_checks_projected_ink(
 
 
 def test_both_knife_stubs_are_one_prism_read_back_coplanar() -> None:
-    """Code review C09: the stubs are ONE sketch extruded mid-plane through
+    """Code review C09: the stubs are ONE sketch extruded end to end through
     the body, so each side face of the -Z stub is the +Z stub's plane by
     construction, and the build reads that back once the model is final."""
     assert not hasattr(lever_build, "_hex_collar")
@@ -1226,15 +1296,18 @@ def test_both_knife_stubs_are_one_prism_read_back_coplanar() -> None:
 
     prism = [_call_name(call) for call in _calls_in_order(_builder_function("_hex_knife"))]
     assert prism.count("create_sketch") == 1
-    assert prism.count("create_extrusion") == 1
-    assert "extrude_at_offset" not in prism
-    [params] = [
+    assert "create_extrusion" not in prism
+    [boss] = [
         call
         for call in _calls_in_order(_builder_function("_hex_knife"))
-        if _call_name(call) == "ExtrusionParameters"
+        if _call_name(call) == "extrude_at_offset"
     ]
-    keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in params.keywords}
-    assert keywords == {"depth": "2.0 * HEX_Z_OUTER", "both_directions": "True"}
+    # One blind boss from the -Z stub end over the whole length: the body's
+    # -Z end is .25 in longer than its +Z end, so mid-plane no longer fits.
+    assert [ast.unparse(argument) for argument in boss.args[1:]] == [
+        "PLATE_L + 2.0 * HEX_DEPTH", "HEX_Z_OUTER_MINUS",
+    ]
+    assert not boss.keywords
 
 
 def test_the_knife_prism_merges_into_the_pivot_between_the_stubs() -> None:
@@ -1245,9 +1318,15 @@ def test_the_knife_prism_merges_into_the_pivot_between_the_stubs() -> None:
     w2, h2, h4 = spec.HEX_W / 2.0, spec.HEX_H / 2.0, spec.HEX_H / 4.0
     vertices = [(0.0, h2), (-w2, h4), (-w2, -h4), (0.0, -h2), (w2, -h4), (w2, h4)]
     assert max(math.hypot(x, y) for x, y in vertices) < spec.CYL_R
-    assert spec.HEX_Z_INNER == spec.PLATE_L / 2.0
-    assert spec.HEX_Z_OUTER - spec.HEX_Z_INNER == pytest.approx(spec.HEX_DEPTH)
-    for name in ("HEX_W", "HEX_H", "HEX_DEPTH", "HEX_Z_INNER", "HEX_Z_OUTER", "CYL_R"):
+    assert spec.HEX_Z_OUTER_PLUS - spec.PLATE_Z_PLUS == pytest.approx(spec.HEX_DEPTH)
+    assert spec.PLATE_Z_MINUS - spec.HEX_Z_OUTER_MINUS == pytest.approx(spec.HEX_DEPTH)
+    assert spec.HEX_Z_OUTER_PLUS - spec.HEX_Z_OUTER_MINUS == pytest.approx(
+        spec.PLATE_L + 2.0 * spec.HEX_DEPTH
+    )
+    for name in (
+        "HEX_W", "HEX_H", "HEX_DEPTH", "PLATE_Z_MINUS", "PLATE_Z_PLUS",
+        "HEX_Z_OUTER_MINUS", "HEX_Z_OUTER_PLUS", "CYL_R",
+    ):
         assert getattr(lever_build, name) == getattr(spec, name), name
     assert notes.DRAWING_DIMENSIONS["KnifeStubReference"] == {"KnifeStubLength"}
     assert notes.DIMENSION_PREFIXES[("KnifeStubReference", "KnifeStubLength")] == "2X "
@@ -1271,8 +1350,11 @@ def _knife_faces(shift_minus_z_side_m: float = 0.0) -> list[SimpleNamespace]:
         )
 
     faces = []
-    for sign in (1.0, -1.0):
-        inner, outer = sign * spec.HEX_Z_INNER / 1000.0, sign * spec.HEX_Z_OUTER / 1000.0
+    for sign, inner_mm, outer_mm in (
+        (1.0, spec.PLATE_Z_PLUS, spec.HEX_Z_OUTER_PLUS),
+        (-1.0, spec.PLATE_Z_MINUS, spec.HEX_Z_OUTER_MINUS),
+    ):
+        inner, outer = inner_mm / 1000.0, outer_mm / 1000.0
         mid = (inner + outer) / 2.0
         for index, (a, b) in enumerate(zip(vertices, vertices[1:] + vertices[:1])):
             # The chain runs CCW, so (dy, -dx) points out of the prism.
@@ -1309,13 +1391,17 @@ def test_the_coplanarity_readback_passes_one_prism_and_fails_a_stepped_side() ->
 def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -> None:
     """Each ridge is .159 +/-.002 from its stub's sides.  Only with both
     stubs' sides the same planes does that hold the two ridges within 0.1016
-    of each other (0.078 of hook-arm spread over the hole column); the bound,
+    of each other (0.0815 of hook-arm spread over the hole column); the bound,
     the callout and the one-prism build stand or fall together."""
     spec = sm_summing_lever_spec
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.1016)
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
-    assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
-    assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.078, abs=5e-4)
+    assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(
+        spec.KNIFE_SEAT_Z_PLUS - spec.KNIFE_SEAT_Z_MINUS
+    )
+    assert spec.KNIFE_SEAT_Z_PLUS == pytest.approx((spec.PLATE_Z_PLUS + spec.HEX_Z_OUTER_PLUS) / 2.0)
+    assert spec.KNIFE_SEAT_Z_MINUS == pytest.approx((spec.PLATE_Z_MINUS + spec.HEX_Z_OUTER_MINUS) / 2.0)
+    assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.0815, abs=5e-4)
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "EACH STUB "
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromRight")] == "EACH STUB "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
@@ -1522,7 +1608,7 @@ def test_knife_detail_is_cut_from_the_existing_receiver_view(monkeypatch) -> Non
     (args, definition), = calls
     assert args == (adapter, back)
     assert definition["centre_mm"] == (
-        0.0, 0.0, -drawing.PLATE_L / 2.0 - drawing.HEX_DEPTH,
+        0.0, 0.0, drawing.HEX_Z_OUTER_MINUS,
     )
     assert definition["radius_m"] == pytest.approx(0.006)
     assert definition["scale"] == (10.0, 1.0)
@@ -1541,7 +1627,7 @@ def test_plan_ridge_reference_follows_datum_a_negative_z_stub(monkeypatch) -> No
 
     monkeypatch.setattr(drawing, "_owned_centerline", owned_reference)
     assert drawing._ridge_centerline(adapter, top) is segment
-    inner_z = -drawing.PLATE_L / 2.0
+    inner_z = drawing.PLATE_Z_MINUS
     assert endpoints[0] == pytest.approx((0.0, drawing.HEX_H / 2.0, inner_z))
     assert endpoints[1] == pytest.approx((
         0.0, drawing.HEX_H / 2.0,
@@ -1553,7 +1639,7 @@ def test_datum_a_attaches_the_actual_visible_back_knife_round(monkeypatch) -> No
     calls = []
     edge, detail = object(), object()
     spec = sm_summing_lever_spec
-    z = -spec.PLATE_L / 2.0 - spec.HEX_DEPTH
+    z = spec.HEX_Z_OUTER_MINUS
     center_y = spec.HEX_H / 2.0 - spec.KNIFE_RIDGE_R / math.sin(
         math.radians(spec.RIDGE_ANGLE_DEG) / 2.0,
     )
@@ -1963,13 +2049,13 @@ def test_native_rib_end_planes_preserve_uniform_depths_and_fixed_outer_faces(
         return SimpleNamespace(GetSurface=lambda: surface)
 
     planes = {
-        "EdgeRibBack": [-76.2, -71.12],
+        "EdgeRibBack": [-82.55, -77.47],
         "EdgeRibFront": [71.12, 76.2],
         "MiddleRib": [-2.54, 2.54],
     }
     depths = {name: 5.08 for name in planes}
     if damage == "outer-caps-absent":
-        planes["EdgeRibBack"] = [-71.12]
+        planes["EdgeRibBack"] = [-77.47]
         planes["EdgeRibFront"] = [71.12]
     elif damage == "receiver-depth":
         depths["EdgeRibBack"] = 9.0
@@ -1980,7 +2066,7 @@ def test_native_rib_end_planes_preserve_uniform_depths_and_fixed_outer_faces(
     elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
-        planes["EdgeRibBack"][1] = -67.2
+        planes["EdgeRibBack"][1] = -73.55
     elif damage == "opposite-inner":
         planes["EdgeRibFront"][0] = 71.2
     elif damage == "middle-inner":
@@ -2243,7 +2329,7 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
     state.lines = [
         ((free_x - gap, y), (tail_x, y)) for gap, y in zip(state.gaps, levels)
     ] + [((arrow_x, levels[0]), (arrow_x, levels[1]))]
-    z_mm = -drawing.PLATE_L / 2.0
+    z_mm = drawing.PLATE_Z_MINUS
     state.edges = [
         _line((drawing.PLATE_W - 2.0, y, z_mm), (drawing.PLATE_W, y, z_mm))
         for y in (drawing.COEFFICIENT_BOTTOM_Y, drawing.COEFFICIENT_TOP_Y)
@@ -2428,7 +2514,9 @@ def _recorded_plate_thickness(monkeypatch):
     state.text_position = (
         0.21636249951273206, 0.08022187482984736, -9.999999999949722e-05,
     )
-    # Keep the historical witness/leader shapes, translated with the plate.
+    # Keep the historical witness/leader shapes, translated with the plate:
+    # up with its top face, and onto the -Z end face VIEW F looks along (the
+    # view projects along Z, so that end's station moves no sheet point).
     rise = drawing.COEFFICIENT_TOP_Y / 1000.0 - 0.00254
     state.lines = [
         (*row[:5], row[5] + rise, *row[6:8], row[8] + rise, *row[9:])
@@ -2437,8 +2525,12 @@ def _recorded_plate_thickness(monkeypatch):
     for row in state.arrows:
         row[1] += rise
     state.projected = {
-        (x, (drawing.COEFFICIENT_TOP_Y if y > 0.0 else drawing.COEFFICIENT_BOTTOM_Y) / 1000.0, z): (px, py + rise)
-        for (x, y, z), (px, py) in state.projected.items()
+        (
+            x,
+            (drawing.COEFFICIENT_TOP_Y if y > 0.0 else drawing.COEFFICIENT_BOTTOM_Y) / 1000.0,
+            drawing.PLATE_Z_MINUS / 1000.0,
+        ): (px, py + rise)
+        for (x, y, _z), (px, py) in state.projected.items()
     }
     for member in ("annotation_position", "text_position"):
         x, y, z = getattr(state, member)
@@ -2539,7 +2631,7 @@ def test_recorded_plate_thickness_rejects_wrong_native_geometry(
         state.arrows[index][1] += 0.001
     else:
         y = (drawing.COEFFICIENT_BOTTOM_Y, drawing.COEFFICIENT_TOP_Y)[index]
-        z = -drawing.PLATE_L / 2.0
+        z = drawing.PLATE_Z_MINUS
         state.edges[index] = _line(
             (drawing.PLATE_W - 2.0, y, z), (drawing.PLATE_W - 0.1, y, z),
         )
@@ -2644,11 +2736,11 @@ def test_plate_thickness_keeps_native_identity_band_gaps_and_free_end_ink(
     assert state.active_sheet == drawing.SHEET_NAMES[1]
     assert state.scans == 2
     assert set(state.projections) == {
-        drawing._metres((drawing.PLATE_W, y, -drawing.PLATE_L / 2.0))
+        drawing._metres((drawing.PLATE_W, y, drawing.PLATE_Z_MINUS))
         for y in (drawing.COEFFICIENT_BOTTOM_Y, drawing.COEFFICIENT_TOP_Y)
     } | {
         drawing._metres((
-            drawing.PLATE_W - 1.0, drawing.COEFFICIENT_BOTTOM_Y, -drawing.PLATE_L / 2.0,
+            drawing.PLATE_W - 1.0, drawing.COEFFICIENT_BOTTOM_Y, drawing.PLATE_Z_MINUS,
         )),
     }
 
@@ -2726,7 +2818,7 @@ def test_plate_thickness_rejects_wrong_projection(monkeypatch, member, value) ->
 def test_plate_thickness_requires_both_actual_visible_free_end_edges(monkeypatch, damage) -> None:
     case = _native_plate_thickness(monkeypatch)
     bottom = drawing.COEFFICIENT_BOTTOM_Y
-    z = -drawing.PLATE_L / 2.0
+    z = drawing.PLATE_Z_MINUS
     if damage == "hidden":
         case.state.edges.pop(0)
     elif damage == "inboard_end":
@@ -2871,7 +2963,7 @@ def test_plate_thickness_refusals_capture_every_native_geometry_boundary(
     projected = record["expected_projected_points_m"]
     assert set(projected) == {"bottom", "top", "inboard"}
     for face, (x, y, z) in model.items():
-        assert z == -drawing.PLATE_L / 2000.0
+        assert z == drawing.PLATE_Z_MINUS / 1000.0
         assert projected[face] == (
             0.235 - state.projection_scale[0] * (x - drawing.PLATE_W / 1000.0),
             0.100 + y,
