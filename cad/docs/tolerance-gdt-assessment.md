@@ -362,9 +362,10 @@ Express these as **consistency + fit-at-assembly**, not absolute position — th
 error model and how the machine was actually built and trimmed.
 
 - **Channel pitch & coplanarity (the real assembly precision):** the 7.62 mm (.300 in) channel spacing and
-  the coplanarity of the 20 rockers / 20 levers are set by the **spacer-bushing lengths** and the
-  **pivot-shaft straightness**, not by 20 independently located holes. → machine the spacers
-  together; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
+  the coplanarity of the 20 rockers / 20 levers are set by the **integral hub lengths** (each
+  set's 20 hubs stack face to face; the 19 bushing spacers are retired) and the
+  **pivot-shaft straightness**, not by 20 independently located holes. → face each set's hubs
+  in one setup; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
   consistency" is won or lost.
 - **Gear mesh centre distances:** **set at assembly by feel** for light backlash; the cone set
   *pivots out of engagement* by design, so spec nominal + "adjust for a little backlash, never
