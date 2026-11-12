@@ -18,9 +18,11 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_arbor_geometry import (
     BACK_CAP_R as BACK_CAP_R,
     BACK_CAP_SAG as BACK_CAP_SAG,
+    BACK_JOURNAL_END_FROM_HEAD_REAR as BACK_JOURNAL_END_FROM_HEAD_REAR,
     BACK_JOURNAL_FROM_HEAD_REAR as BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z as BACK_JOURNAL_Z,
     BACK_RIM_FROM_HEAD_REAR as BACK_RIM_FROM_HEAD_REAR,
+    BOND_RELIEF_BACK_FROM_HEAD_REAR as BOND_RELIEF_BACK_FROM_HEAD_REAR,
     BOND_RELIEF_DIA as BOND_RELIEF_DIA,
     BOND_RELIEF_FROM_HEAD_REAR as BOND_RELIEF_FROM_HEAD_REAR,
     BOND_RELIEF_LEN as BOND_RELIEF_LEN,
@@ -144,14 +146,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FrontJournalLen",
         "FrontJournalDia",
     },
+    # Repitch1038 ruling (#1038): the back land's crown-side end prints as its
+    # own station from the head rear face, not as a length chained off its
+    # head-side station; the front land keeps #2556's station and length.
     "BackJournalReference": {
         "BackJournalFromHeadRear",
-        "BackJournalLen",
+        "BackJournalEndFromHeadRear",
         "BackJournalDia",
     },
-    # #2360: the relief between the two MHA-DT-01 bond lands: its front
-    # shoulder from the head rear face, its length and its diameter.
-    "BondReliefProfile": {"BondReliefFromHeadRear", "BondReliefLen", "BondReliefDia"},
+    # #2360: the relief between the two MHA-DT-01 bond lands: both shoulders
+    # from the head rear face (#1038 ruling) and its diameter.
+    "BondReliefProfile": {
+        "BondReliefFromHeadRear",
+        "BondReliefBackFromHeadRear",
+        "BondReliefDia",
+    },
 }
 
 # The construction-only sketches that carry printed dimensions: the part saves
@@ -198,12 +207,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "BackJournalReference": {
         "BackJournalFromHeadRear": 2,
-        "BackJournalLen": 2,
+        "BackJournalEndFromHeadRear": 2,
         "BackJournalDia": 4,
     },
     "BondReliefProfile": {
         "BondReliefFromHeadRear": 2,
-        "BondReliefLen": 2,
+        "BondReliefBackFromHeadRear": 2,
         "BondReliefDia": 2,
     },
 }

@@ -342,7 +342,9 @@ def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
         "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
         "FrontJournalLen": spec.JOURNAL_LEN,
-        "BackJournalLen": spec.JOURNAL_LEN,
+        "BackJournalEndFromHeadRear": spec.BACK_JOURNAL_END_FROM_HEAD_REAR,
+        "BondReliefFromHeadRear": spec.BOND_RELIEF_FROM_HEAD_REAR,
+        "BondReliefBackFromHeadRear": spec.BOND_RELIEF_BACK_FROM_HEAD_REAR,
         "DrumStationFromHeadRear": spec.DRUM_STATION,
         "BondZoneDia": spec.SHAFT_DIA,
     }
@@ -384,7 +386,7 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     """Below the shaft the back land is boxed in: the back-crown/overall
     witnesses on its crown side ran through its text at 30620a85, and the
     land's station witness and Ra leader sit on its head side.  Its diameter
-    hangs above, text right of the line; its 19.0 goes below."""
+    hangs above, text right of the line; its end station goes below."""
     width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
@@ -397,10 +399,15 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     # The two-line callout (r1 of #1685) is ~23 mm wider; the label's own
     # text measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
     assert detail_left - (x + width) >= 0.006
-    # The 19.0 sits below, clear of the land's crown-side end.
-    len_x, _len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
+    # #1038 ruling: the land's crown end prints as its own station in the
+    # rows below the shaft, between the 8.25 and 9.35 rows, its text right
+    # of its own witness.
+    end_x, end_y = drawing.PRINCIPAL_KEEP["BackJournalEndFromHeadRear"]
     crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
-    assert len_x - 0.0055 > crown_end
+    assert end_x - 0.0055 > crown_end
+    _, back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"]
+    _, rim_row_y = drawing.PRINCIPAL_KEEP["BackRimFromHeadRear"]
+    assert rim_row_y + 0.006 <= end_y <= back_row_y - 0.006
 
 
 def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
@@ -472,19 +479,34 @@ def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
     assert geometry.BOND_RELIEF_RADIAL_AIR >= geometry.BOND_RELIEF_MIN_RADIAL_AIR
     for overlap in (geometry.FRONT_BOND_OVERLAP_MIN, geometry.BACK_BOND_OVERLAP_MIN):
         assert geometry.bond_torque_capacity(overlap) >= 2.0 * geometry.HAND_TORQUE_NM
-    # Both shoulders read from the head rear face, the sheet's station datum:
-    # the front one directly, the back one through the relief's own length.
-    assert spec.DRAWING_DIMENSIONS["BondReliefProfile"] >= {
+    # Both shoulders read directly from the head rear face, the sheet's
+    # station datum (#1038 ruling: the 2.60 length chained off the 4.20).
+    assert spec.DRAWING_DIMENSIONS["BondReliefProfile"] == {
         "BondReliefFromHeadRear",
-        "BondReliefLen",
+        "BondReliefBackFromHeadRear",
+        "BondReliefDia",
     }
+    assert spec.BOND_RELIEF_LEN == pytest.approx(
+        spec.BOND_RELIEF_BACK_FROM_HEAD_REAR - spec.BOND_RELIEF_FROM_HEAD_REAR
+    )
+    # Each shoulder carries one .XX band: the back overlap reads one band.
+    assert geometry.BACK_BOND_OVERLAP_MIN == pytest.approx(
+        spec.DRUM_STATION
+        - spec.DRUM_STATION_BAND
+        + spec.DRUM_LEN
+        + geometry.DRUM_LEN_BAND[1]
+        - spec.BOND_RELIEF_BACK_FROM_HEAD_REAR
+        - spec.LINEAR_XX_BAND
+    )
 
 
 def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
-    """The relief's station runs in the station rows below the shaft, between
-    the 1.82 and 8.25 rows and under the front Ra symbol; its length stands
-    just above the shaft, under detail A's label; its diameter hangs below,
-    clear of both diameter blocks and of the station's shoulder witness."""
+    """The relief's front station runs in the station rows below the shaft,
+    between the 1.82 and 8.25 rows and under the front Ra symbol; its back
+    station stands above the shaft (below, its witness would cross the
+    bond-zone block), its text between detail A's label and the front land's
+    length witnesses; its diameter hangs below, clear of both diameter blocks
+    and of the station's shoulder witness."""
     x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
     front_row_y = drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
     back_row_y = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1]
@@ -493,10 +515,16 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     assert y < ra_y
     assert drawing.RELIEF_FRONT_X + 0.010 < x < ra_x + drawing.RA_SYMBOL_EXTENT[0] - 0.020
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
-    label_bottom = drawing.DETAIL_LABEL_XY[1] - 0.008
-    len_x, len_y = drawing.PRINCIPAL_KEEP["BondReliefLen"]
-    assert shaft_top + 0.003 <= len_y <= label_bottom - 0.004
-    assert drawing.RELIEF_BACK_X < len_x < drawing.RELIEF_FRONT_X
+    back_x, back_y = drawing.PRINCIPAL_KEEP["BondReliefBackFromHeadRear"]
+    # Its line (~2.8 mm under the text) runs clear of the outline.
+    assert back_y - 0.0028 >= shaft_top + 0.004
+    label_right = drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH
+    front_land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
+    assert label_right + 0.020 <= back_x <= front_land_crown_end - 0.020
+    assert drawing.RELIEF_BACK_X < back_x < drawing._sheet_x(spec.HEAD_REAR_Z)
+    # Below the shaft the bond-zone block spans the back shoulder.
+    block_left = drawing.BOND_ZONE_TEXT_XY[0]
+    assert block_left < drawing.RELIEF_BACK_X < drawing.BOND_ZONE_BLOCK_RIGHT_X
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["BondReliefDia"]
     text_left, text_right = (dia_x + d for d in drawing.RELIEF_DIA_TEXT_EXTENT)
     # Either way SolidWorks sets the relief diameter's text, it stands between

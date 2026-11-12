@@ -193,14 +193,18 @@ def worst_land_margins(
     before it and each strap's inner face sits its drum-end air away.  Every
     margin is linear in each input, so the corners bound it.  ``stop`` limits
     the float to one end of its range (the drum hard forward or hard aft).
+    The front land prints its station and length, so its outboard end reads
+    two bands from the head rear face; the back land prints both ends as
+    stations from that face (#1038 ruling), one band each.
     """
     front, back = land_stations(journal_len)
     x = LINEAR_XX_BAND
     shares = (STOPS[stop],) if stop is not None else tuple(STOPS.values())
     worst = dict.fromkeys(LAND_ENDS, math.inf)
-    for a, b, length, strap, station, drum, total, share in product(
+    for a, b, e, length, strap, station, drum, total, share in product(
         (front - x, front + x),
         (back - x, back + x),
+        (back + journal_len - x, back + journal_len + x),
         (journal_len - x, journal_len + x),
         STRAP_T_LIMITS,
         (DRUM_STATION - station_band, DRUM_STATION + station_band),
@@ -215,7 +219,7 @@ def worst_land_margins(
             "front inboard": shoulder + a + length - front_inner,
             "front outboard": front_inner - strap - (shoulder + a),
             "back inboard": back_inner - (shoulder + b),
-            "back outboard": shoulder + b + length - (back_inner + strap),
+            "back outboard": shoulder + e - (back_inner + strap),
         }
         for key, value in margins.items():
             worst[key] = min(worst[key], value)
@@ -236,6 +240,14 @@ def land_margin_slack(journal_len: float) -> float:
 
 JOURNAL_LEN = 20.066  # .79
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
+# Repitch1038 ruling (#1038, machinist review of 057ffb6: the back land's .79
+# chained off its 8.25): the back land's crown-side end prints as its own
+# station from the head rear face, 9.04.  Its length is then the difference of
+# two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
+BACK_JOURNAL_END_FROM_HEAD_REAR = BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
+_END = BACK_JOURNAL_END_FROM_HEAD_REAR
+if abs(on_xx_grid(_END) - _END) > 1e-9:
+    raise AssertionError("the back land's end station is off the .01 in grid")
 LAND_MARGINS_AT_STOPS = {
     stop: worst_land_margins(JOURNAL_LEN, DRUM_STATION_BAND, stop=stop)
     for stop in STOPS
@@ -346,10 +358,7 @@ if BACK_JOURNAL_Z + JOURNAL_LEN >= SHAFT_LEN:
 # Worst case, the back land's far end plus its finishing run-out still stops
 # short of the back-crown root.
 if (
-    BACK_JOURNAL_FROM_HEAD_REAR
-    + JOURNAL_LEN
-    + 2.0 * LINEAR_XX_BAND
-    + LAND_FINISH_RUNOUT
+    BACK_JOURNAL_END_FROM_HEAD_REAR + LINEAR_XX_BAND + LAND_FINISH_RUNOUT
     > BACK_RIM_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("back journal land runs into the back-crown root")
@@ -369,15 +378,18 @@ if (
 # check, made before bonding.  So a step under a land is harmless: it is at
 # most that .0014, under the land's .0014-.0053 bond clearance.
 #
-# The relief's front shoulder is located from the head rear face, the sheet's
+# Both relief shoulders are located from the head rear face, the sheet's
 # datum for every station (drawing-guidelines rules 10/11; machinist review
-# of 7454ba6d gated a chain off the front land), and its length is its own
-# size, as each journal's is.  Both at .XX.  The front land is the longer:
-# the operator's torque enters at the head and reaches the drum through it.
-# The back shoulder stands 25.78 mm ahead of the bond-zone diameter's witness
-# (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the back land.
+# of 7454ba6d gated a chain off the front land, and the review of 057ffb6 the
+# 2.60 length chained off the 4.20; Repitch1038 ruling, #1038).  Both at .XX,
+# so the relief's length is the difference, 2.60 -.02/+.02.  The front land
+# is the longer: the operator's torque enters at the head and reaches the
+# drum through it.  The back shoulder stands 25.78 mm ahead of the bond-zone
+# diameter's witness (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the
+# back land.
 BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
-BOND_RELIEF_LEN = 66.04  # 2.60
+BOND_RELIEF_BACK_FROM_HEAD_REAR = 172.72  # 6.80
+BOND_RELIEF_LEN = BOND_RELIEF_BACK_FROM_HEAD_REAR - BOND_RELIEF_FROM_HEAD_REAR
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
 # Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
 # relief's .29 maximum the radial air is .0118 in (0.30 mm), ten times the
@@ -392,14 +404,14 @@ if BOND_RELIEF_RADIAL_AIR < BOND_RELIEF_MIN_RADIAL_AIR:
         f"under {BOND_RELIEF_MIN_RADIAL_AIR}"
     )
 # Each drum end's bonded overlap, every printed band at its short corner: the
-# relief's front shoulder from the head rear face, its back shoulder that
-# plus the relief length; the drum from its station and length.
+# relief's shoulders from the head rear face; the drum from its station and
+# length.
 FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
     DRUM_STATION + DRUM_STATION_BAND
 )
 BACK_BOND_OVERLAP_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
-) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
+) - (BOND_RELIEF_BACK_FROM_HEAD_REAR + LINEAR_XX_BAND)
 # The relief spans the drum's mid-length, where halves reamed to about half
 # depth from each end meet.  This is not a requirement: a deeper pass (the
 # reamer's reach, about 4.25 in, puts the step anywhere from 4.21 to 6.65 in
@@ -411,8 +423,7 @@ BACK_BOND_OVERLAP_MIN = (
 _DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
 if not (
     BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
-    and _DRUM_MID + DRUM_STATION_BAND
-    < BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN - 2.0 * LINEAR_XX_BAND
+    and _DRUM_MID + DRUM_STATION_BAND < BOND_RELIEF_BACK_FROM_HEAD_REAR - LINEAR_XX_BAND
 ):
     raise AssertionError("the bond relief must span the drum's mid-length")
 # Torque: either land alone holds twice a hard hand twist on the MHA-DT-15

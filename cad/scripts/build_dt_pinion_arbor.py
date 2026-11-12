@@ -51,8 +51,10 @@ from dt_pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
     BACK_CAP_SAG,
+    BACK_JOURNAL_END_FROM_HEAD_REAR,
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
+    BOND_RELIEF_BACK_FROM_HEAD_REAR,
     BOND_RELIEF_DIA,
     BOND_RELIEF_FROM_HEAD_REAR,
     BOND_RELIEF_LEN,
@@ -296,6 +298,7 @@ async def _add_journal_land(
     prefix: str,
     journal_z: float,
     station_expression: str,
+    end_station_expression: str | None = None,
 ) -> list[tuple[str, str]]:
     """Split one MHA-DT-14 journal land off the Ø5/16 shaft and dimension it.
 
@@ -304,6 +307,9 @@ async def _add_journal_land(
     construction witness on the flank between them, and the three native
     dimensions the sheet prints -- station from the head shoulder, land
     length, and the diameter that carries the journal band (drawing-simplicity-policy.md `How the repository implements the guidelines`).
+    With ``end_station_expression`` the land's crown-side end prints as a
+    second station from the head shoulder instead of the length (#1038
+    ruling: baseline axial lengths from one faced end).
     """
     feature_name = f"{prefix}Reference"
     start_v = -journal_z
@@ -381,13 +387,25 @@ async def _add_journal_land(
         ),
     )
     dims.record(f"{prefix}FromHeadRear", station_expression)
-    check(
-        f"{feature_name} length",
-        await adapter.add_sketch_dimension(
-            f"{witness}.start", f"{witness}.end", "vertical_distance", JOURNAL_LEN
-        ),
-    )
-    dims.record(f"{prefix}Len", '"JournalLen"')
+    if end_station_expression is None:
+        check(
+            f"{feature_name} length",
+            await adapter.add_sketch_dimension(
+                f"{witness}.start", f"{witness}.end", "vertical_distance", JOURNAL_LEN
+            ),
+        )
+        dims.record(f"{prefix}Len", '"JournalLen"')
+    else:
+        check(
+            f"{feature_name} end station",
+            await adapter.add_sketch_dimension(
+                f"{axis}.start",
+                f"{witness}.end",
+                "vertical_distance",
+                journal_z + JOURNAL_LEN - HEAD_REAR_Z,
+            ),
+        )
+        dims.record(f"{prefix}EndFromHeadRear", end_station_expression)
     check(
         f"{feature_name} diameter witness on the flank",
         await adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
@@ -544,10 +562,12 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
 
     One Top-plane profile, revolved as a cut about its own axis line: a
     rectangle from the relief's diameter out past the shaft flank, on the
-    sketch's -x side (the sheet's upper flank, where the relief length stands
-    on short extension lines).  The axis starts at the head rear face, the
-    sheet's station datum, so the relief's front shoulder is printed from it
-    like every other station, and the relief's length and diameter follow.
+    sketch's -x side (the sheet's upper flank).  The axis starts at the head
+    rear face, the sheet's station datum, so both relief shoulders are
+    printed from it like every other station (#1038 ruling): the front one
+    on the construction witness below the shaft, the back one on the relief
+    floor above it (below, its extension would cross the bond-zone callout),
+    and the diameter follows.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -623,12 +643,15 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     )
     dims.record("BondReliefFromHeadRear", '"BondReliefFromHeadRear"')
     check(
-        f"{feature_name} length",
+        f"{feature_name} back shoulder station",
         await adapter.add_sketch_dimension(
-            f"{inner}.start", f"{inner}.end", "vertical_distance", BOND_RELIEF_LEN
+            f"{axis}.start",
+            f"{inner}.end",
+            "vertical_distance",
+            BOND_RELIEF_BACK_FROM_HEAD_REAR,
         ),
     )
-    dims.record("BondReliefLen", '"BondReliefLen"')
+    dims.record("BondReliefBackFromHeadRear", '"BondReliefBackFromHeadRear"')
     check(
         f"{feature_name} outer reach",
         await adapter.add_sketch_dimension(
@@ -694,11 +717,12 @@ async def build(adapter) -> dict[str, str]:
         "JournalLen": JOURNAL_LEN,
         "FrontJournalFromHeadRear": FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": BACK_JOURNAL_FROM_HEAD_REAR,
+        "BackJournalEndFromHeadRear": BACK_JOURNAL_END_FROM_HEAD_REAR,
         "DrumStationFromHeadRear": DRUM_STATION,
         "PinStationFromHeadRear": PIN_STATION_FROM_HEAD_REAR,
         "PinHoleDia": PIN_HOLE_DIA,
         "BondReliefFromHeadRear": BOND_RELIEF_FROM_HEAD_REAR,
-        "BondReliefLen": BOND_RELIEF_LEN,
+        "BondReliefBackFromHeadRear": BOND_RELIEF_BACK_FROM_HEAD_REAR,
         "BondReliefDia": BOND_RELIEF_DIA,
     }
     for name, value in globals_mm.items():
@@ -1043,6 +1067,7 @@ async def build(adapter) -> dict[str, str]:
         prefix="BackJournal",
         journal_z=BACK_JOURNAL_Z,
         station_expression='"BackJournalFromHeadRear"',
+        end_station_expression='"BackJournalEndFromHeadRear"',
     )
     if len(_shaft_faces(adapter)) != 6:
         raise RuntimeError(

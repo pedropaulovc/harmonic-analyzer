@@ -450,15 +450,20 @@ ARROWS_INSIDE = (
 # stations' rows below the shaft, between the 1.82 and 8.25 rows and under
 # the front land's Ra symbol (tip ~0.124): the line ~2.8 mm under the text
 # position runs at ~0.1185, 6 mm over the 8.25's, its text left of the Ra
-# in the open run under the front land's diameter block.  The relief's
-# length stands above the shaft, under detail A's label, as the journals'
-# lengths do.  Its plain .XX diameter hangs below the shaft, over the
-# station row, measured from the axis to the station witness's shoulder
-# point, its line in the run between the bond-zone block and that shoulder
-# witness.  SolidWorks has set its text 14.3 mm right of the line (r2,
-# 755e192b) and spread over 25.3 mm about it (r5, b6a90da7: x-13.1..+12.2
-# mm); the line stands where either extent clears both neighbours.
-RELIEF_LEN_Y = 0.178
+# in the open run under the front land's diameter block.  Its back
+# shoulder's station (#1038 ruling: the 2.60 length chained off the 4.20,
+# machinist review of 057ffb6) stands ABOVE the shaft: below, its extension
+# would drop through the bond-zone block.  Its line runs ~5.7 mm over the
+# shaft (a 1.2 mm run would read as the outline) and its text stands
+# between detail A's label (bottom ~0.1844, right ~0.1776) and the front
+# land's length witnesses (x 0.2427).  Its plain .XX diameter hangs below
+# the shaft, over the station row, measured from the axis to the station
+# witness's shoulder point, its line in the run between the bond-zone block
+# and that shoulder witness.  SolidWorks has set its text 14.3 mm right of
+# the line (r2, 755e192b) and spread over 25.3 mm about it (r5, b6a90da7:
+# x-13.1..+12.2 mm); the line stands where either extent clears both
+# neighbours.
+RELIEF_BACK_STATION_TEXT_XY = (0.215, 0.1825)
 RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
@@ -467,9 +472,10 @@ RELIEF_DIA_LINE_OFFSET = 0.0155
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
-    # Below the shaft, under the back Ra symbol and its leader, just left of
-    # the back land's centre.
-    "BackJournalLen": (_sheet_x(BACK_JOURNAL_Z + JOURNAL_LEN / 2.0) - 0.0012, 0.143),
+    # #1038 ruling: the back land's crown-side end, its own station from the
+    # head rear face, in a row under the 8.25 (its line ~0.106, 9 mm over the
+    # 9.35 text), its text clear of every witness that drops below the shaft.
+    "BackJournalEndFromHeadRear": (0.125, 0.1087),
     # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
@@ -477,7 +483,7 @@ PRINCIPAL_KEEP = {
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
-    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_LEN_Y),
+    "BondReliefBackFromHeadRear": RELIEF_BACK_STATION_TEXT_XY,
     "BondReliefDia": RELIEF_DIA_XY,
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
