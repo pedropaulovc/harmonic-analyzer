@@ -47,14 +47,14 @@ PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
 ROD_SECTION = 5.0038  # .197
 SECTION_BAND = (0.0, -0.0508)  # +.000/-.002
 STOCK_SKU = "90457A730"
-STOCK_SECTION = 5.0
-STOCK_SECTION_BAND = (0.0, -0.030)
-STOCK_LENGTH = 305.0
-STOCK_LENGTH_BAND = (1.0, -1.0)
+# The catalogue's section limits (5 mm, -0.030/0) and shortest bar (305 -1).
+STOCK_SECTION_MAX = 5.0
+STOCK_SECTION_MIN = 4.970
+STOCK_LENGTH_MIN = 304.0
 if not (
     ROD_SECTION + SECTION_BAND[1]
-    <= STOCK_SECTION + STOCK_SECTION_BAND[1]
-    <= STOCK_SECTION + STOCK_SECTION_BAND[0]
+    <= STOCK_SECTION_MIN
+    <= STOCK_SECTION_MAX
     <= ROD_SECTION + SECTION_BAND[0]
 ):
     raise AssertionError(f"{STOCK_SKU} key stock is not inside the printed square band")
@@ -143,7 +143,7 @@ STUD_TAP_LEAD_ROOM_MIN = (STUD_TAP_SPEC.depth_mm - _STUD_TAP_DEPTH_BAND) - (
 )
 if STUD_TAP_LEAD_ROOM_MIN < 5.0 * _STUD_PITCH:
     raise AssertionError("the stud tap drill leaves no plug-tap lead under the thread")
-if TOTAL_LENGTH >= STOCK_LENGTH + STOCK_LENGTH_BAND[1]:
+if TOTAL_LENGTH >= STOCK_LENGTH_MIN:
     raise AssertionError(f"one {STOCK_SKU} bar does not yield the rod")
 if PIVOT_DIA >= ROD_SECTION:
     raise AssertionError("pivot end must turn down inside the square (a shoulder)")

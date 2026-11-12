@@ -431,11 +431,10 @@ def test_square_is_bought_key_stock_inside_the_printed_band() -> None:
     rod."""
     import _config
 
-    low = spec.STOCK_SECTION + spec.STOCK_SECTION_BAND[1]
-    high = spec.STOCK_SECTION + spec.STOCK_SECTION_BAND[0]
+    low, high = spec.STOCK_SECTION_MIN, spec.STOCK_SECTION_MAX
     assert spec.ROD_SECTION + spec.SECTION_BAND[1] <= low <= high
     assert high <= spec.ROD_SECTION + spec.SECTION_BAND[0]
-    assert spec.TOTAL_LENGTH < spec.STOCK_LENGTH + spec.STOCK_LENGTH_BAND[1]
+    assert spec.TOTAL_LENGTH < spec.STOCK_LENGTH_MIN
     material = str(_config.parts("pn-pen-rod")["material_specification"])
     assert spec.STOCK_SKU in material
     stock_lines = [
