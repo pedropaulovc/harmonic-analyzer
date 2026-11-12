@@ -141,7 +141,10 @@ ISO_SCALE = (2.0, 1.0)
 # face on the axis) on SIDE_ORIGIN (``_place_origin``).
 AXIS_Y = 0.135
 FRONT_CENTER = (0.075, AXIS_Y)
-SIDE_ORIGIN = (0.2745, AXIS_Y)
+# x 0.2705: the .76 spigot (#1038) carries its centred bond callout 3.8 mm
+# further right than the .71 one did; at 0.2745 the callout's second line
+# ended on the inner border (farm run 20261111T234611671Z).
+SIDE_ORIGIN = (0.2705, AXIS_Y)
 ISO_CENTER = (0.385, 0.222)
 # Top-aligned: the numbered notes top-left, Gear Data right of them.
 NUMBERED_NOTES_POS = (0.015, 0.263)

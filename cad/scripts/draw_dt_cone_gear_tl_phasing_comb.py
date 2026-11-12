@@ -68,8 +68,11 @@ VIEW_SCALE = (5, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 ISO_SCALE = (1, 1)
 # The model origin (the T030 blade's north end on the seat line) on the
-# sheet; the bottom view projects straight below.
-FRONT_ORIGIN = (0.072, 0.215)
+# sheet; the bottom view projects straight below.  x 0.062: the 1.42 plate
+# (#1038) is 14 mm longer on the sheet than the 1.31 one, and at 0.072 the
+# T006 blade's location, under the edge view, stood 6 mm into the title
+# block's column (layout audit of farm run 20261111T234611671Z).
+FRONT_ORIGIN = (0.062, 0.215)
 BOTTOM_CENTER_Y = 0.0903
 # The isometric and its label in the free upper right, over the seat line's
 # extension lines; the notes under the bottom view's callouts, left of the
