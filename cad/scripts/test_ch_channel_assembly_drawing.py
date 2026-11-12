@@ -218,7 +218,8 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         ("rod-pin-remade", steps.RODS_PINNED_KEY),
         ("bank-spring-replaced", "bank-spring-checked"),
         ("south-bracket-reset", "south-bracket-spring-set"),
-        ("bar-pin-remade", steps.BARS_PINNED_KEY),
+        ("bar-pin-remade", "bars-straight"),
+        ("bar-straightened", "bars-straight"),
     ):
         assert steps.step_number(target) < steps.step_number(key)
         assert f"STEP {steps.step_number(target)}." in _step_body(key)
@@ -1337,10 +1338,11 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
     # A bought pin cannot be remade: each remedy replaces the part whose
-    # reamed hole let the pin slide, and sends the fitter back to its press.
+    # reamed hole let the pin slide, and sends the fitter back to its press;
+    # a replacement bar first passes the straightness check (#2341).
     for remedy, host, pinned in (
         ("rod-pin-remade", drawing.explode.ROD, steps.RODS_PINNED_KEY),
-        ("bar-pin-remade", drawing.explode.BAR, steps.BARS_PINNED_KEY),
+        ("bar-pin-remade", drawing.explode.BAR, "bars-straight"),
     ):
         body = _step_body(remedy)
         assert f"REPLACE THE {drawing.item(host)} " in body, remedy
@@ -1483,11 +1485,16 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     neighbours each at that bow keep the mid-span running floor."""
     asm = drawing.asm
     straight = steps.step_number("bars-straight")
-    assert straight == steps.step_number("bar-notches-set") - 1
+    assert straight == steps.step_number("bar-notches-set") - 2
     assert straight < steps.step_number(steps.BARS_PINNED_KEY)
     assert asm.BAR_BOW_MAX_MM == pytest.approx(0.005 * 25.4)
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
     body = _step_body("bars-straight")
     assert "SURFACE PLATE ON EACH SIDE FACE" in body
     assert "A .005 FEELER GAUGE LEAF MUST NOT ENTER" in body
-    assert "STRAIGHTEN BY HAND, OR EXCHANGE" in body
+    # Rule 22: the remedy is its own step and loops back to the check.
+    assert "STRAIGHTEN" not in body
+    assert steps.step_number("bar-straightened") == straight + 1
+    remedy = _step_body("bar-straightened")
+    assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
+    assert f"RETURN TO STEP {straight}." in remedy

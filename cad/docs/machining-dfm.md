@@ -947,8 +947,8 @@ farm validation of the route is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`ch-pivot-shaft`** ×1 | 1018 CF bar per its registry, or 1/4 ground stock as the print allows (stock allocation: [#2346](https://github.com/pedropaulovc/harmonic-analyzer/issues/2346)); Ø.2500 +0/−.0008 × 6.40 tip to tip | domed both ends; two set-screw flats in line, one side, one at each end | **L/D about 25:1** → whip; follow rest | 2 (turn, face and dome both ends; mill both flats in one setup) | manual lathe, chuck and tailstock centre with a follow rest, then mill |
-| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×166.6 | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±75.06 | **L/D 26:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
+| **`ch-pivot-shaft`** ×1 | 1018 CF bar per its registry, or 1/4 ground stock as the print allows (stock allocation: [#2346](https://github.com/pedropaulovc/harmonic-analyzer/issues/2346)); Ø.2500 +0/−.0008 × 6.85 tip to tip | domed both ends; two set-screw flats in line, one side, one at each end | **L/D about 27:1** → whip; follow rest | 2 (turn, face and dome both ends; mill both flats in one setup) | manual lathe, chuck and tailstock centre with a follow rest, then mill |
+| **`ch-fulcrum-shaft`** ×1 | plain steel bar Ø6.35×178.05 (7.01) | domed R3.175 ends; two 0.3-deep set-screw flats on one side at ±80.772 | **L/D 28:1** → whip; **same stock as pivot-shaft — don't mix** | 2 (turn domes; mill both flats in one setup) | manual lathe + steady, mill |
 
 The 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. The 20 rocker arms ride the
 pivot shaft and the 20 channel levers the fulcrum shaft on their own integral hubs, which stack face

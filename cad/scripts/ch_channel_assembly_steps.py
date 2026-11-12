@@ -118,6 +118,7 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     "keepers-unclamped",
     "keepers-held",
     "bars-straight",
+    "bar-straightened",
     "bar-notches-set",
     BARS_PINNED_KEY,
     "bar-pins-dressed",

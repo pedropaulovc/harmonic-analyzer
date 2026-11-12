@@ -1364,8 +1364,11 @@ def _fitup_text() -> dict[str, str]:
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
-            f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT. STRAIGHTEN "
-            "BY HAND, OR EXCHANGE, ANY BAR IT ENTERS."
+            f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT."
+        ),
+        "bar-straightened": (
+            f"STRAIGHTEN BY HAND, OR EXCHANGE, ANY {bar} BAR THE LEAF ENTERED AND "
+            f"RETURN TO STEP {n('bars-straight')}."
         ),
         "bar-notches-set": (
             f"AT THE BENCH, SET THE TOP NOTCH OF EACH {bar} BAR ASTRIDE ONE "
@@ -1383,7 +1386,7 @@ def _fitup_text() -> dict[str, str]:
         "bar-pin-remade": (
             f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
             f"THE PIN OUT, REPLACE THE {bar} AND RETURN TO STEP "
-            f"{n(steps.BARS_PINNED_KEY)}."
+            f"{n('bars-straight')}."
         ),
         "fulcrum-shaft-withdrawn": (
             f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
