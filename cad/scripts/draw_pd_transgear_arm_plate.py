@@ -598,9 +598,13 @@ DATUM_A_MODEL = (0.0, _SCREW_Y, -14.0)
 # annulus between the bore and the face's diameter, below the axis, and the
 # symbol stands level with it beyond the face, inside the diameter's witness
 # lines (under them, its leader crossed the hub's: run 20261027T130144223Z).
-# The hub face's caption stands under the hub diameter's lower witness line,
-# its 14-character first line ending short of the face; the boss face's
-# above its symbol.  Each caption's xy is its top-left corner. Model points, mm.
+# Each face's caption stands directly over its own symbol, on the symbol's
+# side of every witness line (inside the face diameter's), so it reads as
+# the symbol's words: under the hub diameter's lower witness line, the hub
+# caption read as loose text or a note on the diameter (machinist review,
+# run 20261112T165728270Z; that placement was main's).  The hub caption's
+# widest line (the second, 14 characters) ends short of the face.  Each
+# caption's xy is its top-left corner. Model points, mm.
 FACE_FINISH_CAPTIONS = {
     key: two_lines_of_words(caption) for key, caption in FINISH_CAPTIONS.items()
 }
@@ -612,16 +616,25 @@ def _annulus_mid_y(face_dia: float) -> float:
     return -(BORE_DIA + face_dia) / 4.0
 
 
+# On the run 20261112T165728270Z sheet the Ra symbol stands 3.5 mm of model
+# over its pick, and a two-line caption's block (the note's top pad, two
+# lines at their pitch) is 4.2 tall; each caption's foot stands
+# _CAPTION_FOOT_GAP over its symbol, less than one caption text height.
+FINISH_SYMBOL_HEIGHT = 3.5
+CAPTION_BLOCK_HEIGHT = 4.2
+_CAPTION_FOOT_GAP = 0.7
+_CAPTION_OVER_PICK = FINISH_SYMBOL_HEIGHT + _CAPTION_FOOT_GAP + CAPTION_BLOCK_HEIGHT
+
 FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
     "hub_face": (
         (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z),
         (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z - 9.5),
-        (0.0, -HUB_DIA / 2.0 - 1.5, HUB_FACE_Z - 20.5),
+        (0.0, _annulus_mid_y(HUB_DIA) + _CAPTION_OVER_PICK, HUB_FACE_Z - 20.5),
     ),
     "boss_face": (
         (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z),
         (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z + 4.0),
-        (0.0, 4.0, BOSS_FACE_Z + 3.0),
+        (0.0, _annulus_mid_y(BOSS_DIA) + _CAPTION_OVER_PICK, BOSS_FACE_Z + 3.0),
     ),
 }
 # A placed note reads back its own SetPosition point; a refused move leaves
