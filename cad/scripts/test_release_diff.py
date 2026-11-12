@@ -65,6 +65,8 @@ KITS = [
     }),
 ]
 FAMILIES = GROUPS + KITS
+# Families allocated with no prior native identity (#2339): no prior stem pairs.
+INTRODUCED = [("sh-vn-pivot-pin", "MHA-SH-VN-58", "RodPin", ("RodPin", "BarPin"))]
 NAMED_FAMILIES = [family for family in FAMILIES if family[2] != "Default"]
 
 
@@ -106,7 +108,9 @@ def render_diff(monkeypatch):
 @pytest.mark.parametrize("stem,number,neutral,prior_members", FAMILIES)
 def test_configured_family_members_and_prior_current_aliases(stem, number, neutral, prior_members):
     mapping = load_identity_map()
-    assert set(mapping.configured_families) == {family[0] for family in FAMILIES}
+    assert set(mapping.configured_families) == {
+        family[0] for family in FAMILIES + INTRODUCED
+    }
     group = mapping.configured_families[stem]
     assert group["number"] == number
     assert group["neutral_export_configuration"] == neutral
@@ -153,6 +157,37 @@ def test_a_configured_kit_member_needs_its_declared_family(tmp_path):
 
     with pytest.raises(ValueError, match="configured identity outside a configured family"):
         load_identity_map(_kit_map(tmp_path, drop_kits), HISTORICAL_IDENTITY_MAP)
+
+
+def test_an_introduced_family_has_members_but_no_prior_alias(tmp_path):
+    """#2339: the bought pivot pin is a configured family allocated with no
+    prior native identity; its bare stem selects its members, nothing else."""
+    mapping = load_identity_map()
+    [(stem, number, neutral, members)] = INTRODUCED
+    group = mapping.configured_families[stem]
+    assert (group["number"], group["neutral_export_configuration"]) == (number, neutral)
+    assert tuple(group["configurations"]) == members
+    assert stem not in mapping.aliases
+    assert canonical_keys("sh-vn-pivot-pin", mapping) == ("sh-vn-pivot-pin--rodpin",)
+    assert canonical_keys("sh-vn-pivot-pin", mapping, drawing=True) == (
+        "sh-vn-pivot-pin--rodpin", "sh-vn-pivot-pin--barpin",
+    )
+    # The retired shop pins stay reservations, not aliases of the members.
+    assert canonical_keys("ch-rod-pivot-pin", mapping) == ("ch-rod-pivot-pin",)
+
+    def claim_a_prior_number(payload):
+        row = next(row for row in payload["parts_and_assemblies"]
+                   if row["old_stem"] == "sh-vn-pivot-pin")
+        row["new_identities"][0]["prior_number"] = "MHA-CH-10"
+
+    def repeat_a_member(payload):
+        row = next(row for row in payload["parts_and_assemblies"]
+                   if row["old_stem"] == "sh-vn-pivot-pin")
+        row["new_identities"][1]["configuration"] = row["new_identities"][0]["configuration"]
+
+    for mutate in (claim_a_prior_number, repeat_a_member):
+        with pytest.raises(ValueError, match="conflicting configured member identity"):
+            load_identity_map(_kit_map(tmp_path, mutate), HISTORICAL_IDENTITY_MAP)
 
 
 @pytest.mark.parametrize("stem,number,neutral,prior_members", KITS)
@@ -205,6 +240,9 @@ def test_all_current_and_archived_artifact_aliases_compose_without_mutating_maps
     mapping = load_identity_map()
     old_keys, candidates = [], {}
     for row in payload["parts_and_assemblies"] + payload.get("retired_identities", []):
+        if row["old_stem"] in mapping.configured_families:
+            # An introduced family's own row is no alias (covered above).
+            continue
         expected = tuple(dict.fromkeys(
             mesh_key(identity["stem"], identity["configuration"])
             if "configuration" in identity else identity["stem"]

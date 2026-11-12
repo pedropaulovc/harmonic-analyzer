@@ -5,7 +5,7 @@
  */
 import mapping from './content/current-native-identities.json' with { type: 'json' }
 
-export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = '5c64b170fac6025f2f9fd66d67b417b5b128bf5352daad33616be6d7ad2f0bef'
+export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = '7c83a11dfb1472f23e23b67b9ff8e964866c9d6c3c313d048997ff2014749f7b'
 export const CURRENT_NATIVE_OCCURRENCE_NAMESPACE = 'archive-role-local'
 export const CURRENT_NATIVE_IDENTITY_PROJECTION = Object.freeze({
   kind: 'current-native-identity-projection',
@@ -83,7 +83,9 @@ function token(name, allowConfiguration = false) {
 function resolveIdentity(stem, parent, suffix = '') {
   const sourceStem = aliases.get(stem) ?? stem, row = sources.get(sourceStem)
   let records = row ? row.identities.map(identity => ({ row, identity })) : priorTargets.get(stem)
-  const current = !records
+  // An identity introduced after the migration is its own source: a member of
+  // such a shared part still resolves by its role or configuration.
+  const current = !records || sourceStem === stem && row?.identities.some(identity => identity.stem === stem) === true
   records ??= targets.get(`${parent ?? ''}/${stem}`) ?? targets.get(`/${stem}`) ?? []
   records = records.filter(record => !record.identity.parent || record.identity.parent === parent)
   if (current) {

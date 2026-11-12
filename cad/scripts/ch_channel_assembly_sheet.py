@@ -37,6 +37,7 @@ from ch_channel_explode_spec import (
     KEEPER_FOOT_SCREW,
     KEEPER_SET_SCREW,
     ROD,
+    ROD_PIN,
     WASHER,
 )
 
@@ -71,7 +72,8 @@ if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
 
 # Hand-written (components carry no Description property), keyed by family
-# stem; the drawing keys the spring row by its built variant stem.
+# stem (each pivot pin member by stem--member, its configured BOM key); the
+# drawing keys the spring row by its built variant stem.
 BOM_DESCRIPTIONS = {
     "ch-pivot-shaft": "ROCKER PIVOT SHAFT",
     "ch-fulcrum-shaft": "LEVER FULCRUM SHAFT",
@@ -95,7 +97,7 @@ BOM_DESCRIPTIONS = {
     ROD: "CONNECTING ROD",
     BAR: "AMPLITUDE BAR",
     "ch-channel-lever": "CHANNEL LEVER",
-    "ch-rod-pivot-pin": "ROD PIVOT PIN",
+    ROD_PIN: "ROD PIVOT PIN",
     BAR_PIN: "BAR PIVOT PIN",
     CHANNEL_SPRING: "EXTENSION SPRING",
     HOOK: "#6-32 EYEBOLT SPRING ANCHOR",

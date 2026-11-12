@@ -70,7 +70,7 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # prints .118 +/-.002, so the notch is .124 +.007/.000, and the bar-to-bar
 # side gap (pitch 7.0565 - bar 6.35 = 0.7065) holds the running floor with
 # this float, both ledges' and both plate offsets' bands in it
-# (ch_bar_pivot_pin_spec.joint_budget). The foot notch keeps an interim
+# (sh_vn_pivot_pin_bar_spec.joint_budget). The foot notch keeps an interim
 # +.010/.000 (the metric +0.30 narrowed so its widest notch and thinnest
 # cheek are no worse than before); its stack is still #1038.
 BOTTOM_NOTCH_WIDTH = _straddle_minimum(
@@ -82,15 +82,15 @@ TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE) 
 TOP_NOTCH_WIDTH_BAND = (0.1778, 0.0)  # +.007/.000 (upper, lower) deviations, native
 # The top notch's depth only clears the lever: its roof must stay below the
 # lever's lower edge with the lever turned on the pin relative to the bar
-# (ch_bar_pivot_pin_spec.joint_budget notch_roof_clearance_min). The legacy
+# (sh_vn_pivot_pin_bar_spec.joint_budget notch_roof_clearance_min). The legacy
 # 1/2" (12.7) does not hold that at the printed bands (owner ruling
 # 2026-10-15 deepened the lever), so the notch is cut .55 deep.
 TOP_NOTCH_HEIGHT = 13.97  # .55
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 (.25) hole centre below the bar top
-# The MHA-CH-11 bar pivot pin presses into this hole through both top-notch
+# The MHA-SH-VN-58 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
-# ch_bar_pivot_pin_spec holds the fit budget). Reamed .077 +.0009/+.0005 in
-# under the 5/64 drill rod: a purchased .0775 chucking reamer cuts inside it.
+# sh_vn_pivot_pin_bar_spec holds the fit budget). Reamed .077 +.0009/+.0005 in
+# under the 5/64 dowel: a purchased .0775 chucking reamer cuts inside it.
 TOP_PIN_HOLE_DIA = 1.9558  # .077 in
 TOP_PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
 
