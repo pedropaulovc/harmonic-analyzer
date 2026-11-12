@@ -112,7 +112,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)
 
-# Sheet layout (meters). A 177.8 mm casting with four views needs a 1:2 ASME B
+# Sheet layout (meters). A 192.0 mm casting with four views needs a 1:2 ASME B
 # sheet. Section A-A replaces the side view, exposing the opposed pocket floors
 # and web; the clearance-hole setup stays aligned below the front. The front
 # shifts left of the section, and the bottom view drops to open an exterior
@@ -136,7 +136,7 @@ FRONT_KEEP = {
     # fix3 render), so the text sits up-right of that corner, on the arc's
     # own bisector. From the left column its leader crossed the whole cavity
     # and landed on the far side of the fillet's circle, off the arc.
-    "CavityRadius": (0.161, 0.240),
+    "CavityRadius": (0.1625, 0.240),
     # Each stacked width prints its text just above its own dimension line,
     # so the lower one needs a full band: at 0.118 the 127.0 line ran
     # through "165.1" (fix3 render).
@@ -153,16 +153,19 @@ FRONT_KEEP = {
     ),
     # The cavity's and the pockets' locations (CavityLocationReference, blanked
     # in the part) stand above the view's left end, clear of the R6.35 low
-    # left: from the -X end face, the pocket wall's 7.70 on the inner band
+    # left: from the -X end face, the pocket wall's .53 on the inner band
     # (its text outside left, its pocket-wall extension line stopping below
-    # the outer band) and the cavity wall's 26.7 on the outer one, under the
-    # 180.5; from the top face, the cavity's top wall left of the view. The
-    # 7.70's BOTH SIDES stands left of the 25.4's dimension line and its line
-    # above the 25.4's outside arrow tail (r9 review: the tail struck the
-    # callout's E and crossed the pocket station's line).
-    "PocketEndStation": (0.0365, 0.244),
+    # the outer band) and the cavity wall's 1.28 on the outer one, under the
+    # 7.56; from the top face, the cavity's top wall left of the view. The
+    # .53's BOTH SIDES stands left of the 1.00's dimension line and its line
+    # above the 1.00's outside arrow tail (r9 review: the tail struck the
+    # callout's E and crossed the pocket station's line). The 7.56 length
+    # (#1038) put the -X end face 2.8 mm further left than the 7.12 did, so
+    # the 1.00 and the .53 moved left with it to keep the 1.00's text off
+    # the end face.
+    "PocketEndStation": (0.0345, 0.244),
     "CavityEndStation": (0.0668, 0.249),
-    "CavityTopStation": (0.052, 0.2231),
+    "CavityTopStation": (0.0505, 0.2231),
     # The pockets' bottom wall up from the mounting face (r6 review: the
     # pocket had no vertical location). Its 6.35 spans only 3.2 mm of sheet,
     # so its dimension line runs on down past the mounting face's extension
@@ -212,7 +215,7 @@ DIMENSION_CALLOUTS = {
 # stations' and the locations' are the PART's
 # (build_fr_rocker_arm_support.DRAWING_PRECISION): read back
 # (PART_PRECISION), never set here.
-# Decimal inch: every size .XX (the 7.12 length's half locates the cavity
+# Decimal inch: every size .XX (the 7.56 length's half locates the cavity
 # and the pockets at .XX).
 DIMENSION_PRECISION = {
     "Depth": 2,
@@ -282,7 +285,11 @@ SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
 # sees through the cavity: at 16 mm it cut them, leaving half hole symbols on
 # its edges (r743-p1s-B2 render). The callout text sits right of VIEW B,
 # between the hole table and the title block; its rows centre on its y.
-VIEW_B_CENTER = (0.210, 0.108)
+# The 7.56 length (#1038) grew VIEW B 5.6 mm on the sheet: between the
+# bottom view's and the hole table's 10 mm lanes it fits at 211.4 only with
+# the table 3.5 mm further right than for the 7.12, which also gives the
+# east REF station room left of the table.
+VIEW_B_CENTER = (0.2114, 0.108)
 VIEW_B_CROP_HALF_Z_MM = 12.0
 FOOT_HOLE_INNER_Z = min(abs(z) for _, z in HOLES) - HOLE_DIA / 2.0
 if not NARROW < VIEW_B_CROP_HALF_Z_MM < FOOT_HOLE_INNER_Z:
@@ -302,7 +309,7 @@ SEAT_CALLOUT_XY = (0.300, 0.081)
 # east text clears the hole table's left edge; the west one the front view's
 # pocket-width extension lines and the section label.
 VIEW_B_REF_RISE = 0.0055
-VIEW_B_REF_OUTBOARD = 0.0045
+VIEW_B_REF_OUTBOARD = 0.004
 VIEW_B_KEEP = {
     name: (
         VIEW_B_CENTER[0]
@@ -359,7 +366,7 @@ RIM_CHAMFER_TEXT_XY = (0.1717, 0.190)
 
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
-HOLE_TABLE_ANCHOR = (0.270, 0.130)
+HOLE_TABLE_ANCHOR = (0.2735, 0.130)
 HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
 # Native hole tags land up-right of their holes. At the bottom view's right
 # end that printed A3 and A4 across the pocket's hidden end lines (fix3
@@ -368,7 +375,7 @@ HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
 RIGHT_END_HOLE_TAGS = ("A3", "A4")
 HOLE_TAG_MIRROR_SHIFT = -0.0150
 # The LOC cells print .XXX in the sheet's inch: X from the -X end face
-# (3.56 -/+ 2.375), Y from the -Z foot edge (1.250 +/- .687). The table
+# (3.78 -/+ 2.375), Y from the -Z foot edge (1.250 +/- .687). The table
 # check converts them back to these millimetres.
 EXPECTED_HOLE_TABLE_LOCATIONS_MM = tuple(
     (BOSS_DEPTH / 2.0 + sx * HOLD_DOWN_LOCAL_HALF_X, WIDE + sz * HOLD_DOWN_LOCAL_HALF_Z)
@@ -394,7 +401,7 @@ HOLE_TABLE_MATE_COLUMN = HOLE_TABLE_SIZE_COLUMN + 1
 # Column widths (sheet m). The native widths (19/31/31/63 mm) left no room
 # for a fifth column before the right border (x 419 mm); the table text runs
 # about 3.0 mm a glyph: "X LOC" 15 mm, "Ø .313 THRU ALL" 45 mm, "MHA-FR-01"
-# 27 mm. At the 270 mm anchor the table ends at x 410 mm.
+# 27 mm. At the 273.5 mm anchor the table ends at x 413.5 mm.
 HOLE_TABLE_COLUMN_WIDTHS = {0: 0.014, 1: 0.022, 2: 0.022, 3: 0.050, 4: 0.032}
 _RIGHT_BORDER_X = 0.419
 if HOLE_TABLE_ANCHOR[0] + sum(HOLE_TABLE_COLUMN_WIDTHS.values()) > _RIGHT_BORDER_X - 0.005:
