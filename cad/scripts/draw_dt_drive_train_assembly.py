@@ -600,9 +600,12 @@ CONE_TIP_DETAIL_CAPTION_ALLOWANCE = 0.010
 # Seed spot: the empty right half above the title block; the fit re-centres it.
 CONE_TIP_DETAIL_SEED = (0.350, 0.170)
 # The boundary letter's air outside its circle (draw_ch_channel_assembly
-# DETAIL_LETTER_OFFSET), at the circle's lower left, the side the tip parts'
-# balloons left when they moved to the detail.
+# DETAIL_LETTER_OFFSET).  It takes the first of these sides (degrees about
+# the circle's centre) whose box clears every balloon and leader of the 1:3
+# view: r9 (run 20261112T135520653Z) put it at 225 degrees, on balloon 15.
 CONE_TIP_DETAIL_LETTER_OFFSET = 0.002
+CONE_TIP_DETAIL_LETTER_ANGLES = (225.0, 135.0, 315.0, 45.0, 180.0, 270.0, 90.0, 0.0)
+CONE_TIP_DETAIL_LETTER_CLEARANCE = CLUSTER_BALLOON_CLEARANCE["cone-set"]
 # The boundary circle's radius beyond the parts' half-diagonal, at the parent's
 # scale, so its line clears their ink.
 CONE_TIP_DETAIL_BOUNDARY_PAD = 0.002
@@ -2669,6 +2672,66 @@ def cone_tip_detail_boundary(
     return centre, half_diagonal * ratio + CONE_TIP_DETAIL_BOUNDARY_PAD
 
 
+def _segment_meets_box(
+    segment: LeaderSegment, box: tuple[float, float, float, float]
+) -> bool:
+    """Whether a straight leader run touches a box (Liang-Barsky clip)."""
+    low, high = 0.0, 1.0
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    for p, q in (
+        (-dx, segment.x0 - box[0]),
+        (dx, box[2] - segment.x0),
+        (-dy, segment.y0 - box[1]),
+        (dy, box[3] - segment.y0),
+    ):
+        if p == 0.0:
+            if q < 0.0:
+                return False
+            continue
+        t = q / p
+        if p < 0.0:
+            low = max(low, t)
+        else:
+            high = min(high, t)
+        if low > high:
+            return False
+    return True
+
+
+def cone_tip_letter_corner(
+    centre: tuple[float, float],
+    radius: float,
+    size: tuple[float, float],
+    balloons: Sequence[tuple[float, float]],
+    leaders: Sequence[LeaderSegment],
+) -> tuple[float, float]:
+    """The boundary letter's top-left corner, sheet m: on the first
+    CONE_TIP_DETAIL_LETTER_ANGLES side whose box, just outside the circle,
+    clears every 1:3 view balloon circle (centres ``balloons``) and leader by
+    the clearance.  Raises when no side does."""
+    width, height = size
+    reach = radius + CONE_TIP_DETAIL_LETTER_OFFSET + math.hypot(width, height) / 2.0
+    clear = CONE_TIP_DETAIL_LETTER_CLEARANCE
+    balloon_r = BALLOON_DIAMETER / 2.0
+    for degrees in CONE_TIP_DETAIL_LETTER_ANGLES:
+        x = centre[0] + reach * math.cos(math.radians(degrees))
+        y = centre[1] + reach * math.sin(math.radians(degrees))
+        box = (x - width / 2.0, y - height / 2.0, x + width / 2.0, y + height / 2.0)
+        grown = (box[0] - clear, box[1] - clear, box[2] + clear, box[3] + clear)
+        if any(
+            _boxes_overlap(grown, (bx - balloon_r, by - balloon_r, bx + balloon_r, by + balloon_r))
+            for bx, by in balloons
+        ):
+            continue
+        if any(_segment_meets_box(segment, grown) for segment in leaders):
+            continue
+        return box[0], box[3]
+    raise RuntimeError(
+        "cone tip detail: every side of its boundary circle meets a balloon or leader"
+    )
+
+
+
 def cone_tip_detail_caption(
     scale: tuple[float, float], sheet_scale: tuple[float, float]
 ) -> str:
@@ -4638,12 +4701,14 @@ def _balloon_cone_tip_detail(
     parent_scale: tuple[float, float],
     outline: tuple[float, float, float, float],
     origin: tuple[float, float],
+    parent_balloons: dict[str, Any],
     bom_name: str,
     items: dict[str, str],
 ) -> tuple[dict[str, Any], list[BalloonLanding]]:
     """Mark the cone tip detail's boundary and letter on the ballooned 1:3
-    view, balloon the six tip families on the detail and caption it under its
-    ring; return its balloons by note name and their landings."""
+    view (its balloons by note name: ``parent_balloons``), balloon the six tip
+    families on the detail and caption it under its ring; return its balloons
+    by note name and their landings."""
     sheet_name = SHEET_NAMES[CLUSTER_SHEETS["cone-set"] - 1]
     _activate_sheet(adapter, sheet_name)
     label = "cone tip detail"
@@ -4670,11 +4735,19 @@ def _balloon_cone_tip_detail(
         raise RuntimeError(f"cannot activate the cone set view for the {label} letter")
     letter = _add_note_block(adapter, CONE_TIP_DETAIL_LETTER, centre, label=f"{label} letter")
     letter_extent = _note_extent(adapter, letter, label=f"{label} letter")
-    reach = (radius + CONE_TIP_DETAIL_LETTER_OFFSET) / math.sqrt(2.0)
+    # The final uncross only swaps balloons between ring slots, so the slots
+    # read here are the ones the audit reads.
+    parent_leaders = _placed_balloon_leaders(adapter, parent_balloons)
     _anchor_note(
         adapter,
         letter,
-        (centre[0] - reach - (letter_extent[2] - letter_extent[0]), centre[1] - reach),
+        cone_tip_letter_corner(
+            centre,
+            radius,
+            (letter_extent[2] - letter_extent[0], letter_extent[3] - letter_extent[1]),
+            [_leader_centre(segments) for segments in parent_leaders.values()],
+            [segment for segments in parent_leaders.values() for segment in segments],
+        ),
         label=f"{label} letter",
     )
     _telemetry.event(
@@ -5440,6 +5513,7 @@ def _place_package(
                         parent_scale=cluster_scales[cluster],
                         outline=tip_outline,
                         origin=tip_origin,
+                        parent_balloons=placed[-1][1],
                         bom_name=bom_name,
                         items=items,
                     ),

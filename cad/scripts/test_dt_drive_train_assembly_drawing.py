@@ -1687,6 +1687,63 @@ def test_the_cone_tip_boundary_circles_the_detail_parts_on_the_1_3_view() -> Non
             assert gap == pytest.approx(drawing.CONE_TIP_DETAIL_BOUNDARY_PAD)
 
 
+# r9 (run 20261112T135520653Z): sheet 4's boundary circle and the letter box
+# the audit read, which balloon 15 overlapped at 225 degrees.
+R9_BOUNDARY = ((0.1820, 0.1150), 0.0340)
+R9_LETTER_SIZE = (0.0023, 0.0048)
+
+
+def _letter_box(corner: tuple[float, float]) -> tuple[float, float, float, float]:
+    w, h = R9_LETTER_SIZE
+    return (corner[0], corner[1] - h, corner[0] + w, corner[1])
+
+
+def test_the_boundary_letter_stands_just_outside_its_circle_on_the_preferred_side() -> None:
+    (cx, cy), r = R9_BOUNDARY
+    box = _letter_box(drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [], []))
+    mid = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+    assert mid[0] < cx and mid[1] < cy, "lower left first"
+    corners = [(x, y) for x in (box[0], box[2]) for y in (box[1], box[3])]
+    offset = drawing.CONE_TIP_DETAIL_LETTER_OFFSET
+    assert min(math.dist(c, (cx, cy)) for c in corners) >= r + offset - 1e-9
+    assert math.dist(mid, (cx, cy)) < r + 0.01, "it stays beside its circle"
+
+
+def test_the_boundary_letter_moves_off_a_balloon_or_leader_on_its_side() -> None:
+    """r9's balloon 15 sat on the lower-left side; a leader crossing the next
+    side moves the letter on again, and it never touches either."""
+    (cx, cy), r = R9_BOUNDARY
+    first = _letter_box(drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [], []))
+    balloon = ((first[0] + first[2]) / 2 + 0.004, (first[1] + first[3]) / 2)
+    second = _letter_box(
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [balloon], [])
+    )
+    assert second != first
+    br = drawing.BALLOON_DIAMETER / 2
+    keep = (balloon[0] - br, balloon[1] - br, balloon[0] + br, balloon[1] + br)
+    assert not drawing._boxes_overlap(second, keep)
+    mid = ((second[0] + second[2]) / 2, (second[1] + second[3]) / 2)
+    leader = drawing.LeaderSegment(
+        "L", "note", mid[0] - 0.01, mid[1] - 0.01, mid[0] + 0.01, mid[1] + 0.01
+    )
+    third = _letter_box(
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, [balloon], [leader])
+    )
+    assert third not in (first, second)
+    assert not drawing._segment_meets_box(leader, third)
+
+
+def test_a_boundary_letter_with_no_clear_side_is_refused() -> None:
+    (cx, cy), r = R9_BOUNDARY
+    reach = r + 0.006
+    ring = [
+        (cx + reach * math.cos(math.radians(a)), cy + reach * math.sin(math.radians(a)))
+        for a in range(0, 360, 5)
+    ]
+    with pytest.raises(RuntimeError, match="every side"):
+        drawing.cone_tip_letter_corner((cx, cy), r, R9_LETTER_SIZE, ring, [])
+
+
 def test_the_cone_tip_detail_caption_names_its_scale_and_what_it_omits() -> None:
     """Rule 9 prints its scale against the 1:3 sheet; sheet 1 promises the
     teeth- and thread-free configuration only at 1:2 and smaller."""
