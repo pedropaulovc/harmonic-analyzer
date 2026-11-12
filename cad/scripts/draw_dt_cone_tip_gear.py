@@ -482,9 +482,9 @@ def form_sheet_notes() -> str:
     return "\n".join(
         (
             # The R column and the plot's station radii derive from X and Y
-            # (REF); Y is an exact station; X carries the form band (machinist
+            # (REF); Y is a BASIC station; X carries the form band (machinist
             # review of PR #2557).
-            "R (REF) FROM GEAR AXIS; X FROM CL, EACH SIDE; Y EXACT, ALONG CL FROM P1.",
+            "R (REF) FROM GEAR AXIS; Y BASIC, ALONG CL FROM P1; X FROM CL, EACH SIDE.",
             f"{CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET "
             f"{SHEET_NAMES.index(GEAR_SHEET) + 1} NOTE {TEETH_NOTE_NUMBER}.",
         )

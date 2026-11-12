@@ -1360,12 +1360,13 @@ CONE_CRANK_STEPS = _note_text(
         f"2D. REMOVE {PHASING_COMB}.",
         # The cured tip is accepted on the comb; the remedy parts every tip
         # bond, cleans the film off the coated spigot and the pivot too, and
-        # redoes the tip from 1M, since the heat also frees a 1N bond on
-        # MHA-DT-38 (Codjiflo reviews of PR #2531).
+        # redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off, so
+        # it is pressed back on before 1M (Codjiflo reviews of PR #2531;
+        # machinist review of PR #2557 named the parts and the restart).
         f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
-        "2F. IF IT DOES NOT, TAKE THE BONDED TIP PARTS OFF AT 250 DEG C.",
+        "2F. IF IT DOES NOT, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
-        "2H. REDO FROM 1M.",
+        "2H. REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
