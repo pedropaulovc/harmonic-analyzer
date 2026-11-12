@@ -33,6 +33,7 @@ sys.path.insert(0, str(SCRIPTS))
 import _artifact_cache as cache  # noqa: E402
 import _buildgraph  # noqa: E402
 import _com_conversation as conv  # noqa: E402
+import _com_outcome  # noqa: E402
 import _replay_shadow as shadow  # noqa: E402
 import _telemetry  # noqa: E402
 from test_artifact_cache import _BlockBlobService  # noqa: E402
@@ -97,6 +98,7 @@ def blob(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "_PREWARMED", None)
     service = _ListingService()
     monkeypatch.setattr(cache, "_BACKEND", cache._BlobBackend(service))
+    monkeypatch.setattr(cache, "_PUBLISHED", {})
     monkeypatch.setattr(shadow, "RECORDINGS", tmp_path / "replay")
     monkeypatch.setattr(shadow, "OUT_ROOT", tmp_path / "out")
     monkeypatch.setattr(shadow, "SCRATCH", tmp_path / "out" / "rs")
@@ -113,6 +115,13 @@ def _events(tmp_path: Path, event: str) -> list[dict[str, Any]]:
 
 def _digest(path: str) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _stored(key: str) -> None:
+    """This process stored an archive under ``key`` (``cache.publication``),
+    as the build of every recording that publishes did."""
+    archive = hashlib.sha256(b"archive of " + key.encode()).hexdigest()
+    cache._PUBLISHED[key] = ("stored", (archive, 1024))
 
 
 class _Spans:
@@ -183,8 +192,9 @@ def _summary(**changes: Any) -> dict[str, Any]:
 def _built(
     tmp_path: Path, config: str, **summary: Any
 ) -> tuple[shadow.Recording, list[str]]:
-    """A part build that ran under the driver: its recording directory holds
-    a log, a capture and the summary (``plan`` under the current mode)."""
+    """A part build that ran under the driver and stored its archive (as every
+    build whose recording publishes did): its recording directory holds a log,
+    a capture and the summary (``plan`` under the current mode)."""
     source = tmp_path / "src"
     source.mkdir(exist_ok=True)
     script = source / f"build_{_STEM}.py"
@@ -200,6 +210,7 @@ def _built(
         b"capture of " + key.encode()
     )
     recording.summary_path.write_text(json.dumps(_summary(**summary)), "utf-8")
+    _stored(key)
     return recording, deps
 
 
@@ -1030,6 +1041,19 @@ def test_every_noop_is_judged_exactly_once():
     assert judgement is shadow.NoopJudgement.OUTCOME_UNKNOWN
 
 
+def test_a_title_counter_echo_is_seat_nondeterminism():
+    # 2026-11-12, ms_stick: a dimension's full name, which carries the seat's
+    # document counter, written into an equation.
+    found = shadow.Shadow(
+        "noop",
+        ground_truth="diverged",
+        truth_cause=_com_outcome.TITLE_COUNTER_CAUSE,
+        outcome="same",
+    )
+    assert found.noop_judgement is shadow.NoopJudgement.SEAT_NONDETERMINISM
+    assert found.seat_nondeterminism and not found.noop_unexplained_divergence
+
+
 def test_every_verdict_has_a_class():
     assert {v.value for v in conv.Verdict} | {"timeout", "unavailable"} == set(
         shadow.VERDICT_CLASSES
@@ -1331,6 +1355,7 @@ def test_a_shadow_replay_end_to_end(blob, tmp_path, monkeypatch, spans):
         # What dodo._exec_com does with the driver's exit: never a re-run here.
         assert not recording.exited(proc.returncode)
         built = _outputs(shadow.OUT_ROOT)
+        _stored(recording.key)
         shadow.after_build(recording, deps, _digest)
         # Observation reads the outputs; it never writes one (and its scratch
         # under the output root is gone).
@@ -1700,11 +1725,16 @@ def _drop(service: _ListingService, name: str) -> None:
 class _Shop:
     """A checkout under ``tmp_path`` for ``blob``'s cache, which is rooted at
     its output root: the end-to-end part script (which a replay executes) and
-    a config nothing reads, built on the fake seat; the replay driver resolves
-    the inputs a replay executed or read against this checkout."""
+    a config it does not read (``script`` may), built on the fake seat; the
+    replay driver resolves the inputs a replay executed or read against this
+    checkout."""
 
     def __init__(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, digest: Any = _digest
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        digest: Any = _digest,
+        script: str = _E2E_SCRIPT,
     ) -> None:
         self.digest = digest
         self.root = tmp_path.resolve()
@@ -1712,7 +1742,7 @@ class _Shop:
         source.mkdir()
         self.script = source / f"build_{_STEM}.py"
         self.config = source / "widget.yaml"
-        self.script.write_text(_E2E_SCRIPT, "utf-8")
+        self.script.write_text(script, "utf-8")
         self.config.write_text("size: 1\n", "utf-8")
         self.deps = [str(self.script), str(self.config)]
         self.out = self.root / "out"
@@ -1755,12 +1785,13 @@ class _Shop:
     def key(self) -> str:
         return cache.cache_key(self.deps, self.digest, _LABEL)
 
-    def edit(self, *, audited: bool) -> str:
-        """An inert edit (one more comment in the script) to a key the audit
-        does, or does not, sample."""
-        text = self.script.read_text("utf-8")
+    def edit(self, *, audited: bool, path: Path | None = None) -> str:
+        """An inert edit (one more comment in the script, or in ``path``) to
+        a key the audit does, or does not, sample."""
+        path = path or self.script
+        text = path.read_text("utf-8")
         for n in itertools.count():
-            self.script.write_text(f"{text}# edit {n}\n", "utf-8")
+            path.write_text(f"{text}# edit {n}\n", "utf-8")
             if shadow.audited(cache.key_inputs(self.deps, self.digest)[0]) is audited:
                 return self.key()
         raise AssertionError("unreachable")
@@ -1842,13 +1873,14 @@ class _Shop:
     def attempt(self, **options: Any) -> shadow.Reuse:
         """dodo's reuse path for the current source (_cached_part_action,
         _reuse_part): the attempt, then for a reuse install, re-stamp, check
-        the token, store under the key and publish its recording."""
+        the token, mark, and store under the key."""
         part = self.part(**options)
         with shadow.reuse_attempt(part) as reuse:
             if reuse.decision is shadow.ReuseDecision.REUSED:
                 reuse.install(part.outputs)
                 self.token.write_text(_sha(self.native.read_bytes()) + "\n", "utf-8")
                 reuse.check_token(self.token)
+                reuse.mark()
                 reuse.finish(cache.store(part.key, part.outputs, _LABEL))
         return reuse
 
@@ -1856,6 +1888,11 @@ class _Shop:
         engine = engine or conv.sha256_file(conv.ENGINE_FILE)
         _, name = shadow.blob_names(engine, _STEM, key)
         data = cache.fetch_sidecar(name)
+        return None if data is None else json.loads(data)
+
+    def marker(self, key: str, engine: str | None = None) -> dict[str, Any] | None:
+        engine = engine or conv.sha256_file(conv.ENGINE_FILE)
+        data = cache.fetch_sidecar(shadow.reused_name(engine, _STEM, key))
         return None if data is None else json.loads(data)
 
 
@@ -1878,6 +1915,7 @@ def _replay_as(
         "python_files": [cache._rel(shop.script)],
         "solidworks_inputs": [],
         "solidworks_out_inputs": [],
+        "title_echoes": {"count": 0, "first": []},
         "com_outputs": {"sldprt/fake.SLDPRT": _sha(_NATIVE)},
         "py_outputs": {"py-output.json": _sha(_PY)},
         **result,
@@ -1928,8 +1966,29 @@ def _case_inputs_moved(shop, monkeypatch, blob):
     return {"key": "k" * 64}
 
 
-def _case_unbound_base(shop, monkeypatch, blob):
-    _edited(shop, store=False)
+def _rewrite_manifest(blob, key: str, rewrite: Any) -> None:
+    """Replace base ``key``'s published manifest with ``rewrite(manifest)``."""
+    _, name = shadow.blob_names(_ENGINE, _STEM, key)
+    record = rewrite(json.loads(cache.fetch_sidecar(name)))
+    _drop(blob, cache._sidecar_blob(name))
+    assert cache.publish_sidecar(name, json.dumps(record).encode()) == "stored"
+
+
+def _case_no_bound_base(shop, monkeypatch, blob):
+    # The only recording is 66def8bddb's manifest of a reused key: no base.
+    key = _edited(shop)
+    _rewrite_manifest(blob, key, lambda m: {**m, "reused_from": "f" * 64})
+
+
+def _case_legacy_unbound(shop, monkeypatch, blob):
+    # Published before manifests were bound to their archive.
+    key = _edited(shop)
+    _rewrite_manifest(blob, key, lambda m: {**m, "archive": None})
+
+
+def _case_revoked(shop, monkeypatch, blob):
+    key = _edited(shop)
+    assert shadow.revoke(_ENGINE, _STEM, key, "a test") == "stored"
 
 
 def _case_archive_replaced(shop, monkeypatch, blob):
@@ -1976,9 +2035,36 @@ def _case_outside_declared(shop, monkeypatch, blob):
     return {"outputs": [shop.native]}
 
 
+def _seat_session(shop: _Shop, monkeypatch: pytest.MonkeyPatch, changed: str) -> None:
+    """The shop's own seat session, ``_session.py`` importing ``_paths.py``,
+    as SESSION_MODULE (its closure derived by _buildgraph from the shop's
+    scripts), with ``changed`` (one of them) edited since the base. The
+    caller clears _buildgraph's import caches afterwards."""
+    scripts = shop.root / "cad" / "scripts"
+    scripts.mkdir(parents=True)
+    session, paths = scripts / "_session.py", scripts / "_paths.py"
+    session.write_text("import _paths\n", "utf-8")
+    paths.write_text("PART_TEMPLATE = 'a.PRTDOT'\n", "utf-8")
+    shop.deps += [str(session), str(paths)]
+    monkeypatch.setattr(shadow, "SESSION_MODULE", session)
+    monkeypatch.setattr(_buildgraph, "SCRIPTS_DIR", scripts)
+    _buildgraph.clear_import_caches()
+    shop.base()
+    edited = scripts / changed
+    edited.write_text(edited.read_text("utf-8") + "# changed\n", "utf-8")
+
+
+def _case_seat_session(shop, monkeypatch, blob):
+    _seat_session(shop, monkeypatch, "_session.py")
+
+
+def _case_seat_session_import(shop, monkeypatch, blob):
+    # Also when the recipe executes it inside the window (_REPLAYS).
+    _seat_session(shop, monkeypatch, "_paths.py")
+
+
 _PATH_CASES = {
     "template": "cad/templates/harmonic-analyzer.PRTDOT",
-    "seat_session": "cad/scripts/_session.py",
     "step_read_by_python": "cad/references/plate.STEP",
     "dxf_read_and_named": "cad/references/plate.dxf",
     "named_by_com": "cad/references/profile.csv",
@@ -1987,6 +2073,7 @@ _PATH_CASES = {
 _REPLAYS: dict[str, dict[str, Any]] = {
     # Python reads each of these, so only the rules under test decline them.
     "step_read_by_python": {"python_files": ["cad/references/plate.STEP"]},
+    "seat_session_import": {"python_files": ["cad/scripts/_paths.py"]},
     "dxf_read_and_named": {
         "python_files": ["cad/references/plate.dxf"],
         "solidworks_inputs": ["cad/references/plate.dxf"],
@@ -2002,6 +2089,13 @@ _REPLAYS: dict[str, dict[str, Any]] = {
         "solidworks_inputs": ["cad/references/profile.csv"],
     },
     "reads_output_root": {"solidworks_out_inputs": ["sldprt/other.SLDPRT"]},
+    "seat_state_echo": {
+        "title_echoes": {
+            "count": 2,
+            "first": ["18627 IEquationMgr.Add3", "18628 IEquationMgr.Add2"],
+        }
+    },
+    "echoes_unreported": {"title_echoes": None},
     "diverged": {"verdict": "diverged"},
     "exhausted": {"verdict": "exhausted"},
     "sandbox": {"verdict": "sandbox"},
@@ -2022,7 +2116,9 @@ _DECLINES = [
     ("forced_refresh", _D.FORCED_REFRESH, 0),
     ("inputs_moved", _D.INPUTS_MOVED, 0),
     ("no_base", _D.NO_BASE, 0),
-    ("unbound_base", _D.UNBOUND_BASE, 0),
+    ("no_bound_base", _D.NO_BOUND_BASE, 0),
+    ("legacy_unbound", _D.NO_BOUND_BASE, 0),
+    ("revoked", _D.REVOKED_BASE, 0),
     ("archive_replaced", _D.UNBOUND_BASE, 1),
     ("seat_differs", _D.SEAT_DIFFERS, 0),
     ("seat_unknown", _D.SEAT_DIFFERS, 0),
@@ -2030,12 +2126,15 @@ _DECLINES = [
     ("bundle_missing", _D.BASE_BUNDLE_MISSING, 0),
     ("template", _D.UNJUDGED_INPUT, 0),
     ("seat_session", _D.UNJUDGED_INPUT, 0),
+    ("seat_session_import", _D.UNJUDGED_INPUT, 0),
     ("step_read_by_python", _D.UNJUDGED_INPUT, 0),
     ("dxf_read_and_named", _D.UNJUDGED_INPUT, 0),
     ("named_by_com", _D.UNJUDGED_INPUT, 1),
     ("named_and_refused", _D.UNJUDGED_INPUT, 1),
     ("config", _D.UNJUDGED_INPUT, 1),
     ("reads_output_root", _D.UNJUDGED_INPUT, 1),
+    ("seat_state_echo", _D.SEAT_STATE_ECHO, 1),
+    ("echoes_unreported", _D.SEAT_STATE_ECHO, 1),
     ("diverged", _D.DIVERGED, 1),
     ("exhausted", _D.DIVERGED, 1),
     ("sandbox", _D.SANDBOX, 1),
@@ -2053,8 +2152,9 @@ _DECLINES = [
     ("case", "reason", "replays"), _DECLINES, ids=[c[0] for c in _DECLINES]
 )
 def test_every_failed_check_declines_and_says_why(
-    blob, tmp_path, monkeypatch, spans, logged, case, reason, replays
+    blob, tmp_path, monkeypatch, spans, logged, request, case, reason, replays
 ):
+    request.addfinalizer(_buildgraph.clear_import_caches)  # _seat_session's
     shop = _Shop(tmp_path, monkeypatch)
     replayed = _replay_as(monkeypatch, shop, **_REPLAYS.get(case, {}))
     options: dict[str, Any] | None = None
@@ -2074,7 +2174,7 @@ def test_every_failed_check_declines_and_says_why(
     assert not [m for m in logged["warn"] if "building on the seat" in m]
     [record] = _events(tmp_path, "replay_reuse")
     assert record["reuse_decision"] == reuse.value
-    assert (record["decline"], record["store"], record["manifest"]) == (
+    assert (record["decline"], record["store"], record["marker"]) == (
         reason.value,
         None,
         None,
@@ -2089,7 +2189,7 @@ def test_every_failed_check_declines_and_says_why(
     assert "\n" not in line
 
 
-def test_an_inert_edit_reuses_the_base_archive_for_two_generations(
+def test_inert_edits_reuse_the_one_real_build_until_a_refresh_revokes_it(
     blob, tmp_path, monkeypatch, spans, logged
 ):
     shop = _Shop(tmp_path, monkeypatch)
@@ -2104,8 +2204,7 @@ def test_an_inert_edit_reuses_the_base_archive_for_two_generations(
     key = shop.edit(audited=False)
     reuse = shop.attempt()
     assert reuse.value == "reused", reuse.detail
-    # The base's outputs, byte for byte, re-stamped to the base's token: every
-    # dependent keeps its key.
+    # The base's outputs, byte for byte, re-stamped to the base's token.
     assert shop.outputs_now() == built
     assert reuse.token == _sha(built["fake.SLDPRT"])
     assert shop.token.read_text("utf-8").strip() == reuse.token
@@ -2115,24 +2214,29 @@ def test_an_inert_edit_reuses_the_base_archive_for_two_generations(
     shop.clear()
     assert cache.restore(key, shop.outputs, _LABEL)
     assert shop.outputs_now() == built
-    # The new key's recording: the base's, under this key's inputs, bound to
-    # the archive this process stored.
-    reused = shop.manifest(key)
-    assert (reused["key"], reused["reused_from"], reused["origin_key"]) == (
-        key,
-        base.key,
-        base.key,
+    # No recording of the reused key (only real builds are bases), only the
+    # marker naming the build and the archive it came from.
+    engine = conv.sha256_file(conv.ENGINE_FILE)
+    bundle_name, _ = shadow.blob_names(engine, _STEM, key)
+    assert shop.manifest(key) is None and cache.fetch_sidecar(bundle_name) is None
+    marker = shop.marker(key)
+    assert (marker["key"], marker["origin_key"]) == (key, base.key)
+    assert (
+        marker["archive"]
+        == origin["archive"]
+        == {
+            "sha256": stored[1][0],
+            "size": stored[1][1],
+        }
     )
-    assert reused["archive"]["sha256"] == cache.publication(key)[1][0]
-    assert reused["inputs"] == dict(cache.key_inputs(shop.deps, _digest)[1])
-    assert reused["bundle"] == origin["bundle"]
+    assert marker["commit"] and marker["marked_utc"]
     assert shop.ran == ["replay"]
     [record] = _events(tmp_path, "replay_reuse")
     assert (record["base_key"], record["differing"]) == (
         base.key,
         ["src/" + shop.script.name],
     )
-    assert (record["store"], record["manifest"]) == ("stored", "stored")
+    assert (record["store"], record["marker"]) == ("stored", "stored")
     assert record["verdict"] == "noop" and record["served"] == record["recorded"] > 20
     assert list(record["seconds"]) == list(shadow._REUSE_PHASES)
     assert record["archive_bytes"] == stored[1][1]
@@ -2145,20 +2249,31 @@ def test_an_inert_edit_reuses_the_base_archive_for_two_generations(
         f"[com-replay] {_LABEL}: reuse=reused | base={base.key[:12]} differing=1 "
         f"| shadow=noop served={record['served']}/{record['recorded']} | lookup="
     )
-    assert "| store=stored manifest=stored" in line
+    assert "| store=stored marker=stored" in line
     # The local record of the reuse.
     kept = json.loads((shadow.RECORDINGS / _STEM / shadow.REUSE_NAME).read_text())
     assert kept["reuse_decision"] == "reused"
-    # A second generation reuses from the reused key, back to the one build.
+    # A second generation reuses from the same real build.
     shop.clear()
     third = shop.edit(audited=False)
     again = shop.attempt()
     assert again.value == "reused", again.detail
-    assert again.base.manifest["key"] == key
-    chained = shop.manifest(third)
-    assert (chained["reused_from"], chained["origin_key"]) == (key, base.key)
+    assert again.base.manifest["key"] == base.key
+    assert shop.marker(third)["origin_key"] == base.key
     assert shop.outputs_now() == built
     assert shop.ran == ["replay", "replay"]
+    # A forced refresh of a reused key revokes the build it came from, and no
+    # key reuses it again.
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: "suspect")
+    assert shop.attempt(key=third).value == "declined:forced_refresh"
+    assert shadow.revoked(engine, _STEM, base.key)
+    assert not shadow.revoked(engine, _STEM, third)
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: None)
+    shop.edit(audited=False)
+    revoked = shop.attempt()
+    assert revoked.value == "declined:revoked_base", revoked.detail
+    assert shop.ran == ["replay", "replay"]
+    assert any(f"base {base.key[:12]} revoked" in m for m in logged["warn"])
 
 
 def test_a_build_that_is_not_reused_is_judged_with_the_replay_before_it(
@@ -2196,6 +2311,9 @@ def test_a_build_that_is_not_reused_is_judged_with_the_replay_before_it(
     [message] = logged["error"]
     assert "SOUNDNESS ALARM" in message
     assert "| reuse=audited |" in logged["info"][-1]
+    # The alarmed base is revoked: no reuse installs its archive again.
+    assert record["revoked"] == "stored"
+    assert shadow.revoked(conv.sha256_file(conv.ENGINE_FILE), _STEM, base.key)
     # A diverging edit builds, and after the build only the comparison runs.
     monkeypatch.setattr(shadow, "_diff", diff)
     shop.script.write_text(
@@ -2253,14 +2371,20 @@ def test_a_lost_publication_publishes_no_recording(blob, tmp_path, monkeypatch):
     )
 
 
-def test_a_legacy_or_unstored_recording_is_unbound(blob, tmp_path, monkeypatch):
+def test_only_a_build_that_stored_its_archive_publishes_a_recording(
+    blob, tmp_path, monkeypatch
+):
     shop = _Shop(tmp_path, monkeypatch)
     monkeypatch.setattr(shadow, "engine_digest", lambda: _ENGINE)
     key = shop.base(store=False)
-    published = shop.manifest(key, _ENGINE)
-    assert published["archive"] is None and shadow.bound_archive(published) is None
-    legacy = {k: v for k, v in published.items() if k not in ("archive", "sw_build")}
-    assert shadow.bound_archive(legacy) is None
+    assert blob.committed == {}
+    assert shop.manifest(key, _ENGINE) is None
+    [record] = _events(tmp_path, "replay_shadow")
+    assert (record["publish"], record["bound"]) == ("unstored", False)
+    # Manifests published before binding, or bound to a malformed digest,
+    # are unbound.
+    assert shadow.bound_archive({"key": key}) is None
+    assert shadow.bound_archive({"archive": None}) is None
     assert shadow.bound_archive({"archive": {"sha256": "x" * 64}}) is None
     assert shadow.bound_archive({"archive": {"sha256": "a" * 64}}) == "a" * 64
 
@@ -2271,15 +2395,43 @@ def test_the_audit_samples_one_key_in_eight():
     assert shadow.AUDIT_ONE_IN == 8
 
 
-def test_the_seat_build_is_read_without_starting_solidworks(monkeypatch):
-    # No COM: importing pywin32's COM modules fails for the probe.
-    for name in ("pythoncom", "win32com", "win32com.client"):
-        monkeypatch.setitem(sys.modules, name, None)
+def test_the_seat_build_is_the_registered_servers_file_version(monkeypatch):
+    if sys.platform != "win32":
+        assert shadow.seat_build.__wrapped__() is None
+        return
+    import winreg
+
+    # SolidWorks registered as this Python (a file with a version resource),
+    # read without starting it; every other registry read is the real one.
+    executable = sys._base_executable
+    server = {
+        r"SldWorks.Application\CLSID": "{5F0B1F4E}",
+        r"CLSID\{5F0B1F4E}\LocalServer32": f'"{executable}" /automation',
+    }
+    open_key, query_value = winreg.OpenKey, winreg.QueryValue
+
+    def opened(root: Any, path: str, *rest: Any) -> Any:
+        if path in server:
+            return contextlib.nullcontext(path)
+        if path.startswith(("SldWorks", "CLSID\\")):
+            raise OSError(path)
+        return open_key(root, path, *rest)
+
+    def queried(handle: Any, name: Any) -> Any:
+        return server[handle] if isinstance(handle, str) else query_value(handle, name)
+
+    monkeypatch.setattr(winreg, "OpenKey", opened)
+    monkeypatch.setattr(winreg, "QueryValue", queried)
     found = shadow.seat_build.__wrapped__()
-    if found is not None:
-        assert len(found.split(".")) == 4 and all(
-            part.isdigit() for part in found.split(".")
-        )
+    major, minor, *_ = sys.version_info
+    assert found is not None and found.startswith(f"{major}.{minor}.")
+    assert len(found.split(".")) == 4 and all(p.isdigit() for p in found.split("."))
+    # An unquoted server command line names the same executable.
+    server[r"CLSID\{5F0B1F4E}\LocalServer32"] = f"{executable} -Embedding"
+    assert shadow.seat_build.__wrapped__() == found
+    # No SolidWorks registered: unknown.
+    del server[r"SldWorks.Application\CLSID"]
+    assert shadow.seat_build.__wrapped__() is None
 
 
 def test_solidworks_inputs_are_the_logs_repository_and_uncaptured_output_paths():
@@ -2299,6 +2451,146 @@ def test_solidworks_inputs_are_the_logs_repository_and_uncaptured_output_paths()
     )
     assert named == ["cad/references/plate.STEP", "cad/references/plate.dxf"]
     assert inside == ["sldprt/b.SLDPRT"]
+
+
+def test_the_outside_window_inputs_are_the_seat_sessions_keyed_closure():
+    outside = shadow.outside_window_inputs()
+    assert {
+        "cad/scripts/_session.py",
+        "cad/scripts/_paths.py",
+        "cad/scripts/_com.py",
+    } <= outside
+    # Only key inputs: _buildgraph leaves out what never keys a part.
+    assert "cad/scripts/_telemetry.py" not in outside
+    assert "cad/scripts/_watchdog.py" not in outside
+
+
+def test_dodo_keys_the_template_the_session_pins():
+    import _paths
+
+    assert _load_dodo().PART_TEMPLATE.resolve() == _paths.PART_TEMPLATE.resolve()
+
+
+# The fake seat's run_build with what a real _session.run_build also has: seat
+# state set BEFORE the recorded window from a repository module (as
+# _pin_default_part_template reads _paths.PART_TEMPLATE). The fake server's
+# Volume answers scale with it.
+_SEAT_CONFIG_DRIVER = """
+import asyncio, os, sys
+import _session
+import test_com_conversation as fixture
+sys.path.insert(0, os.environ["SEAT_CONFIG_SRC"])
+def run_build(build):
+    import seatcfg
+    adapter = fixture.FakeAdapter(fixture.FakeServer(volume_scale=seatcfg.SCALE))
+    try:
+        asyncio.run(build(adapter))
+    except Exception:
+        return 1
+    return 0
+_session.run_build = run_build
+import com_replay
+sys.exit(com_replay.main(sys.argv[1:]))
+"""
+
+
+def test_seat_state_set_outside_the_window_is_never_reused(
+    blob, tmp_path, monkeypatch, request
+):
+    # The adversarial review's demonstration (2026-11-12): the session sets
+    # seat state outside the recorded window from a module the recipe also
+    # imports. A replay serves the base's answers, so it cannot see a change.
+    request.addfinalizer(_buildgraph.clear_import_caches)
+    shop = _Shop(tmp_path, monkeypatch, script="import seatcfg\n" + _E2E_SCRIPT)
+    source = shop.script.parent
+    seatcfg, session = source / "seatcfg.py", source / "seat_session.py"
+    seatcfg.write_text("SCALE = 1.0\n", "utf-8")
+    session.write_text("import seatcfg\n", "utf-8")
+    shop.deps += [str(seatcfg), str(session)]
+    monkeypatch.setattr(shadow, "SESSION_MODULE", session)
+    monkeypatch.setattr(_buildgraph, "SCRIPTS_DIR", source)
+    _buildgraph.clear_import_caches()
+    key = shop.key()
+    recording = shadow.plan(_STEM, shop.script, key)
+    assert recording is not None
+    env = {k: v for k, v in os.environ.items() if k not in _PINS}
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            _SEAT_CONFIG_DRIVER,
+            *recording.command[2:],
+            "--out-root",
+            str(shop.out),
+        ],
+        cwd=SCRIPTS,
+        env={
+            **env,
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+            "PYTHONHASHSEED": "0",
+            "SEAT_CONFIG_SRC": str(source),
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert cache.store(key, shop.outputs, _LABEL) == "stored"
+    shadow.after_build(recording, shop.deps, shop.digest)
+    built = shop.outputs_now()
+    # Only the seat state changes: a build now answers Volume twice as large.
+    shop.clear()
+    seatcfg.write_text("SCALE = 2.0\n", "utf-8")
+    shop.edit(audited=False, path=seatcfg)
+    reuse = shop.attempt()
+    assert reuse.value == "declined:unjudged_input", reuse.detail
+    assert "src/seatcfg.py" in reuse.detail
+    assert shop.ran == [] and not shop.native.exists()
+    # The control: a session whose closure leaves it out, and the same attempt
+    # replays clean and reuses the base's part, built at the old scale.
+    other = source / "other_session.py"
+    other.write_text("SEAT = None\n", "utf-8")
+    monkeypatch.setattr(shadow, "SESSION_MODULE", other)
+    stale = shop.attempt()
+    assert stale.value == "reused", stale.detail
+    assert "src/seatcfg.py" in stale.replay["python_files"]
+    assert shop.outputs_now() == built
+
+
+# The end-to-end script, reading the config it never uses.
+_READS_CONFIG_SCRIPT = _E2E_SCRIPT.replace(
+    "async def build(adapter):\n",
+    "from pathlib import Path\n"
+    "async def build(adapter):\n"
+    "    Path(__file__).with_name('widget.yaml').read_text()\n",
+)
+
+
+def test_a_replay_judges_what_the_recipe_reads_and_nothing_else(
+    blob, tmp_path, monkeypatch
+):
+    shop = _Shop(tmp_path, monkeypatch, script=_READS_CONFIG_SCRIPT)
+    notes = shop.script.parent / "notes.txt"
+    notes.write_text("never read\n", "utf-8")
+    shop.deps.append(str(notes))
+    shop.build()
+    built = shop.outputs_now()
+    shop.clear()
+    # A differing file the recipe reads (and does not use): judged, reused.
+    shop.edit(audited=False, path=shop.config)
+    reuse = shop.attempt()
+    assert reuse.value == "reused", reuse.detail
+    assert shop.outputs_now() == built
+    # The recipe's own reads and imports, never the engine's: not the base
+    # log it served, the inputs it digested, or the modules it loaded.
+    assert reuse.replay["python_files"] == ["src/build_sh_widget.py", "src/widget.yaml"]
+    # A differing file nothing reads: unjudged.
+    shop.clear()
+    shop.edit(audited=False, path=notes)
+    declined = shop.attempt()
+    assert declined.value == "declined:unjudged_input", declined.detail
+    assert "src/notes.txt" in declined.detail
+    assert shop.ran == ["replay", "replay"]
 
 
 # --------------------------------------------------------------------------- #
@@ -2365,8 +2657,9 @@ def test_a_reused_part_leaf_runs_no_com(blob, tmp_path, monkeypatch, spans, logg
     assert not spans.named("sw.") and len(replayed) == 1
     [record] = _events(tmp_path, "replay_reuse")
     assert (record["reuse_decision"], record["base_key"]) == ("reused", base)
-    assert (record["store"], record["manifest"]) == ("stored", "stored")
-    assert shop.manifest(shop.key(), _ENGINE)["reused_from"] == base
+    assert (record["store"], record["marker"]) == ("stored", "stored")
+    assert shop.manifest(shop.key(), _ENGINE) is None
+    assert shop.marker(shop.key(), _ENGINE)["origin_key"] == base
 
 
 def test_a_token_that_is_not_the_bases_falls_through_to_the_seat(
@@ -2389,9 +2682,20 @@ def test_a_token_that_is_not_the_bases_falls_through_to_the_seat(
     assert [task["cache"] for task in spans.named("task ")] == ["reuse_failed", "miss"]
 
 
-@pytest.mark.parametrize(
-    "phase", ["lookup", "bundle", "replay", "archive", "verify", "install", "publish"]
-)
+# phase: (what faults, the phase the decline names)
+_FAULTS = {
+    "lookup": ((shadow, "find_base"), "lookup"),
+    "revocation": ((cache, "read_sidecar"), "lookup"),
+    "bundle": ((shadow, "_bundle_of"), "bundle"),
+    "replay": ((shadow, "_replay_before"), "replay"),
+    "archive": ((shadow, "_fetch_base_archive"), "archive"),
+    "verify": ((shadow, "_verify_outputs"), "verify"),
+    "install": ((cache, "install_archive"), "install"),
+    "mark": ((cache, "publish_sidecar"), "mark"),
+}
+
+
+@pytest.mark.parametrize("phase", list(_FAULTS))
 def test_a_fault_in_any_phase_never_costs_the_build(
     blob, tmp_path, monkeypatch, spans, logged, phase
 ):
@@ -2403,32 +2707,103 @@ def test_a_fault_in_any_phase_never_costs_the_build(
     def fault(*_a, **_k):
         raise RuntimeError(f"injected {phase} fault")
 
-    target = {
-        "lookup": (shadow, "find_base"),
-        "bundle": (shadow, "_bundle_of"),
-        "replay": (shadow, "_replay_before"),
-        "archive": (shadow, "_fetch_base_archive"),
-        "verify": (shadow, "_verify_outputs"),
-        "install": (cache, "install_archive"),
-        "publish": (cache, "publish_sidecar"),
-    }[phase]
+    target, named = _FAULTS[phase]
     monkeypatch.setattr(*target, fault)
     order, recordings = _reuse_action(dodo, shop, monkeypatch)
     [record] = _events(tmp_path, "replay_reuse")
-    if phase == "publish":
-        # The outputs were reused and stored; only this key's recording is lost.
-        assert order == ["store"]
-        assert (record["reuse_decision"], record["manifest"]) == ("reused", "error")
-        assert any("not published" in m for m in logged["warn"])
-        return
+    # Nothing stored under the key but the seat's build, no marker.
     assert order == ["seat", "sw.connect", "build", "store", "observe"]
     assert shop.outputs_now()["fake.SLDPRT"] == b"built on the seat"
+    assert shop.marker(shop.key(), _ENGINE) is None
     [recording] = recordings
     assert recording.reuse.value == "declined:fault"
-    assert (record["reuse_decision"], record["phase"]) == ("declined:fault", phase)
+    assert (record["reuse_decision"], record["phase"]) == ("declined:fault", named)
     [warning] = [m for m in logged["warn"] if "building on the seat" in m]
-    assert f"reuse declined:fault in {phase}" in warning
+    assert f"reuse declined:fault in {named}" in warning
     assert f"injected {phase} fault" in warning
+
+
+def test_a_marker_naming_another_base_falls_through_to_the_seat(
+    blob, tmp_path, monkeypatch, logged
+):
+    dodo = _load_dodo()
+    shop = _Shop(tmp_path, monkeypatch, digest=dodo.ContentChecker._digest)
+    _replay_as(monkeypatch, shop)
+    _edited(shop)
+    other = json.dumps({"origin_key": "0" * 64}).encode()
+    assert (
+        cache.publish_sidecar(shadow.reused_name(_ENGINE, _STEM, shop.key()), other)
+        == "stored"
+    )
+    order, [recording] = _reuse_action(dodo, shop, monkeypatch)
+    assert order == ["seat", "sw.connect", "build", "store", "observe"]
+    assert recording.reuse.value == "declined:fault"
+    [warning] = [m for m in logged["warn"] if "building on the seat" in m]
+    assert "in mark" in warning and "0" * 64 in warning
+
+
+def test_a_local_record_that_fails_never_fails_a_stored_reuse(
+    blob, tmp_path, monkeypatch, logged
+):
+    dodo = _load_dodo()
+    shop = _Shop(tmp_path, monkeypatch, digest=dodo.ContentChecker._digest)
+    _replay_as(monkeypatch, shop)
+    _edited(shop)
+    shop.clear()
+
+    def broken(*_a):
+        raise ValueError("injected local record fault")
+
+    monkeypatch.setattr(shadow, "_fresh_directory", broken)
+    order, recordings = _reuse_action(dodo, shop, monkeypatch)
+    assert order == ["store"] and recordings == []
+    assert cache.publication(shop.key())[0] == "stored"
+    [record] = _events(tmp_path, "replay_reuse")
+    assert (record["reuse_decision"], record["store"]) == ("reused", "stored")
+    assert any("local reuse record not kept" in m for m in logged["warn"])
+
+
+@pytest.mark.parametrize("mode", ["reuse", "shadow", "record"])
+def test_a_forced_refresh_of_a_base_revokes_it(
+    blob, tmp_path, monkeypatch, logged, mode
+):
+    shop = _Shop(tmp_path, monkeypatch)
+    replayed = _replay_as(monkeypatch, shop)
+    key = shop.base()
+    monkeypatch.setenv(shadow.MODE_ENV, mode)
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: "an intended rebuild")
+    reuse = shop.attempt(key=key)
+    expected = "declined:forced_refresh" if mode == "reuse" else None
+    assert reuse.value == expected, reuse.detail
+    assert shadow.revoked(_ENGINE, _STEM, key) and replayed == []
+    assert any(f"base {key[:12]} revoked" in m for m in logged["warn"])
+
+
+@pytest.mark.parametrize("fault", ["write", "read"])
+def test_a_revocation_that_fails_never_costs_the_build(
+    blob, tmp_path, monkeypatch, logged, fault
+):
+    shop = _Shop(tmp_path, monkeypatch)
+    _replay_as(monkeypatch, shop)
+    key = shop.base()
+
+    def unreadable(*_a):
+        raise OSError("injected read fault")
+
+    if fault == "write":
+        monkeypatch.setattr(cache, "publish_sidecar", lambda *_a: "error")
+    else:
+        monkeypatch.setattr(cache, "read_sidecar", unreadable)
+    # A forced refresh still builds on the seat.
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: "an intended rebuild")
+    assert shop.attempt(key=key).value == "declined:forced_refresh"
+    assert any("revocation failed" in m for m in logged["warn"])
+    # A soundness alarm is still raised and recorded.
+    assert shadow._revoke_alarmed(_ENGINE, _STEM, {"key": key}) == (
+        "error" if fault == "write" else "stored"
+    )
+    revocation = cache._sidecar_blob(shadow.revoked_name(_ENGINE, _STEM, key))
+    assert (revocation in blob.committed) is (fault == "read")
 
 
 @pytest.mark.parametrize("mode", ["shadow", "record", "off"])

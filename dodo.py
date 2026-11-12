@@ -2743,8 +2743,9 @@ def _reuse_part(
     """Make the base's verified archive this key's outputs with no COM at all
     (:func:`_replay_shadow.reuse_attempt` decided ``reused``): install it as a
     HIT restores one, re-stamp the ``.execution`` token, which must be the
-    base's, validate, then publish under ``key`` like a build and publish this
-    key's recording. False: a step before the store failed (WARN; declined
+    base's, validate, publish the ``reused/`` marker naming the base, then
+    publish under ``key`` like a build (no recording: only real builds are
+    bases). False: a step before the store failed (WARN; declined
     ``fault``/``token_mismatch``), and the caller builds on the seat, which
     rewrites every output."""
     label = f"part:{stem}"
@@ -2759,9 +2760,10 @@ def _reuse_part(
             _stamp_part_execution(stem)
             reuse.check_token(Path(_part_execution_token(stem)))
             _validate_part_configuration_outputs(stem, key)
+            reuse.mark()
         except Exception as exc:  # noqa: BLE001 - a reuse never costs a build
             sp.set_attribute("cache", "reuse_failed")
-            reuse.fall_through("install", exc)
+            reuse.fall_through(reuse.phase, exc)
             return False
     reuse.finish(_publish_part(stem, key, outputs))
     return True

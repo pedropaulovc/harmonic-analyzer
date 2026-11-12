@@ -1046,23 +1046,29 @@ See DEVELOPING.md "COM conversation recording (shadow)".
 
 **Part reuse (`reuse`, the default).** On a part key miss under `rw`, before the
 seat, `_replay_shadow.reuse_attempt` replays the current source with SolidWorks
-absent against the nearest recording of the stem that is bound to the archive
-its build stored (manifest `archive`; a lost store publishes no recording,
-older manifests are `unbound_base`), recorded under this cache salt on this
-machine's SolidWorks file version (`sw_build`). It reuses only when the replay
-is a clean `noop`, every differing key input is one the replayed Python executed
-or read (none SolidWorks opens itself: templates, models, DXF/STEP and other
-imports, anything a COM argument names; not `_session.py`/`_seat_forensics.py`,
-which act outside the recorded window), the replay wrote exactly the base
+absent against the nearest real build's recording of the stem that is bound to
+the archive its build stored (manifest `archive`; only a build that stored its
+archive publishes a recording, and a reused key publishes none), recorded under
+this cache salt on this machine's SolidWorks file version (`sw_build`), and not
+revoked (`revoked_base`; no qualifying recording is `no_bound_base`). It reuses
+only when the replay is a clean `noop`, every differing key input is one the
+replayed recipe itself imported or read (none SolidWorks opens itself:
+templates, models, DXF/STEP and other imports, anything a COM argument names;
+none in `_session.py`'s keyed import closure, `_session`/`_paths`/`_com`, which
+act on the seat outside the recorded window), the replay wrote exactly the base
 archive's files inside the task's declared outputs with every Python-written one
 byte-identical, and the leaf is no forced refresh. The archive is then installed
 as this key's outputs with no COM at all (`task` span `cache=reuse`,
-`com=none`), the `.execution` token must equal the base's, the outputs are
-stored under the new key through the create-only store, and a manifest for the
-new key (`reused_from`, `origin_key`) lets the next key reuse from it. One would-be
-reuse in eight (`AUDIT_ONE_IN`, by key hash) builds anyway and is judged, so the
-soundness alarm stays live. Every other outcome, and any exception in the attempt
-(`declined:fault`, WARN), builds on the seat as before; no cache key moves.
+`com=none`), the `.execution` token must equal the base's (an integrity check),
+a create-only `reused/<key>` marker names the origin, and the outputs are stored
+under the new key through the create-only store. Dependents' keys move with the
+part's key as for any edit, so a reuse saves the part leaf only and dependents
+rebuild against the reused part. A `SOUNDNESS ALARM` against a base, or a forced
+refresh of a base or of a key reused from one, writes a create-only
+`revoked/<base key>` marker. One would-be reuse in eight (`AUDIT_ONE_IN`, by key
+hash) builds anyway and is judged, so the soundness alarm stays live. Every other
+outcome, and any exception in the attempt (`declined:fault`, WARN), builds on
+the seat as before; no cache key moves.
 Decisions are `replay_reuse` records, `replay.reuse` spans and
 `[com-replay] part:<stem>: reuse=<decision>` lines. Environment variables are not
 forwarded to farm workers: to turn reuse off fleet-wide, set

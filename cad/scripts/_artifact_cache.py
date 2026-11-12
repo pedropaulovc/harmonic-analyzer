@@ -2192,6 +2192,20 @@ def fetch_sidecar(name: str) -> bytes | None:
         return None
 
 
+def read_sidecar(name: str) -> bytes | None:
+    """Sidecar ``name``'s verified bytes; None when it is absent. RAISES when
+    the cache is off or the answer is unknown (a failed download or
+    verification), for a caller that must fail closed: :func:`fetch_sidecar`
+    reads any failure as absence."""
+    backend = _backend() if enabled() else None
+    if backend is None:
+        raise RuntimeError(f"sidecar {name}: the remote cache is off")
+    with _phase("cache.sidecar.download") as span:
+        data = backend.get_sidecar(_sidecar_blob(name))
+        span.set_attribute("bytes", 0 if data is None else len(data))
+        return data
+
+
 def list_sidecars(prefix: str) -> list[tuple[str, float]]:
     """``(name, last-modified epoch seconds)`` of every sidecar under
     ``prefix`` in this cache epoch, newest first; empty when the cache is off

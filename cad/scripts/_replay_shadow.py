@@ -12,20 +12,25 @@ One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
   key (``com-replay/<engine>/<stem>/bundle/<key>.tar`` and
   ``.../manifest/<key>.json``): create-only, never fatal
   (``_artifact_cache.publish_sidecar``). The manifest is bound to the archive
-  this process stored under the key (``archive``); a build whose store lost
-  the race publishes no recording. Only a cache role that can publish (``rw``)
-  records at all: in ``ro`` or ``off`` the build runs unrecorded.
+  this process stored under the key (``archive``); a build that stored no
+  archive (its store lost the race, failed, or stored nothing) publishes no
+  recording. Only a cache role that can publish (``rw``) records at all: in
+  ``ro`` or ``off`` the build runs unrecorded.
 * ``shadow``: ``record``, then, still off the seat, the nearest earlier
   recording of the stem (fewest differing key inputs) is replayed against the
   CURRENT source in a sandboxed subprocess and compared with this build's
   recording. The verdict is telemetry only: span ``replay.shadow <label>`` on
   ``build-infra`` and a ``replay_shadow`` record in ``cad/out/reports/cache.jsonl``.
-* ``reuse``: before the seat, the nearest recording bound to its archive is
-  replayed against the current source (:func:`reuse_attempt`). A clean no-op
-  whose every check holds makes the base's archive this key's outputs, published
-  under this key like a build's, with no COM at all; one in :data:`AUDIT_ONE_IN`
-  such keys builds anyway and is judged as a shadow. Anything else builds as in
-  ``shadow``, judged by the same replay (no second one after the build).
+* ``reuse``: before the seat, the nearest real build's recording bound to its
+  archive, and not revoked, is replayed against the current source
+  (:func:`reuse_attempt`). A clean no-op whose every check holds makes the
+  base's archive this key's outputs, stored under this key like a build's and
+  marked (``.../reused/<key>.json``, no recording), with no COM at all; one in
+  :data:`AUDIT_ONE_IN` such keys builds anyway and is judged as a shadow.
+  Anything else builds as in ``shadow``, judged by the same replay (no second
+  one after the build). A soundness alarm against a base, or a forced refresh
+  of a base or of a key reused from one, revokes the base
+  (``.../revoked/<key>.json``).
 
 A driver exit of :data:`EXIT_RECORD_FAULT` (the recorder failed where the
 build's results cannot be trusted, not the script or SolidWorks) re-runs the
@@ -65,6 +70,7 @@ from pathlib import Path, PurePath
 from typing import Any, BinaryIO
 
 import _artifact_cache as _cache
+import _buildgraph
 import _telemetry
 
 MODE_ENV = "HARMONIC_COM_REPLAY"
@@ -86,12 +92,15 @@ WORK_BASE, WORK_OUTPUT, WORK_TMP = "b", "o", "t"
 DRIVER = SCRIPTS_DIR / "com_replay.py"
 # The engine whose digest scopes every recording (never imported here).
 ENGINE_FILE = SCRIPTS_DIR / "_com_conversation.py"
+# The module whose run_build drives the seat before and after the recorded
+# window (connect, discard, template pin, teardown); a replay replaces it.
+SESSION_MODULE = SCRIPTS_DIR / "_session.py"
 BLOB_ROOT = "com-replay"
 # 3: manifests carry the cache salt and epoch; bundles of engine log schema 2
 # (flat captures). Fields a reuse needs and older manifests lack are optional:
 # ``archive`` (the identity of the archive the recorded build stored under its
-# key), ``sw_build`` (that machine's SolidWorks file version), and for a
-# reused key ``reused_from`` and ``origin_key``.
+# key) and ``sw_build`` (that machine's SolidWorks file version). Only a real
+# build publishes one: a reused key publishes a ``reused/`` marker instead.
 MANIFEST_SCHEMA = 3
 LOG_NAME = "conversation.jsonl.gz"
 CAPTURE_NAME = f"{LOG_NAME}.files"  # _com_conversation.capture_dir_of
@@ -547,32 +556,63 @@ def bound_archive(record: dict[str, Any]) -> str | None:
     return digest if isinstance(digest, str) and _SHA256.fullmatch(digest) else None
 
 
-def reused_manifest(
-    base: dict[str, Any],
-    stem: str,
-    key: str,
-    inputs: dict[str, str],
-    archive: tuple[str, int],
-) -> dict[str, Any]:
-    """The manifest of key ``key``, reused from ``base``'s archive: the base's
-    recording (its bundle, counts, seat and environment) under this key's
-    inputs, bound to the archive stored under this key. ``origin_key`` is the
-    one real build every reuse in a chain goes back to."""
-    settings = _cache.config_summary()
-    return {
-        **base,
-        "recording_id": uuid.uuid4().hex,
-        "label": f"part:{stem}",
-        "stem": stem,
-        "key": key,
-        "inputs": inputs,
-        "salt": settings["salt"],
-        "epoch": settings["epoch"],
-        "archive": {"sha256": archive[0], "size": archive[1]},
-        "reused_from": base["key"],
-        "origin_key": base.get("origin_key") or base["key"],
-        "reused_utc": datetime.datetime.now(datetime.UTC).isoformat(),
-    }
+def reused_name(engine: str, stem: str, key: str) -> str:
+    """The marker a reuse publishes for ``key`` instead of a recording: where
+    its archive came from (:meth:`Reuse.mark`)."""
+    return f"{BLOB_ROOT}/{engine[:16]}/{stem}/reused/{key}.json"
+
+
+def revoked_name(engine: str, stem: str, key: str) -> str:
+    """The marker that retires base ``key`` from reuse (:func:`revoke`)."""
+    return f"{BLOB_ROOT}/{engine[:16]}/{stem}/revoked/{key}.json"
+
+
+def revoke(engine: str, stem: str, key: str, reason: str) -> str:
+    """Retire base ``key``: a create-only ``revoked/`` marker, after which no
+    reuse installs its archive (``revoked_base``). The publication's outcome
+    (``exists``: already revoked); RAISES when it is neither, so the caller
+    says so."""
+    record = {"key": key, "reason": reason, "revoked_utc": _now(), "commit": _commit()}
+    outcome = _cache.publish_sidecar(
+        revoked_name(engine, stem, key),
+        json.dumps(record, sort_keys=True).encode("utf-8"),
+    )
+    if outcome not in ("stored", "exists"):
+        raise RuntimeError(f"revocation of {key[:12]} not published ({outcome})")
+    label = f"part:{stem}"
+    _telemetry.warn(
+        f"[com-replay] {label}: base {key[:12]} revoked ({outcome}): {reason}",
+        label=label,
+        base_key=key,
+    )
+    return outcome
+
+
+def revoked(engine: str, stem: str, key: str) -> bool:
+    """Is base ``key`` revoked? RAISES when the cache cannot say: a reuse
+    attempt then declines (fail closed)."""
+    return _cache.read_sidecar(revoked_name(engine, stem, key)) is not None
+
+
+def _now() -> str:
+    return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+@functools.cache
+def _commit() -> str:
+    """This checkout's HEAD for a marker, or ``unknown``."""
+    try:
+        found = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return found.stdout.strip() or "unknown"
 
 
 def publish(recording: Recording, record: dict[str, Any], data: bytes) -> str:
@@ -786,7 +826,9 @@ class NoopJudgement(StrEnum):
     # Another part than the base's: reuse would have served a wrong artefact.
     SOUNDNESS_ALARM = "soundness_alarm"
     # The base's part; the requests diverged after SolidWorks answered
-    # differently (2026-11-11: one body's faces listed in another order).
+    # differently (2026-11-11: one body's faces listed in another order;
+    # 2026-11-12: a document title counter the script echoed into an equation,
+    # ``truth_cause`` ``response:title_counter``).
     SEAT_NONDETERMINISM = "seat_nondeterminism"
     # The base's part; the requests diverged with every earlier answer the
     # same. A no-op rules the source out and SolidWorks answered alike, so an
@@ -805,7 +847,8 @@ class Shadow:
     ``ground_truth``: whether this build's own recording issued the base's
     requests (request equality, ``same``/``diverged``). ``truth_cause``: what
     preceded its first divergence, ``response:<member>`` (SolidWorks answered
-    differently first) or ``request`` (the source asked something else).
+    differently first; ``response:title_counter``: the script echoed a title
+    counter SolidWorks answered) or ``request`` (the source asked something else).
     ``outcome``: whether this build made the base's part (``same``,
     ``different``, ``unknown``: ``_com_outcome.Outcome``). A no-op proves the
     current source maps the base's answers onto the base's requests, so with
@@ -1216,9 +1259,15 @@ class Decline(StrEnum):
     FORCED_REFRESH = "forced_refresh"
     INPUTS_MOVED = "inputs_moved"
     NO_BASE = "no_base"
-    # No recording of the stem bound to its key's canonical archive under this
-    # salt: published before binding, by a build whose store lost the race or
-    # failed, or one whose archive a refresh replaced.
+    # Recordings of the stem exist, but none is a real build's bound to the
+    # archive it stored under this salt: published before binding existed, or
+    # under another salt (a stored build publishes only bound manifests).
+    NO_BOUND_BASE = "no_bound_base"
+    # The base was revoked (a ``revoked/`` marker: a soundness alarm against
+    # it, or a forced refresh of it or of a key reused from it).
+    REVOKED_BASE = "revoked_base"
+    # The base's key no longer holds the archive its recording is bound to (a
+    # forced refresh replaced it).
     UNBOUND_BASE = "unbound_base"
     # The base was recorded on another SolidWorks than this machine's.
     SEAT_DIFFERS = "seat_differs"
@@ -1230,6 +1279,11 @@ class Decline(StrEnum):
     TIME_CAP = "time_cap"
     # A differing key input whose effect the replay does not judge.
     UNJUDGED_INPUT = "unjudged_input"
+    # A replayed request carries a SolidWorks new-document title counter
+    # (``Part24``): the script echoes the seat's session state, which the
+    # replay serves from the base, so a build here would ask something else
+    # (2026-11-12, ms_stick). Also when the replay did not report it.
+    SEAT_STATE_ECHO = "seat_state_echo"
     BASE_ARCHIVE_MISSING = "base_archive_missing"
     OUTPUT_SET_DIFFERS = "output_set_differs"
     PYTHON_OUTPUT_DIFFERS = "python_output_differs"
@@ -1251,12 +1305,24 @@ def _fold(path: str) -> str:
     return path.replace("\\", "/").casefold()
 
 
-# Repository modules that drive the seat outside the recorded window
-# (``_session.run_build``: connect, discard, template pin, teardown). A replay
-# replaces run_build whole and never runs that code, so it never judges it.
-SEAT_SESSION_MODULES = frozenset(
-    {"cad/scripts/_session.py", "cad/scripts/_seat_forensics.py"}
-)
+def outside_window_inputs() -> frozenset[str]:
+    """The key inputs that act on the seat outside the recorded window, as
+    folded repository paths: :data:`SESSION_MODULE` and every keyed module it
+    imports (``_buildgraph.module_deps_of``: today ``_com.py`` and
+    ``_paths.py``, whose ``PART_TEMPLATE`` it pins). ``run_build`` connects,
+    discards, pins the template and tears down outside the window, and a
+    replay replaces it whole, so whatever these modules do there is never
+    judged, even when the recipe also executes them inside the window."""
+    root = _cache.REPO_ROOT.resolve()
+    found = set()
+    for raw in (str(SESSION_MODULE), *_buildgraph.module_deps_of(SESSION_MODULE)):
+        try:
+            found.add(_fold(Path(raw).resolve().relative_to(root).as_posix()))
+        except ValueError:  # outside this checkout: no key input of it
+            continue
+    return frozenset(found)
+
+
 # Documents of a kind SolidWorks opens itself, by path: templates, models,
 # drawings, imports, fonts and libraries. None is ever judged by a replay,
 # whatever Python also does with it (a defence beside the COM-argument rule:
@@ -1293,12 +1359,13 @@ SOLIDWORKS_DOCUMENTS = frozenset(
 def seat_inputs(differing: Iterable[str]) -> list[str]:
     """Differing key inputs no replay judges, whatever it finds: documents
     SolidWorks opens itself (:data:`SOLIDWORKS_DOCUMENTS`) and the modules
-    that drive the seat outside the recorded window
-    (:data:`SEAT_SESSION_MODULES`)."""
+    that act on the seat outside the recorded window
+    (:func:`outside_window_inputs`)."""
+    outside = outside_window_inputs()
     return [
         tag
         for tag in differing
-        if _fold(tag) in SEAT_SESSION_MODULES
+        if _fold(tag) in outside
         or PurePath(tag).suffix.casefold() in SOLIDWORKS_DOCUMENTS
     ]
 
@@ -1313,12 +1380,14 @@ def solidworks_named(differing: Iterable[str], replay: dict[str, Any]) -> list[s
 
 
 def unexecuted_inputs(differing: Iterable[str], replay: dict[str, Any]) -> list[str]:
-    """Differing key inputs the replayed Python neither executed nor read
-    (``python_files``, com_replay.py): what reaches the part some other way
-    (the cache salt, the adapter, anything SolidWorks resolves itself). What
-    Python executed or read reaches the part only through the requests the
+    """Differing key inputs the replayed recipe neither imported nor read
+    (``python_files``, com_replay.py: the build script's own execution, never
+    the engine's): what reaches the part some other way (the cache salt, the
+    adapter, anything SolidWorks resolves itself). What the recipe executed
+    or read inside the window reaches the part only through the requests the
     replay matched and the Python-written outputs, compared with the base
-    archive's (:func:`_verify_outputs`)."""
+    archive's (:func:`_verify_outputs`); what it does outside the window is
+    :func:`seat_inputs`'."""
     executed = {_fold(path) for path in replay.get("python_files") or []}
     return [tag for tag in differing if _fold(tag) not in executed]
 
@@ -1373,7 +1442,8 @@ class Reuse:
     token: str | None = None
     seconds: dict[str, float] = field(default_factory=dict)
     store: str | None = None
-    manifest: str | None = None
+    # The ``reused/`` marker's publication (:meth:`mark`).
+    marker: str | None = None
     published_from: float = 0.0
     # The last phase entered (``timed``): where a fault happened.
     phase: str = "prepare"
@@ -1432,7 +1502,10 @@ class Reuse:
     def install(self, outputs: list[Path]) -> None:
         """Install the base's verified archive as this build's ``outputs``,
         as a cache HIT restores one, and check each installed file is the
-        archive's member byte for byte."""
+        archive's member byte for byte. A restore lock on an output (a
+        document open in SolidWorks: ``RestoreLocked``) raises like any other
+        fault, and the build falls through to the seat."""
+        self.phase = "install"
         self.published_from = time.monotonic()
         if self.archive is None or self.base is None or self.part is None:
             raise RuntimeError("no verified base archive to install")
@@ -1444,8 +1517,11 @@ class Reuse:
                 raise RuntimeError(f"installed {rel} is not the archive's member")
 
     def check_token(self, path: Path) -> None:
-        """The ``.execution`` token re-stamped from the installed native part
-        must be the base's (the same bytes), so every dependent keeps its key."""
+        """An integrity check: the ``.execution`` token re-stamped from the
+        installed native part must be the base's (the same bytes). Dependents'
+        keys still move with this key, since they fold the part's recipe
+        digest (``dodo._stable_artefact_digest``); a reuse saves the part leaf
+        only."""
         stamped = path.read_text(encoding="utf-8").strip()
         if stamped != self.token:
             raise Declined(
@@ -1454,22 +1530,45 @@ class Reuse:
                 f"{str(self.token)[:12]}",
             )
 
+    def mark(self) -> None:
+        """Before dodo stores the installed outputs under this key: the
+        create-only ``reused/<key>`` marker naming the origin (a real build)
+        and the archive installed, so a forced refresh of this key can revoke
+        that origin. RAISES when the marker is not published, or an existing
+        one names another origin: the build then runs on the seat."""
+        self.phase = "mark"
+        if self.part is None or self.base is None:
+            raise RuntimeError("no reuse to mark")
+        origin = str(self.base.manifest.get("key"))
+        name = reused_name(engine_digest(), self.part.stem, self.part.key)
+        record = {
+            "key": self.part.key,
+            "origin_key": origin,
+            "archive": {
+                "sha256": bound_archive(self.base.manifest),
+                "size": self.archive_bytes,
+            },
+            "marked_utc": _now(),
+            "commit": _commit(),
+        }
+        self.marker = _cache.publish_sidecar(
+            name, json.dumps(record, sort_keys=True).encode("utf-8")
+        )
+        if self.marker == "stored":
+            return
+        if self.marker == "exists":
+            existing = _cache.read_sidecar(name)
+            named = json.loads(existing).get("origin_key") if existing else None
+            if named == origin:
+                return
+            raise RuntimeError(f"reused marker of {self.part.key[:12]} names {named}")
+        raise RuntimeError(f"reused marker not published ({self.marker})")
+
     def finish(self, outcome: str) -> None:
-        """dodo stored the installed outputs under this key (``outcome``):
-        publish this key's recording, the base's under this key's inputs and
-        bound to the archive just stored, so a later build can reuse from it
-        in turn. A store that stored nothing publishes no recording (the key's
-        archive is then not these bytes). Never raises."""
+        """dodo stored the installed outputs under this key (``outcome``).
+        A reused key publishes no recording (only real builds are bases);
+        its marker went out before the store (:meth:`mark`). Never raises."""
         self.store = outcome
-        try:
-            self.manifest = self._publish_manifest()
-        except Exception as exc:  # noqa: BLE001 - a sidecar never costs a build
-            self.manifest = "error"
-            _telemetry.warn(
-                f"[com-replay] {self.label}: reused key's recording not "
-                f"published: {exc!r}",
-                label=self.label,
-            )
         self.seconds["publish"] = time.monotonic() - self.published_from
         self._keep()
 
@@ -1477,34 +1576,27 @@ class Reuse:
     def label(self) -> str:
         return self.part.label if self.part else "part:?"
 
-    def _publish_manifest(self) -> str:
-        stored = _cache.publication(self.part.key) if self.part else None
-        if stored is None or stored[0] != "stored" or stored[1] is None:
-            return "unbound"
-        assert self.part is not None and self.base is not None
-        record = reused_manifest(
-            self.base.manifest, self.part.stem, self.part.key, self.inputs, stored[1]
-        )
-        _, name = blob_names(str(record["engine"]), self.part.stem, self.part.key)
-        return _cache.publish_sidecar(
-            name, json.dumps(record, sort_keys=True).encode("utf-8")
-        )
-
     def _keep(self) -> None:
         """This reuse's record and replay log in the stem's recording
-        directory, for a local look (best-effort)."""
-        if self.part is None:
-            return
-        directory = _fresh_directory(self.part.stem, "keeping no local record")
-        if directory is None:
-            return
-        with contextlib.suppress(OSError):
+        directory, for a local look (best-effort: never raises, so nothing
+        here can fail a task whose outputs are already stored)."""
+        try:
+            if self.part is None:
+                return
+            directory = _fresh_directory(self.part.stem, "keeping no local record")
+            if directory is None:
+                return
             (directory / REUSE_NAME).write_text(
                 json.dumps(reuse_record(self), indent=2, sort_keys=True, default=str),
                 encoding="utf-8",
             )
             if self.replay_log:
                 (directory / REPLAY_LOG_NAME).write_text(self.replay_log, "utf-8")
+        except Exception as exc:  # noqa: BLE001 - a local record never costs a build
+            _telemetry.warn(
+                f"[com-replay] {self.label}: local reuse record not kept: {exc!r}",
+                label=self.label,
+            )
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -1518,19 +1610,63 @@ def _sha256_file(path: Path) -> str | None:
         return None
 
 
+def revoke_refreshed(part: PartBuild) -> bool:
+    """Is this build a forced cache refresh (``_cache.forced_refresh``)? Then
+    what ``part.key`` held is suspect: revoke the origin its ``reused/``
+    marker names, and the key itself when it is a base (a recording of it is
+    published). A revocation that fails is a WARN, never the build's: the
+    refresh builds on the seat either way. Raises only what reading the
+    refresh carrier raises."""
+    if _cache.forced_refresh(part.label) is None:
+        return False
+    engine = engine_digest()
+    try:
+        marker = _cache.read_sidecar(reused_name(engine, part.stem, part.key))
+        origin = json.loads(marker).get("origin_key") if marker is not None else None
+        if isinstance(origin, str) and origin:
+            revoke(
+                engine,
+                part.stem,
+                origin,
+                f"forced refresh of {part.key[:12]}, which was reused from it",
+            )
+        _, manifest_name = blob_names(engine, part.stem, part.key)
+        if _cache.read_sidecar(manifest_name) is not None:
+            revoke(engine, part.stem, part.key, "forced refresh of a base")
+    except Exception as exc:  # noqa: BLE001 - a revocation never costs a build
+        _telemetry.warn(
+            f"[com-replay] {part.label}: forced refresh, but its revocation "
+            f"failed: {exc!r}",
+            label=part.label,
+        )
+    return True
+
+
 @contextlib.contextmanager
 def reuse_attempt(part: PartBuild) -> Iterator[Reuse]:
     """Mode ``reuse`` in a cache role that can publish: before the seat, try
-    to make the nearest bound recording's archive this build's outputs
+    to make the nearest bound real build's archive this build's outputs
     (:func:`_prepare`), inside span ``replay.reuse <label>``. The body sees
-    the decision: ``reused`` lets dodo install and publish it
-    (:meth:`Reuse.install`, :meth:`Reuse.check_token`, :meth:`Reuse.finish`);
-    anything else builds on the seat. On leaving: one ``replay_reuse``
-    cache.jsonl record and one INFO line (:func:`reuse_line`). The attempt
-    never raises; another mode or role yields a Reuse without a decision and
-    records nothing."""
+    the decision: ``reused`` lets dodo install, mark and store it
+    (:meth:`Reuse.install`, :meth:`Reuse.check_token`, :meth:`Reuse.mark`,
+    :meth:`Reuse.finish`); anything else builds on the seat. On leaving: one
+    ``replay_reuse`` cache.jsonl record and one INFO line (:func:`reuse_line`).
+    The attempt never raises; another mode or role yields a Reuse without a
+    decision and records nothing (``record`` and ``shadow`` still revoke
+    what a forced refresh replaces: :func:`revoke_refreshed`)."""
     reuse = Reuse(part)
-    if mode() is not ReplayMode.REUSE or not _cache.writable():
+    current = mode()
+    if current is ReplayMode.OFF or not _cache.writable():
+        yield reuse
+        return
+    if current is not ReplayMode.REUSE:
+        try:
+            revoke_refreshed(part)
+        except Exception as exc:  # noqa: BLE001 - the probe already read it
+            _telemetry.warn(
+                f"[com-replay] {part.label}: refresh carrier unreadable: {exc!r}",
+                label=part.label,
+            )
         yield reuse
         return
     label = part.label
@@ -1552,18 +1688,20 @@ def reuse_attempt(part: PartBuild) -> Iterator[Reuse]:
 
 def _prepare(part: PartBuild, reuse: Reuse) -> None:
     """Fill ``reuse`` through its decision; :class:`Declined` at the first
-    check that fails, in this order: no forced refresh; the key's inputs;
-    a recording of the stem bound to its archive under this salt, made on
-    this machine's SolidWorks; its bundle; a clean no-op replay of the
-    current source against it, standing for the base's seat; every differing
-    input judged by that replay (none SolidWorks opens itself, none acting
-    outside the recorded window, each one the replayed Python executed or
-    read); the base key's archive, verified and the
-    one the recording is bound to; the replay's outputs exactly the archive's
-    members, within the task's declared outputs, the Python-written ones byte
-    for byte, the native part among them; the inputs unmoved."""
+    check that fails, in this order: no forced refresh (which revokes what it
+    replaces); the key's inputs; a real build's recording of the stem bound
+    to its archive under this salt, not revoked, made on this machine's
+    SolidWorks; its bundle; a clean no-op replay of the current source against
+    it, standing for the base's seat; every differing input judged by that
+    replay (none SolidWorks opens itself, none acting outside the recorded
+    window, each one the replayed recipe imported or read); no replayed
+    request echoing a document title counter; the base key's archive,
+    verified and the one the recording is bound to; the replay's outputs
+    exactly the archive's members, within the task's declared outputs, the
+    Python-written ones byte for byte, the native part among them; the inputs
+    unmoved."""
     deadline = time.monotonic() + REUSE_SECONDS
-    if _cache.forced_refresh(part.label) is not None:
+    if revoke_refreshed(part):
         raise Declined(
             Decline.FORCED_REFRESH, "a forced cache refresh builds on the seat"
         )
@@ -1571,15 +1709,19 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
     salt = str(_cache.config_summary()["salt"])
 
     def usable(record: dict[str, Any]) -> bool:
+        # Only a real build's recording is a base: 66def8bddb published
+        # manifests for reused keys too (``reused_from``); none is one.
         return (
             bound_archive(record) is not None
+            and "reused_from" not in record
             and record.get("salt") == salt
             and record.get("key") != part.key
         )
 
+    engine = engine_digest()
     with reuse.timed("lookup"):
         reuse.lookup = found = find_base(
-            blob_prefix(engine_digest(), part.stem),
+            blob_prefix(engine, part.stem),
             reuse.inputs,
             None,
             salt,
@@ -1591,12 +1733,15 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
     if found.base is None:
         if found.unusable:
             raise Declined(
-                Decline.UNBOUND_BASE,
-                f"{found.unusable} recording(s) of the stem, none bound to its "
-                f"archive under salt {salt}",
+                Decline.NO_BOUND_BASE,
+                f"{found.unusable} recording(s) of the stem, none a real build's "
+                f"bound to its archive under salt {salt}",
             )
         raise Declined(Decline.NO_BASE, f"no recording of the stem ({found.outcome})")
     base = reuse.base = found.base
+    base_key = str(base.manifest.get("key"))
+    if revoked(engine, part.stem, base_key):
+        raise Declined(Decline.REVOKED_BASE, f"base {base_key[:12]} is revoked")
     here = seat_build()
     if here is None or base.manifest.get("sw_build") != here:
         raise Declined(
@@ -1608,7 +1753,7 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
     if unjudged:
         raise Declined(
             Decline.UNJUDGED_INPUT,
-            "differing input(s) SolidWorks opens itself or that drive the seat "
+            "differing input(s) SolidWorks opens itself or that act on the seat "
             "outside the recorded window: " + ", ".join(unjudged[:5]),
         )
     with reuse.timed("bundle"):
@@ -1648,6 +1793,9 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
             "SolidWorks opens output-root files the base did not capture: "
             + ", ".join(read_outputs[:5]),
         )
+    echoes = replay.get("title_echoes")
+    if not isinstance(echoes, dict) or echoes.get("count") != 0:
+        raise Declined(Decline.SEAT_STATE_ECHO, _echo_detail(echoes))
     with reuse.timed("archive"):
         _fetch_base_archive(base, reuse, deadline)
     with reuse.timed("verify"):
@@ -1659,6 +1807,16 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
         reuse.close()
         return
     reuse.decision = ReuseDecision.REUSED
+
+
+def _echo_detail(echoes: Any) -> str:
+    if not isinstance(echoes, dict):
+        return "the replay did not report its requests' title counters"
+    first = ", ".join(str(item) for item in (echoes.get("first") or [])[:5])
+    return (
+        f"{echoes.get('count')} replayed request(s) carry a SolidWorks document "
+        f"title counter, the seat's session state: {first}"
+    )
 
 
 def _current_inputs(part: PartBuild) -> dict[str, str]:
@@ -1802,7 +1960,6 @@ def reuse_record(reuse: Reuse) -> dict[str, Any]:
         "read": lookup.read if lookup else None,
         "unusable": lookup.unusable if lookup else None,
         "base_key": base.get("key"),
-        "origin_key": base.get("origin_key") or base.get("key"),
         "differing_count": len(reuse.base.differing) if reuse.base else None,
         "differing_classes": reuse.base.classes if reuse.base else None,
         "differing": list(reuse.base.differing[:DIFFERING_LISTED])
@@ -1820,7 +1977,7 @@ def reuse_record(reuse: Reuse) -> dict[str, Any]:
         "archive_bytes": reuse.archive_bytes,
         "token": reuse.token,
         "store": reuse.store,
-        "manifest": reuse.manifest,
+        "marker": reuse.marker,
     }
 
 
@@ -1828,7 +1985,7 @@ def reuse_line(label: str, record: dict[str, Any]) -> str:
     """One line (never a newline) of a reuse attempt: the decision; the base
     and how many inputs differ from it; the replay's verdict and requests
     served of recorded; seconds per phase; for a reuse, the store's outcome
-    and this key's recording's publication; for a decline, why."""
+    and the ``reused/`` marker's publication; for a decline, why."""
 
     def shown(name: str) -> str:
         value = record.get(name)
@@ -1843,7 +2000,7 @@ def reuse_line(label: str, record: dict[str, Any]) -> str:
         " ".join(f"{phase}={value}s" for phase, value in seconds.items()) or "-",
     ]
     if record.get("store") is not None:
-        segments.append(f"store={shown('store')} manifest={shown('manifest')}")
+        segments.append(f"store={shown('store')} marker={shown('marker')}")
     if record.get("detail"):
         segments.append(" ".join(str(record["detail"]).split())[:200])
     return " | ".join(segments)
@@ -2094,10 +2251,15 @@ def _after_build(
     record["bundle_bytes"] = len(data)
     record["bound"] = bound_archive(published) is not None
     with _telemetry.span(f"replay.publish {label}", service=infra, label=label) as sp:
-        # A build whose store lost the race made none of the key's archive: its
-        # recording describes another build's part, so it is not the key's.
+        # Only a build that stored the key's archive publishes its recording:
+        # one whose store lost the race made none of it (its recording
+        # describes another build's part), and one that stored nothing, or
+        # failed to, would leave an unbound manifest holding the key's
+        # create-only names. ``publish`` is then the store's outcome.
         record["publish"] = (
-            "lost" if outcome == "lost" else publish(recording, published, data)
+            publish(recording, published, data)
+            if outcome == "stored"
+            else outcome or "unstored"
         )
         sp.set_attribute("replay.publish", record["publish"])
         sp.set_attribute("replay.bundle_bytes", len(data))
@@ -2212,6 +2374,9 @@ def _after_build(
             label=label,
             base_key=key,
         )
+        record["revoked"] = _revoke_alarmed(
+            summary["engine"], recording.stem, base.manifest
+        )
     if shadow.noop_unexplained_divergence:
         _telemetry.warn(
             f"[com-replay] noop_unexplained_divergence {label}: the replay "
@@ -2233,6 +2398,25 @@ def _after_build(
         )
     record["outcome"] = "evaluated"
     _write_shadow(recording, record)
+
+
+def _revoke_alarmed(engine: str, stem: str, base: dict[str, Any]) -> str:
+    """A soundness alarm against ``base``: revoke it, and the real build a
+    66def8bddb manifest of a reused key names (``origin_key``). The base's
+    outcome, or ``error`` after a WARN (the alarm itself is already raised)."""
+    keys = [str(key) for key in (base.get("key"), base.get("origin_key")) if key]
+    try:
+        outcomes = [
+            revoke(engine, stem, key, "a SOUNDNESS ALARM against it")
+            for key in dict.fromkeys(keys)
+        ]
+    except Exception as exc:  # noqa: BLE001 - the alarm is raised either way
+        _telemetry.warn(
+            f"[com-replay] part:{stem}: SOUNDNESS ALARM base not revoked: {exc!r}",
+            label=f"part:{stem}",
+        )
+        return "error"
+    return outcomes[0] if outcomes else "error"
 
 
 def _write_shadow(recording: Recording, record: dict[str, Any]) -> None:

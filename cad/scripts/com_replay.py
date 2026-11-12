@@ -24,12 +24,13 @@
     SolidWorks revision other than the log's refuses the replay
     (``input_mismatch``). ``--base-outputs`` compares the Python-written
     outputs with that output root, file by file. The result also names the
-    repository files this process executed or opened for reading
-    (``python_files``) and those the log's COM arguments name, which
-    SolidWorks opens itself (``solidworks_inputs``; output-root paths that
-    are not the log's captured outputs: ``solidworks_out_inputs``). Exits 0
-    for a no-op verdict, 91 for any other verdict, 1 for an infrastructure
-    failure.
+    repository files the build script's own execution imported or opened for
+    reading, never the engine's (``python_files``); those the log's COM
+    arguments name, which SolidWorks opens itself (``solidworks_inputs``;
+    output-root paths that are not the log's captured outputs:
+    ``solidworks_out_inputs``); and the log's recipe requests that carry a
+    document title counter (``title_echoes``). Exits 0 for a no-op verdict,
+    91 for any other verdict, 1 for an infrastructure failure.
 
 ``diff <a> <b> [--result P]``
     Request divergence and per-member response differences between two logs
@@ -49,6 +50,7 @@ import argparse
 import json
 import os
 import sys
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +59,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Repository files that are never a build's input: the environment and the
 # outputs (the replay's own scratch included).
 _NOT_INPUTS = (".venv", "cad/out")
+# Bound on the requests a ``title_echoes`` result lists (all are counted).
+_ECHOES_LISTED = 10
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -137,25 +141,69 @@ def _repo_relative(raw: str) -> str | None:
     return relative
 
 
-def _python_files() -> Any:
-    """Start noting every file this process opens for reading; the returned
-    callable lists them, with every loaded module's source (an import served
-    from bytecode opens no source), as repository-relative paths: what the
-    replayed build's Python executed or read."""
+class _Owner(Enum):
+    """Whose code a stack frame runs, for :func:`_python_files`."""
+
+    RECIPE = "recipe"  # the build script's own code
+    ENGINE = "engine"  # _com_conversation, serving or checking for itself
+    OTHER = "other"  # helpers, the standard library: look further out
+
+
+def _python_files(script: Path, scratch: Path) -> Any:
+    """Start noting what the build script's own execution loads and reads:
+    each file opened for reading and each module imported while, walking out
+    from the event, a frame of ``script`` comes before one of the engine
+    (``_com_conversation``). The returned callable lists them, with the script
+    itself, as repository-relative paths: what the replayed recipe executed or
+    read, bar its own outputs under ``scratch``. What the engine loads or
+    reads for itself (its frames come first: ``redirect_outputs``' ``_paths``,
+    ``_session``, the log, ``check_inputs``' digests) is left out, and so is a
+    module the recipe uses after something else imported it (no import
+    happens then): a differing input left out is unjudged, the safe
+    direction. So is work in a thread or task the script starts, whose frames
+    do not reach it."""
+    import _com_conversation as conversation
+
+    owners = {
+        _code_file(str(script)): _Owner.RECIPE,
+        _code_file(conversation.__file__): _Owner.ENGINE,
+    }
+    seen: dict[str, _Owner] = {}
     opened: set[str] = set()
+    imported: set[str] = set()
     writing = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT
 
+    def owner(filename: str) -> _Owner:
+        found = seen.get(filename)
+        if found is None:
+            found = seen[filename] = owners.get(_code_file(filename), _Owner.OTHER)
+        return found
+
+    def by_recipe(frame: Any) -> bool:
+        while frame is not None:
+            found = owner(frame.f_code.co_filename)
+            if found is not _Owner.OTHER:
+                return found is _Owner.RECIPE
+            frame = frame.f_back
+        return False
+
     def hook(event: str, args: tuple[Any, ...]) -> None:
-        if event != "open" or not args:
+        if event not in ("open", "import") or not args:
             return
         try:
+            if event == "import":
+                if isinstance(args[0], str) and by_recipe(sys._getframe(1)):
+                    imported.add(args[0])
+                return
             path, mode = args[0], args[1] if len(args) > 1 else None
             flags = args[2] if len(args) > 2 else 0
             if isinstance(mode, str) and any(c in mode for c in "wax+"):
                 return
             if mode is None and isinstance(flags, int) and flags & writing:
                 return
-            if isinstance(path, (str, bytes, os.PathLike)):
+            if isinstance(path, (str, bytes, os.PathLike)) and by_recipe(
+                sys._getframe(1)
+            ):
                 opened.add(os.fsdecode(path))
         except Exception:  # noqa: BLE001 - an audit hook must never fail an open
             return
@@ -163,15 +211,29 @@ def _python_files() -> Any:
     sys.addaudithook(hook)
 
     def files() -> list[str]:
-        sources = [getattr(m, "__file__", None) for m in list(sys.modules.values())]
+        outputs = _code_file(str(scratch)) + os.sep
+        sources = [
+            getattr(sys.modules.get(name), "__file__", None) for name in imported
+        ]
         found = {
             relative
-            for raw in (*opened, *(s for s in sources if isinstance(s, str)))
-            if (relative := _repo_relative(raw)) is not None and os.path.isfile(raw)
+            for raw in (
+                str(script),
+                *opened,
+                *(source for source in sources if isinstance(source, str)),
+            )
+            if not _code_file(raw).startswith(outputs)
+            and (relative := _repo_relative(raw)) is not None
+            and os.path.isfile(raw)
         }
         return sorted(found)
 
     return files
+
+
+def _code_file(name: str) -> str:
+    """A code object's file name as one path compares on this system."""
+    return os.path.normcase(os.path.abspath(name))
 
 
 def _solidworks_inputs(conversation: Any) -> tuple[list[str], list[str]]:
@@ -195,6 +257,23 @@ def _solidworks_inputs(conversation: Any) -> tuple[list[str], list[str]]:
                 if rest and rest not in captured:
                     inside.append(rest)
     return sorted(set(named)), sorted(set(inside))
+
+
+def _title_echoes(log: Any) -> dict[str, Any]:
+    """The log's recipe requests whose arguments carry a SolidWorks
+    new-document title counter (``Part24``): the script echoed the seat's
+    session state into a request. A no-op replay issued exactly the log's
+    recipe requests, so these are the replay's. ``first``: ``<recipe index>
+    <member>`` of the first :data:`_ECHOES_LISTED`."""
+    import _com_conversation as conversation
+    import _com_outcome
+
+    found = [
+        f"{index} {call.site}"
+        for index, call in enumerate(conversation.recipe_calls(log.calls))
+        if _com_outcome.carries_title_counter(call.args)
+    ]
+    return {"count": len(found), "first": found[:_ECHOES_LISTED]}
 
 
 def _summary(
@@ -340,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
     # Telemetry creates cad/out/reports/telemetry on first use: do it before the
     # replay's audit hook starts refusing writes outside the scratch root.
     _telemetry.info(f"com_replay replay {script.name} <- {args.log}")
-    python_files = _python_files()
+    python_files = _python_files(script, args.scratch.resolve())
     result = conversation.replay_build(
         script,
         args.log.resolve(),
@@ -349,16 +428,17 @@ def main(argv: list[str] | None = None) -> int:
         capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
         seat_log=args.seat_log.resolve(),
     )
-    solidworks_inputs, solidworks_out_inputs = _solidworks_inputs(
-        conversation.load(args.log.resolve())
-    )
+    files = python_files()
+    log = conversation.load(args.log.resolve())
+    solidworks_inputs, solidworks_out_inputs = _solidworks_inputs(log)
     _write_json(
         args.result,
         {
             **result.to_json(),
-            "python_files": python_files(),
+            "python_files": files,
             "solidworks_inputs": solidworks_inputs,
             "solidworks_out_inputs": solidworks_out_inputs,
+            "title_echoes": _title_echoes(log),
         },
     )
     inert = result.details.get("inert") or {}

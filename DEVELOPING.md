@@ -2323,12 +2323,12 @@ a farm leaf) under a cache role that can publish (`rw`) is recorded, and the
 recording is replayed in the shadow of the build. In `ro` or `off` a part builds
 exactly as unrecorded (`_replay_shadow.plan`): a recording nobody can publish
 would be pure cost. In the default mode, `reuse`, a part whose key misses is
-first replayed, with SolidWorks absent, against the nearest earlier recording
-bound to its archive; when that proves the current source issues the same
-conversation, the earlier archive becomes this key's outputs and no COM runs
-("Reuse" below). Every other build is recorded and judged exactly as in
-`shadow` mode, where nothing is reused: every output, exit code and cache key
-is what an unrecorded build produces.
+first replayed, with SolidWorks absent, against the nearest earlier real
+build's recording bound to its archive; when that proves the current source
+issues the same conversation, the earlier archive becomes this key's outputs
+and no COM runs ("Reuse" below). Every other build is recorded and judged
+exactly as in `shadow` mode, where nothing is reused: every output, exit code
+and cache key is what an unrecorded build produces.
 
 ### What is recorded
 
@@ -2385,9 +2385,9 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 
 | value | effect |
 | --- | --- |
-| `reuse` (default, also unset or empty) | before the seat, try to reuse a bound base's archive ("Reuse" below); otherwise as `shadow` |
-| `shadow` | record, publish, then evaluate a shadow replay; nothing is reused |
-| `record` | record and publish; no lookup or replay |
+| `reuse` (default, also unset or empty) | before the seat, try to reuse a real build's bound archive ("Reuse" below); otherwise as `shadow` |
+| `shadow` | record, publish, then evaluate a shadow replay; nothing is reused (a forced refresh still revokes what it replaces) |
+| `record` | record and publish; no lookup or replay (a forced refresh still revokes what it replaces) |
 | `off` | the kill switch: the build runs the command it ran before recording existed, and the engine is never imported |
 
 Any other value is treated as `off` with one warning. A farm leaf takes the mode
@@ -2462,22 +2462,29 @@ the version resource of the `SLDWORKS.exe` that `SldWorks.Application`'s COM
 registration starts, read from the registry without starting SolidWorks),
 request counts, the bundle's SHA-256, and `archive`: the SHA-256 and size of
 the archive this very process committed under the key
-(`_artifact_cache.publication`). A build whose store lost the race made none
-of the key's archive, so its recording describes another build's part and is
-not published at all (`publish=lost`); one whose store failed, stored nothing,
-or ran before binding existed publishes an unbound manifest (`archive` null),
-which shadow lookups use and reuse never does. The bundle is published first;
-only the writer whose bundle was stored then writes the manifest. A bundle that
-already `exists` is another writer's bytes, which this manifest's digest and
-counts do not describe, so that publication ends at the bundle
-(`publish=exists`). Failing to publish is a soft outcome. If an input changed
-while the part built, the inputs no longer match the key and nothing is
-published. Sidecars follow the container's 7-day last-access retention.
+(`_artifact_cache.publication`). Only a build that stored the key's archive
+publishes its recording: one whose store lost the race made none of the key's
+archive, so its recording describes another build's part (`publish=lost`),
+and one whose store failed or stored nothing publishes nothing either
+(`publish` is then the store's outcome, or `unstored`). Every manifest a build
+publishes is therefore bound; those published before binding existed are
+unbound (`archive` null), which shadow lookups use and reuse never does. A
+reused key publishes no recording at all ("Reuse" below). The bundle is
+published first; only the writer whose bundle was stored then writes the
+manifest. A bundle that already `exists` is another writer's bytes, which
+this manifest's digest and counts do not describe, so that publication ends
+at the bundle (`publish=exists`). Failing to publish is a soft outcome. If an
+input changed while the part built, the inputs no longer match the key and
+nothing is published. Sidecars follow the container's 7-day last-access
+retention.
 
 Known limit: a lookup reads up to 8 manifests and downloads at most one
 bundle, so a manifest's last access stays fresher than its bundle's and it can
 outlive it. A base whose bundle has expired yields `unavailable` (class
-`infrastructure`).
+`infrastructure`). The reuse lookup applies the same bound of 8 newest
+manifests before filtering for a real build's bound recording under this salt,
+so legacy or other-salt manifests can crowd every bound base out of it
+(`no_bound_base`).
 
 In `shadow` mode, the base is the earlier recording of the same stem and engine
 with the fewest differing key inputs; a tie goes to the newest. A base recorded
@@ -2520,6 +2527,10 @@ not held. Next, the base log is compared with this build's own fresh recording
   against `Part12`), the masked provenance value, and floats within 1e-9 of
   their value's largest float. The named answer need not have steered the
   request: when a source edit follows a reordering, the reordering is named.
+  `response:title_counter` means the diverging request is the base's but for
+  a title counter an earlier answer carried (ms_stick, 2026-11-12: a
+  dimension's full name, `D3@MinorPattern@Part24.Part`, written into an
+  equation), so on a `noop` it is `seat_nondeterminism`.
   `error:<type>` means judging the cause raised (message in
   `outcome_details.truth_cause`); on a `noop` that is `noop_outcome_unknown`,
   never `noop_unexplained_divergence`.
@@ -2656,21 +2667,31 @@ before the seat is taken, inside span `replay.reuse part:<stem>`. It reuses
 only when every check below holds, in this order; the first that fails
 declines with its reason:
 
-1. Not a forced refresh (`forced_refresh`), and the inputs still make the key
+1. Not a forced refresh (`forced_refresh`; the refresh revokes what it
+   replaces, see "Revocation"), and the inputs still make the key
    (`inputs_moved`).
-2. A base: the nearest recording of the stem under this engine whose
-   manifest is bound to its archive (`archive`), was made under this cache
-   salt (keys are revision-agnostic only within a salt) and is of another
-   key; the usual 8-manifest, 3 s lookup (`no_base`; `unbound_base` when only
-   unbound or other-salt recordings exist; `time_cap`).
+2. A base: the nearest recording of the stem under this engine made by a
+   real build (no `reused_from`, which only manifests 66def8bddb published
+   for reused keys carry), whose manifest is bound to its archive
+   (`archive`), made under this cache salt (keys are revision-agnostic only
+   within a salt) and of another key; the usual 8-manifest, 3 s lookup
+   (`no_base`; `no_bound_base` when recordings exist but none qualifies,
+   without replaying; `time_cap`). The base must not be revoked
+   (`revoked_base`, without replaying; a revocation that cannot be read
+   declines `fault`).
 3. The same SolidWorks: the base's `sw_build` is this machine's
    (`seat_differs`, also when either is unknown).
 4. No differing input is a document SolidWorks opens itself
    (`SOLIDWORKS_DOCUMENTS`: templates, models, drawings, DXF/STEP and other
-   imports, fonts, libraries) or a module that drives the seat outside the
-   recorded window (`SEAT_SESSION_MODULES`: `_session.py`,
-   `_seat_forensics.py`, whose connect, discard, template pin and teardown a
-   replay never runs) (`unjudged_input`).
+   imports, fonts, libraries) or acts on the seat outside the recorded window
+   (`outside_window_inputs`: `_session.py` and every keyed module it imports,
+   derived by `_buildgraph.module_deps_of`, today `_com.py` and `_paths.py`;
+   `_session.run_build` connects, discards, pins the template and tears down
+   outside the window, and a replay replaces it whole), even when the recipe
+   also executes it inside the window (`unjudged_input`). An edit to one of
+   them therefore re-keys every part and declines every reuse: in the 30
+   days to 2026-11-12, 3 of 3957 commits touching `cad/scripts/*.py` did
+   (all `_paths.py`).
 5. The base bundle, verified against its manifest (`base_bundle_missing`).
 6. A replay of the current source against it with SolidWorks absent
    (`com_replay.py replay`, `--seat-log` the base's own log: the replay
@@ -2680,10 +2701,15 @@ declines with its reason:
    path whatever the script also does with it (`solidworks_inputs`;
    `unjudged_input`). Then the verdict must be a clean `noop` (`diverged`,
    `input_mismatch`, `sandbox`, `replay_error`, `time_cap`), every differing
-   input must be one the replayed Python executed or read (`python_files`:
-   the driver's audit hook on `open` plus every loaded module's source;
-   `unjudged_input`), and SolidWorks may open no output-root file the base
-   did not capture (`solidworks_out_inputs`; `unjudged_input`).
+   input must be one the replayed recipe imported or read (`python_files`:
+   the driver's audit hook on `open` and `import`, crediting an event to the
+   recipe when a frame of the build script is nearer it than one of the
+   engine, so nothing the engine loads or reads for itself is listed, nor
+   the replay's own outputs; `unjudged_input`), SolidWorks may open no
+   output-root file the base did not capture (`solidworks_out_inputs`;
+   `unjudged_input`), and no replayed request may carry a document title
+   counter, the seat's session state the replay serves from the base
+   (`title_echoes`, also when unreported; `seat_state_echo`).
 7. The base key's canonical archive, downloaded and verified as a restore
    verifies it (`base_archive_missing`), is the one the recording is bound to
    (`unbound_base`: a refresh replaced it).
@@ -2704,31 +2730,47 @@ Then `dodo._reuse_part` makes the reuse, with no COM seat and no
 `com=none`. It installs the archive as a HIT restores one, checks every
 installed file against its member, re-stamps the `.execution` token and
 requires it to equal the base's native SHA-256 (`token_mismatch`), validates,
+publishes the create-only marker
+`com-replay/epoch-<n>/<engine[:16]>/<stem>/reused/<new key>.json`
+(`origin_key`, the base archive's SHA-256 and size, `marked_utc`, the
+checkout's `commit`; an existing marker naming another origin falls through),
 then stores the outputs under the new key through the normal create-only
-store (`lost` adopts the winner, as for a build), and publishes the new key's
-manifest: the base's recording under this key's inputs, bound to the archive
-this process stored, with `reused_from` (the base key) and `origin_key` (the
-real build every reuse in the chain goes back to). The next key can reuse
-from it in turn.
+store (`lost` adopts the winner, as for a build). A reused key publishes no
+recording or bundle: only real builds are bases, so every later key replays
+against a real build's recording, never against a reuse.
 
 A reuse never costs a build: an exception in any phase (lookup, bundle,
-replay, archive, verify, install) declines `fault` with a WARN, and a failed
-install or token check falls through the same way; the build then runs on
-the seat, which rewrites every output. A failure to publish the new key's
-manifest after a reuse is a WARN (`manifest=error`). A build that was not
-reused is recorded and judged after it as in `shadow` mode; when the attempt
-already replayed against a base, that replay is the shadow's and only the
-comparison (`com_replay.py diff`) runs after the build, judged
-`input_mismatch` if the build's seat reported another `sw_revision` than the
-base's. The exit-92 re-run happens inside the seat build, after the attempt,
-and is never reused; `ro`/`off` roles and the farm submitter make no attempt
-(the worker does).
+replay, archive, verify, install, mark) declines `fault` with a WARN, and a
+failed install, token check or marker falls through the same way; the build
+then runs on the seat, which rewrites every output. A restore lock during
+the install (`RestoreLocked`: an output open in a SolidWorks session) is such
+a fault: the attempt declines and the seat builds, rather than releasing the
+documents and retrying, which is acceptable. Once the outputs are stored,
+nothing of the reuse can fail the task: a local record that cannot be kept is
+a WARN. A build that was not reused is recorded and judged after it as in
+`shadow` mode; when the attempt already replayed against a base, that replay
+is the shadow's and only the comparison (`com_replay.py diff`) runs after the
+build, judged `input_mismatch` if the build's seat reported another
+`sw_revision` than the base's. The exit-92 re-run happens inside the seat
+build, after the attempt, and is never reused; `ro`/`off` roles and the farm
+submitter make no attempt (the worker does).
 
 **Audit.** One would-be reuse in eight (`AUDIT_ONE_IN`; the first 8 bytes of
 the key's SHA-256, so every seat and rerun samples the same keys) builds on
 the seat anyway (`reuse_decision=audited`) and is judged with the pre-build
 replay's verdict, so the soundness alarm stays live on exactly the path that
 reuses.
+
+**Revocation.** A create-only
+`com-replay/epoch-<n>/<engine[:16]>/<stem>/revoked/<base key>.json` retires a
+base: no attempt reuses it again (`revoked_base`). It is written when a
+shadow or audit judgement raises a `SOUNDNESS ALARM` against the base (the
+`replay_shadow` record's `revoked`), and when a forced cache refresh targets a
+key in modes `reuse`, `shadow` or `record` under `rw`: the origin its
+`reused/` marker names is revoked, and so is the key itself when a recording
+of it is published (it is a base). A revocation that cannot be written is a
+WARN and never fails the build; one that cannot be read declines the attempt
+(`fault`).
 
 **Soundness.** A reuse claims the base's archive is an outcome the current
 source's build could have had. The replay fed the current source the base's
@@ -2740,15 +2782,19 @@ for the base (the archive's native part, STL and captures), and Python, which
 saw the same responses, writes what the replay wrote, which equals the
 archive's members byte for byte. The seat answers as the base's did when it
 is the same SolidWorks (`sw_build`), started from the same state (the same
-template, by key; the same session modules; nothing in the window inherited
-from earlier documents, which `_session` discards), under the same process
-inputs (`PYTHONHASHSEED`, the read guards: pinned by the replay's input
-check) and the same files SolidWorks opens by path (digests pinned by the
-replay, and every differing one declines). Every other differing key input
-was executed or read by the replayed Python, so its whole effect on the part
-went through the requests and Python outputs just compared. The archive is
-the one the recorded build stored (binding), so another writer's bytes are
-never reused, and the token equality keeps every dependent's key.
+template, by key; the same outside-window inputs; nothing in the window
+inherited from earlier documents, which `_session` discards), under the same
+process inputs (`PYTHONHASHSEED`, the read guards: pinned by the replay's
+input check) and the same files SolidWorks opens by path (digests pinned by
+the replay, and every differing one declines). Every other differing key
+input was imported or read by the replayed recipe inside the window, so its
+whole effect on the part went through the requests and Python outputs just
+compared. The archive is the one the recorded build stored (binding), so
+another writer's bytes are never reused; the token check is an integrity
+check that the installed native part is the base's bytes. Dependents' keys
+still move when the part's key moves (they fold the part's recipe digest,
+`dodo._stable_artefact_digest`), so a reuse saves the part leaf only, and
+the dependents rebuild against the reused part.
 
 Not proven off-seat:
 
@@ -2766,14 +2812,31 @@ Not proven off-seat:
   itself leaves it out of `python_files`, which only declines (the safe
   direction), but a file SolidWorks opens through a path no COM argument
   names (a relative path, an environment variable) is not seen at all.
+- Provenance: a reused part carries the base's `Generator` stamp (the replay
+  masks it), so a base built from a work-in-progress checkout under `rw`
+  spreads its `-dirty` commit to every key that reuses it. Same-key cache
+  hits already carry the stamp of whichever build stored them; the marker's
+  `commit` names the reusing checkout.
 
-Before the default is trusted, the native proof must show, on one throwaway
-salt: a record pass whose manifests are all bound (`replay_shadow` records
-`bound=true`, `sw_build` set); an inert-edit pass that reuses every edited
-part (`reuse=reused`, `com=none`, no `sw.connect`, tokens equal to the
-bases'); a geometry-edit pass that declines and builds; then assemblies,
-drawings and `verify_soundness` over the reused parts, all green with no
-dependent key moved; and audited builds judged with no `SOUNDNESS ALARM`.
+The native proof of reuse, on one throwaway salt: a record pass whose
+manifests are all bound (`replay_shadow` records `bound=true`, `sw_build`
+set); an inert-edit pass that reuses every edited part (`reuse=reused`,
+`com=none`, no `sw.connect`, tokens equal to the bases'); a geometry-edit pass
+that declines and builds; dependents (assemblies, drawings and
+`verify_soundness`) rebuilding green against the reused parts; and audited
+builds judged with no `SOUNDNESS ALARM`.
+
+Reading a proof pass: under one salt, a key reuses only when its source
+differs from a recorded real build's. Unchanged source under the same salt
+hits the cache, and a fresh salt has no base of its own (`no_bound_base`, or
+`no_base`), so same salt plus different source is the only way a proof pass
+reuses. Each part's
+`[com-replay] part:<stem>: reuse=` INFO line says what happened:
+`reuse=reused | base=<key>` installed that base's archive with no COM;
+`reuse=audited` and every `reuse=declined:<reason>` built on the seat, the
+reason naming the first check that failed. A proof that must drive
+SolidWorks (seat behaviour, timing, native outputs) forces a cache refresh
+(which also revokes what it replaces) or runs under a fresh salt.
 
 `_com_conversation.py`'s module docstring still says nothing is reused from a
 recording. Editing it would change the engine digest, which scopes every
@@ -2818,7 +2881,7 @@ jq -s '
                 | map({key: .[0].reuse_decision, value: length}) | from_entries),
     faults: [$r[] | select(.decline == "fault") | {label, phase, detail}],
     reused: [$r[] | select(.reuse_decision == "reused")
-             | {label, key, base_key, origin_key, seconds}],
+             | {label, key, base_key, marker, seconds}],
     audited: [.[] | select(.event == "replay_shadow" and .reuse_decision == "audited")
               | {label, key, verdict, ground_truth, soundness_alarm}]
   }' cad/out/reports/cache.jsonl
@@ -2874,10 +2937,10 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 
 | span | attributes |
 | --- | --- |
-| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.origin_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.manifest`; a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
+| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.marker` (the `reused/` marker's publication); a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
 | `replay.after_build <label>` | `replay.outcome`, `replay.reuse_decision` (mode `reuse`); encloses every span below and the whole off-seat step |
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
-| `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`lost`/`skip`/`off`/`error`), `replay.bundle_bytes`, `replay.bound` |
+| `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
 
@@ -2908,14 +2971,15 @@ or `judge_fault` marker ends the line when it applies; in mode `reuse` a
 `cache.jsonl` stays on the worker, so use Application Insights for fleet-wide
 results. The `replay_shadow` record's outcome fields are `artefact_outcome`
 and `truth_cause`: `outcome` is the step's. It also carries `bound` (the
-manifest names the archive this process stored) and, in mode `reuse`,
-`reuse_decision`.
+manifest names the archive this process stored), in mode `reuse`
+`reuse_decision`, and after a `SOUNDNESS ALARM` `revoked` (the base's
+revocation: `stored`, `exists`, or `error` after a WARN).
 
 Every reuse attempt appends one `replay_reuse` record (the span's fields, with
 `seconds` per phase) and logs one INFO line, for example:
 
 ```text
-[com-replay] part:sh_widget: reuse=reused | base=0f3c19a2b7d4 differing=1 | shadow=noop served=1874/1874 | lookup=0.21s bundle=0.35s replay=9.84s archive=0.62s verify=0.01s publish=0.48s | store=stored manifest=stored
+[com-replay] part:sh_widget: reuse=reused | base=0f3c19a2b7d4 differing=1 | shadow=noop served=1874/1874 | lookup=0.21s bundle=0.35s replay=9.84s archive=0.62s verify=0.01s publish=0.48s | store=stored marker=stored
 ```
 
 A decline ends the line with its detail instead of the store segment.

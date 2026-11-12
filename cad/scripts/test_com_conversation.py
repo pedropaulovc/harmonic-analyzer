@@ -1188,6 +1188,69 @@ def test_outcome_noise_is_title_counters_provenance_and_last_bits():
     )
 
 
+def _echoing(title: str, equation: str = "DivisionSpacing", handle: int = 4):
+    """ms_stick's shape (2026-11-12): the document's title and a dimension's
+    full name, both carrying the seat's document counter, then that full name
+    written into an equation."""
+    name = f"D3@MinorPattern@{title}.Part"
+    return [
+        conv.Call(0, 1, "InvokeTypes", [], "IModelDoc2.GetTitle", result=title),
+        conv.Call(1, 2, "InvokeTypes", [], "IDimension.FullName", result=name),
+        conv.Call(2, 3, "InvokeTypes", ["Count"], "IApp.Get", result=0),
+        conv.Call(
+            3,
+            handle,
+            "InvokeTypes",
+            [-1, f'"{name}" = "{equation}"', True],
+            "IEquationMgr.Add2",
+            result=0,
+        ),
+    ]
+
+
+def test_a_request_echoing_a_title_counter_is_caused_by_the_seat():
+    cause = _com_outcome.truth_cause
+    at = {"index": 3, "field": "args"}
+    base = _echoing("Part13")
+    assert cause(base, _echoing("Part24"), at) == _com_outcome.TITLE_COUNTER_CAUSE
+    # Anything else in the request differing is the script's own.
+    assert cause(base, _echoing("Part24", "ScaleEndMargin"), at) == "request"
+    assert cause(base, _echoing("Part24", handle=5), at) == "request"
+    # A counter the script made up, with every answer the same.
+    made_up = [*base[:3], _echoing("Part14")[3]]
+    assert cause(base, made_up, at) == "request"
+    # An earlier answer beyond noise is still named first.
+    counted = [
+        *_echoing("Part24")[:2],
+        conv.Call(2, 3, "InvokeTypes", ["Count"], "IApp.Get", result=1),
+        _echoing("Part24")[3],
+    ]
+    assert cause(base, counted, at) == "response:IApp.Get"
+    # A missing request is no echo.
+    assert cause(base, base[:3], {"index": 3, "field": "length"}) == "request"
+    assert _com_outcome.carries_title_counter([{"t": ["D1@Sketch1@Assem3.Assembly"]}])
+    assert not _com_outcome.carries_title_counter(["Partial11", 11, {"f": "0x1p0"}])
+
+
+def test_a_replay_reports_the_requests_that_carry_a_title_counter():
+    import types
+
+    import com_replay
+
+    inert = conv.Call(
+        4, 1, "InvokeTypes", ["Part9"], "IApp.Note", origin=conv.Origin.INERT
+    )
+    echoes = com_replay._title_echoes(
+        types.SimpleNamespace(calls=[*_echoing("Part24"), inert])
+    )
+    assert echoes == {"count": 1, "first": ["3 IEquationMgr.Add2"]}
+    plain = [call for call in _echoing("Part24") if call.site != "IEquationMgr.Add2"]
+    assert com_replay._title_echoes(types.SimpleNamespace(calls=plain)) == {
+        "count": 0,
+        "first": [],
+    }
+
+
 def test_a_divergence_is_labelled_at_or_after_the_last_named_feature(
     tmp_path, monkeypatch
 ):

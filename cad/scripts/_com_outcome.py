@@ -12,8 +12,9 @@ diff``:
 
 * :func:`truth_cause`: what preceded the first request difference. Either a
   response difference beyond noise (``response:<member>``: SolidWorks answered
-  differently first) or none (``request``: the script asked something else of
-  the same answers).
+  differently first), a title counter the script echoed into the request
+  (:data:`TITLE_COUNTER_CAUSE`), or none (``request``: the script asked
+  something else of the same answers).
 * :func:`outcome`: whether the two builds made the same part, on signals that
   do not depend on call order (:class:`Outcome`).
 
@@ -52,6 +53,12 @@ REL_TOL = 1e-9
 # The counter in a new document's title (Part11, Assem3, Draw2): SolidWorks
 # numbers documents per session, so the same build reads another one each run.
 _TITLE_COUNTER = re.compile(r"\b(Part|Assem|Draw)\d+\b")
+# The cause of a request that differs from the base's only in title counters,
+# after an answer that differed only in one: the script put the seat's
+# document counter into a request (2026-11-12, ms_stick: ``IDimension.FullName``
+# ``D3@MinorPattern@Part24.Part`` written into an equation). SolidWorks
+# answered differently first, so it is a response cause like any other.
+TITLE_COUNTER_CAUSE = "response:title_counter"
 # The members answering mass properties: matched as measurements within
 # tolerance (:func:`_mass_signal`), never as exact multiset members.
 _MASS_SITE = re.compile(r"^IMassProperty\d*\.|\.GetMassProperties\d*$")
@@ -169,8 +176,10 @@ def truth_cause(
 ) -> str | None:
     """``response:<member>`` for the nearest response before the request
     divergence that differs beyond noise (SolidWorks answered differently
-    first), ``request`` when every earlier answer agrees (the script asked
-    something else), ``None`` without a divergence."""
+    first), :data:`TITLE_COUNTER_CAUSE` when every earlier answer agrees but
+    for noise and the diverging request echoes a title counter
+    (:func:`_echoes_title`), ``request`` when the script asked something else
+    of the same answers, ``None`` without a divergence."""
     if divergence is None:
         return None
     end = min(int(divergence["index"]), len(a), len(b))
@@ -178,7 +187,69 @@ def truth_cause(
         x, y = a[index], b[index]
         if not _close([x.result, x.raised, x.outs], [y.result, y.raised, y.outs]):
             return f"response:{x.site}"
+    if _echoes_title(a, b, end):
+        return TITLE_COUNTER_CAUSE
     return "request"
+
+
+def carries_title_counter(value: Any) -> bool:
+    """Whether any string in ``value`` (a call's arguments or answer, as
+    logged) carries a SolidWorks new-document title counter (``Part24``)."""
+    if isinstance(value, str):
+        return _TITLE_COUNTER.search(value) is not None
+    if isinstance(value, list):
+        return any(carries_title_counter(item) for item in value)
+    if isinstance(value, dict):
+        return any(carries_title_counter(item) for item in value.values())
+    return False
+
+
+def _echoes_title(a: Sequence[conv.Call], b: Sequence[conv.Call], index: int) -> bool:
+    """The request at ``index`` is the base's on the same object but for the
+    title counters in its arguments (provenance masked), and an earlier answer
+    differed in title counters only: the script echoed the seat's document
+    counter. Anything else in the request differing is the script's own."""
+    if index >= min(len(a), len(b)):
+        return False
+    x, y = a[index], b[index]
+    if (x.handle, x.op, x.site) != (y.handle, y.op, y.site):
+        return False
+    if not carries_title_counter(y.args):
+        return False
+    if _exact(_mapped(x.args, _text)) != _exact(_mapped(y.args, _text)):
+        return False
+    return any(_title_only(_answer(a[i]), _answer(b[i])) for i in range(index))
+
+
+def _answer(call: conv.Call) -> list[Any]:
+    return [call.result, call.raised, call.outs]
+
+
+def _title_only(a: Any, b: Any) -> bool:
+    """Two answers that differ, and only in title counters."""
+    if not carries_title_counter(a):
+        return False
+    exact = _exact(a)
+    return exact != _exact(b) and _exact(_mapped(a, _counterless)) == _exact(
+        _mapped(b, _counterless)
+    )
+
+
+def _exact(value: Any) -> str:
+    """``value`` as logged, compared exactly (``true`` is not ``1``, a float
+    is its hex)."""
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _mapped(value: Any, text: Callable[[str], str]) -> Any:
+    """``value`` with ``text`` applied to every string, the rest as it is."""
+    if isinstance(value, str):
+        return text(value)
+    if isinstance(value, list):
+        return [_mapped(item, text) for item in value]
+    if isinstance(value, dict):
+        return {name: _mapped(item, text) for name, item in value.items()}
+    return value
 
 
 def outcome(
@@ -817,6 +888,10 @@ def _text(value: str) -> str:
     for rule in conv.PROVENANCE_MASK:
         if rule.pattern.fullmatch(value):
             return f"<masked:{rule.name}>"
+    return _counterless(value)
+
+
+def _counterless(value: str) -> str:
     return _TITLE_COUNTER.sub(r"\1#", value)
 
 
