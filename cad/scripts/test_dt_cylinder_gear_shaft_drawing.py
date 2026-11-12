@@ -152,6 +152,35 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
     assert '{"Depth": LENGTH_CALLOUT}' in source
 
 
+def test_the_supplied_bar_covers_the_longest_fitted_arbor() -> None:
+    """The bar is supplied long and cut at assembly, so the SUPPLY note must
+    cover the overall (span plus both domes) at the worst corner of every
+    band the span stacks (south disc, accepted 20-gear stack, spring set and
+    both strap depths, the domes at the .XX row), with a facing cut at each
+    end (the shop's ch_rocker_hub_spec.FACE_STOCK).  #1038 re-pitch: the
+    176.464 span leaves 7-1/2 in about 10 mm spare."""
+    import ch_rocker_hub_spec
+    import cylinder_bank_layout as bank
+    from _printed_tolerance import printed_band_mm
+
+    xx_band = printed_band_mm(2, unit="in")
+    longest = (
+        bank.ARBOR_OVERALL_LENGTH
+        + bank.WASHER_THICK_TOLERANCE_MM
+        + bank.STACK_L20_ACCEPT_BAND[0]
+        + bank.BANK_SPRING_SET_BAND
+        + 2 * xx_band  # strap depths
+        + 2 * xx_band  # dome heights
+    )
+    for text in (notes.DRAWING_NOTES, spec.DRAWING_NOTES):
+        supply = re.search(r"SUPPLY (\d+)-(\d+)/(\d+) LONG", text)
+        assert supply is not None, text
+        whole, numerator, denominator = (int(group) for group in supply.groups())
+        supply_mm = (whole + numerator / denominator) * 25.4
+        facing = 2 * ch_rocker_hub_spec.FACE_STOCK
+        assert supply_mm - longest >= facing, (supply_mm, longest)
+
+
 def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     """The bright dome on each pedestal is the arbor end (#743, MHA-125
     deleted). InsertDome states no markable height or radius, so a hidden

@@ -26,9 +26,10 @@ PEDESTAL_NUMBER = "MHA-DT-02"
 SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
 
 # Part-specific facts a machinist cannot read off the views (rule 7).  A
-# 6.5:.375 slender bar is turned between centres, which may stay.  The length
+# 7:.375 slender bar is turned between centres, which may stay.  The length
 # is cut at assembly, so the shop supplies the bar long (7-1/2 in covers the
-# nominal span, both domes and facing stock) and domes the cut ends.
+# nominal span, both domes and facing stock: test_dt_cylinder_gear_shaft_drawing)
+# and domes the cut ends.
 DRAWING_NOTES = "\n".join(
     (
         "CENTRES OK.",

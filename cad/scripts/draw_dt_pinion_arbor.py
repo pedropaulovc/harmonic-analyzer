@@ -39,10 +39,13 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
@@ -73,10 +76,12 @@ from dt_pinion_arbor_spec import (
     RETAINING_COMPOUND,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
+    SHAFT_LEN,
     STRAP_NUMBER,
     SURFACE_FINISHES,
 )
 from dt_pinion_arbor_notes import (
+    BACK_BOND_DIA_Z,
     BACK_STUB_DIA_Z,
     BOND_ZONE_WITNESS_LEN,
     DRAWING_DIMENSIONS,
@@ -124,26 +129,31 @@ JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
 # stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
 # keeps the band.
 STRAP_NAME = "PINION BRACKET STRAP"
-COLLAR_NAME = "PINION ARBOR RETENTION COLLAR"
 COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
-# Two word rows (rule 7), the first shortened to "BONDED IN" (#2360): the
-# block then ends ~0.169 and leaves the relief diameter room before its
-# shoulder (machinist review of 4657f680 gated a third word row).
-BOND_ZONE_CALLOUT = f"BONDED IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+# Both bond lands link one numbered note (rule 7: a note linked by SEE NOTE n
+# counts as being at the callout).  Rule 26's fit name is "bonded with its
+# LOCTITE grade", and the back land's pocket under the shaft holds no row as
+# wide as "BONDED IN MHA-DT-01," (#1038 r11 machinist review, all 3 runs:
+# its callout without the grade read as a different compound).
+BOND_CALLOUT = "SEE NOTE 3"
 SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
+# Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
+# note says what the spans are, not where (#1038 r9 machinist review, rules
+# 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
+# Note 2 names its mate by number only, to keep it to one row.
 SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. SPANS (2X) OUTSIDE THE JOURNALS: SLIDING FIT IN {COLLAR_NUMBER}\n"
-    f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
-    f"{_inch(COLLAR_CLEARANCE[1])})."
+    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
+    f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
+    f"3. BOND LANDS (2X): BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND}."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -159,7 +169,11 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
-PRINCIPAL_CENTER = (0.200, 0.170)
+# #1038 re-pitch: x 0.200 -> 0.19467.  The view centres on the part, so the
+# 10.668 longer shaft moved the head end 5.334 right; this holds the head end
+# and detail A's fence where they were, and only the back end runs 10.668
+# further left.
+PRINCIPAL_CENTER = (0.19467, 0.170)
 ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
@@ -220,12 +234,12 @@ DONOR_KEEP = {
     "HeadDia": (0.030, 0.215),
 }
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
-# x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
-# their centres (x 0.252 front, 0.099 back) hold whatever the derived land
-# length; only their ends move.  The front land's length rides above the
-# shaft and its diameter hangs below; the back land's are swapped (see
-# BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
-# below the shaft.
+# x = 0.19467 - (z - 111.731) / 1000.  The lands are centred on their straps,
+# so their centres (x 0.2505 front, 0.0875 back) hold whatever the derived
+# land length; only their ends move.  Both lands' ends are stations from the
+# Ø15 head rear face, which stack below the shaft; one 2X diameter hangs
+# above the back land (see BACK_JOURNAL_TEXT_X) and each land's Ra symbol
+# hangs above its own land.
 # SolidWorks centres the view on the part's extent: the anchor sits 0.625
 # aft of the crown-to-crown mid-length (106.725 measured at the 11.5 head),
 # so it follows the head's growth forward at r5 of #1685.
@@ -236,7 +250,7 @@ def _sheet_x(model_z: float) -> float:
     return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
 
 
-# Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
+# The back land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
 # head-side end, and its symbol hangs RA_SHOULDER further head side on a short
 # bent-leader shoulder.  At c6eb7f6f the back symbol hung below the shaft and
 # its shoulder ran through the 199.9 / 19.0 witness there (Main).  Nothing
@@ -246,18 +260,20 @@ def _sheet_x(model_z: float) -> float:
 RA_ARROW_FROM_HEAD_END = 2.0
 RA_SYMBOL_OFFSET = 0.0033
 RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
-# The front land is walled below the shaft by the drum-station witness (x
-# ~0.2458) and the 46.3 station witness at its head end (x ~0.2606), 14.8 mm
-# apart -- narrower than the 16.9 mm symbol.  Hung beside the land at y 0.150
-# its shoulder ran back across the 46.3 witness (audit leader-crosses-line).
-# So the symbol drops UNDER that witness's end (the 46.3 row rises to y 0.140
-# to make room): the ▽ sits right of the witness at y 0.124, 6.6 mm over the
-# 61.05 line, and the shoulder runs left beneath the witness end onto a steep
-# leader that stays inside the pocket, 2.7 mm off the witness and 2.9 mm off
-# the 46.3 arrow. Landing 7 mm in from the head end (x ~0.2533) keeps that
-# leader 7.5 mm clear of the drum-station witness.
-FRONT_RA_ARROW_FROM_HEAD_END = 7.0
-FRONT_RA_XY = (_sheet_x(FRONT_JOURNAL_Z) + 0.0048, 0.124)
+# #1038 ruling (review of 703211d): the front land's crown end prints as its
+# own 2.61 station, whose row runs below the shaft between the 1.82 and 4.20
+# rows, where the front symbol hung (y 0.124, x ~0.2529-0.270): its line
+# would cross the symbol and its leader.  Above the shaft the land is open
+# now that its .79 length is gone, so the front symbol hangs there as the
+# back one does, at the same height: the arrow 2 mm in from the land's
+# crown end, the symbol RA_SYMBOL_OFFSET head side of it over the land.  Its
+# right end (~0.2612) then stands ~3.8 mm left of the collar pin hole's
+# sloping leader at the symbol's top (r6 layout audit: the leader ran
+# (268.2, 170.8) -> (258.7, 215.4) mm) and its left end ~7.6 mm right of the
+# bond-zone diameter's line.
+FRONT_RA_ARROW_FROM_CROWN_END = 2.0
+FRONT_RA_ARROW_Z = FRONT_JOURNAL_Z + JOURNAL_LEN - FRONT_RA_ARROW_FROM_CROWN_END
+FRONT_RA_XY = (_sheet_x(FRONT_RA_ARROW_Z) + RA_SYMBOL_OFFSET, 0.179)
 BACK_RA_XY = (
     _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
     0.179,
@@ -267,28 +283,71 @@ BACK_RA_XY = (
 # on the c6eb7f6f sheet.
 RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
 FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
-# Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
-# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
-# test), and its line stands 1 mm from that point, so its extensions are ~1 mm
-# rather than a run along the flank (Main, 2026-09-24).  The text hangs away
-# from the side its extensions come from: left of the front line, right of the
-# back one.
+# Each 2X diameter's dimension reaches one span; a leadered tag reaches the
+# other (#1038 r9 machinist review, rules 1 and 26: the front journal was
+# marked only by its Ra symbol and the collar span only by note 2's words;
+# a native dimension takes one leader, and neither span has room for a block
+# of its own).  Each tag hangs under the shaft in its span's open pocket,
+# two short rows starting SPAN_TAG_INSET right of the span's crown-side
+# witness, its leader rising to the span's lower flank just right of the
+# text, so it meets the block's right side beside the short SEE row (r12
+# review, rule 14: a landing over the block's middle ran the leader into its
+# left side, through the S).  The front journal's pocket lies between the
+# 2.61 and 1.82 witnesses (x ~0.2408 / ~0.2602, over the 2.61 row's line at
+# ~0.1278), the collar span's between the 1.82 witness and the neck's
+# (x 0.296), over the 1.82 row's text (~0.1372-0.141).
+# key -> (landing z, text, top-left xy).
+SPAN_TAG_ROW_WIDTH = 0.0147  # "NOTE n", six capitals at ~2.45 mm
+SPAN_TAG_TOP_Y = 0.158
+SPAN_TAG_HEIGHT = 0.0112  # two rows, 5.6 mm apart
+SPAN_TAG_INSET = 0.002
+SPAN_TAG_LEADER_GAP = 0.001
+
+
+def _model_z(sheet_x: float) -> float:
+    """Model z of a profile sheet x (the inverse of _sheet_x)."""
+    return MODEL_Z_AT_SHEET_ORIGIN_X - (sheet_x - PRINCIPAL_CENTER[0]) * 1000.0
+
+
+def _span_tag(crown_side_z: float, text: str) -> tuple[float, str, tuple[float, float]]:
+    left = _sheet_x(crown_side_z) + SPAN_TAG_INSET
+    landing_x = left + SPAN_TAG_ROW_WIDTH + SPAN_TAG_LEADER_GAP
+    return (_model_z(landing_x), text, (left, SPAN_TAG_TOP_Y))
+
+
+SPAN_TAGS = {
+    "front_journal": _span_tag(FRONT_JOURNAL_Z + JOURNAL_LEN, "SEE\nNOTE 1"),
+    # Head side of the collar pin station's witness (x ~0.2683, a stub under
+    # the shaft to ~0.1657): from the 1.82 witness the tag and its leader
+    # straddled it (r13 layout audit, text-on-line).
+    "collar_span": _span_tag(PIN_Z, "SEE\nNOTE 2"),
+}
+# The collar span's face: the shaft cylinder whose span holds the tag's
+# landing, head side of the pin hole.
+COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=SPAN_TAGS["collar_span"][0])
+# The back land's 2X diameter (one size for both lands, #1038 ruling) is
+# measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
+# crown-side end (build_pinion_arbor, pinned equal by test), and its line
+# stands 1 mm from that point, so its extensions are ~1 mm rather than a run
+# along the flank (Main, 2026-09-24).  The text hangs away from the side its
+# extensions come from: right of the line.  Under the shaft the front land's
+# own block (r6 of #1038, 703211d) had no open space between its 2.61 and
+# 1.82 station witnesses, 20 mm apart, and above it the collar pin hole's
+# leader closes the land's head side, so the 2X carries both lands as the
+# back stub's carries both spans outside them.
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_LINE_OFFSET = 0.001
-FRONT_JOURNAL_DIA_POINT_X = _sheet_x(
-    FRONT_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
-)
 BACK_JOURNAL_DIA_POINT_X = _sheet_x(
     BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
 )
 # The back land is boxed in below the shaft (the back-crown and overall
-# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
-# leader on its head side), so its diameter hangs ABOVE the shaft, its text
-# right of the line over the land and clear of the back-crown sag witnesses,
-# and its 19.0 length moves below.  The block rides high enough that the
-# back Ra symbol fits under it, over the land; at 0.1945 (r1 of #1685) the
-# one-line callout cleared the Ra text by 2.35 mm, so the two-line one rises
-# to keep its shoulder 2.8 mm over it.
+# witnesses ~8 mm left of its crown end, the land's station witness and the
+# Ra leader on its head side), so its diameter hangs ABOVE the shaft, its
+# text right of the line over the land and clear of the back-crown sag
+# witnesses, and its 19.0 length moves below.  The block rides high enough
+# that the back Ra symbol fits under it, over the land; at 0.1945 (r1 of
+# #1685) the one-line callout cleared the Ra text by 2.35 mm, so the
+# two-line one rises to keep its shoulder 2.8 mm over it.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
 BACK_JOURNAL_DIA_Y = 0.1981
 # Callout blocks, measured on the r1 sheet of #1685: lines 5.6 mm apart, a
@@ -313,26 +372,33 @@ def _diameter_block_size(callout: str) -> tuple[float, float]:
     return (max(width, _callout_width(callout)), height + CALLOUT_LINE_PITCH * lines)
 
 
-# The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
-# measured at 4e97c4d8).  Its line stands on the land 1 mm crown side of its
-# measuring point.
+# A diameter's text hung LEFT of its line overhangs the line by this much
+# (x-0.026 .. x+0.001, measured at 4e97c4d8).
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
-FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
-# The bond-zone diameter stands over the part's witness and hangs its text
-# right of its line BELOW the shaft, in the open run between the back land's
-# head end and the front land's.  Above the shaft (r1 of #1685) the callout
-# no longer fit under detail A.  Its arrows sit inside the flanks
-# (ARROWS_INSIDE): an outside tail would rise into the back Ra symbol over
-# the shaft.  Two callout rows now (r3 had three): one pitch up keeps the
-# block's top, so its witnesses stay short.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
-# The block's widest row starts at its line: on the r2 sheet of #2360
-# (755e192b) "BONDED FIT IN MHA-DT-01," ran 59.3 mm, 2.47 mm a character, so
-# the 20-character "BONDED IN MHA-DT-01," ends ~49.4 mm right of the line.
-BOND_ZONE_CHAR_ADVANCE = 0.00247
-BOND_ZONE_BLOCK_RIGHT_X = BOND_ZONE_TEXT_XY[0] + BOND_ZONE_CHAR_ADVANCE * max(
-    map(len, BOND_ZONE_CALLOUT.split("\n"))
-)
+# The bond-zone diameter (#1038 ruling: its witness now on the front bond
+# land, BOND_ZONE_DIA_FROM_HEAD_REAR) hangs ABOVE the shaft, its line 1 mm
+# crown side of its measuring point so its text hangs LEFT of the line: in
+# the open run between detail A's label and the front land, 5 mm over the
+# shaft and well under the collar pin hole's callout.  Below the shaft (r1
+# of #1685 to r3 of #1038) it sat over the back bond land, where the
+# relief's back-shoulder station must now drop.  Its arrows sit inside the
+# flanks (ARROWS_INSIDE): outside, its lower tail would hang into the
+# station rows under the shaft.
+BOND_ZONE_LINE_X = _sheet_x(BOND_ZONE_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
+BOND_ZONE_TEXT_XY = (BOND_ZONE_LINE_X, 0.1865)
+# A four-place Ø value row runs 31.3 mm (r8 of #1038: the front land's
+# "2X Ø.3125 -.0038" ran 38.0 mm, 6.7 mm of it the 2X); the one-row SEE NOTE
+# 3 under it is narrower, so the block's left end is the value row's.
+DIA_VALUE_ROW_WIDTH = 0.0313
+BOND_ZONE_BLOCK_LEFT_X = BOND_ZONE_LINE_X - DIA_VALUE_ROW_WIDTH
+# The back bond land's diameter hangs BELOW the shaft in the open pocket
+# between the relief's back-shoulder witness (6.80, x ~0.1343) and the back
+# land's (8.25, x ~0.0975), over the 8.25 row (line ~0.1059).  As the front
+# land's, its line stands 1 mm crown side of its measuring point so the text
+# hangs LEFT of it, its block (DIA_VALUE_ROW_WIDTH wide) top 5 mm under the
+# shaft.  Arrows inside, as the front land's.
+BACK_BOND_LINE_X = _sheet_x(BACK_BOND_DIA_Z) - JOURNAL_DIA_LINE_OFFSET
+BACK_BOND_TEXT_XY = (BACK_BOND_LINE_X, 0.1545)
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
 # dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
@@ -346,14 +412,16 @@ BOND_ZONE_BLOCK_RIGHT_X = BOND_ZONE_TEXT_XY[0] + BOND_ZONE_CHAR_ADVANCE * max(
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+    "BackBondReference": (BACK_BOND_DIA_Z, BACK_BOND_DIA_Z + BOND_ZONE_WITNESS_LEN),
     "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
-# The back stub's 2X diameter (line at x ~0.086, between the back crown's
-# rim witness at x 0.0796 and the back land's crown end at x 0.0875) rises
+# The back stub's 2X diameter (line at x ~0.075, between the back crown's
+# rim witness at x ~0.069 and the back land's crown end at x 0.0775) rises
 # above the shaft, past the back land's diameter block (top y ~0.210), into
 # open sheet (round-3/6 PDFs: no line in x 0.040-0.133 over y 0.225-0.260).
 # SolidWorks ran it right of its line in rounds 4, 5 and 6 (x 86.1-124.2 mm,
-# y 228.7-244.7 mm in round 6).
+# y 228.7-244.7 mm in round 6, on the 226.162 shaft: 10.67 mm right of
+# where the #1038 re-pitch's longer shaft puts the back end).
 BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 # The (.05) back-crown sag REF sits over that block.  At y 0.220 (round 6)
 # its dimension line ran at y 217.2 mm and its right arrow tail, 6.4 mm past
@@ -362,8 +430,11 @@ BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 # 14).  Any row under the block's shoulder meets that leader, so the row
 # rises over the block: the line ~2.8 mm under the text position runs at
 # ~250 mm, ~10 mm over the block's "2X" and 21 mm over the leader's top,
-# its text ~11 mm under the sheet's zone border.
-BACK_CAP_SAG_TEXT_XY = (0.055, 0.253)
+# its text ~11 mm under the sheet's zone border.  It stands a fixed run left
+# of the back rim, so it follows the back end (#1038 re-pitch: x 0.055 ->
+# 0.0443).
+BACK_RIM_X = _sheet_x(SHAFT_LEN)
+BACK_CAP_SAG_TEXT_XY = (BACK_RIM_X - 0.0253, 0.253)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -428,8 +499,8 @@ PIN_HOLE_CALLOUT_X = (
 # 3.6 mm arrowheads).
 ARROWS_INSIDE = (
     "PinStationFromHeadRear",
-    "FrontJournalLen",
     "BondZoneDia",
+    "BackBondDia",
     # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
     # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
     # both arrowheads, as the 8 mm bond zone does.
@@ -438,18 +509,21 @@ ARROWS_INSIDE = (
 # #2360: the relief between the bond lands.  Its front shoulder's station
 # from the head rear face (machinist review of 7454ba6d: a chain off the
 # front land left the back shoulder four links from the datum) runs in the
-# stations' rows below the shaft, between the 1.82 and 7.83 rows and under
-# the front land's Ra symbol (tip ~0.124): the line ~2.8 mm under the text
-# position runs at ~0.1185, 6 mm over the 7.83's, its text left of the Ra
-# in the open run under the front land's diameter block.  The relief's
-# length stands above the shaft, under detail A's label, as the journals'
-# lengths do.  Its plain .XX diameter hangs below the shaft, over the
-# station row, measured from the axis to the station witness's shoulder
-# point, its line in the run between the bond-zone block and that shoulder
-# witness.  SolidWorks has set its text 14.3 mm right of the line (r2,
-# 755e192b) and spread over 25.3 mm about it (r5, b6a90da7: x-13.1..+12.2
-# mm); the line stands where either extent clears both neighbours.
-RELIEF_LEN_Y = 0.178
+# stations' rows below the shaft, under the 1.82 and 2.61 rows and over the
+# 8.25's: the line ~2.8 mm under the text position runs at ~0.1185, 6 mm
+# over the 8.25's, its text left of the 2.61 witness in the open run under
+# the front bond land.  Its back
+# shoulder's station (#1038 ruling: the 2.60 length chained off the 4.20,
+# machinist review of 057ffb6) runs in the next row down, where the 8.25
+# stood: above the shaft the collar pin hole's leader crossed it (review of
+# 7c26893, rule 14), so the bond-zone callout moved above instead.  Its
+# plain .XX diameter hangs below the shaft, over the station row, measured
+# from the axis to the station witness's shoulder point, its line in the run
+# between the back shoulder's witness and the front one's.  SolidWorks has
+# set its text 14.3 mm right of the line (r2, 755e192b) and spread over 25.3
+# mm about it (r5, b6a90da7: x-13.1..+12.2 mm); the line stands where either
+# extent clears both neighbours.
+RELIEF_BACK_STATION_TEXT_XY = (0.160, 0.115)
 RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
@@ -457,23 +531,27 @@ RELIEF_DIA_TEXT_EXTENT = (-0.0131, 0.0143)
 RELIEF_DIA_LINE_OFFSET = 0.0155
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
-    "FrontJournalLen": (0.252, 0.188),
-    # Below the shaft, under the back Ra symbol and its leader.
-    "BackJournalLen": (0.097, 0.143),
-    # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
-    # station's text.
-    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
+    # #1038 ruling (review of 703211d): the front land's crown-side end, its
+    # own station from the head rear face, in a row between the 1.82's and
+    # the 4.20's (lines ~0.1372 / ~0.1278 / ~0.1185), its text centred on its
+    # span right of the 1.82's head-end witness (x ~0.2602, which stops at
+    # ~0.1362) and left of the neck-end witness (x 0.296).
+    "FrontJournalEndFromHeadRear": (0.273, 0.1306),
+    # #1038 ruling: the back land's crown-side end, its own station from the
+    # head rear face, in the row under the 8.25 (its line ~0.0996, 2.8 mm
+    # over the 9.35 text), its text clear of every witness below the shaft.
+    "BackJournalEndFromHeadRear": (0.125, 0.1024),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
+    "BackBondDia": BACK_BOND_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
-    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_LEN_Y),
+    "BondReliefBackFromHeadRear": RELIEF_BACK_STATION_TEXT_XY,
     "BondReliefDia": RELIEF_DIA_XY,
-    # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
-    # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
-    # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.
+    # y 0.140: its dimension line at ~0.1372, the top row under the shaft;
+    # its head-end witness stops at ~0.1362, over the 2.61 row's text.
     "FrontJournalFromHeadRear": (0.283, 0.140),
-    "BackJournalFromHeadRear": (0.160, 0.115),
+    "BackJournalFromHeadRear": (0.160, 0.1087),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
@@ -481,11 +559,12 @@ PRINCIPAL_KEEP = {
     "BackCapSagDim": BACK_CAP_SAG_TEXT_XY,
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
-    "BackCapR": (0.045, 0.140),
-    # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
-    # so both its dimensions stand ABOVE the shaft: the station from the head
-    # rear face in a row over the Ø15's, and the hole's leader rising left of
-    # that row's witness, above the 19.0's right arrow tail.  The hole's
+    "BackCapR": (BACK_RIM_X - 0.0353, 0.140),
+    # R1a's collar pin hole (x 0.269) sits inside every head-rear station's
+    # span under the shaft, so both its dimensions stand ABOVE the shaft: the
+    # station from the head rear face in a row over the Ø15's, and the hole's
+    # leader rising left of that row's witness, right of the front Ra symbol.
+    # The hole's
     # underline stands clear above detail A's (3.0): at y 0.222 (pc-r11) it
     # ran 0.7 mm over that text's top and began 0.9 mm right of it, so the
     # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) it
@@ -578,9 +657,9 @@ def _detail_x(model_z: float) -> float:
 
 DIMENSION_CALLOUTS = {
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
-    "FrontJournalDia": JOURNAL_CALLOUT,
     "BackJournalDia": JOURNAL_CALLOUT,
-    "BondZoneDia": BOND_ZONE_CALLOUT,
+    "BondZoneDia": BOND_CALLOUT,
+    "BackBondDia": BOND_CALLOUT,
     "BackStubDia": SPAN_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
@@ -607,14 +686,10 @@ PRINTED_PRECISION_BY_NAME = {
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
-# Each land's Ra symbol hangs off one flank on the land's head side of its
-# diameter line, clear of the split-line rings at the land ends.
+# Each land's Ra symbol hangs off its upper flank over the land, clear of the
+# split-line rings at the land ends.
 JOURNAL_FINISHES = {
-    "front_journal": (
-        FRONT_JOURNAL_Z + FRONT_RA_ARROW_FROM_HEAD_END,
-        FRONT_RA_XY,
-        "lower",
-    ),
+    "front_journal": (FRONT_RA_ARROW_Z, FRONT_RA_XY, "upper"),
     "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),
 }
 
@@ -656,6 +731,34 @@ def _journal_finish_picks(
         )
         landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
         picks[key] = (faces[key], landing, symbol_xy)
+    return picks
+
+
+def _span_tag_picks(
+    adapter: Any, view: Any
+) -> dict[str, tuple[Any, tuple[float, float], str, tuple[float, float]]]:
+    """Each SPAN_TAGS target: ``(span face, lower-flank landing, text, xy)``.
+
+    The faces resolve on the part the view references, as the Ra targets do
+    (:func:`_journal_finish_picks`): the front journal's is its Ra control's.
+    """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    front = surface_finish_by_key(SURFACE_FINISHES, "front_journal").face
+    faces = resolve_faces(
+        document, {"front_journal": front, "collar_span": COLLAR_SPAN_FACE}
+    )
+    picks = {}
+    for key, (station_z, text, note_xy) in SPAN_TAGS.items():
+        land_x, axis_y = model_point_in_view(
+            adapter,
+            view,
+            (0.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} tag station",
+        )
+        landing = (land_x, axis_y + FLANK_SIGN["lower"] * SHAFT_DIA / 2000.0)
+        picks[key] = (faces[key], landing, text, note_xy)
     return picks
 
 
@@ -1429,6 +1532,25 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"arbor {key} finish",
             entity_type="FACE",
             char_height=0.0025,
+        )
+    tags = _span_tag_picks(adapter, principal)
+    for key, (face, landing, text, note_xy) in tags.items():
+        # The part's face is not IsSame to its drawing-view selection (r10
+        # leaf: "selection changed before landing"); the tag is held to the
+        # view's own face, as add_surface_finish holds its symbol.
+        view_face = _select_view_entity(
+            adapter, principal, "FACE", None, label=f"arbor {key} tag", entity=face
+        )
+        add_attached_note(
+            adapter,
+            principal,
+            text=text,
+            entity=face,
+            attached_to=view_face,
+            entity_type="FACE",
+            leader_attach_xy=landing,
+            note_xy=note_xy,
+            label=f"arbor {key} tag",
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
