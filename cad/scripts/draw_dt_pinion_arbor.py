@@ -56,6 +56,8 @@ from dt_pinion_arbor_pin_spec import PIN_NUMBER as _PIN_NUMBER
 from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
+    BOND_RELIEF_LEN,
+    BOND_RELIEF_Z,
     BOND_ZONE_DIA_Z,
     CROSSROD_NUMBER,
     DRUM_NUMBER,
@@ -106,10 +108,11 @@ JOURNAL_CLEARANCE = (
 )
 JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
-# drum's span between the journals (the drum, 2.40-8.04 from the head rear
-# face, rests on both lands' inner ends:
-# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) is its bonded fit, reason
-# once at its callout.  The two spans outside the journals (the collar's, by
+# drum's two bond lands either side of the relief (#2360; the drum, 2.40-8.04
+# from the head rear face, rests on both journals' inner ends:
+# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) are its bonded fit, sized
+# by one 2X diameter with its reason once at its callout.  The two spans
+# outside the journals (the collar's, by
 # the head, with its pin hole; the back stub) take the same -.0004/-.0038:
 # MHA-DT-33 slides over both from the back crown to its pin station, the
 # band's upper limit its slide-on clearance
@@ -126,7 +129,10 @@ COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
-BOND_ZONE_CALLOUT = f"BONDED FIT IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
+# Two word rows (rule 7), the first shortened to "BONDED IN" (#2360): the
+# block then ends ~0.169 and leaves the relief diameter room before its
+# shoulder (machinist review of 4657f680 gated a third word row).
+BOND_ZONE_CALLOUT = f"BONDED IN {DRUM_NUMBER},\n{RETAINING_COMPOUND}"
 SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
@@ -320,6 +326,13 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # the shaft.  Two callout rows now (r3 had three): one pitch up keeps the
 # block's top, so its witnesses stay short.
 BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474 + 0.0028)
+# The block's widest row starts at its line: on the r2 sheet of #2360
+# (755e192b) "BONDED FIT IN MHA-DT-01," ran 59.3 mm, 2.47 mm a character, so
+# the 20-character "BONDED IN MHA-DT-01," ends ~49.4 mm right of the line.
+BOND_ZONE_CHAR_ADVANCE = 0.00247
+BOND_ZONE_BLOCK_RIGHT_X = BOND_ZONE_TEXT_XY[0] + BOND_ZONE_CHAR_ADVANCE * max(
+    map(len, BOND_ZONE_CALLOUT.split("\n"))
+)
 # The bond-zone reference sketch is part-hidden; the profile shows it for its
 # dimension's import, and it ends on a short construction witness lying ON
 # the lower Ø5/16 outline.  The view paints that witness construction grey over
@@ -413,7 +426,36 @@ PIN_HOLE_CALLOUT_X = (
 # #1685: the 38.0's head-end tail ran under the pin hole's leader); each is
 # set inside, where its span has room (the bond zone's 8 mm takes its two
 # 3.6 mm arrowheads).
-ARROWS_INSIDE = ("PinStationFromHeadRear", "FrontJournalLen", "BondZoneDia")
+ARROWS_INSIDE = (
+    "PinStationFromHeadRear",
+    "FrontJournalLen",
+    "BondZoneDia",
+    # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
+    # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
+    # both arrowheads, as the 8 mm bond zone does.
+    "BondReliefDia",
+)
+# #2360: the relief between the bond lands.  Its front shoulder's station
+# from the head rear face (machinist review of 7454ba6d: a chain off the
+# front land left the back shoulder four links from the datum) runs in the
+# stations' rows below the shaft, between the 1.82 and 7.83 rows and under
+# the front land's Ra symbol (tip ~0.124): the line ~2.8 mm under the text
+# position runs at ~0.1185, 6 mm over the 7.83's, its text left of the Ra
+# in the open run under the front land's diameter block.  The relief's
+# length stands above the shaft, under detail A's label, as the journals'
+# lengths do.  Its plain .XX diameter hangs below the shaft, over the
+# station row, measured from the axis to the station witness's shoulder
+# point, its line in the run between the bond-zone block and that shoulder
+# witness.  SolidWorks has set its text 14.3 mm right of the line (r2,
+# 755e192b) and spread over 25.3 mm about it (r5, b6a90da7: x-13.1..+12.2
+# mm); the line stands where either extent clears both neighbours.
+RELIEF_LEN_Y = 0.178
+RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
+RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
+RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
+RELIEF_DIA_TEXT_EXTENT = (-0.0131, 0.0143)
+RELIEF_DIA_LINE_OFFSET = 0.0155
+RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # Below the shaft, under the back Ra symbol and its leader.
@@ -424,6 +466,9 @@ PRINCIPAL_KEEP = {
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackStubDia": BACK_STUB_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
+    "BondReliefFromHeadRear": RELIEF_STATION_TEXT_XY,
+    "BondReliefLen": ((RELIEF_FRONT_X + RELIEF_BACK_X) / 2.0, RELIEF_LEN_Y),
+    "BondReliefDia": RELIEF_DIA_XY,
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
     # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
     # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.

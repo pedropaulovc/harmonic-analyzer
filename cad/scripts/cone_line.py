@@ -56,15 +56,15 @@ Z_DRUM0 = _config.machine("channels", "station_z0_mm")
 DRUM_FACE = 2.9972  # MHA-DT-12 face width, .118 (dt_cylinder_gear_spec.FACE_WIDTH)
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the contact
-# azimuth; the edge slack is the T120 set point above the standard centre
-# (cone_set_stack, user ruling 2026-10-10).
+# azimuth; the edge slack is the CAD placement above the standard centre (the
+# feel set runs tighter, cone_set_stack, owner direction 2026-11-11).
 # The ideal (N+2)/DP tip below is a retained PLACEMENT REFERENCE, not current
 # material. Actual 120T/32T tooth-tip caps and physical envelopes come from
 # dt_cylinder_gear_spec / dt_alignment_pinion_spec and their stock-form profiles.
 DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
-# CAD placement of the set: at assembly the pedestals are shimmed to the cone
-# line, T120 is swung in onto its radial feeler (standard clearance + edge
-# slack) and the cone-lock-knob is locked; every other cone follows the swing.
+# CAD placement of the set: at assembly the cone set is swung in and locked
+# by feel where the gears do not bind; the CAD draws every cone at standard
+# clearance + edge slack.
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
 )  # cad/config/tolerances/cone_drum_oblique_mesh.yaml

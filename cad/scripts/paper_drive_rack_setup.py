@@ -1,9 +1,11 @@
 """The paper-drive feed-rack datum setup and its closed-form gates.
 
 The builder refuses a model whose rack pitch line, mesh or engaged-feed window
-leaves these bands, and MHA-PD-00 prints the same bands
-(``pd_paper_drive_assembly_steps``). Owned here, not by the steps module, so
-the assembly's recipe carries the setup it gates on and never the sheet text.
+leaves these bands. The datum backlash band is a design proof only: MHA-PD-00
+prints the engaged-feed window but sets and accepts the mesh on function
+(``pd_paper_drive_assembly_steps``, #2416). Owned here, not by the steps
+module, so the assembly's recipe carries the setup it gates on and never the
+sheet text.
 The frozen finite-rack reader requires the exact source-derived measured-datum
 physical stack. Its configured operating-domain wrapper additionally guards
 the actual cut ends and the entire located, graded recording-paper sweep;

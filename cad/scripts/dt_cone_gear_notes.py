@@ -77,11 +77,11 @@ def gear_data(teeth: int) -> str:
     mesh = dt_mesh_checks.cone_check(teeth)
     inch = spec.inch_text
     # Conservative reference reporting: round the backlash range and web
-    # outward. These rows do not replace native toleranced sizes. Backlash is
-    # the set-at-assembly mesh's RSS band about its nominal (dt_mesh_checks).
-    spread = mesh.backlash_nominal_mm - mesh.backlash_rss_mm
-    minimum = spec.inch_grid_mm(mesh.backlash_rss_mm, 3, math.floor)
-    maximum = spec.inch_grid_mm(mesh.backlash_nominal_mm + spread, 3, math.ceil)
+    # outward. These rows do not replace native toleranced sizes. Backlash
+    # runs from the feel set's floor (no bind) to the loosest running centre
+    # (dt_mesh_checks, owner direction 2026-11-11).
+    minimum = spec.inch_grid_mm(max(0.0, mesh.backlash_floor_mm), 3, math.floor)
+    maximum = spec.inch_grid_mm(mesh.backlash_max_mm, 3, math.ceil)
     web = spec.inch_grid_mm(root_to_bore_web_min_mm(teeth), 4, math.floor)
     whole_depth_max = spec.inch_grid_mm(max(
         corner.blank_radius_mm - corner.root_radius_min_mm
@@ -107,8 +107,8 @@ def gear_data(teeth: int) -> str:
         ("TOOTH FORM", TOOTH_FORM),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
         # The fit route of the tip, thickness and root bands (drawing-
-        # guidelines "What the shop holds"): the cone mesh is set at assembly,
-        # so its backlash is accepted there, inside the mesh's RSS budget.
+        # guidelines "What the shop holds"): the cone mesh is set by feel at
+        # assembly, so its backlash is accepted there, from no binding up.
         ("BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).

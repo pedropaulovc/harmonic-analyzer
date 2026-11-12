@@ -149,7 +149,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "DROPS INTO ALL FIVE GEARS",
             "250 DEG C",
             "SPIGOT, PIVOT",
-            "REDO FROM 1M.",
+            "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",
         ),
     )

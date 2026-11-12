@@ -717,7 +717,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 8.7122,
             ),
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
-                3.175, 3.1496, 7.9375
+                3.21564, 3.2004, 7.366
             ),
             # MHA-PD-VN-64 3/32 (Ø2.38125) dowels pressed into the arm's Ø2.3622
             # through reams, the 5/16 stock less the 1.7018 proud set.
@@ -943,11 +943,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # more, so a thinner stretch of the taper sits in both receivers.
     assert 111.5 < crank_allowed[hub_pair] < 112.3
     assert 54.8 < crank_allowed[shaft_pair] < 55.3
-    # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.9558 ream
-    # through both top-notch cheeks (6.35 bar less the .124 notch), and
-    # MHA-CH-10: the same pin pressed into its rod's Ø1.9558 fork ream through
-    # both tines (.240 fork less the .106 slot); channel j's pin with
-    # channel j's bar or rod only. MHA-CH-VN-53: each #4-40 apex set screw's
+    # MHA-SH-VN-58: each 5/64 BarPin pressed into its bar's Ø1.9558 ream
+    # through both top-notch cheeks (6.35 bar less the .124 notch), and each
+    # RodPin into its rod's Ø1.9558 fork ream through both tines (.240 fork
+    # less the .106 slot); channel n's RodPin (instance 2n - 1) and BarPin
+    # (2n) with channel n's rod or bar only. MHA-CH-VN-53: each #4-40 apex set screw's
     # thread in its MHA-CH-08 ear's tap, over the 9.80 apex (R8 arch lifted
     # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
     # screw n in bracket n.
@@ -958,13 +958,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         {
             **{
                 frozenset(
-                    (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
+                    (f"sh-vn-pivot-pin-{2 * n}", f"ch-amplitude-bar-{n}")
                 ): _annulus_limit(1.984375, 1.9558, 6.35 - 3.1496)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
-                    (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
+                    (f"sh-vn-pivot-pin-{2 * n - 1}", f"ch-connecting-rod-{n}")
                 ): _annulus_limit(1.984375, 1.9558, 6.096 - 2.6924)
                 for n in range(1, 21)
             },

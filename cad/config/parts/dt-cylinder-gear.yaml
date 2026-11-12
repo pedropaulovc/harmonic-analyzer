@@ -10,7 +10,12 @@ dt-cylinder-gear:
   # the integral cam OD is additionally a cam_follower_contact bearing surface
   # for the connecting-rod strap (cam dims/provenance in build_dt_cylinder_gear.py).
   fit_class: gear_mesh
-  process: "gear cutting: 120T 48DP PA20 with the finite 55T stock form cutter and integral custom eccentric cam"
+  process: "gear cutting: 120T 48DP PA20 with the finite 55T stock form cutter and integral custom eccentric cam; matched set of 20: finish-face gears 0-19 in order, each to .2778 less the running sum of the earlier gears' miced deviations from .2778, inside its printed .2778 +/-.0010; a replacement gear is faced to the set's shortfall"
+  # Owner ruling 2026-11-11 (#2362, option g): the 20-gear stack meets its
+  # MHA-DT-00 step 8E window (5.553-5.560) because each gear absorbs the
+  # earlier gears' deviations while the band, the window and the guards stay
+  # as they are; steps 8F-8G (re-face the thickest, remake the thinnest)
+  # remain the fallback.
   # OutsideDia uses the shared standard 0/-.004 in tip grade at .XXX.
   # Boston Y48120 is a pitch/count rim candidate, not this cutter-native composite:
   # face, bore/hub, actual flank and cam attachment require separate qualification.

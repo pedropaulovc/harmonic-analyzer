@@ -299,7 +299,7 @@ sections:
       pivot 75 mm below the crankshaft axis with the grip axis parallel to the shaft.
 - heading: Chapter 12 — Cone Gear Set (pp. 16–21)
   elements:
-  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, with actual finite stock/custom cutter authority rather than ideal actual-count involutes. Historical photo measurements and prior reconstruction choices remain identified as such, not current cutting dimensions. T006 is cut by the custom DT6-FORM1 finite N6PA20 tool, option (a) (user ruling 2026-10-10): root R1.10, a drum-tip trochoid relief below the true-involute start, tool thickness 0.872 and blank Ø4.31, on the 1/32 in terminal journal. The cone centre is set at assembly on T120 (cone_set_stack); cones T012..T120 are accepted at nominal contact ratio >= 1.0 with no binding and no interference at the RSS corner (RSS contact ratio and arithmetic worst-corner interference are REF). T006 is pending exception ruling #971: relief >= 10 um clear of every drum-tip path, backlash >= 0.02, contact ratio REF (~0.77).'
+  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, with actual finite stock/custom cutter authority rather than ideal actual-count involutes. Historical photo measurements and prior reconstruction choices remain identified as such, not current cutting dimensions. T006 is cut by the custom DT6-FORM1 finite N6PA20 tool, option (a) (user ruling 2026-10-10): root R1.10, a drum-tip trochoid relief below the true-involute start, tool thickness 0.872 and blank Ø4.31, on the 1/32 in terminal journal. The cone centre is set by feel at assembly where the gears do not bind (owner direction 2026-11-11, #2365; cone_set_stack); cones T012..T120 are accepted at nominal contact ratio >= 1.0 at the loosest centre a feel set leaves them, the feel set itself keeping backlash >= 0 at the tightest gear (the printed-corner contact ratio there is REF). T006 is pending exception ruling #971: relief >= 10 um clear of every drum-tip path at the loosest feel set and running centres, contact ratio REF (~0.77).'
   - table:
       columns:
       - dim
@@ -537,12 +537,12 @@ sections:
       64T gear's solid root and the engaged alignment-pinion drum.
       dt_cylinder_end_disc_clearance derives the reduced disc's arithmetic
       worst-case envelopes from the actual printed size limits, the 64T's
-      chamfer-shortened bore support, T120 feeler/set and seat floats, tooth
+      chamfer-shortened bore support, the feel set's swing departure and seat floats, tooth
       runout, compensated south datum and all disc tilt permitted by its bore.
-      The 64T separating-plane air is 0.553834 mm, the engaged pinion's
-      enclosing-sphere radial air 3.496162 mm; both exceed 0.10 running air
+      The 64T separating-plane air is 0.667328 mm, the engaged pinion's
+      enclosing-sphere radial air 3.738593 mm; both exceed 0.10 running air
       plus 0.25 spare. Minimum projected retaining land beyond the farthest
-      accepted rod-ring bore edge is 2.549601 mm. Covering the entire ring
+      accepted rod-ring bore edge is 2.954126 mm. Covering the entire ring
       outer rim is neither required nor claimed; continuous axial capture is.
       All 20 cone gears share the drive axis: their maximum printed tip radius
       is 32.175 mm (T120), below the 64T's 35.570 mm maximum by 3.395 mm.
@@ -638,7 +638,7 @@ sections:
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear pitch section crosses x = −92.703856638 at the reference contact azimuth; X_PITCH follows drum x −60.393602135 and the retained placement contract, not a finite-tool tooth-tip boundary'
-        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference; ADDENDUM and WORKING_DEPTH are pitch-based references. Reference depth 1.058333333 mm, edge slack 0.20 mm (the T120 set point above standard, cone_set_stack), drum face 3.0 mm and incline 13.0011073536895° place the family. Actual material tips, finite support and contact domains belong to the gear specs and stock_form_cutter; the placement identity is not mesh qualification.'
+        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference; ADDENDUM and WORKING_DEPTH are pitch-based references. Reference depth 1.058333333 mm, edge slack 0.20 mm (the CAD placement above standard; the feel set runs tighter, cone_set_stack), drum face 3.0 mm and incline 13.0011073536895° place the family. Actual material tips, finite support and contact domains belong to the gear specs and stock_form_cutter; the placement identity is not mesh qualification.'
         - low
       - - Cone big-end (T120) gear centre
         - '(x, z) = (−123.639968152, −56.869618342) = (X_PITCH − 31.75 cos i, Z_DRUM0 + 31.75 sin i)'
@@ -781,7 +781,7 @@ sections:
       - - Ring / shank / fork thickness
         - 2.175 / 2.175 / 6.075 (REF) mm; ring faces 1.950 / 4.125 ±0.05, tines 1.700 ±0.05, slot 2.675 ±0.05, all from one fork face; one mid-plane (the cam plane = the arm plane)
         - —
-        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.175, both faces located ±0.05 from the fork''s datum face (#982; was 2.200 at three places symmetric to the slot within 0.10, #948 ruling R, PR #1292): the thinnest cam slot then floats the ring ±0.85, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Tines 1.700 ±0.05 either side of a 2.675 ±0.05 slot, so the fork over the tines is 6.075 REF (Main ruling 2026-10, option b; #982): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.65 MIN (rule-20 shortfall against the 2.0 wall target; the ch14 fan photo shows cheeks thinner than the 2.5 arm), 0.48 MIN to the neighbouring fork with both straps off their hubs and both pin ends flush (0.35 floor; `ch_rod_pivot_pin_spec.BUDGET`)'
+        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.175, both faces located ±0.05 from the fork''s datum face (#982; was 2.200 at three places symmetric to the slot within 0.10, #948 ruling R, PR #1292): the thinnest cam slot then floats the ring ±0.85, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Tines 1.700 ±0.05 either side of a 2.675 ±0.05 slot, so the fork over the tines is 6.075 REF (Main ruling 2026-10, option b; #982): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.65 MIN (rule-20 shortfall against the 2.0 wall target; the ch14 fan photo shows cheeks thinner than the 2.5 arm), 0.48 MIN to the neighbouring fork with both straps off their hubs and both pin ends flush (0.35 floor; `sh_vn_pivot_pin_rod_spec.BUDGET`)'
         - derived
         - med
       - - Shank width
@@ -793,7 +793,7 @@ sections:
       - - Fork (Y-shaped upper end)
         - 10 wide, full-round crown R5 on the pin, root step 13 below the pin; slot 2.675 ±0.05 with its floor 9.75 below the pin; Ø1.968 +0.010/0 pin hole reamed through both tines
         - —
-        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.21 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-10 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is pressed into both reamed tines, ends dressed flush, as the MHA-CH-11 bar pin (user ruling 2026-10-09, PR #1292 review F1: a countersink for a peened end left 0.92 of tine land, under the drawing-guidelines.md rule 17 (walls and webs) 1.5 floor; reverses the issue #746 peening choice): a RECONSTRUCTION choice, not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
+        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.21 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-SH-VN-58 RodPin (bought 5/64 dowel, McMaster 90145A299) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is pressed into both reamed tines, ends dressed flush, as its BarPin member is in the bar (user ruling 2026-10-09, PR #1292 review F1: a countersink for a peened end left 0.92 of tine land, under the drawing-guidelines.md rule 17 (walls and webs) 1.5 floor; reverses the issue #746 peening choice): a RECONSTRUCTION choice, not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
         - measured/derived
         - med
   - prose: |2
@@ -973,7 +973,7 @@ sections:
       - - Top notch height
         - 14.0 mm
         - '0.551'
-        - 'legacy TopNotchHeight 1/2"; deepened so the roof clears the 11.0 lever turned 10.3° on its pin at the printed bands (ch_bar_pivot_pin_spec notch_roof_clearance_min)'
+        - 'legacy TopNotchHeight 1/2"; deepened so the roof clears the 11.0 lever turned 10.3° on its pin at the printed bands (sh_vn_pivot_pin_bar_spec notch_roof_clearance_min)'
         - derived
         - med
       - - Top pin hole
@@ -1857,7 +1857,7 @@ sections:
         - scaled
         - med
       - - Transgear pin, bushings and ring (MHA-PD-23..25 and MHA-PD-VN-61, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
-        - 'plain steel pin `pd-transgear-pin` (MHA-PD-23, Ø.125 +.0000/-.0002) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.4625; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-24, printed length); steel feed sleeve MHA-PD-10, with .125 REAM_SLIDE bore (+.0015/+.0010) and step seating the hub''s Ø.501 spigot (+.0000/-.0008); the 150T disc pilots on that spigot, clamped by the hub flange, while the hub''s Ø.313 bore (+.0010/+.0005) and D-flat mate with the sleeve boss; brass `pd-transgear-front-bushing` (MHA-PD-25, printed length) on the sleeve nose; side-mount ring `pd-vn-transgear-retaining-ring` (MHA-PD-VN-61, McMaster 97431A240) in the pin''s groove. Between the arm front face and the rear bushing, 0 to 5 McMaster 94773A606 .005 shims `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; the model carries 2) set the end float at MHA-PD-00 (owner ruling 2026-11-01, #2038, superseding the 2026-10-28 nothing-faced stack): the fitter reads the ring gap against VIEW E''s window, the disc end float is `transgear_cluster_fit.END_FLOAT_RANGE`, and collar-to-disc air is accepted at assembly by the full-turn inspection (model: cluster rearward).'
+        - 'plain steel pin `pd-transgear-pin` (MHA-PD-23, journal Ø.125 +.0000/-.0002) pressed from the rear into the arm''s .126 +.0005/0 ream at S by its (Ø.1266) REF press land, .29 long under the head and turned to the measured ream for .0002-.0005 interference; the journal passes the ream clear (#2415). Its domed head is seated on the arm''s rear face −116.4625; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-24, printed length); steel feed sleeve MHA-PD-10, with .125 REAM_SLIDE bore (+.0015/+.0010) and step seating the hub''s Ø.501 spigot (+.0000/-.0008); the 150T disc pilots on that spigot, clamped by the hub flange, while the hub''s Ø.313 bore (+.0010/+.0005) and D-flat mate with the sleeve boss; brass `pd-transgear-front-bushing` (MHA-PD-25, printed length) on the sleeve nose; side-mount ring `pd-vn-transgear-retaining-ring` (MHA-PD-VN-61, McMaster 97431A240) in the pin''s groove. Between the arm front face and the rear bushing, 0 to 5 McMaster 94773A606 .005 shims `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; the model carries 2) set the end float at MHA-PD-00 (owner ruling 2026-11-01, #2038, superseding the 2026-10-28 nothing-faced stack): the fitter reads the ring gap against VIEW E''s window, the disc end float is `transgear_cluster_fit.END_FLOAT_RANGE`, and collar-to-disc air is accepted at assembly by the full-turn inspection (model: cluster rearward).'
         - —
         - 'ruling R9-68 (rev 5, candidate B); `pd_transgear_pin_spec`, `transgear_cluster_fit`, `pd_transgear_rear_bushing_spec`, `pd_transgear_front_bushing_spec`, `pd_vn_transgear_retaining_ring_spec`; ch23 p.59 page002_img04'
         - derived
