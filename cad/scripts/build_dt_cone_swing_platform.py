@@ -17,10 +17,11 @@ only limits the disengaged swing and plays no part in meshing.
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
 side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
-protrusion); the open LOCK NOTCH cuts straight into the west edge. The
-four plan corners are rounded, echoing the hardware each sits beside
-(pivot screw head at the north end, the green column at the south-east,
-the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
+protrusion); the open LOCK NOTCH cuts straight into the west edge. Three
+plan corners are rounded, echoing the hardware each sits beside (pivot
+screw head at the north end, the lock-knob head at the south-west); the
+south-east corner is chamfered 1.04 x .34 so the swung plate clears the
+green column there (#1038). A native close-clearance Ø6.756 pivot
 hole clears the stock Ø6.35 shoulder. A 10.50-wide x 0.25-deep top relief,
 round-ended about the pivot and open through the north edge (drawing-guidelines.md rule 17 (walls and webs) W18),
 reduces only the local bearing thickness to 6.10, preserving 0.25 running
@@ -103,6 +104,11 @@ from dt_cone_swing_platform_crank_axis import (
 )
 from dt_cone_swing_platform_geometry import (
     PLATE_CORNERS,
+    ROUNDED_CORNERS,
+    SE_CHAMFER_EAST_XZ,
+    SE_CHAMFER_RISE,
+    SE_CHAMFER_RUN,
+    SE_CHAMFER_SOUTH_XZ,
     EAST_HALF_S,
     HALF_WIDTH_N,
     NORTH_OVERHANG,
@@ -462,6 +468,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "WestHalfS", f"{WEST_HALF_S}mm")
     await set_global(adapter, "PlateLen", f"{PLATE_LEN}mm")
     await set_global(adapter, "NorthOverhang", f"{NORTH_OVERHANG}mm")
+    await set_global(adapter, "SeChamferRun", f"{SE_CHAMFER_RUN}mm")
+    await set_global(adapter, "SeChamferRise", f"{SE_CHAMFER_RISE}mm")
     # The pivot hole remains a native Hole Wizard 1/4 close-clearance feature;
     # its diameter and callout come from the table rather than a model global.
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
@@ -893,10 +901,63 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "tip dowel axis")
 
+    # South-east corner chamfer (#1038): a triangle through the sharp corner,
+    # the chamfer's start on the south edge and its end on the east edge,
+    # cut through.  The two printed legs are the run along the south edge
+    # from the sharp corner and the rise square to it; the end's set-back
+    # along the taper follows from them by equation, so the triangle's east
+    # side stays on the plate's east edge.  Sketch (x, y) -> part (X, -Z).
+    chamfer = SketchDims()
+    check("create_sketch south-east chamfer", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    chamfer_pts = [
+        (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),
+        (SE_CHAMFER_SOUTH_XZ[0], -SE_CHAMFER_SOUTH_XZ[1]),
+        (SE_CHAMFER_EAST_XZ[0], -SE_CHAMFER_EAST_XZ[1]),
+    ]
+    chamfer_lines = await add_line_chain(adapter, chamfer_pts)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(
+        adapter,
+        chamfer_lines,
+        chamfer_pts,
+        label="south-east chamfer",
+        dims=chamfer,
+        names=[
+            "CornerSEX",
+            "CornerSEZ",
+            "CornerSERun",
+            "CornerSEBack",
+            "CornerSERise",
+        ],
+        drives=[
+            '"EastHalfS"',
+            '"PlateLen" - "NorthOverhang"',
+            '"SeChamferRun"',
+            '"SeChamferRun" - "SeChamferRise" * ( "EastHalfS" - "HalfWidthN" ) / "PlateLen"',
+            '"SeChamferRise"',
+        ],
+    )
+    await ensure_fully_defined(adapter, "south-east chamfer sketch")
+    check("exit_sketch south-east chamfer", await adapter.exit_sketch())
+    name_last_feature(adapter, "CornerSEProfile")
+    drive_jobs += chamfer.apply(adapter, "CornerSEProfile")
+    check(
+        "cut south-east chamfer",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "CornerSE")
+    v_chamfer = SE_CHAMFER_RUN * SE_CHAMFER_RISE / 2.0 * PLATE_T
+    volume = await volume_check(
+        adapter, "south-east chamfer", volume - v_chamfer, 0.01 * v_chamfer
+    )
+
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
     v_fillets = 0.0
-    for lbl, cx_a, cz_l, r in PLATE_CORNERS:
+    for lbl, cx_a, cz_l, r in ROUNDED_CORNERS:
         check(
             f"fillet corner {lbl}",
             await adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),

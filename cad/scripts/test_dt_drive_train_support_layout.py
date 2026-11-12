@@ -802,12 +802,11 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
         collar.LENGTH_FITTED_MIN <= paper.KNOB_COLLAR_FITTED_LENGTH <= collar.LENGTH_FITTED_MAX
     )
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot runs from the seat face; the body runs on to the boss's
-    # south face (owner ruling D1: no washer).
-    assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(crank_seat + cs.SPIGOT_LENGTH)
+    # The spigot runs from the seat face to the boss's south face (owner
+    # ruling D1: no washer).
     assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.0254)
-    body = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank collar body")
-    assert body[:3] == (drive.CRANK_SPIGOT_FRONT_Z, drive.CRANK_COLLAR_Z1, cs.COLLAR_DIA)
+    spigot = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank seat spigot")
+    assert spigot[:3] == (crank_seat, drive.CRANK_COLLAR_Z1, cs.SPIGOT_DIA)
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-183.0 + 25.146)
     assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST > 0.0
     # Negative control: the first seat (-152.5) against the moved collar.

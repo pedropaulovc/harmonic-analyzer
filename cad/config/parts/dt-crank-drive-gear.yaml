@@ -7,6 +7,6 @@ dt-crank-drive-gear:
   tolerance_class: machined_block
   fit_class: gear_mesh
   drawing_unit: in
-  process: "gear cutting: normal-24DP PA20 straight teeth inclined 13 deg right hand, finite 55T normal stock form, plain indexing, dividing head tilted 13 deg"
-  # Owner ruling 2026-11-10 (#2332, option A) supersedes the true right-hand helix (lead 37.239 in/rev): straight teeth inclined 13.0011 deg, cutter centre plane crossing the axis .07 in from the south face.
-  # Cutter #2 uses its actual 55T stock form, not an ideal 69.185T virtual flank.
+  process: "gear cutting: normal-24DP PA20 straight teeth inclined 12 deg right hand, finite 55T normal stock form, plain indexing, dividing head tilted 12 deg"
+  # Owner ruling 2026-11-10 (#2332, option A): straight teeth inclined at the cone incline (12.0247 deg), cutter centre plane crossing the axis .07 in from the south face.
+  # Cutter #2 uses its actual 55T stock form, not an ideal 68.405T virtual flank.

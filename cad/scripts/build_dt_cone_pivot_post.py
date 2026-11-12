@@ -642,7 +642,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, True)
     # Top-plane sketch X is model +X; sketch Y is model -Z, so the crank boss
-    # (model -21.3753..+50.6591 along +Z) runs from sketch +Y down to -Y.
+    # (model -21.3868..+50.6476 along +Z) runs from sketch +Y down to -Y.
     #
     # Every line here is a RAY ROOTED AT THE ORIGIN, which is the post axis:
     # that is how the shop stations these faces, and it is also the only

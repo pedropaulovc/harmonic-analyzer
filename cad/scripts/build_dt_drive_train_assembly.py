@@ -522,7 +522,8 @@ import dt_vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 import _sprocket_seat_geometry as seat_geometry  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
-    COLLAR_DIA,
+    COLLAR_LENGTH,
+    COLLAR_LENGTH_MIN,
     COLLAR_REAR,
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_FLOOR,
@@ -531,9 +532,6 @@ from dt_crankshaft_spec import (  # noqa: E402
     SEAT_COLLAR_BAND,
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
     SPIGOT_DIA,
-    SPIGOT_END,
-    SPIGOT_LENGTH,
-    SPIGOT_LENGTH_TOL,
     WHEEL_SEAT_FLOAT,
 )
 from dt_crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
@@ -592,11 +590,10 @@ if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
 # Behind the seat: the integral collar, its rear face on the post boss's
 # south face (owner ruling D1, 2026-10-15: no crank-seat washer).
 CRANK_COLLAR_Z1 = CRANKSHAFT_Z0 + COLLAR_REAR
-# The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
-# body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
-# the hub rear face.  Both let the #25 plates wrapping the crank sprocket pass inside
-# the collar/barrel diameters (Main's ruling, 2026-09-30).
-CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
+# The collar is one Ø17.5 seat spigot (SEAT_FACE_Z..CRANK_COLLAR_Z1) ahead of
+# the post boss; the hub's rear Ø16.5 relief runs from its barrel's rear
+# shoulder to the hub rear face.  Both let the #25 plates wrapping the crank
+# sprocket pass inside the boss/barrel diameters (Main's ruling, 2026-09-30).
 CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.65
 # Chain-plate clearance: the plate's inner edge against the spigot
 # (print-worst, largest) and the hub relief, radially, for the CAD link and a
@@ -682,14 +679,13 @@ if abs(CHAIN_BARREL_AXIAL_AIR - _STACK_A_MODELLED) > 1e-9:
 CRANK_HUB_SPROCKET_AIR_PRINT_WORST = (
     _SEAT_FACE_Z_WORST - (seat_geometry.PLATE + max(seat_geometry.PLATE_BAND))
 ) - _HUB_REAR_Z_WORST  # 0.10
-# C: chain floated rearmost on the thinnest wheel, spigot short; the chain
-# and the body front face both ride the seat, so the seat band cancels.
-CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - seat_geometry.chain_reach_rear(
+# C: chain floated rearmost on the thinnest wheel, collar short.  The chain
+# rides the seat and the post boss's south face is where the collar's rear
+# face bears, so the air is the collar's length less the chain's reach.
+CHAIN_SPIGOT_AXIAL_AIR = COLLAR_LENGTH - seat_geometry.chain_reach_rear(
     seat_geometry.PLATE
-)  # 2.3135 on nominal spigot and plate
-CHAIN_SPIGOT_AXIAL_AIR_WORST = (
-    SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
-)  # 2.1635
+)  # 3.4223 on nominal collar and plate
+CHAIN_SPIGOT_AXIAL_AIR_WORST = COLLAR_LENGTH_MIN - _CHAIN_REACH_REAR_WORST  # 3.1191
 for _what, _air in (
     ("chain / hub relief shoulder, wheel seated", CHAIN_BARREL_AXIAL_AIR_WORST),
     (
@@ -697,7 +693,7 @@ for _what, _air in (
         CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST,
     ),
     ("hub rear face / crank sprocket front face", CRANK_HUB_SPROCKET_AIR_PRINT_WORST),
-    ("chain / crank collar body front face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
+    ("chain / post boss south face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
 ):
     if _air <= 0.0:
         raise AssertionError(f"{_what} axial air closes at print-worst: {_air:.4f}")
@@ -1038,6 +1034,7 @@ from dt_cone_swing_platform_geometry import (  # noqa: E402
     # the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
+    PLATE_OUTLINE as PLAT_OUTLINE,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
     SLOT_E_X as PLAT_SLOT_E_X,
@@ -1748,17 +1745,13 @@ if PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM < 1.5 * THREAD_MAJOR_MM[PINCH_T
 # for the merged column's crank bore and the platform's "crank axis":
 _PPIVOT = cone_station(PIVOT_STATION)
 # The centered legacy harmonic base is the installation envelope. The engaged
-# platform's four sharp plan vertices must all remain on its top plate; the
-# filleted outline is contained by that convex polygon. This catches a plate
-# length regression before SolidWorks inserts an off-base rider.
+# platform's sharp plan vertices (the south-east corner as chamfered) must
+# all remain on its top plate; the rounded outline is contained by that
+# convex polygon. This catches a plate length regression before SolidWorks
+# inserts an off-base rider.
 _BASE_X_LIMIT = BASE_TOP_LENGTH / 2.0
 _BASE_Z_LIMIT = BASE_TOP_WIDTH / 2.0
-_PLATFORM_VERTICES = (
-    (-PLAT_EAST_N, PLAT_OVERHANG),
-    (PLAT_WEST_N, PLAT_OVERHANG),
-    (PLAT_WEST_S, PLAT_OVERHANG - PLAT_LEN),
-    (-PLAT_EAST_S, PLAT_OVERHANG - PLAT_LEN),
-)
+_PLATFORM_VERTICES = tuple((_x, _z) for _label, _x, _z in PLAT_OUTLINE)
 for _x_local, _z_local in _PLATFORM_VERTICES:
     _x_machine = _PPIVOT[0] + _x_local * COS_I + _z_local * SIN_I
     _z_machine = _PPIVOT[2] - _x_local * SIN_I + _z_local * COS_I
@@ -2949,8 +2942,9 @@ def west_edge_arbor_gaps(swing_deg: float) -> tuple[float, ...]:
 
 
 def plate_vertices_machine(swing_deg: float) -> tuple[tuple[float, float], ...]:
-    """The plate's four sharp plan vertices in machine (x, z), swung
-    ``swing_deg`` past the engaged incline about the pivot."""
+    """The plate's sharp plan vertices (dt_cone_swing_platform_geometry's
+    PLATE_OUTLINE) in machine (x, z), swung ``swing_deg`` past the engaged
+    incline about the pivot."""
     angle = math.radians(INCLINE_DEG + swing_deg)
     c, s = math.cos(angle), math.sin(angle)
     return tuple(
@@ -3040,8 +3034,8 @@ for _k, _swing in enumerate(SWING_ANGLES):
                 f"swing-plate west edge within {_gap:.3f} mm of the {_name} "
                 f"block at swing {_swing:.3f} deg (needs >= {_floor})"
             )
-    for _label, (_vx, _vz) in zip(
-        ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
+    for (_label, *_local_xz), (_vx, _vz) in zip(
+        PLAT_OUTLINE, plate_vertices_machine(_swing), strict=True
     ):
         _margin = min(_BASE_X_LIMIT - abs(_vx), _BASE_Z_LIMIT - abs(_vz))
         _key = f"{_label} corner over the base"
@@ -3795,7 +3789,7 @@ _SWING_RIG_BANDS = (
 )
 # The crank column behind the hub, each body a solid of revolution about the
 # crank axis (z band, diameter): the selected crank sprocket paper-drive seats on it, the
-# collar's seat spigot and body, the body's rear face on the post boss.
+# collar's seat spigot, its rear face on the post boss.
 CRANK_SPROCKET_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.CRANK_TEETH)
 CRANK_COLUMN_BANDS = (
     (
@@ -3804,8 +3798,7 @@ CRANK_COLUMN_BANDS = (
         CRANK_SPROCKET_TIP_DIA,
         "crank chain wheel",
     ),
-    (seat_geometry.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
-    (CRANK_SPIGOT_FRONT_Z, CRANK_COLLAR_Z1, COLLAR_DIA, "crank collar body"),
+    (seat_geometry.SEAT_FACE_Z, CRANK_COLLAR_Z1, SPIGOT_DIA, "crank seat spigot"),
 )
 _CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
 for _lo, _hi, _what in (

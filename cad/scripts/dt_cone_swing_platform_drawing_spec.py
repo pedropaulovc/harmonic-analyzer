@@ -14,7 +14,9 @@ from __future__ import annotations
 # print shows.  The pivot-hole centre is the layout origin: every plan corner,
 # both post-mount taps and the lock notch are located from it in the plate's own
 # axes (station along the cone axis, offset across it), so a shop lays the whole
-# plate out from one scribed centre.  Corner radii come off their fillets. ---
+# plate out from one scribed centre.  Corner radii come off their fillets; the
+# south-east chamfer's two legs come off its cut sketch, from the sharp corner
+# along the south edge and square to it. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {
         "NorthEastX",
@@ -46,7 +48,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
-    "CornerSE": {"CornerSER"},
+    "CornerSEProfile": {"CornerSERun", "CornerSERise"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
@@ -90,7 +92,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
     "CornerSW": {"CornerSWR": 2},
-    "CornerSE": {"CornerSER": 2},
+    "CornerSEProfile": {"CornerSERun": 2, "CornerSERise": 2},
 }
 
 
