@@ -13,9 +13,9 @@ supplied diameter. Head and stud supplier tolerances are unprovided; no
 manufactured title-block grade is assigned to these purchased nominals.
 
 The knob locks the cone-to-drum set at assembly (cone_set_stack): with the
-pedestals already shimmed and tightened, swing the platform in until T120's
-radial feeler is snug, hold it, and tighten the knob. It clamps by friction
-anywhere along the lock notch.
+pedestals already set and tightened, swing the platform in until a gear just
+binds, ease it out until the gears turn freely, hold it, and tighten the knob.
+It clamps by friction anywhere along the lock notch.
 """
 
 from __future__ import annotations

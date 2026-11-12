@@ -1,14 +1,15 @@
 cone_drum_oblique_mesh:  # the inclined cone partial engagement
-  # The engaged centre is SET AT ASSEMBLY (user ruling 2026-10-10): pedestal screws
-  #   snug-loose, swing in on shims at T012 and T120 so the arbor aligns to the cone
-  #   line, tighten the pedestals, then set T120 with a radial tip-to-root feeler at
-  #   the standard clearance + edge_slack and lock the cone-lock-knob (MHA-DT-VN-51).
-  #   The other cones follow the swing rotation. cone_set_stack books the centres;
-  #   dt_mesh_checks gates nominal CR >= 1.0 and no binding/interference at the RSS
-  #   corner (RSS CR reported). The swing stop (MHA-DT-VN-53) only limits the disengaged swing.
-  edge_slack_mm: 0.20               # T120 feeler set point over standard; the CAD placement
-  set_feeler_reading_mm: 0.0254     # one 0.001-in feeler leaf step
+  # The engaged centre is SET BY FEEL AT ASSEMBLY (owner direction 2026-11-11, #2365,
+  #   superseding the feeler sets of user ruling 2026-10-10 and owner ruling
+  #   2026-11-08): the operator swings the cone set in and out many times and locks
+  #   the cone-lock-knob (MHA-DT-VN-51) just out from the first bind, where the gears
+  #   turn freely; check 4 first taps the arbor pedestals in to the first bind at both
+  #   ends of the set. No feeler, gauge or engaged stop. cone_set_stack books the
+  #   centres a feel set can leave each cone at; dt_mesh_checks states what it
+  #   guarantees (backlash >= 0 at the tightest gear) and gates nominal CR >= 1.0 at
+  #   the loosest. The swing stop (the shared MHA-SH-VN-52) only limits the
+  #   disengaged swing.
+  edge_slack_mm: 0.20               # CAD placement of the cone line over standard; the feel set runs tighter (cone_set_stack)
   pivot_bore_band_mm: [0.0127, 0.0]  # platform pivot bore, .2500 +.0005/.0000 in on the stock 1/4 shoulder
   tooth_cutting_runout_tir_mm: 0.0508 # .002 in TIR per gear (each cone and the drum) about its finished bore
-  note: "oblique partial engagement; centre set at assembly on T120 (cone_set_stack)"
-
+  note: "oblique partial engagement; centre set by feel at assembly (cone_set_stack)"
