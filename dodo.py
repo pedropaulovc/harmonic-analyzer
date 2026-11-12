@@ -4123,6 +4123,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
         # Finite stock-cutter geometry is a production design contract.
         SCRIPTS_DIR / "test_stock_form_cutter.py",
+        # The gear-cutting kit records cover the cutters, arbors, broach and
+        # keyseat end mill the gear specs and the key module name (#2356).
+        SCRIPTS_DIR / "test_gear_cutting_kit.py",
         # The 64T's straight inclined tooth space (#2332 option A).
         SCRIPTS_DIR / "test_straight_gash.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
