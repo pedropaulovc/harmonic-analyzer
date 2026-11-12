@@ -1037,8 +1037,14 @@ another order from run to run, re-triangulates planar faces, and writes some
 STL vertices up to 7.2e-7 mm apart (fr_nameplate, 2026-11-12), so two
 builds of the same source can issue their requests in another order and
 still make the same part
-(`seat_nondeterminism`, counted, never an alarm). The same part from requests
-that diverged with no earlier answer differing is
+(`seat_nondeterminism`, counted, never an alarm). A build that SolidWorks
+steered onto a detour (a `response:` cause from a selection's answer, the
+base's mass properties and STL, and requests that differ only by blocks of
+listed reads and selections cleared by `ClearSelection2` on the selected
+document before anything else, every other answer the same:
+`_com_outcome.seat_path`) is `seat_path_divergence` (counted, never an
+alarm, never a revocation; mg_magnifying_wheel, 2026-11-12). The same part
+from requests that diverged with no earlier answer differing is
 `noop_unexplained_divergence` (counted, logged at WARN); one whose cause could
 not be judged (`truth_cause=error:<type>`) is `noop_outcome_unknown`. A judge
 that raised, on any verdict, is also `judge_fault` (counted, logged at WARN).

@@ -926,6 +926,49 @@ _FAULTED = {
     "outcome": "unknown",
     "judge_faults": [{"step": "stl", "error": "KeyError: 'file'"}],
 }
+# 2026-11-12, mg_magnifying_wheel: an edge SelectByID2 answered False and the
+# vendored geometric fallback selected the edge itself (173 more requests,
+# reads and selections), the base's mass properties and STL.
+_DETOURED = {
+    "request_divergence": {"index": 7285, "field": "member"},
+    "truth_cause": "response:IModelDocExtension.SelectByID2",
+    "outcome": "different",
+    "outcome_signals": {
+        "mass": "same",
+        "requests": "different",
+        "answers": "different",
+        "stl": "same",
+    },
+    "seat_path": {
+        "path": "detour",
+        "count": 1,
+        "blocks": [
+            {
+                "base": [7285, 7285],
+                "new": [7285, 7458],
+                "steered_by": "IModelDocExtension.SelectByID2",
+            }
+        ],
+    },
+}
+# A detour that put a property or kept its selection, or another solid: an
+# alarm, whatever else held.
+_DETOURED_PUT = {
+    **_DETOURED,
+    "seat_path": {"path": "not_read", "detail": "IFeature.Name (put) in the block"},
+}
+_DETOURED_SELECTING = {
+    **_DETOURED,
+    "seat_path": {
+        "path": "selection_kept",
+        "detail": "new called IFeatureManager.FeatureFillet3 before "
+        "IModelDoc2.ClearSelection2 after the block at base 7285 new 7285",
+    },
+}
+_DETOURED_RESHAPED = {
+    **_DETOURED,
+    "outcome_signals": {**_DETOURED["outcome_signals"], "stl": "different"},
+}
 
 
 def _verdict(name: str) -> dict[str, Any]:
@@ -943,12 +986,43 @@ def _verdict(name: str) -> dict[str, Any]:
         (0, _NOOP, _UNEXPLAINED, "noop", "diverged", "noop", "unexplained"),
         (0, _NOOP, _UNJUDGED, "noop", "diverged", "noop", "unknown judge"),
         (0, _NOOP, _FAULTED, "noop", "diverged", "noop", "unknown judge"),
+        (0, _NOOP, _DETOURED, "noop", "diverged", "noop", "path"),
+        (0, _NOOP, _DETOURED_PUT, "noop", "diverged", "noop", "alarm"),
+        (0, _NOOP, _DETOURED_SELECTING, "noop", "diverged", "noop", "alarm"),
+        (0, _NOOP, _DETOURED_RESHAPED, "noop", "diverged", "noop", "alarm"),
+        # The judge's conditions, checked again: a request cause, or another
+        # mass, is no detour SolidWorks steered.
+        (
+            0,
+            _NOOP,
+            {**_DETOURED, "truth_cause": "request"},
+            "noop",
+            "diverged",
+            "noop",
+            "alarm",
+        ),
+        (
+            0,
+            _NOOP,
+            {
+                **_DETOURED,
+                "outcome_signals": {
+                    **_DETOURED["outcome_signals"],
+                    "mass": "different",
+                },
+            },
+            "noop",
+            "diverged",
+            "noop",
+            "alarm",
+        ),
         # No comparison at all: a noop nothing confirms.
         (0, _NOOP, None, "noop", "unknown", "noop", "unknown"),
         (91, _DIVERGED, _UNEXPLAINED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _DIFFERENT, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _REORDERED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _FAULTED, "diverged", "diverged", "divergence", "judge"),
+        (91, _DIVERGED, _DETOURED, "diverged", "diverged", "divergence", ""),
         (91, _DIVERGED, _SAME, "diverged", "same", "divergence", "false"),
         (91, _verdict("exhausted"), _SAME, "exhausted", "same", "divergence", "false"),
         (
@@ -988,6 +1062,7 @@ def test_a_shadow_folds_replay_ground_truth_and_outcome(
     flags_of = {
         "alarm": result.soundness_alarm,
         "seat": result.seat_nondeterminism,
+        "path": result.seat_path_divergence,
         "unexplained": result.noop_unexplained_divergence,
         "unknown": result.noop_outcome_unknown,
         "false": result.false_divergence,
@@ -999,24 +1074,32 @@ def test_a_shadow_folds_replay_ground_truth_and_outcome(
 _NOOP_MARKERS = {
     shadow.NoopJudgement.SOUNDNESS_ALARM: "soundness_alarm",
     shadow.NoopJudgement.SEAT_NONDETERMINISM: "seat_nondeterminism",
+    shadow.NoopJudgement.SEAT_PATH_DIVERGENCE: "seat_path_divergence",
     shadow.NoopJudgement.UNEXPLAINED_DIVERGENCE: "noop_unexplained_divergence",
     shadow.NoopJudgement.OUTCOME_UNKNOWN: "noop_outcome_unknown",
 }
 
 
 def test_every_noop_is_judged_exactly_once():
-    # Every verdict x ground truth x cause x outcome: a noop has exactly one
-    # judgement, each but CONFIRMED with exactly its own marker; any other
-    # verdict has none.
+    # Every verdict x ground truth x cause x outcome x geometry x seat path: a
+    # noop has exactly one judgement, each but CONFIRMED with exactly its own
+    # marker; any other verdict has none.
     judged = set()
-    for verdict, truth, cause, outcome in itertools.product(
+    for verdict, truth, cause, outcome, geometry, path in itertools.product(
         [*shadow.VERDICT_CLASSES, "garbled"],
         ("same", "diverged", "unknown"),
         (None, "request", "response:IFace2.Normal", "error:RuntimeError"),
         ("same", "different", "unknown"),
+        ("same", "different"),
+        (None, {"path": "detour"}, {"path": "not_read"}),
     ):
         found = shadow.Shadow(
-            verdict, ground_truth=truth, truth_cause=cause, outcome=outcome
+            verdict,
+            ground_truth=truth,
+            truth_cause=cause,
+            outcome=outcome,
+            outcome_signals={"mass": "same", "stl": geometry},
+            seat_path=path,
         )
         markers = {name for name in _NOOP_MARKERS.values() if getattr(found, name)}
         judgement = found.noop_judgement
@@ -1025,7 +1108,7 @@ def test_every_noop_is_judged_exactly_once():
             continue
         judged.add(judgement)
         expected = {_NOOP_MARKERS[judgement]} if judgement in _NOOP_MARKERS else set()
-        assert markers == expected, (truth, cause, outcome)
+        assert markers == expected, (truth, cause, outcome, geometry, path)
     assert judged == set(shadow.NoopJudgement)
     judgement = shadow.Shadow(
         "noop", ground_truth="diverged", truth_cause="request", outcome="same"
@@ -1039,6 +1122,13 @@ def test_every_noop_is_judged_exactly_once():
         outcome="same",
     ).noop_judgement
     assert judgement is shadow.NoopJudgement.OUTCOME_UNKNOWN
+
+
+def test_a_seat_path_detour_is_the_judges_own_verdict():
+    assert shadow.SEAT_PATH_DETOUR == _com_outcome.SeatPath.DETOUR.value
+    found = shadow.shadow_of(0, _NOOP, 91, _DETOURED)
+    assert found.noop_judgement is shadow.NoopJudgement.SEAT_PATH_DIVERGENCE
+    assert found.seat_path == _DETOURED["seat_path"] and not found.soundness_alarm
 
 
 def test_a_title_counter_echo_is_seat_nondeterminism():
@@ -1177,6 +1267,18 @@ def test_a_soundness_alarm_is_an_error_and_never_fails_the_build(
             "noop_outcome_unknown",
             "| truth=same | outcome=unknown cause=- | noop_outcome_unknown",
         ),
+        (
+            {
+                "ground_truth": "diverged",
+                "truth_cause": _DETOURED["truth_cause"],
+                "outcome": "different",
+                "outcome_signals": _DETOURED["outcome_signals"],
+                "seat_path": _DETOURED["seat_path"],
+            },
+            "seat_path_divergence",
+            "| outcome=different cause=response:IModelDocExtension.SelectByID2 "
+            "| seat_path_divergence",
+        ),
     ],
 )
 def test_a_noop_the_outcome_does_not_contradict_is_counted_never_an_alarm(
@@ -1204,6 +1306,9 @@ def test_a_noop_the_outcome_does_not_contradict_is_counted_never_an_alarm(
     assert span["replay.noop_judgement"] == marker
     assert logged["info"][-1].endswith(line_end)
     assert record["judge_fault"] is False and span["replay.judge_fault"] is False
+    # Never revoked: only an alarm revokes the base.
+    assert "revoked" not in record and "alarm_evidence" not in record
+    assert record["seat_path"] == (found.get("seat_path") or {}).get("path")
     assert "replay.judge_faults" not in span
     assert not [m for m in logged["warn"] if m.startswith("[com-replay] judge_fault ")]
 
@@ -2329,6 +2434,30 @@ def test_a_build_that_is_not_reused_is_judged_with_the_replay_before_it(
     assert (record["verdict"], record["ground_truth"]) == ("diverged", "diverged")
     assert record["base_key"] == audited.key and not record["soundness_alarm"]
     assert current.reuse is declined
+
+
+def test_an_audited_build_that_took_a_seat_path_detour_revokes_nothing(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _Shop(tmp_path, monkeypatch)
+    base = shop.build()
+    shop.edit(audited=True)
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    # The audited build on the seat detoured (mg_magnifying_wheel's shape):
+    # counted, and the base stays reusable.
+    monkeypatch.setattr(shadow, "_diff", lambda *_a: (91, _DETOURED))
+    shop.build(reuse=reuse)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    assert (record["reuse_decision"], record["verdict"]) == ("audited", "noop")
+    assert record["noop_judgement"] == "seat_path_divergence"
+    assert record["seat_path_divergence"] and not record["soundness_alarm"]
+    assert "revoked" not in record and logged["error"] == []
+    assert logged["info"][-1].endswith("| seat_path_divergence")
+    assert not shadow.revoked(conv.sha256_file(conv.ENGINE_FILE), _STEM, base.key)
+    shop.edit(audited=False)
+    again = shop.attempt()
+    assert again.value == "reused", again.detail
 
 
 def test_a_build_on_another_solidworks_revision_is_not_judged_by_the_replay(
