@@ -90,8 +90,8 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
 
 def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     stations = drawing.STATIONS
-    # The pitch prints .278 (7.0612) +.001/.000: each hub may come out the
-    # printed maximum, past the 7.0565 model.
+    # The pitch prints .300 (7.62) +.001/.000: each hub may come out the
+    # printed maximum, .001 past the model.
     lower, upper = printed_deviations(
         spec.HUB_LENGTH,
         notes.DRAWING_PRECISION["Hub"]["HubLength"],
@@ -147,6 +147,24 @@ def test_hub_diameter_lands_on_its_near_rim() -> None:
     assert source.index("set_near_side_diameter(") < source.index(
         "set_dimension_callouts(adapter, front_annotations"
     )
+
+
+def test_one_centreline_joins_the_three_holes_along_the_bar() -> None:
+    """r5 machinist review (clarity): the bore, the #47 and the #21 holes
+    lie on the bar's mid-height axis, so one centreline bisecting the two
+    long edges prints their cross-bar position and the .43 bar symmetric
+    about it. The edges are picked between the two drilled holes, where only
+    the bar's own edges run."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("_add_bar_centerline(adapter, front)") == 1
+    assert source.index("auto_center_marks(adapter, front") < source.index(
+        "_add_bar_centerline(adapter, front)"
+    )
+    assert "(BAR_PIN_X + LEVER_SPRING_X) / 2000.0" in source
+    assert "side * BAR_TALL / 2000.0" in source
+    assert spec.BAR_PIN_X < (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0
+    assert (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0 < spec.TIP_ARC_CX
+    assert spec.TIP_RADIUS == spec.NOSE_RADIUS == spec.BAR_TALL / 2.0
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

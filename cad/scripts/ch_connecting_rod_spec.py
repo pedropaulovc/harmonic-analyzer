@@ -74,7 +74,7 @@ SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
 # plane, which is also the arm plane (rocker_bank_layout.ARM_MID_DZ). Two tines
 # straddle the arm; the bridge joining them sits below the arm's bottom edge;
 # the pin hole runs through both tines on the rod axis at CENTER_DISTANCE.
-# Each inter-arm gap (pitch 7.0565 - arm 2.500) holds one tine of each
+# Each inter-arm gap (pitch 7.62 - arm 2.500) holds one tine of each
 # neighbouring rod, so both tines and the slot carry explicit bands (Main
 # ruling 2026-10, option b), located from one finished fork face (#982):
 # the near tine prints from that face, the slot as a size, the far tine as

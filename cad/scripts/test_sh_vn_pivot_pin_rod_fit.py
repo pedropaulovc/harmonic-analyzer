@@ -103,7 +103,7 @@ def test_worst_case_joint_budget() -> None:
     assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.127, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.2794, abs=1e-6)
-    assert b["neighbour_clearance_min"] == pytest.approx(0.4271, abs=1e-6)
+    assert b["neighbour_clearance_min"] == pytest.approx(0.9906, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.NEIGHBOUR_CLEARANCE_MIN
     assert b["tine_min"] == pytest.approx(1.651, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
@@ -214,15 +214,15 @@ def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
     half_zone = arm.STRAP_HUB_SYMMETRY / 2.0
     gap = _corner_gap(pin.PIN_END_PROUD_MAX, (-half_zone, half_zone))
     assert gap == pytest.approx(pin.BUDGET["neighbour_clearance_min"], abs=1e-9)
-    assert gap == pytest.approx(0.4271, abs=1e-9)
+    assert gap == pytest.approx(0.9906, abs=1e-9)
     assert gap >= pin.NEIGHBOUR_CLEARANCE_MIN
     # Positive controls: the strap symmetry is in the corner (centred straps
-    # gain its whole zone), and the withdrawn peened pin (0.10 proud each
-    # end) on these straps would have broken the 0.35 floor the earlier
-    # budget claimed it held.
+    # gain its whole zone), and so is each dressed pin end: the withdrawn
+    # peened pin (0.10 proud each end) costs both opposed ends.
     centred = _corner_gap(pin.PIN_END_PROUD_MAX, (0.0,))
     assert centred - gap == pytest.approx(arm.STRAP_HUB_SYMMETRY, abs=1e-9)
-    assert _corner_gap(0.10, (-half_zone, half_zone)) < pin.NEIGHBOUR_CLEARANCE_MIN
+    peened = _corner_gap(0.10, (-half_zone, half_zone))
+    assert gap - peened == pytest.approx(2.0 * (0.10 - pin.PIN_END_PROUD_MAX), abs=1e-9)
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:

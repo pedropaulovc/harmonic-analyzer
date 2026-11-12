@@ -74,7 +74,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø.400 x .32 hub at 4:1: the face view, the side view and the land's
+# A Ø.400 x .35 hub at 4:1: the face view, the side view and the land's
 # two-row callout right of it share one row midway between the top border and
 # the title block; the isometric stands above-right of that callout.
 SHEET_SCALE = (4.0, 1.0)
@@ -88,7 +88,7 @@ ISO_CENTER = (0.360, 0.125)
 NOTES_XY = (0.020, 0.090)  # left of the title block, below the views
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 HALF_DIA = LAND_DIA / 2.0 * _S  # 0.0203
-HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0163
+HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0178
 
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there. The bore keeps the face view, its
@@ -104,7 +104,7 @@ FRONT_KEEP = {
     "SupplyBore": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] + HALF_DIA + 0.022),
     "LandDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - HALF_DIA - 0.020),
 }
-# "SUPPLY .32 MIN" outruns the 33 mm hub: centred (r1) it sat on
+# "SUPPLY .35 MIN" outruns the 36 mm hub: centred (r1) it sat on
 # both extension lines, so it stands right of the right one, the dimension
 # line carried out to it, below the land's lower extension line; its note
 # link hangs under it.

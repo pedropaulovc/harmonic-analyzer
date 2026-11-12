@@ -59,9 +59,9 @@ SHAFT_R = SHAFT_DIA / 2.0
 # length on the .XX grid and keeps both domes clear of the bores
 # (FLAT_STATION_WINDOW_MM below). ---
 END_PROUD = 1.016  # .040
-CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 80.137
+CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 85.852
 DOME_R = SHAFT_R
-SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 166.624 (6.56) tip to tip
+SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 178.054 (7.01) tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
 # (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. Both
@@ -70,13 +70,13 @@ SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 166.624 (6.56) tip to tip
 # FLAT_BASELINE off it, so no station chains through another. .17 long, in
 # the .32 lug; with the lug's .XX bands in the chain both stations, the flat
 # length and the overall length print .XX (FLAT_STATION_WINDOW_MM). ---
-FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 150.114 (5.910) centre to centre (assembly only)
+FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 161.544 (6.360) centre to centre (assembly only)
 FLAT_LENGTH = 4.318  # .17
 FLAT_DEPTH = 0.3048  # .012
 FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 6.096 (.24)
 FLAT_BASELINE = (
     SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0
-)  # 156.21 (6.15)
+)  # 167.64 (6.60)
 ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.0452 (.238): the printed size
 FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.8702: the set screw's cup seat above the axis
 
@@ -307,7 +307,7 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
 BORE_OFFSET_UNPAIRED_MM = 2.0 * _band(KEEPER_PRECISION, "LugProfile", "LugRise")
 PAIRED_MIN_CLEARANCE_MM = (
     BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0] - BORE_SEAT_ALLOWANCE_MM
-)  # 0.0103
+)  # 0.0109
 if BORE_OFFSET_UNPAIRED_MM <= BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1]:
     raise AssertionError("the keeper bores line up unpaired: drop the pair reaming")
 if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
