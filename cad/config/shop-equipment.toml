@@ -552,3 +552,32 @@ material = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms)"
 note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand casting, ASTM A48 class 25B, poured by an outside jobbing foundry (a candidate service: none chosen, contacted or quoted) from a pattern the shop 3D-prints in sections from the finished-part model. The pattern carries the 2 degree draft as the model has it (owner rulings B1 and D1: added on the webs, crossbar, gussets, lands, hub rib and set-screw boss sides; taken out of the corner and hub boss barrels, the flange rims and the set-screw boss face), the machining stock and the foundry's shrink allowance (about 1/8 in per ft for gray iron), and parts on the faced top plane with the four boss tops in the cope. No cores or loose pieces: the sockets, bores and holes are cast solid. As-cast dimensions print +/-.03 (B2), and the first machining setup stands on six cast datum targets (B6: E1-E3 on three boss bottoms, F1-F2 on the two rear boss barrels, G1 on the rear-west boss barrel). The foundry stress relieves the casting and returns it cleaned, risers and gates removed. The shop machines the seats listed in the part's registry row (cad/config/parts/fr-top-frame.yaml). Allocation: fr-top-frame (MHA-FR-02). About 24.2 lb as cast (18.0 lb finished); envelope 17.35 x 10.59 x 1.93 in finished and 17.35 x 10.59 x 2.09 in as cast before the shrink allowance. Both masses are estimated from the finished model at 7.2 g/cm3, the as-cast one with every machined feature cast solid and .16 in stock on the faced top and boss tops, .12 in on the faced underside; neither is a foundry figure. Not quoted or ordered."
 on_hand = false
 cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]
+
+# --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
+
+# The reducer disc (MHA-PD-06, 150T 48DP, .118 thick at Ø3.1655) cannot take
+# 150 form-cutter gashes on its own stiffness. To make: special to this part,
+# not owned. Sizes read from pd_rack_pinion_spec (bore Ø.501 REAM_H7, least
+# root Ø3.0719): the backing discs stop .036 under the least root radius, so
+# the #1 cutter's rim clears them at full depth.
+[fixtures.pd-rack-pinion-cutting-arbor]
+name = "MHA-PD-06 disc cutting arbor with two Ø3.00 backing discs, shop-made"
+kind = "gear_blank_arbor"
+present = false
+shop_made = true
+purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of the owned .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack."
+note = "Workholding for cutting the MHA-PD-06 teeth (pd-rack-pinion.yaml process; machining-dfm.md, Paper drive): backing disc, disc blank, backing disc and nut on the journal, the arbor in the BS-0 chuck with the tailstock centre in its end. Indicate the backing disc rim within .001 TIR before cutting. The Ø3.00 discs stop .036 under the disc's least root Ø3.0719 (radius), so the #1 cutter reaches whole depth without touching them; they back the .118 web to within .036 of the tooth spaces on both faces."
+pieces = 3
+backing_disc_dia_in = 3.00
+journal_dia_in = 0.501
+
+# MHA-PD-06 disc blank (#2412): the Ø3.1655 disc needs at least 3.25 in of
+# width; the 1/8 in thickness leaves .007 to face to the .118 print.
+[[stock]]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "To order: 1/8 x 4 in C360 brass flat, 12 in (the shortest standard length). Allocation: pd-rack-pinion (MHA-PD-06), one Ø3.25 blank face-skimmed .0035 a side to .118, with stock left for a trial disc. Not owned."
+section_mm = [101.6, 3.175]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1376 https://www.onlinemetals.com/en/buy/brass/0-125-x-4-brass-rectangle-bar-360-h02-extruded/pid/1376 read live 2026-11-12: 1/8 x 4 brass rectangle bar 360-H02, ASTM B16, 12 in $65.37"]

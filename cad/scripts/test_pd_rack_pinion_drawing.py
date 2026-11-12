@@ -138,8 +138,8 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
 
 def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     """#2167 (Codjiflo on #2124): at the front face the web also loses the
-    bore's chamfer at its .015 leg and the tap's .004 break (.0635 since the
-    Ø.504 bore and the hub spigot's turned .501 -.001), at the rear the
+    bore's chamfer at its .015 leg and the tap's .004 break (.0650 since
+    #2412's Ø.501 bore over the hub spigot's turned .498 -.001), at the rear the
     bore's .010 title-block break and the .004: over the .060 floor, under
     the .080 target, and the taps' numbered note (their callout links it)
     states the least (rule 20)."""
@@ -153,8 +153,8 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     )
     assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == finished["front face"]
     assert 0.060 * inch <= spec.TAP_TO_BORE_WALL_FINISHED_MIN < 0.080 * inch
-    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.06352 * inch, abs=1e-3)
-    assert spec.TAP_WALL_TEXT == "WALL .063 MIN TO BORE"
+    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.06502 * inch, abs=1e-3)
+    assert spec.TAP_WALL_TEXT == "WALL .065 MIN TO BORE"
     tap_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[1]
     assert tap_note.rstrip(".").endswith(spec.TAP_WALL_TEXT)
 
@@ -172,8 +172,8 @@ def test_the_package_declares_the_tap_web_the_sheet_prints() -> None:
 
 
 def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
-    """The bands the two builds apply (the disc's Ø.504 REAM_H7 bore, the
-    MHA-PD-17 hub's SHAFT_H spigot) never bind and leave at least the
+    """The bands the two builds apply (the disc's Ø.501 REAM_H7 bore, the
+    MHA-PD-17 hub's turned spigot) never bind and leave at least the
     clearance MHA-PD-00 centres the disc in, and the fit note quotes the
     clearance the limits give."""
     import build_pd_transgear_disc_hub as hub_part
@@ -183,7 +183,7 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
         model_toleranced_dimensions(hub_part)[("HubProfile", "SpigotDia")]
         == "*SPIGOT_DIA_DEVIATIONS"
     )
-    assert spec.BORE_DIA == pytest.approx(0.504 * 25.4)
+    assert spec.BORE_DIA == pytest.approx(0.501 * 25.4)
     bore_lower, bore_upper = spec.BORE_DEVIATIONS
     spigot_lower, spigot_upper = hub.SPIGOT_DIA_DEVIATIONS
     least = (spec.BORE_DIA + bore_lower) - (hub.SPIGOT_DIA + spigot_upper)
@@ -209,6 +209,26 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
     )
     for banned in ("DIA CLR", "DIAMETRAL", "GOVERN"):
         assert banned not in note
+
+
+def test_the_cutting_arbor_backs_the_disc_clear_of_the_cutter() -> None:
+    """#2412: the thin disc is cut on a shop-made arbor whose journal slides
+    in the reamed bore and whose backing discs stop under the least root, so
+    the form cutter reaches whole depth without touching them."""
+    import tomllib
+
+    equipment = tomllib.loads(
+        (Path(spec.__file__).parents[1] / "config" / "shop-equipment.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    arbor = equipment["fixtures"]["pd-rack-pinion-cutting-arbor"]
+    assert arbor["present"] is False and arbor["shop_made"] is True
+    assert arbor["journal_dia_in"] * 25.4 == pytest.approx(spec.BORE_DIA)
+    backing_r = arbor["backing_disc_dia_in"] * 25.4 / 2.0
+    root_r = spec.ROOT_DIA_MIN / 2.0
+    assert 0.025 * 25.4 <= root_r - backing_r <= 0.060 * 25.4
+    assert "pd-rack-pinion-cutting-arbor" in _config.parts("pd-rack-pinion")["process"]
 
 
 def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:

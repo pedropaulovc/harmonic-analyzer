@@ -1246,6 +1246,17 @@ cutters, #1 and #7, are sizes the cones do not use, so the 48DP set needs both. 
 cut straight through its face: its form root stands above the journal, so the cutter runs out in
 air with no endcut. The feed 12T carries the stock #8 form, and its hub is shaped so the cutter
 runs out clear.
+The reducer disc is too thin (.118 in at Ø3.17) to take 150 gashes on its own stiffness. It is
+cut on the shop-made arbor in `shop-equipment.toml` (`fixtures.pd-rack-pinion-cutting-arbor`,
+#2412): the reamed Ø.501 bore slides on the arbor's journal between two Ø3.00 backing discs that
+stop .036 in under the least root, clamped by the arbor nut, and the arbor runs in the BS-0
+chuck with the tailstock centre in its end. The bore is reamed with the owned .501 reamer
+(the hub spigot is turned to Ø.498 to keep the centring clearance), so the journal is turned
+to slide in that bore. Face the blank to .118 on the same arbor before cutting the teeth.
+The disc's blank is 1/8 × 4 in C360 flat (`[[stock]]`).
+The knob shaft's #8-32 stud is single-pointed before the 15T is cut, with the tip carried on a
+tailstock centre in sacrificial length parted off afterwards; the Ø.110/.115 relief is the stud's
+least section under the tool (#2419).
 The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
 [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to the printed 269.6 mm callout
