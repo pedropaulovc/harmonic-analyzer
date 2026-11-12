@@ -42,8 +42,10 @@ PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
 # 90457A730, 360 brass machine key stock, 5 x 5 mm, DIN 6880 undersized
 # (height and width -0.030 to 0.000 mm), 305 mm long (-1.000 to +1.000 mm),
 # $13.23, read live 2026-11-12 (https://www.mcmaster.com/90457A730/).  Its
-# section lies inside the printed band, so the flats stay as supplied: only
-# the ends are faced, the pivot turned and the stud tap cut.
+# section lies inside the printed band, so the square stays as supplied --
+# flats and the long edges' factory break (DIN 6880 key stock; the page
+# states no edge form), which the title-block FINISH covers: only the ends
+# are faced, the pivot turned and the stud tap cut.
 ROD_SECTION = 5.0038  # .197
 SECTION_BAND = (0.0, -0.0508)  # +.000/-.002
 STOCK_SKU = "90457A730"
@@ -246,16 +248,14 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
     "TapWallMin": TAP_WALL_CALLOUT,
 }
-# The square is the key stock's own (title-block MATERIAL names it): note 2
-# says its flats take no cut, as dt_crank_arm's stock note does (rule 7's
-# stock statement; the SQ size above still states the band they must hold).
-STOCK_NOTE = 2
+# The square's flats and long edges are the key stock's own: the title-block
+# FINISH says so (rule 2; pn-pen-rod.yaml), so the sheet needs no note for it
+# and the SQ size above still states the band the stock must hold.
 DRAWING_NOTES = "\n".join(
     (
         f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE, TURNED",
         "   TO THE MEASURED BORE (CLEARANCE "
         f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
-        f"{STOCK_NOTE}. SQUARE FLATS AS SUPPLIED.",
     )
 )
 

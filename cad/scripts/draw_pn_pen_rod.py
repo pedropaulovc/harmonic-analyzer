@@ -294,12 +294,10 @@ VIEW_A_ARROW = (
     _VIEW_A_TIP,
 )
 # Note 1 (the pivot's matched fit, two lines of ~53 characters, ~125 x 9 mm
-# at ~2.35 mm a character, anchored top-left) and note 2 (the square's stock,
-# one short line under them) in the empty field under the side view: x
-# 0.150..0.275, y ~0.111..0.125, 14 mm under the R MAX block (bottom 0.139),
-# 25 mm right of the stud tap's callout (x <= 0.1248), left of the
-# isometric's note (x >= 0.35) and 26 mm over the end view's SQ block (top
-# ~0.0846).
+# at ~2.35 mm a character, anchored top-left) in the empty field under the
+# side view: x 0.150..0.275, y ~0.116..0.125, 14 mm under the R MAX block
+# (bottom 0.139), 25 mm right of the stud tap's callout (x <= 0.1248) and
+# left of the isometric's note (x >= 0.35).
 NOTES_XY = (0.150, 0.125)
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its

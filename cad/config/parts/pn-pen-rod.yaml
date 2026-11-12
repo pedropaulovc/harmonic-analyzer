@@ -2,7 +2,7 @@ pn-pen-rod:
   number: MHA-PN-04
   material: Brass
   material_specification: "C36000 brass key stock, 5 x 5 mm, DIN 6880; McMaster-Carr 90457A730"
-  finish: machined, oiled
+  finish: square as supplied; ends, pivot machined; oiled
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"

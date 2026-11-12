@@ -426,23 +426,19 @@ def test_stud_tap_drill_leaves_a_plug_tap_lead_at_the_printed_bands() -> None:
 
 
 def test_square_is_bought_key_stock_inside_the_printed_band() -> None:
-    """#2438: the flats stay as the key stock supplies them, so its whole
-    catalogue section lies inside the printed SQ band and one bar yields the
-    rod."""
+    """#2438: the square stays as the key stock supplies it, so its whole
+    catalogue section lies inside the printed SQ band, one bar yields the rod,
+    and the title-block finish says the square takes no cut."""
     import _config
 
     low, high = spec.STOCK_SECTION_MIN, spec.STOCK_SECTION_MAX
     assert spec.ROD_SECTION + spec.SECTION_BAND[1] <= low <= high
     assert high <= spec.ROD_SECTION + spec.SECTION_BAND[0]
     assert spec.TOTAL_LENGTH < spec.STOCK_LENGTH_MIN
-    material = str(_config.parts("pn-pen-rod")["material_specification"])
-    assert spec.STOCK_SKU in material
-    stock_lines = [
-        line
-        for line in spec.DRAWING_NOTES.splitlines()
-        if line.startswith(f"{spec.STOCK_NOTE}. ")
-    ]
-    assert len(stock_lines) == 1 and "AS SUPPLIED" in stock_lines[0]
+    row = _config.parts("pn-pen-rod")
+    assert spec.STOCK_SKU in str(row["material_specification"])
+    assert "square as supplied" in str(row["finish"]).lower()
+    assert "AS SUPPLIED" not in spec.DRAWING_NOTES
 
 
 def test_overall_length_is_one_parenthesised_reference() -> None:
