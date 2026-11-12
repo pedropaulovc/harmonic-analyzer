@@ -17,7 +17,9 @@ retain their station owners. A driven span between genuine finite-flank
 contacts carries the tooth-thickness inspection limits. Datums: ``Front Plane``
 is the rear face (``RearFace``);
 ``GearFace`` (the step face the hub seats on) and ``FlatEndFace`` are offset
-planes; ``Axis1`` is the tooth pattern's Top x Right axis.
+planes; ``Axis1`` is the tooth pattern's Top x Right axis.  The flat's
+distance from the axis prints from the hidden ``FlatReference`` sketch on the
+Front plane, in the nose view where the flat shows as a chord.
 
 Run (SolidWorks already open)::
 
@@ -104,7 +106,8 @@ from pd_transgear_feed_pinion_spec import (
     FLAT_END_MIN,
     FLAT_END_PLACES,
     FLAT_END_TOL_TYPE,
-    FLAT_TO_AXIS_DEVIATIONS,
+    FLAT_TO_AXIS_PLACES,
+    FLAT_TO_AXIS_TOL,
     FULL_DEPTH,
     FULL_DEPTH_DEVIATIONS,
     FULL_DEPTH_PLACES,
@@ -159,6 +162,16 @@ V_FLAT = (
     _R_BOSS**2 * math.acos(FLAT_TO_AXIS / _R_BOSS)
     - FLAT_TO_AXIS * math.sqrt(_R_BOSS**2 - FLAT_TO_AXIS**2)
 ) * (OVERALL_LENGTH - FLAT_END_STATION)
+# The flat's printed distance from the axis rides a hidden Front-plane
+# reference sketch (drawing-simplicity-policy.md's reference-sketch
+# allowance; build_pd_transgear_knob_shaft's CoreFlatReference) so it prints
+# in the nose view, where the flat shows as a chord: FlatProfile's own line
+# lies in the Right plane, where the flat stands edge-on (r8 machinist
+# review: no view showed the flat as a chord).  One construction line runs
+# along the flat from under the axis to a witness 0.85 of the half-chord out
+# on model +X, the nose view's right, the side its dimension stands.
+_FLAT_HALF_CHORD = math.sqrt(_R_BOSS**2 - FLAT_TO_AXIS**2)
+FLAT_WITNESS_STATION = 0.85 * _FLAT_HALF_CHORD
 
 # These later cuts do not overlap the end-envelope oracle's stock bodies.
 if OIL_HOLE_SLEEVE_Z - OIL_HOLE_DIA / 2.0 <= CUTTER_RUNOUT_MAX:
@@ -258,9 +271,9 @@ async def _cut_flat(
     section's plane, where the flat shows edge-on: a rectangle whose upper
     edge is the flat, from its end wall to 1 mm past the nose, and whose
     lower edge stands 1 mm clear of the boss.  The end wall is placed from
-    the origin (the rear face) and the flat from a construction axis line
-    that ends with it past the nose, so the section prints that distance
-    just right of the nose, its extension lines short.  The cut is mid-plane
+    the origin (the rear face), the section printing it, and the flat from a
+    construction axis line that ends with it past the nose, driven by the
+    ``FlatToAxis`` global the printed ``FlatReference`` shares.  The cut is mid-plane
     across the sketch plane, 1 mm clear of the boss either side (a
     through-all cut here ran one way only), so the wall is square across the
     boss.  The wall stops nothing (the hub's flat starts clear ahead of it),
@@ -321,7 +334,7 @@ async def _cut_flat(
         FLAT_TO_AXIS,
         "flat from the axis",
     )
-    dims.record("FlatToAxis", '"FlatToAxis"')
+    dims.record("FlatHeight", '"FlatToAxis"')
     await dimension_between(
         adapter,
         f"{flat}.start",
@@ -355,6 +368,55 @@ async def _cut_flat(
         (name_dimensions(adapter, "Flat", ["FlatCutWidth"])[0], '"BossDia" + 2mm')
     )
     return await check_one_solid_body_volume(adapter, "D-flat", volume - V_FLAT, 0.01 * V_FLAT)
+
+
+async def _flat_reference(adapter: Any) -> list[tuple[str, str]]:
+    """The printed FlatToAxis, driven by the same ``FlatToAxis`` global as
+    the cut, on the hidden ``FlatReference`` Front-plane sketch."""
+    dims = SketchDims()
+    floor = -FLAT_TO_AXIS
+    check("create_sketch flat reference", await adapter.create_sketch("Front"))
+    suppress_dimension_input(adapter)
+    set_sketch_direct_db(adapter, True)
+    flat = check(
+        "flat reference line",
+        await adapter.add_centerline(FLAT_WITNESS_STATION, floor, 0.0, floor),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "flat reference horizontal",
+        await adapter.add_sketch_constraint(flat, None, "horizontal"),
+    )
+    check(
+        "flat reference under the axis",
+        await adapter.add_sketch_constraint(f"{flat}.end", "origin", "vertical_points"),
+    )
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "horizontal_distance",
+        FLAT_WITNESS_STATION,
+        "flat witness station",
+    )
+    dims.record("FlatWitnessStation")
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        "origin",
+        "vertical_distance",
+        FLAT_TO_AXIS,
+        "printed flat from the axis",
+    )
+    dims.record("FlatToAxis", '"FlatToAxis"')
+    await ensure_fully_defined(adapter, "flat reference")
+    check("exit_sketch flat reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "FlatReference")
+    jobs = dims.apply(adapter, "FlatReference")
+    # Saved hidden so no part image or assembly renders it (#880); the
+    # drawing shows it in its nose view only (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, ("FlatReference",))
+    return jobs
 
 
 def _as_construction(adapter, line: str) -> None:
@@ -734,6 +796,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The D-flat on -Y, opposite the oil hole: the hub drives through it.
     volume = await _cut_flat(adapter, drive_jobs, volume)
+    drive_jobs += await _flat_reference(adapter)
 
     # Mate datums: the gear face and the flat's end wall (the hub's rear
     # stop, the disc's front face), each driven by the station it sits at;
@@ -768,8 +831,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Bands (pd_transgear_feed_pinion_spec), printed in inches: the reamed
-    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.001
-    # under the hub's flat, the standard tip class, the root as a physical
+    # bore, the boss's SHAFT_H under the hub's bore, the flat's ±.002 under
+    # the hub's key pin, the standard tip class, the root as a physical
     # MIN floor, the flat's end wall as LIMITS between the step and the hub's
     # flat; the cutter's full depth as a MIN (it covers the rack) and its
     # run-out as a MAX limit (R9-67).  The tooth length and the overall are
@@ -797,8 +860,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BossDia", *BOSS_DIA_DEVIATIONS, display_unit=UNIT
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "FlatProfile", "FlatToAxis", *FLAT_TO_AXIS_DEVIATIONS, display_unit=UNIT
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "FlatReference",
+        "FlatToAxis",
+        FLAT_TO_AXIS_TOL,
+        places=FLAT_TO_AXIS_PLACES,
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,

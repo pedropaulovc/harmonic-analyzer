@@ -195,6 +195,32 @@ def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
         assert _pair(pin, "pd-transgear-knob-shaft-1") not in allowed
 
 
+def test_hub_key_pin_and_collar_flat_pin_rows_follow_their_specs() -> None:
+    """#2409: MHA-PD-VN-69 presses along the hub's chord ream over its whole
+    length; MHA-PD-VN-70 presses into the collar's blind ream over its faced
+    model length; neither pin's side or crest carries a row with the shafts,
+    each standing off the flat it keys."""
+    import pd_vn_transgear_collar_flat_pin_spec as flat_pin
+    import pd_vn_transgear_hub_key_pin_spec as key_pin
+    import pd_transgear_feed_pinion_spec as feed_pinion
+
+    collar = _collar()
+    allowed = _allowed()
+    assert key_pin.DIA > hub.KEY_PIN_HOLE_DIA
+    key_limit = _annulus(key_pin.DIA, hub.KEY_PIN_HOLE_DIA, key_pin.LENGTH)
+    pair = _pair("pd-vn-transgear-hub-key-pin-1", "pd-transgear-disc-hub-1")
+    assert allowed[pair] == pytest.approx(key_limit)
+    assert _pair("pd-vn-transgear-hub-key-pin-1", "pd-transgear-feed-pinion-1") not in allowed
+    assert hub.KEY_PIN_CHORD_OFFSET - key_pin.DIA / 2.0 > feed_pinion.FLAT_TO_AXIS
+    assert flat_pin.DIA > collar.FLAT_PIN_HOLE_DIA
+    pin_limit = _annulus(flat_pin.DIA, collar.FLAT_PIN_HOLE_DIA, collar.FLAT_PIN_LENGTH)
+    pin = "pd-vn-transgear-collar-flat-pin-1"
+    assert allowed[_pair(pin, "pd-transgear-drive-collar-1")] == pytest.approx(pin_limit)
+    assert _pair(pin, "pd-transgear-knob-shaft-1") not in allowed
+    # The modelled crest stands off the modelled core flat.
+    assert collar.FLAT_PIN_CENTRE - flat_pin.DIA / 2.0 > shaft.CORE_FLAT_FROM_AXIS
+
+
 def test_connecting_link_row_is_the_closing_link_mesh_on_the_t24() -> None:
     """MHA-PD-VN-66 closes the loop at the last station, whose forward pin is
     pin 0 on the knob T24's pitch circle: one bounded mesh row with the

@@ -770,6 +770,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.3622,
                 2.3625,
             ),
+            # #2409: MHA-PD-VN-69 1/16 x 5/16 key pin pressed along the hub's
+            # .0615 chord ream over its whole length.
+            frozenset(
+                ("pd-vn-transgear-hub-key-pin-1", "pd-transgear-disc-hub-1")
+            ): _annulus_limit(1.5875, 1.5621, 7.9375),
+            # #2409: MHA-PD-VN-70 1/16 pin in the collar's .0615 blind ream,
+            # faced flush with the .243 model collar: 4.1402 long.
+            frozenset(
+                ("pd-vn-transgear-collar-flat-pin-1", "pd-transgear-drive-collar-1")
+            ): _annulus_limit(1.5875, 1.5621, 4.1402),
         },
         "ha-harmonic-analyzer": {
             # Exact nested bearing contacts, NOT manufactured interference.

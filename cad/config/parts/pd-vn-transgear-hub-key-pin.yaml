@@ -1,0 +1,13 @@
+pd-vn-transgear-hub-key-pin:
+  title: Transgear Hub Key Pin
+  number: MHA-PD-VN-69
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A416]
+  material: Alloy Steel
+  material_specification: "Alloy steel dowel pin, 1/16 x 5/16, hardened; McMaster-Carr 98381A416"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: purchased

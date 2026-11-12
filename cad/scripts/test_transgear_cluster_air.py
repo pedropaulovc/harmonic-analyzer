@@ -215,11 +215,12 @@ def test_hub_slides_forward_on_the_boss_by_the_end_float():
     slide = FIT.END_FLOAT_RANGE[1]
     sleeve_min = FIT.OL[1] - FIT.OL[2]
     tooth_max = FIT.TL[1] + FIT.TL[2]
-    assert HUB.FLAT_DRIVE_LENGTH_MIN <= HUB.HUB_LENGTH_MIN - HUB.SPIGOT_LENGTH_MAX
-    assert (
-        HUB.FLAT_DRIVE_LENGTH_MIN
-        <= sleeve_min - tooth_max - slide - HUB.SPIGOT_LENGTH_MAX
-    )
+    # #2409: the hub's chord key pin rides over the sleeve's flat; slid
+    # forward by the end float, its section still lies over the flat, ahead
+    # of the flat's end wall and behind the shortest sleeve's nose.
+    pin_r = max(HUB.KEY_PIN.DIA_LIMITS_MM) / 2.0
+    assert HUB.KEY_PIN_FLAT_END_CLEARANCE_WORST > 0.0
+    assert HUB.KEY_PIN_SLEEVE_Z + slide + pin_r < sleeve_min
     assert HUB.ROUND_ENGAGEMENT_MIN <= sleeve_min - tooth_max - slide
     assert HUB.ROCK_ANGLE_MAX == pytest.approx(
         HUB.BOSS_CLEARANCE / HUB.ROUND_ENGAGEMENT_MIN

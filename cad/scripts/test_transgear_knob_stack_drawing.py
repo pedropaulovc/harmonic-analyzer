@@ -1,7 +1,8 @@
 """Worst-case contracts of the transgear knob stack (R9-52, R9-53, R9-54).
 
 The MHA-PD-08 knob shaft's #8-32 stud and D-core, the MHA-PD-22 drive
-collar's matching D-bore and rear-face clamp reaction on actual gear face F,
+collar's round bore and pressed flat pin (#2409) and its rear-face clamp
+reaction on actual gear face F,
 and the MHA-PD-13 thumbnut, each pair judged at the printed worst case
 (drawing-guidelines.md rule 17 (walls and webs)). Every corner is recomputed from printed values and places,
 not read back from derived constants; reloads prove the refusal guards.
@@ -71,7 +72,7 @@ def _reloaded_nut(monkeypatch, angular_row: float):
     return fresh
 
 
-def test_true_d_fit_clears_the_core_and_round_stud_at_printed_limits(
+def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits(
     monkeypatch,
 ) -> None:
     core = tuple(shaft.CORE_DIA + delta for delta in sorted(shaft.CORE_DIA_BAND))
@@ -79,26 +80,31 @@ def test_true_d_fit_clears_the_core_and_round_stud_at_printed_limits(
     core_flat = tuple(
         shaft.CORE_FLAT_FROM_AXIS + delta for delta in sorted(shaft.CORE_FLAT_BAND)
     )
-    bore_flat = tuple(
-        collar.FLAT_TO_AXIS + delta for delta in sorted(collar.FLAT_BAND)
+    # The pin's crest: its centre .118 ±.002 less the 1/16 pin's 0/+.0002 radius.
+    crest = (
+        (0.118 - 0.002) * INCH - (0.0627 * INCH) / 2.0,
+        (0.118 + 0.002) * INCH - (0.0625 * INCH) / 2.0,
     )
     curved_air = (bore[0] - core[1], bore[1] - core[0])
-    flat_air = (bore_flat[0] - core_flat[1], bore_flat[1] - core_flat[0])
+    crest_air = (crest[0] - core_flat[1], crest[1] - core_flat[0])
     assert core == pytest.approx((4.83108, 4.8514))
     assert curved_air == pytest.approx((0.0254, 0.05842))
-    assert flat_air == pytest.approx((0.02032, 0.0508))
+    assert collar.BORE_CORE_CLEARANCE == pytest.approx(curved_air)
+    assert collar.FLAT_PIN_CREST_LIMITS == pytest.approx(crest)
+    assert crest_air == pytest.approx((0.01651, 0.13589))
+    assert collar.FLAT_PIN_CREST_CLEARANCE == pytest.approx(crest_air)
     # The #8-32 UNC-2A class governs the blank: its largest major.
     stud_max = max(shaft.THREAD_BLANK_LIMITS)
-    stud_air = min(bore[0] / 2.0, bore_flat[0]) - stud_max / 2.0
-    assert stud_air == pytest.approx(0.08255)
-    assert collar.STUD_D_BORE_AIR == pytest.approx(stud_air)
+    stud_air = min(bore[0] / 2.0, crest[0]) - stud_max / 2.0
+    assert stud_air == pytest.approx(0.07874)
+    assert collar.STUD_FLAT_PIN_AIR == pytest.approx(stud_air)
     with monkeypatch.context() as patch:
-        with pytest.raises(AssertionError, match="the D-flat binds"):
-            _reloaded_collar(patch, shaft, "CORE_FLAT_BAND", (0.030, -0.015))
+        with pytest.raises(AssertionError, match="the flat pin's crest binds"):
+            _reloaded_collar(patch, shaft, "CORE_FLAT_BAND", (0.060, -0.015))
     with monkeypatch.context() as patch:
         with pytest.raises(AssertionError, match="the bore binds"):
             _reloaded_collar(patch, shaft, "CORE_DIA_BAND", (0.030, -0.008))
-    with pytest.raises(AssertionError, match="round stud cannot pass the actual D-bore"):
+    with pytest.raises(AssertionError, match="round stud cannot pass the flat pin"):
         _reloaded_collar(monkeypatch, shaft, "THREAD_BLANK_LIMITS", (4.50, 4.60))
 
 
@@ -107,17 +113,18 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
 ) -> None:
     core_r = (shaft.CORE_DIA + min(shaft.CORE_DIA_BAND)) / 2.0
     bore_r = (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
-    flat_min = shaft.CORE_FLAT_FROM_AXIS + min(shaft.CORE_FLAT_BAND)
-    centre_float = math.sqrt(flat_min**2 + bore_r**2 - core_r**2) - flat_min
-    # The D axis is bounded at both support sections and extrapolated to F.
-    lever = 1.0 + 2.0 * collar.D_SUPPORT_TO_F_MAX / collar.D_SUPPORT_LENGTH_MIN
+    float_max = bore_r - core_r
+    # The bore's axis is bounded at both support sections of the core and
+    # extrapolated to F; its rear mouth takes the title block's edge break.
+    lever = 1.0 + 2.0 * shaft.FRONT_RELIEF_WIDTH_MAX / shaft.CORE_ACTIVE_LENGTH_MIN
+    assert collar.BORE_EDGE_BREAK_MAX == pytest.approx(0.254)
     inner = (
-        bore_r + collar.BORE_ENTRY_BREAK_LEG_MAX
-        + (centre_float + shaft.CORE_TOTAL_RUNOUT / 2.0) * lever
+        bore_r + collar.BORE_EDGE_BREAK_MAX
+        + (float_max + shaft.CORE_TOTAL_RUNOUT / 2.0) * lever
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
-    assert collar.D_CENTRE_FLOAT_MAX == pytest.approx(centre_float)
-    assert inner == pytest.approx(2.815058, abs=1e-6)
+    assert collar.ROUND_FIT_FLOAT_MAX == pytest.approx(float_max)
+    assert inner == pytest.approx(2.791574, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)
@@ -188,7 +195,9 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     # full thread on incomplete thread rather than on the relief.
     bad_runout_end = 6.5 + printed_band_mm(3, unit=shaft.UNIT) + PITCH
     assert nut_seat + nut.REAR_THREAD_LOSS < bad_runout_end
-    with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 core step"):
+    # #2409: the round bore's own reach check (its rear-mouth break short of
+    # the core's front) is the stricter refusal and fires first.
+    with pytest.raises(AssertionError, match="the bore ends short of the core's front"):
         _reloaded_collar(monkeypatch, shaft, "CORE_FRONT_FROM_F", 6.5)
 
 

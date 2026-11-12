@@ -475,6 +475,7 @@ CLUSTER_STEMS = frozenset(
         "pd-transgear-feed-pinion",
         "pd-rack-pinion",
         "pd-transgear-disc-hub",
+        "pd-vn-transgear-hub-key-pin",
         "pd-vn-transgear-disc-screw",
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
@@ -932,6 +933,7 @@ BOM_PART_NUMBERS = {
     "pd-transgear-rear-bushing": _config.parts("pd-transgear-rear-bushing")["number"],
     "pd-transgear-feed-pinion": _config.parts("pd-transgear-feed-pinion")["number"],
     "pd-transgear-disc-hub": _config.parts("pd-transgear-disc-hub")["number"],
+    "pd-vn-transgear-hub-key-pin": _config.parts("pd-vn-transgear-hub-key-pin")["number"],
     "pd-transgear-front-bushing": _config.parts("pd-transgear-front-bushing")["number"],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
     "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")["number"],
@@ -940,6 +942,9 @@ BOM_PART_NUMBERS = {
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
     "pd-transgear-drive-collar": _config.parts("pd-transgear-drive-collar")["number"],
     "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")["number"],
+    "pd-vn-transgear-collar-flat-pin": _config.parts("pd-vn-transgear-collar-flat-pin")[
+        "number"
+    ],
     "pd-transgear-thumbnut": _config.parts("pd-transgear-thumbnut")["number"],
     "pd-transgear-knob-thrust-ring": _config.parts("pd-transgear-knob-thrust-ring")["number"],
     "pd-transgear-knob-cup": _config.parts("pd-transgear-knob-cup")["number"],
@@ -982,6 +987,9 @@ _SKU = {
         "supplier_skus"
     ][0],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
+    "pd-vn-transgear-hub-key-pin": _config.parts("pd-vn-transgear-hub-key-pin")[
+        "supplier_skus"
+    ][0],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")[
         "supplier_skus"
     ][0],
@@ -989,6 +997,9 @@ _SKU = {
         "supplier_skus"
     ][0],
     "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")[
+        "supplier_skus"
+    ][0],
+    "pd-vn-transgear-collar-flat-pin": _config.parts("pd-vn-transgear-collar-flat-pin")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-knob-cup-pin": _config.parts("pd-vn-transgear-knob-cup-pin")["supplier_skus"][
@@ -1052,6 +1063,9 @@ BOM_DESCRIPTIONS = {
         f"{feed_pinion.DIAMETRAL_PITCH:g}DP PA{feed_pinion.PRESSURE_ANGLE_DEG:g}"
     ),
     "pd-transgear-disc-hub": "TRANSGEAR DISC HUB",
+    "pd-vn-transgear-hub-key-pin": (
+        f"HUB KEY PIN, MCMASTER {_SKU['pd-vn-transgear-hub-key-pin']}"
+    ),
     "pd-transgear-front-bushing": "TRANSGEAR FRONT BUSHING",
     "pd-vn-transgear-retaining-ring": (
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
@@ -1076,6 +1090,9 @@ BOM_DESCRIPTIONS = {
     "pd-transgear-drive-collar": "KNOB DRIVE COLLAR",
     "pd-vn-transgear-knob-drive-pin": (
         f"WHEEL DRIVE DOWEL, MCMASTER {_SKU['pd-vn-transgear-knob-drive-pin']}"
+    ),
+    "pd-vn-transgear-collar-flat-pin": (
+        f"COLLAR FLAT PIN, MCMASTER {_SKU['pd-vn-transgear-collar-flat-pin']}"
     ),
     "pd-transgear-thumbnut": "TRANSGEAR THUMBNUT",
     "pd-transgear-knob-thrust-ring": "KNOB THRUST RING",
@@ -1114,6 +1131,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
     "pd-transgear-disc-hub": 1,
+    "pd-vn-transgear-hub-key-pin": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
     # The kit: the stack's nominal count plus the spares (DETAIL E sets the
@@ -1124,6 +1142,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
     "pd-vn-transgear-knob-drive-pin": len(seat_geometry.PIN_HOLE_ANGLES_DEG),
+    "pd-vn-transgear-collar-flat-pin": 1,
     "pd-transgear-removable": 3,  # two mounted wheels plus the loose T18 spare
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
@@ -1179,14 +1198,17 @@ TRANSGEAR_INSTANCES = frozenset(
 # obscured by their neighbours. The pin, front bushing and retaining ring
 # attach within 3.5 mm of each other on the pin nose, so their three leaders
 # met there with overlapping arrowheads (machinist review, run
-# 20261024T124144759Z). Sheet 3's explode shows and balloons them all, with
-# every other family it draws apart.
+# 20261024T124144759Z). The collar's flat pin and the hub's key pin sit
+# inside their hosts (#2409). Sheet 3's explode shows and balloons them all,
+# with every other family it draws apart.
 ISO_HIDDEN_STEMS = frozenset(
     {
         "pd-transgear-feed-pinion",
         "pd-transgear-knob-shaft",
         "pd-transgear-drive-collar",
         "pd-vn-transgear-knob-drive-pin",
+        "pd-vn-transgear-collar-flat-pin",
+        "pd-vn-transgear-hub-key-pin",
         "pd-vn-transgear-knob-cup-pin",
         "pd-vn-transgear-arm-plate-screw",
         "pd-vn-transgear-arm-plate-locating-pin",
@@ -1947,7 +1969,7 @@ def _step_text(
     )
     bare_gap = " TO ".join(steps.inch_text(limit * 25.4, 3) for limit in _bare_in)
     # Remedies that run back through joints made permanent by then (15J
-    # stake, 22D/22E cross-pin, 9E-9H tapped disc) release and renew named
+    # stake, 22D/22E cross-pin, 9G-9K tapped disc) release and renew named
     # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
     # owner confirmation (#2144): renew, the bar's staked tap re-chased and
     # re-staked on fresh metal, 31E's cluster re-faced without renewal.
@@ -1967,6 +1989,16 @@ def _step_text(
     )
     pivot_tap_chased = f"RE-CHASE THE {n['pd-support-bar']} BAR'S PIVOT TAP FROM THE FRONT."
     fresh_stake = f"STAKING FRESH METAL AT {s('hanger-pivoted', 8)}"
+    # #2409: the hub is keyed to the sleeve's flat by its MHA-PD-VN-69 pin,
+    # pressed along a chord of the hub to its ream's stop before the hub is
+    # fitted, its side lying over the flat. The flat runs out at the nose, so
+    # a remedy slides hub and disc off and back on with the pin riding it;
+    # the pin stays in the hub, on any sleeve.
+    hub_pin = n["pd-vn-transgear-hub-key-pin"]
+    hub_slid_off = (
+        f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} NOSE AS ONE, "
+        f"THE {hub_pin} PIN RIDING THE FLAT."
+    )
 
     return {
         "bar-clamped": (
@@ -2157,17 +2189,20 @@ def _step_text(
             f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {s('arm-plate-located', 0)}.",
             "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
             f"{steps.step_number('disc-cluster-assembled')}-"
-            f"{steps.step_number('disc-taps-transferred')} AND REPEAT FROM "
+            f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
+            f"{hub_pin} PIN LEFT IN AND RIDING THE FLAT, AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
             # The disc is screwed to the hub by then, so it is slackened before
             # it is centred again (codjiflo P3 on 593f4ee).
             "SLIDE THE HUB AND DISC AS ONE OFF A "
-            f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE.",
+            f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
             f"WITH THE {n['pd-vn-transgear-disc-screw']} SCREWS SLACKENED, REPEAT "
-            f"{s('disc-cluster-assembled', 1)}, {s('disc-taps-transferred', 0)}-"
+            f"{s('disc-cluster-assembled', 3)}-{s('disc-cluster-assembled', 4)}, "
+            f"{s('disc-taps-transferred', 0)}-"
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 16)} ON A NEW "
-            f"{n['pd-transgear-feed-pinion']}, THEN FROM {s('arm-plate-located', 9)}.",
+            f"{n['pd-transgear-feed-pinion']}, THEN FROM "
+            f"{s('arm-plate-located', 9)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
             "IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
@@ -2285,10 +2320,16 @@ def _step_text(
             f"({PIVOT_VIEW_REF}).",
         ),
         "disc-cluster-assembled": (
-            f"FIT THE {n['pd-rack-pinion']} DISC ON THE {n['pd-transgear-disc-hub']} "
-            "HUB'S SPIGOT.",
-            f"FIT THE HUB'S D-BORE ON THE {n['pd-transgear-feed-pinion']} D-FLAT, "
-            f"SPIGOT TO THE {n['pd-transgear-feed-pinion']} STEP FACE.",
+            f"PRESS THE {hub_pin} PIN INTO THE {n['pd-transgear-disc-hub']} HUB'S "
+            "REAMED CROSS HOLE FROM ITS REAMED END UNTIL IT STOPS.",
+            _press_remedy(
+                "PIN", f"{n['pd-transgear-disc-hub']} HUB", "disc-cluster-assembled"
+            ),
+            f"FIT THE {n['pd-rack-pinion']} DISC ON THE HUB'S SPIGOT.",
+            f"SLIDE THE HUB'S BORE ON THE {n['pd-transgear-feed-pinion']} BOSS FROM "
+            "THE NOSE, THE PIN OVER THE FLAT, SPIGOT TO THE "
+            f"{n['pd-transgear-feed-pinion']} STEP FACE.",
+            "CHECK: TURNED EACH WAY, THE HUB DRIVES THE SLEEVE THROUGH THE PIN.",
         ),
         "disc-taps-transferred": (
             # #2418: not a Ø1/8 mandrel between centres, a precision tool of
@@ -2405,6 +2446,11 @@ def _step_text(
             _press_remedy(
                 "DOWEL", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
             ),
+            f"PRESS THE {n['pd-vn-transgear-collar-flat-pin']} PIN INTO THE COLLAR'S "
+            "REAR BLIND HOLE TO THE BOTTOM; COLLAR AND PIN ARE ONE PERMANENT UNIT.",
+            _press_remedy(
+                "PIN", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
+            ),
         ),
         "pilot-faced-to-fit": (
             f"FACE THE {n['pd-transgear-drive-collar']} COLLAR'S FRONT PILOT "
@@ -2432,8 +2478,8 @@ def _step_text(
             f"CUP AND {n['pd-transgear-knob-shaft']} SHAFT AND REPEAT FROM "
             f"{s('knob-stack-fitted', 0)}.",
             f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
-            f"{n['pd-transgear-knob-shaft']} SHAFT'S D-FLAT, ITS DOWELS FORWARD, "
-            "NOT YET FIXED TO THE SHAFT.",
+            f"{n['pd-transgear-knob-shaft']} SHAFT, ITS PIN ON THE D-FLAT, ITS DOWELS "
+            "FORWARD, NOT YET FIXED TO THE SHAFT.",
             "TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP "
             f"{steps.step_number('chain-closed')}; FROM THEN ON, TURN THE CRANK.",
         ),
@@ -2534,7 +2580,8 @@ def _step_text(
             f"{steps.step_number('fitup-pose-set')}.",
             f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
             f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
-            "AFTER INSPECTING THEM, CHECK THE RACK AND GUIDES FOR LOOSENESS.",
+            "AFTER INSPECTING THEM, CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, "
+            "THE RACK AND GUIDES DO NOT MOVE ON THE PLATEN.",
             f"AFTER CHECKING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
@@ -2599,15 +2646,14 @@ def _step_text(
             "FOR A FAULT ONCE A DISC TURN (A DISC TOOTH), STRIP THE CLUSTER "
             f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
             "KEEPING ITS SHIMS.",
-            "SLIDE THE HUB AND DISC OFF THE "
-            f"{n['pd-transgear-feed-pinion']} D-FLAT AS ONE.",
+            hub_slid_off,
             # A new disc's thickness is its own, so the old screws' cut tips
             # no longer sit in their window under its rear face: new screws,
             # cut again (codjiflo P2 on 27438d7).
             f"REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')} WITH A NEW "
             f"{n['pd-rack-pinion']} DISC AND NEW {n['pd-vn-transgear-disc-screw']} "
-            f"SCREWS ON THE SAME HUB, THEN STEPS "
+            f"SCREWS ON THE SAME HUB, ITS PIN LEFT IN AND RIDING THE FLAT, THEN STEPS "
             f"{steps.step_number('disc-screws-cut')}, "
             f"{steps.step_number('disc-cluster-hung')}-"
             f"{steps.step_number('disc-cluster-shimmed')} AND FROM STEP {pose}.",
@@ -2652,6 +2698,8 @@ def _step_text(
             "FACE THE COLLAR'S REAR UNTIL, REFITTED, THE "
             f"{knob_short}'S FRONT FACE STANDS {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
             f"OF THE {crank_short}'S FRONT FACE.",
+            "BREAK THE COLLAR'S REAR BORE MOUTH 45° TO ITS SHEET'S SIZE, THROUGH THE "
+            f"{n['pd-vn-transgear-collar-flat-pin']} PIN'S CREST WITH IT.",
             f"CHECK: THE FINISHED COLLAR BODY IS WITHIN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
             f"IF NOT, OR IF THE {s('collar-rear-faced-to-fit', 1)} READING WAS "
@@ -2660,7 +2708,8 @@ def _step_text(
             f"FROM STEP {steps.step_number('collar-pins-pressed')}.",
         ),
         "collar-shoulder-seated": (
-            f"SEAT THE {n['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
+            f"SEAT THE {n['pd-transgear-drive-collar']} COLLAR ON THE SHAFT, ITS PIN ON "
+            "THE D-FLAT, "
             f"ITS REAR FACE ON THE {n['pd-transgear-knob-shaft']} {teeth} FRONT "
             "FACE.",
             f"FIT THE {knob} ON THE DRIVE DOWELS.",
@@ -2695,8 +2744,8 @@ def _step_text(
             f"IF SHORT, {knob_stack_off}",
             f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
             f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-            f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} D-FLAT "
-            "AS ONE, THEIR SCREWS LEFT IN.",
+            f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} NOSE "
+            f"AS ONE, THEIR SCREWS LEFT IN, THE {hub_pin} PIN RIDING THE FLAT.",
             # The feeler check carries every feeler-accepted collar-air source:
             # the MHA-PD-10 step face (Q1 C), the MHA-PD-17 spigot end ⊥ .001
             # (owner ruling 2026-11-08 (Pedro), #2144 item 3.2) and the
@@ -2718,8 +2767,8 @@ def _step_text(
             f"{s('collar-disc-air-inspected', 3)} READING; "
             f"THE {n['pd-transgear-disc-hub']} SPIGOT END SEATS ON IT, SO HUB AND "
             "DISC SET BACK BY THAT AMOUNT.",
-            "REFIT THE HUB'S D-BORE ON THE D-FLAT, SPIGOT TO THE STEP FACE, DISC "
-            "AND HUB MATCH MARKS TOGETHER.",
+            "SLIDE THE HUB'S BORE BACK ON THE BOSS FROM THE NOSE, ITS PIN RIDING "
+            "THE FLAT, SPIGOT TO THE STEP FACE, DISC AND HUB MATCH MARKS TOGETHER.",
             f"REPEAT {s('disc-taps-transferred', 1)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 15)}.",
             f"RE-DRILL THE OIL HOLE THROUGH THE HUB INTO THE SLEEVE'S HOLE, AS STEP "

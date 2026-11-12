@@ -1,0 +1,17 @@
+pd-vn-transgear-collar-flat-pin:
+  title: Collar Flat Pin
+  number: MHA-PD-VN-70
+  stock_name: 18-8 Stainless Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [90145A414]
+  material: AISI 304
+  material_specification: "18-8 stainless steel dowel pin, 1/16 x 3/16, Chamfer ends, unhardened; McMaster-Carr 90145A414"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  # Modified purchased part (#2409): pressed into MHA-PD-22's blind ream, its
+  # rear end is faced flush with the collar's rear face when the collar is
+  # faced to fit at assembly (the model's default configuration); the sheet
+  # draws the AS SUPPLIED STOCK configuration.
+  process: purchased
+  drawing_unit: in

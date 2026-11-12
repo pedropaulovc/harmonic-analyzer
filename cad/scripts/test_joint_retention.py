@@ -173,6 +173,21 @@ def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
     assert jr.REQUIRED_JOINTS[row.id].anchor == row.lock_step
 
 
+def test_disc_hub_key_pin_is_an_unthreaded_press_with_no_joint_row() -> None:
+    """#2409: MHA-PD-VN-69 is a dowel pressed along the hub's chord ream to
+    its stop, its side keying the hub on the feed sleeve's flat; no thread, so no rule-23 lock
+    and no joint row, and the hub itself carries no thread."""
+    rows = {joint.id for joint in jr.JOINTS}
+    assert not any("hub-set-screw" in joint_id for joint_id in rows)
+    assert not any(
+        "pd_vn_transgear_hub_key_pin" in (joint.member, joint.receiver) for joint in jr.JOINTS
+    )
+    assert {"pd_vn_transgear_hub_key_pin", "pd_transgear_disc_hub"} <= jr.UNTHREADED_PARTS
+    assert "pd_transgear_disc_hub" not in jr.THREADED_PARTS
+    assert jr.UNTHREADED_STOCK["pd_vn_transgear_hub_key_pin"].startswith("dowel pin pressed")
+    assert "pd_vn_transgear_collar_flat_pin" in jr.UNTHREADED_STOCK
+
+
 def _audit(joints, inventory=INVENTORY, **kwargs):
     kwargs.setdefault("threaded", THREADED)
     kwargs.setdefault("unthreaded", UNTHREADED)
