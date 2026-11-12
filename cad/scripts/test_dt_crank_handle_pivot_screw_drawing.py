@@ -811,3 +811,114 @@ def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
     assert math.hypot(x - ax, y - ay) > crop + drawing.DETAIL_CROP_RADIUS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.index("keep=DETAIL_B_KEEP") < source.index("keep=SIDE_KEEP")
+
+
+class _ProfileCaptured(Exception):
+    """Raised at the revolve's volume check: the profile is complete."""
+
+
+def test_profile_runs_the_head_seat_into_a_tangent_round_and_dimensions_it(
+    monkeypatch,
+) -> None:
+    # #1757: drive the real build through the revolve profile with a
+    # recording adapter, stopping at the first volume check.
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    entities: dict[str, tuple[str, tuple[float, ...]]] = {}
+    dimensions: list[tuple[object, ...]] = []
+
+    def success(data: object = None) -> SimpleNamespace:
+        return SimpleNamespace(is_success=True, data=data)
+
+    def entity(kind: str, *coordinates: float) -> SimpleNamespace:
+        key = f"{kind}_{len(entities)}"
+        entities[key] = (kind, coordinates)
+        return success(key)
+
+    async def between(_adapter, start, end, kind, value, _label):
+        dimensions.append((start, end, kind, value))
+
+    async def sketch_dimension(first, second, kind, value):
+        dimensions.append((first, second, kind, value))
+        return success("dim")
+
+    adapter = SimpleNamespace(
+        currentSketchManager=SimpleNamespace(AddToDB=False),
+        _attempt=lambda read, default=None: read(),
+        create_part=AsyncMock(return_value=success()),
+        create_sketch=AsyncMock(return_value=success()),
+        add_centerline=AsyncMock(side_effect=lambda *p: entity("axis", *p)),
+        add_line=AsyncMock(side_effect=lambda *p: entity("line", *p)),
+        add_arc=AsyncMock(side_effect=lambda *p: entity("arc", *p)),
+        add_sketch_constraint=AsyncMock(return_value=success("constraint")),
+        add_sketch_dimension=AsyncMock(side_effect=sketch_dimension),
+        exit_sketch=AsyncMock(return_value=success()),
+        create_revolve=AsyncMock(return_value=success()),
+    )
+    for name in (
+        "set_global", "add_diametric_linear_dimension", "anchor_point_to_origin",
+        "ensure_fully_defined",
+    ):
+        monkeypatch.setattr(part, name, AsyncMock())
+    for name in ("apply_package_model_units", "name_last_feature"):
+        monkeypatch.setattr(part, name, MagicMock())
+    monkeypatch.setattr(part, "dimension_between", between)
+    monkeypatch.setattr(part.SketchDims, "apply", lambda *_args: [])
+
+    async def stop(*_args, **_kwargs):
+        raise _ProfileCaptured
+
+    monkeypatch.setattr(part, "volume_check", stop)
+    with pytest.raises(_ProfileCaptured):
+        asyncio.run(part.build(adapter))
+
+    r = seat.UNDER_HEAD_RADIUS_MAX
+    c = seat.HEAD_CHAMFER
+    shoulder_r, head_r = spec.SHOULDER_DIA / 2.0, spec.HEAD_DIA / 2.0
+    lines = {k: p for k, (kind, p) in entities.items() if kind == "line"}
+    (arc, (cx, cy, sx, sy, ex, ey)), = (
+        (k, p) for k, (kind, p) in entities.items() if kind == "arc"
+    )
+    assert (cx, cy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r + r))
+    assert (sx, sy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r))
+    assert (ex, ey) == pytest.approx((-spec.HEAD_LENGTH, shoulder_r + r))
+    # add_arc is CCW: the 90-degree fill, not its 270-degree complement.
+    sweep = (math.atan2(ey - cy, ex - cx) - math.atan2(sy - cy, sx - cx)) % math.tau
+    assert sweep == pytest.approx(math.pi / 2)
+    # The profile is one closed loop through the arc.
+    ends = [p[:2] for p in lines.values()] + [p[2:] for p in lines.values()]
+    ends += [(sx, sy), (ex, ey)]
+    for point in ends:
+        assert sum(1 for other in ends if other == pytest.approx(point)) == 2
+    head_break = next(
+        k for k, p in lines.items()
+        if p == pytest.approx(
+            (-(spec.HEAD_LENGTH - c), head_r, -spec.HEAD_LENGTH, head_r - c)
+        )
+    )
+    under_head_face = next(
+        k for k, p in lines.items()
+        if p == pytest.approx(
+            (-spec.HEAD_LENGTH, head_r - c, -spec.HEAD_LENGTH, shoulder_r + r)
+        )
+    )
+    shoulder = next(
+        k for k, p in lines.items()
+        if p == pytest.approx((sx, sy, -spec.SEAT_STATION, shoulder_r))
+    )
+    assert (arc, None, "radial", r) in dimensions
+    assert (f"{head_break}.start", f"{head_break}.end", "horizontal_distance", c) in (
+        dimensions
+    )
+    assert (f"{head_break}.start", f"{head_break}.end", "vertical_distance", c) in (
+        dimensions
+    )
+    constraints = [call.args for call in adapter.add_sketch_constraint.call_args_list]
+    assert (under_head_face, arc, "tangent") in constraints
+    assert (arc, shoulder, "tangent") in constraints
+    assert (under_head_face, None, "vertical") in constraints
+    assert (shoulder, None, "horizontal") in constraints
+    assert (head_break, None, "vertical") not in constraints
+    assert (head_break, None, "horizontal") not in constraints

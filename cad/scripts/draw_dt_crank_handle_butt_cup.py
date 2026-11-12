@@ -249,13 +249,21 @@ def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
     )
 
 
-# The break's radial leg: a vertical dimension whose extension lines run
-# right over the open pocket, its line 10 mm right of the circle, centred on
-# the break, with its two limits and callout rows beside it.
+# The break's axial leg, as the screw's head break (draw_dt_crank_handle_
+# pivot_screw DETAIL_B_KEEP): its two limits, then its three callout rows,
+# with the dimension line under the last row (5.1 mm from the keep to the
+# value, rows 5.5 mm apart, the line 2.5 mm under the last: 13.5 mm from the
+# keep to the line).  The line runs 4 mm over the circle's top; the block
+# stands right of both extension lines, its 17-character rows (43 mm at
+# 2.55 mm a character) starting 4 mm right of the floor-side line, so no
+# line strikes the text (farm run 20261112T185221266Z r1-r3: the radial
+# leg's dimension line ran through its centred block).
+FLOOR_HOLE_CHAMFER_TEXT_WIDTH = 0.044
+FLOOR_HOLE_CHAMFER_LINE_DROP = 0.0135
 DETAIL_KEEP = {
     "FloorHoleChamfer": (
-        DETAIL_CENTER[0] + DETAIL_CROP_RADIUS + 0.010,
-        (_detail_xy(*_MOUTH_ON_HOLE)[1] + _detail_xy(*_MOUTH_ON_FLOOR)[1]) / 2.0,
+        _detail_xy(*_MOUTH_ON_FLOOR)[0] + 0.004 + FLOOR_HOLE_CHAMFER_TEXT_WIDTH / 2.0,
+        DETAIL_CENTER[1] + DETAIL_CROP_RADIUS + 0.004 + FLOOR_HOLE_CHAMFER_LINE_DROP,
     ),
 }
 
@@ -552,6 +560,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # mouth break the detail holds.
     detail = _mouth_break_detail(adapter, section)
     set_hidden_lines_removed(adapter, detail)
+    # The pocket-floor round's wall-side tangent edge would print as a second
+    # floor line 2 mm inside the pocket at 20:1 (farm run 20261112T185221266Z).
+    detail.SetDisplayTangentEdges2(0)
+    if int(detail.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide MHA-DT-35 detail B tangent edges")
+    detail.UpdateViewDisplayGeometry()
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
