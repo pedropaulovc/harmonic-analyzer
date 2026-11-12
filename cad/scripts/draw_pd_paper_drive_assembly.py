@@ -2580,7 +2580,8 @@ def _step_text(
             f"{steps.step_number('fitup-pose-set')}.",
             f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
             f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
-            "AFTER INSPECTING THEM, CHECK THE RACK AND GUIDES FOR LOOSENESS.",
+            "AFTER INSPECTING THEM, CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, "
+            "THE RACK AND GUIDES DO NOT MOVE ON THE PLATEN.",
             f"AFTER CHECKING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
