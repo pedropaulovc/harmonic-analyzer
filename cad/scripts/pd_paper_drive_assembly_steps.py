@@ -211,46 +211,122 @@ BAR_TOP_ABOVE_DECK_TEXT = inch_text(BAR_TOP_ABOVE_DECK, 2)
 RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.0508  # .002
 # The feed rack's datum setup band and its gates are the builder's design
-# proofs (paper_drive_rack_setup). The sheet prints no backlash window for that
-# mesh: the fitter sets the arm on a feeler leaf in the mesh and accepts it on
-# function, no tight spot, no skipped tooth, a steady feed (owner direction
-# 2026-11-11, #2416).
-RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
-# The arm is swung up until the feed teeth wedge a feeler leaf of thickness t
-# into the rack and clamped there; drawn out, the leaf leaves t of normal gap
-# on each flank of the tooth-centred mesh, a datum backlash of 2t/cos(PA)
-# along the rack, whatever play lies behind the pinion (codjiflo P1 on
-# e690ffe and 5972cc9: platen shake with the knob held, and the disc's rim
-# rock through the hub's D-flat, could both pass with the teeth at
-# interference). The first leaf, .0025 (a standard leaf in 26- and 32-leaf
-# inch sets), lands inside the builder's design band: every rack-mesh gate
-# and the opposite-flank budget (rack index and face lead plus the feed's
-# lateral terms, codjiflo P2 on 2ba1416: .002 fell 0.012 mm short of it). The
-# second, used once if the first leaves a tight spot, keeps the teeth clear
-# of interference and the contact ratio at the continuous-action floor
-# below: the owner's option C on #2416 (2026-11-11) gives up the 1.2
-# guarantee at the loose end. It is this mesh's own floor; the same 1.1 is
-# the reducer's runout floor only by the same AGMA reasoning.
-FEED_FALLBACK_CONTACT_RATIO_FLOOR = 1.1
-FEED_MESH_LEAVES_MM = (0.0025 * 25.4, 0.003 * 25.4)
-FEED_MESH_LEAF_BACKLASH_MM = tuple(
-    2.0 * leaf / math.cos(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
-    for leaf in FEED_MESH_LEAVES_MM
+# proofs (paper_drive_rack_setup). The sheet prints no number for that mesh:
+# the fitter sets it by feel and accepts it on function, no tight spot, no
+# skipped tooth, a steady feed (owner direction 2026-11-11, #2416: the mesh
+# must not bind, must not come loose and must feed at constant speed;
+# backlash is not a function). As on the original, the arm is swung up until
+# the teeth are fully engaged without binding and latched there; a tight spot
+# is cleared by easing the arm off at it. No feeler, gauge or stop is used.
+# What the feel set guarantees is the floor: the arm sits at the first bind,
+# the flanks wedging at zero tooth-centred backlash or, at the corners where it
+# comes first, a rack crest on the pinion's flank below its base circle (the
+# interference point). The run's tight spot sets it, so every other station
+# runs looser by the rack's relative index error and the feed's lateral terms
+# (along the rack), the pinion's toothspace runout over a turn and the rack's
+# crest drift along the run (radial: the rack-soldered band lets one end of
+# the engaged feed sit 2 x RACK_CREST_TOL higher than the other; codjiflo P2
+# on 6fa30c1d3). The loosest feel set books those from the later of the two
+# binds. Easing past the bind is not booked: the remedy eases the arm only
+# until the teeth just turn free at the tight spot, which keeps the set at that
+# spot's bind (draw_pd_paper_drive_assembly, "hanger-meshed"); the no-skip
+# check before the hook is drilled only guards against the mesh coming loose.
+
+
+def _feed_first_bind_backlash_mm() -> float:
+    """The datum backlash at which the last printed corner clears interference."""
+    low, high = 0.0, feed_pinion.RACK_BACKLASH_RANGE[1]
+    if mesh_check.feed_rack_mesh((high, high)).interference_margin_min_mm < 0.0:
+        raise AssertionError(
+            "the feed mesh's design band reaches the interference point"
+        )
+    if mesh_check.feed_rack_mesh((low, low)).interference_margin_min_mm >= 0.0:
+        return low
+    for _ in range(60):
+        middle = (low + high) / 2.0
+        if mesh_check.feed_rack_mesh((middle, middle)).interference_margin_min_mm < 0.0:
+            low = middle
+        else:
+            high = middle
+    return high
+
+
+FEED_FIRST_BIND_BACKLASH_MM = _feed_first_bind_backlash_mm()
+# At the bind every printed corner keeps the rack's root clearance, positive
+# backlash and its crests clear of the interference point.
+mesh_check.feed_rack_mesh((FEED_FIRST_BIND_BACKLASH_MM,) * 2).require()
+_PRESSURE_ANGLE_TAN = math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
+# Each opening as tooth-centred backlash along the rack (a radial opening r
+# gives 2 r tan(PA)).
+FEED_LOOSE_TERMS_MM = {
+    "rack relative index": gear_quality.rack_pitch_index_deviation_mm(),
+    "feed lateral terms": paper_geometry.feed_lateral_deviation_mm(),
+    "pinion toothspace runout": (
+        2.0 * feed_pinion.TOOTH_SPACE_RUNOUT_TIR_MM * _PRESSURE_ANGLE_TAN
+    ),
+    "rack crest drift along the run": (
+        2.0 * (2.0 * RACK_CREST_TOL) * _PRESSURE_ANGLE_TAN
+    ),
+}
+# The terms are independent (the stock rack's index, the mounting and cock of
+# the feed, the pinion's cut, the solder joint), so the loose side takes
+# their root sum square. Delegated ruling (Main, 2026-11-11, under the owner
+# direction on #2416; owner review #2144): RSS here because the setting is by
+# feel and the acceptance is functional; an exception to the repo's
+# worst-case mesh stacks, limited to this mesh.
+FEED_LOOSEST_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.hypot(
+    *FEED_LOOSE_TERMS_MM.values()
 )
-mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[0],) * 2).require()
-if not (
-    gear_quality.rack_pitch_index_deviation_mm() + paper_geometry.feed_lateral_deviation_mm()
-    <= FEED_MESH_LEAF_BACKLASH_MM[0]
-):
-    raise AssertionError("the first feeler leaf leaves the feed mesh's opposite-flank budget")
-_LOOSE_LEAF_MESH = mesh_check.feed_rack_mesh((FEED_MESH_LEAF_BACKLASH_MM[1],) * 2)
-if [
-    problem
-    for problem in _LOOSE_LEAF_MESH.failures()
-    if not problem.startswith("contact ratio ")
-] or not _LOOSE_LEAF_MESH.contact_ratio_min >= FEED_FALLBACK_CONTACT_RATIO_FLOOR:
-    raise AssertionError(f"the second feeler leaf leaves the feed mesh: {_LOOSE_LEAF_MESH.summary}")
-FEED_MESH_LEAF_TEXTS = tuple(inch_text(leaf, 4).rstrip("0") for leaf in FEED_MESH_LEAVES_MM)
+# Reported, not gated: every term at its limit together.
+FEED_WORST_CASE_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.fsum(
+    FEED_LOOSE_TERMS_MM.values()
+)
+# Against coming loose and for a feed at constant speed: a contact ratio of at
+# least 1.0 at the loosest feel set, at every printed corner, keeps one tooth
+# pair in conjugate contact through every handover. Delegated ruling (Main,
+# 2026-11-11, under the owner direction on #2416; owner review #2144): no
+# precedent; it departs from the owner's 1.1 continuous-action floors at a
+# loose extreme (the reducer's runout extreme, 2026-10-11, and option C's 1.1
+# for the removed .003 leaf fallback), which only a gauged set could hold here.
+# Residual accepted under the same ruling: the floor holds at the pinion/rack
+# phase felt in step 24. A later re-latch enters at another tooth offset, and
+# the pinion's toothspace runout can bring its high tooth to the tightest
+# station, up to one TIR (0.051 mm) radial past the felt bind, about 0.037 mm
+# of backlash. A bind there is felt in service and cured by re-setting the arm
+# (step 25's remedy), as on the original.
+FEED_CONTACT_RATIO_FLOOR = 1.0
+FEED_LOOSEST_MESH = mesh_check.feed_rack_mesh(
+    (FEED_FIRST_BIND_BACKLASH_MM, FEED_LOOSEST_BACKLASH_MM)
+)
+if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
+    raise AssertionError(
+        f"the loosest feel set leaves the feed mesh: {FEED_LOOSEST_MESH.summary}"
+    )
+# If every term stacks, the contact ratio falls just under 1.0: a slight hitch
+# in the feed at that station, which the steady-advance check
+# ("loaded-rack-geometry-checked") catches. With every part inside its sheet
+# its remedy re-solders the rack with its crests reading the same at both ends
+# on step 2's height gauge, the one term the fitter controls, before setting
+# the mesh again by feel on a new hook. "The same" leaves at most one .001
+# division of drift, and with that the arithmetic worst case keeps the floor,
+# so the loop ends.
+FEED_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
+    (FEED_FIRST_BIND_BACKLASH_MM, FEED_WORST_CASE_BACKLASH_MM)
+)
+LEVEL_RACK_CREST_DRIFT = 0.0254  # one .001 height-gauge division
+FEED_LEVEL_RACK_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
+    (
+        FEED_FIRST_BIND_BACKLASH_MM,
+        FEED_WORST_CASE_BACKLASH_MM
+        - FEED_LOOSE_TERMS_MM["rack crest drift along the run"]
+        + 2.0 * LEVEL_RACK_CREST_DRIFT * _PRESSURE_ANGLE_TAN,
+    )
+)
+if not FEED_LEVEL_RACK_WORST_CASE_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
+    raise AssertionError(
+        "a level-soldered rack still leaves the feed mesh: "
+        f"{FEED_LEVEL_RACK_WORST_CASE_MESH.summary}"
+    )
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check

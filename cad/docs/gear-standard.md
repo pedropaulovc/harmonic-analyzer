@@ -119,9 +119,15 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   is at least zero (`cone_check` reports it; it is not a separate gate).
 - Against coming loose, cones T012–T120 must reach a contact ratio of at least
   1.0 at the loosest centre a feel set leaves them: the highest first bind of
-  any pair, opened by both gears' running runout, plus a 0.04 mm allowance
-  for the felt ease (`cone_set_stack.FEEL_EASE_MM`). Nominal ratios at the
-  ceiling run from 1.07 (T012) up to about 1.20.
+  any pair, opened by both gears' running runout. Check 4N then eases the set
+  out of the bind only until the gears turn freely. That ease is neither
+  printed nor measured, and no number is booked for it (delegated ruling
+  2026-11-12, Main, following the owner's direction of 2026-11-11 on #2416;
+  owner review
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144),
+  pending owner confirmation): the 0.04 mm allowance #2557 carried for it had
+  no source. Nominal ratios at the loosest centre run from 1.07 (T012) up to
+  about 1.20; T012 keeps a ratio of 1.0 for a further 0.04 mm of centre (REF).
 - T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
   ratio of 1 against the 20° 120T drum. Its DT6-FORM1 relief is gated at
   least 0.010 mm clear of every printed drum-tip path where the swing locks
@@ -178,19 +184,54 @@ hidden `KnobSettingReference` sketch), printed in sheet 6's DETAIL K: the S-K
 centre distance toleranced 43.794 +0.050/-0, the two DRO coordinates as
 references.
 
-The paper feed mesh (12T feed pinion on the purchased rack) is set at assembly
-on a feeler leaf, not on a number (owner direction on #2416, 2026-11-11: the
-mesh must not bind, must not come loose, and must feed steadily; backlash is
-not a function). MHA-PD-00 step 24 wedges a .0025 leaf in the teeth with the
-arm, clamps the arm and draws the leaf out. That leaves 2t/cos 20° = 0.135 mm
-of tooth-centred datum backlash whatever play lies behind the pinion, inside
-the builder's 0.12–0.14 design band and its opposite-flank budget. Only if
-that run shows a tight spot is the arm re-set once on a .003 leaf (0.162 mm).
-Its contact ratio is 1.177. That is below 1.2 but above the 1.1 continuous-
-action floor, which is the floor the owner's option C accepts at the loose
-end (`pd_paper_drive_assembly_steps.FEED_MESH_LEAF_BACKLASH_MM` and
-`FEED_FALLBACK_CONTACT_RATIO_FLOOR`). The latched mesh is then accepted on
-function: no tight spot, and no skipped tooth with the platen pushed by hand.
+The paper feed mesh (12T feed pinion on the purchased rack) is set by feel at
+assembly, not on a number (owner direction on #2416, 2026-11-11: the mesh must
+not bind, must not come loose, and must feed steadily; backlash is not a
+function). As on the original, MHA-PD-00 step 24 swings the arm up until the
+teeth are fully engaged without binding and clamps it there; the latch is then
+match-drilled at that mesh. No feeler, gauge or stop is used. A tight spot is
+cleared by easing the arm off at it only until the teeth just turn free there,
+which keeps the set at that spot's bind. Before the hook is drilled, the
+platen is pushed firmly by hand with the knob held and must skip no tooth; a
+skip sends the fitter to the parts.
+The latched mesh is then accepted on function: no tight spot over the whole
+engaged feed, no skipped tooth, a steady advance.
+
+No binding is what the feel set itself guarantees, at the pinion/rack phase
+felt in step 24: the arm sits at the first bind. A later re-latch enters at
+another tooth offset, and the pinion's toothspace runout can then bring its
+high tooth to the tightest station, up to one TIR (0.051 mm) radial past the
+felt bind, about 0.037 mm of backlash. That residual is accepted under the
+ruling below: a bind there is felt in service and cured by re-setting the arm
+(step 25's remedy), as on the original. At some printed corners a rack crest
+reaches the pinion's flank below its
+base circle before the flanks wedge, at 0.069 mm of tooth-centred backlash, so
+the stack starts from that later bind, where every corner keeps the 0.25 mm
+root clearance. The run's tight spot sets the arm, so every other station runs
+looser by the rack's index error and the feed's lateral terms (along the rack),
+the pinion's toothspace runout and the rack's crest drift along the run, up to
+twice the rack-soldered ±.002 crest band (radial). These are independent, and
+the loose side takes their root sum square: 0.188 mm of backlash at the
+loosest feel set. Against coming loose and for a feed at constant speed, every
+printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
+(`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). If every term stacks
+(0.299 mm, reported only as `FEED_WORST_CASE_MESH`), the contact ratio is 0.942,
+a slight hitch in the feed at that station, which the steady-advance check
+catches. The 1.0 floor and the root sum square are delegated rulings (Main,
+2026-11-11, under the owner's #2416 direction; owner review #2144):
+continuous conjugate action is what "paper advances at constant speed" asks,
+and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
+is used because the setting is by feel and the acceptance is functional, an
+exception to the worst-case mesh stacks limited to this mesh. A hitch with every
+part inside its sheet is cured by re-soldering the rack with its crests reading
+the same at both ends, which leaves at most one .001 division of drift; with
+that the arithmetic worst case keeps contact ratio 1.0 (1.037,
+`FEED_LEVEL_RACK_WORST_CASE_MESH`), and the mesh is set again by feel on a new
+hook. Easing
+past the bind is not booked: the remedy stops where the teeth just turn free,
+and the no-skip check only guards against the mesh coming loose. The builder's
+0.12–0.14 datum band remains the design proof of the modelled mesh
+(`paper_drive_rack_setup`).
 
 ### Setting the cone mesh
 
@@ -303,7 +344,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   and 17.99 mm) so that the whole cutter-form flank stays inside the stock
   cutter's ground profile at every tolerance corner.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
-  7.0565 mm channel pitch is unchanged.
+  7.0565 mm channel pitch was unchanged by the pitch change. The #1038
+  re-pitch (owner ruling 2026-11-11) then moved the channel pitch to 7.62 mm
+  (.300 in): sin i = 1.5875/7.62 gives a cone incline of 12.025°, a seat
+  pitch of 7.4528 mm (the cone face width, .2934 in) and a 149.056 mm
+  twenty-gear cone stack. Tooth counts, DP, PA, bores and keyways did not
+  move.
 - Cone outside diameters follow the AGMA standard blank: 7.26 mm at 12T up to
   64.35 mm at 120T, where the #2 cutter's form caps it just under the ideal
   64.56 mm. T006 is 4.31 mm, above its AGMA 4.23 mm, so that its tip keeps a

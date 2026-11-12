@@ -107,6 +107,10 @@ STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
 HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
+# The fifth instruction sheet: the greedy flow carries the sequence's tail
+# (today the end of the strap's preparation, its hub and its cuts; #2443)
+# onto it.
+CUTTING_SHEET = "STRAP CUTTING"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 LINEAR_MOTION_SHEET = "LINEAR MOTION FROM ABOVE"
 
@@ -396,6 +400,7 @@ SHEET_NAMES = (
     FIT_SHEET,
     OPERATION_SHEET,
     HOLDING_SHEET,
+    CUTTING_SHEET,
     LINEAR_MOTION_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
@@ -451,6 +456,7 @@ def package_sheet_scales(
         FIT_SHEET: NOTES_REFERENCE_SCALE,
         OPERATION_SHEET: ISOMETRIC_SCALE,
         HOLDING_SHEET: NOTES_REFERENCE_SCALE,
+        CUTTING_SHEET: NOTES_REFERENCE_SCALE,
         LINEAR_MOTION_SHEET: LINEAR_MOTION_SCALE,
     }
     return {
@@ -1030,35 +1036,55 @@ def note_ink_height(text: str) -> float:
     return NOTE_INK_FIRST_LINE_M + (lines - 1) * NOTE_INK_PITCH_M if lines else 0.0
 
 
-# The setting tables atop the last instruction sheet's right column, in
-# place of continued steps: the rail setting, pass and far limit tables.
+# The setting tables atop the strap holding sheet's right column (sheet 10,
+# the next to last instruction sheet), in place of continued steps: the rail
+# setting, pass and far limit tables.
 SETTING_SHEET = HOLDING_SHEET
 if SHEET_NAMES.index(SETTING_SHEET) + 1 != spec.SETTING_SHEET_NUMBER:
     raise AssertionError("the setting tables moved off the sheet the steps cite")
-SETTING_TABLES = tuple(
-    (
-        _wrapped((title,), width=STEPS_LINE_WIDTH),
-        header,
-        rows,
-        table_column_widths(header, rows),
-        label,
+
+
+def _table_specs(specs: Sequence[tuple[str, tuple[str, ...], tuple[tuple[str, ...], ...], str]]):
+    return tuple(
+        (
+            _wrapped((title,), width=STEPS_LINE_WIDTH),
+            header,
+            rows,
+            table_column_widths(header, rows),
+            label,
+        )
+        for title, header, rows, label in specs
     )
-    for title, header, rows, label in (
-        (spec.RAIL_SETTING_TITLE, spec.RAIL_SETTING_HEADER, spec.RAIL_SETTING_ROWS, "rail setting table"),
-        (spec.PASS_TABLE_TITLE, spec.PASS_TABLE_HEADER, spec.PASS_TABLE_ROWS, "pass table"),
-        (spec.FAR_LIMIT_TITLE, spec.FAR_LIMIT_HEADER, spec.FAR_LIMIT_ROWS, "far limit table"),
-    )
-)
+
+
+def _tables_bottom(tables) -> float:
+    # Their rows at the BOM's row height, which this package's BOM holds natively.
+    return STEPS_CONTINUED_XY[1] - sum(
+        note_ink_height(title) + TABLE_TITLE_GAP + (len(rows) + 1) * BOM_ROW_HEIGHT
+        for title, _, rows, _, _ in tables
+    ) - TABLE_GAP * (len(tables) - 1)
+
+
+SETTING_TABLES = _table_specs((
+    (spec.RAIL_SETTING_TITLE, spec.RAIL_SETTING_HEADER, spec.RAIL_SETTING_ROWS, "rail setting table"),
+    (spec.PASS_TABLE_TITLE, spec.PASS_TABLE_HEADER, spec.PASS_TABLE_ROWS, "pass table"),
+    (spec.FAR_LIMIT_TITLE, spec.FAR_LIMIT_HEADER, spec.FAR_LIMIT_ROWS, "far limit table"),
+))
+# The strap blank layout table (#2443, a location is a table row) atop the
+# strap cutting sheet's right column, the setting sheet having no room left.
+if SHEET_NAMES.index(CUTTING_SHEET) + 1 != spec.LAYOUT_SHEET_NUMBER:
+    raise AssertionError("the strap blank layout table moved off the sheet the steps cite")
+LAYOUT_TABLES = _table_specs((
+    (spec.BLANK_LAYOUT_TITLE, spec.BLANK_LAYOUT_HEADER, spec.BLANK_LAYOUT_ROWS, "strap blank layout table"),
+))
+SHEET_TABLES = {SETTING_SHEET: SETTING_TABLES, CUTTING_SHEET: LAYOUT_TABLES}
 if any(
     STEPS_CONTINUED_XY[0] + sum(widths) > SHEET_INNER_BORDER[2] - BOM_SHEET_CLEARANCE
-    for _, _, _, widths, _ in SETTING_TABLES
+    for tables in SHEET_TABLES.values()
+    for _, _, _, widths, _ in tables
 ):
     raise AssertionError("a setting table runs past the right border")
-# Their rows at the BOM's row height, which this package's BOM holds natively.
-SETTING_TABLES_BOTTOM = STEPS_CONTINUED_XY[1] - sum(
-    note_ink_height(title) + TABLE_TITLE_GAP + (len(rows) + 1) * BOM_ROW_HEIGHT
-    for title, _, rows, _, _ in SETTING_TABLES
-) - TABLE_GAP * (len(SETTING_TABLES) - 1)
+SETTING_TABLES_BOTTOM = _tables_bottom(SETTING_TABLES)
 
 
 @dataclass(frozen=True)
@@ -1076,7 +1102,7 @@ class StepsSheet:
         """The source view's room under the right column, over its caption."""
         top = STEPS_CONTINUED_XY[1]
         if self.tables:
-            top = SETTING_TABLES_BOTTOM - REGION_GAP
+            top = _tables_bottom(SHEET_TABLES[self.sheet]) - REGION_GAP
         elif self.right:
             top -= _note_height(self.right) + REGION_GAP
         return (
@@ -1087,12 +1113,12 @@ class StepsSheet:
         )
 
 
-INSTRUCTION_SHEETS = (STEPS_SHEET, FIT_SHEET, OPERATION_SHEET, HOLDING_SHEET)
+INSTRUCTION_SHEETS = (STEPS_SHEET, FIT_SHEET, OPERATION_SHEET, HOLDING_SHEET, CUTTING_SHEET)
 STEPS_HEADING = (
     f"ASSEMBLY SEQUENCE (SHEETS {SHEET_NAMES.index(INSTRUCTION_SHEETS[0]) + 1}-"
     f"{SHEET_NAMES.index(INSTRUCTION_SHEETS[-1]) + 1})"
 )
-STEPS_CONTINUED_HEADING = "ASSEMBLY SEQUENCE, CONTINUED"
+STEPS_CONTINUED_HEADING = "ASSEMBLY SEQUENCE, CONTINUED (CODES: SHEET 1; S, NEAR, FAR: SHEET 7)"
 _RIGHT_FLOOR = (
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP
     + NOTES_REFERENCE_MIN_HEIGHT + REGION_GAP
@@ -1113,6 +1139,7 @@ INSTRUCTION_LINES = (
     spec.GENERAL_TORQUE_NOTE,
     spec.PIVOT_HOLE_KEY,
     spec.STATION_KEY,
+    spec.NEAR_FAR_KEY,
     *spec.ASSEMBLY_STEPS,
     "PASS CHANGE AND SERVICE:",
     *spec.OPERATION_STEPS[_OPERATION_START:_CUTTING_START],
@@ -1146,22 +1173,24 @@ def steps_sheets(lines: Sequence[str]) -> tuple[StepsSheet, ...]:
         heading = STEPS_HEADING if index == 0 else STEPS_CONTINUED_HEADING
         left, count = _column_fit(rest, STEPS_XY[1] - STEPS_FLOOR, heading=heading)
         rest = rest[count:]
-        if sheet == SETTING_SHEET:
+        if sheet in SHEET_TABLES:
             sheets.append(StepsSheet(sheet, left, "", tables=True))
             continue
         right, count = _column_fit(rest, STEPS_CONTINUED_XY[1] - _RIGHT_FLOOR, heading=None)
         rest = rest[count:]
         sheets.append(StepsSheet(sheet, left, right))
     if rest:
-        raise ValueError(f"the instructions overrun sheets 7-10 by {len(rest)} lines")
+        first, last = (SHEET_NAMES.index(INSTRUCTION_SHEETS[i]) + 1 for i in (0, -1))
+        raise ValueError(f"the instructions overrun sheets {first}-{last} by {len(rest)} lines")
     return tuple(sheets)
 
 
 STEPS_SHEETS = steps_sheets(INSTRUCTION_LINES)
 STEPS_BY_SHEET = {layout.sheet: layout for layout in STEPS_SHEETS}
-_SETTING_ROOM = STEPS_BY_SHEET[SETTING_SHEET].view_region
-if _SETTING_ROOM[3] - _SETTING_ROOM[1] < NOTES_REFERENCE_MIN_HEIGHT:
-    raise AssertionError("the setting tables leave too little room for the reference view")
+for _table_sheet in SHEET_TABLES:
+    _room = STEPS_BY_SHEET[_table_sheet].view_region
+    if _room[3] - _room[1] < NOTES_REFERENCE_MIN_HEIGHT:
+        raise AssertionError("the setting tables leave too little room for the reference view")
 # The stud acceptance (spec.HOLD_DOWN_REFERENCE, cited by the kit drawing) is
 # printed on the sheet the spec names.
 _STUD_CHECK_HEAD = f"{spec.HOLD_DOWN_STEPS_REFERENCE.split('-')[0]}. "
@@ -3248,7 +3277,7 @@ def _place_setting_tables(adapter: Any, sheet_name: str) -> None:
     """Each setting table's title, then the table under it; the next title
     under the table's read-back bottom."""
     x, top = STEPS_CONTINUED_XY
-    for title, header, rows, widths, label in SETTING_TABLES:
+    for title, header, rows, widths, label in SHEET_TABLES[sheet_name]:
         _add_note_block(adapter, sheet_name, title, (x, top), label=f"{label} title")
         box = _place_general_table(
             adapter,

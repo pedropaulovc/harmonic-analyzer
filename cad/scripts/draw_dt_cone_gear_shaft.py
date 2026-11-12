@@ -270,9 +270,9 @@ DIMENSION_SUFFIXES = {
     **SEAT_MATE_SUFFIXES,
     **{name: STACK_FLAG_SUFFIX for name in STACK_LENGTHS},
 }
-# The collar prints its reference diameter over the stock line with its edge
-# break and the roots line with its mates, lines as wide as "5/8 BAR AS
-# SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
+# The collar prints its reference diameter over the stock line with its mates
+# and the thrust-face line with its edge break and root limits, lines as wide
+# as "5/8 BAR AS SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the

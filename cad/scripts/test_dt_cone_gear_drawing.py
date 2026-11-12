@@ -163,7 +163,8 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     # longer than the pitch; cone_gear_stack owns the stack's band.
     assert spec.FACE_WIDTH == math.floor(spec.SEAT_PITCH * 1e4) / 1e4
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
-    assert spec.FACE_WIDTH_BAND == (0.0254, -0.0254)
+    upper, lower = spec.FACE_WIDTH_BAND
+    assert upper == -lower > 0.0  # centred, as the stack's partial bands need
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 
@@ -460,7 +461,8 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             if teeth in spec.SPIGOT_TEETH:
                 mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
             else:
-                mate = f"{shaft} MHA-DT-04, LAND 2"
+                land_name = f"\u00d8{spec.inch_text(spec.bore_dia_mm(teeth), 4)} LAND"
+                mate = f"{shaft} MHA-DT-04, {land_name}"
             assert lines[0] == f"1. BONDED SLIP FIT ON {mate}."
             assert drawing.KEY_MATE not in text
             # Rule 7 / rule 23: no size, no compound, no method in the note.

@@ -370,12 +370,12 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
 
 
 def test_the_step_sits_one_setback_inside_t030() -> None:
-    """The step T030|T024 sits 1.0 south of T030's north face, inside T030,
-    and at print-worst the step and its root stay south of T024."""
+    """The step T030|T024 sits one setback south of T030's north face, inside
+    T030, and at print-worst the step and its root stay south of T024."""
     spec = dt_cone_gear_shaft_spec
     station = spec.SECTION_ENDS[1] - spec.FRONT_STUB
     south, north = spec.gear_faces(15)
-    assert station == pytest.approx(north - 1.0)
+    assert station == pytest.approx(north - spec.SEAT_STEP_SETBACK)
     assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
     margin = _setback_margin(
         15,
@@ -1075,14 +1075,29 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     )
 
 
-def test_the_swing_platform_pivot_station_is_bit_identical() -> None:
-    """C1 keyed (owner decision 2026-11-09, PR #1992) moves no drilled hole in
-    the harmonic base: the pivot keeps origin/main's exact float, its 8.0
-    extension a literal now that the collar shift it summed is retired."""
+def test_the_swing_platform_pivot_stands_a_fixed_reach_north_of_t006() -> None:
+    """The pivot's reach past T006's north face is fixed (23.0 plus the
+    literal 8.0 extension, C1 keyed, PR #1992); its station follows T006,
+    nineteen exact-tracking seat pitches from T120 (#1038: the pitch is a
+    config input, so the station is derived, never a pinned float)."""
+    import cone_pitch
     import cone_stations
 
     assert cone_stations.TIP_END_EXTENSION_MM == 8.0
-    assert cone_stations.PIVOT_STATION == 160.02197937541507
+    # The law: sin i = radius step / station pitch, seat pitch = pitch cos i.
+    assert cone_pitch.RADIUS_STEP == 3.0 * 25.4 / 48.0
+    seat_pitch = math.sqrt(cone_pitch.Z_PITCH**2 - cone_pitch.RADIUS_STEP**2)
+    assert cone_pitch.SEAT_PITCH == pytest.approx(seat_pitch, abs=1e-12)
+    t006_north = (
+        cone_stations.SHAFT_T120_STATION
+        + _cone_axis_constants.GEAR_AXIS_SHIFT
+        + 19 * seat_pitch
+        + cone_stations.CONE_FACE_STATION_REFERENCE / 2.0
+    )
+    assert cone_stations.T006_NORTH_FACE == pytest.approx(t006_north, abs=1e-9)
+    assert cone_stations.PIVOT_STATION - cone_stations.T006_NORTH_FACE == (
+        pytest.approx(23.0 + cone_stations.TIP_END_EXTENSION_MM, abs=1e-9)
+    )
     assert cone_line.PIVOT_STATION == cone_stations.PIVOT_STATION
 
 
@@ -1099,7 +1114,11 @@ def test_the_shaft_end_stays_inside_t024_at_every_limit() -> None:
         (north[1] - band + width[1], north[0] + band + width[0])
     )
     end_lower, end_upper = spec.printed_length_deviations("Sec2End")
-    assert end_upper == pytest.approx(-end_lower, abs=0.01)
+    # The title block's .XXX either side of the PRINTED value: the model
+    # (a stack closure, off the inch grid) stands within half a thousandth
+    # of it, so the two deviations differ by at most a thousandth.
+    assert end_upper - end_lower == pytest.approx(2.0 * _band(3))
+    assert abs(end_upper + end_lower) <= 0.001 * 25.4 + 1e-9
     recess = cone_tip_cluster.TIP_END_RECESS_MM
     low, high = spec.TIP_END_RECESS_LIMITS_MM
     assert low == pytest.approx(recess + spec.T024_NORTH_FACE_DEVIATION_MM[0] - end_upper)
@@ -1323,7 +1342,13 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
         + key.KEY_LENGTH_MM
         + key_band
     )
-    t024_south = spec.FRONT_STUB + spec.gear_faces(16)[0]
+    # T024's south face with the stack pushed onto the collar at its shortest.
+    t024_south = (
+        spec.FRONT_STUB
+        + spec.gear_faces(16)[0]
+        + cone_tip_cluster.TIP_SET_SHIFT_MM
+        + dt_cone_gear_stack.face_band(16, "south")[1]
+    )
     assert spec.KEY_NORTH_MARGIN_MM == pytest.approx(t024_south - north)
     assert spec.KEY_NORTH_MARGIN_MM > 0.0
     # Its text sits right of the web's and left of its own left arrow, its

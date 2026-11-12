@@ -128,7 +128,7 @@ PNG = OUTPUTS.png
 
 GEAR_SHEET = SHEET_NAMES[0]
 # 6:1 keeps the T006 tooth, its thickness witness and root envelope legible
-# (the family's T012 sheet's ratio) and the 1.23 in part inside the border.
+# (the family's T012 sheet's ratio) and the 1.30 in part inside the border.
 VIEW_SCALE = (6.0, 1.0)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 SHEET_SCALES = {GEAR_SHEET: VIEW_SCALE, CUTTER_DETAIL_SHEET: (1.0, 1.0)}
@@ -141,7 +141,10 @@ ISO_SCALE = (2.0, 1.0)
 # face on the axis) on SIDE_ORIGIN (``_place_origin``).
 AXIS_Y = 0.135
 FRONT_CENTER = (0.075, AXIS_Y)
-SIDE_ORIGIN = (0.2745, AXIS_Y)
+# x 0.2705: the .76 spigot (#1038) carries its centred bond callout 3.8 mm
+# further right than the .71 one did; at 0.2745 the callout's second line
+# ended on the inner border (farm run 20261111T234611671Z).
+SIDE_ORIGIN = (0.2705, AXIS_Y)
 ISO_CENTER = (0.385, 0.222)
 # Top-aligned: the numbered notes top-left, Gear Data right of them.
 NUMBERED_NOTES_POS = (0.015, 0.263)
@@ -174,7 +177,10 @@ SPIGOT_END_X = side_x(SPIGOT_END_Z_MM)
 # text above the part, in two tiers.
 # The spigot's block and the tip's share a tier (they never overlap in x);
 # the pivot's two callout lines reach over the leaves, so it stands above,
-# under Gear Data.
+# under Gear Data.  The spigot's block hangs right of its dimension line and
+# its first line names the compound (44 characters, ~114 mm), so the line
+# stands a quarter of the spigot from the leaves, which keeps the block's
+# end ~8 mm inside the border.
 BLANK_DIA_TEXT_Y = AXIS_Y + HALF_OD + 0.016
 SPIGOT_DIA_TEXT_Y = BLANK_DIA_TEXT_Y
 PIVOT_DIA_TEXT_Y = AXIS_Y + HALF_OD + 0.040
@@ -183,7 +189,10 @@ OVERALL_TEXT_Y = LENGTH_TEXT_Y - 0.018
 SIDE_KEEP = {
     "PivotDia": ((PIVOT_END_X + LEAVES_NORTH_X) / 2.0, PIVOT_DIA_TEXT_Y),
     "BlankDia": ((LEAVES_NORTH_X + LEAVES_SOUTH_X) / 2.0, BLANK_DIA_TEXT_Y),
-    "SpigotDia": ((LEAVES_SOUTH_X + SPIGOT_END_X) / 2.0, SPIGOT_DIA_TEXT_Y),
+    "SpigotDia": (
+        LEAVES_SOUTH_X + (SPIGOT_END_X - LEAVES_SOUTH_X) / 4.0,
+        SPIGOT_DIA_TEXT_Y,
+    ),
     "PivotLength": ((PIVOT_END_X + LEAVES_NORTH_X) / 2.0, LENGTH_TEXT_Y),
     "FaceWidth": ((LEAVES_NORTH_X + LEAVES_SOUTH_X) / 2.0, LENGTH_TEXT_Y),
     "SpigotLength": ((LEAVES_SOUTH_X + SPIGOT_END_X) / 2.0, LENGTH_TEXT_Y),
