@@ -281,7 +281,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "DeckCorners": {"DeckCornerRadius": 2},
     "DeckEdgeBreak": {"DeckEdgeChamfer": 2},
     "HeightReference": dict.fromkeys(HEIGHT_REFERENCE_DIMENSIONS, 2),
-    "CrossTapReference": {"CrossTapX": 3, "CrossTapFarX": 3},
+    # The cross holes need only enter their sockets, which are transferred
+    # from MHA-FR-02 (#2386); the tube holes are spotted through them at
+    # MHA-FR-00. .XX, not the socket table's .XXX (machinist review run
+    # 20261112T192037873Z, rule 3).
+    "CrossTapReference": {"CrossTapX": 2, "CrossTapFarX": 2},
     "PlanReference": {
         "PadX": 2,
         "PadY": 2,
