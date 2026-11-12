@@ -73,6 +73,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
     ("build_dt_cone_gear_tl_phasing_comb", "deviations"): ("MODEL_BANDS_MM", "values"),
+    # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
+    ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
@@ -315,6 +317,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 98830A511 supplied undersized key-stock section +0/-0.0508 mm, "
         "printed as supplier REF; cone_land_key's keyseat/keyway clearance proofs "
         "read the same band as KEY_STOCK_BAND"
+    ),
+    ("dt_cone_gear_tl_arbor_key_spec", "SIZE_BAND"): (
+        "1/16 undersized key-stock section +0/-0.0508 mm as supplied, printed as "
+        "stock REF; cone_land_key's keyseat/keyway clearance proofs read the same "
+        "band as KEY_STOCK_BAND"
     ),
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"

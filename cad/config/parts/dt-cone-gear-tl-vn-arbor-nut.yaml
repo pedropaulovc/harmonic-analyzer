@@ -1,0 +1,16 @@
+dt-cone-gear-tl-vn-arbor-nut:
+  title: Keyed Cutting Arbor Nut
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Issue #2465: clamps the backing collar and the blank to the arbor's shoulder.
+  number: MHA-DT-03-TL-VN-50
+  stock_name: Medium-Strength Zinc-Plated Steel Hex Nut
+  supplier: McMaster-Carr
+  supplier_skus: ["95462A505"]
+  material: Plain Carbon Steel
+  material_specification: "Medium-strength zinc-plated steel hex nut, SAE grade 5, ASME B18.2.2, 1/4-28 class 2B, 7/16 AF x 7/32; McMaster-Carr 95462A505"
+  finish: zinc plated
+  # https://www.mcmaster.com/95462A505/ read live 2026-11-12: $8.00 per pack of 100.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in

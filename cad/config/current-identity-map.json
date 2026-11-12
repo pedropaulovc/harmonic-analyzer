@@ -2122,6 +2122,50 @@
       ]
     },
     {
+      "old_stem": "dt-cone-gear-tl-keyed-arbor",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-keyed-arbor",
+          "number": "MHA-DT-03-TL-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-arbor-collar",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor-collar",
+          "number": "MHA-DT-03-TL-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-arbor-key",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor-key",
+          "number": "MHA-DT-03-TL-06"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-vn-arbor-nut",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-vn-arbor-nut",
+          "number": "MHA-DT-03-TL-VN-50"
+        }
+      ]
+    },
+    {
       "old_stem": "dt-cone-gear-tl-indexing",
       "old_number": null,
       "introduced": "2026-11-02",
@@ -2163,6 +2207,18 @@
         {
           "stem": "dt-cone-tip-gear-tl-cutter",
           "number": "MHA-DT-37-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-arbor",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor",
+          "number": "MHA-DT-03-TL-05"
         }
       ],
       "kind": "assembly"

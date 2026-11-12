@@ -77,6 +77,7 @@ _STOCK_REQUIREMENTS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-spacer": (("AS62-18-40",), "MHA-CH-06-TL-VN-78", 2),
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": (("SHIM-0375-008",), "MHA-CH-06-TL-VN-79", 10),
+    "dt-cone-gear-tl-vn-arbor-nut": (("95462A505",), "MHA-DT-03-TL-VN-50", 1),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {
