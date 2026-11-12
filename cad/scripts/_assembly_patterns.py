@@ -169,12 +169,15 @@ def assert_pattern_targets(
     rows: list[list[float]],
     label: str,
 ) -> None:
-    """Match unordered native-pattern instances to authored poses and gate each."""
+    """Match unordered native-pattern instances to authored poses and gate each.
+    Candidates are read in sorted name order, never the set's (string hashing
+    is salted per process), so the transform reads are the same COM calls in
+    the same order on every run."""
     unmatched = set(instances)
     for target in targets:
         matching = [
             name
-            for name in unmatched
+            for name in sorted(unmatched)
             if all(
                 abs(
                     component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis]

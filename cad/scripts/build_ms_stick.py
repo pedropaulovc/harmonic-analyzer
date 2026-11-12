@@ -851,7 +851,11 @@ async def build(adapter) -> dict[str, str]:
             f"MinorPattern: expected one dim reading the {DIVISION_SPACING} pitch, "
             f"found {minor_pitch_dims}"
         )
-    drive_jobs.append((minor_pitch_dims[0], '"DivisionSpacing"'))
+    # FullName ends in the document's title (D3@MinorPattern@Part24.Part), a
+    # counter of the seat's new documents: equate the title-free leaf@feature
+    # form, as D3@TickPattern above.
+    pitch_dim = minor_pitch_dims[0].split("@", 1)[0]
+    drive_jobs.append((f"{pitch_dim}@MinorPattern", '"DivisionSpacing"'))
 
     # The hand-stamped artefact the book calls out: a longer 0.5 tick (it
     # overcuts the 0.5 tenth above).

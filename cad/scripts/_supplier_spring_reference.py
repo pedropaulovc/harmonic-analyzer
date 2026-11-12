@@ -373,7 +373,7 @@ async def add_supplier_reference_configurations(
             finally:
                 try:
                     added = _features(model, top_level=True)
-                    for name in set(added) - before:
+                    for name in sorted(set(added) - before):
                         owned[name] = str(added[name].GetTypeName2())
                 except Exception as error:
                     if callback_failure is None:

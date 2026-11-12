@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import _holes
@@ -107,3 +108,23 @@ def test_disjoint_exact_floors_outrank_one_offset_face_spanning_both(
     )
 
     assert selected is left_floor
+
+
+def test_tied_faces_are_picked_whatever_order_the_body_lists_them(monkeypatch) -> None:
+    # SolidWorks may list a body's faces in another order from run to run, and
+    # equal areas read back up to an ulp apart: neither may decide the pick.
+    monkeypatch.setattr(_holes, "_early_bound", lambda value, _interface: value)
+    area = 0.00006
+    left = _Face("left", plane_z_mm=-133.0, area_m2=area, x_bounds_mm=(180.0, 200.0))
+    for noise in (0.0, math.ulp(area)):
+        right = _Face(
+            "right",
+            plane_z_mm=-133.0,
+            area_m2=area + noise,
+            x_bounds_mm=(190.0, 210.0),
+        )
+        for faces in ([left, right], [right, left]):
+            selected = _holes.find_planar_face(
+                _Part(faces), (0.0, 0.0, -1.0), [[195.0, 38.1, -133.0]]
+            )
+            assert selected is left

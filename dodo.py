@@ -707,14 +707,9 @@ def _external_console_level() -> str:
 
 # Every COM subprocess (:func:`_exec_com`: a part build, its recording driver
 # and its unrecorded re-run, assembly/drawing/hook runs) hashes str with seed
-# 0. Two shared helpers order COM requests by iterating a set of str
-# (_drawing_precision.py:40 ``_named_dimensions``; _supplier_spring_reference.py:376
-# ``add_supplier_reference_configurations``), so under per-process hash
-# randomisation a build's request order was random: 5 of 10 identical-source
-# part rebuilds diverged on it on 2026-11-11 (COM-replay native pass 2). Seed 0
-# is one of the orders builds already took, so no artefact's semantics change
-# and no cache key moves (dodo.py is in no recipe closure). Applied last, so an
-# inherited PYTHONHASHSEED cannot override it.
+# 0, applied last so an inherited PYTHONHASHSEED cannot override it. Why it
+# stays pinned: DEVELOPING.md, "What is recorded". It moves no cache key
+# (dodo.py is in no recipe closure).
 _COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
 
 
@@ -4012,6 +4007,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_reference_text.py",
         SCRIPTS_DIR / "test_drawing_physical_axial_dimension.py",
         SCRIPTS_DIR / "test_drawing_serialized_note_identity.py",
+        # Named-dimension lookups bind in sorted name order (#2514).
+        SCRIPTS_DIR / "test_drawing_precision.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
         # Native supplier I/O doubles and recorded ink replays stay COM-free.
         SCRIPTS_DIR / "test_purchased_title_fit.py",

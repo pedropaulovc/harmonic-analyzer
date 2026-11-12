@@ -515,7 +515,8 @@ def assert_supplier_washer_references(
 ) -> None:
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     part = _early_bound(model, "IPartDoc")
-    for label in _model_reference_labels(references):
+    # Sorted: each label's checks are COM reads, and str hashing is salted per process.
+    for label in sorted(_model_reference_labels(references)):
         feature, name = SOURCE_DIMENSIONS[label]
         raw = part.FeatureByName(feature)
         display, _ = _named_dimensions(adapter, feature, {name}, feature=raw)[name]
