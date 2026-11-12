@@ -438,6 +438,16 @@ async def _add_journal_land(
             f"{prefix}Dia",
         )
         dims.record(f"{prefix}Dia", '"ShaftDia"')
+    else:
+        # Without the diameter nothing else holds the flank witness off the
+        # axis (farm r7, 4a51a72: FrontJournalReference under-defined).
+        check(
+            f"{feature_name} flank witness off the axis",
+            await adapter.add_sketch_dimension(
+                f"{axis}.end", f"{witness}.end", "horizontal_distance", SHAFT_R
+            ),
+        )
+        dims.record(f"{prefix}FlankR", '"ShaftDia" / 2')
     await ensure_fully_defined(adapter, feature_name)
     check(f"exit sketch {feature_name}", await adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
