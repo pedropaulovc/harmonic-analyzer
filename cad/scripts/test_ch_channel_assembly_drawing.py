@@ -1043,7 +1043,21 @@ def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 18
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
-    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(drawing.BOM_COMPONENTS)
+    # One Number per native file: the bought pivot pin's two member rows
+    # share MHA-SH-VN-58 and bind by (file, member) instead.
+    files = {
+        drawing.BOM_COMPONENT_IDENTITIES[key][0] for key in drawing.BOM_COMPONENTS
+    }
+    assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(files) == 18
+    assert {
+        drawing.BOM_COMPONENT_IDENTITIES[key]
+        for key in (drawing.explode.ROD_PIN, drawing.explode.BAR_PIN)
+    } == {("sh-vn-pivot-pin", "RodPin"), ("sh-vn-pivot-pin", "BarPin")}
+    assert (
+        drawing.BOM_PART_NUMBERS[drawing.explode.ROD_PIN]
+        == drawing.BOM_PART_NUMBERS[drawing.explode.BAR_PIN]
+        == _config.parts("sh-vn-pivot-pin")["number"]
+    )
     for stem in drawing.BOM_COMPONENTS:
         row = drawing.PART_ROWS[stem]
         skus = row.get("supplier_skus") or ()
@@ -1274,11 +1288,12 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     """The rod ring is captured in its closed cam slot during the cylinder
     stack, and a pressed pin needs its far tine backed on the press, so the
-    MHA-CH-10 pin goes in at the bench, before that drive-train step -- after
-    the hub stack is proved on the shaft and the rockers come off in order.
-    User ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush;
-    a pin that slides in by hand is remade (rule 23)."""
-    from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
+    pin goes in at the bench, before that drive-train step -- after the hub
+    stack is proved on the shaft and the rockers come off in order. User
+    ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush. The
+    pin is bought (#2339), so a pin that slides in by hand condemns the fork
+    hole: the rod is replaced (rule 23)."""
+    from sh_vn_pivot_pin_rod_spec import PIN_END_PROUD_MAX
 
     order = [
         "rocker-stack-accepted",
@@ -1312,11 +1327,21 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         "rod-pin-remade",
         "bar-pin-remade",
     }
-    pin = drawing.item("ch-rod-pivot-pin")
+    pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
         body = _step_body(key)
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
+    # A bought pin cannot be remade: each remedy replaces the part whose
+    # reamed hole let the pin slide, and sends the fitter back to its press.
+    for remedy, host, pinned in (
+        ("rod-pin-remade", drawing.explode.ROD, steps.RODS_PINNED_KEY),
+        ("bar-pin-remade", drawing.explode.BAR, steps.BARS_PINNED_KEY),
+    ):
+        body = _step_body(remedy)
+        assert f"REPLACE THE {drawing.item(host)} " in body, remedy
+        assert f"RETURN TO STEP {steps.step_number(pinned)}." in body, remedy
+        assert "REMAKE" not in body, remedy
 
 
 def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:

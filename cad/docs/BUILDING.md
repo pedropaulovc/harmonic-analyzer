@@ -137,6 +137,7 @@ are the sole member inventory:
 | `sh-vn-chain-link` | `InnerLink` | `OuterLink` |
 | `sh-vn-music-wire` | `LeverWire` | `PenWire` |
 | `sh-vn-clamping-kit-hardware` | `HoldDownStud` | `TNut`, `FlangeNut` |
+| `sh-vn-pivot-pin` | `RodPin` | `BarPin` |
 | `ch-rocker-arm-tl-vn-oblique-rail-kit` | `Rail` | `Carriage` |
 | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | `LeadScrew` | `FeedNut` |
 

@@ -168,6 +168,20 @@ hidden `KnobSettingReference` sketch), printed in sheet 6's DETAIL K: the S-K
 centre distance toleranced 43.794 +0.050/-0, the two DRO coordinates as
 references.
 
+The paper feed mesh (12T feed pinion on the purchased rack) is set at assembly
+on a feeler leaf, not on a number (owner direction on #2416, 2026-11-11: the
+mesh must not bind, must not come loose, and must feed steadily; backlash is
+not a function). MHA-PD-00 step 24 wedges a .0025 leaf in the teeth with the
+arm, clamps the arm and draws the leaf out. That leaves 2t/cos 20° = 0.135 mm
+of tooth-centred datum backlash whatever play lies behind the pinion, inside
+the builder's 0.12–0.14 design band and its opposite-flank budget. Only if
+that run shows a tight spot is the arm re-set once on a .003 leaf (0.162 mm).
+Its contact ratio is 1.177. That is below 1.2 but above the 1.1 continuous-
+action floor, which is the floor the owner's option C accepts at the loose
+end (`pd_paper_drive_assembly_steps.FEED_MESH_LEAF_BACKLASH_MM` and
+`FEED_FALLBACK_CONTACT_RATIO_FLOOR`). The latched mesh is then accepted on
+function: no tight spot, and no skipped tooth with the platen pushed by hand.
+
 ### Setting the cone mesh
 
 The cone set swings on a platform. The cone-lock knob, MHA-DT-VN-51, sets and

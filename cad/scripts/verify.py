@@ -167,14 +167,15 @@ _MOTION_TOL_MM = 1e-2
 # verify never imports the spec): drive the recorded slide to each pose, read
 # both carriages back, and run native interference where the pose is checked.
 SWEEP_OWNER = "ch-rocker-arm-tl-oblique-jig"
-_MOVING_CHANNEL_STEMS = (
-    "ch-rocker-arm",
-    "ch-connecting-rod",
-    "ch-amplitude-bar",
-    "ch-channel-lever",
-    "ch-rod-pivot-pin",
-    "ch-bar-pivot-pin",
-)
+# Independent instances of each moving stem per channel: the purchased pivot
+# pin's RodPin and BarPin members share one stem (MHA-SH-VN-58).
+_MOVING_CHANNEL_STEMS = {
+    "ch-rocker-arm": 1,
+    "ch-connecting-rod": 1,
+    "ch-amplitude-bar": 1,
+    "ch-channel-lever": 1,
+    "sh-vn-pivot-pin": 2,
+}
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("dt-crank-pinion", "dt-crank-drive-gear")
@@ -192,8 +193,8 @@ _FEED_GEAR_RATIO = (1, 10)  # 15T third gear : 150T reducer disc
 # paper-drive) -- NOT the ~340 flattened parts. Bands measured live on a green
 # build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod-pivot-pin,
-# bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
+# active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod pivot
+# pin,bar,bar pivot pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
 # (MHA-CH-VN-56, south and north) + fulcrum shaft + 2 pivot brackets
 # + 2 bracket hold-down screws (MHA-CH-VN-57) + 2 pivot-arbor apex set screws
 # (MHA-CH-VN-53) + 2 fulcrum keepers + 2 keeper foot screws (MHA-CH-VN-52)
@@ -516,27 +517,27 @@ def assert_channel_independence(adapter: Any) -> None:
 
     The decoherence test the docs ask for (each channel runs at its own harmonic)
     is a motion-solver run -- tracked, not wired here. But its structural
-    precondition IS statically checkable: the four chain parts and their
-    rod-pivot and bar pivot pins must each be CHANNELS individually-mated
-    instances, not pattern slaves (a pattern instance is a rigid, DOF-less copy
-    and could never articulate independently). Counting CHANNELS of each stem is
-    the tripwire that a rebuild did not drop or duplicate a channel or collapse
-    the channels into a component pattern -- the single most important "no
-    pattern for moving parts" invariant (spec §5 / handoff §8), checked at the
-    level that owns them.
+    precondition IS statically checkable: the four chain parts must each be
+    CHANNELS individually-mated instances, and the pivot pins (one rod and one
+    bar member per channel) 2 x CHANNELS, not pattern slaves (a pattern
+    instance is a rigid, DOF-less copy and could never articulate
+    independently). Counting each stem is the tripwire that a rebuild did not
+    drop or duplicate a channel or collapse the channels into a component
+    pattern -- the single most important "no pattern for moving parts"
+    invariant (spec §5 / handoff §8), checked at the level that owns them.
     """
     stems = [_INSTANCE_SUFFIX.sub("", n) for n in component_names(adapter)]
-    counts = {stem: stems.count(stem) for stem in _MOVING_CHANNEL_STEMS}
-    wrong = {s: c for s, c in counts.items() if c != CHANNELS}
+    expected = {stem: per * CHANNELS for stem, per in _MOVING_CHANNEL_STEMS.items()}
+    counts = {stem: stems.count(stem) for stem in expected}
+    wrong = {s: c for s, c in counts.items() if c != expected[s]}
     if wrong:
         raise RuntimeError(
-            f"channel moving parts are not {CHANNELS} independent instances: {wrong} "
-            f"(a count != {CHANNELS} means a channel was dropped/duplicated, or the "
+            f"channel moving parts are not {expected} independent instances: {wrong} "
+            f"(a wrong count means a channel was dropped/duplicated, or the "
             f"moving parts were collapsed into a component pattern)"
         )
     _telemetry.success(
-        f"{CHANNELS} independent instances of each moving stem "
-        f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)"
+        f"independent instances of each moving stem {expected} (not pattern slaves)"
     )
 
 

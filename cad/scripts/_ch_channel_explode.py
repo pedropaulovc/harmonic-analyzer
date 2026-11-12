@@ -15,17 +15,18 @@ from __future__ import annotations
 
 import math
 import sys
-from pathlib import Path
 from typing import Any, NamedTuple
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
+from _component_references import component_identity
 from _simplified_names import simplified_name
 from ch_channel_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
+    member_family,
     plan_explode,
 )
 
@@ -156,10 +157,11 @@ def create_channel_explode(adapter: Any, configuration_name: str) -> None:
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}
     # Pairs split on their side of the bank by their saved z (transform
     # translation, metres): plan_explode refuses a pair that is not one a side.
+    # The pivot pin's members share a file: each is keyed by its member.
     instances = [
         Instance(
             name=name,
-            stem=Path(str(component.GetPathName() or "")).stem.casefold(),
+            stem=member_family(*component_identity(component)),
             z_mm=baseline[name][11] * 1000.0,
         )
         for name, component in by_name.items()

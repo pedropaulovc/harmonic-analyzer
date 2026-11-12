@@ -39,7 +39,7 @@ LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
 # deepened in its own plane from 9.5 for strength under the 2026-10-15 gray
 # iron ruling, and keeps that depth in the 1018 steel that superseded it
 # (owner ruling 2026-11-03), staying under the Ø.47 hub. Its lower edge clears
-# the bar's top-notch roof (ch_bar_pivot_pin_spec notch_roof_clearance_min)
+# the bar's top-notch roof (sh_vn_pivot_pin_bar_spec notch_roof_clearance_min)
 # and the spring's coil under the full-round tip
 # (build_ch_channel_assembly._assert_spring_mount).
 BAR_TALL = 10.922  # .43
@@ -94,14 +94,14 @@ LEVER_THICKNESS_TOLERANCE = 0.0508  # +/-.002
 BAR_PIN_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 LEVER_SPRING_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 # The 20 hubs stack face to face between the fulcrum keepers.  A hub may only
-# come out long (ch_bar_pivot_pin_spec's bar-to-bar clearance takes the pitch
+# come out long (sh_vn_pivot_pin_bar_spec's bar-to-bar clearance takes the pitch
 # at its nominal minimum), and twenty of them at the band's top must still
 # leave float at the keeper lugs (test_ch_channel_lever_drawing pins it). The
 # pitch prints .278 +.001/.000.
 HUB_LENGTH_BAND = (0.0254, 0.0)
 # The plate sits central on the hub, located from ONE hub face: each bar rides
 # its lever's plate, so the plate's offset in the hub shifts the bar toward its
-# neighbour's (ch_bar_pivot_pin_spec's bar-to-bar gap; the stack is #1038).
+# neighbour's (sh_vn_pivot_pin_bar_spec's bar-to-bar gap; the stack is #1038).
 PLATE_OFFSET = (
     HUB_LENGTH - LEVER_THICKNESS
 ) / 2.0  # 2.02965 (.080) hub face -> plate face

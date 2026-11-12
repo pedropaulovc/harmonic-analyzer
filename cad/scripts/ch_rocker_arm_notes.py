@@ -179,6 +179,6 @@ HUB_LENGTH_CALLOUT = "SETS STACK PITCH\nON MHA-CH-05"
 # The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
 TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"
-# The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-10 pin runs
-# in it (ch_rod_pivot_pin_spec), a prefix row over the native #47 DRILL.
-ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
+# The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-SH-VN-58 pin
+# runs in it (sh_vn_pivot_pin_rod_spec), a prefix row over the native #47 DRILL.
+ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-SH-VN-58"
