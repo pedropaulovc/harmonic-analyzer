@@ -71,7 +71,6 @@ from dt_pinion_arbor_spec import (
     HEAD_REAR_Z,
     JOURNAL_DIA_BAND,
     JOURNAL_LEN,
-    NECK_END_Z,
     OVERALL_LEN,
     PIN_Z,
     RETAINING_COMPOUND,
@@ -289,32 +288,40 @@ FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
 # marked only by its Ra symbol and the collar span only by note 2's words;
 # a native dimension takes one leader, and neither span has room for a block
 # of its own).  Each tag hangs under the shaft in its span's open pocket,
-# two short rows centred on the span, its leader rising straight to the
-# span's lower flank: the front journal's between the 2.61 and 1.82
-# witnesses (x ~0.2408 / ~0.2602, over the 2.61 row's line at ~0.1278), the
-# collar span's between the 1.82 witness and the neck's (x 0.296), over the
-# 1.82 row's text (~0.1372-0.141).  key -> (landing z, text, top-left xy).
+# two short rows starting SPAN_TAG_INSET right of the span's crown-side
+# witness, its leader rising to the span's lower flank just right of the
+# text, so it meets the block's right side beside the short SEE row (r12
+# review, rule 14: a landing over the block's middle ran the leader into its
+# left side, through the S).  The front journal's pocket lies between the
+# 2.61 and 1.82 witnesses (x ~0.2408 / ~0.2602, over the 2.61 row's line at
+# ~0.1278), the collar span's between the 1.82 witness and the neck's
+# (x 0.296), over the 1.82 row's text (~0.1372-0.141).
+# key -> (landing z, text, top-left xy).
 SPAN_TAG_ROW_WIDTH = 0.0147  # "NOTE n", six capitals at ~2.45 mm
 SPAN_TAG_TOP_Y = 0.158
 SPAN_TAG_HEIGHT = 0.0112  # two rows, 5.6 mm apart
-_FRONT_TAG_Z = FRONT_JOURNAL_Z + JOURNAL_LEN / 2.0
-_COLLAR_TAG_Z = (FRONT_JOURNAL_Z + NECK_END_Z) / 2.0
-_COLLAR_TAG_X = _sheet_x(_COLLAR_TAG_Z)
+SPAN_TAG_INSET = 0.002
+SPAN_TAG_LEADER_GAP = 0.001
+
+
+def _model_z(sheet_x: float) -> float:
+    """Model z of a profile sheet x (the inverse of _sheet_x)."""
+    return MODEL_Z_AT_SHEET_ORIGIN_X - (sheet_x - PRINCIPAL_CENTER[0]) * 1000.0
+
+
+def _span_tag(crown_side_z: float, text: str) -> tuple[float, str, tuple[float, float]]:
+    left = _sheet_x(crown_side_z) + SPAN_TAG_INSET
+    landing_x = left + SPAN_TAG_ROW_WIDTH + SPAN_TAG_LEADER_GAP
+    return (_model_z(landing_x), text, (left, SPAN_TAG_TOP_Y))
+
+
 SPAN_TAGS = {
-    "front_journal": (
-        _FRONT_TAG_Z,
-        "SEE\nNOTE 1",
-        (_sheet_x(_FRONT_TAG_Z) - SPAN_TAG_ROW_WIDTH / 2.0, SPAN_TAG_TOP_Y),
-    ),
-    "collar_span": (
-        _COLLAR_TAG_Z,
-        "SEE\nNOTE 2",
-        (_COLLAR_TAG_X - SPAN_TAG_ROW_WIDTH / 2.0, SPAN_TAG_TOP_Y),
-    ),
+    "front_journal": _span_tag(FRONT_JOURNAL_Z + JOURNAL_LEN, "SEE\nNOTE 1"),
+    "collar_span": _span_tag(FRONT_JOURNAL_Z, "SEE\nNOTE 2"),
 }
 # The collar span's face: the shaft cylinder whose span holds the tag's
-# station (the pin hole, ~9 mm toward the front land, does not split it).
-COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=_COLLAR_TAG_Z)
+# landing (the pin hole, ~9.5 mm toward the front land, does not split it).
+COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=SPAN_TAGS["collar_span"][0])
 # The back land's 2X diameter (one size for both lands, #1038 ruling) is
 # measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
 # crown-side end (build_pinion_arbor, pinned equal by test), and its line

@@ -874,9 +874,10 @@ def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
     """#1038 r9 machinist review (rules 1 and 26): each 2X diameter's
     dimension reached one span; the front journal was marked only by its Ra
     symbol and the collar span only by note 2's words.  A native dimension
-    takes one leader, so each second span carries a SEE NOTE tag whose
-    leader rises straight to its lower flank, the tag centred under the span
-    between its two witnesses and over the station rows."""
+    takes one leader, so each second span carries a SEE NOTE tag between its
+    two witnesses and over the station rows.  r12 (rule 14): a leader landing
+    over the block's middle ran into its left side through the S, so each
+    landing stands just right of the block and meets its right side."""
     import inspect
 
     tags = drawing.SPAN_TAGS
@@ -905,12 +906,13 @@ def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
         ("front_journal", front_land),
         ("collar_span", collar_span),
     ):
-        station_z, text, (x, top) = tags[key]
-        centre = drawing._sheet_x(station_z)
-        assert left_witness < centre < right_witness
-        assert x + drawing.SPAN_TAG_ROW_WIDTH / 2.0 == pytest.approx(centre)
-        assert x - left_witness >= 0.002
-        assert right_witness - (x + drawing.SPAN_TAG_ROW_WIDTH) >= 0.002
+        landing_z, text, (x, top) = tags[key]
+        landing = drawing._sheet_x(landing_z)
+        right = x + drawing.SPAN_TAG_ROW_WIDTH
+        assert drawing._model_z(landing) == pytest.approx(landing_z)
+        assert x - left_witness >= 0.0015
+        assert 0.0005 <= landing - right <= 0.002
+        assert right_witness - landing >= 0.0015
         assert max(map(len, text.split("\n"))) <= 6
         assert 0.005 <= shaft_bottom - top <= 0.010
         assert top - drawing.SPAN_TAG_HEIGHT - rows_under[key] >= 0.003
