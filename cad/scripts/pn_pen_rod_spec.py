@@ -26,6 +26,7 @@ from _fit_close_running import SHAFT_G6_3_TO_6_MM, measured_close_running_cleara
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
 
 # #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths stay
 # millimetres, each the exact decimal of its printed inch value, except the
@@ -37,8 +38,26 @@ UNIT = drawing_unit("parts/pn-pen-rod", _config.parts("pn-pen-rod"))
 PEN_HANGER_NUMBER = _config.parts("pn-pen-hanger")["number"]
 PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
 
-ROD_SECTION = 5.0038  # .197 square section, machined (DIMENSIONS.md ch24)
+# .197 square section (DIMENSIONS.md ch24), bought to size (#2438): McMaster
+# 90457A730, 360 brass machine key stock, 5 x 5 mm, DIN 6880 undersized
+# (height and width -0.030 to 0.000 mm), 305 mm long (-1.000 to +1.000 mm),
+# $13.23, read live 2026-11-12 (https://www.mcmaster.com/90457A730/).  Its
+# section lies inside the printed band, so the flats stay as supplied: only
+# the ends are faced, the pivot turned and the stud tap cut.
+ROD_SECTION = 5.0038  # .197
 SECTION_BAND = (0.0, -0.0508)  # +.000/-.002
+STOCK_SKU = "90457A730"
+STOCK_SECTION = 5.0
+STOCK_SECTION_BAND = (0.0, -0.030)
+STOCK_LENGTH = 305.0
+STOCK_LENGTH_BAND = (1.0, -1.0)
+if not (
+    ROD_SECTION + SECTION_BAND[1]
+    <= STOCK_SECTION + STOCK_SECTION_BAND[1]
+    <= STOCK_SECTION + STOCK_SECTION_BAND[0]
+    <= ROD_SECTION + SECTION_BAND[0]
+):
+    raise AssertionError(f"{STOCK_SKU} key stock is not inside the printed square band")
 # Square length: the shoulder sits on the v-block top and the top face carries
 # the jam nut + adjuster stud under the wheel rim. 112 puts the top at the
 # engineerguy 4/4 (9:15-10:34) photo ratio -- rod top ~1.6 rod-lengths of
@@ -56,13 +75,16 @@ PIVOT_LENGTH = 10.414  # .41, shoulder to end: stops clear above the v-block rel
 
 # Adjuster stud tap in the top face. #0-80 is the largest thread whose tap
 # drill leaves the drawing-guidelines.md rule 17 (walls and webs) .060 floor
-# in the .197 square (#2-56 would not).
+# in the .197 square (#2-56 would not). The drill runs .09 past the full
+# thread so a plug tap's lead (four chamfered threads plus a pitch,
+# machining-dfm.md) still fits under the deepest printed thread at the
+# shallowest printed drill (#1609; .24 left .040).
 STUD_THREAD = "#0-80"
 STUD_TAP_SPEC = HoleSpec(
     "tapped",
     STUD_THREAD,
     end="blind",
-    depth_mm=6.096,  # .24
+    depth_mm=6.858,  # .27
     overrides_mm={"ThreadDepth": 4.572},  # .18
 )
 STUD_TAP_DRILL_DIA = TAP_DRILL_MM[STUD_THREAD]
@@ -114,6 +136,15 @@ if STUD_ENGAGEMENT >= STUD_TAP_SPEC.overrides_mm["ThreadDepth"]:
     raise AssertionError("adjuster stud bottoms in its tap")
 if STUD_TAP_SPEC.depth_mm + STUD_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H >= SQUARE_LENGTH:
     raise AssertionError("stud tap runs out of the square")
+_STUD_TAP_DEPTH_BAND = printed_band_mm(STUD_TAP_DEPTH_PLACES, unit=UNIT)
+_STUD_PITCH = 25.4 / int(STUD_THREAD.split("-")[1])
+STUD_TAP_LEAD_ROOM_MIN = (STUD_TAP_SPEC.depth_mm - _STUD_TAP_DEPTH_BAND) - (
+    STUD_TAP_SPEC.overrides_mm["ThreadDepth"] + _STUD_TAP_DEPTH_BAND
+)
+if STUD_TAP_LEAD_ROOM_MIN < 5.0 * _STUD_PITCH:
+    raise AssertionError("the stud tap drill leaves no plug-tap lead under the thread")
+if TOTAL_LENGTH >= STOCK_LENGTH + STOCK_LENGTH_BAND[1]:
+    raise AssertionError(f"one {STOCK_SKU} bar does not yield the rod")
 if PIVOT_DIA >= ROD_SECTION:
     raise AssertionError("pivot end must turn down inside the square (a shoulder)")
 
@@ -215,11 +246,16 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
     "TapWallMin": TAP_WALL_CALLOUT,
 }
+# The square is the key stock's own (title-block MATERIAL names it): note 2
+# says its flats take no cut, as dt_crank_arm's stock note does (rule 7's
+# stock statement; the SQ size above still states the band they must hold).
+STOCK_NOTE = 2
 DRAWING_NOTES = "\n".join(
     (
         f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE, TURNED",
         "   TO THE MEASURED BORE (CLEARANCE "
         f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
+        f"{STOCK_NOTE}. SQUARE FLATS AS SUPPLIED.",
     )
 )
 
