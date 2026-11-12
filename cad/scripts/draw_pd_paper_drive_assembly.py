@@ -2165,8 +2165,8 @@ def _step_text(
             f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE.",
             f"WITH THE {n['pd-vn-transgear-disc-screw']} SCREWS SLACKENED, REPEAT "
             f"{s('disc-cluster-assembled', 1)}, {s('disc-taps-transferred', 0)}-"
-            f"{s('disc-taps-transferred', 1)}, {s('disc-taps-transferred', 7)} AND "
-            f"{s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 14)} ON A NEW "
+            f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
+            f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 16)} ON A NEW "
             f"{n['pd-transgear-feed-pinion']}, THEN FROM {s('arm-plate-located', 9)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
@@ -2228,8 +2228,10 @@ def _step_text(
             # costs only the arm's own parts. The uncut plate screws stand
             # under the disc with room to spare
             # (test_the_trial_stack_goes_together_at_the_located_step).
-            "CLAMP THE ARM FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE AND "
-            f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 11)}.",
+            # Machinist review r9 (rule 22): one action; the step is at its
+            # 24-letter budget, so the clamp set-up is the repeat's condition.
+            f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 11)} WITH "
+            "THE ARM CLAMPED FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE.",
             f"CHECK: AS {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)}, "
             "WITH THE TEST INDICATOR ON A MAGNETIC BASE.",
             # A chip from the drilling just done reads as a tight spot or an
@@ -2298,11 +2300,13 @@ def _step_text(
             # tailstock centre holds its front bore mouth. The stub stays
             # chucked until the re-check, or a re-chucked stub's own runout
             # enters the reading.
-            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC "
-            "ON A STUB MANDREL TURNED IN PLACE IN THE LATHE CHUCK TO A SLIDING FIT "
-            f"IN THE {n['pd-transgear-feed-pinion']} BORE, THE SLEEVE'S REAR FACE "
-            "ON THE MANDREL'S FACED SHOULDER, THE TAILSTOCK CENTRE IN ITS FRONT "
-            "BORE MOUTH.",
+            # Machinist review r9 (cca037c3d, rule 22): turning the stub and
+            # mounting the cluster on it are separate sub-steps.
+            "TURN A STUB MANDREL IN PLACE IN THE LATHE CHUCK TO A SLIDING FIT IN "
+            f"THE {n['pd-transgear-feed-pinion']} BORE, WITH A FACED SHOULDER.",
+            f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON THE "
+            "MANDREL, THE SLEEVE'S REAR FACE ON ITS SHOULDER, THE TAILSTOCK CENTRE "
+            "IN ITS FRONT BORE MOUTH.",
             "WITH A DIAL INDICATOR ON A "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
             f"IN EACH {n['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC "
@@ -2313,8 +2317,9 @@ def _step_text(
             # (#2418).
             "CLAMP THE DISC TO THE HUB FLANGE WITH 2 TOOLMAKER'S CLAMPS BETWEEN "
             "ITS HOLES.",
-            "BACK OFF THE TAILSTOCK AND SLIDE THE SLEEVE, HUB AND DISC OFF THE "
-            "MANDREL, LEAVING THE MANDREL IN THE CHUCK.",
+            "BACK OFF THE TAILSTOCK.",
+            "SLIDE THE SLEEVE, HUB AND DISC OFF THE MANDREL, LEAVING THE MANDREL IN "
+            "THE CHUCK.",
             f"SPOT-DRILL THE DISC THROUGH THE {hub_geometry.SCREW_COUNT} HUB FLANGE "
             "HOLES.",
             f"DRILL EACH SPOT {TAP_0_80_DRILL_TEXT} THRU THE DISC.",
@@ -2323,11 +2328,11 @@ def _step_text(
             f"{n['pd-vn-transgear-disc-screw']} SCREWS.",
             "REMOVE THE CLAMPS.",
             "REFIT THE SLEEVE, HUB AND DISC ON THE MANDREL AND TAILSTOCK AS "
-            f"{s('disc-taps-transferred', 0)}.",
+            f"{s('disc-taps-transferred', 1)}.",
             f"CHECK: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
             f"IF NOT, SLACKEN THE {n['pd-vn-transgear-disc-screw']} SCREWS AND REPEAT "
-            f"{s('disc-taps-transferred', 1)}, {s('disc-taps-transferred', 7)} AND "
-            f"{s('disc-taps-transferred', 10)}.",
+            f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
+            f"{s('disc-taps-transferred', 12)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
             # drive torque as shear on the flange's bolt circle
             # (joint_retention 'pd-paper-drive/disc-screws', STATIC_CLAMP;
@@ -2335,7 +2340,7 @@ def _step_text(
             "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
             "NOT TURN THE DISC ON THE HUB.",
             f"IF IT TURNS, FIT NEW {n['pd-vn-transgear-disc-screw']} SCREWS AND "
-            f"REPEAT {s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 12)}.",
+            f"REPEAT {s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 14)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
         "disc-screws-cut": (
@@ -2528,9 +2533,9 @@ def _step_text(
             "IF EVERY CHECK PASSES, GO TO STEP "
             f"{steps.step_number('fitup-pose-set')}.",
             f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
-            f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS, AND THE RACK AND "
-            "GUIDES FOR LOOSENESS.",
-            f"AFTER INSPECTING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
+            f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
+            "AFTER INSPECTING THEM, CHECK THE RACK AND GUIDES FOR LOOSENESS.",
+            f"AFTER CHECKING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
             "REPLACE ANY PART FOUND OUTSIDE OR LOOSE, PER ITS STEP "
@@ -2584,7 +2589,8 @@ def _step_text(
         "fitup-mesh-remedied": (
             f"IF A {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK FAILS, "
             "CHECK THAT, PUSHED AND ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS "
-            "DOWELS AND ITS SCREWS ARE TIGHT.",
+            "DOWELS.",
+            "WITH A CHECK FAILED, CHECK THAT THE PLATE'S SCREWS ARE TIGHT.",
             f"IF THE PLATE IS SOUND, CLEAN THE {teeth} AND THE DISC TEETH AND "
             f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
             "IF A CHECK STILL FAILS, TURN THE DISC ONE FULL TURN BY THE COLLAR, "
@@ -2704,7 +2710,8 @@ def _step_text(
             # a Ø1/8 mandrel's friction alone cannot drive a cut on steel, and
             # a collet on the Ø.313 boss would face the step toward the collet.
             f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE ON A STUB MANDREL AS "
-            f"{s('disc-taps-transferred', 0)}, ITS REAR FACE HELD ON THE MANDREL'S "
+            f"{s('disc-taps-transferred', 0)}-{s('disc-taps-transferred', 1)}, ITS "
+            "REAR FACE HELD ON THE MANDREL'S "
             "FACED SHOULDER BY THE TAILSTOCK CENTRE IN ITS BORE MOUTH.",
             f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE BY "
             f"{steps.COLLAR_DISC_AIR_TEXT.split()[0]} LESS THE "
@@ -2713,8 +2720,8 @@ def _step_text(
             "DISC SET BACK BY THAT AMOUNT.",
             "REFIT THE HUB'S D-BORE ON THE D-FLAT, SPIGOT TO THE STEP FACE, DISC "
             "AND HUB MATCH MARKS TOGETHER.",
-            f"REPEAT {s('disc-taps-transferred', 0)} AND "
-            f"{s('disc-taps-transferred', 10)}-{s('disc-taps-transferred', 13)}.",
+            f"REPEAT {s('disc-taps-transferred', 1)} AND "
+            f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 15)}.",
             f"RE-DRILL THE OIL HOLE THROUGH THE HUB INTO THE SLEEVE'S HOLE, AS STEP "
             f"{steps.step_number('oil-hole-drilled')}.",
             f"REPEAT STEPS {steps.step_number('disc-cluster-hung')}-"

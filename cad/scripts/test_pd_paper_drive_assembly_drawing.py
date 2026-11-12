@@ -2599,10 +2599,10 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"WITH THE {_number('pd-vn-transgear-disc-screw')} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 1)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 1)}, "
-        f"{drawing.sub_step('disc-taps-transferred', 7)} AND "
-        f"{drawing.sub_step('disc-taps-transferred', 10)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 14)} ON A NEW "
+        f"{drawing.sub_step('disc-taps-transferred', 2)}, "
+        f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
+        f"{drawing.sub_step('disc-taps-transferred', 12)}-"
+        f"{drawing.sub_step('disc-taps-transferred', 16)} ON A NEW "
         f"{_number('pd-transgear-feed-pinion')}, THEN FROM {trial}.",
         f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
     ):
@@ -2618,7 +2618,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"IF A DOWEL SLIDES IN BY HAND, REPEAT FROM STEP {steps.step_number('latch-pin-pressed')} "
         f"WITH A NEW {_number('pd-transgear-arm')} ARM, {_number('pd-transgear-arm-plate')} PLATE,"
     ) in fitted
-    assert "CLAMP THE ARM FRONT UP ON THE SAME PARALLELS" in fitted
+    assert "ARM CLAMPED FRONT UP ON THE SAME PARALLELS" in fitted
     # A failed doweled re-read is cleaned and read again before the set is
     # scrapped, each its own sub-step.
     assert fitted.index("CLEAN THE TEETH AND SEATS AND REPEAT") < fitted.index("IF A CHECK STILL FAILS")
