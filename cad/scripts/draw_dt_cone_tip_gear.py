@@ -377,7 +377,7 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
         )
         labels.append(
             (
-                f"R{inch_text(radius, 4)}",
+                f"(R{inch_text(radius, 4)})",
                 (
                     x + FORM_PLOT_STATION_LABEL_OFFSET[0],
                     y + FORM_PLOT_STATION_LABEL_OFFSET[1],
@@ -481,7 +481,10 @@ def form_sheet_notes() -> str:
     to the mate (sheet 1's note 2; no second copy here)."""
     return "\n".join(
         (
-            "R FROM GEAR AXIS; X FROM CL, EACH SIDE; Y ALONG CL FROM P1.",
+            # The R column and the plot's station radii derive from X and Y
+            # (REF); Y is a BASIC station; X carries the form band (machinist
+            # review of PR #2557).
+            "R (REF) FROM GEAR AXIS; Y BASIC, ALONG CL FROM P1; X FROM CL, EACH SIDE.",
             f"{CUSTOM_SIX_FORM_TOLERANCE_NOTE}, SEE SHEET "
             f"{SHEET_NAMES.index(GEAR_SHEET) + 1} NOTE {TEETH_NOTE_NUMBER}.",
         )

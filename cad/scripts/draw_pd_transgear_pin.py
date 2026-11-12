@@ -2,10 +2,10 @@ r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
-fit band, linked by SEE NOTE 1 to the numbered note naming both fits it
-serves, and one bearing-surface finish; the MHA-PD-VN-61 ring groove its
-catalogue Ø and width bands, and every other size is an ordinary model
-dimension at its part-authored places.
+fit band and the press land its reference Ø, both linked by SEE NOTE 1 to
+the numbered note naming their fits, and one bearing-surface finish; the
+MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and every other
+size is an ordinary model dimension at its part-authored places.
 
 The pin axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the domed tip on the
@@ -51,6 +51,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
+from _gtol_face_resolve import resolve_faces
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -73,6 +74,7 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     LENGTH,
     OVERALL_LENGTH,
+    PRESS_LAND_LENGTH,
     SURFACE_FINISHES,
 )
 
@@ -114,6 +116,8 @@ def _sheet_y(radius_mm: float) -> float:
 HEAD_APEX_X = _sheet_x(-HEAD_HEIGHT)
 HEAD_BACK_X = _sheet_x(-HEAD_LAND)
 SEAT_X = _sheet_x(0.0)
+LAND_END_X = _sheet_x(PRESS_LAND_LENGTH)
+LAND_MID_X = (SEAT_X + LAND_END_X) / 2.0
 GROOVE_REAR_X = _sheet_x(GROOVE_REAR_STATION)
 LOAD_WALL_X = _sheet_x(GROOVE_STATION)
 FRONT_END_X = _sheet_x(GROOVE_STATION + FRONT_LAND)
@@ -136,7 +140,11 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # sits at the same height right of the head.  The diameters
 # stand above the profile, each on its own section: the shank Ø's SEE NOTE 1
 # under its value, the groove Ø above it with the ring's name above its
-# value.  The tip dome's reference height stands above the tip.
+# value.  The tip dome's reference height stands above the tip.  The press
+# land (#2415) takes its reference Ø above its own length and its .XX length
+# in a row of its own between the profile and the station's row, the shorter
+# baseline nearer the part; the seat root's R MAX stands left of the land,
+# over that row.
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
@@ -145,6 +153,11 @@ SIDE_KEEP = {
     # audit text-on-line, run 20261024T060429646Z).
     "FrontLand": (TIP_X - 0.008, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
+    "LandLength": (LAND_MID_X, SIDE_CENTER[1] - 0.024),
+    # Near the land's end, so the R MAX leader rising to the seat corner
+    # passes under its lower arrow (at the land's middle it crossed the
+    # arrow: machinist review, run 20261111T224008804Z).
+    "LandDia": (LAND_END_X + 0.006, SHANK_TOP_Y + 0.025),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
     # At the shank's middle: its dimension line, and the arrow below the
@@ -165,20 +178,32 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's one-line R MAX just under the shank, its right end
-    # short of the seat's extension line (the 1.8600's, 2.02's and .09's),
-    # so its shelf and leader rise to the lower corner crossing nothing and
-    # stay above the (.03) and the station's row (round-5 review).
-    "SeatRadius": (SEAT_X - 0.025, SIDE_CENTER[1] - 0.010),
+    # The seat root's one-line R MAX under the shank, its shelf ending short
+    # of the land end's extension line: the 23 mm text does not fit between
+    # that line and the seat's (the 1.8600's, 2.02's, .09's and .29's), where
+    # run 20261111T193324863Z printed it crossed by the seat's (text-on-line),
+    # and at LAND_END_X - 0.014 its shelf, 2.7 mm past the text, crossed the
+    # land end's (shoulder-crosses-line, run 20261111T201934013Z).  Its
+    # leader rises steeply to the lower corner over the land, crossing only
+    # the land end's extension line, under the land Ø's lower arrow and above
+    # the land's .29 row.
+    "SeatRadius": (LAND_END_X - 0.018, SIDE_CENTER[1] - 0.016),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
 # proves they arrived.
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
-# The shank's upper silhouette, between the shank Ø's tolerance stack and the
-# head Ø (at 30 mm left of the seat its leader touched the -0.008).
-FINISH_PICK = (SEAT_X - 0.015, SHANK_TOP_Y)
-FINISH_SYMBOL = (SEAT_X - 0.015, SHANK_TOP_Y + 0.008)
+# The shank's finish: the part-owned ``journal`` control's ONE Ø.125
+# cylinder, resolved on the part the side view references and attached as
+# that model FACE, its leader landing on the upper outline ahead of the press
+# land, between the shank Ø's tolerance stack and the land's reference Ø.
+# Not a SILHOUETTE pick: on farm runs 20261111T181535941Z and
+# 20261111T190609060Z ISilhouetteEdge::GetFace failed IsSame against the
+# picked silhouette's (same_entity=False, dangling=False), with or without a
+# selection-point landing (draw_mg_magnifying_lever's rod finish; the face is
+# proven by IsSame and the landing readback pins the flank and station).
+FINISH_STATION_MM = PRESS_LAND_LENGTH + 0.013 * 1000.0 / _S
+FINISH_SYMBOL = (_sheet_x(FINISH_STATION_MM), SHANK_TOP_Y + 0.008)
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (SHANK_MID_X + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
@@ -238,6 +263,31 @@ def _dress_seat_radius(adapter: Any, annotations: list[Any]) -> None:
     display.ArcExtensionLineOrOppositeSide = False
     if display.ArcExtensionLineOrOppositeSide is not False:
         raise RuntimeError("SeatRadius leader still runs to the opposite side")
+
+
+def _shank_finish_pick(adapter: Any, side: Any) -> tuple[Any, tuple[float, float]]:
+    """The shank finish's target: ``(controlled face, sheet landing)``.
+
+    The face is the one the part's own Ra PMI names (``SURFACE_FINISHES``'
+    ``journal``), resolved on the part the side view references; the landing
+    is the upper of the shank's two outline points at ``FINISH_STATION_MM``.
+    """
+    document = _early_bound(
+        _early_bound(side, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    control = surface_finish_by_key(SURFACE_FINISHES, "journal")
+    face = resolve_faces(document, {control.key: control.face})[control.key]
+    flanks = model_points_in_view(
+        adapter,
+        side,
+        tuple(
+            (0.0, sign * DIA / 2000.0, FINISH_STATION_MM / 1000.0)
+            for sign in (1.0, -1.0)
+        ),
+        label="MHA-PD-23 shank finish landing",
+        names=("flank +Y", "flank -Y"),
+    )
+    return face, max(flanks, key=lambda xy: xy[1])
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
@@ -358,14 +408,16 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=CENTERLINE_PICK,
         label="MHA-PD-23 turning axis",
     )
+    shank_face, shank_landing = _shank_finish_pick(adapter, side)
     add_surface_finish(
         adapter,
         side,
-        edge_xy=FINISH_PICK,
+        entity=shank_face,
+        leader_attach_xy=shank_landing,
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
         label="MHA-PD-23 shank finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

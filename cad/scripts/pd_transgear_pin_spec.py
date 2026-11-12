@@ -1,8 +1,9 @@
 r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 
-The plain steel pin the disc cluster runs on.  It is pressed through the
-MHA-PD-18 arm's reamed hole at S from the rear until its domed head seats on
-the arm's rear face; forward of the arm it carries, rear to front, the
+The plain steel pin the disc cluster runs on.  Its short press land under
+the head is pressed into the MHA-PD-18 arm's reamed hole at S from the rear
+until the domed head seats on the arm's rear face; the shank passes the
+ream clear and, forward of the arm, carries, rear to front, the
 MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub and screws on
 it), the MHA-PD-25 front bushing and, in the groove near its front end, the
 MHA-PD-VN-61 retaining ring (McMaster 97431A240).  Nothing on it is threaded.
@@ -14,7 +15,8 @@ owner ruling of 2026-10-30 took the shank from 3.9 mm to 1/8 in.
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
 (the face that seats on the arm's rear face, machine z -116.4625) and local
 +Z runs toward the machine front, so machine z = ``HEAD_SEAT_MACHINE_Z`` -
-local z.  The head runs z -HEAD_HEIGHT..0, the shank z 0..LENGTH.
+local z.  The head runs z -HEAD_HEIGHT..0, the press land z
+0..PRESS_LAND_LENGTH and the shank on from there to LENGTH.
 
 PURE DATA: the build and the drawing both import it; neither imports the
 other.  ``transgear_cluster_fit`` holds the chain the groove station sets.
@@ -53,24 +55,48 @@ RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 # The head seats on the arm's rear face.
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
 
-# --- Shank: the running journal and the press in the arm -----------------------
+# --- Shank: the running journal ------------------------------------------------
 # The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
-# the owned .1260 reamer, .0010..0017 diametral); the arm's .124 REAM_H7 (the
-# owned .1240 reamer) holds it by a .0003..0010 press
-# (``pd_transgear_arm_geometry``), named at the shank Ø.  One turned diameter
-# both presses and runs; its top stops at .1250, the MHA-PD-VN-68 shims'
-# smallest bore, so no shim interferes (line-on-line at the worst case;
-# transgear_cluster_fit, codjiflo P2 on #2124).
+# the owned .1260 reamer, .0010..0017 diametral); its top stops at .1250, the
+# MHA-PD-VN-68 shims' smallest bore, so no shim interferes (line-on-line at
+# the worst case; transgear_cluster_fit, codjiflo P2 on #2124).  #2415: it
+# passes the arm's .1260 ream clear, so pressing never drags it through an
+# interference; the press land below holds the pin.
 DIA = 3.175  # .125
 DIA_BAND = (0.0, -0.00508)  # (upper, lower) deviations, +.0000/-.0002 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 4
-# (loosest, tightest): smallest shank in the largest ream, and the reverse.
-PRESS_INTERFERENCE = (
-    round(DIA_MIN - ARM.PIN_BORE_DIA_MAX, 6),
-    round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
-)  # 0.00762, 0.0254
+JOURNAL_ARM_CLEARANCE_MIN = round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6)  # .0010
+
+# --- Press land: the only length pressed into the arm (#2415) -----------------
+# A short land under the head, turned in the stiff length beside the chuck to
+# the measured arm ream for a light drive fit, .0002-.0005 diametral (FN1's
+# range at 1/8): pressed oiled (μ ≈ .10) over its .29 grip that is about
+# 270-680 lbf [INFERENCE: thick-hub estimate], under the 12L14 land's
+# ~750 lbf squash; no slender length carries it.
+# The model is the ream's mid band plus the mid interference, a reference.
+PRESS_INTERFERENCE = (0.00508, 0.0127)  # (loosest, tightest) diametral: .0002, .0005
+PRESS_LAND_DIA = round(
+    ARM.PIN_BORE_DIA + sum(ARM.PIN_BORE_DIA_BAND) / 2.0 + sum(PRESS_INTERFERENCE) / 2.0,
+    6,
+)  # .1266 REF
+PRESS_LAND_DIA_PLACES = 4
+PRESS_LAND_DIA_MAX = round(ARM.PIN_BORE_DIA_MAX + PRESS_INTERFERENCE[1], 6)
+# The land ends short of the arm's front face on the thinnest stock, so the
+# MHA-PD-VN-68 shims seat on the face around the journal; .XX.
+PRESS_LAND_LENGTH = 7.366  # .29
+PRESS_LAND_LENGTH_PLACES = 2
+PRESS_LAND_LENGTH_MAX = round(
+    PRESS_LAND_LENGTH + printed_band_mm(PRESS_LAND_LENGTH_PLACES, unit=UNIT), 6
+)
+# The land's grip in the full ream: past the rear mouth's largest chamfer.
+PRESS_LAND_GRIP_MIN = round(
+    PRESS_LAND_LENGTH
+    - printed_band_mm(PRESS_LAND_LENGTH_PLACES, unit=UNIT)
+    - ARM.PIN_MOUTH_CHAMFER_LIMITS[1],
+    6,
+)  # .27
 
 # --- Head: Ø.20, a .09 land then a spherical dome R.18 ------------------------
 # The head stops the press and, pulled forward by the ring's thrust on the
@@ -103,7 +129,7 @@ SEAT_CONTACT_WIDTH_MIN = round(
     - edge_break_chamfer_mm(unit=UNIT)
     - max(
         ARM.PIN_BORE_DIA_MAX / 2.0 + ARM.PIN_MOUTH_CHAMFER_LIMITS[1],
-        DIA_MAX / 2.0 + SEAT_FILLET_R,
+        PRESS_LAND_DIA_MAX / 2.0 + SEAT_FILLET_R,
     ),
     6,
 )
@@ -172,10 +198,13 @@ SURFACE_FINISHES = (
 # Each dome prints its radius and, as a reference, its height off the land's
 # end face, so the blank and the dome read without deriving the cap.  The tip
 # apex prints from the head seat; the land ahead of the groove, ending at the
-# tip dome's junction, prints as a reference.
+# tip dome's junction, prints as a reference.  The press land prints its
+# reference Ø (made to the measured ream, note 1) and its .XX length.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",
+        "LandDia",
+        "LandLength",
         "HeadDia",
         "HeadLand",
         "GrooveStation",
@@ -190,6 +219,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
         "ShankDia": DIA_PLACES,
+        "LandDia": PRESS_LAND_DIA_PLACES,
+        "LandLength": PRESS_LAND_LENGTH_PLACES,
         "HeadDia": 2,
         "HeadLand": HEAD_LAND_PLACES,
         "GrooveStation": GROOVE_STATION_PLACES,
@@ -247,7 +278,15 @@ for _ok, _what in (
     ),
     (
         PRESS_INTERFERENCE[0] > 0.0,
-        f"the shank loses its press in the {ARM_NUMBER} ream: {PRESS_INTERFERENCE}",
+        f"the press land loses its press in the {ARM_NUMBER} ream: {PRESS_INTERFERENCE}",
+    ),
+    (
+        JOURNAL_ARM_CLEARANCE_MIN > 0.0,
+        f"the journal is dragged through the {ARM_NUMBER} ream when pressed",
+    ),
+    (
+        PRESS_LAND_LENGTH_MAX < ARM.THICKNESS - ARM.THICKNESS_BAND,
+        f"the press land stands past the thinnest {ARM_NUMBER}'s front face",
     ),
 ):
     if not _ok:

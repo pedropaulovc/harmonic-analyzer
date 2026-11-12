@@ -162,11 +162,14 @@ class ExplodeStep:
 # and castings carry the balloons in place; only what hides or overlaps moves.
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # cylinder bank: slide the retention stack off each end of the arbor
+    # The south pedestal and the end disc each stand 30 clear (machinist
+    # review of PR #2557, two runs: at -35/-15 the disc's rim projected onto
+    # the pedestal boss and balloon 3 read as landing on MHA-DT-02).
     ExplodeStep(
         "south pedestal",
         ("dt-arbor-pedestal", "dt-vn-pedestal-hold-down-screw", "sh-vn-arbor-set-screw"),
         "z",
-        -35.0,
+        -60.0,
         ("south",),
     ),
     ExplodeStep(
@@ -176,7 +179,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         35.0,
         ("north",),
     ),
-    ExplodeStep("south end disc", ("dt-cylinder-end-disc",), "z", -15.0),
+    ExplodeStep("south end disc", ("dt-cylinder-end-disc",), "z", -30.0),
     # R11 sheet 3: 15 left the spring over the arbor dome, so balloons 1 and 4
     # read as one ring. Separate their ink without reaching the north pedestal.
     ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", 22.0),
