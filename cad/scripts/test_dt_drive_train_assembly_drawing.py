@@ -910,14 +910,19 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     step = _rig_step_body("other-base-mounting")
     number = steps.step_number("other-base-mounting")
     route = [
-        f"{number}A. CLAMP MHA-DT-20 TO MHA-FR-01.",
-        f"{number}B. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
-        f"{number}C. LIFT MHA-DT-20 OFF.",
-        f"{number}D. SPOT-DRILL THE PUNCH MARK.",
-        f"{number}E. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
+        f"{number}A. EASE OUT UNTIL THE GEARS TURN FREELY THROUGH "
+        f"{drawing.CONE_TURN_CRANK_TURNS} CRANK TURNS.",
+        f"{number}B. CLAMP MHA-DT-20 TO MHA-FR-01.",
+        f"{number}C. TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
+        f"{number}D. LIFT MHA-DT-20 OFF.",
+        f"{number}E. SPOT-DRILL THE PUNCH MARK.",
+        f"{number}F. DRILL AND TAP {pivot_screw.THREAD} THERE PER MHA-FR-01.",
         "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.",
     ]
-    assert step.startswith("CONE SET ON THE BASE: SET MHA-DT-20 WHERE NO GEAR BINDS.")
+    # The transfer pose is check 4's feel set (#1038 re-pitch ruling).
+    assert step.startswith(
+        "CONE SET ON THE BASE: SWING MHA-DT-20 IN UNTIL A GEAR JUST BINDS."
+    )
     positions = [step.index(part) for part in route]
     assert positions == sorted(positions)
     assert step.count("CHECK THAT") == 1

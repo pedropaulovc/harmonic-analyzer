@@ -1932,10 +1932,16 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # round 6 (clarity): a seated screw's engagement cannot be read, so
         # each blind seat's full-thread depth and its screw's thread length
         # are recorded before the screw goes in; checks 4W and 4Y take the
-        # lesser of the two.
+        # lesser of the two.  The transfer pose is check 4's feel set (4M-4N:
+        # in to the first bind, eased out until the gears turn freely), so
+        # the permanent pivot is punched where check 4 will set the swing
+        # (Repitch1038 ruling, #1038 re-pitch, on machinist review of point A:
+        # "WHERE NO GEAR BINDS" gave no pose and no check).
         (
             "other-base-mounting",
-            "CONE SET ON THE BASE: SET MHA-DT-20 WHERE NO GEAR BINDS.\n"
+            "CONE SET ON THE BASE: SWING MHA-DT-20 IN UNTIL A GEAR JUST BINDS.\n"
+            f"EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
+            "CRANK TURNS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
@@ -2050,11 +2056,11 @@ CHECKS = _note_text(
         "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'F')}-{_step_ref('other-base-mounting', 'G')}.",
+        f"{_step_ref('other-base-mounting', 'G')}-{_step_ref('other-base-mounting', 'H')}.",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')}.",
+        f"{_step_ref('other-base-mounting', 'L')}-{_step_ref('other-base-mounting', 'M')}.",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
