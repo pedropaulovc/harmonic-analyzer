@@ -159,35 +159,55 @@ def test_physical_flat_terminal_has_two_actual_end_limits():
     assert shaft.FRONT_RELIEF_WIDTH_MIN > 2.0 * shaft.FRONT_CORNER_RADIUS_MAX
 
 
-def test_torque_contact_uses_no_favourable_bore_float_credit():
-    flat_min = shaft.CORE_FLAT_FROM_AXIS + min(shaft.CORE_FLAT_BAND)
+def test_round_bore_and_flat_pin_clear_the_neck_without_float_credit():
     neck_crown = (
         shaft.FRONT_RELIEF_DIA_MAX / 2.0
         + (shaft.CORE_TOTAL_RUNOUT + shaft.FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
     )
-    assert flat_min - neck_crown == pytest.approx(0.09906)
-    assert collar.NECK_TORQUE_FLAT_AIR_MIN == pytest.approx(flat_min - neck_crown)
-    assert collar.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.14463096928059818)
-    # A legal zero general edge break would seat on the gear-side fillet.
-    assert flat_min - neck_crown - shaft.FRONT_CORNER_RADIUS_MAX < 0.0
-    assert collar.BORE_ENTRY_BREAK_MIN == pytest.approx(0.1524)
-    assert collar.BORE_ENTRY_BREAK_MAX == pytest.approx(0.254)
-    assert collar.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
-    assert collar.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.14717096928059806)
-    assert collar.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.2630246997028047)
-    assert collar.FLAT_TO_AXIS == pytest.approx(2.16154)
-    assert collar.FLAT_LIMITS == (2.15392, 2.16916)
-    assert min(collar.FLAT_CLEARANCE) > 0.0
-    assert collar.STUD_D_BORE_AIR > 0.0
+    bore_r_min = (collar.BORE_DIA + min(collar.BORE_DIA_BAND)) / 2.0
+    float_max = (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0 - (
+        shaft.CORE_DIA + min(shaft.CORE_DIA_BAND)
+    ) / 2.0
+    assert collar.ROUND_FIT_FLOAT_MAX == pytest.approx(float_max)
+    # #2409: the round rear mouth spends the whole float and both runouts
+    # over the neck's largest radius and its largest root corner.
+    air = bore_r_min - neck_crown - shaft.FRONT_CORNER_RADIUS_MAX - float_max
+    assert collar.ROOT_CORNER_BORE_AIR_MIN == pytest.approx(air)
+    assert air == pytest.approx(0.28829)
+    # The flat pin's lowest crest stands off the neck crown with the same
+    # charges, so the pressed pin, which runs back to F, never rides the neck.
+    crest_min = min(collar.FLAT_PIN_CREST_LIMITS)
+    assert crest_min - neck_crown - float_max > 0.0
+    # Within the root corner's radius of F the corner reaches further; the
+    # crest alone gives it no air, so the collar's rear bore-mouth break,
+    # cut through the crest after facing (its least leg at its steepest
+    # angle, one corner radius in), lifts the crest corner off it.
+    corner_reach = neck_crown + shaft.FRONT_CORNER_RADIUS_MAX + float_max
+    assert crest_min - corner_reach == pytest.approx(0.0, abs=1e-6)
+    assert collar.REAR_BREAK_LIMITS == pytest.approx((0.1524, 0.254))
+    assert collar.REAR_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
+    break_r = (
+        bore_r_min
+        + min(collar.REAR_BREAK_LIMITS)
+        - shaft.FRONT_CORNER_RADIUS_MAX * math.tan(math.radians(max(collar.REAR_BREAK_ANGLE_LIMITS)))
+    )
+    corner_air = max(crest_min, break_r) - corner_reach
+    assert collar.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(corner_air)
+    assert corner_air == pytest.approx(0.33548, abs=1e-5)  # .0132
+    assert min(collar.FLAT_PIN_CREST_CLEARANCE) > 0.0
+    assert collar.STUD_FLAT_PIN_AIR > 0.0
 
 
 def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert shaft.CORE_FRONT_FROM_F == 5.334
     assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
     assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.5466)
-    assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.991639285135482)
+    # #2409: the pressed pin's least length on the D-core over every fitted
+    # body length, floor and core-front corner, behind the crest relief the
+    # rear break cuts from F.
+    assert collar.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(1.03207, abs=1e-5)
     assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
-    assert collar.D_DRIVE_AREA_MIN > 0.0
+    assert collar.FLAT_PIN_CORE_ENGAGEMENT_MIN > 0.0
     assert collar.LENGTH == collar.SET_NOMINAL == 6.1722
     assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.8862, 6.8834)
     assert collar.BODY_BLANK_LENGTH_MIN >= collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
@@ -255,13 +275,13 @@ def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
 def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX > (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
     # Regression value, not a load floor: the spec's physical gate is a
-    # positive face. It charges bore, entry break, D-axis error at F and
+    # positive face. It charges bore, edge break, bore-axis error at F and
     # half the 0.0508 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(22.5066, abs=1e-3)
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(22.920251, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
     assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.18802833069091696)
-    assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.02055060059439)
-    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.08188336584674044)
+    assert collar.BORE_SUPPORT_LENGTH_MIN == pytest.approx(shaft.CORE_ACTIVE_LENGTH_MIN)
+    assert collar.BORE_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.06742351955307258)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.782128330690917)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0

@@ -3,12 +3,12 @@ r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its draw
 The transgear pinion sleeve (MHA-PD-10, R9-68): one turned steel sleeve that
 runs on the MHA-PD-23 pin's 1/8 shank and carries, rear to front, the
 independent 12T 32DP PA20 finite stock-form feed pinion and the Ø.313 boss.
-The pinion meshes the purchased standard platen rack. The brass hub
-slides on the boss; its rear spigot passes through
+The pinion meshes the purchased standard platen rack. The brass hub's
+round bore slides on the boss; its rear spigot passes through
 the 120T disc's (MHA-PD-06) bore, which pilots on it, and seats its end on the
 step face, so the step is the rear stop of hub and disc; the hub drives
-through the boss's D-flat, which is drive only (its end wall stands behind
-the hub's own flat and never touches it).  The hub's printed overall leaves
+through the boss's D-flat, on which the inner end of its MHA-PD-VN-69 key pin
+stops ahead of the flat's end wall (#2409).  The hub's printed overall leaves
 its front face never proud of the nose (``transgear_cluster_fit.RECESS_RANGE``),
 so the MHA-PD-25 front bushing bears on the nose and traps hub and disc
 against the step.  The rear face runs on the MHA-PD-24 rear bushing; both
@@ -246,8 +246,9 @@ RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 # the tooth length's end is the step face the hub's spigot seats on.  The
 # shims set the end float (owner ruling 2026-11-01, #2124); the recess still
 # needs both, so they print +/-.001.
-# STATION_TOL is the allowance the flat's reach and the hub's flat-end check
-# keep on the sleeve's other stations (R9-5's former overall band).
+# STATION_TOL is the allowance the flat's reach and the hub key pin's
+# flat-end check keep on the sleeve's other stations (R9-5's former overall
+# band).
 STATION_TOL = 0.0508  # .002
 STATION_PLACES = 3
 FACE_WIDTH = 13.589  # .535, the tooth length: rear face to the step onto the boss
@@ -289,20 +290,22 @@ STEP_FACE_PERPENDICULARITY = float(
 STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
 
 # --- D-flat (local -Y): drive only ------------------------------------------------
-# The hub drives through it.  The flat plane prints from the boss axis at
-# .138 0/-.001, the shop's .0001-place row (Owner ruling 2026-11-08
-# (Pedro), #2144 item 3.4):
-# the hub's flat sits pd_transgear_disc_hub_spec.FLAT_CLEARANCE off it (the
-# hub owns its band and checks the pair).
+# The hub drives through it: the side of the hub's MHA-PD-VN-69 key pin,
+# on a chord of the hub over it, bears on it (#2409).  The flat plane prints
+# from the boss axis at .138 ±.002, the shop's row for a milled step located
+# from the bore axis (machinist reviews r4 and r5 on #2409 opened the
+# .0001-place 0/-.001 band of owner ruling 2026-11-08 (Pedro), #2144 item
+# 3.4); it sets the pin's air to the flat
+# (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_AIR).
 FLAT_TO_AXIS = 3.5052  # .138
-FLAT_TO_AXIS_BAND = (0.0, -0.0254)  # (upper, lower) deviations: 0/-.001
-FLAT_TO_AXIS_PLACES = 4
+FLAT_TO_AXIS_TOL = 0.0508  # ±.002, printed symmetric
+FLAT_TO_AXIS_BAND = (FLAT_TO_AXIS_TOL, -FLAT_TO_AXIS_TOL)  # (upper, lower) deviations
+FLAT_TO_AXIS_PLACES = 3
 FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # .0185
 # The flat runs from the nose rearward to an end wall at FLAT_END_STATION,
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
-# nose.  The wall stops nothing: the hub's flat starts at its flange's rear
-# face, the spigot's length ahead of the step, so the wall stands clear
-# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST), and it
+# nose.  The wall stops nothing: the key pin lands ahead of it
+# (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_END_CLEARANCE_WORST), and it
 # stays clear of the step the hub's spigot seats on, so the flat never
 # notches that face.  Those are its only functions, so it prints as limits
 # at two inch places (2026-10-27 ENFORCE review: ±0.05 was unneeded
@@ -310,11 +313,10 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # .0185
 # The MAX is the modelled station.  The MIN stands behind the longest tooth
 # length plus the title block's .010 edge break, and behind the cutter's
 # run-out (asserted below).  The hub's check keeps its conservative
-# STATION_TOL allowance on top of the MAX.  The MAX stands far enough behind
-# the hub's flat that the title block's R.040 inside corner, where the
-# flat's floor meets the wall, stays under the flats' minimum clearance
-# where the hub's flat starts (codjiflo P2 on edb402b/482fbdc: at 16.6 an
-# R1.0 corner rose 0.21 there; #2006).  The drawing test holds that envelope.
+# STATION_TOL allowance on top of the MAX.  The title block's R.040 inside
+# corner, where the flat's floor meets the wall, stays behind the pin's
+# footprint (codjiflo P2 on edb402b/482fbdc: at 16.6 an R1.0 corner rose
+# 0.21 into the old hub flat; #2006).  The drawing test holds that envelope.
 FLAT_END_STATION = 16.002  # .63
 FLAT_END_MIN = 13.97  # .55
 FLAT_END_PLACES = 2
@@ -545,11 +547,11 @@ WALLS = (
 for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
-# The D-flat wall (.138 flat over the .125 bore, both contract fits) sits
-# under the .080 target and keeps the .060 floor: owner minor RV-03.
+# The D-flat wall (.138 ±.002 flat over the .125 bore) sits under the .080
+# target and keeps the .060 floor: minor RV-03.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
-FLAT_WALL_PRINTED = inch_floor_mm(FLAT_WALL_WORST, 3)  # .073
+FLAT_WALL_PRINTED = inch_floor_mm(FLAT_WALL_WORST, 3)  # .072
 if FLAT_WALL_WORST < WALL_FLOOR:
     raise AssertionError(f"the D-flat wall {FLAT_WALL_WORST:.3f} is under the floor")
 
@@ -571,8 +573,12 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # at the root's MIN: the root prints on the rear-face view, where the
 # full-depth gaps show their floors (the section cuts through teeth).
 # ``FlatProfile`` is the flat's cut sketch on the Right plane (the section
-# plane): the flat from the axis and its end wall from the rear face print on
-# the section, where the flat shows edge-on.
+# plane): its end wall from the rear face prints on the section, where the
+# flat shows edge-on.  The flat's distance from the axis prints from
+# ``FlatReference``, a hidden Front-plane reference sketch driven by the same
+# ``FlatToAxis`` global, on the nose view, where the flat shows as a chord
+# (r8 machinist review: no view showed it so; draw_pd_transgear_knob_shaft's
+# CoreFlatReference).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "SleeveProfile": {
@@ -584,7 +590,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CutterRunout",
     },
     "RootProfile": {"RootDia"},
-    "FlatProfile": {"FlatToAxis", "FlatEnd"},
+    "FlatProfile": {"FlatEnd"},
+    "FlatReference": {"FlatToAxis"},
     "SpanProfile": {"ToothSpan"},
 }
 
@@ -599,10 +606,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
     "RootProfile": {"RootDia": ROOT_DIA_PLACES},
-    "FlatProfile": {
-        "FlatToAxis": FLAT_TO_AXIS_PLACES,
-        "FlatEnd": FLAT_END_PLACES,
-    },
+    "FlatProfile": {"FlatEnd": FLAT_END_PLACES},
+    "FlatReference": {"FlatToAxis": FLAT_TO_AXIS_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -620,7 +625,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
 BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
 BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
-FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # The root witness's nominal IS the printed physical MIN limit.
 ROOT_DIA_DEVIATIONS = (0.0, 0.0)
@@ -633,7 +637,7 @@ RADIAL_SETTING_DEVIATIONS = deviations(RADIAL_SETTING_BAND)
 # the notes block it reached no feature), so the notes block omits it.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # Emits approved declaration pd-transgear-feed-pinion RV-03 (owner ruling
-# 2026-10-27, #1378, re-ruled at .073 MIN by delegated ruling 2026-11-07
+# 2026-10-27, #1378, re-ruled at .072 MIN by delegated ruling 2026-11-11
 # (Main), no precedent; owner review #2144).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.

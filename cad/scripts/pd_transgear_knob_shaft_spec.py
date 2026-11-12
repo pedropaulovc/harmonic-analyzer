@@ -9,7 +9,8 @@ One turned SAE1018 shaft carries a standard-depth ``TEETH``-tooth 48DP PA20
 integral pinion cut by the finite TTC stock form ``CUTTER_NUMBER``
 (``CUTTER_SKU``, Ø44.45 cutter).
 The gear front F and every chain/cup station remain unchanged.  Its front
-Ø.191 solid D-core drives the matching brass D-collar without a cross
+Ø.191 solid D-core slides in the brass drive collar's round bore, and the
+collar's pressed pin bears on the core's flat to drive it, without a cross
 hole.  The collar's fitted rear face bears directly on F; the #8-32 stud
 and same-outer custom thumbnut clamp it there, while the removable T24
 still floats on the existing pilot and is driven by the two axial dowels.
@@ -216,7 +217,7 @@ _TOOTH_PITCH_DEG = 360.0 / TEETH
 FRONT_STACK_PHASE_DEG = (180.0 + DISC.MESH_ANGLE_DEG - GAP_AZIMUTH_DEG) % _TOOTH_PITCH_DEG
 if FRONT_STACK_PHASE_DEG > _TOOTH_PITCH_DEG / 2.0:
     FRONT_STACK_PHASE_DEG -= _TOOTH_PITCH_DEG
-# --- #8-32 stud: passes the true D-bore, including its flat ------------------
+# --- #8-32 stud: passes the collar's round bore and its flat pin's crest ----
 THREAD = "#8-32"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 THREADS_PER_IN = 32
@@ -263,7 +264,7 @@ if _STUD_STATION_BAND > printed_band_mm(TIP_STATION_PLACES, unit=UNIT):
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
 # .191 SHAFT_H (#290 fit F10; 4.850 before): under the drive collar's .192
-# reamed D-bore.  The current form root lifts FRONT_CORE_AIR_MIN well over
+# reamed round bore.  The current form root lifts FRONT_CORE_AIR_MIN well over
 # its 0.035 floor.
 CORE_DIA = 4.8514  # .191
 CORE_DIA_BAND = SHAFT_H  # .0000/-.0008
@@ -328,7 +329,8 @@ TOOTH_SPACE_CALLOUT_POINT_MM = (
 # The core's front: printed as a station from the tip face (CORE_FRONT_FROM_
 # TIP, .XXX), so from F it is the difference of two .XXX stations, at the
 # .XX row's ±.010 (CORE_FRONT_FROM_F_PLACES, asserted below).  Its stacks
-# (the collar's D support, the thumbnut's core-step air, the thread relief)
+# (the collar's bore support and flat-pin engagement, the thumbnut's
+# core-step air, the thread relief)
 # all hold at that band.
 CORE_FRONT_FROM_F = 5.334  # .21
 CORE_FRONT_FROM_F_PLACES = 2
@@ -337,10 +339,10 @@ CORE_FRONT_FROM_TIP = TIP_STATION - CORE_FRONT_FROM_F  # .730
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
 # .155, not .157: paid the 0.05 tooth-space TIR under the earlier, smaller
 # pinion.  The neck prints LIMITS .155/.150 (owner ruling, machinist review
-# r8): the maximum clears the collar's D entry (the .XXX row would put
-# its crown into the torqued core-flat plane, the drive collar's
-# NECK_TORQUE_FLAT_AIR_MIN) and the minimum keeps the section that carries
-# the drive torque (FRONT_RELIEF_AREA_MIN).
+# r8): the maximum keeps the neck's crown under the torqued core-flat plane,
+# where the drive collar's pressed flat pin runs over it (the .XXX row would
+# put the crown into that plane), and the minimum keeps the section that
+# carries the drive torque (FRONT_RELIEF_AREA_MIN).
 FRONT_RELIEF_DIA = 3.937  # .155
 FRONT_RELIEF_DIA_PLACES = 3
 FRONT_RELIEF_DIA_MAX = FRONT_RELIEF_DIA
@@ -724,7 +726,8 @@ if TIP_CHAMFER_MAX > THREAD_PITCH + 1e-9:
     )
 
 
-# The drive collar MHA-PD-22: its D-bore slides on the D-core.
+# The drive collar MHA-PD-22: its round bore slides on the D-core and its
+# pressed MHA-PD-VN-70 pin drives on the flat.
 DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 
 

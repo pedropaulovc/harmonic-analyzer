@@ -50,6 +50,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91375A942",
         material="Alloy Steel",
     ),
+    # #2409: a 1/16 x 5/16 hardened alloy dowel pressed along a chord of the
+    # MHA-PD-17 disc hub to its ream's stop, its side keying the hub on the
+    # MHA-PD-10 feed sleeve's flat.
+    "pd-vn-transgear-hub-key-pin": _stock(
+        "pd-vn-transgear-hub-key-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A416",
+        material="Alloy Steel",
+    ),
     "sh-vn-clamp-screw": _stock(
         "sh-vn-clamp-screw",
         "Steel Narrow Fillister Head Slotted Screw",
@@ -303,6 +312,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Alloy Steel Dowel Pin",
         "98381A433",
         material="Alloy Steel",
+    ),
+    # #2409: pressed into the MHA-PD-22 collar's blind hole; its crest is the
+    # collar's drive flat on the MHA-PD-08 knob shaft's D-flat. Unhardened
+    # 18-8, so the collar's rear-face facing to fit faces it flush.
+    "pd-vn-transgear-collar-flat-pin": _stock(
+        "pd-vn-transgear-collar-flat-pin",
+        "18-8 Stainless Steel Dowel Pin",
+        "90145A414",
+        material="AISI 304",
     ),
     "pd-vn-transgear-disc-screw": _stock(
         "pd-vn-transgear-disc-screw",

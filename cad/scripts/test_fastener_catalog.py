@@ -48,6 +48,8 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-arm-plate-screw": (("91790A199",), "MHA-PD-VN-56", 2),
     "pd-vn-transgear-arm-plate-locating-pin": (("98381A435",), "MHA-PD-VN-64", 2),
     "pd-vn-transgear-knob-drive-pin": (("98381A433",), "MHA-PD-VN-54", 2),
+    "pd-vn-transgear-collar-flat-pin": (("90145A414",), "MHA-PD-VN-70", 1),
+    "pd-vn-transgear-hub-key-pin": (("98381A416",), "MHA-PD-VN-69", 1),
     "pd-vn-transgear-knob-cup-pin": (("98296A031",), "MHA-PD-VN-62", 1),
     "pd-vn-transgear-disc-screw": (("91794A055",), "MHA-PD-VN-55", 3),
     "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),

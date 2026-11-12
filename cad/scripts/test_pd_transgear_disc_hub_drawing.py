@@ -70,7 +70,7 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.END_KEEP, drawing.SIDE_KEEP)
+    views = (drawing.END_KEEP, drawing.SIDE_KEEP, drawing.SECTION_KEEP)
     assert set().union(*map(set, views)) == marked
     for a, b in itertools.combinations(views, 2):
         assert not set(a) & set(b)
@@ -78,14 +78,26 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     # Each callout rides a dimension the sheet keeps.
     assert set(drawing.DIMENSION_CALLOUTS_BELOW) <= marked
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= marked
+    assert set(drawing.SECTION_CALLOUTS_BELOW) <= set(drawing.SECTION_KEEP)
+    # Each view proves only the places of what it keeps, and together they
+    # prove every marked dimension's.
+    proofs = (
+        drawing._precision_of({**drawing.END_KEEP, **drawing.SIDE_KEEP}),
+        drawing._precision_of(drawing.SECTION_KEEP),
+    )
+    assert not set(proofs[0]) & set(proofs[1])
+    assert {**proofs[0], **proofs[1]} == spec.DRAWING_PRECISION_BY_NAME
 
 
 def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> None:
     """R9-5: the overall (spigot end to hub front) is a +/-.001 term of the
     disc cluster stack, .539 at 3 places; the flange .094 is a .XXX
     length and the spigot .144 a stack term; the hub body is their
-    remainder and is not printed.  The oil hole's station prints at .XX
-    from the hub front face (machinist review: "centred" located nothing)."""
+    remainder and is not printed.  The key-pin hole's station, which the oil
+    hole shares, prints at .XX from the hub front face (machinist review:
+    "centred" located nothing); its ream and knockout at four places and its
+    chord offset and stop at three in A-A.  The bore is round: nothing
+    locates a flat."""
     diameters = {
         "FlangeDia",
         "HubDia",
@@ -93,22 +105,32 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
         "BoreDia",
         "BoltCircleDia",
         "ScrewHoleDia",
+        "OilHoleDia",
+        "KeyPinDia",
+        "KeyPinDrillDia",
     }
-    lengths = (
-        set(spec.DRAWING_PRECISION_BY_NAME) - diameters - {"OilHoleDia", "FlatToAxis"}
-    )
-    assert lengths == {"HubLength", "FlangeThick", "SpigotLength", "OilHoleStation"}
-    assert _places("OilHoleStation") == 2
+    lengths = set(spec.DRAWING_PRECISION_BY_NAME) - diameters
+    assert lengths == {
+        "HubLength",
+        "FlangeThick",
+        "SpigotLength",
+        "KeyPinStation",
+        "KeyPinChord",
+        "KeyPinStop",
+    }
+    assert _places("KeyPinStation") == 2
+    assert _places("KeyPinDia") == _places("KeyPinDrillDia") == 4
+    assert _places("KeyPinChord") == _places("KeyPinStop") == 3
     assert spec.REFERENCE_DIMENSIONS == frozenset()
-    assert {"HubLength", "SpigotLength"} < set(drawing.SIDE_KEEP)
+    assert {"HubLength", "SpigotLength", "KeyPinStation"} < set(drawing.SIDE_KEEP)
+    assert set(drawing.SECTION_KEEP) == spec.DRAWING_DIMENSIONS["KeyPinProfile"]
     assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH == pytest.approx(0.539 * IN)
     assert _places("HubLength") == cluster_fit.LENGTH_PLACES == 3
     assert spec.FLANGE_THICK == pytest.approx(0.094 * IN) and _places("FlangeThick") == 3
     assert spec.SPIGOT_LENGTH == pytest.approx(0.144 * IN) and _places("SpigotLength") == 3
     assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 4
-    assert spec.FLAT_TO_AXIS == spec.SLEEVE.FLAT_TO_AXIS
-    assert _places("FlatToAxis") == 4
-    assert spec.HUB_DIA == pytest.approx(0.52 * IN) and _places("HubDia") == 2
+    assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia"}
+    assert spec.HUB_DIA == pytest.approx(0.540 * IN) and _places("HubDia") == 3
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN) and _places("SpigotDia") == 4
     assert spec.FLANGE_DIA == pytest.approx(1.05 * IN) and _places("FlangeDia") == 2
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
@@ -143,10 +165,12 @@ def test_the_bore_the_spigot_and_the_stack_lengths_carry_model_bands() -> None:
     the title block's DRILLED HOLES row."""
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
-        ("BoreProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
         ("HubProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
         ("HubProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("HubProfile", "SpigotLength"): "SPIGOT_LENGTH_BAND",
+        ("KeyPinProfile", "KeyPinDia"): "*KEY_PIN_HOLE_DEVIATIONS",
+        ("KeyPinProfile", "KeyPinChord"): "KEY_PIN_LOCATION_BAND",
+        ("KeyPinProfile", "KeyPinStop"): "KEY_PIN_LOCATION_BAND",
     }
 
 
@@ -161,56 +185,45 @@ def _printed_limits(build, spec_module, feature: str, name: str, nominal: float)
     return nominal + lower, nominal + upper
 
 
-def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() -> None:
-    """The D drives the disc's torque; the two parts are made apart, each to
-    its own sheet, so the round part and the flat each keep a clearance
-    (never a bind) at every printed limit, and the callouts state the
-    clearances the limits give."""
+def test_the_round_bore_slides_on_the_sleeve_boss_at_every_printed_limit() -> None:
+    """#2409: the bore is plain round and reamed through; the two parts are
+    made apart, each to its own sheet, so it keeps a clearance (never a
+    bind) at every printed limit, and its callout names the mate it slides
+    on (rule 4) and ends on the least finished wall over it (rule 20)."""
     import build_pd_transgear_feed_pinion as sleeve_part
     import pd_transgear_feed_pinion_spec as sleeve
 
     assert spec.BORE_DIA == sleeve.BOSS_DIA
     assert spec.BORE_BAND == pytest.approx((0.0010 * IN, 0.0005 * IN))  # +.0010/+.0005
-    assert spec.FLAT_TO_AXIS == sleeve.FLAT_TO_AXIS
     assert part.BORE_DIA == drawing.BORE_DIA == spec.BORE_DIA
     assert part.BORE_R == pytest.approx(sleeve.BOSS_DIA / 2.0)
-    assert part.FLAT_TO_AXIS == spec.FLAT_TO_AXIS
     assert part.BORE_DEVIATIONS == spec.BORE_DEVIATIONS
+    # The reamer's .3135 is the bore's least size.
+    assert spec.BORE_DIA + spec.BORE_BAND[1] == pytest.approx(0.3135 * IN)
+    # One round cut through the whole part: no flat, no second bore.
+    assert part.V_BORE == pytest.approx(math.pi * part.BORE_R**2 * spec.HUB_LENGTH)
+    for name in ("FLAT_TO_AXIS", "FLAT_CLEARANCE", "BORE_FIT_TEXT"):
+        assert not hasattr(spec, name)
 
     bore = _printed_limits(part, spec, "BoreProfile", "BoreDia", spec.BORE_DIA)
     boss = _printed_limits(
         sleeve_part, sleeve, "SleeveProfile", "BossDia", sleeve.BOSS_DIA
     )
     round_fit = (bore[0] - boss[1], bore[1] - boss[0])
-    hub_flat = _printed_limits(
-        part, spec, "BoreProfile", "FlatToAxis", spec.FLAT_TO_AXIS
-    )
-    shaft_flat = _printed_limits(
-        sleeve_part, sleeve, "FlatProfile", "FlatToAxis", sleeve.FLAT_TO_AXIS
-    )
-    flat_fit = (hub_flat[0] - shaft_flat[1], hub_flat[1] - shaft_flat[0])
-    assert round_fit[0] >= -1e-9 and flat_fit[0] > 0.0
+    assert round_fit[0] >= -1e-9
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
-    assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
-    link = f"SEE NOTE {spec.BORE_FIT_NOTE}"
-    assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
-    # The flat's callout is the link alone: where the flat ends is drawn on
-    # SECTION A-A, never worded on its location dimension.
-    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == link
-    note = " ".join(spec.BORE_FIT_TEXT.split())
-    printed = re.findall(r"(\d*\.\d+-\d*\.\d+) ON THE (ROUND|FLAT)", note)
-    assert [kind for _, kind in printed] == ["ROUND", "FLAT"]
-    assert _clr(printed[0][0]) == pytest.approx(round_fit, abs=0.00005 * IN)
-    assert _clr(printed[1][0]) == pytest.approx(flat_fit, abs=0.00005 * IN)
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
+    assert any(spec.SLEEVE_NUMBER in line for line in callout)
+    assert callout[-1] == spec.BORE_WALL_TEXT
+    assert len(callout) <= 3
 
 
-def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() -> None:
+def test_boss_round_engagement_follows_the_live_sleeve() -> None:
     """The retained axial stack keeps the finite cutter end behind the
-    locating round and the sleeve flat's end behind the hub flat. The hub
-    slides forward off the step by up to the whole end float, its front face
-    then past the nose. The available D-flat face is geometry, not a
-    certified torque capacity."""
+    locating round.  The spigot seats on the step; the engagement still
+    allows it to slide forward off the step by up to the whole end float, its
+    front face then past the nose."""
     sleeve = spec.SLEEVE
     slide = cluster_fit.END_FLOAT_RANGE[1]
     teeth = (
@@ -219,7 +232,6 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
     )
     sleeve_min = sleeve.OVERALL_LENGTH - sleeve.OVERALL_LENGTH_BAND
     hub_min = spec.HUB_LENGTH - FIT_LENGTH_BAND_IN
-    spigot_max = spec.SPIGOT_LENGTH + FIT_LENGTH_BAND_IN
     # Seated: hub front face to the boss's first full round; slid forward:
     # the nose to the first full round behind the slid spigot.  Each exposed
     # end of the contact loses the title block's edge break.
@@ -233,24 +245,105 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
     )
     assert spec.ROUND_ENGAGEMENT_MIN == pytest.approx(engagement)
     assert engagement > 0.0
-    assert spec.FLAT_END_CLEARANCE_WORST > 0.0
-    width = 2.0 * math.sqrt(
-        (sleeve.BOSS_DIA / 2.0) ** 2 - sleeve.FLAT_TO_AXIS**2
+
+
+def test_the_key_pin_keys_the_hub_on_the_sleeve_flat() -> None:
+    """#2409: one MHA-PD-VN-69 1/16 x 5/16 hardened dowel lies on a chord
+    of the hub body over the MHA-PD-10 flat, pressed from +X into a .0615
+    REAM_H7 hole to its stop: its side keeps air to the flat at every
+    printed limit (the hub slides on), so the hub turns a stated play before
+    the pin bears; both ends stay under the O.D., each held in at least 1D
+    of wall beside the bore's window, gripped at both press extremes, and
+    the wall over the ream holds the .060 floor."""
+    import pd_vn_transgear_hub_key_pin_spec as pin
+
+    sleeve = spec.SLEEVE
+    assert spec.KEY_PIN_NUMBER == _config.parts("pd-vn-transgear-hub-key-pin")["number"]
+    assert spec.KEY_PIN is pin
+    assert spec.KEY_PIN_HOLE_DIA == pytest.approx(0.0615 * IN)
+    hole_max = spec.KEY_PIN_HOLE_DIA + spec.KEY_PIN_HOLE_BAND[0]
+    hole_min = spec.KEY_PIN_HOLE_DIA + spec.KEY_PIN_HOLE_BAND[1]
+    assert (hole_min, hole_max) == pytest.approx((0.0615 * IN, 0.0620 * IN))
+    pin_min, pin_max = pin.DIA_LIMITS_MM
+    assert spec.KEY_PIN_INTERFERENCE == pytest.approx((pin_min - hole_max, pin_max - hole_min))
+    assert pin_min - hole_max > 0.0
+    assert spec.KEY_PIN_STATION == pytest.approx(0.15 * IN)
+    assert spec.KEY_PIN_Z == pytest.approx(spec.HUB_FRONT_Z + spec.KEY_PIN_STATION)
+    station = (
+        spec.KEY_PIN_STATION - _row(2),
+        spec.KEY_PIN_STATION + _row(2),
     )
-    width_min = 2.0 * math.sqrt(
-        ((sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0) ** 2
-        - (sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[0]) ** 2
+    # The hole's whole section, at the shortest teeth and hub and the
+    # greatest station, ahead of the flat's end wall at its worst station.
+    teeth_min = sleeve.FACE_WIDTH - sleeve.FACE_WIDTH_BAND
+    hub_min = spec.HUB_LENGTH - FIT_LENGTH_BAND_IN
+    flat_end = sleeve.FLAT_END_STATION + sleeve.STATION_TOL
+    clearance = teeth_min + hub_min - station[1] - hole_max / 2.0 - flat_end
+    assert spec.KEY_PIN_FLAT_END_CLEARANCE_WORST == pytest.approx(clearance)
+    assert clearance > 0.0
+    assert spec.KEY_PIN_SLEEVE_Z == pytest.approx(0.924 * IN)
+    assert spec.KEY_PIN_SLEEVE_Z < sleeve.OVERALL_LENGTH
+    # The chord and the stop at the reamed-hole location band.
+    band = 0.002 * IN
+    assert spec.KEY_PIN_LOCATION_BAND == pytest.approx(band)
+    chord = (spec.KEY_PIN_CHORD_OFFSET - band, spec.KEY_PIN_CHORD_OFFSET + band)
+    stop = (spec.KEY_PIN_STOP - band, spec.KEY_PIN_STOP + band)
+    assert chord == pytest.approx((0.172 * IN, 0.176 * IN))
+    assert stop == pytest.approx((0.158 * IN, 0.162 * IN))
+    assert spec.KEY_PIN_CHORD_RANGE == pytest.approx(chord)
+    assert spec.KEY_PIN_STOP_RANGE == pytest.approx(stop)
+    assert spec.KEY_PIN_STOP_X == -spec.KEY_PIN_STOP
+    # The #56 knockout, drilled through, leaves a step the pin stops on.
+    assert spec.KEY_PIN_DRILL_DIA == pytest.approx(0.0465 * IN)
+    assert spec.KEY_PIN_DRILL_DIA + DRILL_PLUS < hole_min
+    # The pin's side never touches the flat: air at every printed limit.
+    flat = (
+        sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[1],
+        sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[0],
     )
-    length_min = min(
-        hub_min - spigot_max,
-        sleeve_min - teeth[1] - slide - spigot_max,
+    air = (chord[0] - pin_max / 2.0 - flat[1], chord[1] - pin_min / 2.0 - flat[0])
+    assert spec.KEY_PIN_FLAT_AIR == pytest.approx(air)
+    assert air[0] > 0.0
+    # It bears on the flat where it crosses the least bore, along the least
+    # flat chord; the play is the greatest air over the shorter lever, lost
+    # both ways on reversal at the 12T's pitch radius.
+    boss_min_r = (sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0
+    flat_chord = 2.0 * math.sqrt(boss_min_r**2 - flat[1] ** 2)
+    assert spec.KEY_PIN_FLAT_CHORD_MIN == pytest.approx(flat_chord)
+    bore_min_r = (spec.BORE_DIA + spec.BORE_BAND[1]) / 2.0
+    bearing = math.sqrt(bore_min_r**2 - (chord[1] - pin_min / 2.0) ** 2)
+    lever = min(flat_chord / 2.0, bearing)
+    play = math.degrees(air[1] / lever)
+    assert spec.KEY_PIN_PLAY_DEG == pytest.approx(play)
+    assert spec.KEY_PIN_PAPER_LOST == pytest.approx(
+        2.0 * math.radians(play) * sleeve.PITCH_DIA / 2.0
     )
-    assert length_min > 0.0
-    assert spec.FLAT_DRIVE_WIDTH == pytest.approx(width)
-    assert spec.FLAT_DRIVE_WIDTH_MIN == pytest.approx(width_min)
-    assert spec.FLAT_DRIVE_LENGTH_MIN == pytest.approx(length_min)
-    assert spec.FLAT_DRIVE_FACE_AREA_MIN == pytest.approx(width_min * length_min)
-    # The existing named flat-wall floor is unchanged, with the reamed bore.
+    # The pin spans x = -stop .. length - stop; both ends, the ream's corner
+    # at the deepest stop and the pin's rim at its farthest outer end, stay
+    # under the least O.D. on the farthest chord.
+    length_min, length_max = pin.LENGTH_LIMITS_MM
+    ends = (length_min - stop[1], length_max - stop[0])
+    assert spec.KEY_PIN_END_X_RANGE == pytest.approx(ends)
+    hub_r_min = (spec.HUB_DIA - _row(_places("HubDia"))) / 2.0
+    recess = hub_r_min - max(
+        math.hypot(stop[1], chord[1] + hole_max / 2.0),
+        math.hypot(ends[1], chord[1] + pin_max / 2.0),
+    )
+    assert spec.KEY_PIN_END_RECESS_WORST == pytest.approx(recess)
+    assert recess > 0.0
+    # Each end held in at least 1D of wall beside the largest bore's window.
+    bore_max_r = (spec.BORE_DIA + spec.BORE_BAND[0]) / 2.0
+    window = math.sqrt(bore_max_r**2 - (chord[0] - hole_max / 2.0) ** 2)
+    support = (stop[0] - window, ends[0] - window)
+    assert spec.KEY_PIN_SUPPORT_WORST == pytest.approx(support)
+    assert min(support) >= pin.DIA
+    # The wall over the ream: on the floor, under the target.
+    wall = hub_r_min - (chord[1] + hole_max / 2.0)
+    assert spec.KEY_PIN_WALL_WORST == pytest.approx(wall)
+    assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
+    # The oil hole is match-drilled at the key pin's station, opposite it.
+    assert spec.OIL_HOLE_SLEEVE_Z == spec.KEY_PIN_SLEEVE_Z
+    # The sleeve flat's own wall over its bore keeps its floor.
     flat_wall = (
         sleeve.FLAT_TO_AXIS
         + sleeve.FLAT_TO_AXIS_BAND[1]
@@ -258,6 +351,25 @@ def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() 
     )
     assert sleeve.FLAT_WALL_WORST == pytest.approx(flat_wall)
     assert flat_wall >= sleeve.WALL_FLOOR
+
+
+def test_the_package_declares_the_chord_wall_and_the_key_pin_play() -> None:
+    """Round 3: the .060 wall over the chord ream is a delegated minor in the
+    owner's thin-wall band (#2144 item 3.2), and the stated play a delegated
+    accept pending the owner's review."""
+    exceptions = {
+        row["id"]: row
+        for row in _config.parts(part.PART_NAME)["machinist_exceptions"]
+    }
+    wall, play = exceptions["RV-03"], exceptions["RV-04"]
+    assert wall["kind"] == "minor"
+    assert "#2144 item 3.2" in wall["reason"]
+    assert play["kind"] == "accept"
+    assert play["reason"].startswith(
+        "Delegated ruling 2026-11-11 (Main), no precedent; owner review #2144"
+    )
+    assert f"{spec.KEY_PIN_PLAY_DEG:.1f} deg" in play["finding"]
+    assert not any("rule 18" in row["finding"] for row in exceptions.values())
 
 
 def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
@@ -422,6 +534,11 @@ def test_each_frame_lands_square_on_its_face_clear_of_corners_and_text() -> None
     assert axis_y - flange_r * s + 0.002 <= flange_box.ymin
     assert flange_box.ymax <= axis_y - spigot_r * s - 0.002
     assert flange_box.xmin > drawing.SPIGOT_END_X
+    # Section A-A's lower letter once stood on the flange's rear face, where
+    # the leader ran level through it (r4 layout audit); it now stands under
+    # the flange, well below the leader's landing.
+    lower_letter = drawing.section_letter_box(drawing.SECTION_LINE[0])
+    assert _nominal_landing(flange)[1] >= lower_letter.ymax + 0.006
 
 
 def _circle(radius: float, z: float, *, x: float = 0.0, axis_z: float = 1.0):
@@ -555,6 +672,7 @@ def _sheet_text() -> str:
         (
             *drawing.DIMENSION_CALLOUTS_BELOW.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
+            *drawing.SECTION_CALLOUTS_BELOW.values(),
             drawing.NOTES_TEXT,
         )
     )
@@ -562,13 +680,15 @@ def _sheet_text() -> str:
 
 def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
     """drawing-guidelines.md rule 4 (tighten only for function, and name the
-    mate): every part number the sheet cites is a mate's own number, and each
-    matched fit names its mate by name and number."""
+    mate): every part number the sheet cites is a mate's own number: the
+    sleeve the bore slides on, the key pin pressed into its hole, the disc and its
+    screws, the collar the stack sets."""
     cited_mates = {
         _config.parts(stem)["number"]
         for stem in (
             "pd-transgear-feed-pinion",
             "pd-vn-transgear-disc-screw",
+            "pd-vn-transgear-hub-key-pin",
             "pd-rack-pinion",
             "pd-transgear-drive-collar",
         )
@@ -576,7 +696,7 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
     assert set(cited) == cited_mates
-    assert f"{spec.SLEEVE_NAME} {spec.SLEEVE_NUMBER}" in spec.BORE_FIT_TEXT
+    assert spec.KEY_PIN_NUMBER in spec.KEY_PIN_CALLOUT_BELOW
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
@@ -585,10 +705,11 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         (spec.HUB_DIA - _row(_places("HubDia"))) - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
     oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
-    # The oil hole is centred on the shortest hub body the printed overall,
-    # the printed spigot and the printed flange leave, give or take the
-    # centring at fit-up: the same ligament to the hub front face and to the
-    # flange face.
+    pin_hole_r = (spec.KEY_PIN_HOLE_DIA + spec.KEY_PIN_HOLE_BAND[0]) / 2.0
+    # The key-pin hole and the oil hole share one axis at the printed
+    # station, on the shortest hub body the printed overall, the printed
+    # spigot and the printed flange leave: each keeps its ligament to the hub
+    # front face and to the flange face.
     body_min = (
         spec.HUB_LENGTH
         - FIT_LENGTH_BAND_IN
@@ -596,10 +717,11 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         - (spec.FLANGE_THICK + _row(_places("FlangeThick")))
     )
     station = (
-        spec.OIL_HOLE_STATION - _row(_places("OilHoleStation")),
-        spec.OIL_HOLE_STATION + _row(_places("OilHoleStation")),
+        spec.KEY_PIN_STATION - _row(_places("KeyPinStation")),
+        spec.KEY_PIN_STATION + _row(_places("KeyPinStation")),
     )
     oil_ligament = min(station[0], body_min - station[1]) - oil_r
+    pin_ligament = min(station[0], body_min - station[1]) - pin_hole_r
     spigot_wall = (
         spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1] - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
@@ -613,36 +735,34 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         # Finished: the rim's and the hole mouth's .010 breaks (Codjiflo, #2124).
         - 2.0 * 0.010 * IN
     )
-    flat_wall = (spec.HUB_DIA - _row(_places("HubDia"))) / 2.0 - (
-        spec.FLAT_TO_AXIS + spec.FLAT_TO_AXIS_BAND[0]
-    )
 
     assert oil_ligament == pytest.approx(2.807, abs=0.005)
     assert oil_ligament == pytest.approx(spec.OIL_HOLE_LIGAMENT_WORST)
+    assert pin_ligament == pytest.approx(0.103 * IN, abs=0.005)
     assert hole_to_rim == pytest.approx(2.146, abs=0.005)
     for wall in (
         hub_wall,
         oil_ligament,
+        pin_ligament,
         hole_to_bore,
         hole_to_rim,
-        flat_wall,
         spigot_wall,
     ):
         assert wall >= WALL_FLOOR - 1e-9
     assert spec.SPIGOT_WALL_WORST == pytest.approx(spigot_wall, abs=1e-9)
     assert spec.HUB_WALL_WORST == pytest.approx(hub_wall, abs=1e-9)
     assert spec.OIL_HOLE_LIGAMENT_WORST == pytest.approx(oil_ligament, abs=1e-9)
+    assert spec.KEY_PIN_LIGAMENT_WORST == pytest.approx(pin_ligament, abs=1e-9)
     assert spec.HOLE_TO_RIM_WORST == pytest.approx(hole_to_rim, abs=1e-9)
-    assert spec.FLAT_WALL_WORST == pytest.approx(flat_wall, abs=1e-9)
 
 
 def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
     """#2168 (Codjiflo on #2124): at the hub front face and at the spigot's
     end the wall over the round bore also loses the OD's and the bore
-    mouth's .010 breaks: the body .098 -> .078, the spigot .0931 -> .0731,
-    both over the .060 floor (the bore and the spigot are the cluster's
-    fits); the wall over the flat still holds .080 (.0956).  The bore's
-    callout states the least (rule 20)."""
+    mouth's .010 breaks: the Ø.540 body .1105 -> .0905, back over the target,
+    the spigot .0931 -> .0731, over the .060 floor (the bore and the spigot
+    are the cluster's fits).  The bore's callout states the least (rule
+    20)."""
     breaks = 2.0 * 0.010 * IN
     finished = spec.BORE_WALLS_FINISHED
     assert finished == pytest.approx(
@@ -651,12 +771,12 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
             "spigot wall over the bore": spec.SPIGOT_WALL_WORST - breaks,
         }
     )
-    assert finished["hub wall over the bore"] == pytest.approx(0.078 * IN, abs=1e-3)
-    assert finished["spigot wall over the bore"] == pytest.approx(0.0730 * IN, abs=1e-3)
-    for wall in finished.values():
-        assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
-    assert spec.FLAT_WALL_FINISHED == pytest.approx(spec.FLAT_WALL_WORST - breaks)
-    assert spec.FLAT_WALL_FINISHED >= WALL_FLOOR
+    assert finished["hub wall over the bore"] == pytest.approx(0.0905 * IN, abs=1e-3)
+    assert finished["hub wall over the bore"] >= WALL_FLOOR
+    spigot = finished["spigot wall over the bore"]
+    assert spigot == pytest.approx(0.0730 * IN, abs=1e-3)
+    assert 0.060 * IN - 1e-9 <= spigot < WALL_FLOOR
+    assert not hasattr(spec, "FLAT_WALL_FINISHED")
     assert spec.BORE_WALL_TEXT == "WALL .073 MIN"
     assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
         spec.BORE_WALL_TEXT
@@ -687,18 +807,26 @@ def test_screw_heads_keep_a_millimetre_of_air_to_the_hub_body() -> None:
 
 def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> None:
     """The smaller sleeve-matched bore does not resize the R9-68 envelope:
-    the hub body and spigot retain their diameters; the flange is the
-    smallest .XX size whose screw holes keep the wall to its rim with the
-    flange and the circle both at .XX (machinist review: no .XXX held only
-    to rescue that wall)."""
+    the spigot retains its diameter; the hub body is Ø.540 (.XXX, the title
+    block's +/-.005), which holds the .060 floor over the key pin's chord
+    ream where Ø.530 would not (#2409 rounds 3-4); the
+    flange is the smallest .XX size whose screw holes keep the wall to its
+    rim with the flange and the circle both at .XX (machinist review: no
+    .XXX held only to rescue that wall)."""
     import pd_rack_pinion_spec as disc
 
-    assert spec.HUB_DIA == pytest.approx(0.520 * IN)
+    assert spec.HUB_DIA == pytest.approx(0.540 * IN)
+    ream_out = spec.KEY_PIN_CHORD_RANGE[1] + (
+        spec.KEY_PIN_HOLE_DIA + spec.KEY_PIN_HOLE_BAND[0]
+    ) / 2.0
+    for hub_dia, holds in ((spec.HUB_DIA, True), (spec.HUB_DIA - 0.01 * IN, False)):
+        chord_wall = (hub_dia - _row(_places("HubDia"))) / 2.0 - ream_out
+        assert (chord_wall >= 0.060 * IN - 1e-9) is holds, hub_dia
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN)
     assert spec.FLANGE_DIA == pytest.approx(1.05 * IN)
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
-    round_wall, flat_wall = spec.body_walls_worst(spec.HUB_DIA)
-    assert min(round_wall, flat_wall, spec.SPIGOT_WALL_WORST) >= spec.WALL_FLOOR
+    round_wall = spec.body_wall_worst(spec.HUB_DIA)
+    assert min(round_wall, spec.SPIGOT_WALL_WORST) >= spec.WALL_FLOOR
     bc = joint.BOLT_CIRCLE_DIA
     assert spec.head_air_worst(bc, spec.HUB_DIA) >= spec.HEAD_AIR_MIN
     assert disc.TAP_TO_BORE_WALL_WORST >= disc.WALL_FLOOR
@@ -723,7 +851,6 @@ def test_the_native_bore_follows_the_feed_boss_instead_of_an_old_literal(
     fresh = _spec_fresh()
     assert fresh.BORE_DIA == pytest.approx(old_boss - 0.1)
     assert fresh.BORE_BAND == spec.BORE_BAND
-    assert fresh.FLAT_TO_AXIS == spec.SLEEVE.FLAT_TO_AXIS
     assert fresh.HUB_DIA == spec.HUB_DIA
     assert fresh.SPIGOT_DIA == spec.SPIGOT_DIA
     assert fresh.FLANGE_DIA == spec.FLANGE_DIA
@@ -744,13 +871,13 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
         _spec_fresh()
 
 
-def test_the_oil_hole_station_is_printed_and_clears_both_body_ends() -> None:
+def test_the_oil_hole_is_on_the_key_pin_axis_and_clears_both_body_ends() -> None:
     """R9-8: #57 (.043) on the drilled row, match-drilled through hub and
-    sleeve with the hub seated, at a printed .XX station behind the hub
-    front face; its band and the printed lengths' leave both body ends."""
+    sleeve with the hub seated, opposite the key pin on its printed .XX
+    station behind the hub front face; that band and the printed lengths'
+    leave both body ends."""
     assert spec.OIL_HOLE_DIA == pytest.approx(0.043 * IN)
-    assert spec.OIL_HOLE_STATION == pytest.approx(0.15 * IN)
-    assert spec.OIL_HOLE_Z == pytest.approx(spec.HUB_FRONT_Z + 0.15 * IN)
+    assert not hasattr(spec, "OIL_HOLE_STATION")
     body = (
         spec.HUB_LENGTH
         - FIT_LENGTH_BAND_IN
@@ -762,25 +889,25 @@ def test_the_oil_hole_station_is_printed_and_clears_both_body_ends() -> None:
         - (spec.FLANGE_THICK - _row(_places("FlangeThick"))),
     )
     assert spec.HUB_BODY_LENGTH_RANGE == pytest.approx(body)
-    band = _row(_places("OilHoleStation"))
-    assert spec.OIL_HOLE_STATION_RANGE == pytest.approx(
-        (spec.OIL_HOLE_STATION - band, spec.OIL_HOLE_STATION + band)
+    band = _row(_places("KeyPinStation"))
+    assert spec.KEY_PIN_STATION_RANGE == pytest.approx(
+        (spec.KEY_PIN_STATION - band, spec.KEY_PIN_STATION + band)
     )
     oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
-    assert spec.OIL_HOLE_STATION_RANGE[0] - oil_r >= WALL_FLOOR
-    assert body[0] - spec.OIL_HOLE_STATION_RANGE[1] - oil_r >= WALL_FLOOR
+    assert spec.KEY_PIN_STATION_RANGE[0] - oil_r >= WALL_FLOOR
+    assert body[0] - spec.KEY_PIN_STATION_RANGE[1] - oil_r >= WALL_FLOOR
     # The sleeve drills the same hole: the spigot's end on the step, the
-    # hole its station behind the hub front face, over the flat.
+    # hole the key pin's station behind the hub front face, over the flat.
     sleeve = cluster_fit.SLEEVE
     assert spec.OIL_HOLE_SLEEVE_Z == pytest.approx(
-        sleeve.FACE_WIDTH + spec.HUB_LENGTH - spec.OIL_HOLE_STATION
+        sleeve.FACE_WIDTH + spec.HUB_LENGTH - spec.KEY_PIN_STATION
     )
     assert sleeve.FLAT_END_STATION < spec.OIL_HOLE_SLEEVE_Z < sleeve.OVERALL_LENGTH
     # Its ligament to the nose holds the sleeve's 2.0 target with the hub
     # front face at its least recess behind the nose.
     nose_worst = (
         cluster_fit.RECESS_RANGE[0]
-        + spec.OIL_HOLE_STATION_RANGE[0]
+        + spec.KEY_PIN_STATION_RANGE[0]
         - (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
     )
     assert nose_worst >= sleeve.WALL_TARGET
@@ -806,28 +933,34 @@ _NOMINAL = {
     "FlangeThick": spec.FLANGE_THICK,
     "SpigotLength": spec.SPIGOT_LENGTH,
     "BoreDia": spec.BORE_DIA,
-    "FlatToAxis": spec.FLAT_TO_AXIS,
     "BoltCircleDia": joint.BOLT_CIRCLE_DIA,
     "ScrewHoleDia": spec.SCREW_HOLE_DIA,
     "OilHoleDia": spec.OIL_HOLE_DIA,
-    "OilHoleStation": spec.OIL_HOLE_STATION,
+    "KeyPinStation": spec.KEY_PIN_STATION,
+    "KeyPinDia": spec.KEY_PIN_HOLE_DIA,
+    "KeyPinDrillDia": spec.KEY_PIN_DRILL_DIA,
+    "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
+    "KeyPinStop": spec.KEY_PIN_STOP,
 }
 # The bore's and the spigot's native bands print beside their values.
 _BANDS = {
     "BoreDia": spec.BORE_BAND,
-    "FlatToAxis": spec.FLAT_TO_AXIS_BAND,
     "SpigotDia": spec.SPIGOT_DIA_BAND,
+    "KeyPinDia": spec.KEY_PIN_HOLE_BAND,
 }
-# The disc cluster stack's printed lengths carry their symmetric band.
+# The disc cluster stack's printed lengths and the chord hole's locations
+# carry their symmetric band.
 _SYMMETRIC = {
     "HubLength": spec.HUB_LENGTH_BAND,
     "SpigotLength": spec.SPIGOT_LENGTH_BAND,
+    "KeyPinChord": spec.KEY_PIN_LOCATION_BAND,
+    "KeyPinStop": spec.KEY_PIN_LOCATION_BAND,
 }
 
 
 def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
     """The estimated box of a kept dimension's whole text, centred on its
-    text point: value (the D-bore's with its upper limit) and callouts."""
+    text point: value (the bore's with its upper limit) and callouts."""
     value = f"{_NOMINAL[name] / IN:.{_places(name)}f}".lstrip("0")
     if name.endswith("Dia"):
         value = f"\u00d8{value}"
@@ -838,7 +971,8 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
     lines = [
         drawing.DIMENSION_CALLOUTS_ABOVE.get(name),
         value,
-        drawing.DIMENSION_CALLOUTS_BELOW.get(name),
+        drawing.DIMENSION_CALLOUTS_BELOW.get(name)
+        or drawing.SECTION_CALLOUTS_BELOW.get(name),
     ]
     box = estimate_text_box(
         "\n".join(line for line in lines if line),
@@ -876,7 +1010,6 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
 
     assert set(drawing.END_KEEP) == {
         "BoreDia",
-        "FlatToAxis",
         "BoltCircleDia",
         "ScrewHoleDia",
     }
@@ -902,9 +1035,10 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
     # the hole from the block's lower-right corner, inside the hub body's
     # length, crossing no dimension line.  The flange thickness and its
     # function stand below the part wholly right of the flange's extension
-    # lines.  The station shares the spigot's row above; the overall stands
-    # a row above those, its text right of the spigot's end.
-    hole_x = drawing._OIL_HOLE_X
+    # lines.  The key-pin station shares the spigot's row above; the
+    # overall stands a row above those, its text right of the spigot's end.
+    hole_x = drawing._KEY_PIN_X
+    assert hole_x == pytest.approx(drawing._side_x(spec.KEY_PIN_Z))
     shoulder = drawing._OIL_HOLE_SHOULDER
     assert boxes["OilHoleDia"].ymax < edge.ymin
     assert boxes["OilHoleDia"].xmax <= shoulder[0] + 1e-9 < hole_x
@@ -916,7 +1050,7 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
     assert boxes["FlangeThick"].ymax < edge.ymin
     assert boxes["HubLength"].ymin > boxes["SpigotLength"].ymax
     assert boxes["HubLength"].xmin > drawing.SPIGOT_END_X
-    assert drawing.SIDE_KEEP["OilHoleStation"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
+    assert drawing.SIDE_KEEP["KeyPinStation"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
     # The spigot's text and callout end clear of the flange's dimension line.
     assert boxes["SpigotDia"].xmax < drawing.SIDE_KEEP["FlangeDia"][0] - 0.004
     clashes = [
@@ -927,63 +1061,170 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
     assert clashes == []
 
 
-def test_section_a_a_cuts_the_flat_square_through_the_bore_axis() -> None:
-    """drawing-guidelines.md rule 9: the flat's blind end on the flange's
-    rear face is internal shape, so SECTION A-A draws it in solid lines.  Its
-    cutting plane is the model's x = 0: through the bore's axis and along the
-    flat's normal (local -Y), square to the flat through its middle; it
-    misses every screw hole and runs past the flange's rim each side, so the
-    whole cut closes and each letter stands off the rim."""
+def test_section_a_a_cuts_across_the_chord_hole_at_its_station() -> None:
+    """drawing-guidelines.md rule 9: the chord hole runs through the wall
+    into the bore, internal shape, so SECTION A-A draws it in solid lines.
+    Its cutting plane is the hole profile's station plane, through the hub
+    body only (clear of the flange), drawn across the edge view at the
+    station and past the O.D. each side, so the cut closes and each letter
+    stands off the hub."""
     (x0, y0, z0), (x1, y1, z1) = drawing.SECTION_LINE_MODEL
-    assert x0 == x1 == 0.0
-    assert z0 == z1
-    # From the flat's side (-Y) across the axis to the oil hole's (+Y).
-    flange_r = spec.FLANGE_DIA / 2.0
-    assert y0 < -flange_r < -spec.FLAT_TO_AXIS < 0.0 < flange_r < y1
-    for index in range(spec.SCREW_COUNT):
-        angle = 2.0 * math.pi * index / spec.SCREW_COUNT  # 0 deg on local +X
-        hole_x = joint.BOLT_CIRCLE_DIA / 2.0 * math.cos(angle)
-        assert abs(hole_x) - spec.SCREW_HOLE_DIA / 2.0 > 1.0, index
-
-    # The face view lays model +Y right and +X up, so the plane is the
-    # horizontal through the bore's centre, the flat's end on the left.
-    assert drawing.END_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
+    assert y0 == y1 == 0.0
+    assert z0 == z1 == spec.KEY_PIN_Z
+    hub_r = spec.HUB_DIA / 2.0
+    assert x0 < -hub_r < hub_r < x1
+    hole_r = spec.KEY_PIN_HOLE_DIA / 2.0
+    assert spec.HUB_FRONT_Z < spec.KEY_PIN_Z - hole_r
+    assert spec.KEY_PIN_Z + hole_r < -spec.FLANGE_THICK
+    # On the edge view (model -Z left, +X up) the plane is the vertical at
+    # the station; drawn bottom to top, its arrows point right, the sight
+    # along +Z.
+    assert drawing.SIDE_VIEW_ANGLE == pytest.approx(math.pi / 2.0)
     (sx0, sy0), (sx1, sy1) = drawing.SECTION_LINE
-    assert sy0 == sy1 == pytest.approx(drawing.AXIS_Y)
-    assert (sx0 + sx1) / 2.0 == pytest.approx(drawing.END_CENTER[0])
-    assert drawing._face_view_xy((0.0, -spec.FLAT_TO_AXIS, 0.0))[0] < (
-        drawing.END_CENTER[0]
-    )
-    # Drawn left to right, its arrows point down, away from datum A's tag.
-    assert sx0 < sx1
-    assert drawing.DATUM_A_SYMBOL[1] > drawing.AXIS_Y
-    overshoot = min(
-        drawing.END_CENTER[0] - flange_r * drawing._S - sx0,
-        sx1 - drawing.END_CENTER[0] - flange_r * drawing._S,
-    )
-    assert overshoot >= 0.005
-    assert sx0 > 0.0127 + 0.005  # inside the sheet's inner border
+    assert sx0 == sx1 == pytest.approx(drawing._KEY_PIN_X)
+    s = drawing._S
+    assert sy0 < drawing.AXIS_Y - hub_r * s - 0.005
+    assert sy1 > drawing.AXIS_Y + hub_r * s + 0.005
+    # Laid with model +X up and +Y right, the chord hole on the left and its
+    # ream entering from the top.
+    xy = drawing._section_xy
+    assert xy(0.0, -spec.KEY_PIN_CHORD_OFFSET)[0] < drawing.SECTION_CENTER[0]
+    assert xy(hub_r, 0.0)[1] > xy(spec.KEY_PIN_STOP_X, 0.0)[1]
+    # The oil hole's leader leans off the cutting line it shares a station
+    # with.
+    assert drawing._OIL_HOLE_SHOULDER[0] <= drawing._KEY_PIN_X - 0.005
 
 
-def test_the_flat_reference_length_is_the_overall_less_the_spigot() -> None:
-    """The section dimensions the flat's end from the hub front face as a
-    REFERENCE: the overall less the spigot length, the two printed stack
-    terms that already locate the flange's rear face, so no band enters any
-    stack, and it prints at their places."""
-    assert spec.FLAT_LENGTH_REF == pytest.approx(spec.HUB_LENGTH - spec.SPIGOT_LENGTH)
-    assert spec.FLAT_LENGTH_REF == pytest.approx(0.395 * IN)
-    assert spec.DRAWING_REFERENCE_PRECISION == _places("HubLength")
-    assert spec.DRAWING_REFERENCE_PRECISION == _places("SpigotLength")
-    assert spec.REFERENCE_DIMENSIONS == frozenset()
-    # The picks lie on the cut's boundary lines on the flat's side: the hub
-    # front face between the flat and the body's O.D., the flange's rear
-    # face (the flat's end, z = 0) between the spigot's O.D. and the rim.
-    front, rear = drawing.FLAT_REF_PICKS_MM
-    assert front[0] == rear[0] == 0.0
-    assert front[2] == spec.HUB_FRONT_Z and rear[2] == 0.0
-    assert rear[2] - front[2] == pytest.approx(spec.FLAT_LENGTH_REF)
-    assert -spec.HUB_DIA / 2.0 < front[1] < -spec.FLAT_TO_AXIS
-    assert -spec.FLANGE_DIA / 2.0 < rear[1] < -spec.SPIGOT_DIA / 2.0
+# The r6 layout audit's native readback of A-A's lower arrow and letter
+# (IDrSection.GetArrowInfo tail, GetTextInfo upper-left origin, CharHeight).
+_R6_LOWER_TAIL = (0.2158941, 0.138426)
+_R6_LOWER_LETTER_ORIGIN = (0.2328981, 0.1403323)
+_R6_LETTER_HEIGHT = 0.00635
+# Ink near the letters outside the recipe's constants (r6 layout audit): the
+# overall's dimension line, the spigot length's, the flange thickness's
+# (with its outside arrow's tail), and the key-pin station's text.
+_OVERALL_LINE = Box(0.2045, 0.2254, 0.3138, 0.2254)
+_SPIGOT_LENGTH_LINE = Box(0.2346, 0.2084, 0.2838, 0.2084)
+_FLANGE_THICK_LINE = Box(0.2211, 0.1027, 0.2875, 0.1027)
+_STATION_TEXT = Box(0.2057, 0.2112, 0.2057 + 0.0090514, 0.2112 + 0.0035)
+
+
+def test_section_letters_stand_clear_of_the_flange_and_its_dimensions() -> None:
+    """r6 machinist review (rule 14): both cutting-plane letters stood on the
+    flange's rear-face line.  SolidWorks prints each letter just past its
+    arrow's tip, in the column of the rear face and the extension lines off
+    it, so the cutting line runs on until each letter clears that ink: the
+    upper under the overall's line, the lower under the flange thickness's
+    extension lines, neither on another dimension or text."""
+    # The letter model reproduces the r6 readback, where the letter struck
+    # the rear face (the positive control).
+    r6 = drawing.section_letter_box(_R6_LOWER_TAIL)
+    assert (r6.xmin, r6.ymax) == pytest.approx(_R6_LOWER_LETTER_ORIGIN, abs=1e-5)
+    assert drawing.SECTION_LETTER_HEIGHT == pytest.approx(_R6_LETTER_HEIGHT)
+    flange, rear_face_ink = drawing.flange_ink_boxes()
+    assert r6.gap(rear_face_ink) == 0.0
+    air = drawing.SECTION_LETTER_AIR
+    lower, upper = (drawing.section_letter_box(end) for end in drawing.SECTION_LINE)
+    neighbours = (_OVERALL_LINE, _SPIGOT_LENGTH_LINE, _FLANGE_THICK_LINE, _STATION_TEXT)
+    kept = [
+        _printed_box(name, anchor)
+        for keep in (drawing.END_KEEP, drawing.SIDE_KEEP)
+        for name, anchor in keep.items()
+    ]
+    for letter in (lower, upper):
+        assert letter.gap(flange) >= air - 1e-9, letter
+        assert letter.gap(rear_face_ink) >= air - 1e-9, letter
+        for box in (*neighbours, *kept):
+            assert letter.gap(box) >= 0.003, (letter, box)
+    assert lower.ymax < flange.ymin < flange.ymax < upper.ymin
+    assert upper.ymax < _OVERALL_LINE.ymin
+    title_top = DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    assert lower.ymin >= title_top + 0.005
+    # The cutting line itself runs clear of the station's text beside it.
+    (cut_x, cut_low), (_x, cut_high) = drawing.SECTION_LINE
+    assert Box(cut_x, cut_low, cut_x, cut_high).gap(_STATION_TEXT) >= 0.001
+
+
+def _drawn_section(arrow_tails, letter_origins, height):
+    arrows = tuple(
+        value
+        for x, y in arrow_tails
+        for value in (x, y, 0.0, x + drawing.SECTION_ARROW_LENGTH, y, 0.0)
+    )
+    texts = tuple(value for x, y in letter_origins for value in (x, y, 0.0))
+    cut = SimpleNamespace(
+        GetArrowInfo=lambda: arrows,
+        GetTextInfo=lambda: texts,
+        GetTextFormat=lambda: SimpleNamespace(CharHeight=height),
+    )
+    return SimpleNamespace(GetSection=lambda: cut)
+
+
+def test_the_build_reads_each_letter_back_clear_of_the_flange(monkeypatch) -> None:
+    """The build reads A-A's arrows and letters back and fails unless each
+    letter printed where the recipe's letter model puts it, clear of the
+    flange's ink: the r6 placement fails, the planned one passes."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    tails = drawing.SECTION_LINE
+    planned = [
+        (box.xmin, box.ymax) for box in map(drawing.section_letter_box, tails)
+    ]
+    drawing._assert_section_letters_clear(
+        _drawn_section(tails, planned, drawing.SECTION_LETTER_HEIGHT)
+    )
+    r6_tails = (_R6_LOWER_TAIL, (_R6_LOWER_TAIL[0], 0.191574))
+    r6_letters = [
+        (box.xmin, box.ymax) for box in map(drawing.section_letter_box, r6_tails)
+    ]
+    with pytest.raises(RuntimeError, match="meets the flange's ink"):
+        drawing._assert_section_letters_clear(
+            _drawn_section(r6_tails, r6_letters, drawing.SECTION_LETTER_HEIGHT)
+        )
+    moved = [(x + 0.002, y) for x, y in planned]
+    with pytest.raises(RuntimeError, match="printed at"):
+        drawing._assert_section_letters_clear(
+            _drawn_section(tails, moved, drawing.SECTION_LETTER_HEIGHT)
+        )
+
+
+def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
+    """The ream's size and fit (two lines of words naming the pin, rules 4
+    and 7) and the knockout's stand left of the ring, each dimension line at
+    its text's height crossing its own run of the hole; the stop's text
+    stands inline between the hub axis's and the stop's extension lines, the
+    chord's above the ring right of the axis's extension line."""
+    callout = drawing.SECTION_CALLOUTS_BELOW["KeyPinDia"]
+    assert spec.KEY_PIN_NUMBER in callout
+    assert len(callout.splitlines()) <= 2
+    assert len(drawing.SECTION_CALLOUTS_BELOW["KeyPinDrillDia"].splitlines()) <= 2
+    assert set(drawing.SECTION_CALLOUTS_BELOW) == {"KeyPinDia", "KeyPinDrillDia"}
+    xy = drawing._section_xy
+    s = drawing._S
+    centre = drawing.SECTION_CENTER
+    ring_left = centre[0] - spec.HUB_DIA / 2.0 * s
+    ring_top = centre[1] + spec.HUB_DIA / 2.0 * s
+    stop_y = xy(spec.KEY_PIN_STOP_X, 0.0)[1]
+    reach = drawing._SECTION_REACH_MM
+    keep = drawing.SECTION_KEEP
+    boxes = {name: _printed_box(name, anchor) for name, anchor in keep.items()}
+    # The ream's line crosses the ream, the knockout's the knockout.
+    assert stop_y < keep["KeyPinDia"][1] < xy(reach, 0.0)[1]
+    assert xy(-reach, 0.0)[1] < keep["KeyPinDrillDia"][1] < stop_y
+    # The stop's text between its extension lines, left of the ring.
+    assert stop_y < keep["KeyPinStop"][1] < centre[1]
+    assert boxes["KeyPinStop"].xmax <= ring_left - 0.002
+    # Both sizes left of the ring, clear of it.
+    for name in ("KeyPinDia", "KeyPinDrillDia"):
+        assert boxes[name].xmax <= ring_left - 0.010, name
+    # The chord above the ring, right of the hub axis's extension line.
+    assert boxes["KeyPinChord"].ymin >= ring_top + 0.002
+    assert boxes["KeyPinChord"].xmin >= centre[0] + 0.002
+    clashes = [
+        (a, b)
+        for a, b in itertools.combinations(sorted(boxes), 2)
+        if boxes[a].overlaps(boxes[b], tol=0.001)
+    ]
+    assert clashes == []
 
 
 # Ink outside the recipe's own constants, measured on the r4 render (run
@@ -998,41 +1239,22 @@ _CAPTION_CAP_M = 0.0055
 
 
 def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None:
-    """The removed section, its REF and its caption stand right of the edge
-    view's Ø1.05, under the isometric and over the title block, inside the
-    border; the REF's text stands off the part, inline beside the hub body
-    under the flange."""
+    """The removed section, the chord hole's dimensions and the caption stand
+    right of the edge view's Ø1.05, under the isometric and over the title
+    block, inside the border, clear of every edge- and face-view text; the
+    caption under the centrelines' lowest end."""
     s = drawing._S
-    xy = drawing._section_xy
-    flange_top = xy(0.0, 0.0)[1]
-    flange_bottom = xy(0.0, -spec.FLANGE_THICK)[1]
-    front = xy(0.0, spec.HUB_FRONT_Z)[1]
-    spigot_end = xy(0.0, spec.SPIGOT_LENGTH)[1]
-    flange = Box(
-        xy(-spec.FLANGE_DIA / 2.0, 0.0)[0], flange_bottom,
-        xy(spec.FLANGE_DIA / 2.0, 0.0)[0], flange_top,
+    centre = drawing.SECTION_CENTER
+    reach = drawing._SECTION_REACH_MM * s
+    hub_r = spec.HUB_DIA / 2.0 * s
+    ring = Box(centre[0] - hub_r, centre[1] - hub_r, centre[0] + hub_r, centre[1] + hub_r)
+    centrelines = Box(
+        centre[0] - reach, centre[1] - reach, centre[0] + reach, centre[1] + reach
     )
-    body = Box(
-        xy(-spec.HUB_DIA / 2.0, 0.0)[0], front,
-        xy(spec.HUB_DIA / 2.0, 0.0)[0], flange_bottom,
-    )
-    spigot = Box(
-        xy(-spec.SPIGOT_DIA / 2.0, 0.0)[0], flange_top,
-        xy(spec.SPIGOT_DIA / 2.0, 0.0)[0], spigot_end,
-    )
-    overrun = drawing.SECTION_AXIS_OVERRUN_MM * s
-    axis = Box(
-        drawing.SECTION_CENTER[0], front - overrun,
-        drawing.SECTION_CENTER[0], spigot_end + overrun,
-    )
-    ref_value = f"({spec.FLAT_LENGTH_REF / IN:.{spec.DRAWING_REFERENCE_PRECISION}f})"
-    ref_text = estimate_text_box(
-        ref_value.replace("(0.", "(.", 1),
-        anchor=drawing.FLAT_REF_TEXT_XY,
-        height=_CAP_M,
-        reference=2,
-        advance_ratio=_ADVANCE,
-    )
+    texts = {
+        name: _printed_box(name, anchor)
+        for name, anchor in drawing.SECTION_KEEP.items()
+    }
     caption = estimate_text_box(
         "SECTION A-A",
         anchor=drawing.SECTION_CAPTION_XY,
@@ -1040,17 +1262,8 @@ def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None
         reference=5,
         advance_ratio=_ADVANCE,
     )
-    assert ref_text is not None and caption is not None
-    # The dimension line through the text, its extension lines out from the
-    # body's and the flange's left ends past it.
-    ref_ink = ref_text.union(
-        Box(drawing.FLAT_REF_TEXT_XY[0] - 0.002, front, flange.xmin, flange_top)
-    )
-    section_ink = [flange, body, spigot, axis, ref_ink, caption]
-
-    # The section's centre is the axis's mid-length.
-    assert (flange.xmin + flange.xmax) / 2.0 == pytest.approx(drawing.SECTION_CENTER[0])
-    assert (front + spigot_end) / 2.0 == pytest.approx(drawing.SECTION_CENTER[1])
+    assert caption is not None
+    section_ink = [ring, centrelines, caption, *texts.values()]
     title_top = DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
     for box in section_ink:
         assert box.xmin >= _INNER_BORDER.xmin + 0.003, box
@@ -1067,14 +1280,129 @@ def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None
     for name, box in kept.items():
         for ink in section_ink:
             assert box.gap(ink) >= 0.005, (name, ink)
-    # Text off the part: the REF beside the hub body, under the flange,
-    # left of the rim; the caption under the axis line's end.
-    for part_box in (flange, body, spigot):
-        assert ref_text.gap(part_box) >= 0.002
-        assert caption.gap(part_box) >= 0.003
-    assert ref_text.xmax < flange.xmin
-    assert flange_bottom > ref_text.ymax and ref_text.ymin > front
-    assert caption.ymax < axis.ymin
+    for name, box in texts.items():
+        assert caption.gap(box) >= 0.003, name
+    assert caption.gap(ring) >= 0.003
+    assert caption.ymax < centrelines.ymin
+
+
+def test_section_centrelines_end_past_the_ring_clear_of_every_text() -> None:
+    """Machinist review r5 (rule 14): the horizontal centreline ran through
+    the ream callout's last line and the stop's text, the vertical through
+    the caption into the isometric.  Each drawn line ends 1 mm past the O.D.
+    and strikes no section text, the caption, the isometric or the title block."""
+    s = drawing._S
+    xy = drawing._section_xy
+    ring_r = spec.HUB_DIA / 2.0 * s
+    lines = []
+    for start, end in drawing.SECTION_CENTERLINES_MODEL:
+        (x0, y0), (x1, y1) = xy(*start), xy(*end)
+        lines.append(Box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
+    centre = drawing.SECTION_CENTER
+    overrun = drawing.SECTION_CENTERLINE_OVERRUN_MM * s
+    for line in lines:
+        # Each line is horizontal or vertical: its offset from the centre
+        # across it, and its half-length along it past where it meets the O.D.
+        vertical = line.xmax - line.xmin < 1e-12
+        offset = line.xmin - centre[0] if vertical else line.ymin - centre[1]
+        lo, hi = (line.ymin, line.ymax) if vertical else (line.xmin, line.xmax)
+        mid = centre[1] if vertical else centre[0]
+        crossing = math.sqrt(ring_r**2 - offset**2)
+        for half in (mid - lo, hi - mid):
+            assert half - crossing == pytest.approx(overrun), line
+    texts = {
+        name: _printed_box(name, anchor)
+        for name, anchor in drawing.SECTION_KEEP.items()
+    }
+    caption = estimate_text_box(
+        "SECTION A-A",
+        anchor=drawing.SECTION_CAPTION_XY,
+        height=_CAPTION_CAP_M,
+        reference=5,
+        advance_ratio=_ADVANCE,
+    )
+    assert caption is not None
+    title_top = DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+    for line in lines:
+        for name, box in (*texts.items(), ("caption", caption)):
+            assert line.gap(box) >= 0.002, (name, line)
+        assert line.gap(_ISO_INK) >= 0.010, line
+        assert line.ymin >= title_top + 0.003, line
+
+
+def _centre_mark_section(marks: list, deletes: bool):
+    """A section holding ``marks`` and a drawing whose EditDelete drops the
+    selected ones (or, ``deletes=False``, silently keeps them)."""
+    events: list = []
+    selected: list = []
+
+    def select(mark):
+        def _select(append, _data):
+            selected.append(mark)
+            events.append(("select", append))
+            return True
+
+        return _select
+
+    for mark in marks:
+        mark.Select2 = select(mark)
+
+    def edit_delete():
+        events.append("delete")
+        if deletes:
+            for mark in selected:
+                marks.remove(mark)
+
+    draw = SimpleNamespace(
+        ClearSelection2=lambda _all: selected.clear() or True,
+        EditDelete=edit_delete,
+    )
+    view = SimpleNamespace(
+        GetAnnotationsByType=lambda kind: (
+            tuple(marks) if kind == drawing._CENTER_MARK_ANNOTATION else ()
+        )
+    )
+    return SimpleNamespace(currentModel=draw), view, events
+
+
+def test_section_a_a_loses_the_centre_marks_it_arrives_with(monkeypatch) -> None:
+    """Machinist review r5: the section arrived centre-marked, the mark's
+    arms printed far past the ring.  Every mark is deleted in one selection
+    and read back gone; a section with none is left alone; a delete that
+    does not land fails the build; the deletion runs before the drawn
+    centrelines."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    marks = [SimpleNamespace(), SimpleNamespace()]
+    adapter, view, events = _centre_mark_section(marks, deletes=True)
+    drawing._delete_section_centre_marks(adapter, view)
+    assert marks == []
+    assert events == [("select", False), ("select", True), "delete"]
+    adapter, view, events = _centre_mark_section([], deletes=True)
+    drawing._delete_section_centre_marks(adapter, view)
+    assert events == []
+    adapter, view, _events = _centre_mark_section([SimpleNamespace()], deletes=False)
+    with pytest.raises(RuntimeError, match="survived deletion"):
+        drawing._delete_section_centre_marks(adapter, view)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("def _section_a_a(") :]
+    assert body.index("_delete_section_centre_marks(") < body.index(
+        "_add_section_centerlines("
+    )
+
+
+def test_the_hub_od_callout_states_the_wall_its_third_place_holds() -> None:
+    """Machinist review r5 (rule 3): Ø.540 at three places, finer than the
+    turned row, states its function under the size: the least wall over the
+    key pin's chord ream, floored at three places (rule 20)."""
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["HubDia"].splitlines()
+    assert _places("HubDia") == 3
+    assert len(callout) <= 2
+    printed = float(callout[0].split()[1])
+    assert printed * IN <= spec.KEY_PIN_WALL_WORST + 1e-9
+    assert spec.KEY_PIN_WALL_WORST - printed * IN < 0.001 * IN
+    assert printed * IN >= spec.WALL_FLOOR_MM - 1e-9
+
 
 
 @pytest.mark.parametrize(
@@ -1148,13 +1476,15 @@ class _FakeSolidWorks:
         self.sketch_lines: dict[int, list[str]] = {}
         self.arcs: list[tuple[float, ...]] = []
         self.circles: list[tuple[float, ...]] = []
+        self.planes: dict[int, str] = {}
 
     async def _entity(self, *_args, **_kwargs) -> str:
         self._n += 1
         return f"Entity{self._n}"
 
-    async def create_sketch(self, _plane) -> str:
+    async def create_sketch(self, plane) -> str:
         self.sketch += 1
+        self.planes[self.sketch] = plane
         return await self._entity()
 
     async def add_line(self, *args) -> str:
@@ -1185,8 +1515,9 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     """Every drive equation (bolt-circle factors included) evaluates to the
     size, centre or length the recipe draws, so a rebuild after the drives
     moves nothing: the screw holes stay on the joint's shared pattern, the
-    turned profile on its printed sizes, the D-bore on its two sizes and the
-    oil hole centred on the body."""
+    turned profile on its printed sizes, the round bore on its size, the key
+    pin's chord hole on its station plane, and its printed station and the
+    oil hole opposite it at one station."""
     globals_mm: dict[str, float] = {}
     circles: list[tuple] = []
     chains: list[list[str]] = []
@@ -1194,6 +1525,12 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     rows: dict[int, list[tuple[str | None, str | None]]] = {}
     drives: dict[str, dict[str | None, str | None]] = {}
     driven: dict[str, str] = {}
+    blanked: list[tuple[str, ...]] = []
+    blanked_geometry: list[tuple[tuple[str, str], ...]] = []
+    between: list[tuple[str, str, str, float]] = []
+
+    async def dimension_between(_adapter, ref1, ref2, kind, value, _label):
+        between.append((ref1, ref2, kind, value))
 
     async def set_global(_adapter, name, value):
         globals_mm[name] = float(value.removesuffix("mm"))
@@ -1245,6 +1582,21 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     monkeypatch.setattr(part, "check", lambda _label, result: result)
     monkeypatch.setattr(part, "name_dimensions", names)
     monkeypatch.setattr(part, "name_bore_axis", lambda *a, **k: _async("Axis1"))
+    monkeypatch.setattr(
+        part, "blank_reference_sketches", lambda _a, sketches: blanked.append(sketches)
+    )
+    monkeypatch.setattr(
+        part,
+        "blank_reference_geometry",
+        lambda _a, references: blanked_geometry.append(references),
+    )
+    # The station plane's sketch reads (u, v) = model (X, Y).
+    monkeypatch.setattr(
+        part,
+        "_sketch_mapper",
+        lambda _a, *, u_axis, v_axis, label: lambda point: (point[0], point[1]),
+    )
+    monkeypatch.setattr(part, "dimension_between", dimension_between)
     monkeypatch.setattr(part, "drive_dimension", drive_dimension)
     monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
     for helper in (
@@ -1252,7 +1604,6 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
         "bbox_extent_check",
         "ensure_fully_defined",
         "anchor_point_to_origin",
-        "dimension_between",
         "force_rebuild",
         "apply_material",
         "report_mass_properties",
@@ -1282,7 +1633,7 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
 
     # Turned profile: each diameter twice its step's radius, the flange's
     # thickness the run of its O.D., the overall the profile's reach.
-    (profile,) = chains
+    profile, pin_hole = chains
     flange_u, flange_v0, _u, flange_v1 = fake.lines[diametric["FlangeDia"]]
     hub_u, *_hub = fake.lines[diametric["HubDia"]]
     spigot_u, spigot_v0, _su, spigot_v1 = fake.lines[diametric["SpigotDia"]]
@@ -1301,39 +1652,85 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     assert drawn["FlangeDia"] == pytest.approx(spec.FLANGE_DIA)
     assert drawn["HubLength"] == pytest.approx(spec.HUB_LENGTH)
     assert drawn["SpigotLength"] == pytest.approx(spec.SPIGOT_LENGTH)
-    # The spigot's bore runs the spigot's length, driven by it.
-    assert _drive_value(
-        driven["SpigotBoreDepth@SpigotBore"], globals_mm
-    ) == pytest.approx(spec.SPIGOT_LENGTH)
-
-    # D-bore: the arc's radius is half the bore, centred on the axis; the
-    # witness runs from the axis to the flat, square to it.
-    ((cx, cy, sx, sy, ex, ey),) = fake.arcs
-    flat, witness = fake.sketch_lines[2]
-    _fx0, flat_y0, _fx1, flat_y1 = fake.lines[flat]
-    wx0, wy0, wx1, wy1 = fake.lines[witness]
-    assert (cx, cy, wx0, wy0, wx1) == pytest.approx((0.0, 0.0, 0.0, 0.0, 0.0))
-    assert math.hypot(sx, sy) == pytest.approx(math.hypot(ex, ey))
-    assert sy == ey == flat_y0 == flat_y1 == wy1
-    assert set(drives["BoreProfile"]) == {"BoreDia", "FlatToAxis"}
-    assert value("BoreProfile", "BoreDia") == pytest.approx(2.0 * math.hypot(sx, sy))
-    assert value("BoreProfile", "FlatToAxis") == pytest.approx(abs(wy1 - wy0))
-    assert wy1 == pytest.approx(-spec.FLAT_TO_AXIS)
+    # The bore: one round circle on the axis, cut through the whole part.
+    (bore,) = [c for c in circles if c[0] == "bore"]
+    assert bore[1:4] == pytest.approx((0.0, 0.0, spec.BORE_DIA / 2.0))
+    assert not fake.arcs
 
     # Oil hole: the station line runs from the hub front face to the hole's
-    # centre, the printed station behind it.
-    (station,) = fake.sketch_lines[5]
+    # centre, the key pin's station behind it.
+    (station,) = fake.sketch_lines[4]
     _u0, front_v, _u1, hole_v = fake.lines[station]
     ((_cu, centre_v, oil_r),) = fake.circles
     assert centre_v == pytest.approx(hole_v)
     assert value("OilHoleProfile", "OilHoleDatum") == pytest.approx(front_v)
     assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(front_v - hole_v)
     assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(
-        spec.OIL_HOLE_STATION
+        spec.KEY_PIN_STATION
     )
     assert value("OilHoleProfile", "OilHoleDia") == pytest.approx(2.0 * oil_r)
     # The one-wall cut runs a body's width deep.
     assert _drive_value(driven["OilHoleDepth@OilHole"], globals_mm) == spec.HUB_DIA
+
+    # The key-pin station's hidden reference: a line on the +X O.D. from
+    # the hub front face back to the hole's axis, blanked once drawn.
+    (reference,) = fake.sketch_lines[5]
+    ru0, rv0, ru1, rv1 = fake.lines[reference]
+    assert ru0 == ru1 == pytest.approx(spec.HUB_DIA / 2.0)
+    assert (rv0, rv1) == pytest.approx((-spec.HUB_FRONT_Z, -spec.KEY_PIN_Z))
+    sketch = spec.REFERENCE_SKETCHES[0]
+    for name, size in (
+        ("KeyPinStation", rv0 - rv1),
+        ("KeyPinStationAnchor1", ru0),
+        ("KeyPinStationAnchor2", rv0),
+    ):
+        assert _drive_value(driven[f"{name}@{sketch}"], globals_mm) == pytest.approx(
+            size
+        ), name
+    assert blanked == [spec.REFERENCE_SKETCHES]
+    # The key pin's chord hole: on the hidden station plane, whose offset
+    # drives from the printed station, a stepped half profile beside its
+    # centreline at y = -chord, revolved: the ream from past the +X O.D. to
+    # the stop, the knockout on past the -X O.D.  The chord, the stop and
+    # both diameters drive from their globals.
+    plane = "KeyPinStationPlane"
+    assert fake.planes[6] == plane
+    assert blanked_geometry == [((plane, "PLANE"),)]
+    assert _drive_value(driven[f"KeyPinZ@{plane}"], globals_mm) == pytest.approx(
+        -spec.KEY_PIN_Z
+    )
+    out_end, ream, stop, drill, in_end, _on_axis = pin_hole
+    assert diametric["KeyPinDia"] == ream
+    assert diametric["KeyPinDrillDia"] == drill
+    out_x, axis_y, _ox, ream_y = fake.lines[out_end]
+    _rx, _ry, stop_x, _ry1 = fake.lines[ream]
+    _sx, _sy, _sx1, drill_y = fake.lines[stop]
+    _dx, _dy, far_x, _dy1 = fake.lines[drill]
+    assert fake.lines[in_end][3] == axis_y
+    drawn_pin = {
+        "KeyPinChord": -axis_y,
+        "KeyPinStop": -stop_x,
+        "KeyPinDia": 2.0 * (axis_y - ream_y),
+        "KeyPinDrillDia": 2.0 * (axis_y - drill_y),
+    }
+    for name, size in drawn_pin.items():
+        assert value("KeyPinProfile", name) == pytest.approx(size), name
+    assert drawn_pin == pytest.approx(
+        {
+            "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
+            "KeyPinStop": spec.KEY_PIN_STOP,
+            "KeyPinDia": spec.KEY_PIN_HOLE_DIA,
+            "KeyPinDrillDia": spec.KEY_PIN_DRILL_DIA,
+        }
+    )
+    assert out_x > spec.HUB_DIA / 2.0 and -far_x > spec.HUB_DIA / 2.0
+    # The printed chord and stop run from the sketch origin, the hub axis.
+    assert (f"{out_end}.start", "origin", "vertical_distance") in {
+        row[:3] for row in between
+    }
+    assert (f"{stop}.start", "origin", "horizontal_distance") in {
+        row[:3] for row in between
+    }
     holes = [c for c in circles if c[0].startswith("screw hole")]
     drawn_holes = [v for _label, x, y, *_rest in holes for v in (x, y)]
     assert drawn_holes == pytest.approx([v for xy in joint.screw_centres() for v in xy])
@@ -1351,7 +1748,7 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
             )
             checked += 1
     # The bolt circle's diameter, three hole sizes, five non-zero hole
-    # centres and the spigot bore's size.
+    # centres and the bore's size.
     assert checked == 1 + 3 + 5 + 1
 
 

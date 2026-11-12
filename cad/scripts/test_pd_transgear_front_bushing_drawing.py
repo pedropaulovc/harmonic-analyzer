@@ -89,7 +89,7 @@ def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
 
 def test_the_rear_face_covers_the_hub_front_face_past_its_bore() -> None:
     """R9-68: the bushing traps the hub, so at the smallest printed O.D. its
-    rear face reaches a millimetre past the hub's largest D-bore, and stays
+    rear face reaches a millimetre past the hub's largest bore, and stays
     on the hub's front face (inside the smallest hub body)."""
     od_r_min = (spec.OD - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)) / 2.0
     overlap = od_r_min - (hub.BORE_DIA + hub.BORE_BAND[0]) / 2.0

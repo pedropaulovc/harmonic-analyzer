@@ -1,16 +1,17 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-10).
 
 An end view, a longitudinal section B-B, VIEW D on the rear face, VIEW C
-outside in the section's direction and an isometric at 3:1 (the section
-takes B: A names the bore datum). The end view looks at the rear face
-(*Back), the third-angle left view of the section, whose rear face stands
-left (the 2026-10-27 ENFORCE review: a nose view there broke the
+outside in the section's direction, VIEW E on the nose and an isometric at
+3:1 (the section takes B: A names the bore datum). The end view looks at the
+rear face (*Back), the third-angle left view of the section, whose rear face
+stands left (the 2026-10-27 ENFORCE review: a nose view there broke the
 projection). It carries the genuine native two-tooth span, finish, datum A
 and VIEW C's viewing arrow; VIEW D, named by an arrow on VIEW C, carries the
 toothspace inspection callout on a full-depth flank and the root's MIN
 across two gap floors; VIEW C carries the cutter's full-depth station and
-run-out limit from the floor of the gap facing it; the section
-carries diameters beside their axial extent, the D-flat from the axis, the
+run-out limit from the floor of the gap facing it; VIEW E, named by an
+arrow on the section, carries the D-flat's chord from the axis; the section
+carries diameters beside their axial extent, the flat's end wall, the
 lengths baselined from the rear face (drawing-guidelines.md rule 11 (turned
 parts read like the lathe)) and the step face (the disc hub's seat) square to
 the bore, all imported natively from the part with the places, bands and
@@ -20,7 +21,7 @@ drawing's own note: its span row cites the MHA-PD-00 step that sets the
 mesh.  The oil hole is drilled through the seated hub into the bore at
 assembly, so the section carries only its drill note; its station belongs
 to the hub's sheet.  Decimal-inch sheet (#290); the model
-keeps its millimetre nominals.  Views C and D print at the sheet's 3:1, so
+keeps its millimetre nominals.  Views C, D and E print at the sheet's 3:1, so
 no caption restates a scale (rule 9).
 """
 
@@ -128,8 +129,9 @@ END_VIEW_ORIENTATION = "*Back"
 FRONT_CENTER = (0.080, 0.160)
 RIGHT_CENTER = (0.230, 0.160)
 # The isometric (94 x 88 mm at 3:1) stands upper right, clear of the title
-# block and right of the oil-hole note.
-ISO_CENTER = (0.367, 0.214)
+# block and right of the oil-hole note, high enough that VIEW E's distance
+# text passes under it.
+ISO_CENTER = (0.367, 0.221)
 # The toothspace pin seats on the straight pass's full-depth flank at the
 # REAR face (TOOTH_SPACE_INSPECTION_END_MM).  The nose view once used as the
 # end view looked at the step face, where the cutter's run-out leaves only
@@ -188,10 +190,10 @@ def _side_x(z_mm: float) -> float:
 # On the section, the tip and boss diameters print inline on the axis,
 # between their own extension lines and off the part (the crank hub's and
 # the disc hub's layout): the tip left of the rear face, where its witness
-# starts; the boss right of the nose, beyond the flat.  Each prints its mate
-# under its value.  The flat's distance from the axis hangs below the
-# section right of the nose, its mate under it: the four rows are taller
-# than the flat's depth.  The bore keeps its shelf above-left of the rear
+# starts; the boss right of the nose, beyond VIEW E's arrow.  Each prints its
+# mate under its value.  The flat's distance from the axis prints on VIEW E,
+# the nose view, where the flat shows as a chord.  The bore keeps its shelf
+# above-left of the rear
 # face, which holds its two-row band, process and fit callout clear of its
 # own extension lines (the fit there, not on a separate end-view note: run
 # 20261101T054343686Z's note overlapped the oil hole note's leader extent).
@@ -227,24 +229,19 @@ def _left_of(edge_x: float, width: float) -> float:
 # test_pd_transgear_feed_pinion_drawing): the rows are placed by their text
 # centres, each a 3 mm gap under the row above.
 _FACE_WIDTH_TEXT_WIDTH = 0.0627
-_FLAT_END_TEXT_WIDTH = 0.0601
+_FLAT_END_TEXT_WIDTH = 0.0131
+# The boss's fit rows (the standard fit name and the mate's name and number,
+# the route and the clearance REF) are the sheet's widest: centred this far
+# out, the text starts right of VIEW E's letter and ends inside the border.
+BOSS_TEXT_OFFSET = 0.0825
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # 4 mm farther out than run 20261027T064211655Z, whose "RACK" touched
     # the bore dimension's lower extension line (r1, r3).
     "OutsideDia": (_REAR_X - 0.044, RIGHT_CENTER[1]),
-    # Its fit's two rows (the standard fit name and the mate's name and
-    # number, the route and the clearance REF) are the sheet's widest:
-    # centred this far out, the text starts right of the flat's dimension
-    # line and ends inside the border.
-    "BossDia": (_NOSE_X + 0.074, RIGHT_CENTER[1]),
-    # Its dimension line stands just right of the nose; the text prints right
-    # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
-    # outside view's outline struck its last row).
-    "FlatToAxis": (_NOSE_X + 0.006, _SIDE_BOTTOM - 0.0079),
+    "BossDia": (_NOSE_X + BOSS_TEXT_OFFSET, RIGHT_CENTER[1]),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
-    # The tooth length's band and its second callout row (the disc cluster
-    # stack) make it a three-row text, centred on its point: every row stands
-    # 3 mm lower than with the bare tooth length.
+    # The tooth length's band and its mate's row make a two-row text,
+    # centred on its point.
     "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0099),
     "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0278),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0452),
@@ -373,8 +370,7 @@ VIEW_C_ARROW = (
 )
 # D's arrow points right (model +Z) at VIEW C's rear face, 6 mm under the
 # axis: VIEW D (*Back) looks at the rear face from behind.  The letter
-# stands left of the face, under the flat's callout and over the cutter
-# rows.
+# stands left of the face, over the cutter rows.
 _VIEW_D_TIP = (_LEFT_REAR_X - VIEW_ARROW_TIP_GAP, LEFT_CENTER[1] - 0.006)
 VIEW_D_ARROW = (
     (
@@ -396,6 +392,39 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
         REAR_CENTER[1] + _ROOT_TEXT_RADIUS * math.sin(_ROOT_TEXT_ANGLE),
     )
 }
+
+# VIEW E: the *Front view looks at the nose along -Z, where the D-flat shows
+# as a chord (r8 machinist review: the flat showed only edge-on, as a step
+# in B-B; the end view and VIEW D look at the gear face, the teeth hiding the
+# hub).  It prints the flat's distance from the axis, imported from the
+# hidden FlatReference sketch, with the key pin it keys.  It stands in the
+# free field over B-B's nose, left of the isometric and right of the oil
+# hole note's leader.  SolidWorks prints a vertical distance's text on the
+# far side of its dimension line from the measured points (B-B's flat text
+# ran right of its line, run 20261027T032128736Z; r9's, its line left of
+# the view, ran left onto the oil hole's leader), so the line stands just
+# right of the tooth tips, the text running right under the isometric and
+# over the boss's upper extension line, the caption under the view.  The
+# view's native outline (the tips plus 6.25 mm, r10's View6) stands 3.5 mm
+# over B-B's (183.5 mm top, r10), which it overlapped at 204.5 mm.
+NOSE_VIEW_LETTER = "E"
+NOSE_CAPTION = f"VIEW {NOSE_VIEW_LETTER}"
+NOSE_CENTER = (0.292, 0.2105)
+NOSE_TEXT_AIR = 0.004
+NOSE_KEEP: dict[str, tuple[float, float]] = {
+    "FlatToAxis": (NOSE_CENTER[0] + HALF_OD + NOSE_TEXT_AIR, NOSE_CENTER[1] - 0.0287)
+}
+# The caption's top centre, under the view.
+NOSE_CAPTION_TOP = (NOSE_CENTER[0], NOSE_CENTER[1] - HALF_OD - 0.0025)
+# Inserted by its upper left at VIEW C's caption's measured width.
+NOSE_CAPTION_XY = (NOSE_CAPTION_TOP[0] - LEFT_CAPTION_EXTENT[0] / 2.0, NOSE_CAPTION_TOP[1])
+# E's arrow points left (model -Z) at B-B's nose, level with the axis, the
+# letter right of the tip and left of the boss's fit text.
+_VIEW_E_TIP = (_NOSE_X + VIEW_ARROW_TIP_GAP, RIGHT_CENTER[1])
+VIEW_E_ARROW = (
+    (_VIEW_E_TIP[0] + VIEW_ARROW_LEADER, _VIEW_E_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
+    _VIEW_E_TIP,
+)
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
 # the upper boss wall; the note's leader lands mid-wall on its front edge.
@@ -697,6 +726,32 @@ def _insert_view_caption(
     return note
 
 
+def _hang_caption(
+    adapter: Any,
+    view: Any,
+    text: str,
+    xy: tuple[float, float],
+    target: tuple[float, float],
+    label: str,
+) -> tuple[float, ...]:
+    """Insert ``view``'s caption at ``xy`` and settle its measured top centre
+    (``INote.GetExtent``) on ``target``; returns the extent."""
+    note = _insert_view_caption(adapter, view, text, xy, label)
+    for _attempt in range(4):
+        extent = tuple(float(value) for value in note.GetExtent())
+        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
+            break
+        move_annotation(adapter, note.GetAnnotation(), *error, label=f"{label} caption")
+    else:
+        raise RuntimeError(
+            f"{label} caption stayed at {extent}, its top centre requested at {target}"
+        )
+    if extent[1] < SHEET_INNER_BORDER[1]:
+        raise RuntimeError(f"{label} caption {extent} left the inner border")
+    return extent
+
+
 def _place_rear_caption(adapter: Any, view: Any) -> None:
     """Hang the rear view's caption, centred, below the view's measured outline.
 
@@ -706,20 +761,19 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
     _pin_sheet_scale(adapter)
     outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
     target = ((outline[0] + outline[2]) / 2.0, outline[1] - REAR_CAPTION_GAP_M)
-    note = _insert_view_caption(adapter, view, REAR_CAPTION, REAR_CAPTION_XY, "rear view")
-    for _attempt in range(4):
-        extent = tuple(float(value) for value in note.GetExtent())
-        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
-        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
-            break
-        move_annotation(adapter, note.GetAnnotation(), *error, label="rear view caption")
-    else:
-        raise RuntimeError(
-            f"rear view caption stayed at {extent}, its top centre requested at {target}"
-        )
-    if extent[1] < SHEET_INNER_BORDER[1]:
-        raise RuntimeError(f"rear view caption {extent} left the inner border")
+    extent = _hang_caption(
+        adapter, view, REAR_CAPTION, REAR_CAPTION_XY, target, "rear view"
+    )
     _telemetry.info(f"rear view caption: outline {outline}, extent {extent}")
+
+
+def _place_nose_caption(adapter: Any, view: Any) -> None:
+    """Hang VIEW E's caption, centred on the view, under the flat's text."""
+    _pin_sheet_scale(adapter)
+    extent = _hang_caption(
+        adapter, view, NOSE_CAPTION, NOSE_CAPTION_XY, NOSE_CAPTION_TOP, "nose view"
+    )
+    _telemetry.info(f"nose view caption: extent {extent}")
 
 
 def _hide_tangent_edges(view: Any) -> None:
@@ -1036,12 +1090,14 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)
     outside = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso, rear, outside):
+    nose = place_view(adapter, str(SOURCE), "*Front", *NOSE_CENTER, scale=VIEW_SCALE)
+    for view in (front, right, iso, rear, outside, nose):
         set_hidden_lines_removed(adapter, view)
     _hide_tangent_edges(outside)
     _crop_outside_view(adapter, outside)
     _place_rear_caption(adapter, rear)
     _place_outside_caption(adapter, outside)
+    _place_nose_caption(adapter, nose)
 
     annotations = []
     # The section first: the outside view then imports only the cutter
@@ -1051,6 +1107,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (right, RIGHT_KEEP, "longitudinal section"),
         (outside, LEFT_KEEP, "outside"),
         (rear, REAR_KEEP, "rear face"),
+        (nose, NOSE_KEEP, "nose"),
     ):
         annotations += curate_view_dimensions(
             adapter,
@@ -1070,6 +1127,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _sketch_outside_break(adapter, outside)
     _add_view_arrow(adapter, front, OUTSIDE_VIEW_LETTER, VIEW_C_ARROW)
     _add_view_arrow(adapter, outside, REAR_VIEW_LETTER, VIEW_D_ARROW)
+    _add_view_arrow(adapter, right, NOSE_VIEW_LETTER, VIEW_E_ARROW)
 
     oil_note = add_leader_note(
         adapter,

@@ -5,8 +5,11 @@ closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
 ``draw_pd_transgear_drive_collar`` keeps exactly the same names.
 
-The actual D-bore slides over the knob shaft's .191 solid D-core.
-The D-flat carries torque; there is no rear slot or front spring pin.
+The plain round reamed bore slides over the knob shaft's .191 solid D-core
+(#2409: no internal D, no broach).  The drive flat is the crest of the
+MHA-PD-VN-70 dowel pressed parallel to the axis into a blind ream on local
+-Y; that crest bears on the core's D-flat and carries the torque.  There is
+no rear slot or front spring pin.
 The existing seat-diameter body is supplied long and its REAR FACE is faced
 at assembly until the removable T24 meets the unchanged chain-plane setting,
 with that rear face seated directly on the integral gear front F.
@@ -20,22 +23,23 @@ Decimal inch (#290): nominals are the exact millimetres of their printed
 inch values, except the shared seat interface's (``_sprocket_seat_geometry``)
 Ø17.5 seat and 14.0 pin circle, which print rounded (.689, .2756).
 
-The rear D-entry nominal is the actual shaft corner envelope plus one full
-entry-tolerance span. Both legs retain the explicit manufacturing band;
-the drawn 45-degree angle also spends the title block's angular grade, with
-no favourable credit for intersecting those constraints. The smallest
-true-D edge, fitted rear axial span and post-break wall bound the maximum
-physical leg, while the neck/corner stack bounds its functional minimum.
+The front bore mouth takes the title block's edge break.  The pin hole is
+reamed blind from the rear face into the supplied body; its floor station is
+from the front face, because the rear face is faced at assembly (and faces
+the unhardened pin flush with it).  The rear bore mouth then takes a 45°
+break about the bore axis, the pin's crest included, which lifts the crest
+off the shaft's root corner at F.  Collar and pin are one permanent pair.
 
 Part frame: the axis is local +Z through the origin (``Axis1``, the bore
 axis); +Z is machine +Z (rearward), so the assembly places the part without
 rotation.  The origin is the front (seat) face, machine z -154.3 at the
 nominal setting: the body runs z = 0..LENGTH, the pilot -PILOT_LENGTH..0,
-and the drive-pin holes run along Z at (0, ±PIN_CIRCLE_RADIUS).
+and the drive-pin holes run along Z at (0, ±PIN_CIRCLE_RADIUS), the flat
+pin's at (0, -FLAT_PIN_CENTRE) from z = FLAT_PIN_FLOOR to the rear face.
 
 Named datums: ``Axis1``; ``Front Plane`` (the seat face); planes
-``PilotFront`` and ``RearFace``; axes ``DrivePinAxis1`` (+Y)
-and ``DrivePinAxis2`` (-Y).
+``PilotFront`` and ``RearFace``; axes ``DrivePinAxis1`` (+Y),
+``DrivePinAxis2`` (-Y) and ``FlatPinAxis`` (the flat pin's, -Y).
 """
 
 from __future__ import annotations
@@ -45,11 +49,13 @@ import textwrap
 
 import _config
 from _fit_ream_h7 import REAM_H7
-from _inch_wall_limits import WALL_FLOOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
     printed_band_mm,
     printed_deviations,
 )
@@ -59,6 +65,11 @@ from _sprocket_seat_geometry import (
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_vn_transgear_knob_drive_pin_spec import LENGTH as PIN_LENGTH
 from pd_vn_transgear_knob_drive_pin_spec import PROUD_RANGE, THINNEST_PLATE
+from pd_vn_transgear_collar_flat_pin_spec import DIA_LIMITS_MM as FLAT_PIN_DIA_LIMITS
+from pd_vn_transgear_collar_flat_pin_spec import LENGTH as FLAT_PIN_STOCK_LENGTH
+from pd_vn_transgear_collar_flat_pin_spec import LENGTH_LIMITS_MM as FLAT_PIN_LENGTH_LIMITS
+from pd_vn_transgear_collar_flat_pin_spec import PRESS_HOLE_BAND as FLAT_PIN_HOLE_BAND
+from pd_vn_transgear_collar_flat_pin_spec import PRESS_HOLE_DIA as FLAT_PIN_HOLE_DIA
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_DIA_BAND,
@@ -70,6 +81,7 @@ from pd_transgear_knob_shaft_spec import (
     CORE_ACTIVE_LENGTH_MIN,
     FRONT_RELIEF_DIA_MAX,
     FRONT_RELIEF_WIDTH_MAX,
+    FRONT_RELIEF_WIDTH_MIN,
     FRONT_RELIEF_TOTAL_RUNOUT,
     FRONT_CORNER_RADIUS_MAX,
     END_FLOAT,
@@ -171,105 +183,102 @@ if PILOT_BLANK_LENGTH_MIN < PILOT_LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
 if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
     raise AssertionError("MHA-PD-22's modelled pilot lies outside its fitted band")
 
-# --- True D-bore: curved H7 envelope plus a separately banded flat -----------
-# #290 fits D10/D11: the .192 REAM_H7 D-bore over the .191 core, the flat
-# .0848-.0854 over the core's .084 0/-.0006.
+# --- Round bore over the D-core (#2409) --------------------------------------
+# #290 fit D10: the .192 REAM_H7 bore (.1920-.1925, the .192 reamer) slides
+# over the core's .191 SHAFT_H.  No flat is cut in the bore: the MHA-PD-VN-70
+# pin's crest (below) is the drive flat.
 BORE_DIA = 4.8768  # .192
 BORE_DIA_BAND = REAM_H7
 BORE_DIA_PLACES = 4
-FLAT_LIMITS = (2.15392, 2.16916)  # .0848 .. .0854
-FLAT_TO_AXIS = sum(FLAT_LIMITS) / 2.0
-FLAT_BAND = (FLAT_LIMITS[1] - FLAT_TO_AXIS, FLAT_LIMITS[0] - FLAT_TO_AXIS)
-FLAT_TOL_TYPE = 3  # native LIMIT, four-place .0848..0854
-FLAT_PLACES = 4
-FLAT_CLEARANCE = (
-    FLAT_TO_AXIS + min(FLAT_BAND) - (CORE_FLAT_FROM_AXIS + max(CORE_FLAT_BAND)),
-    FLAT_TO_AXIS + max(FLAT_BAND) - (CORE_FLAT_FROM_AXIS + min(CORE_FLAT_BAND)),
-)
 _CORE_R_MIN = (CORE_DIA + min(CORE_DIA_BAND)) / 2.0
+_BORE_R_MIN = (BORE_DIA + min(BORE_DIA_BAND)) / 2.0
 _BORE_R_MAX = (BORE_DIA + max(BORE_DIA_BAND)) / 2.0
 _CORE_FLAT_MIN = CORE_FLAT_FROM_AXIS + min(CORE_FLAT_BAND)
-# Every direction sees >=flatMIN support on the core's retained major arc.
-# The largest permitted centre translation therefore satisfies
-# coreRMIN² + float² + 2*flatMIN*float <= boreRMAX².
-D_CENTRE_FLOAT_MAX = math.sqrt(
-    _CORE_FLAT_MIN**2 + _BORE_R_MAX**2 - _CORE_R_MIN**2
-) - _CORE_FLAT_MIN
-STUD_D_BORE_AIR = min(
-    BORE_DIA + min(BORE_DIA_BAND),
-    2.0 * (FLAT_TO_AXIS + min(FLAT_BAND)),
-) / 2.0 - max(THREAD_BLANK_LIMITS) / 2.0
-# Keep one full manufacturing-tolerance span beyond the actual shaft corner
-# envelope, without spending favourable neck/bore air to shrink the entry,
-# rounded up onto the three-place inch grid; its band is ±.002.
-BORE_ENTRY_BREAK_BAND = (0.0508, -0.0508)
-BORE_ENTRY_BREAK_PLACES = 3
-BORE_ENTRY_BREAK = inch_ceil_mm(
-    FRONT_CORNER_RADIUS_MAX
-    + max(BORE_ENTRY_BREAK_BAND) - min(BORE_ENTRY_BREAK_BAND),
-    BORE_ENTRY_BREAK_PLACES,
+_CORE_FLAT_MAX = CORE_FLAT_FROM_AXIS + max(CORE_FLAT_BAND)
+_CORE_FRONT_MIN = CORE_FRONT_FROM_F - printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=SHAFT_UNIT)
+_CORE_FRONT_MAX = CORE_FRONT_FROM_F + printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=SHAFT_UNIT)
+# The front mouth takes the title block's edge break.
+BORE_EDGE_BREAK_MAX = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+# The rear mouth: a 45° break of radial leg REAR_BREAK about the bore axis,
+# cut after the rear is faced at assembly, through the pressed flat pin with
+# it (collar and pin are one permanent pair): it lifts the pin's crest corner
+# clear of the shaft's root corner at F (rule 21; FLAT_PIN_CREST_CORNER_AIR_MIN).
+REAR_BREAK = 0.2032  # .008
+REAR_BREAK_TOL = 0.0508  # ±.002
+REAR_BREAK_PLACES = 3
+REAR_BREAK_LIMITS = (REAR_BREAK - REAR_BREAK_TOL, REAR_BREAK + REAR_BREAK_TOL)
+REAR_BREAK_ANGLE_DEG = 45.0  # from the axis, at the title block's angular row
+REAR_BREAK_ANGLE_LIMITS = (
+    REAR_BREAK_ANGLE_DEG - angular_band_deg(unit=UNIT),
+    REAR_BREAK_ANGLE_DEG + angular_band_deg(unit=UNIT),
 )
-BORE_ENTRY_BREAK_MIN = BORE_ENTRY_BREAK + min(BORE_ENTRY_BREAK_BAND)
-BORE_ENTRY_BREAK_MAX = BORE_ENTRY_BREAK + max(BORE_ENTRY_BREAK_BAND)
-BORE_ENTRY_BREAK_ANGLE_DEG = 45.0
-BORE_ENTRY_BREAK_ANGLE_BAND_DEG = angular_band_deg(unit=UNIT)
-BORE_ENTRY_BREAK_ANGLE_LIMITS = (
-    BORE_ENTRY_BREAK_ANGLE_DEG - BORE_ENTRY_BREAK_ANGLE_BAND_DEG,
-    BORE_ENTRY_BREAK_ANGLE_DEG + BORE_ENTRY_BREAK_ANGLE_BAND_DEG,
+# How far the break runs along the bore from the rear face: widest, steepest.
+REAR_BREAK_DEPTH_MAX = max(REAR_BREAK_LIMITS) / math.tan(
+    math.radians(min(REAR_BREAK_ANGLE_LIMITS))
 )
-if not 0.0 < min(BORE_ENTRY_BREAK_ANGLE_LIMITS) < max(BORE_ENTRY_BREAK_ANGLE_LIMITS) < 90.0:
-    raise AssertionError("MHA-PD-22 rear D-entry angle band must remain acute")
-# At the authored 90-degree rear face/wall junction, the second leg is
-# width*tan(angle). Both width and angle increase it monotonically. Spend
-# every independent printed corner even though BOTH LEGS constrains the
-# accepted intersection more tightly: no nominal-45 or favourable-leg credit.
-BORE_ENTRY_BREAK_LEG_MIN = min(
-    BORE_ENTRY_BREAK_MIN,
-    BORE_ENTRY_BREAK_MIN * math.tan(math.radians(min(BORE_ENTRY_BREAK_ANGLE_LIMITS))),
+
+
+def rear_break_radius(depth: float, bore_r: float, leg: float, angle_deg: float) -> float:
+    """Radius of the rear break's cone ``depth`` in from the rear face: the
+    bore edge plus the leg at the face, closing at ``angle_deg`` to the axis."""
+    return bore_r + leg - depth * math.tan(math.radians(angle_deg))
+
+
+def circle_overlap_area(r1: float, r2: float, distance: float) -> float:
+    """Area common to two circles whose centres lie ``distance`` apart."""
+    if distance >= r1 + r2:
+        return 0.0
+    if distance <= abs(r1 - r2):
+        return math.pi * min(r1, r2) ** 2
+    d2, a2, b2 = distance**2, r1**2, r2**2
+    return (
+        a2 * math.acos((d2 + a2 - b2) / (2.0 * distance * r1))
+        + b2 * math.acos((d2 + b2 - a2) / (2.0 * distance * r2))
+        - 0.5 * math.sqrt(
+            (-distance + r1 + r2)
+            * (distance + r1 - r2)
+            * (distance - r1 + r2)
+            * (distance + r1 + r2)
+        )
+    )
+
+
+def cone_cylinder_volume(
+    face_r: float, depth: float, cylinder_r: float, distance: float, steps: int = 64
+) -> float:
+    """Volume common, over ``depth`` in from a face, to a 45° cone narrowing
+    from ``face_r`` at that face and a cylinder of ``cylinder_r`` parallel to
+    the cone's axis ``distance`` from it (Simpson's rule)."""
+    step = depth / steps
+    return step / 3.0 * sum(
+        (1 if i in (0, steps) else 4 if i % 2 else 2)
+        * circle_overlap_area(max(face_r - i * step, 0.0), cylinder_r, distance)
+        for i in range(steps + 1)
+    )
+
+
+# The largest radial float of the round bore on the plain core.
+ROUND_FIT_FLOAT_MAX = _BORE_R_MAX - _CORE_R_MIN
+# The rear mouth seats on F over the shaft's neck and its root corner (the
+# neck's largest radius plus its largest corner, .0815): spend both turned
+# surfaces' runout and the whole float, no common-axis credit.
+_ROOT_CORNER_REACH_MAX = (
+    FRONT_RELIEF_DIA_MAX / 2.0 + FRONT_CORNER_RADIUS_MAX
+    + (CORE_TOTAL_RUNOUT + FRONT_RELIEF_TOTAL_RUNOUT) / 2.0 + ROUND_FIT_FLOAT_MAX
 )
-BORE_ENTRY_BREAK_LEG_MAX = max(
-    BORE_ENTRY_BREAK_MAX,
-    BORE_ENTRY_BREAK_MAX * math.tan(math.radians(max(BORE_ENTRY_BREAK_ANGLE_LIMITS))),
-)
-# Spend both turned-surface axes independently; no perfect common-axis credit.
-NECK_D_BORE_AIR_MIN = (
-    FLAT_TO_AXIS + min(FLAT_BAND) - FRONT_RELIEF_DIA_MAX / 2.0
-    - (CORE_TOTAL_RUNOUT + FRONT_RELIEF_TOTAL_RUNOUT) / 2.0 - D_CENTRE_FLOAT_MAX
-)
-# Under drive use the actual minimum core-flat plane, with NO favourable
-# bore-float credit. This is why the neck is 4.000, not the old 4.050 proposal.
-NECK_TORQUE_FLAT_AIR_MIN = (
-    _CORE_FLAT_MIN - FRONT_RELIEF_DIA_MAX / 2.0
-    - (CORE_TOTAL_RUNOUT + FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
-)
-BORE_ENTRY_BREAK_REQUIRED_MIN = max(
-    0.0,
-    FRONT_CORNER_RADIUS_MAX
-    - min(NECK_D_BORE_AIR_MIN, NECK_TORQUE_FLAT_AIR_MIN),
-)
-# Over0..R the entry-clearance minus quarter-circle is concave, so its
-# minimum is at an end. Spend the smaller physical leg at every printed corner.
-NECK_CORNER_D_BORE_AIR_MIN = (
-    min(NECK_D_BORE_AIR_MIN, NECK_TORQUE_FLAT_AIR_MIN)
-    + BORE_ENTRY_BREAK_LEG_MIN - FRONT_CORNER_RADIUS_MAX
-)
-D_DRIVE_WIDTH_MIN = 2.0 * math.sqrt(
-    _CORE_R_MIN**2 - (CORE_FLAT_FROM_AXIS + max(CORE_FLAT_BAND))**2
-)
-D_DRIVE_AREA_MIN = (
-    (D_DRIVE_WIDTH_MIN - 2.0 * BORE_ENTRY_BREAK_LEG_MAX)
-    * (CORE_ACTIVE_LENGTH_MIN - 2.0 * BORE_ENTRY_BREAK_LEG_MAX)
-)
-# The F face lies beyond the active D support. Bound a straight bore's axis
-# at both unbroken support sections, then extrapolate to F; spend the actual
-# core/journal runout at BOTH sections, not only a favourable common axis.
-D_SUPPORT_LENGTH_MIN = CORE_ACTIVE_LENGTH_MIN - 2.0 * BORE_ENTRY_BREAK_LEG_MAX
-D_SUPPORT_TO_F_MAX = FRONT_RELIEF_WIDTH_MAX + BORE_ENTRY_BREAK_LEG_MAX
-D_AXIS_AT_F_FROM_JOURNAL_MAX = (
-    D_CENTRE_FLOAT_MAX + CORE_TOTAL_RUNOUT / 2.0
-) * (1.0 + 2.0 * D_SUPPORT_TO_F_MAX / D_SUPPORT_LENGTH_MIN)
+ROOT_CORNER_BORE_AIR_MIN = _BORE_R_MIN - _ROOT_CORNER_REACH_MAX
+# The F face lies behind the core's support.  The rear mouth's break ends
+# inside the neck and the bore runs on through the shortest pilot past the
+# core's front (both asserted below), so the bore bears on the core's whole
+# active length.  Bound the bore's axis at both ends of that support, then
+# extrapolate to F; spend the core runout at BOTH sections.
+BORE_SUPPORT_LENGTH_MIN = CORE_ACTIVE_LENGTH_MIN
+BORE_SUPPORT_TO_F_MAX = FRONT_RELIEF_WIDTH_MAX
+BORE_AXIS_AT_F_FROM_JOURNAL_MAX = (
+    ROUND_FIT_FLOAT_MAX + CORE_TOTAL_RUNOUT / 2.0
+) * (1.0 + 2.0 * BORE_SUPPORT_TO_F_MAX / BORE_SUPPORT_LENGTH_MIN)
 FRONT_BEARING_INNER_RADIUS_MAX = (
-    _BORE_R_MAX + BORE_ENTRY_BREAK_LEG_MAX + D_AXIS_AT_F_FROM_JOURNAL_MAX
+    _BORE_R_MAX + max(REAR_BREAK_LIMITS) + BORE_AXIS_AT_F_FROM_JOURNAL_MAX
     + TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
 )
 FRONT_BEARING_AREA_MIN = min(
@@ -288,12 +297,142 @@ PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 each centre
 PIN_OFFSET_PLACES = DRIVE_PIN_OFFSET_PLACES
 PIN_HOLE_DEPTH = LENGTH  # through the body
 
-# --- Native D construction and the existing drive-hole carriers ------------
+# --- The drive flat: the MHA-PD-VN-70 dowel's crest (#2409) ------------------
+# A 1/16 x 3/16 unhardened stainless dowel pressed parallel to the axis into a
+# blind .0615 REAM_H7 hole on local -Y (the former D-flat side, so the
+# assembly's clocking is unchanged).  The hole is reamed blind from the rear
+# face into the supplied body to a full-diameter floor FLAT_PIN_FLOOR behind
+# the front (seat) face; the floor prints at two places (.XX, ±.01): over its
+# band the drill point stays in the body, the pilot-shoulder wall holds the
+# .080 target and the pin keeps its engagement on the core (asserted below),
+# so the floor needs no tighter row and no function words.  The pin is
+# pressed to that floor and its
+# crest, the surface nearest the axis, stands inside the bore over the core's
+# D-flat.  Facing the rear to fit faces the pin flush with it, and the rear
+# break then cuts its crest corner: collar and pin are one permanent pair
+# (rule 16), named so at the pin hole's callout.
+FLAT_PIN_NUMBER = "MHA-PD-VN-70"
+FLAT_PIN_HOLE_PLACES = 4
+# The shop row for a reamed hole's location, no fit route: the crest's
+# clearance to the core's flat holds over the whole band (asserted below).
+FLAT_PIN_CENTRE = 2.9972  # .118 from the bore axis, along local -Y
+FLAT_PIN_CENTRE_TOL = 0.0508  # ±.002
+FLAT_PIN_CENTRE_PLACES = 3
+FLAT_PIN_FLOOR = 2.032  # .08 behind the front face
+FLAT_PIN_FLOOR_PLACES = 2
+_FLOOR_LO, _FLOOR_HI = printed_deviations(FLAT_PIN_FLOOR, FLAT_PIN_FLOOR_PLACES, unit=UNIT)
+FLAT_PIN_FLOOR_LIMITS = (FLAT_PIN_FLOOR + _FLOOR_LO, FLAT_PIN_FLOOR + _FLOOR_HI)
+# The pin as modelled: the catalogue length, faced flush with the model's
+# nominal fitted rear face when it would stand past it.
+FLAT_PIN_LENGTH = min(FLAT_PIN_STOCK_LENGTH, LENGTH - FLAT_PIN_FLOOR)
+_FLAT_PIN_CENTRE_LIMITS = (
+    FLAT_PIN_CENTRE - FLAT_PIN_CENTRE_TOL, FLAT_PIN_CENTRE + FLAT_PIN_CENTRE_TOL
+)
+_FLAT_PIN_R_LIMITS = (min(FLAT_PIN_DIA_LIMITS) / 2.0, max(FLAT_PIN_DIA_LIMITS) / 2.0)
+_FLAT_PIN_HOLE_R_MAX = (FLAT_PIN_HOLE_DIA + max(FLAT_PIN_HOLE_BAND)) / 2.0
+_FLAT_PIN_HOLE_OUTER_R_MAX = max(_FLAT_PIN_CENTRE_LIMITS) + _FLAT_PIN_HOLE_R_MAX
+# The pressed pin sits on the hole's axis: its crest is centre less radius.
+FLAT_PIN_CREST_LIMITS = (
+    min(_FLAT_PIN_CENTRE_LIMITS) - max(_FLAT_PIN_R_LIMITS),
+    max(_FLAT_PIN_CENTRE_LIMITS) - min(_FLAT_PIN_R_LIMITS),
+)  # .0847 .. .0888
+# Radial air from the crest to the core's flat, the core centred in the bore.
+FLAT_PIN_CREST_CLEARANCE = (
+    min(FLAT_PIN_CREST_LIMITS) - _CORE_FLAT_MAX,
+    max(FLAT_PIN_CREST_LIMITS) - _CORE_FLAT_MIN,
+)
+# The #8-32 stud's largest blank passes the lowest crest.
+STUD_FLAT_PIN_AIR = min(FLAT_PIN_CREST_LIMITS) - max(THREAD_BLANK_LIMITS) / 2.0
+# More than half the pin lies in the hole: the bore cannot release it.
+FLAT_PIN_RETAINED_MARGIN = min(_FLAT_PIN_CENTRE_LIMITS) - _BORE_R_MAX
+# The pin's rear end, deepest floor and longest pin, inside the supplied body
+# blank: the rear-face fit faces the pin with the body.
+FLAT_PIN_REAR_MAX = max(FLAT_PIN_FLOOR_LIMITS) + max(FLAT_PIN_LENGTH_LIMITS)
+FLAT_PIN_BLANK_INSET_MIN = BODY_BLANK_LENGTH_MIN - FLAT_PIN_REAR_MAX
+# The reamed hole's 118-degree drill point lies ahead of the full-diameter
+# floor; it stays in the body, behind the front face.
+FLAT_PIN_DRILL_POINT = _FLAT_PIN_HOLE_R_MAX / math.tan(math.radians(59.0))
+FLAT_PIN_DRILL_TIP_MIN = min(FLAT_PIN_FLOOR_LIMITS) - FLAT_PIN_DRILL_POINT
+# Within FRONT_CORNER_RADIUS_MAX of F the shaft's root corner reaches
+# _ROOT_CORNER_REACH_MAX.  There the rear break has cut the pin's crest back
+# to at least its cone's radius at that depth (its smallest leg at its
+# steepest angle), so the metal nearest the axis is the larger of the crest
+# and that cone.
+FLAT_PIN_CREST_CORNER_AIR_MIN = max(
+    min(FLAT_PIN_CREST_LIMITS),
+    rear_break_radius(
+        FRONT_CORNER_RADIUS_MAX,
+        _BORE_R_MIN,
+        min(REAR_BREAK_LIMITS),
+        max(REAR_BREAK_ANGLE_LIMITS),
+    ),
+) - _ROOT_CORNER_REACH_MAX
+# How deep from F the break removes the crest: the cone's widest reach down
+# to the lowest crest, at its shallowest angle.  The pin bears on the flat
+# only behind it.
+FLAT_PIN_CREST_RELIEF_MAX = (
+    _BORE_R_MAX + max(REAR_BREAK_LIMITS) - min(FLAT_PIN_CREST_LIMITS)
+) / math.tan(math.radians(min(REAR_BREAK_ANGLE_LIMITS)))
+
+
+def flat_pin_core_engagement(
+    body_length: float, floor: float, pin_length: float, core_front: float
+) -> float:
+    """Axial length of the pressed pin on the shaft's D-core, the collar's
+    rear face seated on F ``body_length`` behind its front face: the pin runs
+    ``body_length - floor`` forward of F back to its rear end, faced flush
+    with the rear face where it would stand past it and its crest relieved by
+    the rear break; the core runs from the neck's widest end to
+    ``core_front``."""
+    pin_front = body_length - floor
+    pin_rear = max(pin_front - pin_length, 0.0)
+    return min(pin_front, core_front) - max(
+        pin_rear, FLAT_PIN_CREST_RELIEF_MAX, FRONT_RELIEF_WIDTH_MAX
+    )
+
+
+# Affine terms under min/max: concave over the box, so its corners bound it.
+FLAT_PIN_CORE_ENGAGEMENT_MIN = min(
+    flat_pin_core_engagement(length, floor, pin, front)
+    for length in (LENGTH_FITTED_MIN, LENGTH_FITTED_MAX)
+    for floor in FLAT_PIN_FLOOR_LIMITS
+    for pin in FLAT_PIN_LENGTH_LIMITS
+    for front in (_CORE_FRONT_MIN, _CORE_FRONT_MAX)
+)
+
+
+def flat_pin_play_deg(centre: float, pin_r: float, core_flat: float) -> float:
+    """Turn of the shaft, either way from square, until its flat meets the
+    round pin: cos(theta) = (flat + pin radius) / pin centre."""
+    return math.degrees(math.acos((core_flat + pin_r) / centre))
+
+
+# A binding crest leaves no play (the acos below has no root): refuse it here.
+if min(FLAT_PIN_CREST_CLEARANCE) <= 0.0:
+    raise AssertionError("MHA-PD-22: the flat pin's crest binds on the core's flat")
+# Lost motion, stated not gated: the knob is chain-driven and the paper feeds
+# one way while the crank turns.  Delegated accept RV-04 in the registry row.
+FLAT_PIN_PLAY_DEG = (
+    flat_pin_play_deg(min(_FLAT_PIN_CENTRE_LIMITS), max(_FLAT_PIN_R_LIMITS), _CORE_FLAT_MAX),
+    flat_pin_play_deg(max(_FLAT_PIN_CENTRE_LIMITS), min(_FLAT_PIN_R_LIMITS), _CORE_FLAT_MIN),
+)
+# At the widest play the contact still lands on the flat, short of its edge.
+FLAT_PIN_CONTACT_EDGE_MARGIN = math.sqrt(_CORE_R_MIN**2 - _CORE_FLAT_MAX**2) - (
+    max(_FLAT_PIN_CENTRE_LIMITS) * math.sin(math.radians(max(FLAT_PIN_PLAY_DEG)))
+)
+# Reversal lost motion at the knob, both ways at the widest play.  The paper
+# travel it costs (through 15:150 and the feed pinion on the rack) is RV-04's,
+# whose figures the collar tests derive from paper_drive_geom: importing that
+# chain here would key this part's build on the paper-drive stock modules.
+KNOB_REVERSAL_PLAY_DEG = 2.0 * max(FLAT_PIN_PLAY_DEG)
+
+# --- The native features' marked dimensions --------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"CollarDia", "CollarLength", "PilotDia", "PilotLength"},
-    "BoreProfile": {"BoreDia", "FlatToAxis"},
-    "RearBoreChamfer": {"BoreEntryBreak"},
+    "BoreProfile": {"BoreDia"},
     "PinHoleProfile": {"PinPosDia", "PinPosY", "PinNegY"},
+    "FlatPinProfile": {"FlatPinDia", "FlatPinCentre", "FlatPinFloor"},
+    "RearBreakProfile": {"RearBreak"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BodyProfile": {
@@ -302,13 +441,18 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PilotDia": PILOT_DIA_PLACES,
         "PilotLength": PILOT_LENGTH_PLACES,
     },
-    "BoreProfile": {"BoreDia": BORE_DIA_PLACES, "FlatToAxis": FLAT_PLACES},
-    "RearBoreChamfer": {"BoreEntryBreak": BORE_ENTRY_BREAK_PLACES},
+    "BoreProfile": {"BoreDia": BORE_DIA_PLACES},
     "PinHoleProfile": {
         "PinPosDia": PIN_HOLE_PLACES,
         "PinPosY": PIN_OFFSET_PLACES,
         "PinNegY": PIN_OFFSET_PLACES,
     },
+    "FlatPinProfile": {
+        "FlatPinDia": FLAT_PIN_HOLE_PLACES,
+        "FlatPinCentre": FLAT_PIN_CENTRE_PLACES,
+        "FlatPinFloor": FLAT_PIN_FLOOR_PLACES,
+    },
+    "RearBreakProfile": {"RearBreak": REAR_BREAK_PLACES},
 }
 if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
     DRAWING_DIMENSIONS
@@ -340,7 +484,7 @@ DRIVE_PIN_COLLAR_RIM = OD / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
 DRIVE_PIN_COLLAR_RIM_WORST = floor_inch(
     _OD_R_MIN - PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
 )
-# The smaller D-bore meets the full pilot-wall target.
+# The round bore meets the full pilot-wall target.
 PILOT_WALL = (PILOT_DIA - BORE_DIA) / 2.0
 PILOT_WALL_WORST = floor_inch(
     (PILOT_DIA + min(PILOT_DIA_BAND) - (BORE_DIA + max(BORE_DIA_BAND))) / 2.0
@@ -353,46 +497,27 @@ BORE_PIN_WALL_WORST = (
     - _PIN_HOLE_R_MAX
     - (BORE_DIA + max(BORE_DIA_BAND)) / 2.0
 )
-# The entry is on the BODY rear, not the smaller pilot front. Spend the
-# largest radial leg against both pin holes and the outer body envelope.
-BORE_ENTRY_WALL_MIN = min(BORE_PIN_WALL_WORST, _OD_R_MIN - _BORE_R_MAX)
-BORE_ENTRY_WALL_WORST = BORE_ENTRY_WALL_MIN - BORE_ENTRY_BREAK_LEG_MAX
-# These are the actual opening's flat chord and retained major arc, not a
-# full-circle proxy. The chord decreases with flat offset and increases with
-# bore radius; the major arc increases with both. Their independent worst
-# corners therefore bound every accepted D profile.
-_BORE_R_MIN = (BORE_DIA + min(BORE_DIA_BAND)) / 2.0
-BORE_ENTRY_FLAT_EDGE_MIN = 2.0 * math.sqrt(
-    _BORE_R_MIN**2 - max(FLAT_LIMITS)**2
+# The flat-pin hole on local -Y and the -Y drive-pin hole share a radius
+# line: the web between them at the worst centres and largest holes.  Under
+# the target, over the floor: RV-03 in the registry row, printed as note 2.
+FLAT_PIN_WEB_WORST = floor_inch(
+    PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX - _FLAT_PIN_HOLE_OUTER_R_MAX
 )
-BORE_ENTRY_ARC_EDGE_MIN = 2.0 * _BORE_R_MIN * (
-    math.pi - math.acos(min(FLAT_LIMITS) / _BORE_R_MIN)
-)
-BORE_ENTRY_PROFILE_EDGE_MIN = min(BORE_ENTRY_FLAT_EDGE_MIN, BORE_ENTRY_ARC_EDGE_MIN)
-# Bound even unequal as-made setbacks: a flat at its largest outward break
-# must stay inside the smallest arc envelope even if that arc has no setback
-# at the same axial section. This protects the whole D, not just its mid-arc.
-BORE_ENTRY_PROFILE_DEPTH_MIN = _BORE_R_MIN - max(FLAT_LIMITS)
-# Stop before the nearest axial body/pilot shoulder even though the D bore
-# itself continues through the pilot. Use the shortest actual fitted body.
-BORE_ENTRY_AXIAL_SPAN_MIN = LENGTH_FITTED_MIN
-# Reserve two end legs on the profile/core edges and preserve the wall floor.
-# Actual gear-front bearing area and axis-extrapolation guards remain separate;
-# this is a geometric ceiling, not permission to enlarge the functional break.
-BORE_ENTRY_BREAK_GEOMETRY_MAX = min(
-    BORE_ENTRY_PROFILE_EDGE_MIN / 2.0,
-    BORE_ENTRY_PROFILE_DEPTH_MIN,
-    BORE_ENTRY_AXIAL_SPAN_MIN,
-    BORE_ENTRY_WALL_MIN - WALL_FLOOR,
-    D_DRIVE_WIDTH_MIN / 2.0,
-    CORE_ACTIVE_LENGTH_MIN / 2.0,
+# Flat-pin hole to the body O.D.
+FLAT_PIN_OD_WALL_WORST = _OD_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX
+# The hole lies inside the pilot's footprint; its floor's outer edge meets
+# the pilot shoulder (pilot O.D. on the front face) across the shallowest
+# floor.  The hole breaking into the bore is the intended crest, not a wall.
+_PILOT_R_MIN = (PILOT_DIA + min(PILOT_DIA_BAND)) / 2.0
+FLAT_PIN_SHOULDER_WALL_WORST = math.hypot(
+    _PILOT_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX, min(FLAT_PIN_FLOOR_LIMITS)
 )
 # The holes run through the body beside the pilot, never into it.
 PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
 PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0
 
 # --- Fits ------------------------------------------------------------------------
-# Diametral sliding clearance of the curved portion of the true D interface.
+# Diametral sliding clearance of the round bore on the core.
 BORE_CORE_CLEARANCE = (
     BORE_DIA + min(BORE_DIA_BAND) - (CORE_DIA + max(CORE_DIA_BAND)),
     BORE_DIA + max(BORE_DIA_BAND) - (CORE_DIA + min(CORE_DIA_BAND)),
@@ -464,22 +589,32 @@ for _ok, _what in (
     ),
     (DRIVE_PIN_COLLAR_RIM_WORST > 0.0, "the drive-pin holes break out of the rim"),
     (PILOT_WALL_WORST >= WALL_FLOOR, "pilot wall under the floor"),
-    (min(FLAT_CLEARANCE) > 0.0, "the D-flat binds on the solid core"),
-    (STUD_D_BORE_AIR > 0.0, "the round stud cannot pass the actual D-bore"),
+    (STUD_FLAT_PIN_AIR > 0.0, "the round stud cannot pass the flat pin's crest"),
+    (FLAT_PIN_RETAINED_MARGIN > 0.0, "the bore releases the flat pin"),
+    (FLAT_PIN_BLANK_INSET_MIN >= 0.0, "the flat pin stands out of the supplied body"),
+    (FLAT_PIN_DRILL_TIP_MIN > 0.0, "the flat-pin hole's drill point leaves the body"),
+    (FLAT_PIN_CORE_ENGAGEMENT_MIN > 0.0, "the flat pin misses the shaft's D-core"),
+    (FLAT_PIN_CONTACT_EDGE_MARGIN > 0.0, "the flat pin drives on the flat's edge"),
+    (FLAT_PIN_WEB_WORST >= WALL_FLOOR, "flat-pin hole to drive-pin hole under the floor"),
+    (FLAT_PIN_OD_WALL_WORST >= WALL_TARGET_MM, "flat-pin hole to the O.D. under the target"),
+    (
+        FLAT_PIN_SHOULDER_WALL_WORST >= WALL_TARGET_MM,
+        "flat-pin hole floor to the pilot shoulder under the target",
+    ),
     (FRONT_BEARING_AREA_MIN > 0.0, "the collar rear face has no actual gear support"),
-    (NECK_D_BORE_AIR_MIN > 0.0, "the front neck enters the D-bore flat"),
-    (NECK_TORQUE_FLAT_AIR_MIN > 0.0, "the front neck enters the torqued core-flat plane"),
-    (NECK_CORNER_D_BORE_AIR_MIN > 0.0, "the D entry cannot clear a neck corner"),
+    (ROOT_CORNER_BORE_AIR_MIN > 0.0, "the rear bore mouth does not clear the root corner"),
     (
-        BORE_ENTRY_BREAK_LEG_MIN > BORE_ENTRY_BREAK_REQUIRED_MIN,
-        "the smallest entry leg does not exceed the functional corner envelope",
+        REAR_BREAK_DEPTH_MAX <= FRONT_RELIEF_WIDTH_MIN,
+        "the rear mouth's break shortens the bore's support on the core",
     ),
     (
-        BORE_ENTRY_BREAK_LEG_MAX < BORE_ENTRY_BREAK_GEOMETRY_MAX,
-        "the largest entry leg consumes an adjacent edge, axial span or wall",
+        FLAT_PIN_CREST_CORNER_AIR_MIN > 0.0,
+        "the flat pin's crest rides the shaft's root corner at F",
     ),
-    (BORE_ENTRY_WALL_WORST >= WALL_FLOOR, "rear D entry to pin hole or rim under the floor"),
-    (D_DRIVE_AREA_MIN > 0.0, "the shortened D-core has no usable drive face"),
+    (
+        LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN - BORE_EDGE_BREAK_MAX >= _CORE_FRONT_MAX,
+        "the bore ends short of the core's front",
+    ),
     (BORE_PIN_WALL_WORST >= WALL_FLOOR, "bore to drive-pin hole under the floor"),
     (PIN_HOLE_INNER_R_MIN > PILOT_R_MAX, "the drive-pin holes break into the pilot"),
     (min(BORE_CORE_CLEARANCE) > 0.0, "the bore binds on the plain core"),
@@ -501,37 +636,31 @@ for _ok, _what in (
         raise AssertionError(f"MHA-PD-22: {_what}")
 
 # drawing-guidelines.md rule 4 (name the mate): every tight band names its
-# mate and fit at its own callout; the native bands print the limits.  The
-# D's acute inside corners cannot be sharp; the shaft's broken D-core edges
-# set how large they may be, so the fit states it (r10 review: the title
-# block's R1.0 MAX inside corner would eat the flat).
+# mate and fit at its own callout; the native bands print the limits and the
+# fit's range follows as REF.  The bore's rows: the process and its mate,
+# then its clearance.
 BORE_CALLOUT = (
-    f"TRUE D THRU\nSLIDING FIT ON\n{SHAFT_NUMBER} {SHAFT_NAME}\n"
-    f"D-CORE: {inch_text(inch_floor_mm(BORE_CORE_CLEARANCE[0], 4), 4)}-"
-    f"{inch_text(inch_ceil_mm(BORE_CORE_CLEARANCE[1], 4), 4)}\nCLEARANCE ON DIA.\n"
-    "CORNERS CLEAR D-CORE EDGES"
+    f"REAM THRU, SLIDING FIT\nON {SHAFT_NUMBER} D-CORE\n"
+    f"(CLEARANCE {inch_text(inch_floor_mm(BORE_CORE_CLEARANCE[0], 4), 4)}-"
+    f"{inch_text(inch_ceil_mm(BORE_CORE_CLEARANCE[1], 4), 4)})"
 )
-FLAT_CALLOUT = f"SLIDES ON {SHAFT_NUMBER}\n{SHAFT_NAME} D-FLAT"
-PIN_HOLE_CALLOUT = f"2X REAM THROUGH\nPRESS FIT, DRIVE\nDOWEL {DOWEL_NUMBER}"
-# The dowels must enter the sprocket's drilled holes, which carry the same
-# location band (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL).
-PIN_LOCATION_CALLOUT = f"LOCATES SPROCKET\n{SPROCKET_NUMBER}"
-# Three short lines each: the two blocks stand side by side right of the
-# pilot face, and two-line blocks met (farm run 20261031T205208603Z).
-PILOT_DIA_CALLOUT = f"CLEARS\nSPROCKET\n{SPROCKET_NUMBER} BORE"
-OD_CALLOUT = f"CLEARS #25\nCHAIN ON\n{SPROCKET_NUMBER} T12"
-# The rear D entry clears the shaft's root corner so the rear face seats on
-# F; it is cut on the rear end only, after that face is faced to fit.  The
-# band's MAX has its own job, said on the callout (review of farm run
-# 20261101T111956470Z: an upper limit nothing on the sheet needs): the flat's
-# largest leg stays inside the smallest bore radius, so the entry keeps its
-# D.  Rows stay within the 21 characters that end left of the section's bore
-# edge.
-BORE_ENTRY_BREAK_CALLOUT = (
-    f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g} DEG, BOTH LEGS\nREAR END ARC AND FLAT\n"
-    f"AFTER REAR FACE FIT\nCLEARS {SHAFT_NUMBER} KNOB\nSHAFT ROOT CORNER;\n"
-    "MAX KEEPS D AT ENTRY"
-)
+# The flat pin's press ream.  Its process reads on one line over the size:
+# BLIND, to the floor the .XX station dimension places, which controls.  The
+# size carries the depth as a REF from the section's (nominal fitted) rear
+# face (rule 26: a depth is never left to the view; REF because the rear is
+# faced to fit after reaming).  Under the size, two lines of words (rule 7):
+# its pin, pressed for good so collar and pin are one permanent pair (rule
+# 16), and why its location is tight (rule 4): the crest drives the shaft.
+# An above-callout prints only on one line.
+FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
+FLAT_PIN_HOLE_SUFFIX = f" <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
+FLAT_PIN_HOLE_CALLOUT_ABOVE = "BLIND REAM, PRESS FIT"
+FLAT_PIN_HOLE_CALLOUT = f"PERMANENT PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
+# The rear break prints its leg and angle on one line, then the mate it
+# clears (rule 4) on two short rows under it; the clearance is the spec's
+# assertion (FLAT_PIN_CREST_CORNER_AIR_MIN).
+REAR_BREAK_SUFFIX = f" X {REAR_BREAK_ANGLE_DEG:g}°"
+REAR_BREAK_CALLOUT = f"CLEARS {SHAFT_NUMBER}\nROOT CORNER"
 # The overall, pilot front face to rear face, prints as a .XX reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH
 DRAWING_REFERENCE_PRECISION = 2
@@ -569,7 +698,6 @@ STUD_CUT_PHRASE = (
 # in front of the seat.
 _TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES, unit=SHAFT_UNIT)
 _PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES, unit=SHAFT_UNIT)
-_CORE_FRONT_MAX = CORE_FRONT_FROM_F + printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=SHAFT_UNIT)
 NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO
 
 
@@ -720,12 +848,15 @@ FIT_UP_NOTE = "\n".join(
     )
 )
 
-# The external drive-pin rim shortfall only: owner-ruled permanent minor
+# The external drive-pin rim shortfall, note 1: owner-ruled permanent minor
 # exception RV-01 in cad/config/parts/pd-transgear-drive-collar.yaml (shared
-# #25 sprocket-seat geometry, #2141). The D-bore's fit prints at its own
-# callout (BORE_CALLOUT). The drawing numbers this 1 and appends the two
-# fitted lengths as notes 2 and 3 with their assembly steps
+# #25 sprocket-seat geometry, #2141).  The flat-pin hole to drive-pin hole
+# web, note 2: delegated minor exception RV-03 there (#2409).  The bore's fit
+# prints at its own callout (BORE_CALLOUT).  The drawing appends the two
+# fitted lengths as notes 3 and 4 with their assembly steps
 # (draw_pd_transgear_drive_collar.FIT_NOTES).
 DRAWING_NOTES = (
-    f"1. DRIVE-PIN HOLE TO COLLAR RIM {inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN."
+    f"1. DRIVE-PIN HOLE TO COLLAR RIM {inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
+    f"2. {FLAT_PIN_NUMBER} PIN HOLE TO DRIVE-PIN HOLE "
+    f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN."
 )

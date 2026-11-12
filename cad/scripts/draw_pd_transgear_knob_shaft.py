@@ -227,7 +227,7 @@ NOTE_TEXTS = (
         "TURN TO MEASURED "
         f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
     ),
-    (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN, NO ROCK."),
+    (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN BY HAND."),
     (
         STATIONS_NOTE,
         f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} LOCATE THE "

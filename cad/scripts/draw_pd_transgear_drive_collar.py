@@ -1,9 +1,10 @@
 r"""Create the manufacturing drawing for the transgear drive collar (MHA-PD-22).
 
-The end view shows the actual D opening and the two axial drive holes.
-An axial section through the D-flat shows the controlled rear entry break,
-turned diameters and fitted body/pilot lengths. The saved body dimension
-is REF; its linked assembly step faces the actual rear reaction face on F.
+The end view shows the round bore, the two axial drive holes and the flat
+pin's hole.  An axial section through the flat pin's hole shows that blind
+ream, the turned diameters and the fitted body/pilot lengths.  The saved
+body dimension is REF; its linked assembly step faces the actual rear
+reaction face on F.
 No roughness symbol is added to these clamp faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
 
@@ -19,6 +20,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -52,17 +54,20 @@ from _session import run_build
 import _config
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
-from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_drive_collar_spec import (
     BODY_SUPPLY_NOTE,
-    BORE_CORE_CLEARANCE,
+    BORE_CALLOUT,
     BORE_DIA,
-    BORE_ENTRY_BREAK_ANGLE_DEG,
     DOWEL_NUMBER,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FLAT_CLEARANCE,
+    FLAT_PIN_CENTRE,
+    FLAT_PIN_FLOOR,
+    FLAT_PIN_HOLE_CALLOUT,
+    FLAT_PIN_HOLE_CALLOUT_ABOVE,
+    FLAT_PIN_HOLE_SUFFIX,
     LENGTH,
     OD,
     OVERALL_LENGTH,
@@ -70,8 +75,8 @@ from pd_transgear_drive_collar_spec import (
     PILOT_DIA,
     PILOT_LENGTH,
     PIN_CIRCLE_RADIUS,
-    SHAFT_NAME,
-    SHAFT_NUMBER,
+    REAR_BREAK_CALLOUT,
+    REAR_BREAK_SUFFIX,
     SPROCKET_NUMBER,
 )
 
@@ -90,11 +95,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# 4:1 exposes the 0.200 rear D entry in section and both axial dowel holes.
+# 4:1 exposes the .0615 flat-pin ream in section and both axial dowel holes.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-END_CENTER = (0.100, 0.165)
+# 5 mm left of the sheet's middle-left: the section's flat-pin size block,
+# its 26-character mate row ending at its dimension line by the rear face,
+# needs that room clear of the end view's outline.
+END_CENTER = (0.095, 0.165)
 SIDE_CENTER = (0.235, END_CENTER[1])
 # Right of the section, clear of the outside diameter's mate callout.
 ISO_CENTER = (0.380, END_CENTER[1])
@@ -114,22 +122,16 @@ _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
 # that whole line is clear: the bore's up and right of the end view, above
 # section line A's arrow, its mate lines hanging toward the bore; the
 # dimensioned (+Y) pin hole's up and left of that hole, outside the part.
-# The flat's limits stand right of the view BELOW its witness lines, its mate
-# under them: between them its arrows sit outside the 8.7 mm span and their
-# tails struck both (run 20261010T001620278Z).  The block stands 14 mm in and
-# 7 mm down from where run 20261101T095301211Z put it (x 152..201, top 153.6
-# mm): there its limits sat 2.4 mm under the bore chamfer callout's shelf and
-# read as part of that note.  Now ~138..187 x ~127..147 mm, over SEE NOTE 3
-# (top 122.9) and left of (6.20) (from x 193.2).  Each pin location reads left
-# of the view, its text toward the outer witness so its mate lines stay
-# between the witnesses and clear of the rim. The -Y text's top line stands
-# clear under the axis, where the +Y dimension line starts (run
-# 20261031T205208603Z: that line struck it).
+# Each pin location reads left of the view, its text toward the outer witness
+# so its mate lines stay between the witnesses and clear of the rim. The -Y
+# text's top line stands clear under the axis, where the +Y dimension line
+# starts (run 20261031T205208603Z: that line struck it).  The bore's leader
+# from up and right leaves the bore lower left, clear of the flat pin's hole
+# straight below the axis.
 _BORE_TEXT_HALF = 0.017
 _PIN_TEXT_HALF = 0.022
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.048 + _BORE_TEXT_HALF, END_CENTER[1] + 0.063),
-    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.003, END_CENTER[1] - 0.0285),
     "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.061),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] + PIN_R * 0.65),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35 - 0.006),
@@ -137,23 +139,46 @@ END_KEEP = {
 # SolidWorks put "SECTION A-A / SCALE 4:1" just under the section, where the
 # fitted-length row's dimension line (about 11 mm under the view, under its
 # two-line text) ran through "SECTION" (machinist review of bcdc09b35): the
-# caption, top-centre anchored, now stands 19 mm under the view, clear of
+# caption, top-centre anchored, now stands 25 mm under the view, clear of
 # that line and above the notes block. The two
 # fitted lengths share one row just under the section, each with only a
 # pointer to its sheet note: the pilot's text right of its short span, the
 # body's left of the rear witness, which struck it inside its own span
 # (baseline run 20261031T145011192Z). The overall reference reads above
-# the section. The rear entry break stands left of the rear face at the
-# chamfered bore edge. Its dimension line runs under the callout's last row,
-# 22 mm below the text's top; with the top at the bore edge that line landed
-# 4 mm into the hatched wall under the D-flat (sheet y 152.4 mm against the
-# flat at 156.4, run 20261101T183557651Z review). 8 mm higher it runs in the
-# bore's air between the flat and the axis, and the block's top stays 4 mm
-# under the bore callout's shelf (206.7 mm). Both diameters read right of the
-# pilot face, each mate callout clear of the other.
-_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
-SECTION_CAPTION_XY = (SIDE_CENTER[0], SIDE_CENTER[1] - HALF_OD - 0.019)
+# the section. Both diameters read right of the pilot face, each mate
+# callout clear of the other.
+#
+# The flat pin's ream lies below the axis.  Its floor station reads on its
+# own row between the section and the fitted-length row (both drop 6 mm to
+# make room), its witnesses running down from the seat-face origin and the
+# floor; its text stands outside left of that 9 mm span, between the floor's
+# and the rear face's witnesses (run 20261111T212425353Z: centred in the span
+# it reached the seat-face witness).  Its size reads left of the rear face,
+# its one-line process over the value, its REF depth after the value and two
+# mate rows under it, the whole block ending at its dimension line
+# (SOLIDWORKS sets a vertical dimension's outside text there, run
+# 20261111T234324465Z), clear of the end view; that line stands 2 mm short of
+# where the size's witnesses start, room for the 26-character mate row.  The
+# centre's span crosses the size's, so the centre's dimension line stands in
+# the 4 mm between the rear face and where the size's witnesses start (the ream's
+# sketch runs 1 mm past the face): neither crosses the other's witness (run
+# 20261111T212425353Z: the line struck the size's).  Its text reads outside
+# its span above the axis, under the rear break's witnesses.
+#
+# The rear mouth's break leg reads on one line, its angle as the suffix, up
+# and left of the +Y mouth, its two mate rows under it, the block ending at
+# its dimension line as it rises in air left of the rear face, under the
+# overall reference's row and clear of its rear witness; that line's lower
+# arrow runs down past its span, so it stands 4 mm clear of the centre's
+# text (run 20261111T234324465Z: the arrow touched ".118").
+_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.012
+SECTION_CAPTION_XY = (SIDE_CENTER[0], SIDE_CENTER[1] - HALF_OD - 0.025)
+_FLAT_PIN_Y = SIDE_CENTER[1] - FLAT_PIN_CENTRE * _S / 1000.0
 _BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
+_FLAT_PIN_FLOOR_X = _SEAT_X - FLAT_PIN_FLOOR * _S / 1000.0
+# The ream's sketch line ends 1 mm (build_pd_transgear_drive_collar._OVERRUN)
+# past the rear face, where the size's witnesses start.
+_REAM_RUN_X = _REAR_X - 1.0 * _S / 1000.0
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
     "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
@@ -162,13 +187,14 @@ SIDE_KEEP = {
     # upper extension line and the pilot block's top.
     "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1] + 0.022),
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
-    # Three callout rows now, not six: the text drops the 11 mm the three
-    # removed rows took, so its dimension line keeps running in the bore's air.
-    "BoreEntryBreak": (_REAR_X - 0.031, _BORE_EDGE_Y + 0.0068 - 0.011),
+    "FlatPinFloor": ((_REAR_X + _FLAT_PIN_FLOOR_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.005),
+    "FlatPinCentre": (_REAR_X - 0.0025, SIDE_CENTER[1] + 0.006),
+    "FlatPinDia": (_REAR_X - 0.007, _FLAT_PIN_Y - 0.006),
+    "RearBreak": (_REAR_X - 0.029, _BORE_EDGE_Y + 0.015),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
-# Physical annular end-face picks, outside the actual rear entry relief and
-# inside the pilot. The rear-face bore/chamfer is air, not a length witness.
+# Physical annular end-face picks, inside the pilot and clear of the bore.
+# The rear-face bore edge is air, not a length witness.
 _OVERALL_PICK_Y = SIDE_CENTER[1] + PILOT_DIA * 3.0 * _S / 8000.0
 OVERALL_PICKS = ((_PILOT_X, _OVERALL_PICK_Y), (_REAR_X, _OVERALL_PICK_Y))
 # The pilot is supplied long and faced at assembly, and the body's rear face
@@ -190,35 +216,14 @@ def _numbered(number: int, text: str) -> str:
     )
 
 
-PILOT_NOTE = 2
-BODY_NOTE = 3
-# Rule 4 (one feature with several tight dimensions names its mate once, on
-# one numbered flag note linked to each) and the shop table: the flat's
-# .0006 band is narrower than the milled-step row, so the note names the fit
-# route, the D-bore made to the measured shaft, with both clearances as REF
-# (machinist review, rubric v2: the bore callout carried six lines of words
-# and the private TRUE D / D-CORE).
-D_BORE_NOTE = 4
-
-
-def _clearance(limits: tuple[float, float]) -> str:
-    """A clearance range rounded outward onto the four-place inch grid."""
-    return (
-        f"{inch_text(inch_floor_mm(min(limits), 4), 4)}-"
-        f"{inch_text(inch_ceil_mm(max(limits), 4), 4)}"
-    )
-
-
-D_BORE_FIT = (
-    f"D-BORE Ø AND FLAT: SLIDING FIT ON {SHAFT_NUMBER} {SHAFT_NAME}, MADE TO "
-    f"THE MEASURED SHAFT (CLEARANCE {_clearance(BORE_CORE_CLEARANCE)} ON Ø, "
-    f"{_clearance(FLAT_CLEARANCE)} ON FLAT)."
-)
+# The part's own notes come first (Manufacturing Notes); the drawing's
+# fitted-length notes continue their numbering.
+PILOT_NOTE = len(DRAWING_NOTES.splitlines()) + 1
+BODY_NOTE = PILOT_NOTE + 1
 FIT_NOTES = "\n".join(
     (
         _numbered(PILOT_NOTE, f"{PILOT_SUPPLY_NOTE}, PER {step_ref(FIT_STEP_KEY)}."),
         _numbered(BODY_NOTE, f"{BODY_SUPPLY_NOTE}, PER {step_ref(BODY_FIT_STEP_KEY)}."),
-        _numbered(D_BORE_NOTE, D_BORE_FIT),
     )
 )
 # The #25 chain the O.D. clears, by its drawing number (rule 4).
@@ -226,31 +231,50 @@ CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
 # Rule 7: a callout carries its size and process lines plus at most two lines
 # of words, and a location dimension carries only its value and band.  The
 # dowel pattern names the dowel and the sprocket its pins locate once, on its
-# 2X callout; each mate is named by drawing number (rule 4).  The flat's rows
-# start at its jogged dimension line; two leading spaces stop their ink short
-# of it (review of farm run 20261101T130334243Z: the line struck the S of
-# SLIDES; draw_ch_fulcrum_shaft's trailing-space form).
+# 2X callout; each mate is named by drawing number (rule 4): the bore's
+# sliding fit on the shaft's D-core, the flat pin pressed in its ream for
+# good, the two one permanent pair, and the rear break clearing the shaft's
+# root corner.
 DIMENSION_CALLOUTS_BELOW = {
-    "BoreDia": f"THRU\nSEE NOTE {D_BORE_NOTE}",
-    "FlatToAxis": f"  SEE NOTE {D_BORE_NOTE}",
+    "BoreDia": BORE_CALLOUT,
     "PinPosDia": f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\nPINS LOCATE {SPROCKET_NUMBER}",
     "PilotDia": f"CLEARS BORE\nOF {SPROCKET_NUMBER}",
     "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
-    # The chamfer callout: its form line, then one reason (rule 7), each row
-    # within the 21 characters that end left of the section's bore edge.
-    "BoreEntryBreak": (
-        f"X {BORE_ENTRY_BREAK_ANGLE_DEG:g}°\n"
-        f"CLEARS {SHAFT_NUMBER}\nSHAFT ROOT CORNER"
-    ),
+    "FlatPinDia": FLAT_PIN_HOLE_CALLOUT,
+    "RearBreak": REAR_BREAK_CALLOUT,
 }
+DIMENSION_CALLOUTS_ABOVE = {"FlatPinDia": FLAT_PIN_HOLE_CALLOUT_ABOVE}
+DIMENSION_SUFFIXES = {"RearBreak": REAR_BREAK_SUFFIX, "FlatPinDia": FLAT_PIN_HOLE_SUFFIX}
 
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 # The part's note, then the drawing's two fitted-length notes, in one
 # block; the actual fit procedure is linked to its assembly step.
 NOTES_XY = (0.016, 0.085)
 NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"
+
+
+def _set_dimension_suffixes(
+    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
+) -> None:
+    """Append each named dimension's suffix to its value on the same line
+    (draw_dt_crankshaft's).  ``SetText`` reports nothing, so each suffix is
+    read back."""
+    remaining = dict(suffixes)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        applied = str(display.GetText(2) or "")
+        if applied.replace("\r", "") != text:
+            raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
 
 
 def _section_frame(adapter: Any, view: Any) -> tuple[tuple[float, float], ...]:
@@ -365,7 +389,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Drive Collar Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear drive collar; true D; fitted rear reaction face",
+            3: "transgear drive collar; round bore, pressed flat pin; fitted rear reaction face",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -376,7 +400,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_start=(END_CENTER[0], END_CENTER[1] - HALF_OD - 0.005),
         line_end=(END_CENTER[0], END_CENTER[1] + HALF_OD + 0.005),
         view_xy=SIDE_CENTER, section_label="A", scale=VIEW_SCALE,
-        label="collar axial D-flat section",
+        label="collar axial flat-pin section",
     )
     _orient_section(adapter, side)
     position_section_caption(
@@ -407,6 +431,10 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
+    _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the collar end view")

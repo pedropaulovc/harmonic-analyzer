@@ -29,6 +29,7 @@ recipes:
 | 90114A511 | `sh-vn-brass-fillister-screw` (MHA-SH-VN-51; shared by dt, fr and pd) | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90145A299 | `sh-vn-pivot-pin` (MHA-SH-VN-58, `RodPin` and `BarPin`; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
+| 90145A414 | `pd-vn-transgear-collar-flat-pin` (MHA-PD-VN-70; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -110,6 +111,7 @@ recipes:
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98381A416 | `pd-vn-transgear-hub-key-pin` (MHA-PD-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A417 | `dt-vn-locating-pin` (MHA-DT-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
@@ -1272,6 +1274,28 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
+- [98381A416](https://www.mcmaster.com/98381A416/) (`pd-vn-transgear-hub-key-pin`,
+  MHA-PD-VN-69, quantity one; Main ruling 2026-11-11, #2409) was read live
+  on November 11, 2026 (by DBore2409): alloy steel dowel pin, 1/16 in
+  diameter (+0.0001 to +0.0003 in over nominal), 5/16 in long, end shape
+  "Round x Chamfer", Rockwell C47 minimum, ASME B18.8.2, 750 lbf double
+  shear, $11.09 per package of 50. It is pressed along a chord of the
+  MHA-PD-17 disc hub, .174 below its axis, into a .0615 REAM_H7 hole (about
+  .0006 to .0013 in interference) until it stops on the step to the #56
+  knockout hole; its side lies over the MHA-PD-10 feed sleeve's existing
+  flat and bears across it, keying the hub now that its bore is plain
+  round. `diag_build_98381A416.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate.
+- [90145A414](https://www.mcmaster.com/90145A414/) (`pd-vn-transgear-collar-flat-pin`,
+  MHA-PD-VN-70, quantity one; Main ruling 2026-11-11, #2409) was read live on
+  November 11, 2026: 18-8 stainless steel dowel pin, 1/16 in diameter
+  (0 to +0.0002 in), 3/16 in long, chamfered ends, hardness not rated,
+  standard tolerance rating. It is pressed to the floor of the MHA-PD-22
+  drive collar's blind .0615 ream, its crest forming the drive flat on the
+  MHA-PD-08 knob shaft's D-flat; unhardened, it is faced flush with the
+  collar's rear when that face is faced to fit (cut to length only).
+  `diag_build_90145A414.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate.
 - 93600A189 (MHA-PD-VN-64 until #290) was a passivated 316 ISO 2338-m6
   2 x 6 mm dowel, read live on October 9, 2026. Retired 2026-11-02: the
   metric dowel went to inch (owner ruling 2026-10-30) and its recipe and
