@@ -170,8 +170,10 @@ WEB_WALL_MIN = (
 # The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
 # local X (its length; the height is a different 177.8). The end faces' top
 # edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
-# build_fr_rocker_arm_support.CHAMFER_EDGES): no larger than the seat's own
-# mouth break, it ends above the thread, so the wall holds to the plane.
+# build_fr_rocker_arm_support.CHAMFER_EDGES). The thread's crest starts below
+# its own mouth break, so at the top the wall runs from that crest point to
+# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.77, N 4.37,
+# both over the target (with the .06 leg there the south one was 1.51).
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0

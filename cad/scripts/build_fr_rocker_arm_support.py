@@ -59,14 +59,15 @@ Z = wall thickness):
   (Y=-82.55) at ``(X ±60.325, Z ±17.4498)`` (2.375, .687). One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
   into through-tapped seats in the harmonic base.
-* **RimChamfer** -- .06 / 45° on the 12 inner-frame opening edges, the +X
-  end face's foot and top edges, the two slant faces, the -X end face, and one
-  fillet face, with tangent propagation -- i.e. the whole window rim and all
-  twelve outside edges.
+* **RimChamfer** -- .06 / 45° on the 12 inner-frame opening edges, both end
+  faces' foot edges, the two slant faces and one fillet face, with tangent
+  propagation -- i.e. the whole window rim and ten of the twelve outside
+  edges; the end faces' top edges, under the MHA-CH-08 feet, keep the title
+  block's break so the bracket seats keep their end wall (#1038).
 * **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
   down from the top face on the centreline, under the MHA-CH-08 pivot
-  brackets' hold-down holes, each over a window side edge: the post outboard,
-  the web inboard (``rocker_bracket_seat_layout`` owns their stack; the print
+  brackets' hold-down holes, each wholly in an end post, outboard of the
+  cavity (``rocker_bracket_seat_layout`` owns their stack; the print
   transfers them from the set brackets at assembly).
 * **SeatStationReference** -- a blanked Top-plane sketch of two construction
   lines, each end face to its seat's centre, whose dimensions VIEW B prints as
@@ -517,8 +518,8 @@ SOURCE_CHAMFER = 1.27
 # a 45° chamfer's cross-section, so its removal, goes as the leg squared.
 RIM_CHAMFER_REMOVAL = SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
 # The two end faces' top edges stay off the chamfer (#1038: at the leg the
-# bracket seats' end wall, square to the 45° face, fell under the rule-17
-# floor; rocker_bracket_seat_layout). Each edge spans the top flat (2 x
+# south bracket seat's thread came 1.51 from the chamfer's top edge, under
+# the rule-17 floor; rocker_bracket_seat_layout). Each edge spans the top flat (2 x
 # NARROW) and gives back its leg-squared-over-two prism; the corner mitres
 # with the slant faces' end edges are of order CHAMFER**3, inside the check.
 END_TOP_EDGE_CHAMFER_RELIEF = 2 * (2.0 * NARROW) * CHAMFER**2 / 2.0  # 38.9
@@ -527,8 +528,9 @@ RIM_CHAMFER_VOLUME = (
 )
 # The rocker brackets' two bottoming-tapped seats, down from the top face on
 # the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
-# solid iron for its whole length: the post outboard of the window edge, the
-# web column (wider than the drill) inboard of it.
+# solid iron for its whole length: at 7.56 both lie wholly in the end posts,
+# outboard of the cavity (a seat over the window edge would have the web
+# column, wider than the drill, inboard of it).
 SEAT_POINTS = [[x, HALF_Y, 0.0] for x in SEAT_LOCAL_X]
 # Each seat's placement, in SEAT_POINTS order: sketch x is model X on the +Y
 # top face (harmonic-base's +Y deck seats map the same way) and the seats sit
@@ -1258,10 +1260,11 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
-    # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and every
-    #    outside edge -- the +X end face's foot edge first (it carries the
-    #    size), its top edge, the 12 inner-frame opening edges, plus the
-    #    slant/back-end/fillet faces, tangent-propagated.
+    # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and ten
+    #    of the twelve outside edges -- the +X end face's foot edge first (it
+    #    carries the size), the -X end face's foot edge, the 12 inner-frame
+    #    opening edges, plus the slant/fillet faces, tangent-propagated; the
+    #    end faces' top edges keep the title block's break.
     check(
         "chamfer",
         await adapter.add_chamfer(
@@ -1273,8 +1276,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
     # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
-    #    down from the top face over the window's side edges. Located at their
-    #    nominal stations; the print says TRANSFER FROM MHA-CH-08 AT ASSEMBLY.
+    #    down from the top face into the end posts. Located at their nominal
+    #    stations; the print says TRANSFER FROM MHA-CH-08 AT ASSEMBLY.
     bracket_seats = wizard_holes(
         adapter,
         SEAT_SPEC,

@@ -658,24 +658,39 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert min(seats.END_WALL_MIN) >= WALL_TARGET_MM
 
 
-def _end_wall_square_to_top_edge_break(end_wall: float, leg: float) -> float:
-    """The bracket seat's thread to the end face's top-edge break, square to
-    its 45° face: the thread starts below its own mouth break, so a top-edge
-    leg no larger than that keeps the full end wall; a larger leg leaves the
-    run left on the top face plus the mouth's depth, over root 2."""
+def _point_to_segment(point, start, end) -> float:
+    (px, py), (ax, ay), (bx, by) = point, start, end
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _end_wall_past_top_edge_break(end_wall: float, leg: float) -> float:
+    """The bracket seat's thread to the end face, with that face's top edge
+    broken at a 45° leg. In the end-face section (x in from the end face, y
+    down from the top) the thread's crest runs down x = end_wall from its
+    mouth break; the iron's boundary is the bounded break face (leg, 0) to
+    (0, leg), then the end face below it. Both are convex and apart, so the
+    nearest pair includes the crest's top point or a face endpoint."""
     mouth = seats.EDGE_BREAK
-    if leg <= mouth:
-        return end_wall
-    return min(end_wall, (end_wall - leg + mouth) / math.sqrt(2.0))
+    crest = (end_wall, mouth)
+    break_face = ((leg, 0.0), (0.0, leg))
+    to_corner_below = end_wall if leg >= mouth else math.hypot(end_wall, mouth - leg)
+    return min(
+        end_wall,  # the end face below the break
+        _point_to_segment(crest, *break_face),
+        math.hypot(end_wall - leg, mouth),  # the break's top edge
+        to_corner_below,
+    )
 
 
 def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall() -> (
     None
 ):
     """#1038 review: the .06 leg on an end face's top edge left the bracket
-    seat's thread about 1.2 mm, square to the 45° face, from it at the worst
-    case (under the .060 floor). Neither top edge is chamfered, so the edge
-    keeps the title block's break and the seats keep their end walls."""
+    seat's thread about 1.51 mm from the break's top edge at the worst case
+    (under the .060 floor). Neither top edge is chamfered, so the edge keeps
+    the title block's break and the seats keep 2.77 (S) and 4.37 (N)."""
     from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
     from _printed_tolerance import edge_break_chamfer_mm
 
@@ -684,10 +699,13 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
         assert [sign * half, support.HALF_Y, 0.0] not in support.CHAMFER_EDGES
         assert [sign * half, 0.0, 0.0] not in support.CHAMFER_FACES
     title_break = edge_break_chamfer_mm(unit=placement.UNIT)
-    for wall in seats.END_WALL_MIN:
-        assert _end_wall_square_to_top_edge_break(wall, title_break) >= WALL_TARGET_MM
+    walls = [_end_wall_past_top_edge_break(w, title_break) for w in seats.END_WALL_MIN]
+    assert walls == pytest.approx([2.768, 4.372], abs=0.001)
+    assert min(walls) >= WALL_TARGET_MM
     south = min(seats.END_WALL_MIN)
-    assert _end_wall_square_to_top_edge_break(south, support.CHAMFER) < WALL_FLOOR_MM
+    chamfered = _end_wall_past_top_edge_break(south, support.CHAMFER)
+    assert chamfered == pytest.approx(1.508, abs=0.001)
+    assert chamfered < WALL_FLOOR_MM
 
 
 
