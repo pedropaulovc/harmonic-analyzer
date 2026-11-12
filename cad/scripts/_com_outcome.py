@@ -37,6 +37,7 @@ import json
 import math
 import re
 import struct
+import sys
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
@@ -639,15 +640,28 @@ def _answers_signal(
 def _answer_close(a: Any, b: Any) -> bool:
     """Two answers (handles erased) equal but for float noise: the same
     structure and normalised strings, every float within
-    :data:`_ANSWER_ULPS` ulps of the largest finite |float| of either."""
+    :data:`_ANSWER_ULPS` ulps of the largest finite |float| of either, a
+    subnormal one compared as 0.0 (:func:`_measured`)."""
     left: list[float] = []
     right: list[float] = []
     if not _same_shape(a, b, left, right):
         return False
+    left, right = [_measured(x) for x in left], [_measured(y) for y in right]
     tolerance = _ANSWER_ULPS * math.ulp(_scale(iter([*left, *right])))
     return all(
         x == y or abs(x - y) <= tolerance for x, y in zip(left, right, strict=True)
     )
+
+
+def _measured(x: float) -> float:
+    """``x``, or 0.0 for a subnormal: below the smallest normal double
+    (``sys.float_info.min``, 2.2e-308) a float is no measurement. SolidWorks
+    packs integers into doubles (``IEdge.GetCurveParams2``'s curve type, tag
+    and sense), and some answers are memory read as doubles: on 2026-11-12
+    ``ISurface.CylinderParams`` of pn_vn_pen_set_screw's faces that are no
+    cylinder answered the high half of a module address, 0x00007FF9 on one
+    worker and 0x00007FFF on another; nothing else in them differed."""
+    return 0.0 if abs(x) < sys.float_info.min else x
 
 
 def _erased(value: Any) -> Any:

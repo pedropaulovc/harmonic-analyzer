@@ -1286,6 +1286,46 @@ def test_answers_to_one_request_within_float_noise_are_one_answer():
     )
 
 
+def _cylinder(*values: str) -> conv.Call:
+    """``ISurface.CylinderParams`` answering ``values`` (float hex)."""
+    return conv.Call(
+        0,
+        315,
+        "InvokeTypes",
+        [2, 0, 2, {"t": [12, 0]}, {"t": []}],
+        "ISurface.CylinderParams",
+        result={"t": [{"f": value} for value in values]},
+    )
+
+
+def test_subnormal_answers_are_no_measurement():
+    # pn_vn_pen_set_screw (2026-11-12): CylinderParams of a face that is no
+    # cylinder, on two workers. Only the high half of a module address in
+    # the first double differs: 6.95e-310 against 6.95e-310, 2.6e10 ulps.
+    zero, junk = (0.0).hex(), "0x0.0000043e97a1cp-1022"
+    base = ("0x0.07ff900000002p-1022", *[zero] * 5, junk)
+    new = ("0x0.07fff00000002p-1022", *[zero] * 5, junk)
+    radius = (0.0037729).hex()
+    real = (zero, (0.00635).hex(), zero, zero, (-1.0).hex(), zero, radius)
+    assert _answers(
+        [_cylinder(*base), _cylinder(*real)], [_cylinder(*new), _cylinder(*real)]
+    ) == (
+        "same",
+        {
+            "ISurface.CylinderParams": "1 answers within 33554432 ulps of the other build's"
+        },
+    )
+    # A normal float that differs in the same answer still differs.
+    axis = (*new[:4], (-1.0).hex(), *new[5:])
+    flipped = (*base[:4], (1.0).hex(), *base[5:])
+    assert _answers([_cylinder(*axis)], [_cylinder(*flipped)])[0] == "different"
+    # An answer of zeros is not one with a normal float where it has zero.
+    zeros = (zero,) * 7
+    assert _answers([_cylinder(*zeros)], [_cylinder(*zeros[:6], radius)])[0] == (
+        "different"
+    )
+
+
 def test_answers_pairing_works_only_on_the_answers_that_differ(monkeypatch):
     # One request (a face's area) answered 50,000 times, faces listed in
     # another order, five answers moved by float noise beyond REL_TOL: the
