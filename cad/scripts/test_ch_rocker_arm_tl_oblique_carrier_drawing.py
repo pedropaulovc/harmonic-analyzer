@@ -353,11 +353,12 @@ def test_table_states_each_size_group_once() -> None:
     assert groups[("A1", "B1", "A2", "B2")] == [
         "<MOD-DIAM>.3760-.3765", "4X REAM THRU", "RUNNING FIT ON TL-VN-77", "SEE NOTES 1, 2",
     ]
-    assert groups[("CL", "CR")] == [
-        "2X <MOD-DIAM>.136 THRU", "8-32 UNC THRU", "CLAMPS MHA-CH-13", "SEE NOTE 2",
+    # CL/CR bench-drilled (2X, as sheet 1); the HUB, the same tap in the same
+    # native run, made at assembly (TL-00 step 10, sheet 3).
+    assert groups[("CL", "CR", "HUB")] == [
+        "CL, CR: 2X <MOD-DIAM>.136 THRU", "8-32 UNC THRU", "HUB: 8-32 AT ASSEMBLY",
+        "CLAMPS MHA-CH-13", "SEE NOTE 2",
     ]
-    # Drilled and tapped at assembly (TL-00 step 10), so its own row, as sheet 3.
-    assert groups[("HUB",)] == ["8-32 UNC AT ASSEMBLY", "CLAMPS MHA-CH-13 HUB"]
     assert groups[("R1", "R2", "R3", "R4")] == [
         "4X <MOD-DIAM>.089 THRU", "4-40 UNC THRU", "HOLDS TL-24", "SEE NOTE 2",
     ]
@@ -391,7 +392,7 @@ def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
     with sheet 3's parenthesized references from A1."""
     assert "HUB" in carrier_table.TABLED_HOLES and "HUB" in carrier_table.TAG_OFFSETS
     assert "HUB" not in carrier_table.A1_RELATED
-    assert dict(carrier_table.NOTE_GROUPS)[("HUB",)].startswith("8-32 UNC AT ASSEMBLY\n")
+    assert "HUB: 8-32 AT ASSEMBLY" in dict(carrier_table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert carrier_table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert not hasattr(carrier_table, "IN_SITU_HOLES")
     hub_x, hub_y = carrier_table.table_location("HUB")

@@ -42,7 +42,7 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert not hasattr(drawing, "SECTION_NOTE")
     assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert sorted(tag for tags, _note in table.NOTE_GROUPS for tag in tags) == sorted(TABLED)
-    assert "AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("HUB",)]
+    assert "HUB: 8-32 AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.STATION_BAND == pytest.approx(.0005 * I)
@@ -165,9 +165,11 @@ def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
             spec.correlated_pin_budget(band, row)
 
 
-# Production sorts the table by TAG (TAG_ORDER), so each group is one run.
-# The fake keeps TABLED's order within contiguous groups, so A1 stays row 1
-# and B1 row 2 for the row-indexed tests below.
+# The native table orders its rows by size group, each group's holes in
+# selection order (carrier render, proof 20261112T074730410Z: A2 A1 B1 B2 |
+# CL HUB CR | R3 R1 R2 R4 | L2 L1; an ascending TAG sort left it so, farm
+# 20261112T132107016Z). The fake keeps TABLED's order within each group, so
+# A1 stays row 1 and B1 row 2.
 _GROUP_OF = {tag: index for index, (tags, _note) in enumerate(table.NOTE_GROUPS) for tag in tags}
 NATIVE_ORDER = sorted(TABLED, key=_GROUP_OF.__getitem__)
 
@@ -237,16 +239,21 @@ def test_size_groups_are_one_merged_note_each_with_their_count_and_flags():
     assert notes[("A1", "B1", "A2", "B2")] == (
         "<MOD-DIAM>.3760-.3765\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
     )
-    assert notes[("CL", "CR")] == "2X <MOD-DIAM>.136 THRU\n8-32 UNC THRU\nCLAMPS MHA-CH-13\nSEE NOTE 2"
-    # The HUB is made at assembly, never in the bench-drilled CL/CR group
-    # (farm review 20261112T131117993Z).
-    assert notes[("HUB",)] == "8-32 UNC AT ASSEMBLY\nCLAMPS MHA-CH-13 HUB"
+    # CL/CR are bench-drilled (2X, as sheet 1); the HUB, the same #8-32 tap
+    # in the same native run, is made at assembly and says so on its own
+    # line (farm review 20261112T131117993Z read '3X ... HUB AT ASSEMBLY'
+    # as all three made at assembly).
+    assert notes[("CL", "CR", "HUB")] == (
+        "CL, CR: 2X <MOD-DIAM>.136 THRU\n8-32 UNC THRU\nHUB: 8-32 AT ASSEMBLY\n"
+        "CLAMPS MHA-CH-13\nSEE NOTE 2"
+    )
     assert notes[("R1", "R2", "R3", "R4")] == (
         "4X <MOD-DIAM>.089 THRU\n4-40 UNC THRU\nHOLDS TL-24\nSEE NOTE 2"
     )
     assert notes[("L1", "L2")] == "2X <MOD-DIAM>.257 THRU\n5/16-18 UNC THRU\nHOLDS TL-26"
+    assert "3X" not in notes[("CL", "CR", "HUB")]
     for tags, note in table.NOTE_GROUPS:
-        assert len(tags) == 1 or note.count(f"{len(tags)}X ") == 1, tags
+        assert note.count(f"{len(tags) - ('HUB' in tags)}X ") == 1, tags
         lines = note.splitlines()
         assert len(lines) <= table.NOTE_LINES_PER_ROW * len(tags), tags
         assert max(len(line.replace("<MOD-DIAM>", "D")) for line in lines) <= table.NOTE_MAX_GLYPHS
@@ -254,25 +261,17 @@ def test_size_groups_are_one_merged_note_each_with_their_count_and_flags():
     assert spec.OUTER_Y_NOTE.startswith("A2, B2: ")
     assert table.A1_RELATION_NOTE.startswith(", ".join(("B1", "A2", "B2", "CL", "CR")))
     assert table.PIN_MATE in drawing.PIN_FIT_CALLOUT.splitlines()
-    # Every group is one run in TAG order, and the sort is what makes CL, CR
-    # (with HUB after them) contiguous: the native size order was CL HUB CR.
-    assert table.TAG_ORDER == tuple(sorted(TABLED))
-    for tags, _note in table.NOTE_GROUPS:
-        indices = sorted(map(table.TAG_ORDER.index, tags))
-        assert indices == list(range(indices[0], indices[0] + len(tags))), tags
+    # A merged run must be the group's own contiguous rows.
     native = NativeCells()
     rows = table._rows(native)
     assert [(top, bottom) for top, bottom, _tags, _note in table._group_spans(rows)] == [
-        (1, 4), (5, 6), (7, 7), (8, 11), (12, 13)
+        (1, 4), (5, 7), (8, 11), (12, 13)
     ]
     split = dict(rows)
-    split["CR"], split["R1"] = rows["R1"], rows["CR"]
-    with pytest.raises(RuntimeError, match=r"size group \('CL', 'CR'\) is not one run"):
+    split["HUB"], split["R1"] = rows["R1"], rows["HUB"]
+    with pytest.raises(RuntimeError, match=r"size group \('CL', 'CR', 'HUB'\) is not one run"):
         table._group_spans(split)
-    source = inspect.getsource(table.create_carrier_hole_table)
-    assert (source.index('label="carrier owner tags"')
-            < source.index('_early_bound(table, "IHoleTableAnnotation").Sort(0, True)')
-            < source.index('label="carrier TAG sort"') < source.index("rows = _rows(table)"))
+    assert "Sort(" not in inspect.getsource(table.create_carrier_hole_table)
 
 
 def _row_of(native: NativeCells, tag: str) -> int:
@@ -561,9 +560,8 @@ def test_hole_table_native_calls_are_declared_on_their_bound_interfaces():
         # The hidden SIZE column: indexed BOOL get/put and row visibility.
         ("ITableAnnotation", "ColumnHidden"), ("ITableAnnotation", "SetColumnHidden"),
         ("ITableAnnotation", "RowHidden"),
-        # #2649: the size groups' merged NOTE cells and the TAG sort.
+        # #2649: the size groups' merged NOTE cells.
         ("ITableAnnotation", "MergeCells"), ("ITableAnnotation", "IsCellMerged"),
-        ("IHoleTableAnnotation", "Sort"),
     ):
         assert member in _native_declaration(interface)[0], f"{interface}.{member}"
     for interface, member in (
@@ -841,7 +839,7 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     for mutate, match in (
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".38", ".39")), r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".46", ".47")), r"changed now: A1 \(row 1\)"),
-        (lambda cells: cells[1].__setitem__(4, dict(table.NOTE_GROUPS)[("CL", "CR")]),
+        (lambda cells: cells[1].__setitem__(4, dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]),
          r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from the corner"),
         (lambda cells: cells[2].__setitem__(0, "A1"), "extra/duplicate"),
@@ -1145,7 +1143,7 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     # is drilled and tapped at assembly, TL-00 step 10; ORIGIN_NOTE says so).
     expected = {(tag, axis) for tag in TABLED if tag != "HUB" for axis in (0, 1)}
     assert "HUB X/Y REF" in table.ORIGIN_NOTE
-    assert "AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("HUB",)]
+    assert "HUB: 8-32 AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
     assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
@@ -1179,7 +1177,7 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     flagged = {tags: note.splitlines()[-1] for tags, note in table.NOTE_GROUPS if "NOTE" in note}
     assert flagged == {
         ("A1", "B1", "A2", "B2"): "SEE NOTES 1, 2",
-        ("CL", "CR"): "SEE NOTE 2",
+        ("CL", "CR", "HUB"): "SEE NOTE 2",
         ("R1", "R2", "R3", "R4"): "SEE NOTE 2",
     }
 
@@ -1234,7 +1232,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
     visible_widths = [width for column, width in enumerate(table.TABLE_WIDTHS) if column != table.SIZE_COLUMN]
     native = SimpleNamespace(
         HoleTable=feature, TotalRowCount=len(TABLED) + 1, TotalColumnCount=5,
-        InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True, Sort=lambda *_: True,
+        InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
         IsCellTextEditable=lambda *_: True,
         MergeCells=lambda *_: True, IsCellMerged=lambda *_: (True, 0, 0), ColumnHidden=lambda _col: False,
         SetText2=lambda row, _col, _hidden, text: notes.__setitem__(row, text),
