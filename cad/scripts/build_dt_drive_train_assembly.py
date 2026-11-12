@@ -1025,10 +1025,6 @@ from dt_cone_swing_platform_crank_axis import (  # noqa: E402
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
 )
 from dt_cone_swing_platform_geometry import (  # noqa: E402
-    EAST_HALF_S as PLAT_EAST_S,
-    HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
-    # the lock-slot side keeps its full seat; feeds the stop-screw/containment
-    # east-edge math)
     WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (the trim;
     # feeds ONLY the west-edge sweep. Aliasing it into the east math shifted
     # the derived stop point -- Codex catch, 2026-07-05)
@@ -1500,15 +1496,20 @@ def _plat_side_half_widths(s: float) -> dict[str, float]:
     (west) and -x (east) sides, keyed by the sign a rider placed with the
     plate's ROT_Y_INCLINE shares; both negative if s is off the plate, so a
     rider run past either end fails its containment check instead of reading
-    extrapolated edges."""
+    extrapolated edges.  The edges are PLAT_OUTLINE's sloped sides crossing
+    the station, so the south-east chamfer (#2600) bounds the east side
+    where it runs (#2611)."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
-    if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
+    crossings = [
+        ax + (bx - ax) * (z_local - az) / (bz - az)
+        for (_a, ax, az), (_b, bx, bz) in zip(
+            PLAT_OUTLINE, PLAT_OUTLINE[1:] + PLAT_OUTLINE[:1], strict=True
+        )
+        if az != bz and min(az, bz) - 1e-9 <= z_local <= max(az, bz) + 1e-9
+    ]
+    if not crossings:
         return {"+X": -1.0, "-X": -1.0}
-    frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
-    return {
-        "+X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
-        "-X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
-    }
+    return {"+X": max(crossings), "-X": -min(crossings)}
 
 
 def _plat_half_width(s: float) -> float:
@@ -1520,18 +1521,52 @@ def _plat_half_width(s: float) -> float:
     return min(_plat_side_half_widths(s).values())
 
 
+def _plat_round_foot_containment_mm(station: float, radius: float) -> float:
+    """Least plate left outside a round foot of ``radius`` centred on the
+    shaft plan line (local x 0) at cone station ``station``: the smallest
+    signed normal distance from its centre to PLAT_OUTLINE's edges, less the
+    radius (negative once the foot crosses an edge).  The convex outline's
+    sharp vertices bound the plate (its corner rounds lie inside)."""
+    centre = (0.0, station - PIVOT_STATION)
+    vertices = [(x, z) for _label, x, z in PLAT_OUTLINE]
+    inside = (
+        sum(x for x, _z in vertices) / len(vertices),
+        sum(z for _x, z in vertices) / len(vertices),
+    )
+
+    def _signed(point: tuple[float, float], a, b) -> float:
+        (px, pz), (ax, az), (bx, bz) = point, a, b
+        return ((bx - ax) * (pz - az) - (bz - az) * (px - ax)) / math.hypot(
+            bx - ax, bz - az
+        )
+
+    return (
+        min(
+            _signed(centre, a, b) * math.copysign(1.0, _signed(inside, a, b))
+            for a, b in zip(vertices, vertices[1:] + vertices[:1], strict=True)
+        )
+        - radius
+    )
+
+
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
-# frame: both are centred on the shaft-axis plan line, so only the along-axis
-# span and the half-width at each end matter), each face at least
+# frame: both are centred on the shaft-axis plan line), each face at least
 # PLATFORM_CONTAINMENT_FLOOR_MM inside the plate's edge.
 PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
-# Each rider's foot: label -> (south station, north station, half-width).
+# The pivot post's foot is round: held as the circle it is against every
+# outline edge, the south-east chamfer included (#2611), not as a square
+# span of its radius (which the chamfered corner cannot hold).
+POST_PLATFORM_CONTAINMENT_MM = _plat_round_foot_containment_mm(
+    POST_STATION, POST_BLOCK_DIA / 2.0
+)
+if POST_PLATFORM_CONTAINMENT_MM < PLATFORM_CONTAINMENT_FLOOR_MM:
+    raise AssertionError(
+        f"pivot post overhangs the swing platform: {POST_PLATFORM_CONTAINMENT_MM:.3f}"
+        f" mm inside its outline"
+    )
+# Each rectangular rider's foot: label -> (south station, north station,
+# half-width); the plate's edges are straight between its end stations.
 PLATFORM_RIDER_SPANS: dict[str, tuple[float, float, float]] = {
-    "pivot post": (
-        POST_STATION - POST_BLOCK_DIA / 2.0,
-        POST_STATION + POST_BLOCK_DIA / 2.0,
-        POST_BLOCK_DIA / 2.0,
-    ),
     # The straight prism's foot is its full plan section.
     "tip block": (
         TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0,
@@ -3591,23 +3626,28 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # 20261111T190620364Z-755e192b28244d509c72ba587ea5469a (ce59dcd6d, #2360:
 # the Ø.28 relief between MHA-DT-22's two bond lands, -644 mm^3 of steel):
 # the moments fell 1.36% parked and 1.34% engaged.
+# Re-measured 2026-11-12 from farm run
+# 20261112T080234615Z-d39dff5dc53e46e598c5fa2368310a64 (5cf67631b4, #1038
+# point A: the .300 in channel grid's 153.924 drum, the 236.83 arbor and the
+# 7.71 pivot shaft): weight volume +2676 mm^3, mass +22.1 g (+4.8%), the
+# moments rose 5.33% parked and 5.27% engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.221824088117998, 24.200417624544546)
-SWING_GRAVITY_CORNER_NMM = (14.50541516755855, 24.677190469261063)
+SWING_GRAVITY_NMM = (14.980239335725214, 25.47546406056267)
+SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24318.026182668003, 8500.0),
-    "dt-pinion-arbor": (1, 12929.48190210243, 7800.0),
-    "dt-pinion-pivot-shaft": (1, 5881.487907488445, 7800.0),
+    "dt-alignment-pinion": (1, 26128.94294339178, 8500.0),
+    "dt-pinion-arbor": (1, 13457.368170365333, 7800.0),
+    "dt-pinion-pivot-shaft": (1, 6219.3351191767015, 7800.0),
     "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 462.3770979697974
+SWING_GRAVITY_MASS_G = 484.52261157956855
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -3615,7 +3655,7 @@ SWING_GRAVITY_FINGERPRINT = {
         "TEETH": 32,
         "DIAMETRAL_PITCH": 48.0,
         "PRESSURE_ANGLE_DEG": 20.0,
-        "FACE_WIDTH": 143.256,
+        "FACE_WIDTH": 153.924,
         "BORE_DIA": 7.9375,
         "CUTTER_REFERENCE_TEETH": 26,
         "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,

@@ -73,6 +73,48 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
         )
 
 
+def test_plate_edges_come_from_the_platform_outline() -> None:
+    """#2611: the assembly reads the plate's edges from PLATE_OUTLINE, so in
+    the band the south-east chamfer runs, the east edge is the chamfer line,
+    not the straight east taper continued to the south edge."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_geometry as geometry
+
+    south_x, south_z = geometry.SE_CHAMFER_SOUTH_XZ
+    east_x, east_z = geometry.SE_CHAMFER_EAST_XZ
+    z_local = (south_z + east_z) / 2.0
+    station = bdt.PIVOT_STATION + z_local
+    chamfer_x = south_x + (east_x - south_x) * (z_local - south_z) / (east_z - south_z)
+    taper_east = geometry.HALF_WIDTH_N + (
+        geometry.EAST_HALF_S - geometry.HALF_WIDTH_N
+    ) * (geometry.NORTH_OVERHANG - z_local) / geometry.PLATE_LEN
+    assert bdt._plat_side_half_widths(station)["-X"] == pytest.approx(-chamfer_x)
+    assert -chamfer_x < taper_east - 1.0
+    # North of the chamfer the east edge is still the taper.
+    north = bdt.PIVOT_STATION + geometry.NORTH_OVERHANG - 1.0
+    assert bdt._plat_side_half_widths(north)["-X"] == pytest.approx(
+        geometry.HALF_WIDTH_N
+        + (geometry.EAST_HALF_S - geometry.HALF_WIDTH_N) / geometry.PLATE_LEN
+    )
+
+
+def test_pivot_post_is_held_on_the_plate_as_a_circle() -> None:
+    """#2611: the post's round foot is checked as a circle against every
+    outline edge, the chamfer included, and agrees with the platform part's
+    own POST_FOOT_CONTAINMENT; a foot one margin wider fails."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_checks as checks
+
+    assert "pivot post" not in bdt.PLATFORM_RIDER_SPANS
+    radius = bdt.POST_BLOCK_DIA / 2.0
+    assert bdt.POST_PLATFORM_CONTAINMENT_MM == pytest.approx(
+        checks.POST_FOOT_CONTAINMENT
+    )
+    assert bdt.POST_PLATFORM_CONTAINMENT_MM >= bdt.PLATFORM_CONTAINMENT_FLOOR_MM
+    grown = radius + bdt.POST_PLATFORM_CONTAINMENT_MM + 0.01
+    assert bdt._plat_round_foot_containment_mm(bdt.POST_STATION, grown) < 0.0
+
+
 def test_block_width_one_sided_band_holds_containment() -> None:
     """The width's band may only bring the +X face in (machinist review of
     83e3370f9, rules 4 and 19): its upper limit, the nominal, keeps the

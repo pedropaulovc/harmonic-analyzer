@@ -453,14 +453,20 @@ SHEET_SCALES = package_sheet_scales(CLUSTER_SCALES)
 # model origin (ASME third angle: top above front, right to the right of it).
 # At 1:3 main's group read 209.2 x 190.7 mm with a 14 mm gap (drawing.projected_group);
 # the inch train grew it to 213.0 x 194.9 (0d454fa91), 0.9 mm past the 194 mm
-# region. A 12 mm gap still holds each caption (4 mm under its view, one
-# ~3.5 mm line) ~4.5 mm clear of the view below and fits with 1.1 mm to spare.
+# region. A 12 mm gap held each caption (4 mm under its view, one ~3.5 mm
+# line) ~4.5 mm clear of the view below and fit with 1.1 mm to spare. The
+# #1038 re-pitch to the .300 in grid lengthens the cone set, the bank and the
+# platform ~11 mm along the axis, ~3.7 mm more top view at 1:3: point A
+# (leaf 20261112T093538Z-1-b9cd03cc) failed "passes the top of its region".
+# A 10 mm gap keeps each caption ~2.5 mm clear of the view outline below
+# (the outlines stand ~5 mm off their geometry), and the region top rises
+# 2 mm to 2.5 mm under the zone border (0.2665).
 # The 175 mm the first region allowed failed on the farm (leaf
 # 20260923T045245Z-1-b34a8422). The origin sits just above the title block
-# (top y=0.0655) and the region top 4.5 mm under the zone border.
+# (top y=0.0655).
 PROJECTED_GROUP_ORIGIN = (0.024, 0.068)
-PROJECTED_GAP = 0.012
-PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
+PROJECTED_GAP = 0.010
+PROJECTED_REGION = (0.018, 0.068, 0.300, 0.264)
 # The right half between the four-line heading (bottom ~0.245) and the title block
 # (top 0.0655): a 1:3 isometric outline is ~130 mm, 1.5x baseline-5's 1:4.
 # Lowered 16 mm (rubric sample round 3) to give the general notes the
@@ -1097,14 +1103,41 @@ FEELER_STACK_ROWS = _feeler_stack_rows()
 
 # Check 4 re-reads the pedestals after the cone swing's shims: each recorded
 # DRO value plus its indicator reading must stay in its setting-table range.
+# Its REMEDY column is check 4J's remedy (Repitch1038 ruling, #1038 re-pitch,
+# on machinist review of the point A sheet: 4J named no part).  One end's
+# bind point is that end's gear pair plus its pedestal's bore height (a
+# common-mode cone-axis error would move both ends); Y is never adjusted in
+# 4E, so a Y out means the pedestal crept and is re-located.
 PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
 PEDESTAL_RECHECK_HEADER = (
-    "PEDESTAL, AXIS", "RECORDED AT", "RECORDED VALUE", "INDICATOR READING", "SUM", "ACCEPT"
+    "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
+)
+_RELOCATE_REFS = (
+    f"{_step_ref('cylinder-stack-accepted', 'X')}-"
+    f"{_step_ref('cylinder-stack-accepted', 'Z')}"
 )
 PEDESTAL_RECHECK_ROWS = (
-    ("FRONT MHA-DT-02, X", _step_ref("cylinder-stack-accepted", "Z"), "", "", "", BANK_X_LIMITS),
-    ("BACK MHA-DT-02, X", _step_ref("cylinder-bank-located", "Q"), "", "", "", BANK_X_LIMITS),
-    ("FRONT MHA-DT-02, Y", _step_ref("cylinder-stack-accepted", "Z"), "", "", "", FRONT_STRAP_Y_WINDOW),
+    (
+        "FRONT MHA-DT-02, X",
+        _step_ref("cylinder-stack-accepted", "Z"),
+        "", "", "",
+        BANK_X_LIMITS,
+        "MIKE GEAR 0 + T120 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+    ),
+    (
+        "BACK MHA-DT-02, X",
+        _step_ref("cylinder-bank-located", "Q"),
+        "", "", "",
+        BANK_X_LIMITS,
+        "MIKE GEAR 19 + MHA-DT-37 TIPS, THEN BORE HEIGHT; REMAKE ONE OUT",
+    ),
+    (
+        "FRONT MHA-DT-02, Y",
+        _step_ref("cylinder-stack-accepted", "Z"),
+        "", "", "",
+        FRONT_STRAP_Y_WINDOW,
+        f"IT CREPT: RE-LOCATE IT AS STEPS {_RELOCATE_REFS}",
+    ),
 )
 
 # Step 7's bond and release agents, named so the fitter buys the right ones.
@@ -1892,17 +1925,23 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # working position: punch, lift off, spot-drill, drill and tap.  That
         # position is found by feel, where the gears mesh without binding
         # (owner direction 2026-11-11, #2365, superseding the check 4D
-        # leaves).  The swing check (23J) is the only acceptance, and
+        # leaves).  The swing check (23K) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
         # Check 4 then sets the swing and clamps it.  PR 2 machinist review
         # round 6 (clarity): a seated screw's engagement cannot be read, so
         # each blind seat's full-thread depth and its screw's thread length
         # are recorded before the screw goes in; checks 4W and 4Y take the
-        # lesser of the two.
+        # lesser of the two.  The transfer pose is check 4's feel set (4M-4N:
+        # in to the first bind, eased out until the gears turn freely), so
+        # the permanent pivot is punched where check 4 will set the swing
+        # (Repitch1038 ruling, #1038 re-pitch, on machinist review of point A:
+        # "WHERE NO GEAR BINDS" gave no pose and no check).
         (
             "other-base-mounting",
-            "CONE SET ON THE BASE: SET MHA-DT-20 WHERE NO GEAR BINDS.\n"
+            "CONE SET ON THE BASE: SWING MHA-DT-20 IN UNTIL A GEAR JUST BINDS.\n"
+            f"EASE OUT UNTIL THE GEARS TURN FREELY THROUGH {CONE_TURN_CRANK_TURNS} "
+            "CRANK TURNS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
@@ -1993,13 +2032,14 @@ CHECKS = _note_text(
         "4E. TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. TIGHTEN MHA-DT-VN-62.",
         "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
-        f"{SETTING_SHEET}): EACH RECORDED VALUE PLUS ITS INDICATOR READING MUST BE IN "
+        f"{SETTING_SHEET}): EACH DRO VALUE PLUS ITS INDICATOR READING MUST BE IN "
         "ITS ACCEPT RANGE.",
         # A pedestal outside its range after 4E means a part is out of print:
         # resetting it by indicator would take that end off its binds, so
-        # the part is corrected and the alignment redone (Codjiflo r2, #2557).
+        # the part is corrected and the alignment redone (Codjiflo r2, #2557);
+        # the recheck table's REMEDY cell names the part (#1038 re-pitch).
         "4H. IF A PEDESTAL IS OUT, SWING THE CONE SET OUT.",
-        "4J. CORRECT THE OUT-OF-PRINT PART AT THAT END.",
+        f"4J. DO THAT ROW'S REMEDY (SHEET {SETTING_SHEET}).",
         "4K. REDO 4C-4G.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
@@ -2016,11 +2056,11 @@ CHECKS = _note_text(
         "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'F')}-{_step_ref('other-base-mounting', 'G')}.",
+        f"{_step_ref('other-base-mounting', 'G')}-{_step_ref('other-base-mounting', 'H')}.",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')}.",
+        f"{_step_ref('other-base-mounting', 'L')}-{_step_ref('other-base-mounting', 'M')}.",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
