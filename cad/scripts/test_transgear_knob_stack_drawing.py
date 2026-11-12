@@ -171,11 +171,11 @@ def test_relief_keeps_the_single_point_exit_below_the_thread_root() -> None:
     assert thread_end_min - core_max == pytest.approx(1.778)
     assert thread_end_min - core_max > 0.0
     relief_max = _limits(shaft.RELIEF_DIA, _stud_places("ReliefDia"))[1]
-    assert relief_max == pytest.approx(2.794)  # .10 +.01
+    assert relief_max == pytest.approx(2.9972)  # .113 +.005 (#2419)
     assert relief_max < ROOT_2A_MIN < MINOR_2B_MIN
     # Negative control: Ø.11 at the .XX row (the review's first suggestion)
     # would stand above the conservative deepest #8-32 thread-root estimate.
-    assert 2.794 + printed_band_mm(2, unit=shaft.UNIT) > ROOT_2A_MIN
+    assert 0.11 * 25.4 + printed_band_mm(2, unit=shaft.UNIT) > ROOT_2A_MIN
 
 
 def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
