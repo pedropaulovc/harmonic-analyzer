@@ -99,7 +99,7 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
         unit=spec.UNIT,
     )
     growth = stations * upper
-    assert spec.HUB_LENGTH_BAND[1] == 0.0  # ch_bar_pivot_pin_spec's pitch minimum
+    assert spec.HUB_LENGTH_BAND[1] == 0.0  # sh_vn_pivot_pin_bar_spec's pitch minimum
     assert growth < sum(assembly.KEEPER_HUB_FLOAT)
 
 

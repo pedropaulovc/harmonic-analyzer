@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import ch_bar_pivot_pin_spec as pin_spec
+import sh_vn_pivot_pin_bar_spec as pin_spec
 import ch_amplitude_bar_notes
 import ch_amplitude_bar_spec
 import draw_ch_amplitude_bar as drawing
@@ -73,8 +73,8 @@ def test_part_geometry_matches_the_spec() -> None:
 
 
 def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
-    """User ruling 2026-10: the MHA-CH-11 pin is pressed into both top-notch
-    cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
+    """User ruling 2026-10: the BarPin member of MHA-SH-VN-58 is pressed into
+    both top-notch cheeks (sh_vn_pivot_pin_bar_spec holds the fit), so the hole is reamed to a
     band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
     was only words in a note; it now prints in the top end's right side view,
     its REAM THRU callout at the diameter, flagged to note 1."""
@@ -86,7 +86,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
         "*deviations(TOP_PIN_HOLE_BAND)"
     )
-    assert notes.TOP_PIN_NUMBER == parts("ch-bar-pivot-pin")["number"]
+    assert notes.TOP_PIN_NUMBER == parts("sh-vn-pivot-pin")["number"]
     assert notes.DRAWING_DIMENSIONS["TopPinProfile"] == {
         "BarSection",
         "TopPinX",
@@ -102,7 +102,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
         "REAM THRU\nSEE NOTE 1"
     )
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-CH-11:",
+        "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-SH-VN-58:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
     ]
     assert notes.TOP_PIN_NAME == "BAR PIVOT PIN"
@@ -114,7 +114,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     # hole's worst-case face wall, which the pin's joint budget holds too:
     # .125 +/-.005 on the narrowest stock leaves the far wall .079, over the
     # .060 floor and under the .080 target (RV-06).
-    import ch_bar_pivot_pin_spec as pin
+    import sh_vn_pivot_pin_bar_spec as pin
 
     assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL .079 MIN"
     wall = pin.BUDGET["hole_face_wall_min"]
@@ -735,8 +735,8 @@ def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
     .118 +/-.002 plate leaves the side gap its running floor; the full
     stack, with both ledges and plate offsets, is
-    ch_bar_pivot_pin_spec.joint_budget's neighbour_clearance_min."""
-    import ch_bar_pivot_pin_spec as pin
+    sh_vn_pivot_pin_bar_spec.joint_budget's neighbour_clearance_min."""
+    import sh_vn_pivot_pin_bar_spec as pin
     import rocker_bank_layout as bank
 
     spec = ch_amplitude_bar_spec
@@ -789,7 +789,7 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
     floor still holds. The bank's feeler leaf is the least gap floored to the
     .001 grid, so a bank inside its bands passes it, and it proves the floor.
     MHA-CH-01 carries no frame for it (Repitch1038 2026-11-11)."""
-    import ch_bar_pivot_pin_spec as pin
+    import sh_vn_pivot_pin_bar_spec as pin
     import ch_channel_assembly_spec as asm
     import rocker_bank_layout as bank
 

@@ -921,26 +921,19 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     # The span prints once, on the end view with its limits.
     for limit in spec.SPAN_LIMITS:
         assert _inch(limit, spec.SPAN_PLACES) not in drawing.GEAR_DATA_NOTE
-    # The span band's fit route (rule 4): the mesh is set at MHA-PD-00 on the
-    # mesh check's datum backlash band, the window that sheet prints, at the
-    # step that sets it; the part prints no window of its own.
-    import paper_drive_rack_setup as rack_setup
+    # The span band's fit route (rule 4): MHA-PD-00 sets the mesh depth to the
+    # actual teeth at the step the row cites and accepts it on function, so
+    # neither sheet prints a backlash window for it (#2416, owner direction
+    # 2026-11-11); the mesh check's band stays the builder's design proof.
     import pd_paper_drive_assembly_steps as steps
 
-    assert rack_setup.RACK_DATUM_BACKLASH_RANGE == spec.RACK_BACKLASH_RANGE
     label, value = drawing.GEAR_DATA_ROWS[-1]
     assert label == "SPAN MATCHED FIT"
     assert "SET AT ASSY" in value
-    assert steps.RACK_DATUM_BACKLASH_TEXT in value
     assert drawing.MESH_SET_STEP == steps.step_ref("hanger-meshed")
     assert value.endswith(drawing.MESH_SET_STEP)
-    # That step is where MHA-PD-00 sets the shake that sets the mesh depth:
-    # its sub-step sets the arm on the datum backlash window.
-    assembly_draw = Path(drawing.__file__).parent / "draw_pd_paper_drive_assembly.py"
-    assembly_source = assembly_draw.read_text(encoding="utf-8")
-    meshed = assembly_source.split('"hanger-meshed": (', 1)[1].split("),", 1)[0]
-    assert "shake = steps.RACK_DATUM_BACKLASH_TEXT" in assembly_source
-    assert "SET THE ARM SO THE PLATEN SHAKES {shake} ALONG THE RACK" in meshed
+    assert "DIAL" not in value
+    assert not re.search(r"\.\d{4}", value)
     assert "PROFILE SHIFT" not in drawing.GEAR_DATA_NOTE
     # A form-cut tooth is a translated involute: its pitch thickness does
     # not follow the generated-involute span relation, so only the span

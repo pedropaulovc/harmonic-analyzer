@@ -603,6 +603,26 @@
       ]
     },
     {
+      "sourceStem": "sh-vn-pivot-pin",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "sh-vn-pivot-pin",
+          "number": "MHA-SH-VN-58",
+          "configuration": "RodPin",
+          "role": "RodPin"
+        },
+        {
+          "parent": "ch-channel",
+          "stem": "sh-vn-pivot-pin",
+          "number": "MHA-SH-VN-58",
+          "configuration": "BarPin",
+          "role": "BarPin"
+        }
+      ]
+    },
+    {
       "sourceStem": "vn-magnifying-bracket-screw",
       "sourceNumber": "MHA-VN-050",
       "identities": [
@@ -1063,7 +1083,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "7722706a74644185ab93daea49425ed1af3b2cc21a58adbd393ae1f69e8c25e0",
+  "currentRegistryMapSha256": "4d1a5e2c02e8504564ea26241613772a6f78a8ef614ddb97b467234daf13b916",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1302,16 +1322,6 @@
         {
           "stem": "pd-transgear-arm-plate",
           "number": "MHA-PD-19"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-bar-pivot-pin",
-      "sourceNumber": "MHA-CH-011",
-      "identities": [
-        {
-          "stem": "ch-bar-pivot-pin",
-          "number": "MHA-CH-11"
         }
       ]
     },
@@ -1922,16 +1932,6 @@
         {
           "stem": "ch-rocker-strap",
           "number": "MHA-CH-13"
-        }
-      ]
-    },
-    {
-      "sourceStem": "ch-rod-pivot-pin",
-      "sourceNumber": "MHA-CH-010",
-      "identities": [
-        {
-          "stem": "ch-rod-pivot-pin",
-          "number": "MHA-CH-10"
         }
       ]
     },
@@ -3000,6 +3000,17 @@
         "FlangeNut"
       ],
       "neutralExportConfiguration": "HoldDownStud"
+    },
+    {
+      "stem": "sh-vn-pivot-pin",
+      "number": "MHA-SH-VN-58",
+      "supplier": "McMaster",
+      "supplierSku": "90145A299",
+      "configurations": [
+        "RodPin",
+        "BarPin"
+      ],
+      "neutralExportConfiguration": "RodPin"
     }
   ],
   "sourceFiles": [

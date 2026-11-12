@@ -32,9 +32,8 @@ import math
 
 import ch_amplitude_bar_spec as _bar
 import ch_rocker_arm_spec as _arm
-from ch_bar_pivot_pin_spec import BUDGET as _PIN_BUDGET
-from ch_bar_pivot_pin_spec import MM_PER_IN as _MM_PER_IN
-from ch_bar_pivot_pin_spec import RUNNING_FLOOR as _BAR_RUNNING_FLOOR
+from sh_vn_pivot_pin_bar_spec import BUDGET as _PIN_BUDGET
+from sh_vn_pivot_pin_bar_spec import RUNNING_FLOOR as _BAR_RUNNING_FLOOR
 
 from _assembly_contract import assembly_contract
 
@@ -242,7 +241,7 @@ DIMENSION_TOLERANCES = {
 # bar's length (A108's 3/16 in per 10 ft, #2341 triage), so the stock is
 # straightened or selected to the check (parts/ch-amplitude-bar.yaml process).
 BAR_BOW_MAX_IN = 0.005
-BAR_BOW_MAX_MM = BAR_BOW_MAX_IN * _MM_PER_IN  # 0.127
+BAR_BOW_MAX_MM = BAR_BOW_MAX_IN * _bar.MM_PER_IN  # 0.127
 
 
 def bar_gap_budget() -> dict[str, float]:
@@ -250,7 +249,7 @@ def bar_gap_budget() -> dict[str, float]:
     #1038, #2341).
 
     ``top``: the bar pivot pin joint's ``neighbour_clearance_min``
-    (``ch_bar_pivot_pin_spec``). ``foot``: the same
+    (``sh_vn_pivot_pin_bar_spec``). ``foot``: the same
     form on the foot notch and the real MHA-CH-06 strap (.098 +/-.001): the
     pitch the rocker hubs set (never short), the widest stock, the foot
     notch's float on the thinnest strap, both ledges' bands, and the strap's
@@ -278,7 +277,9 @@ def bar_gap_budget() -> dict[str, float]:
     mid_span = (top + foot) / 2.0
     mid_span_bowed = mid_span - 2.0 * BAR_BOW_MAX_MM
     least = min(top, foot, mid_span_bowed)
-    leaf = math.floor(round(least / _MM_PER_IN * 1000.0, 9)) / 1000.0 * _MM_PER_IN
+    leaf = (
+        math.floor(round(least / _bar.MM_PER_IN * 1000.0, 9)) / 1000.0 * _bar.MM_PER_IN
+    )
     return {
         "top": top,
         "foot": foot,

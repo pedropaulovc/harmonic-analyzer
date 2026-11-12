@@ -2558,7 +2558,9 @@ def test_rod_drill_identifier_and_native_callout_process_share_the_hole_spec() -
         "rocker_notes.ROD_PIN_MATE_CALLOUT + '\\n' + drill_process(ROD_HOLE_SPEC) + '\\n'"
     )
     # The pin that runs in the hole is named over the drill (Opus #1020 r3 C5).
-    assert "MHA-CH-10" in ch_rocker_arm_notes.ROD_PIN_MATE_CALLOUT
+    import _config
+
+    assert _config.parts("sh-vn-pivot-pin")["number"] in ch_rocker_arm_notes.ROD_PIN_MATE_CALLOUT
     assert drawing.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
 
 

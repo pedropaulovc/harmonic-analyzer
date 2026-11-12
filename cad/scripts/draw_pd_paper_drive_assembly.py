@@ -1250,9 +1250,37 @@ KNOB_SHAFT_BALLOON_POINT_MM = (
     round(_KNOB_TIP_R * math.sin(KNOB_SHAFT_BALLOON_ANGLE), 4),
     0.0,
 )
+# Sheet 3's balloon 28 walked to the sleeve's rear-face tip arc (part
+# (4.892, 3.024, 0)), drawn hard against the exploded MHA-PD-24 bushing, so
+# its arrow read as the bushing's and balloon 26 seemed to share a part
+# (machinist review of #2551's run 20261111T200045620Z, r1/r3). It lands
+# instead on an edge along the teeth: the corner where the 30-degree tooth's
+# tip land meets its flank toward 45 degrees (teeth centre on local +X every
+# 30 degrees; the spaces centre on TOOTH_SPACE_INSPECTION_PHASE_RAD), 6 mm
+# forward of the rear face. The sleeve is placed turned about Y, so the
+# sheet's *Isometric looks along local (1, 1, 1) and that corner faces the
+# eye; at 2:3 it draws about 3 mm down-left of the old point. (A point on
+# the tip land off a corner is on no edge: run 20261111T221813123Z.)
+FEED_SLEEVE_BALLOON_Z = 6.0
+if not 0.0 < FEED_SLEEVE_BALLOON_Z < feed_pinion.FACE_WIDTH:
+    raise AssertionError("balloon 28 lands on the feed sleeve's teeth")
+if feed_pinion.TOOTH_SPACE_INSPECTION_PHASE_RAD != math.pi / feed_pinion.TEETH:
+    raise AssertionError("balloon 28's corner needs the teeth centred on local +X")
+_FEED_CORNER_ANGLE = (
+    math.radians(30.0)
+    + feed_pinion.STOCK_PROFILE.angular_pitch_rad / 2.0
+    - feed_pinion.STOCK_PROFILE.tip_half_angle_rad
+)
+_FEED_TIP_R = feed_pinion.STOCK_PROFILE.blank_radius_mm
+FEED_SLEEVE_BALLOON_POINT_MM = (
+    round(_FEED_TIP_R * math.cos(_FEED_CORNER_ANGLE), 4),
+    round(_FEED_TIP_R * math.sin(_FEED_CORNER_ANGLE), 4),
+    FEED_SLEEVE_BALLOON_Z,
+)
 _BALLOON_POINTS_MM = {
     "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
     "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
+    "pd-transgear-feed-pinion": FEED_SLEEVE_BALLOON_POINT_MM,
 }
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
@@ -1877,7 +1905,6 @@ def _step_text(
     pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
     drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
     knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
-    shake = steps.RACK_DATUM_BACKLASH_TEXT
     lock_gap = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
     # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
@@ -2425,20 +2452,32 @@ def _step_text(
             "CHECK: THE HOOK BASE SEATS FLAT ON THE BAR.",
             "IF IT ROCKS, DEBURR THE TAP MOUTHS AND THE BASE.",
         ),
+        # Owner direction 2026-11-11 (#2416): the feed mesh only has to run
+        # without binding, keep its teeth engaged and feed the paper steadily;
+        # its backlash is not a function. So the arm is set on a feeler leaf
+        # wedged in the mesh, which fixes the gap at the teeth themselves
+        # whatever play lies behind the pinion (codjiflo P1 on e690ffe and
+        # 5972cc9), and accepted on function, not on a datum shake window read
+        # on a dial. The band stays the builder's design proof
+        # (paper_drive_rack_setup); the leaves' own gates are
+        # steps.FEED_MESH_LEAF_BACKLASH_MM's.
         "hanger-meshed": (
-            f"SWING THE ARM UP UNTIL THE {n['pd-transgear-feed-pinion']} TEETH "
-            f"ENTER THE {n['pd-platen-rack']} RACK.",
-            "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE: THE "
-            "DATUM.",
-            f"KNOB HELD, SET THE ARM SO THE PLATEN SHAKES {shake} ALONG THE RACK "
-            "AT THE DATUM, READ WITH A DIAL INDICATOR ON THE PLATEN END.",
+            f"WITH THE ARM DOWN, LAY A {steps.FEED_MESH_LEAF_TEXTS[0]} FEELER LEAF "
+            f"ACROSS THE TOP OF THE {n['pd-transgear-feed-pinion']} TEETH, ITS LENGTH "
+            f"ALONG THE {n['pd-platen-rack']} RACK.",
+            "SWING THE ARM UP UNTIL IT STOPS, THE TEETH PRESSING THE LEAF INTO THE "
+            "RACK.",
             "CLAMP THE ARM TO THE BAR.",
+            "DRAW THE LEAF OUT SIDEWAYS.",
             "RUN THE PLATEN THROUGH THE ENGAGED FEED, "
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
             "CHECK: NO TIGHT SPOT.",
-            "CHECK: SHAKE AT EVERY TOOTH.",
-            "IF EITHER CHECK FAILS, UNCLAMP AND LOWER THE ARM, FEED DISENGAGED.",
-            f"REPEAT {s('hanger-meshed', 0)}-{s('hanger-meshed', 6)}.",
+            "IF IT HAS A TIGHT SPOT, UNCLAMP AND LOWER THE ARM.",
+            f"REPEAT {s('hanger-meshed', 0)}-{s('hanger-meshed', 5)} ONCE WITH A "
+            f"{steps.FEED_MESH_LEAF_TEXTS[1]} LEAF.",
+            f"IF IT STILL HAS A TIGHT SPOT, INSPECT THE {n['pd-transgear-feed-pinion']} "
+            f"TEETH AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
+            f"REPLACE THE PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
@@ -2458,16 +2497,17 @@ def _step_text(
             f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
             "CHECK: THE ENGAGED FEED RUNS WITH NO TIGHT SPOT.",
-            f"CHECK: THE PLATEN SHAKES {shake} AT THE DATUM, READ WITH A DIAL "
-            "INDICATOR ON THE PLATEN END.",
+            "CHECK: KNOB HELD, PUSHED FIRMLY BY HAND EACH WAY AT BOTH ENDS AND THE "
+            "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
-            f"{s('hanger-meshed', 2)}-{s('hook-pin-hole-match-drilled', 9)}.",
+            f"{s('hanger-meshed', 0)}-{s('hook-pin-hole-match-drilled', 9)} ON THE LEAF "
+            f"STEP {steps.step_number('hanger-meshed')} ENDED ON.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
             "TURN THE KNOB TO RUN THE PLATEN THROUGH THE WHOLE ENGAGED FEED.",
-            "CHECK: NO TIGHT SPOT.",
+            "CHECK: THE PLATEN ADVANCES STEADILY, WITH NO TIGHT SPOT.",
             "CHECK: ARM, HOOK AND PLATEN STAY SEATED.",
             "CHECK: KNOB HELD, THE PLATEN SHAKES ALONG THE RACK AT BOTH ENDS AND "
             "THE MIDDLE OF THE FEED.",

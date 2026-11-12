@@ -80,7 +80,7 @@ SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
 # the near tine prints from that face, the slot as a size, the far tine as
 # the same tine size (2X), and the fork over the tines as a reference.
 # 0.35 mm MIN (running floor plus spare) to the neighbouring fork at the worst case
-# (ch_rod_pivot_pin_spec checks it).
+# (sh_vn_pivot_pin_rod_spec checks it).
 FORK_WIDTH = 9.906  # .39 across the fork (X), crown radius FORK_WIDTH / 2 on the pin
 # Slot = the arm's thickest strap + the 0.10 running floor at its least,
 # centred on its band so the ring-to-slot offset stays even.
@@ -110,16 +110,16 @@ if RING_THICKNESS + RING_THICKNESS_BAND[1] < WALL_TARGET_MM:
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
 # it by 1.0 MIN at the printed worst case of both parts through the solved
-# swing (ch_rod_pivot_pin_spec.BUDGET). SlotDepth (crown top to floor) prints
+# swing (sh_vn_pivot_pin_rod_spec.BUDGET). SlotDepth (crown top to floor) prints
 # .58.
 FORK_CROTCH_BELOW_PIN = 14.732 - FORK_WIDTH / 2.0  # SlotDepth .58
 # The fork boss's root step onto the shank. The bridge below the slot floor
 # (ForkBossLength less SlotDepth, both .XX from the crown top) keeps .080 MIN.
 FORK_BASE_BELOW_PIN = 18.034 - FORK_WIDTH / 2.0  # ForkBossLength .71
-# The MHA-CH-10 rod pivot pin presses into this hole through both tines and
+# The MHA-SH-VN-58 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
-# press fit as the bar pin; ch_rod_pivot_pin_spec holds the fit budget).
-# Reamed .077 +.0009/+.0005 in under the 5/64 drill rod: a purchased .0775
+# press fit as the bar pin; sh_vn_pivot_pin_rod_spec holds the fit budget).
+# Reamed .077 +.0009/+.0005 in under the 5/64 dowel: a purchased .0775
 # chucking reamer cuts inside it. No countersink: the reamed hole runs
 # straight through each tine, so the tine's whole thickness is the pin's land.
 PIN_HOLE_DIA = 1.9558  # .077 in
@@ -129,7 +129,7 @@ PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
 # inside the title block's INSIDE CORNERS R.040 MAX, which governs them on the
 # print (machinist review: a tighter all-corners MAX named no function).
 # That ceiling still clears the arm over the slot floor (the offline drawing
-# test checks it against ch_rod_pivot_pin_spec), and stays well inside half
+# test checks it against sh_vn_pivot_pin_rod_spec), and stays well inside half
 # the slot.
 INSIDE_CORNER_R = 0.5  # model only, never printed
 if 2.0 * INSIDE_CORNER_R >= FORK_SLOT_WIDTH + FORK_SLOT_BAND[1]:
