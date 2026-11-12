@@ -42,11 +42,10 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  rod-pivot-pin x20 (MHA-CH-10, one 5/64 drill-rod pin pressed through
-  each rod's fork tines and running in its arm's #47 rod hole, lock-mated to
-  the rod),
-  bar-pivot-pin x20 (MHA-CH-11, one 5/64 drill-rod pin pressed through
-  each bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
+  sh-vn-pivot-pin x40 (MHA-SH-VN-58, McMaster 90145A299 5/64 dowels; per
+  channel one RodPin pressed through the rod's fork tines and running in its
+  arm's #47 rod hole, lock-mated to the rod, then one BarPin pressed through
+  the bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
   lock-mated to the bar),
   channel-spring-installed x20 (McMaster 9432K31, with fixed measured
   installed-length variants),
@@ -254,7 +253,8 @@ from ch_connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # the builder's closure carries drawing prose, and pulling it here made every
 # notes edit full-rebuild this assembly (codex #354).
 from ch_connecting_rod_spec import FORK_THICKNESS as ROD_FORK_THICKNESS
-from ch_rod_pivot_pin_spec import PIN_INSTALLED_LENGTH
+import sh_vn_pivot_pin_bar_spec as _bar_pin
+import sh_vn_pivot_pin_rod_spec as _rod_pin
 from _rocker_interface import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
 from _rocker_interface import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
@@ -308,12 +308,12 @@ if abs(CAM_DZ - ARM_MID_DZ) > 1e-9:
     raise AssertionError(
         f"cam / rod mid-plane z_j{CAM_DZ:+.5f} != arm mid-plane z_j{ARM_MID_DZ:+.5f}"
     )
-# The pivot pin is modelled installed: flush with both fork faces, its axial
-# mid-plane on its Front Plane, lock-mated to the rod's Front Plane -- the rod
-# mid-plane, which the J2 coincident mate puts on the arm mid-plane.
-if abs(PIN_INSTALLED_LENGTH - ROD_FORK_THICKNESS) > 1e-9:
+# The rod pivot pin is modelled installed: flush with both fork faces, its
+# axial mid-plane on its Front Plane, lock-mated to the rod's Front Plane -- the
+# rod mid-plane, which the J2 coincident mate puts on the arm mid-plane.
+if abs(_rod_pin.PIN_INSTALLED_LENGTH - ROD_FORK_THICKNESS) > 1e-9:
     raise AssertionError(
-        f"rod pivot pin length {PIN_INSTALLED_LENGTH:g} != fork thickness"
+        f"rod pivot pin length {_rod_pin.PIN_INSTALLED_LENGTH:g} != fork thickness"
         f" {ROD_FORK_THICKNESS:g}"
     )
 
@@ -359,17 +359,12 @@ from ch_amplitude_bar_spec import (  # noqa: E402
     BAR_WIDTH,  # 6.35 square section
     TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.9432
 )
-from ch_bar_pivot_pin_spec import (  # noqa: E402
-    INSTALLED_CONFIG as BAR_PIN_INSTALLED_CONFIG,
-    PIN_INSTALLED_LENGTH as BAR_PIN_LENGTH,
-)
-
-# The bar pivot pin is placed in its INSTALLED configuration: flush with both
-# bar faces, centred on the bar's top pin bore at mid-width, lock-mated to the
-# bar (its default is the longer cut pin its drawing prints).
-if abs(BAR_PIN_LENGTH - BAR_WIDTH) > 1e-9:
+# The bar pivot pin is placed in its BarPin member: flush with both bar faces,
+# centred on the bar's top pin bore at mid-width, lock-mated to the bar.
+if abs(_bar_pin.PIN_INSTALLED_LENGTH - BAR_WIDTH) > 1e-9:
     raise AssertionError(
-        f"bar pivot pin length {BAR_PIN_LENGTH:g} != bar width {BAR_WIDTH:g}"
+        f"bar pivot pin length {_bar_pin.PIN_INSTALLED_LENGTH:g} != bar width"
+        f" {BAR_WIDTH:g}"
     )
 
 # --- lever bank -------------------------------------------------------------
@@ -1576,7 +1571,7 @@ async def build(adapter) -> dict[str, str]:
     # rocker instance every later neighbour seat refers to; rod_by_channel[j]
     # is the rod each rod-pivot pin is locked into.
     rocker_by_channel: dict[int, str] = {}
-    # The bar and lever each channel's MHA-CH-11 pin joins (inserted once
+    # The bar and lever each channel's BarPin joins (inserted once
     # every chain is landed, outside the CopyWithMates slice).
     bar_by_channel: dict[int, str] = {}
     lever_by_channel: dict[int, str] = {}
@@ -2273,19 +2268,21 @@ async def build(adapter) -> dict[str, str]:
             )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
-    # Rod-pivot pins (MHA-CH-10): one per channel, OUTSIDE the CopyWithMates
-    # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
-    # per-part mate counts above) never sees them. Each pin is modelled
-    # installed -- pressed through the fork's reamed tines and dressed flush
-    # with both (user ruling 2026-10-09, PR #1292 review F1), its axis the
-    # rod's pin axis (Axis2@rod), its axial mid-plane the rod's Front plane --
-    # so it is inserted at the rod's SOLVED pose and locked to the rod: it is
-    # pressed in the fork tines and runs in the arm's #47 hole with the rod,
-    # adding no DOF. It reads under-constrained with its free rod
-    # (ch-channel.yaml allowed_free_stems). Channel j's pin is the (j + 1)th
-    # instance, like its rod, so _ch_channel_interference can name each
-    # modelled press pair exactly.
+    # Pivot pins (MHA-SH-VN-58, one purchased part, two members): per channel
+    # a RodPin then a BarPin, OUTSIDE the CopyWithMates slice, so the pinned
+    # slice contract (SLICE_MATES / SLICE_EXTERNAL / the per-part mate counts
+    # above) never sees them. Each is modelled installed, its member's length
+    # flush with both faces it is pressed through (user ruling 2026-10-09, PR
+    # #1292 review F1), inserted at its host's SOLVED pose and lock-mated to
+    # it: it rides the host's DOF and adds none, so it reads under-constrained
+    # with its free rod or bar (ch-channel.yaml allowed_free_stems). Channel
+    # j's RodPin is instance 2j + 1 and its BarPin 2j + 2 at any built channel
+    # count, so _ch_channel_interference can name each modelled press pair
+    # exactly.
     for j in range(CHANNELS):
+        # The RodPin: pressed through the fork's reamed tines, running in the
+        # arm's #47 hole; its axis the rod's pin axis (Axis2@rod, rod Z), its
+        # axial mid-plane the rod's Front plane.
         rod = rod_by_channel[j]
         if rod != f"ch-connecting-rod-{j + 1}":
             raise RuntimeError(
@@ -2308,38 +2305,31 @@ async def build(adapter) -> dict[str, str]:
             )
         pin = await place_component(
             adapter,
-            "ch-rod-pivot-pin",
+            "sh-vn-pivot-pin",
             pin_at,
             euler_from_rows(pin_rows),
             pin_rows,
             ground=False,
-            label=f"rod-pivot-pin ch{j:02d} pressed",
+            configuration=_rod_pin.CONFIGURATION,
+            label=f"rod pivot pin ch{j:02d} pressed",
         )
-        if pin != f"ch-rod-pivot-pin-{j + 1}":
+        if pin != f"sh-vn-pivot-pin-{2 * j + 1}":
             raise RuntimeError(
-                f"ch{j:02d} pin is {pin!r}, not ch-rod-pivot-pin-{j + 1} -- the"
-                " press-fit interference contract would name the wrong pair"
+                f"ch{j:02d} rod pin is {pin!r}, not sh-vn-pivot-pin-{2 * j + 1} --"
+                " the press-fit interference contract would name the wrong pair"
             )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{pin}", "PLANE"),
             named_ref(f"Front Plane@{rod}", "PLANE"),
-            label=f"rod-pivot-pin ch{j:02d} locked to {rod}",
+            label=f"rod pivot pin ch{j:02d} locked to {rod}",
         )
 
-    # Bar pivot pins (MHA-CH-11): one per channel, OUTSIDE the CopyWithMates
-    # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
-    # per-part mate counts above) never sees them. Each pin is placed in its
-    # INSTALLED configuration -- pressed through the bar's top-notch cheeks and dressed
-    # flush with both bar faces, its axis the bar's top pin bore (Axis1@bar,
-    # which J3 holds coaxial with the lever's bar-pin hole) -- so it is
-    # inserted at the bar's SOLVED pose (pin X = bar X, the bore axis; pin
-    # origin = the bore's mid-width point) and lock-mated to the bar: it rides
-    # the bar's free amplitude DOF and adds none. It reads under-constrained
-    # with its bar (ch-channel.yaml allowed_free_stems). Channel j's pin is the
-    # (j + 1)th instance, like its bar, so _ch_channel_interference can name
-    # each modelled press pair exactly.
-    for j in range(CHANNELS):
+        # The BarPin: pressed through the bar's top-notch cheeks, running in
+        # the lever's #47 bar-pin hole; its axis the bar's top pin bore
+        # (Axis1@bar, bar X, which J3 holds coaxial with the lever's hole), its
+        # origin the bore's mid-width point. The pin's Z (its axis) turns onto
+        # the bar's X: rows (-bar Z, bar Y, bar X), right-handed.
         bar = bar_by_channel[j]
         lever = lever_by_channel[j]
         if bar != f"ch-amplitude-bar-{j + 1}":
@@ -2348,10 +2338,9 @@ async def build(adapter) -> dict[str, str]:
                 " press-fit interference contract would name the wrong pair"
             )
         a = component_transform(adapter, bar)
-        pin_rows = [list(a[0:3]), list(a[3:6]), list(a[6:9])]
+        pin_rows = [[-value for value in a[6:9]], list(a[3:6]), list(a[0:3])]
         pin_at = world_point(adapter, bar, BAR_TOP_PIN_LOCAL)
         lever_hole = world_point(adapter, lever, LEVER_BAR_PIN_BORE_LOCAL)
-        z_mid = z_station(j) + ARM_MID_DZ
         if (
             math.hypot(pin_at[0] - lever_hole[0], pin_at[1] - lever_hole[1]) > 0.01
             or abs(pin_at[2] - z_mid) > 0.01
@@ -2363,24 +2352,24 @@ async def build(adapter) -> dict[str, str]:
             )
         pin = await place_component(
             adapter,
-            "ch-bar-pivot-pin",
+            "sh-vn-pivot-pin",
             pin_at,
             euler_from_rows(pin_rows),
             pin_rows,
             ground=False,
-            configuration=BAR_PIN_INSTALLED_CONFIG,
-            label=f"bar-pivot-pin ch{j:02d} pressed",
+            configuration=_bar_pin.CONFIGURATION,
+            label=f"bar pivot pin ch{j:02d} pressed",
         )
-        if pin != f"ch-bar-pivot-pin-{j + 1}":
+        if pin != f"sh-vn-pivot-pin-{2 * j + 2}":
             raise RuntimeError(
-                f"ch{j:02d} pin is {pin!r}, not ch-bar-pivot-pin-{j + 1} -- the"
-                " press-fit interference contract would name the wrong pair"
+                f"ch{j:02d} bar pin is {pin!r}, not sh-vn-pivot-pin-{2 * j + 2} --"
+                " the press-fit interference contract would name the wrong pair"
             )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{pin}", "PLANE"),
             named_ref(f"Front Plane@{bar}", "PLANE"),
-            label=f"bar-pivot-pin ch{j:02d} locked to {bar}",
+            label=f"bar pivot pin ch{j:02d} locked to {bar}",
         )
 
     for j in range(CHANNELS):

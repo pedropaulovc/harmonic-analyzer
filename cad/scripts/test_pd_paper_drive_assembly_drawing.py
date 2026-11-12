@@ -866,10 +866,18 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     axis = (0.7071, 0.4082)
     along = (right * axis[0] + up * axis[1]) / math.hypot(*axis)
     assert math.sqrt(right**2 + up**2 - along**2) > shaft.CORE_DIA / 2.0
+    # The feed sleeve lands on its 12T tip land, forward of the rear face that
+    # draws against the exploded rear bushing (#2551 machinist review).
+    sx, sy, sz = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-feed-pinion"].point_mm
+    assert math.hypot(sx, sy) == pytest.approx(
+        drawing.feed_pinion.OUTSIDE_DIA / 2.0, abs=1e-3
+    )
+    assert 0.0 < sz < drawing.feed_pinion.FACE_WIDTH
     pinned = {
         "pd-transgear-removable",
         "pd-transgear-disc-hub",
         "pd-transgear-knob-shaft",
+        "pd-transgear-feed-pinion",
     }
     assert all(
         anchor == drawing.BalloonAnchor()
@@ -1610,7 +1618,6 @@ def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None
     knob = _step_body("knob-stack-fitted")
     chain_step = steps.step_number("chain-closed")
     assert f"TURN THE KNOB ONLY BY THE COLLAR UNTIL STEP {chain_step}" in knob
-    assert "KNOB HELD" in _step_body("hanger-meshed")
     assert steps.SEQUENCE.index("knob-stack-fitted") < steps.SEQUENCE.index(
         "hanger-meshed"
     )
@@ -2421,12 +2428,12 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert meshed == fitted + 1 and drilled == meshed + 1
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
-    # The datum shake is the one constant MHA-PD-10's GEAR DATA also prints.
-    shake = steps.RACK_DATUM_BACKLASH_TEXT
-    low, high = (float(value) * 25.4 for value in shake.split(" TO "))
-    band = rack_setup.RACK_DATUM_BACKLASH_RANGE
-    assert band[0] <= low < high <= band[1]
-    assert shake in mesh and shake in _step_body("hook-pin-hole-match-drilled")
+    hook = _step_body("hook-pin-hole-match-drilled")
+    # #2416 (owner direction 2026-11-11): the mesh is set on the derived
+    # feeler leaves, and no backlash window for it prints any more.
+    for leaf in steps.FEED_MESH_LEAF_TEXTS:
+        assert f"{leaf} " in mesh
+    assert not hasattr(steps, "RACK_DATUM_BACKLASH_TEXT")
     # The window names its end by the crank, not by a machine axis no sheet
     # draws, and the title block already gives the unit.
     window = drawing.engaged_feed_text(domain)
@@ -2435,10 +2442,24 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
         assert axis_word not in mesh
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
-    hook = _step_body("hook-pin-hole-match-drilled")
     assert "LOWER EDGE ON THE PIN" in hook
     # Rule 24: the heat treatment is the hook drawing's.
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
+
+
+def test_the_first_feeler_leaf_sets_the_feed_mesh_inside_its_design_band() -> None:
+    """Codjiflo P1 on e690ffe and 5972cc9, P2 on 2ba1416: a leaf wedged in
+    the teeth sets the gap at the mesh itself, so the as-set mesh is the one
+    the builder proves: the first leaf lands in the design band (opposite-flank
+    budget included), and only the once-used second leaf goes looser."""
+    import paper_drive_mesh_check as mesh_check
+
+    first, second = steps.FEED_MESH_LEAF_BACKLASH_MM
+    low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
+    assert low <= first <= high < second
+    # What the replaced readings could reach: no mesh backlash left, where the
+    # feed teeth pass the interference point.
+    assert mesh_check.feed_rack_mesh((0.0, 0.0)).interference_margin_min_mm < 0.0
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:
@@ -2813,7 +2834,7 @@ def test_native_rack_height_is_observed_not_assumed_from_the_recipe(monkeypatch)
     assert not observed
 
 
-def test_a_direct_datum_reader_cannot_widen_the_printed_setup_band() -> None:
+def test_a_direct_datum_reader_cannot_widen_the_design_setup_band() -> None:
     low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
     span = high - low
     with pytest.raises(ValueError, match="datum setup band leaves"):

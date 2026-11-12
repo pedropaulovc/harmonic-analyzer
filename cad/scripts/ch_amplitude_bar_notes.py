@@ -18,7 +18,7 @@ from _printed_tolerance import printed_band_mm
 
 # Mating parts the callouts name (test_ch_amplitude_bar_drawing pins each to
 # the part registry).
-TOP_PIN_NUMBER = "MHA-CH-11"  # pressed into the top pin hole
+TOP_PIN_NUMBER = "MHA-SH-VN-58"  # BarPin member, pressed into the top pin hole
 LEVER_NUMBER = "MHA-CH-02"  # the channel lever the top notch straddles
 ROCKER_ARM_NUMBER = "MHA-CH-06"  # the rocker arm whose strap the foot notch rides
 
@@ -47,7 +47,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and the foot notch's depth at three places with their own bands; the reamed
 # hole at four. The hole's offset from the back face prints at three places:
 # the .XXX band (+/-.005) holds the reamed hole's wall to the far face at .079
-# on the narrowest stock (ch_bar_pivot_pin_spec.joint_budget
+# on the narrowest stock (sh_vn_pivot_pin_bar_spec.joint_budget
 # hole_face_wall_min, MHA-CH-01 RV-06); at .XX it would fall to .074.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {
@@ -167,7 +167,7 @@ ROOT_CALLOUT = "ROOTS R.015 MAX"
 # reamer row, so the hole is made to its pin: a matched press fit, stated
 # once in the numbered sheet note its callout links (drawing-guidelines.md
 # rules 4 and 7). The acceptance is the ANSI FN2 window the pin budget is
-# held to (ch_bar_pivot_pin_spec.PRESS_INTERFERENCE_MAX), rounded inward.
+# held to (sh_vn_pivot_pin_bar_spec.PRESS_INTERFERENCE_MAX), rounded inward.
 # Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
 TOP_PIN_NAME = "BAR PIVOT PIN"
 PIN_FIT_NOTE_NUMBER = 1
