@@ -79,9 +79,6 @@ from ch_fulcrum_keeper_spec import (
     REFERENCE_DIMENSIONS,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
-    SUPPLY_HEIGHT_CALLOUT,
-    SUPPLY_HEIGHT_MIN,
-    SUPPLY_HEIGHT_TOL_TYPE,
 )
 
 
@@ -144,45 +141,39 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # rows (~5.5 mm pitch) centred at y 199 put the top row under the plan's
 # bottom edge (y 214) and the shoulder (y ~187) over the crown radius's rows.
 FOOT_HOLE_CALLOUT_XY = (0.131, 0.199)
-# The keeper is supplied undrilled, so the crown tap, which stops at the
-# bore, is cut after the line-ream (MR-fleet r2, 0eca37c: "TAP TO BORE" with
-# no bore yet left the stage open). The native sizes lead and say where they
-# stop (both "<hw-thru>" extents read TO BORE; the thread class is the title
-# block's), and the mate and stage close the thread's own part
-# (SET_SCREW_QUALIFIER, two rows; its staking is MHA-CH-00's step).
+# The crown tap stops at the bore (MR-fleet r2, 0eca37c). The native sizes
+# lead and say where they stop (both "<hw-thru>" extents read TO BORE; the
+# thread class is the title block's), and the mate closes the thread's own
+# part (SET_SCREW_QUALIFIER, two rows; its staking is MHA-CH-00's step).
 # Machinist review r13: as two 86 mm rows centred at x 50 the block ran
-# 5.7 mm past the left inner border (x 12.7). Rows of at most 24 characters
-# (~61 mm printed, 2.56 mm a character in r13) centred at x 58 start at
-# x ~27, ~14 mm in from it, and end ~4 mm left of the plan's inner face
-# (x 93.5), in the band between the front view and the plan. The tap's
+# 5.7 mm past the left inner border (x 12.7). Its rows are now at most 16
+# characters (~41 mm printed, 2.56 mm a character in r13); centred at x 69
+# they start at x ~48 and end ~4 mm left of the plan's inner face (x 93.5),
+# in the band between the front view and the plan, so the shoulder and its
+# leader to the tap stay where the 24-character block left them, clear of
+# the plan's lower-left corner. The tap's
 # station prints above the plan (MR-fleet r1, 991a56e: in the front view its
 # text sat 1 mm under this block's shoulder and the two read as one), so
 # nothing else stands in that band.
 SET_SCREW_EXTENT = "TO BORE"
-SET_SCREW_CALLOUT_XY = (0.058, 0.196)
+SET_SCREW_CALLOUT_XY = (0.069, 0.196)
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The foot hole's process, on its own row above the native through row.
 FOOT_HOLE_PROCESS = "DRILL\n"
 # The crown tap's native drill size prints .XXX.
 SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
-# The bore and crown name the line-ream they follow and the shaft the bore
-# slides on (ch_fulcrum_keeper_notes). The bore's (.275) reference station
+# The bore names the process and the shaft it slides on, the crown its full
+# round (ch_fulcrum_keeper_notes). The bore's (.275) reference station
 # off the side face states its place on the width's centre plane and the
 # part it holds there for (owner ruling Q10-B: the MHA-CH-VN-55 set screw's
-# full thread under the full round).
+# full thread under the full round). Locations carry only their values
+# (rule 7): the foot hole's side station's reason, the frame tap it centres,
+# rides the foot-hole callout (FOOT_HOLE_MATE).
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "CrownRadius": CROWN_CALLOUT,
     "BoreFromSide": BORE_CENTRE_CALLOUT,
 }
-# The supplied blank's least height states what it is (MR-fleet r3: the
-# square-topped blank's height was printed nowhere). Locations carry only
-# their values (rule 7): the foot hole's side station's reason, the frame
-# tap it centres, rides the foot-hole callout (FOOT_HOLE_MATE).
-FRONT_CALLOUTS = {
-    "SupplyHeight": SUPPLY_HEIGHT_CALLOUT,
-}
-
 # Per-view survivors of the marked-dimension import: parametric name ->
 # sheet position.  The front view baselines its lengths off the inner lug
 # face (owner ruling 2026-10-28, ENFORCE review eecbf88: the 8.00 + 8.50
@@ -192,9 +183,7 @@ FRONT_CALLOUTS = {
 # length, a real .XX size, ~8 mm under the lug's dimension line (r4: 3.6 mm
 # under it, its own line sat on the lug's arrows) and above the notes; the
 # foot length prints nowhere. The finished height (a reference) stands left
-# of the lug and the supplied height (single limit MIN) outside it, the
-# larger size outermost (r4: the supply size alone left its extension line
-# in empty space above the drawn top); the foot height right of the foot
+# of the lug; the foot height right of the foot
 # tip. The foot-to-lug corner prints no radius: the title block's INSIDE
 # CORNERS R1.0 MAX governs it (ENFORCE review 2026-10-24: a local "R1.0
 # max." restated that row, rule 2).
@@ -213,7 +202,6 @@ FRONT_KEEP = {
     "OverallLength": (FRONT_CENTER[0], 0.068),
     "FootRise": (0.140, 0.106),
     "OverallHeight": (0.080, FRONT_CENTER[1]),
-    "SupplyHeight": (0.042, FRONT_CENTER[1]),
 }
 # The manufacturing notes' top-left corner's height (MR-fleet r4: 4 mm lower
 # to make room for the overall length above them).
@@ -269,7 +257,6 @@ _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 FRONT_REFERENCE_WITNESSES = {
     "OverallHeightReference": CROWN_TOP_Y,
-    "SupplyHeightReference": SUPPLY_HEIGHT_MIN,
     "OverallLengthReference": OVERALL_LENGTH,
 }
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
@@ -281,27 +268,6 @@ def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
     return matches[0]
-
-
-def _require_single_limit(
-    adapter: Any, annotations: list[Any], name: str, tol_type: int, limit_mm: float
-) -> Any:
-    """Prove ``name`` prints the part's single limit: measuring ``limit_mm``
-    and carrying the native swTolMAX / swTolMIN type the part set."""
-    annotation = _early_bound(_one(adapter, annotations, name), "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != tol_type:
-        raise RuntimeError(
-            f"{name} lost its native single-limit type {tol_type}: {int(tolerance.Type)}"
-        )
-    if not math.isclose(float(dimension.SystemValue), limit_mm / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(f"{name} does not measure its {limit_mm:g} mm limit")
-    _telemetry.info(
-        f"{name}: text {display.GetText(1)!r}, single-limit type {tol_type}"
-    )
-    return display
 
 
 @_telemetry.traced("drawing.fulcrum_keeper.crown_radius")
@@ -608,14 +574,6 @@ async def build(adapter: Any) -> dict[str, str]:
         set_near_side_diameter(_one(adapter, right_annotations, name), f"keeper {name}")
     _dress_crown_radius(adapter, right_annotations)
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
-    _require_single_limit(
-        adapter,
-        front_annotations,
-        "SupplyHeight",
-        SUPPLY_HEIGHT_TOL_TYPE,
-        SUPPLY_HEIGHT_MIN,
-    )
     kept = [*front_annotations, *right_annotations]
     for name in REFERENCE_DIMENSIONS:
         set_reference_dimension(

@@ -32,12 +32,12 @@ CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
 # The pivot shaft's set screws are run onto its flats, then staked.
 PIVOT_SET_SCREWS_STAKED_KEY = "pivot-set-screws-staked"
-# The fulcrum shaft's end keepers (MHA-CH-07) are reamed as a pair at the
-# bench, so their bores share one axis whatever their printed bore heights;
-# the pair is then set on the top frame by DRO with the shaft through both
-# (the frame's keeper taps are transferred from the foot holes), and the set
-# screws are staked once the shaft carries the lever bank.
-KEEPERS_PAIR_REAMED_KEY = "fulcrum-keepers-pair-reamed"
+# The fulcrum shaft's end keepers (MHA-CH-07) come finished to their own
+# print (#2338: no pair ream); the pair is set on the top frame by DRO with
+# the shaft through both (the frame's keeper taps are transferred from the
+# foot holes), the shaft is checked to slide through both once they are
+# screwed down, and the set screws are staked once the shaft carries the
+# lever bank.
 KEEPERS_SET_KEY = "fulcrum-keepers-set"
 KEEPERS_SCREWED_KEY = "fulcrum-keepers-screwed"
 FULCRUM_SET_SCREWS_DRIVEN_KEY = "fulcrum-set-screws-driven"
@@ -103,11 +103,6 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "pivot-shaft-held",
 )
 LEVER_SEQUENCE: tuple[str, ...] = (
-    "keepers-clamped",
-    KEEPERS_PAIR_REAMED_KEY,
-    "keeper-bores-checked",
-    "keeper-tops-finished",
-    "keeper-taps-made",
     "keepers-on-frame",
     KEEPERS_SET_KEY,
     "keeper-faces-set",
@@ -117,6 +112,7 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     KEEPERS_SCREWED_KEY,
     "keepers-unclamped",
     "keepers-held",
+    "keeper-bores-checked",
     "bars-straight",
     "bar-straightened",
     "bar-notches-set",

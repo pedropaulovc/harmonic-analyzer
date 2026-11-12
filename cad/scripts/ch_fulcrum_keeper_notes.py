@@ -3,8 +3,8 @@
 The callout rows and the notes live here, apart from ch_fulcrum_keeper_spec
 (the ch_rocker_arm_notes split), so a wording change re-keys only the
 keeper's own part and drawing, not the frame, shaft and assemblies that
-import the spec's geometry. The spec keeps the two band-bearing captions
-its own walls are computed with (BORE_CENTRE_CALLOUT, SUPPLY_HEIGHT_CALLOUT).
+import the spec's geometry. The spec keeps the band-bearing caption its own
+walls are computed with (BORE_CENTRE_CALLOUT).
 
 Each callout keeps its size first and at most two rows of words
 (drawing-guidelines rule 7); each mate is named on the feature it serves
@@ -15,21 +15,17 @@ from __future__ import annotations
 
 from ch_fulcrum_keeper_spec import FOOT_TIP_WALL_TEXT
 
-# The keeper is supplied square-topped and undrilled (SUPPLY_HEIGHT_CALLOUT);
-# the two keepers' bores are line-reamed together on the frame at installed
-# spacing (ch_channel_assembly_steps.KEEPERS_PAIR_REAMED_KEY): a ream at
-# assembly with its mate is a requirement (rule 7), and the band its fit on
-# the shaft (rule 4).
-BORE_CALLOUT = "LINE-REAM WITH OTHER MHA-CH-07\nAT ASSEMBLY; SLIDING FIT ON MHA-CH-04"
+# Each keeper is finished alone to this print (#2338: no at-assembly pair
+# ream): the process word marks the fit bore (rule 7) and the band its fit
+# on the shaft (rule 4).
+BORE_CALLOUT = "REAM THRU\nSLIDING FIT ON MHA-CH-04"
 # The crown is a full round tangent to both side faces (owner ruling Q10-B),
-# centred on the bore, so it is cut with the bore at assembly (MHA-CH-00
-# finishes each keeper's crown and tap on its bore's axis); the supplied
-# blank is square-topped (SUPPLY_HEIGHT_CALLOUT).
-CROWN_CALLOUT = "FULL R AT ASSEMBLY"
-# The crown tap's rows under its native size and TO BORE extents: its mate,
-# and the stage (the bore it stops in is made at assembly). Rows of at most
-# 24 characters keep the block between the front view and the plan.
-SET_SCREW_QUALIFIER = "FOR MHA-CH-VN-55 SET\nSCREW, AT ASSEMBLY"
+# centred on the bore (ch_fulcrum_keeper_spec).
+CROWN_CALLOUT = "FULL R"
+# The crown tap's rows under its native size and TO BORE extents: its mate.
+# Rows of at most 24 characters keep the block between the front view and
+# the plan.
+SET_SCREW_QUALIFIER = "FOR MHA-CH-VN-55\nSET SCREW"
 # The foot hole's rows under its native counterbore: the screw it seats and
 # the frame tap it is transferred to (the reason for the .275's three
 # places). Rows of at most 21 characters keep the block clear of the tap

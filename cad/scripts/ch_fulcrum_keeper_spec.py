@@ -31,7 +31,7 @@ underside x -4..+12.5 is the flat seat.
 
 from __future__ import annotations
 
-from math import ceil, floor, hypot, radians, sqrt, tan
+from math import floor, radians, sqrt, tan
 
 import _config
 from _fit_shaft_h import SHAFT_H
@@ -42,7 +42,6 @@ from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_radius_mm,
     printed_band_mm,
-    printed_deviations,
 )
 from _cone_axis_constants import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
@@ -102,90 +101,31 @@ OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.51 (.65): inner lug face to foo
 CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # Plain reamed bore for the plain .250 (1/4 in ground, SHAFT_H) fulcrum
 # shaft: the shaft slides through both lugs at assembly and the set screw
-# then pulls it onto the bore wall, so the fit only has to locate it, not run
-# on it. Each keeper prints LugRise at .XX, so two keepers bored apart could
-# sit 2 x .01 out of line -- far past any slide clearance, and a reamer only
-# follows the holes it is given. So the two are drilled and reamed through in
-# one pass AT THEIR INSTALLED SPACING (ch_fulcrum_keeper_notes.BORE_CALLOUT,
-# ch_channel_assembly_steps.KEEPERS_PAIR_REAMED_KEY): feet outboard and down on
-# one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM apart as KEEPERS_SET_KEY
-# sets them, the bore axis set parallel to the flat. Both
-# bores are then one straight line across the whole span, and the acceptance
-# (the actual MHA-CH-04 shaft slides freely through both, still clamped)
-# gauges that line itself. A setup tilt of the line to the flat costs no
-# clearance -- on any one plane both bores keep it, so the shaft just lies at
-# that tilt -- and a span error delta moves a bore only delta x tilt off it.
-# Each crown is then rounded: a full round tangent to both side faces,
-# centred at the bore's height (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
-# BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's worst
-# case below spends that offset under the round. ch_fulcrum_shaft_spec pins
-# the nominal to its SHAFT_DIA.
-BORE_DIA = 6.35
+# then pulls it onto the bore wall, so the fit only has to let it slide in
+# and locate it, not run on it (the dt_pinion_cam slip bore's case). Each
+# keeper is finished alone, as a detail, to its own print (#2338: the
+# at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
+# setup). Two bores reamed apart sit out of line by their bore-height bands,
+# so the bore is a stock .2525 chucking reamer's size (shop-equipment.toml
+# tools.reamer-2525), BORE_DIA_BAND +.0010/.0000: its least clearance on the
+# shaft covers the slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
+# The crown is a full round tangent to both side faces, centred on the bore
+# (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
+# BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's
+# worst case below spends that offset under the round.
+BORE_DIA = 0.2525 * 25.4  # 6.4135
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-# .250 +.0020/+.0015 in: the .32 lug spends .0011 of the least clearance on
-# the rail-seat budget (BORE_SEAT_ALLOWANCE_MM below), and the .2515 pair
-# reamer's +.0002/-.0000 size lies inside.
-BORE_DIA_BAND = (0.0508, 0.0381)  # (upper, lower)
+BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2525 +.0010/.0000 in
 KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
-KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 169.672
-# The one-pass reamer: a 0.2515 in long-series chucking reamer, 12 in overall,
-# made to order (Super Tool catalogue 2026 p.59, list 9458EL EDP 645808EL:
-# finished to any size in .2211-.2530, solid carbide, 1-1/2 flute, .2193
-# shank, 6-1/32 to 12 OAL, NAS 897 Type C; p.42: NAS 897 thru .5000 is
-# +.0002/-.0000 in. L&I's LV533XL shelf range stops at .2500). The toleranced
-# reamer, not its nominal, must lie inside BORE_DIA_BAND. Gripped one inch,
-# its reach must carry the whole flute past the far lug's outer face, and its
-# shank must pass the reamed near bore.
-PAIR_REAMER_DIA_IN = 0.2515
-_PAIR_REAMER_TOLERANCE_IN = (0.0, 0.0002)  # (lower, upper), over nominal
-PAIR_REAMER_OAL_IN = 12.0
-_PAIR_REAMER_FLUTE_IN = 1.5
-_PAIR_REAMER_SHANK_MAX_IN = 0.2193
-_PAIR_REAMER_GRIP_IN = 1.0
-PAIR_REAMER_RANGE_MM = tuple(
-    (PAIR_REAMER_DIA_IN + plus) * 25.4 - BORE_DIA for plus in _PAIR_REAMER_TOLERANCE_IN
-)  # (+0.0381, +0.0432) over BORE_DIA
-PAIR_REAMER_REACH_MARGIN_MM = (
-    PAIR_REAMER_OAL_IN - _PAIR_REAMER_GRIP_IN - _PAIR_REAMER_FLUTE_IN
-) * 25.4 - KEEPER_OUTER_FACE_SPAN_MM  # +83.3
-if PAIR_REAMER_REACH_MARGIN_MM < 0.0:
-    raise AssertionError("the pair reamer does not reach through both keepers")
-if _PAIR_REAMER_SHANK_MAX_IN * 25.4 >= BORE_DIA:
-    raise AssertionError("the pair reamer's shank does not pass the near bore")
-if not (
-    BORE_DIA_BAND[1] <= PAIR_REAMER_RANGE_MM[0]
-    and PAIR_REAMER_RANGE_MM[1] <= BORE_DIA_BAND[0]
-):
-    raise AssertionError("the pair reamer's toleranced size is off the bore band")
-# What the bench cannot see is the rail. Both foot seats on MHA-FR-02 lie
-# within one common zone KEEPER_SEAT_FLATNESS_BUDGET_MM thick (the frame's
-# machined keeper-seat note, which pins this constant). Inside it the seats
-# can stand the zone apart in height, roll
-# opposite ways across KEEPER_WIDTH (each lug centre SHAFT_AXIS_H x roll
-# sideways) and each pitch zone/KEEPER_SEAT_LENGTH_MM along the shaft. The
-# shaft takes the straight line through both lug centres, so each lug spends
-# its thickness x (its pitch + that line's slope over the 2 x KEEPER_Z_OFF
-# span) of diametral clearance: BORE_SEAT_ALLOWANCE_MM, on top of the running
-# minimum, inside BORE_DIA_BAND's least clearance (ch_fulcrum_shaft_spec
-# proves the stack, PAIRED_MIN_CLEARANCE_MM).
+# The rail under the two feet: both foot seats lie on MHA-FR-02's one faced
+# top plane (its note B, faced in one setup; no flatness frame is printed,
+# #1659). The stack allows them KEEPER_SEAT_FLATNESS_BUDGET_MM: inside it the
+# seats can stand that far apart in height and each pitch zone /
+# KEEPER_SEAT_LENGTH_MM along the shaft (a roll across the width only moves
+# a lug sideways, which the fit-up takes up: the pair is set with the shaft
+# through both bores). The fit-up step's slide check accepts the result.
 KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
 KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
-_SEAT_ROLL = KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_WIDTH
-_LUG_CENTRE_OFFSET = hypot(
-    KEEPER_SEAT_FLATNESS_BUDGET_MM, 2.0 * SHAFT_AXIS_H * _SEAT_ROLL
-)  # 0.1495
-BORE_SEAT_ALLOWANCE_MM = (
-    2.0
-    * LUG_HALF_T
-    * (
-        KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_SEAT_LENGTH_MM
-        + _LUG_CENTRE_OFFSET / (2.0 * KEEPER_Z_OFF)
-    )
-)  # 0.0274
-if BORE_DIA_BAND[1] - SHAFT_H[0] < (
-    BORE_RUNNING_MIN_CLEARANCE_MM + BORE_SEAT_ALLOWANCE_MM
-):
-    raise AssertionError("the keeper bore band does not cover the rail-seat budget")
 # --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
 # within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
@@ -204,7 +144,7 @@ KEEPER_FITUP_PLACES = 2
 KEEPER_FITUP_X_FROM_WEB_MM = 2.8976  # fulcrum 199.9 - column 197.0024
 # The lug centre's own band (owner ruling X-A, 2026-10-18, on the 5d5245a48
 # machinist review): no mate needs the lateral X held tight -- the pair is
-# reamed together and set with the shaft through both, the fulcrum's gain
+# set with the shaft through both bores, the fulcrum's gain
 # sensitivity is ~0.04 %/mm and common to every channel -- so it carries a
 # looser band than the inner faces (KEEPER_FITUP_LOCATION_BAND_MM, which the
 # shaft flats need). build_fr_top_frame reads it for its X-side stacks.
@@ -459,17 +399,15 @@ if KEEPER_TAP_SPEC.depth_mm - _FRAME_TAP_BAND < (
 # the set-screw tap's station off the inner lug face and the foot screw's
 # stations off the foot tip and a side face are manufacturing dimensions no
 # feature measures (both holes are placed by point), so a one-line
-# construction sketch carries each. Four more: the bore's place across the
+# construction sketch carries each. Three more: the bore's place across the
 # width (BORE_FROM_SIDE, a reference carrying the centre-plane band
-# BORE_CENTRE_CALLOUT: MR-fleet r5 asked what lateral error the pair-ream
+# BORE_CENTRE_CALLOUT: MR-fleet r5 asked what lateral error the bore's
 # layout may take; owner ruling Q10-B), the finished height seat to crown top
-# (a reference: the bore height and crown chain it), the overall length lug
-# face to foot tip (a real size, the front view's baseline beside the lug
-# thickness; owner ruling 2026-10-28) and the supplied blank's height
-# (SUPPLY_HEIGHT_MIN), printed beside the finished one (MR-fleet r4: the
-# supply size alone left its extension line in empty space above the top).
+# (a reference: the bore height and crown chain it) and the overall length
+# lug face to foot tip (a real size, the front view's baseline beside the lug
+# thickness; owner ruling 2026-10-28).
 # The part saves them blanked; the drawing shows the tap's and the foot
-# screw's stations in the plan, the heights and length in the front view and
+# screw's stations in the plan, the height and length in the front view and
 # the bore's place in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
@@ -477,7 +415,6 @@ REFERENCE_SKETCHES = (
     "FootScrewSideReference",
     "BoreSideReference",
     "OverallHeightReference",
-    "SupplyHeightReference",
     "OverallLengthReference",
 )
 REFERENCE_DIMENSIONS = ("OverallHeight", "BoreFromSide")
@@ -497,7 +434,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootScrewSideReference": {"ScrewFromSide"},
     "BoreSideReference": {"BoreFromSide"},
     "OverallHeightReference": {"OverallHeight"},
-    "SupplyHeightReference": {"SupplyHeight"},
     "OverallLengthReference": {"OverallLength"},
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
@@ -506,9 +442,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # at the full round's least radius, half the .XX width's least, over a bore
 # BORE_CENTRE_BAND_MM off the width's centre plane (SET_SCREW_ENGAGEMENT_D),
 # and the bore's side walls at the same (BORE_SIDE_WALL_MM). The shaft-axis
-# height (it sets the fulcrum height; the pair reaming lines the two bores
-# up) prints its exact 25.2 rounded to .99; the reamed bore carries its own
-# BORE_DIA_BAND at four places; the foot screw's station off the tip
+# height (it sets the fulcrum height; both keepers' bands at .XX stay inside
+# the bore's alignment allowance) prints its exact 25.2 rounded to .99; the
+# reamed bore carries its own BORE_DIA_BAND at four places; the foot screw's
+# station off the tip
 # (FOOT_TIP_WALL_MM), the tap station off the inner face and the lug
 # thickness hold the crown tap's web at both title-block .XX bands
 # (SET_SCREW_WEB_MM, owner ruling Q11-B) and the shaft's flat window
@@ -518,7 +455,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # station centres the transferred MHA-FR-02 tap in its rail web
 # (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame). The .275 radial and
 # side references print three places (their exact value), the finished
-# height two, and the supplied height its own SUPPLY_HEIGHT_PLACES.
+# height two.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 2},
@@ -531,7 +468,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootScrewSideReference": {"ScrewFromSide": 3},
     "BoreSideReference": {"BoreFromSide": 3},
     "OverallHeightReference": {"OverallHeight": 2},
-    "SupplyHeightReference": {"SupplyHeight": 1},
     "OverallLengthReference": {"OverallLength": OVERALL_LENGTH_PLACES},
 }
 if {f: set(names) for f, names in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
@@ -566,28 +502,33 @@ if BORE_SIDE_WALL_MM < WALL_TARGET_MM:
 KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
     DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
 ]
-# The keeper is supplied square-topped and undrilled (the bore is line-reamed
-# at assembly, ch_fulcrum_keeper_notes.BORE_CALLOUT) and
-# the pair-ream step rounds each crown about its own bore (MR-fleet r3,
-# cb6e11e: the blank's height was printed nowhere). The blank must reach the
-# crown apex of a bore at the top of its printed LugRise band (.99 +.01)
-# under the largest full round the width allows (CROWN_MOST_R); taller, the
-# round cuts the rest away. The SupplyHeightReference line runs up the inner
-# lug face AT the limit, its square top drawn across the lug (MR-fleet r8:
-# the extension line ended in air), and prints the single limit "1.3 MIN"
-# (swTolMIN prints the nominal, so nominal = limit).
-SUPPLY_HEIGHT_PLACES = DRAWING_PRECISION["SupplyHeightReference"]["SupplyHeight"]
-_SUPPLY_STEP = 25.4 * 10.0**-SUPPLY_HEIGHT_PLACES
-_LUG_RISE_UPPER = printed_deviations(
-    SHAFT_AXIS_H, DRAWING_PRECISION["LugProfile"]["LugRise"], unit=UNIT
-)[1]
-SUPPLY_HEIGHT_MIN = round(
-    ceil((SHAFT_AXIS_H + _LUG_RISE_UPPER + CROWN_MOST_R) / _SUPPLY_STEP - 1e-9)
-    * _SUPPLY_STEP,
-    6,
-)  # 33.02 (1.3)
-SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "1.3 MIN"
-SUPPLY_HEIGHT_CALLOUT = "SUPPLY HEIGHT,\nSQUARE TOP"
-if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
-    raise AssertionError("the supplied blank does not reach the crown apex")
+# The two bores, each reamed alone, line up on the straight shaft through
+# both: each keeper's bore height may stand anywhere in its printed LugRise
+# band and the two seats KEEPER_SEAT_FLATNESS_BUDGET_MM apart, so the bore
+# axes stand up to BORE_HEIGHT_MISMATCH_MM apart in height over the
+# 2 x KEEPER_Z_OFF lug span, and each seat may pitch its zone over its
+# length. The shaft takes the straight line through both lug centres, so
+# each .32 lug spends its thickness x (its seat's pitch + that line's slope)
+# of diametral clearance: BORE_ALIGNMENT_ALLOWANCE_MM. The bore band's least
+# clearance on the largest shaft keeps the slip minimum on top of it
+# (ch_fulcrum_shaft_spec states the result, ALIGNED_MIN_CLEARANCE_MM).
+BORE_HEIGHT_MISMATCH_MM = (
+    2.0 * _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]]
+    + KEEPER_SEAT_FLATNESS_BUDGET_MM
+)  # 0.548
+BORE_ALIGNMENT_ALLOWANCE_MM = (
+    2.0
+    * LUG_HALF_T
+    * (
+        KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_SEAT_LENGTH_MM
+        + BORE_HEIGHT_MISMATCH_MM / (2.0 * KEEPER_Z_OFF)
+    )
+)  # 0.0473
+_SHAFT_MAX_DIA = 0.25 * 25.4 + SHAFT_H[0]  # MHA-CH-04 at the top of its band
+BORE_LEAST_CLEARANCE_MM = BORE_DIA + BORE_DIA_BAND[1] - _SHAFT_MAX_DIA  # .0025 in
+if (
+    BORE_LEAST_CLEARANCE_MM
+    < BORE_RUNNING_MIN_CLEARANCE_MM + BORE_ALIGNMENT_ALLOWANCE_MM
+):
+    raise AssertionError("the keeper bore band does not cover the bore alignment")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

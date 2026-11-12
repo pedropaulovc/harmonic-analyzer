@@ -1501,7 +1501,7 @@ KEEPER_FOOT_BOSS_MARGINS = (
     KEEPER_FOOT_TIP_Z_FRONT - KEEPER_RELIEF_STEP_Z_FRONT,
     KEEPER_RELIEF_STEP_Z_REAR - KEEPER_FOOT_TIP_Z_REAR,
 )  # 1.274, 2.282
-# The bench-pair-reamed keeper INNER faces are DRO-located from the front
+# The finished keepers' INNER faces are DRO-located from the front
 # socket at fit-up, then the frame taps are transferred through their feet.
 # Neither the foot-hole position nor a separate frame-tap station band
 # reaches the foot tip. The real stack is the printed INNER-face station
