@@ -382,17 +382,17 @@ def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> Non
 
 def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> None:
     """Below the shaft the back land is boxed in: the back-crown/overall
-    witnesses (x 0.079-0.081 at the 226.162 shaft) on its crown side ran
-    through its text at 30620a85, and the 199.9 witness and Ra leader sit on
-    its head side.  Its diameter hangs above, text right of the line; its
-    19.0 goes below."""
+    witnesses on its crown side ran through its text at 30620a85, and the
+    land's station witness and Ra leader sit on its head side.  Its diameter
+    hangs above, text right of the line; its 19.0 goes below."""
     width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
     assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
-    # Clear of the crown witnesses rising to the sag.
-    assert x - (0.081 - _BACK_SHIFT_MM / 1000.0) >= 0.010
+    # Clear of the crown witnesses rising to the sag (round 6 read 0.081 as
+    # their right edge, 1.4 mm right of the rim witness).
+    assert x - (_RIM_WITNESS_X_MM + 1.4) / 1000.0 >= 0.010
     detail_left = drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH
     # The two-line callout (r1 of #1685) is ~23 mm wider; the label's own
     # text measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
@@ -598,17 +598,19 @@ def test_fence_judges_an_unread_or_misread_dimension_as_all_extension_lines() ->
 
 
 # The (.05) back-crown sag REF, measured on the round-6 sheet (text position
-# y 0.220): its dimension line ran 2.8 mm under its text position, from its
-# text tail at x 48.8 mm to a right arrow tail ending at x 86.0, 6.4 mm past
-# the rim witness (x 79.6); its two witnesses (x 78.4, 79.6) rise from the
-# crown (y 171.0) 1.0 mm past the line; its "(.05)" text spans x 50.0-60.0
-# from 3.2 mm under its text position to 3.2 mm over.  All on the 226.162
-# shaft: the #1038 re-pitch's longer shaft runs the back end (crown, sag row
-# and stub) this much further left with the head end held (PRINCIPAL_CENTER).
-_BACK_SHIFT_MM = spec.SHAFT_LEN - 226.162
+# (0.055, 0.220)): its dimension line ran 2.8 mm under its text position,
+# from its text tail 6.2 mm left of that position to a right arrow tail 6.4
+# mm past the rim witness; its two witnesses (the rim's 0.6 mm left of the
+# rim's `_sheet_x`, the apex's 1.2 mm further left) rise from the crown
+# (y 171.0) 1.0 mm past the line; its "(.05)" text spans 5.0 mm either side
+# of its position, from 3.2 mm under it to 3.2 mm over.  Kept relative to the
+# rim and the text position, they follow the back end (the #1038 re-pitch ran
+# it 10.67 mm left).
+_RIM_WITNESS_X_MM = drawing.BACK_RIM_X * 1000.0 - 0.6
+_SAG_TEXT_POS_X_MM = drawing.BACK_CAP_SAG_TEXT_XY[0] * 1000.0
 _SAG_LINE_BELOW_TEXT_MM = 2.8
-_SAG_TAIL_END_X_MM = 86.0 - _BACK_SHIFT_MM
-_SAG_TEXT_X_MM = (50.0 - _BACK_SHIFT_MM, 60.0 - _BACK_SHIFT_MM)
+_SAG_TAIL_END_X_MM = _RIM_WITNESS_X_MM + 6.4
+_SAG_TEXT_X_MM = (_SAG_TEXT_POS_X_MM - 5.0, _SAG_TEXT_POS_X_MM + 5.0)
 _SAG_TEXT_HALF_HEIGHT_MM = 3.2
 _SAG_LINE_Y_MM = drawing.BACK_CAP_SAG_TEXT_XY[1] * 1000.0 - _SAG_LINE_BELOW_TEXT_MM
 # Sheet obstacles near the principal view's plain-span diameters, in sheet mm
@@ -621,9 +623,9 @@ _PRINCIPAL_LINES_MM = (
     (260.2, 136.2, 260.2, 165.0),
     (241.8, 141.4, 241.8, 166.0),
     (253.2, 124.0, 259.3, 166.0),
-    (78.4 - _BACK_SHIFT_MM, 171.0, 78.4 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM + 1.0),
-    (79.6 - _BACK_SHIFT_MM, 171.0, 79.6 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM + 1.0),
-    (48.8 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM, _SAG_TAIL_END_X_MM, _SAG_LINE_Y_MM),
+    (_RIM_WITNESS_X_MM - 1.2, 171.0, _RIM_WITNESS_X_MM - 1.2, _SAG_LINE_Y_MM + 1.0),
+    (_RIM_WITNESS_X_MM, 171.0, _RIM_WITNESS_X_MM, _SAG_LINE_Y_MM + 1.0),
+    (_SAG_TEXT_POS_X_MM - 6.2, _SAG_LINE_Y_MM, _SAG_TAIL_END_X_MM, _SAG_LINE_Y_MM),
     (133.6, 227.6, 133.6, 243.0),
 )
 # A "Ø.3125 -.0004/-.0038" block over a "SEE NOTE 2" row, measured from its

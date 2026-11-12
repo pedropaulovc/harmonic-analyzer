@@ -73,6 +73,7 @@ from dt_pinion_arbor_spec import (
     RETAINING_COMPOUND,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
+    SHAFT_LEN,
     STRAP_NUMBER,
     SURFACE_FINISHES,
 )
@@ -286,13 +287,13 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
     BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
 )
 # The back land is boxed in below the shaft (the back-crown and overall
-# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
-# leader on its head side), so its diameter hangs ABOVE the shaft, its text
-# right of the line over the land and clear of the back-crown sag witnesses,
-# and its 19.0 length moves below.  The block rides high enough that the
-# back Ra symbol fits under it, over the land; at 0.1945 (r1 of #1685) the
-# one-line callout cleared the Ra text by 2.35 mm, so the two-line one rises
-# to keep its shoulder 2.8 mm over it.
+# witnesses ~8 mm left of its crown end, the land's station witness and the
+# Ra leader on its head side), so its diameter hangs ABOVE the shaft, its
+# text right of the line over the land and clear of the back-crown sag
+# witnesses, and its 19.0 length moves below.  The block rides high enough
+# that the back Ra symbol fits under it, over the land; at 0.1945 (r1 of
+# #1685) the one-line callout cleared the Ra text by 2.35 mm, so the
+# two-line one rises to keep its shoulder 2.8 mm over it.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
 BACK_JOURNAL_DIA_Y = 0.1981
 # Callout blocks, measured on the r1 sheet of #1685: lines 5.6 mm apart, a
@@ -367,9 +368,11 @@ BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 # 14).  Any row under the block's shoulder meets that leader, so the row
 # rises over the block: the line ~2.8 mm under the text position runs at
 # ~250 mm, ~10 mm over the block's "2X" and 21 mm over the leader's top,
-# its text ~11 mm under the sheet's zone border.  #1038 re-pitch: x 0.055 ->
-# 0.0443, with the back end.
-BACK_CAP_SAG_TEXT_XY = (0.0443, 0.253)
+# its text ~11 mm under the sheet's zone border.  It stands a fixed run left
+# of the back rim, so it follows the back end (#1038 re-pitch: x 0.055 ->
+# 0.0443).
+BACK_RIM_X = _sheet_x(SHAFT_LEN)
+BACK_CAP_SAG_TEXT_XY = (BACK_RIM_X - 0.0253, 0.253)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -464,9 +467,9 @@ RELIEF_DIA_LINE_OFFSET = 0.0155
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
-    # Below the shaft, under the back Ra symbol and its leader.  #1038
-    # re-pitch: this and BackCapR moved 10.67 left with the back end.
-    "BackJournalLen": (0.0863, 0.143),
+    # Below the shaft, under the back Ra symbol and its leader, just left of
+    # the back land's centre.
+    "BackJournalLen": (_sheet_x(BACK_JOURNAL_Z + JOURNAL_LEN / 2.0) - 0.0012, 0.143),
     # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
     # station's text.
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
@@ -488,7 +491,7 @@ PRINCIPAL_KEEP = {
     "BackCapSagDim": BACK_CAP_SAG_TEXT_XY,
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
-    "BackCapR": (0.0343, 0.140),
+    "BackCapR": (BACK_RIM_X - 0.0353, 0.140),
     # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
     # so both its dimensions stand ABOVE the shaft: the station from the head
     # rear face in a row over the Ø15's, and the hole's leader rising left of

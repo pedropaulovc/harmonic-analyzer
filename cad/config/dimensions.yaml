@@ -1162,8 +1162,8 @@ sections:
       ### Channel & top-frame layout (M6.3, eight-views 0°/180° + ch. 14–18)
 
       Machine coords as in "Drive-train layout". Channel j (j = 0 front … 19
-      rear): cylinder gear at z_j = −64.0124 + 7.0565 j; after the end-for-end
-      cylinder flip the integral cam + rod ring plane is z_j − 3.528; the flat
+      rear): cylinder gear at z_j = −69.0839 + 7.62 j; after the end-for-end
+      cylinder flip the integral cam + rod ring plane is z_j − 3.81; the flat
       rod's fork, the rocker arm / amplitude bar / top lever mid-planes and the
       spring stations share that cam plane (`rocker_bank_layout.ARM_MID_DZ`).
   - table:
