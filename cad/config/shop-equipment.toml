@@ -85,7 +85,7 @@ length_in = { value = 2, measured = { status = "measured", by = "placeholder (re
 
 # MHA-SM-00 step 5B / check 5 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
 # #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
-# stand 7.41 in apart at worst. To make: not owned, no receipt metrology.
+# stand 7.67 in apart at worst. To make: not owned, no receipt metrology.
 [gauges.gauge-bar-0472x8]
 name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
 kind = "gauge_bar"

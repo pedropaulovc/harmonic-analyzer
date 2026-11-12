@@ -7,7 +7,7 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 
 A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
 bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
-taps, a solid pivot cylinder (6.00 long, along Z), and a summation arm
+taps, a solid pivot cylinder (6.25 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore. Sheet 1
@@ -121,6 +121,8 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_IN,
     HEX_DEPTH,
     HEX_H,
+    HEX_Z_OUTER_MINUS,
+    HEX_Z_OUTER_PLUS,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -130,8 +132,9 @@ from sm_summing_lever_spec import (
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_TOL_TYPE,
     KNIFE_RIDGE_TANGENT_XY,
-    PLATE_L,
     PLATE_W,
+    PLATE_Z_MINUS,
+    PLATE_Z_PLUS,
     RIB_REACH,
     RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
@@ -165,9 +168,17 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 # Front (down -Z) and top (down -Y) share the same X extent: anchor eye
 # (TIP_X - ANCHOR_R) on the left to the plate right edge (PLATE_W).
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
+# The body's -Z end is extended .25 in (owner ruling 4, #1038), so the plan's
+# outline is centred this far to -Z of the part origin.
+_BBOX_CZ = (HEX_Z_OUTER_PLUS + HEX_Z_OUTER_MINUS) / 2.0
 
 FRONT_CENTER = (0.225, 0.235)
-TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
+# Aligned plan below the front profile.  The plan draws model -Z up the
+# sheet; its centre stands half the extension above the origin's row
+# (_TOP_ORIGIN_Y), so datum B's end, the tap row and everything dimensioned
+# from them keep their sheet stations and only the -Z end moves up.
+_TOP_ORIGIN_Y = 0.130
+TOP_CENTER = (0.225, _TOP_ORIGIN_Y - _BBOX_CZ * _S / 1000.0)
 ISO_CENTER = (0.350, 0.225)
 # R7's receiver callout entered the title block (top Y66 mm), while its
 # left-hand stations entered D. Translate the complete 1:1 field +35/+50 mm:
@@ -207,10 +218,10 @@ DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
 
 
 def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Z) point in the top plan view (1:2)."""
+    """Sheet (x, y) of a model (X, -Z) point in the top plan view (1:2)."""
     return (
         TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        TOP_CENTER[1] + mz * _S / 1000.0,
+        _TOP_ORIGIN_Y + mz * _S / 1000.0,
     )
 
 
@@ -222,7 +233,7 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     plate-top edge is visible. Inboard flange and underside edges cannot
     substitute for this outer end face.
     """
-    z_mm = PLATE_L / 2.0
+    z_mm = PLATE_Z_PLUS
     matches = [
         item
         for item in edges.lines
@@ -256,7 +267,7 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
         axis=(0.0, 1.0, 0.0), label="boss upper-face rim",
     )
     plate_point = (
-        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0,
+        (RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_Z_PLUS,
     )
     plate = edges.exact_line_through(plate_point, label="coefficient top end edge")
     points_mm = (
@@ -390,7 +401,7 @@ def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
     drawing = _early_bound(draw, "IDrawingDoc")
     view = _early_bound(back, "IView")
     expected_mm = HEX_H / 2.0 - COEFFICIENT_TOP_Y
-    plate_point = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, -PLATE_L / 2.0)
+    plate_point = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_Z_MINUS)
 
     def references() -> tuple[Any, Any]:
         vertex, xyz = _theoretical_knife_vertex_in_view(adapter, view)
@@ -465,7 +476,7 @@ def _knife_detail(adapter: Any, back: Any) -> Any:
     return _detail_view(
         adapter,
         back,
-        centre_mm=(0.0, 0.0, -PLATE_L / 2.0 - HEX_DEPTH),
+        centre_mm=(0.0, 0.0, HEX_Z_OUTER_MINUS),
         radius_m=DETAIL_RADIUS_MM / 1000.0,
         at_xy=DETAIL_CENTER,
         scale=DETAIL_SCALE,
@@ -818,7 +829,7 @@ def _ridge_datum(adapter: Any, detail: Any) -> Any:
     review r9 read as a flat face, leaving no basic from A to the 20 holes;
     end-on it can only be the ridge line, the knife-edge pivot axis that the
     39.85 basic and the web arcs' "AXIS A" both name."""
-    z_mm = -PLATE_L / 2.0 - HEX_DEPTH
+    z_mm = HEX_Z_OUTER_MINUS
     half = math.radians(RIDGE_ANGLE_DEG) / 2.0
     centre_y = HEX_H / 2.0 - KNIFE_RIDGE_R / math.sin(half)
     edges = scan_view_edges(detail, label="knife detail datum")
@@ -867,8 +878,8 @@ def _ridge_centerline(adapter: Any, top: Any) -> Any:
         tuple(
             (0.0, HEX_H / 2.0, z)
             for z in (
-                -PLATE_L / 2.0,
-                -PLATE_L / 2.0 - HEX_DEPTH - RIDGE_AXIS_OVERRUN_MM,
+                PLATE_Z_MINUS,
+                HEX_Z_OUTER_MINUS - RIDGE_AXIS_OVERRUN_MM,
             )
         ),
         label="ridge centreline",
@@ -953,8 +964,8 @@ def _plate_top_datum(adapter: Any, front: Any) -> Any:
     """Datum C on the coefficient-plate top, edge-on in VIEW G: the face the 20
     spring taps run through clocks their pattern about A (machinist review
     e1d24c9: A|B left rotation about the knife-edge axis free)."""
-    mid = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0)
-    end = (PLATE_W, COEFFICIENT_TOP_Y, PLATE_L / 2.0)
+    mid = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, PLATE_Z_PLUS)
+    end = (PLATE_W, COEFFICIENT_TOP_Y, PLATE_Z_PLUS)
     plate = scan_view_edges(front, label="VIEW G datum C").exact_line_through(
         mid, label="coefficient top end edge",
     )
@@ -1012,8 +1023,8 @@ def _clear_plate_width_witnesses(
         adapter, top,
         [
             _metres((0.0, COEFFICIENT_TOP_Y, 0.0)),
-            _metres((0.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
-            _metres((PLATE_W, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
+            _metres((0.0, COEFFICIENT_TOP_Y, PLATE_Z_PLUS)),
+            _metres((PLATE_W, COEFFICIENT_TOP_Y, PLATE_Z_PLUS)),
         ],
         label="plate width witness origins",
         names=("middle", "end", "far end"),
@@ -1059,7 +1070,7 @@ def _clear_ridge_witnesses(
     """Leave A's actual ridge attachment alone; start both witnesses above it."""
     vertex = model_point_in_view(
         adapter, detail,
-        _metres((0.0, HEX_H / 2.0, -PLATE_L / 2.0 - HEX_DEPTH)),
+        _metres((0.0, HEX_H / 2.0, HEX_Z_OUTER_MINUS)),
         label="knife ridge witness origin",
     )
     wanted = {"RidgeFromLeft", "RidgeFromRight"}
@@ -1295,7 +1306,7 @@ def _plate_thickness_check(
                 }
             return record
 
-        z_mm = -PLATE_L / 2.0
+        z_mm = PLATE_Z_MINUS
         model_points = {
             "bottom": _metres((PLATE_W, COEFFICIENT_BOTTOM_Y, z_mm)),
             "top": _metres((PLATE_W, COEFFICIENT_TOP_Y, z_mm)),
@@ -1343,7 +1354,7 @@ def _plate_thickness_check(
         return RuntimeError(f"{failure}; native_geometry={evidence!r}")
 
     def geometry() -> tuple[tuple[float, float], tuple[float, float]]:
-        z_mm = -PLATE_L / 2.0
+        z_mm = PLATE_Z_MINUS
         edges = scan_view_edges(view, label="coefficient plate free end")
         points = []
         for face, y_mm in (
@@ -1716,7 +1727,7 @@ RECEIVER_AXIS_OVERRUN_MM = 2.0
 
 def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
     """Extend VIEW F's centreline along the relocated two-tap row only."""
-    z_mm = -PLATE_L / 2.0
+    z_mm = PLATE_Z_MINUS
     stations = [point[0] for point in LEVER_HOLE_POINTS]
     return _owned_centerline(
         adapter,
@@ -1787,15 +1798,14 @@ TOP_KEEP = {
     "PlateWidth": (0.266, 0.0813),
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
     # line crossed "DRILL", farm r7); the value ends inside the border.
-    "PlateLength": (0.405, TOP_CENTER[1]),
+    "PlateLength": (0.405, _TOP_ORIGIN_Y),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
     "AnchorOuterDia": (0.145, 0.168),
-    # Plan geometry (baseline render): the cylinder band x 0.2286..0.2417,
-    # the -Z plate end at y 0.1681 with its stub to 0.179, the +Z end at
-    # 0.0922, the summation web's arcs from the boss (x 0.2021) to the
-    # cylinder ends.
-    # Inside the web's upper arc (centre (0.1737, 0.2001), 69.4 sheet mm,
+    # Plan geometry: the cylinder band x 0.2286..0.2417, the -Z plate end at
+    # y 0.1713 with its stub to 0.1821, the +Z end at 0.0919, the summation
+    # web's arcs from the boss (x 0.2021) to the cylinder ends.
+    # Inside the web's upper arc (centre (0.1718, 0.1994), 69.4 sheet mm,
     # visible from -70 to -37 deg round it).  The leader starts at the text's
     # left end, at -60 deg and 46 mm from the centre, so it lands on the
     # visible arc: from -93 deg (farm r5) or -72 deg (r4) SolidWorks moved the
@@ -1805,12 +1815,12 @@ TOP_KEEP = {
     # text's far corner stays 7 mm inside the arc, 8 mm under the 21.72.
     # Foreshortened (_shorten_radii): the full line from the centre read as
     # a loose line (machinist review r8).
-    "SummationArcRadius": (0.2096, 0.162),
+    "SummationArcRadius": (0.2077, 0.1613),
     # Left of the -Z stub. Native text spanned x 213.0267..233.9732 mm
     # against the stub's x 232.2987 mm outline; move its anchor 5 mm left
     # to target 3.3 mm box clearance. Both stubs are one prism, so the length
     # remains the hidden KnifeStubReference's, along its -X side.
-    "KnifeStubLength": (0.2185, 0.1735),
+    "KnifeStubLength": (0.2185, _top_xy(0.0, -PLATE_Z_MINUS)[1] + 0.0054),
     # One model-owned 3X thickness sizes all three ribs, above its span.
     # R2's native text hangs LEFT of this anchor: x 191.1396..209.5 mm
     # crossed the boss-X witness at x 197.2187. Move the complete native
@@ -1868,7 +1878,8 @@ NOTES_XY = (0.016, 0.040)
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
 # the hex stub (x 0.2335..0.2375) and the 20X frame's leader (x 0.2545); the
-# letter stands 8 mm above the edge, under that frame (bottom y 0.192).
+# letter stands 8 mm above the edge, under that frame (bottom 20.7 mm over
+# the edge: frame and letter both ride _MINUS_END_Y).
 # The leader leaves the letter's right side, VIEW_F_LEADER_DX right of the
 # note's left (farm r13: note x 0.24422, leader start 0.24775), so the note
 # stands that far left of the tip and the arrow drops square onto the end
@@ -1877,7 +1888,10 @@ NOTES_XY = (0.016, 0.040)
 # (note upper-left, leader tip) in sheet metres.
 VIEW_LETTER_HEIGHT = 0.005
 VIEW_F_LEADER_DX = 0.00353
-_VIEW_F_TIP = _top_xy(21.4, PLATE_L / 2.0)
+# Sheet y of the body's -Z end in the plan: the annotations hung over that
+# end keep their clearances to it wherever the end stands.
+_MINUS_END_Y = _top_xy(0.0, -PLATE_Z_MINUS)[1]
+_VIEW_F_TIP = _top_xy(21.4, -PLATE_Z_MINUS)
 VIEW_F_ARROW = (
     (_VIEW_F_TIP[0] - VIEW_F_LEADER_DX, _VIEW_F_TIP[1] + 0.013),
     _VIEW_F_TIP,
@@ -1889,7 +1903,7 @@ VIEW_F_ARROW = (
 # note stands at the tip (the left margin is squared on readback); its foot
 # stays 3 mm over the 76.20/39.85 dimension line (y 0.0784).
 VIEW_ARROW_SQUARE_TOL = 0.0003
-_VIEW_G_TIP = _top_xy(7.2, -PLATE_L / 2.0)
+_VIEW_G_TIP = _top_xy(7.2, -PLATE_Z_PLUS)
 VIEW_G_ARROW = (
     (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
     _VIEW_G_TIP,
@@ -2119,9 +2133,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # negative sheet offset selects the +Z ridge.
     top_edges = scan_view_edges(top, label="summing lever top plan")
     ridge_x, ridge_y = KNIFE_RIDGE_TANGENT_XY
-    stub_mid_z = PLATE_L / 2.0 + HEX_DEPTH / 2.0
+    stub_mid_plus = PLATE_Z_PLUS + HEX_DEPTH / 2.0
+    stub_mid_minus = PLATE_Z_MINUS - HEX_DEPTH / 2.0
     finish_ridge = top_edges.exact_line_through(
-        (ridge_x, ridge_y, stub_mid_z), label="+Z knife-edge ridge round"
+        (ridge_x, ridge_y, stub_mid_plus), label="+Z knife-edge ridge round"
     )
     # The ridge lands in a pocket closed by the 76.20 extension line (left),
     # the 76.20/39.85 dimension line (below) and the plate (above); the default
@@ -2134,7 +2149,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_entity=finish_ridge.edge,
-        leader_attach_xy=_top_xy(ridge_x, -stub_mid_z),
+        leader_attach_xy=_top_xy(ridge_x, -stub_mid_plus),
         symbol_xy=(0.216, 0.084),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
@@ -2145,15 +2160,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # symbol left the other edge open to as-cast).
     # It stands over the -Z stub: right of 21.72's upper dimension line (x
     # 0.2235), its text 3 mm over the F arrow's letter and 2 mm under the
-    # 20X position frame (y 0.192); its leader enters the stub's right side.
+    # 20X position frame (20.7 mm over the -Z end); its leader enters the
+    # stub's right side.
     add_surface_finish(
         adapter,
         top,
         edge_entity=top_edges.exact_line_through(
-            (ridge_x, ridge_y, -stub_mid_z), label="-Z knife-edge ridge round"
+            (ridge_x, ridge_y, stub_mid_minus), label="-Z knife-edge ridge round"
         ).edge,
-        leader_attach_xy=_top_xy(ridge_x, stub_mid_z),
-        symbol_xy=(0.233, 0.1828),
+        leader_attach_xy=_top_xy(ridge_x, -stub_mid_minus),
+        symbol_xy=(0.233, _MINUS_END_Y + 0.0147),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge_minus_z"),
         label="-Z knife-edge ridge finish",
         char_height=0.0025,
@@ -2166,7 +2182,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The other endpoint is the tap rim on the boss top, centre
     # (TIP_X, ANCHOR_H/2, 0), placed by _counter_anchor_tap. The mid rib's
     # apex shares the anchor tap's X station.
-    ridge_dim_edge = _top_xy(0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
+    ridge_dim_edge = _top_xy(0.0, -PLATE_Z_MINUS + 0.3 * HEX_DEPTH)
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     ridge_axis = _ridge_centerline(adapter, top)
     anchor_rim = top_edges.circle_at(
@@ -2217,7 +2233,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the same X or any equal-pitch pair. The picks below are the rims'
     # model positions (the hole wizard's seed at HOLE_Z_LAST, the pattern
     # marching -Z by CHANNEL_PITCH; build_summing_lever).
-    plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
+    plate_end_edge = _top_xy(10.0, -PLATE_Z_PLUS)
     end_edge = _end_face_edge(top_edges, x_mm=10.0)
     add_datum_feature(
         adapter,
@@ -2228,13 +2244,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="plate +Z end face",
     )
     # Z location of the anchor boss (machinist review r4 B3: the plan located
-    # it only in X): datum B to the tap's centre, half the plate length.  The
+    # it only in X): datum B to the tap's centre, 3.00 in (the body's -Z end
+    # stands .25 farther from it, #1038 owner ruling 4).  The
     # pick sits at the end line's inboard end (the rib's top edge at the
     # cylinder), so the extension line runs left under the web's lower arc,
     # not along the outline; the text stands in the span left of the boss,
     # under the anchor tap's callout and right of the Ø19.05's leader.
     boss_z_pick = _top_xy(
-        min(point[0] for point in end_edge.line) + 1.0, -PLATE_L / 2.0
+        min(point[0] for point in end_edge.line) + 1.0, -PLATE_Z_PLUS
     )
     boss_z = add_edge_dimension(
         adapter,
@@ -2249,7 +2266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_dimension_measures(
         adapter,
         boss_z,
-        expected_mm=PLATE_L / 2.0,
+        expected_mm=PLATE_Z_PLUS,
         label="anchor boss Z location",
         entities=(end_edge.edge, anchor_rim.edge),
     )
@@ -2307,7 +2324,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_entity=seed_rim.edge,
         leader_attach_xy=_top_xy(HOLE_X - rim_step, -HOLE_Z_FIRST + rim_step),
-        frame_xy=(0.2133, 0.199),
+        frame_xy=(0.2133, _MINUS_END_Y + 0.0309),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_IN["spring-hole pattern position"],
         datums=("A", "B", "C"),

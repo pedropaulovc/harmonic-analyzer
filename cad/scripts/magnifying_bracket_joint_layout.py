@@ -39,8 +39,11 @@ SCREW_PITCH = 25.4 / 56.0
 
 BRACKET_ORIGIN = (40.0, KNIFE_Y, -173.5192)  # threaded nose in the drum's wire lane
 LEVER_ORIGIN_X = -15.0
-LEVER_FRONT_LOCAL_Z = -76.2
-SEAT_PLANE_Z = -73.11241221957347
+# The seat is the lever's front (-Z) body end, extended .25 in (owner ruling
+# 4, #1038): the seat follows it 6.35 to the front while the nose keeps its
+# station, so the L body is 6.35 shorter (SIDE_PLATE_Z below).
+LEVER_FRONT_LOCAL_Z = lever.PLATE_Z_MINUS  # -82.55
+SEAT_PLANE_Z = -79.46241221957347  # SUMMING_Z + LEVER_FRONT_LOCAL_Z
 SIDE_PLATE_THICKNESS = 3.175
 SIDE_PLATE_HEIGHT = 2.0 * NOSE_R  # owner: match neck width; no lateral root ledge
 SIDE_PLATE_MACHINE_X = (-8.0, 46.25)  # user-approved +5 free end; mounts/neck stay fixed

@@ -121,7 +121,7 @@ def _placed_transform(y: float, z: float) -> list[float]:
 
 
 @pytest.mark.parametrize(
-    "station_z", [asm.SUMMING_Z + asm.HEX_Z_MID, asm.SUMMING_Z - asm.HEX_Z_MID]
+    "station_z", [asm.KNIFE_MOUNT_Z_PLUS, asm.KNIFE_MOUNT_Z_MINUS]
 )
 def test_instance_readback_seats_both_bearing_faces_at_each_station(
     station_z: float,
@@ -150,7 +150,7 @@ def test_instance_readback_seats_both_bearing_faces_at_each_station(
 def test_instance_readback_rejects_drifted_hardware(
     part: str, axis: int, message: str
 ) -> None:
-    station_z = asm.SUMMING_Z + asm.HEX_Z_MID
+    station_z = asm.KNIFE_MOUNT_Z_PLUS
     screw_transform = _placed_transform(asm.HANGER_STUD_Y, station_z)
     washer_transform = _placed_transform(asm.HANGER_WASHER_Y, station_z)
     transforms = {"screw": screw_transform, "washer": washer_transform}
@@ -298,10 +298,11 @@ def test_crossbar_hanger_stations_are_the_assemblys_knife_mount_stations() -> No
     # .XX resolution, so a trunnion-station edit past that rounding must move
     # both.  #1038 (owner ruling 4): the front station stands .25 further out
     # than the rear, the summing plate's front extension.
-    assert round(asm.HEX_Z_MID, 2) == top_frame.HEX_Z_MID_REAR
+    assert round(asm.KNIFE_SEAT_Z_PLUS, 2) == top_frame.HEX_Z_MID_REAR
+    assert round(-asm.KNIFE_SEAT_Z_MINUS, 2) == top_frame.HEX_Z_MID_FRONT
     assert top_frame.HEX_Z_MID_FRONT == pytest.approx(top_frame.HEX_Z_MID_REAR + 6.35)
     for crossbar, assembly in (
-        (top_frame.STUD_Z_FRONT, asm.SUMMING_Z - asm.HEX_Z_MID),
-        (top_frame.STUD_Z_REAR, asm.SUMMING_Z + asm.HEX_Z_MID),
+        (top_frame.STUD_Z_FRONT, asm.KNIFE_MOUNT_Z_MINUS),
+        (top_frame.STUD_Z_REAR, asm.KNIFE_MOUNT_Z_PLUS),
     ):
         assert abs(crossbar - assembly) < 0.005
