@@ -386,16 +386,6 @@
       ]
     },
     {
-      "old_stem": "ch-bar-pivot-pin",
-      "old_number": "MHA-CH-011",
-      "new_identities": [
-        {
-          "stem": "ch-bar-pivot-pin",
-          "number": "MHA-CH-11"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-channel-lever",
       "old_number": "MHA-CH-002",
       "new_identities": [
@@ -1655,16 +1645,6 @@
       ]
     },
     {
-      "old_stem": "ch-rod-pivot-pin",
-      "old_number": "MHA-CH-010",
-      "new_identities": [
-        {
-          "stem": "ch-rod-pivot-pin",
-          "number": "MHA-CH-10"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-alignment-pinion",
       "old_number": "MHA-DT-001",
       "new_identities": [
@@ -2319,6 +2299,27 @@
           "number": "MHA-DT-39"
         }
       ]
+    },
+    {
+      "old_stem": "sh-vn-pivot-pin",
+      "old_number": null,
+      "introduced": "2026-11-11",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "sh-vn-pivot-pin",
+          "number": "MHA-SH-VN-58",
+          "configuration": "RodPin",
+          "role": "RodPin"
+        },
+        {
+          "parent": "ch-channel",
+          "stem": "sh-vn-pivot-pin",
+          "number": "MHA-SH-VN-58",
+          "configuration": "BarPin",
+          "role": "BarPin"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -2867,6 +2868,28 @@
         }
       ],
       "status": "retired"
+    },
+    {
+      "old_stem": "ch-rod-pivot-pin",
+      "old_number": "MHA-CH-010",
+      "new_identities": [
+        {
+          "stem": "ch-rod-pivot-pin",
+          "number": "MHA-CH-10"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-bar-pivot-pin",
+      "old_number": "MHA-CH-011",
+      "new_identities": [
+        {
+          "stem": "ch-bar-pivot-pin",
+          "number": "MHA-CH-11"
+        }
+      ],
+      "status": "retired"
     }
   ],
   "historical_current_aliases": [
@@ -2974,6 +2997,17 @@
         "FlangeNut"
       ],
       "neutral_export_configuration": "HoldDownStud"
+    },
+    {
+      "stem": "sh-vn-pivot-pin",
+      "number": "MHA-SH-VN-58",
+      "supplier": "McMaster",
+      "supplier_sku": "90145A299",
+      "configurations": [
+        "RodPin",
+        "BarPin"
+      ],
+      "neutral_export_configuration": "RodPin"
     }
   ],
   "configured_kits": [

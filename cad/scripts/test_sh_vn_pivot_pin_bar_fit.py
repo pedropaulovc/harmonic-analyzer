@@ -1,10 +1,10 @@
 """Offline contract: the amplitude bar's top notch straddles its channel lever,
-and the MHA-CH-11 pin is pressed into both notch cheeks and runs in the
-lever, with every fit held at the worst case of its printed bands (policy
-drawing-guidelines.md rule 17 (walls and webs)).
+and the BarPin member of MHA-SH-VN-58 is pressed into both notch cheeks and
+runs in the lever, with every fit held at the worst case of its printed bands
+(policy drawing-guidelines.md rule 17 (walls and webs)).
 
-``ch_bar_pivot_pin_spec`` reads only the two parts it joins; the restated
-floors and bands are pinned to their sources here.
+``sh_vn_pivot_pin_bar_spec`` reads only the two parts it joins and the
+purchased pin; the restated floors and bands are pinned to their sources here.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import pytest
 
 import _config
 import ch_amplitude_bar_spec as bar
-import ch_bar_pivot_pin_spec as pin
+import sh_vn_pivot_pin_bar_spec as pin
 import ch_channel_lever_spec as lever
 import rocker_bank_layout as bank
 from _hole_spec import NUMBER_DRILL_MM
@@ -30,7 +30,8 @@ def test_restated_floors_are_their_sources() -> None:
     assert lever.HUB_LENGTH == bank.PITCH
     assert pin.BAR_HOLE_DIA is bar.TOP_PIN_HOLE_DIA
     assert pin.BAR_HOLE_BAND is bar.TOP_PIN_HOLE_BAND
-    # ANSI B4.1 FN2, 0-0.12 in: 0.85 thousandths of an inch at most.
+    # ANSI B4.1 FN2, 0-0.12 in: 0.2 to 0.85 thousandths of an inch.
+    assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-6)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.02159, abs=1e-6)
     # The hole's offset prints at three places on the bar's inch sheet: .XXX.
     from _printed_tolerance import printed_band_mm
@@ -55,33 +56,40 @@ def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
     assert pin.PIN_INSTALLED_LENGTH == bar.BAR_WIDTH
     assert pin.PIN_END_PROUD_MAX == 0.0
     assert pin.PIN_DIA == pytest.approx(5.0 / 64.0 * 25.4)
+    # The catalogue's 0/+.0002 in band over nominal.
+    assert pin.PIN_DIA_LIMITS == pytest.approx((pin.PIN_DIA, pin.PIN_DIA + 0.00508))
     assert lever.BAR_PIN_HOLE_SPEC.size == "#47"
     assert NUMBER_DRILL_MM["#47"] == 1.994
 
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # Press in the reamed cheeks: real at both band extremes, inside FN2.
-    assert b["interference_min"] == pytest.approx(0.000635, abs=1e-6)
+    # Press in the reamed cheeks: real at both band extremes, inside FN2 by
+    # limits alone (the loosest pin still presses at FN2's minimum).
+    assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] < b["interference_max"]
+    assert b["interference_min"] >= pin.PRESS_INTERFERENCE_MIN
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
     # Running fit in the lever's #47 hole.
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
     # Flush ends leave the #1038 top-notch gap untouched.
     assert b["neighbour_clearance_min"] == pytest.approx(0.1223, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
     # The .55 roof under the .43 lever turned the full relative swing.
-    assert b["notch_roof_clearance_min"] == pytest.approx(0.9882, abs=1e-4)
+    assert b["notch_roof_clearance_min"] == pytest.approx(0.9907, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
     # The far face, the offset at its long limit on the narrowest stock: .079,
     # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).
     assert b["hole_face_wall_min"] == pytest.approx(2.00787, abs=1e-6)
     assert pin.RULE12_WALL_FLOOR <= b["hole_face_wall_min"] < pin.RULE12_WALL_TARGET
-    # The .30 blank under the title block's .XX band.
-    assert b["blank_excess_min"] == pytest.approx(1.016, abs=1e-6)
-    assert b["blank_excess_max"] == pytest.approx(1.5748, abs=1e-6)
+    # The supplied 5/16 pin under the assumed +/-.010 length grade: the
+    # shortest over the widest bar leaves .02625 to dress at each end.
+    assert b["length_excess_min"] == pytest.approx(1.3335, abs=1e-6)
+    assert b["dress_stock_per_end_min"] == pytest.approx(0.66675, abs=1e-6)
+    # The longest pin over the narrowest bar: .0745 to file off.
+    assert b["length_excess_max"] == pytest.approx(1.8923, abs=1e-6)
 
 
 def test_the_cheeks_the_pin_presses_into_hold_the_approved_exception() -> None:
@@ -174,15 +182,16 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     assert pin_dia == pytest.approx(pin.PIN_DIA, abs=1e-9)
     assert hole_dia == bar.TOP_PIN_HOLE_DIA
     assert engaged == pytest.approx(bar.BAR_WIDTH - bar.TOP_NOTCH_WIDTH, abs=1e-9)
-    # The rod pins' press pairs share the table (test_ch_rod_pivot_fit holds
-    # the union to exactly the two pin joints).
+    # The rod pins' press pairs share the table and the pin identity
+    # (test_sh_vn_pivot_pin_rod_fit holds the union to exactly the two pin
+    # joints); channel n's BarPin is instance 2n, after its RodPin.
     pairs = {
         pair: limit
         for pair, limit in ic.ALLOWED_PAIRS.items()
-        if any(name.startswith("ch-bar-pivot-pin-") for name in pair)
+        if any(name.startswith("ch-amplitude-bar-") for name in pair)
     }
     assert set(pairs) == {
-        frozenset((f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}"))
+        frozenset((f"sh-vn-pivot-pin-{2 * n}", f"ch-amplitude-bar-{n}"))
         for n in range(1, 21)
     }
     nominal = math.pi / 4.0 * (pin_dia**2 - hole_dia**2) * engaged

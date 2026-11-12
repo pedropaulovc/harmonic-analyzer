@@ -26,4 +26,4 @@ ch-channel-lever:
       kind: "accept"
       where: "the hub width .278 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "band .001 total, narrower than the milled/turned width row (+/-.001), with no fit route at the callout (rule 4)"
-      reason: "the band can neither open nor take a route on this sheet: a hub shorter than nominal closes the bar-to-bar running gap below its .10 mm floor (ch_bar_pivot_pin_spec neighbour_clearance_min 0.122 at the band) and twenty hubs at +.001 must still float between the MHA-CH-07 keepers, so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
+      reason: "the band can neither open nor take a route on this sheet: a hub shorter than nominal closes the bar-to-bar running gap below its .10 mm floor (sh_vn_pivot_pin_bar_spec neighbour_clearance_min 0.122 at the band) and twenty hubs at +.001 must still float between the MHA-CH-07 keepers, so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
