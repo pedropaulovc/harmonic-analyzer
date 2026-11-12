@@ -12,8 +12,9 @@ diff``:
 
 * :func:`truth_cause`: what preceded the first request difference. Either a
   response difference beyond noise (``response:<member>``: SolidWorks answered
-  differently first) or none (``request``: the script asked something else of
-  the same answers).
+  differently first), a title counter the script echoed into the request
+  (:data:`TITLE_COUNTER_CAUSE`), or none (``request``: the script asked
+  something else of the same answers).
 * :func:`outcome`: whether the two builds made the same part, on signals that
   do not depend on call order (:class:`Outcome`).
 
@@ -52,6 +53,12 @@ REL_TOL = 1e-9
 # The counter in a new document's title (Part11, Assem3, Draw2): SolidWorks
 # numbers documents per session, so the same build reads another one each run.
 _TITLE_COUNTER = re.compile(r"\b(Part|Assem|Draw)\d+\b")
+# The cause of a request that differs from the base's only in title counters,
+# after an answer that differed only in one: the script put the seat's
+# document counter into a request (2026-11-12, ms_stick: ``IDimension.FullName``
+# ``D3@MinorPattern@Part24.Part`` written into an equation). SolidWorks
+# answered differently first, so it is a response cause like any other.
+TITLE_COUNTER_CAUSE = "response:title_counter"
 # The members answering mass properties: matched as measurements within
 # tolerance (:func:`_mass_signal`), never as exact multiset members.
 _MASS_SITE = re.compile(r"^IMassProperty\d*\.|\.GetMassProperties\d*$")
@@ -92,6 +99,17 @@ _TOUCHING = tuple(d for d in itertools.product((-1, 0, 1), repeat=4) if any(d))
 # 7.2e-7 mm: float64 residues of 2e-16 to 9e-16 mm where the value is exactly
 # 0 (float32 keeps them there), elsewhere 1-3 float32 ulps of the coordinate.
 _STL_VERTEX_ULPS = 4
+# Two builds' answers to one request (member and arguments) whose floats lie
+# within this many ulps of the answer's largest |float| are one answer
+# (:func:`_answers_signal`). Measured basis, 2026-11-12: over 57 pairs of fleet
+# recordings, 553,379 answers to requests both builds made at the same point
+# were bit-identical, within REL_TOL, or a billion tolerances and more apart
+# (bodies or faces listed in another order, which the multiset pairs); the one
+# exception, dt_crank_drive_gear's IFace2.GetClosestPointOn onto an edge of a
+# planar face, lay up to 9.5e6 ulps (6.6e-11 m, 1.9 REL_TOL) apart. 2**25 ulps
+# is 3.5 times that: at most 2**-27 (7.5e-9) of the answer's largest float,
+# 0.23 nm on a 34 mm coordinate.
+_ANSWER_ULPS = 2**25
 _NEIGHBOURS = tuple(itertools.product((-1, 0, 1), repeat=3))
 _LISTED = 10
 # Bound on a judge fault's message recorded in the result.
@@ -169,8 +187,10 @@ def truth_cause(
 ) -> str | None:
     """``response:<member>`` for the nearest response before the request
     divergence that differs beyond noise (SolidWorks answered differently
-    first), ``request`` when every earlier answer agrees (the script asked
-    something else), ``None`` without a divergence."""
+    first), :data:`TITLE_COUNTER_CAUSE` when every earlier answer agrees but
+    for noise and the diverging request echoes a title counter
+    (:func:`_echoes_title`), ``request`` when the script asked something else
+    of the same answers, ``None`` without a divergence."""
     if divergence is None:
         return None
     end = min(int(divergence["index"]), len(a), len(b))
@@ -178,7 +198,69 @@ def truth_cause(
         x, y = a[index], b[index]
         if not _close([x.result, x.raised, x.outs], [y.result, y.raised, y.outs]):
             return f"response:{x.site}"
+    if _echoes_title(a, b, end):
+        return TITLE_COUNTER_CAUSE
     return "request"
+
+
+def carries_title_counter(value: Any) -> bool:
+    """Whether any string in ``value`` (a call's arguments or answer, as
+    logged) carries a SolidWorks new-document title counter (``Part24``)."""
+    if isinstance(value, str):
+        return _TITLE_COUNTER.search(value) is not None
+    if isinstance(value, list):
+        return any(carries_title_counter(item) for item in value)
+    if isinstance(value, dict):
+        return any(carries_title_counter(item) for item in value.values())
+    return False
+
+
+def _echoes_title(a: Sequence[conv.Call], b: Sequence[conv.Call], index: int) -> bool:
+    """The request at ``index`` is the base's on the same object but for the
+    title counters in its arguments (provenance masked), and an earlier answer
+    differed in title counters only: the script echoed the seat's document
+    counter. Anything else in the request differing is the script's own."""
+    if index >= min(len(a), len(b)):
+        return False
+    x, y = a[index], b[index]
+    if (x.handle, x.op, x.site) != (y.handle, y.op, y.site):
+        return False
+    if not carries_title_counter(y.args):
+        return False
+    if _exact(_mapped(x.args, _text)) != _exact(_mapped(y.args, _text)):
+        return False
+    return any(_title_only(_answer(a[i]), _answer(b[i])) for i in range(index))
+
+
+def _answer(call: conv.Call) -> list[Any]:
+    return [call.result, call.raised, call.outs]
+
+
+def _title_only(a: Any, b: Any) -> bool:
+    """Two answers that differ, and only in title counters."""
+    if not carries_title_counter(a):
+        return False
+    exact = _exact(a)
+    return exact != _exact(b) and _exact(_mapped(a, _counterless)) == _exact(
+        _mapped(b, _counterless)
+    )
+
+
+def _exact(value: Any) -> str:
+    """``value`` as logged, compared exactly (``true`` is not ``1``, a float
+    is its hex)."""
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _mapped(value: Any, text: Callable[[str], str]) -> Any:
+    """``value`` with ``text`` applied to every string, the rest as it is."""
+    if isinstance(value, str):
+        return text(value)
+    if isinstance(value, list):
+        return [_mapped(item, text) for item in value]
+    if isinstance(value, dict):
+        return {name: _mapped(item, text) for name, item in value.items()}
+    return value
 
 
 def outcome(
@@ -196,7 +278,8 @@ def outcome(
       within :data:`REL_TOL` (:func:`_mass_signal`);
     * ``requests``: the multiset of recipe requests;
     * ``answers``: the multiset of (request, answer) pairs, but for mass
-      properties and answers about the session (``_SESSION_SITE``);
+      properties and answers about the session (``_SESSION_SITE``); answers
+      to one request within float noise are one (:func:`_answers_signal`);
     * ``stl``: the geometry of every STL file SolidWorks wrote, vertices
       within float32 noise as one (:func:`_stl_comparison`; last write per
       path).
@@ -214,10 +297,7 @@ def outcome(
             [(site, request) for site, request, _ in keyed[0]],
             [(site, request) for site, request, _ in keyed[1]],
         ),
-        "answers": lambda: _multiset_signal(
-            [item for item in keyed[0] if item[2] is not None],
-            [item for item in keyed[1] if item[2] is not None],
-        ),
+        "answers": lambda: _answers_signal(keyed[0], keyed[1], a, b),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
     }
     signals: dict[str, Signal] = {}
@@ -507,6 +587,79 @@ def _multiset_signal(
         members.setdefault(item[0], [0, 0])[1] += count
     ranked = sorted(members.items(), key=lambda item: (-sum(item[1]), item[0]))
     return Signal.DIFFERENT, dict(ranked[:_LISTED])
+
+
+def _answers_signal(
+    a: Sequence[tuple[str, str, str | None]],
+    b: Sequence[tuple[str, str, str | None]],
+    calls_a: Sequence[conv.Call],
+    calls_b: Sequence[conv.Call],
+) -> tuple[Signal, dict[str, Any] | None]:
+    """The multiset of (request, answer) keys (:func:`_keyed_calls`, per call
+    of ``calls_a`` and ``calls_b``; no answer key: no signal). Keys that
+    differ are not yet another answer: the keys both builds have cancel
+    (their multiset intersection), and per request (member and arguments)
+    the answers left over in one build must pair one-to-one with the other's
+    left over to that request (:func:`_unassigned`) within float noise
+    (:func:`_answer_close`). A request with more answers left over in one
+    build (answered more often), or an answer left unpaired, is different
+    (:func:`_multiset_signal`'s detail). Pairing only the leftovers keeps
+    the work to the answers that differ, whatever the request's count; a
+    leftover that only some exactly matched answer could have absorbed stays
+    unpaired (different: the safe direction). Same after pairing: per member,
+    how many answers were paired."""
+    left = [(k, c) for k, c in zip(a, calls_a, strict=True) if k[2] is not None]
+    right = [(k, c) for k, c in zip(b, calls_b, strict=True) if k[2] is not None]
+    signal, detail = _multiset_signal([k for k, _ in left], [k for k, _ in right])
+    if signal is Signal.SAME:
+        return signal, detail
+    keys_a, keys_b = Counter(k for k, _ in left), Counter(k for k, _ in right)
+    leftover = (keys_a - keys_b, keys_b - keys_a)
+    answers: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {
+        key[:2]: ([], []) for over in leftover for key in over
+    }
+    for side, items in enumerate((left, right)):
+        wanted = Counter(leftover[side])
+        for key, call in items:
+            if wanted[key] > 0:
+                wanted[key] -= 1
+                answers[key[:2]][side].append(_erased(_answer(call)))
+    for xs, ys in answers.values():
+        if len(xs) != len(ys) or _unassigned(xs, ys, _answer_close) is not None:
+            return signal, detail
+    paired: Counter[str] = Counter()
+    for key, count in leftover[0].items():
+        paired[key[0]] += count
+    return Signal.SAME, {
+        member: f"{count} answers within {_ANSWER_ULPS} ulps of the other build's"
+        for member, count in sorted(paired.items())
+    }
+
+
+def _answer_close(a: Any, b: Any) -> bool:
+    """Two answers (handles erased) equal but for float noise: the same
+    structure and normalised strings, every float within
+    :data:`_ANSWER_ULPS` ulps of the largest finite |float| of either."""
+    left: list[float] = []
+    right: list[float] = []
+    if not _same_shape(a, b, left, right):
+        return False
+    tolerance = _ANSWER_ULPS * math.ulp(_scale(iter([*left, *right])))
+    return all(
+        x == y or abs(x - y) <= tolerance for x, y in zip(left, right, strict=True)
+    )
+
+
+def _erased(value: Any) -> Any:
+    """``value`` with handles erased (the interface type kept), as
+    :func:`_shape` erases them, and nothing else changed."""
+    if isinstance(value, list):
+        return [_erased(item) for item in value]
+    if not isinstance(value, dict) or _is_float(value):
+        return value
+    if "h" in value:
+        return {"h": value.get("p", "")}
+    return {name: _erased(item) for name, item in value.items()}
 
 
 _Point = tuple[float, float, float]
@@ -817,6 +970,10 @@ def _text(value: str) -> str:
     for rule in conv.PROVENANCE_MASK:
         if rule.pattern.fullmatch(value):
             return f"<masked:{rule.name}>"
+    return _counterless(value)
+
+
+def _counterless(value: str) -> str:
     return _TITLE_COUNTER.sub(r"\1#", value)
 
 

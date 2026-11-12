@@ -718,6 +718,23 @@ def _external_console_level() -> str:
 _COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
 
 
+def _read_guard_env(task: str) -> dict[str, str | None]:
+    """The read guards a subprocess working for ``task`` gets (None: unset):
+    the catalog rows its cache key folds (`fastener` refuses others) and the
+    fit groups it may read."""
+    return {
+        "HARMONIC_FASTENER_ROWS": _fastener_rows_env(task),
+        "HARMONIC_FIT_GROUPS": _fit_groups_env(task),
+    }
+
+
+def _com_process_inputs(task: str) -> dict[str, str | None]:
+    """The pinned process inputs (``_com_conversation.ENVIRONMENT_KEYS``) a COM
+    subprocess for ``task`` gets from :func:`_run_subprocess`: what a reuse
+    replay of its build runs under (:mod:`_replay_shadow`)."""
+    return {**_read_guard_env(task), **_COM_ENV_PINS}
+
+
 def _run_subprocess(
     cmd: list[str],
     label: str,
@@ -738,15 +755,11 @@ def _run_subprocess(
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
-    # The catalog rows this task's cache key folds; `fastener` refuses others.
-    env.pop("HARMONIC_FASTENER_ROWS", None)
-    fastener_rows = _fastener_rows_env(task or label)
-    if fastener_rows is not None:
-        env["HARMONIC_FASTENER_ROWS"] = fastener_rows
-    env.pop("HARMONIC_FIT_GROUPS", None)
-    fit_groups = _fit_groups_env(task or label)
-    if fit_groups is not None:
-        env["HARMONIC_FIT_GROUPS"] = fit_groups
+    # The catalog rows and fit groups this task's cache key folds.
+    for name, value in _read_guard_env(task or label).items():
+        env.pop(name, None)
+        if value is not None:
+            env[name] = value
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -2609,7 +2622,9 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
-    Falls through to a normal build whenever the cache is off or errors.
+    Falls through to a normal build whenever the cache is off or errors. On a MISS
+    in COM-replay mode ``reuse`` a recording's archive may first become the outputs
+    without SolidWorks (:func:`_reuse_part`; the ``task`` span says ``com=none``).
 
     Opens its OWN spans HERE (rather than in _run) so every phase of the task is
     timed for what it is, and each carries the ``cache`` disposition + ``label``:
@@ -2638,6 +2653,28 @@ def _cached_part_action(stem: str, script: Path) -> None:
         _validate_part_configuration_outputs(stem, key)
         return
 
+    # HARMONIC_COM_REPLAY=reuse (the default) in a cache role that can publish:
+    # before the seat, the nearest recording bound to its archive may become
+    # this key's outputs, with SolidWorks absent (see _replay_shadow.reuse_attempt).
+    # Anything but a completed reuse builds on the seat below, judged after.
+    reuse = None
+    if probed == "miss":
+        part = _replay_shadow.PartBuild(
+            stem,
+            script,
+            key,
+            file_deps,
+            ContentChecker._digest,
+            outputs,
+            Path(_sldprt(stem)),
+            functools.partial(_com_process_inputs, label),
+        )
+        with _replay_shadow.reuse_attempt(part) as reuse:
+            if reuse.decision is _replay_shadow.ReuseDecision.REUSED and _reuse_part(
+                stem, key, outputs, reuse
+            ):
+                return
+
     with _com_seat(label) as waited:
         if _reprobe_under_seat(key, outputs, label, probed):
             _stamp_part_execution(stem)
@@ -2665,7 +2702,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
             # (ro/off): None, and the build runs exactly as before (same
             # command, no engine). Otherwise the build runs under the
             # recording driver; see _replay_shadow.
-            recording = _replay_shadow.plan(stem, script, key)
+            recording = _replay_shadow.plan(stem, script, key, reuse=reuse)
             command = [sys.executable, str(script)]
             if recording is not None:
                 command = recording.command
@@ -2673,6 +2710,16 @@ def _cached_part_action(stem: str, script: Path) -> None:
             _stamp_part_execution(stem)
             _validate_part_configuration_outputs(stem, key)
 
+    _publish_part(stem, key, outputs)
+    # Off the seat and after the part's own publication: publish the recording
+    # and evaluate the shadow replay. Telemetry only; never raises.
+    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
+
+
+def _publish_part(stem: str, key: str, outputs: list[Path]) -> str:
+    """Store a part's outputs under ``key``; a lost publication adopts the
+    winner's whole archive. The store outcome."""
+    label = f"part:{stem}"
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
     with _telemetry.span(
@@ -2687,9 +2734,39 @@ def _cached_part_action(stem: str, script: Path) -> None:
         _adopt_canonical(key, outputs, label)
         _stamp_part_execution(stem)
         _validate_part_configuration_outputs(stem, key)
-    # Off the seat and after the part's own publication: publish the recording
-    # and evaluate the shadow replay. Telemetry only; never raises.
-    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
+    return outcome
+
+
+def _reuse_part(
+    stem: str, key: str, outputs: list[Path], reuse: _replay_shadow.Reuse
+) -> bool:
+    """Make the base's verified archive this key's outputs with no COM at all
+    (:func:`_replay_shadow.reuse_attempt` decided ``reused``): install it as a
+    HIT restores one, re-stamp the ``.execution`` token, which must be the
+    base's, validate, publish the ``reused/`` marker naming the base, then
+    publish under ``key`` like a build (no recording: only real builds are
+    bases). False: a step before the store failed (WARN; declined
+    ``fault``/``token_mismatch``), and the caller builds on the seat, which
+    rewrites every output."""
+    label = f"part:{stem}"
+    with _telemetry.span(
+        f"task {label}", label=label, service=_stage_name(label)
+    ) as sp:
+        sp.set_attribute("cache", "reuse")
+        sp.set_attribute("com", "none")
+        _tag_cache_key(sp, key)
+        try:
+            reuse.install(outputs)
+            _stamp_part_execution(stem)
+            reuse.check_token(Path(_part_execution_token(stem)))
+            _validate_part_configuration_outputs(stem, key)
+            reuse.mark()
+        except Exception as exc:  # noqa: BLE001 - a reuse never costs a build
+            sp.set_attribute("cache", "reuse_failed")
+            reuse.fall_through(reuse.phase, exc)
+            return False
+    reuse.finish(_publish_part(stem, key, outputs))
+    return True
 
 
 def _recipe_files(stem: str) -> list[str]:
