@@ -12,9 +12,9 @@ reading is booked.
 
 The ease out of the bind (check 4N) is neither printed nor measured, and no
 number is booked for it: delegated ruling 2026-11-12 (Main), following the
-delegated ruling of 2026-11-11 on the paper-feed rack mesh (PR #2617,
-PD-00-feed-mesh-by-feel) under the owner's direction on #2416; owner review
-#2144, pending owner confirmation. An allowance for it would be an invented
+owner's direction of 2026-11-11 on #2416 (the gears must not bind and must
+not come loose; backlash is not a function); owner review #2144, pending
+owner confirmation. An allowance for it would be an invented
 number. The stack books the first bind and the real stack terms, and the
 not-coming-loose gate is the nominal contact ratio there.
 

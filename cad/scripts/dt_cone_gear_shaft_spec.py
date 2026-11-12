@@ -166,13 +166,17 @@ COLLAR_ROOT_RADIUS_MAX = 0.0508  # .002
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
 # of the MATERIAL cell, with the collar's two limits tighter than the title
 # block at the feature they govern (rule 3: never in a note) and their one
-# reason naming both faces' mates once by drawing number.  The OD edge break
-# keeps the MHA-DT-05 thrust ring above its floor (above); the sharp roots
-# let both faces seat.  Two lines of words (rule 7).
+# reason: the collar's two faces are thrust faces, and the first line names
+# their mates once by drawing number.  The OD edge break keeps the MHA-DT-05
+# thrust ring above its floor (above); the sharp roots let both faces seat.
+# The limits follow the words THRUST FACES so neither reads as a bare
+# tightening of the title block's break (machinist review, farm run
+# 20261112T024253735Z).  Two lines of words (rule 7).
 COLLAR_STOCK_CALLOUT = "\n".join(
     (
-        f"5/8 BAR AS SUPPLIED, EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX",
-        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX, SEATS MHA-DT-05 AND MHA-DT-07",
+        "5/8 BAR AS SUPPLIED, SEATS MHA-DT-05 AND MHA-DT-07",
+        f"THRUST FACES: EDGE BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX, "
+        f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;

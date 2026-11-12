@@ -122,8 +122,8 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   any pair, opened by both gears' running runout. Check 4N then eases the set
   out of the bind only until the gears turn freely. That ease is neither
   printed nor measured, and no number is booked for it (delegated ruling
-  2026-11-12, Main, following the feed-rack ruling of PR #2617 under the
-  owner's direction on #2416; owner review
+  2026-11-12, Main, following the owner's direction of 2026-11-11 on #2416;
+  owner review
   [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144),
   pending owner confirmation): the 0.04 mm allowance #2557 carried for it had
   no source. Nominal ratios at the loosest centre run from 1.07 (T012) up to
