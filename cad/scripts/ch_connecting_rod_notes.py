@@ -23,7 +23,7 @@ from __future__ import annotations
 # Note 1 is the reamed pin hole's matched press fit, linked from its
 # callout: its .0004 band is narrower than the shop's reamer row, so the hole
 # is reamed to its pin. The acceptance is the ANSI FN2 window the pin budget
-# is held to (ch_rod_pivot_pin_spec.PRESS_INTERFERENCE_MAX), rounded inward.
+# is held to (sh_vn_pivot_pin_rod_spec.PRESS_INTERFERENCE_MAX), rounded inward.
 # Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
 #
 # Notes 2 and 3 each name one mate for two tight bands that serve it (fan-out
@@ -32,7 +32,7 @@ from __future__ import annotations
 # on the arm; the ring and shank's thickness and its offset that centres it
 # on the fork slide in the cam's slot.
 PIN_NAME = "ROD PIVOT PIN"
-PIN_NUMBER = "MHA-CH-10"
+PIN_NUMBER = "MHA-SH-VN-58"  # its RodPin member
 ARM_NUMBER = "MHA-CH-06"
 CAM_NUMBER = "MHA-DT-12"
 PIN_FIT_NOTE_NUMBER = 1

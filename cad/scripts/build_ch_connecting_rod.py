@@ -5,7 +5,7 @@ rotation into the rocker arm's see-saw: a full ring (strap) riding the
 eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
 tines straddle the rocker arm's strap and carry the pressed pivot pin
-(MHA-CH-10, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
+(MHA-SH-VN-58 RodPin, sh_vn_pivot_pin_rod_spec) through the arm's rod-pin hole near its
 rod-side tip. The centre distance follows the actual phased cam centre and the
 level rocker's pin, including the common raised drive-axis height. The ch14
 end views show the 0-crank tip row level (cos-mode home = top of stroke, cam
@@ -26,7 +26,7 @@ original fastener.
 Dimensions: cad/config/dimensions.yaml "Chapter 13" rod rows - centre distance
 derived (high), ring bore derived from the cam OD + confirmed on the p.25
 overlay (med), fork proportions photo-scaled vs the 16 mm arm-depth callout
-and sized to the joint budget (ch_rod_pivot_pin_spec), everything else
+and sized to the joint budget (sh_vn_pivot_pin_rod_spec), everything else
 photo-scaled (low).
 
 Layout: ring centre at the origin, shank rising +Y to the fork; thicknesses
@@ -596,7 +596,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Pivot pin hole on the rod axis, reamed through both tines (the slot
     # between them is air). The pin RUNS in the arm's #47 hole and is PRESSED
-    # here, its ends dressed flush (ch_rod_pivot_pin_spec). No countersink: the
+    # here, its ends dressed flush (sh_vn_pivot_pin_rod_spec). No countersink: the
     # hole runs straight through each tine, so the pin bears on the whole tine.
     pin_hole = SketchDims()
     check("create_sketch rocker pin hole", await adapter.create_sketch("Front"))
