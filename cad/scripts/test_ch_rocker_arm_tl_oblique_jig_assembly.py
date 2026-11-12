@@ -1929,9 +1929,9 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
     assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
     assert "RECORD" in steps["10E"] and "STEPS 19E AND 20" in steps["10E"]
-    assert carrier.HUB_THREAD in steps["10F"] and "NO COUNTERBORE" in steps["10F"]
+    assert carrier.HUB_THREAD in steps["10G"] and "NO COUNTERBORE" in steps["10F"]
     assert "STEP 10E" in steps["20"]
-    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F"))
+    assert all("REAM" not in steps[head] for head in ("10C", "10D", "10E", "10F", "10G"))
     # The origin stops hold through step 14's recheck (as in step 6H, which
     # returns by them); every move uses its own setting stop and indicator.
     assert "UNTIL STEP 14 PASSES" in steps["6A"]
@@ -2066,8 +2066,10 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     # saw corridor, clamp holes, hub drilling and both passes are steps.
     assert not any("PLAN" in text for text in steps.values())
     assert "BEFORE THE FIRST STRAP" in steps["18"]
-    # The blanks are prepared before step 1, while the table is free.
-    assert spec.strap.NUMBER in spec.BLANK_PREPARATION and spec._BLANK_LENGTH in spec.BLANK_PREPARATION
+    # The blanks are cut and faced at steps 1M-1N, before the bars fill the table.
+    assembly = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert spec._BLANK_LENGTH in assembly["1M"] and spec.strap.NUMBER in assembly["1N"]
+    assert list(assembly).index("1N") < list(assembly).index("3C")
     # Every layout mark is a table row (both signs by the title), never a
     # ± sentence; the steps cite the table.
     rows = {(chain, x, y) for chain, x, y in spec.BLANK_LAYOUT_ROWS}
@@ -2075,7 +2077,7 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
         for x, y in spec.blank.LAYOUT_MARKS[chain]:
             assert (chain.upper(), spec._length(abs(x), 3) if x else "0", spec._length(y, 3)) in rows
     assert not any("±" in cell for row in spec.BLANK_LAYOUT_ROWS for cell in row)
-    assert spec._bound(spec.blank.SAW_EDGE_TOLERANCE, 3, up=False) in steps["19D"]
+    assert spec._SAW_CORRIDOR in steps["19D"] and float(spec._SAW_CORRIDOR) * spec.trammel.INCH <= spec.blank.SAW_EDGE_TOLERANCE
     # The clamp holes are piloted from the carrier's own taps (a pilot under
     # the tap drill), then opened to the clearance drill.
     assert spec.riser.SCREW_DRILL in steps["19H"] and spec.blank.CLAMP_DRILL in steps["19K"]
@@ -2554,13 +2556,13 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
     # screwed down with the leadscrew still in it.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     heads = list(steps)
-    sequence = ("7B", "7C", "7D", "7E", "7F", "8A", "8B", "8C", "8D", "8E", "8F",
+    sequence = ("7B", "7C", "7D", "7E", "7F", "7G", "8A", "8B", "8C", "8D", "8E", "8F",
                 "8G", "8H", "8J", "8K", "8L", "8M", "8N", "8P", "8Q", "8R", "8S")
     assert [head for head in heads if head in sequence] == list(sequence)
     assert spec._item(spec.FEED_NUT) in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE in steps["7B"]
     assert feed_nut.REWORK_SHEET_REFERENCE == f"{feed_nut.NUMBER} SHEET {feed_nut.REWORK_SHEET}"
-    assert steps["7C"].startswith("7C. IF ") and steps["7F"].startswith("7F. IF ")
+    assert steps["7C"].startswith("7C. IF ") and steps["7G"].startswith("7G. IF ")
     # Codjiflo P2 and 4475311251: every receipt and rework limit is the kit
     # sheet's native dimension, not TL-00 text.
     limits = {
@@ -2568,7 +2570,7 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
         for nominal, lower, upper, places in feed_nut.NATIVE_CONTROLS.values()
         for deviation in (lower, upper)
     }
-    preparation = " ".join(steps[head] for head in ("7B", "7C", "7D", "7E", "7F"))
+    preparation = " ".join(steps[head] for head in ("7B", "7C", "7D", "7E", "7F", "7G"))
     for typed in (
         *limits,
         f"Ø{feed_nut.CSK_DIA:.1f}", feed_nut.CSK_CUTTER_TEXT,
@@ -2577,7 +2579,7 @@ def test_feed_nut_is_reworked_seated_and_transferred_in_one_order() -> None:
         assert typed not in preparation, typed
     # Rule 25: the faced length is checked once, after the rework.
     assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
-    assert "FACED LENGTH" in steps["7E"] and "FACE" in steps["7D"]
+    assert "FACED LENGTH" in steps["7F"] and "FACE" in steps["7D"]
     # Codjiflo 4477879822/4477879826 on #2187: every hole is set within
     # TL-32's native NutClock, cited and never typed.
     assert feed_block.NUT_CLOCK_REFERENCE == f"{feed_block.NUMBER} SHEET 2 VIEW D"
