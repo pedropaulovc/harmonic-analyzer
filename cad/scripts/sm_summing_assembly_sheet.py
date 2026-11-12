@@ -102,7 +102,7 @@ HUB_SET_SCREW_TORQUE = (
 # The knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item
 # 11.3): a tool named in the steps, not a BOM part.  Owner ruling 2026-11-10
 # (Pedro), #2334, S2: an 8.0 in bar, long enough to pass both mounts (outer
-# faces 7.41 apart), not a 2 in class ZZ pin.  No gauge class comes that
+# faces 7.67 apart), not a 2 in class ZZ pin.  No gauge class comes that
 # long, so its fit route is a matched fit to the mounts it gauges: the
 # reference Ø and the diametral clearance in each bore (rule 4).
 _KNIFE_GAUGE_BAR_CLEARANCE = "-".join(

@@ -114,8 +114,8 @@ def test_explode_moves_only_contracted_families_with_split_stations() -> None:
             )
     moved = {stem for _, stems, _, _, _ in explode.EXPLODE_STEPS for stem in stems}
     assert moved == set(spec.QUANTITIES) - {spec.LEVER}
-    assert station_of(SUMMING_Z + builder.HEX_Z_MID) == "front"
-    assert station_of(SUMMING_Z - builder.HEX_Z_MID) == "back"
+    assert station_of(builder.KNIFE_MOUNT_Z_PLUS) == "front"
+    assert station_of(builder.KNIFE_MOUNT_Z_MINUS) == "back"
     with pytest.raises(ValueError):
         station_of(SUMMING_Z)
     assert summing_exploded_view_name("Default") == explode.EXPLODED_VIEW_NAME
@@ -125,9 +125,16 @@ def test_explode_moves_only_contracted_families_with_split_stations() -> None:
 def test_station_slide_clears_the_hex_trunnion() -> None:
     slide = {station: d for _, _, station, axis, d in explode.EXPLODE_STEPS if station}
     assert slide["front"] > 0.0 > slide["back"]
-    mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
-    for distance in slide.values():
-        assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
+    # Each mount's inner face to its own stub's outer end (the -Z stub
+    # stands .25 in farther out with the lever body's -Z end, #1038).
+    half_mount = builder.knife_mount.SUPPORT_Z_THICK / 2.0
+    lever = sm_summing_lever_spec
+    engaged = {
+        "front": lever.HEX_Z_OUTER_PLUS - (lever.KNIFE_SEAT_Z_PLUS - half_mount),
+        "back": (lever.KNIFE_SEAT_Z_MINUS + half_mount) - lever.HEX_Z_OUTER_MINUS,
+    }
+    for station, distance in slide.items():
+        assert abs(distance) > engaged[station] > 0.0
 
 
 def test_dowels_leave_the_mounts_with_the_crossbar_not_with_the_mounts() -> None:
@@ -332,7 +339,8 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     )
     assert min(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) > 0.0
     assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
-    assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.415, abs=1e-3)
+    # The mounts' outer span grew .25 in with the front station (#1038).
+    assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.665, abs=1e-3)
     assert notes.KNIFE_GAUGE_BAR not in " ".join(notes.BOM_DESCRIPTIONS.values())
     # The bar is defined once, at 5B; check 5 names it.
     assert sum(notes.KNIFE_GAUGE_BAR in line for line in notes.ASSEMBLY_STEPS) == 1
