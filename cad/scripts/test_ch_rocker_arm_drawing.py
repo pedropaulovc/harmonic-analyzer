@@ -2446,7 +2446,8 @@ def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
     assert spec.TIP_FACE == pytest.approx(5.706195, abs=1e-6)
     assert (spec.TOP_ARC_LEN, spec.BOT_ARC_LEN) == pytest.approx((291.499258, 266.459732), abs=1e-6)
     assert spec.HUB_DIA == pytest.approx(10.16)
-    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.28365)
+    # (7.62 - 2.4892) / 2 at the .300 pitch (#1038).
+    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.5654)
 
 
 def test_rod_hole_keeps_its_normal_wall_to_the_real_k_taper_at_printed_bands():
@@ -3581,7 +3582,7 @@ def test_datum_g_basic_is_the_half_hub_length_off_the_face_requirements() -> Non
         ch_rocker_arm_spec.HUB_LENGTH / 2.0
     )
     places = drawing.HUB_FACES.precision["length"]
-    assert ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places) == ".1389"
+    assert ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places) == ".1500"
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     assert not [
         node.value

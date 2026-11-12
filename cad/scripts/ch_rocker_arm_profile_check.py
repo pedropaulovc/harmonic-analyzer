@@ -472,7 +472,7 @@ for _name, _window in WINDOWS.items():
 # strap's mid-plane, which is the hub's, so half the hub length above the
 # template the arm's +Z hub face rests on.
 TEMPLATE_READ_MM = round(THICK / 2.0, 1)  # 1.6
-ARM_READ_MM = round(THICK + rocker.HUB_LENGTH / 2.0, 1)  # 6.7
+ARM_READ_MM = round(THICK + rocker.HUB_LENGTH / 2.0, 1)  # 7.0
 
 
 def _signed(value: float) -> str:

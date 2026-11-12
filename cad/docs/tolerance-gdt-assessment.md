@@ -241,7 +241,7 @@ means, so it is called out per row.
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `fr-rocker-arm-support` 4× foot holes; `sm-summing-lever` 20 spring holes at 7.0565 pitch; channel pivot / lever bores; `sm-knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
+| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `fr-rocker-arm-support` 4× foot holes; `sm-summing-lever` 20 spring holes at 7.62 pitch; channel pivot / lever bores; `sm-knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
 
 Position replaces a `±`-boxed hole location with a **round** zone evenly distributed about the true
 position (a square `±` zone is both too tight on the diagonal and too loose on the axes), and it
@@ -361,7 +361,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 Express these as **consistency + fit-at-assembly**, not absolute position — that matches both the
 error model and how the machine was actually built and trimmed.
 
-- **Channel pitch & coplanarity (the real assembly precision):** the 7.0565 mm channel spacing and
+- **Channel pitch & coplanarity (the real assembly precision):** the 7.62 mm (.300 in) channel spacing and
   the coplanarity of the 20 rockers / 20 levers are set by the **spacer-bushing lengths** and the
   **pivot-shaft straightness**, not by 20 independently located holes. → machine the spacers
   together; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
@@ -462,7 +462,7 @@ geometric:            # keyed by GD&T characteristic (§5.2); each = tolerance z
   straightness:     { tol_mm: 0.05, applies_to: "pivot/fulcrum/cone-gear-shaft + crank-pin axes", how: "between-centres + steady; Rule #1 already bounds it at MMC" }
   perpendicularity: { tol_mm: 0.05, applies_to: "pivot-bore axis to mount face; knife edge to motion plane", how: "bore in the setup that faces the mount" }
   parallelism:      { tol_mm: 0.05, applies_to: "amplitude-bar slide", how: "indicate" }
-  position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.0565, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
+  position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.62, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
   profile_surface:  { tol_mm: 0.1, applies_to: "rocker R800 concave form, cam eccentric profile, gear-tooth flanks", how: "form-cut/CNC; CMM scan vs the nominal curve" }
   runout:           { tir_mm: [0.025, 0.05], types: [circular, total], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "mandrel / bore-and-cut one setup; dial gauge" }
   # feature notes that resolve to the characteristics above:

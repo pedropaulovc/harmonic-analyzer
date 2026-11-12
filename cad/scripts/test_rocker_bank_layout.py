@@ -21,6 +21,7 @@ import ch_pivot_bracket_spec as bracket
 import ch_pivot_shaft_spec as shaft
 import ch_vn_rocker_thrust_washer_spec as washer
 import ch_rocker_arm_spec as arm
+import fr_rocker_arm_support_spec as support
 import rocker_bank_layout as bank
 from _buildgraph import config_files_of, module_deps_of
 from _printed_tolerance import printed_band_mm
@@ -95,7 +96,7 @@ def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
     pitch = _config.machine("channels", "station_pitch_mm")
     # Option A (rod fork joint): the arm plane IS the cam plane.
     assert bank.ARM_MID_DZ == cam_plane.CAM_MID_DZ
-    assert bank.ARM_MID_DZ == pytest.approx(-3.52825)
+    assert bank.ARM_MID_DZ == pytest.approx(-7.62 / 2.0)
     for j in (0, 7, 19):
         assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + cam_plane.CAM_MID_DZ)
     assert bank.STACK_MID_Z == pytest.approx(
@@ -117,7 +118,7 @@ def test_stack_closes_north_on_a_washer_against_the_north_ear() -> None:
     assert bank.NORTH_EAR_OUTER_Z == pytest.approx(
         bank.NORTH_EAR_INNER_Z + bracket.EAR_T
     )
-    assert bank.NORTH_EAR_INNER_Z == pytest.approx(70.848, abs=5e-4)
+    assert bank.NORTH_EAR_INNER_Z == pytest.approx(76.483, abs=5e-4)
     assert not hasattr(bank, "SHOULDER_Z")
 
 
@@ -134,7 +135,7 @@ def test_south_bracket_is_set_off_the_thrust_washer_by_the_spring() -> None:
     assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(
         bank.SOUTH_EAR_INNER_Z - bracket.EAR_T
     )
-    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-72.456, abs=5e-4)
+    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-78.091, abs=5e-4)
 
 
 def test_the_washers_are_purchased_0_031_ring_shims() -> None:
@@ -151,17 +152,20 @@ def test_the_washers_are_purchased_0_031_ring_shims() -> None:
     assert _config.parts("ch-vn-rocker-thrust-washer")["number"] == "MHA-CH-VN-56"
 
 
-def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
+def test_brackets_sit_on_their_ears_over_the_support() -> None:
     south, north = bank.PIVOT_BRACKET_Z
     assert south == pytest.approx(bank.SOUTH_EAR_INNER_Z - bracket.EAR_T / 2)
     assert north == pytest.approx(bank.NORTH_EAR_INNER_Z + bracket.EAR_T / 2)
     assert bracket.EAR_T == pytest.approx(0.320 * 25.4)
-    assert (south, north) == pytest.approx((-76.520, 74.912), abs=5e-4)
-    assert bank.STACK_MID_Z - south < 78.0
-    assert north - bank.STACK_MID_Z < 78.0
-    # Both feet stay on the rocker-arm-support's +-88.9 top.
-    assert south - bracket.EAR_T / 2 > -88.9
-    assert north + bracket.EAR_T / 2 < 88.9
+    # At the .300 pitch (#1038) the bank is 10.71 wider, centred on its mid.
+    assert (south, north) == pytest.approx((-82.155, 80.547), abs=5e-4)
+    # Both ears stay over the rocker-arm support, inside its end faces.
+    ends = (
+        support.SUPPORT_WORLD_Z - support.SUPPORT_HALF_MACHINE_Z,
+        support.SUPPORT_WORLD_Z + support.SUPPORT_HALF_MACHINE_Z,
+    )
+    assert south - bracket.EAR_T / 2 > ends[0]
+    assert north + bracket.EAR_T / 2 < ends[1]
 
 
 def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
@@ -172,11 +176,12 @@ def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
     # The overall length prints at .XX and is finished to it: the shaft
     # between the dome bases takes the rounding, its south end inset from
     # the south ear's outer face by under half a grid step.
-    assert bank.PIVOT_SHAFT_OVERALL_LENGTH == pytest.approx(6.40 * 25.4)
+    assert bank.PIVOT_SHAFT_OVERALL_LENGTH == pytest.approx(6.85 * 25.4)
     assert bank.PIVOT_SHAFT_LENGTH == pytest.approx(
         bank.PIVOT_SHAFT_OVERALL_LENGTH - 2 * shaft.DOME_HEIGHT
     )
-    assert 0.0 <= bank.SOUTH_END_INSET <= 0.127
+    # At the .300 pitch the snap rounds up: the south end stands 0.111 proud.
+    assert abs(bank.SOUTH_END_INSET) <= 0.127
     assert bank.PIVOT_SHAFT_LENGTH == pytest.approx(
         bank.NORTH_EAR_OUTER_Z - bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_END_INSET
     )
@@ -272,7 +277,7 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
             bank.PIVOT_SHAFT_NORTH_Z - north,
         )
     )
-    assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx((155.448, 4.064), abs=5e-3)
+    assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx((166.878, 4.064), abs=5e-3)
     assert shaft.NORTH_FLAT_STATION == bracket.EAR_T / 2
     # Each from its own tip: the bar is the same either way round.
     assert shaft.FLAT_TIP_STATION == pytest.approx(
@@ -282,7 +287,7 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
     # .010 tip set + .004 north-ear thickness + 0.3048 south-ear set + the
     # south end's inset.
     assert bank.FLAT_OFFSET_MAX == pytest.approx(
-        (0.254 + 0.1016 + 0.3048 + bank.SOUTH_END_INSET, 0.254), abs=5e-4
+        (0.254 + 0.1016 + 0.3048 + abs(bank.SOUTH_END_INSET), 0.254), abs=5e-4
     )
     station_error = (
         shaft.FLAT_STATION_BAND + shaft.LENGTH_BAND,
@@ -323,7 +328,7 @@ def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
     length and its north tip is set DOME_HEIGHT proud of the north ear, so
     the south tip stands DOME_HEIGHT past the south ear give or take the
     tip's set, the length's band, both ears' thicknesses and the south ear's
-    set; it must stay over the rocker-arm-support's -88.9 end. Outboard of
+    set; it must stay over the rocker-arm support's south end. Outboard of
     the south ear at the shaft's height there is only the support's own top,
     so its end is the bound. The set screws hold the shaft, so it never
     floats south."""
@@ -337,8 +342,9 @@ def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
         abs=5e-4,
     )
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z == pytest.approx(-83.076, abs=5e-4)
-    assert apex_z - (-88.9) >= 2.0
+    assert apex_z == pytest.approx(-88.871, abs=5e-4)
+    support_end = support.SUPPORT_WORLD_Z - support.SUPPORT_HALF_MACHINE_Z
+    assert apex_z - support_end >= 2.0
 
 
 def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case(
@@ -361,9 +367,12 @@ def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case(
     }
     for air in clearance.values():
         assert air >= bank.RUNNING_FLOOR + bank.MARGIN_SPARE
-    assert clearance["north"] == pytest.approx(0.5816, abs=5e-4)
-    # Without a stand-off the bar would reach the ear.
-    assert face_offset_min - bar.BAR_WIDTH / 2 < 0.0
+    assert clearance["north"] == pytest.approx(0.8636, abs=5e-4)
+    # Without a stand-off the bar would keep only 0.127 to the ear at the
+    # .300 pitch, under the running floor plus spare.
+    bare = face_offset_min - bar.BAR_WIDTH / 2
+    assert bare == pytest.approx(0.127, abs=5e-4)
+    assert bare < bank.RUNNING_FLOOR + bank.MARGIN_SPARE
     assert bank.BAR_TO_THRUST_EAR == pytest.approx(
         washer.THICKNESS + arm.HUB_LENGTH / 2 - bar.BAR_WIDTH / 2
     )
