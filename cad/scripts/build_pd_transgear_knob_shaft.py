@@ -102,6 +102,8 @@ from pd_transgear_knob_shaft_spec import (
     PART_DATUMS,
     REAR_END_Z,
     RELIEF_DIA,
+    RELIEF_DIA_BAND,
+    RELIEF_DIA_TOL_TYPE,
     ROOT_DIA_MIN,
     ROOT_DIA_TOL_TYPE,
     ROOT_PREFIX,
@@ -721,6 +723,10 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
         FRONT_RELIEF_DIA,
         FRONT_RELIEF_DIA_BAND,
         FRONT_RELIEF_DIA_TOL_TYPE,
+    )
+    _apply_native_limits(
+        adapter, "StudProfile", "ReliefDia", RELIEF_DIA,
+        RELIEF_DIA_BAND, RELIEF_DIA_TOL_TYPE,
     )
     _apply_native_limits(
         adapter, "StudProfile", "FrontCornerRadius", FRONT_CORNER_RADIUS,

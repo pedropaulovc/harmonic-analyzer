@@ -20,6 +20,7 @@ import draw_pd_transgear_knob_shaft as drawing
 import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_knob_shaft_spec as spec
 import pd_transgear_knob_thrust_ring_spec as ring
+import pd_transgear_thumbnut_spec as thumbnut
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
@@ -170,13 +171,24 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
 
 def test_single_point_thread_retains_the_functional_relief() -> None:
     # Pedro 2026-11-05: no die-lead requirement, but the thumbnut must cross
-    # the unchanged relief and the tool must exit below the thread root.
+    # the relief and the tool must exit below the thread root.
     assert spec.PLAIN_CORE == pytest.approx(0.30 * spec.MM_PER_IN)
     assert spec.CORE_FRONT_FROM_F == pytest.approx(0.21 * spec.MM_PER_IN)
     assert spec.RELIEF_WIDTH_MIN == pytest.approx(0.07 * spec.MM_PER_IN)
-    assert spec.RELIEF_DIA == pytest.approx(0.10 * spec.MM_PER_IN)
     assert spec.RELIEF_WIDTH_MIN > 0.0
     assert spec.RELIEF_DIA_MAX < spec.THREAD_ROOT_2A_MIN
+    assert spec.RELIEF_DIA_MAX < thumbnut.TAP_MINOR_2B_MIN
+
+
+def test_the_stud_neck_is_no_longer_the_weak_section_under_the_tool() -> None:
+    # #2419: the stud hangs from the relief while it is single-pointed.  The
+    # least relief carries at least 1.7x the bending section of the Ø.090
+    # neck the .XX-row Ø.10 relief allowed, and prints as native LIMITS.
+    old_least = 0.090 * spec.MM_PER_IN
+    assert (spec.RELIEF_DIA_MIN / old_least) ** 3 >= 1.7
+    assert spec.RELIEF_DIA_TOL_TYPE == 3
+    assert spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[1] == pytest.approx(spec.RELIEF_DIA_MIN)
+    assert spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0] == pytest.approx(spec.RELIEF_DIA_MAX)
 
 
 def test_machine_and_float_stations_are_unchanged() -> None:
@@ -422,6 +434,7 @@ def test_the_tool_end_keeps_its_native_limits(monkeypatch) -> None:
     part._apply_neck_and_flat_limits(object())
     assert limits == [
         ("StudProfile", "FrontReliefDia", 3),
+        ("StudProfile", "ReliefDia", 3),
         ("StudProfile", "FrontCornerRadius", 6),
         ("CoreFlatProfile", "FlatEnd", 3),
         ("CoreFlatProfile", "FlatToolRadius", 6),
