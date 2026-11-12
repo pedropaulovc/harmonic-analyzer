@@ -7,10 +7,10 @@ assembly, so its row's X/Y are REF and its NOTE says so and points at the
 HUB CLAMP sheet, whose parenthesized references from A1 are the same
 source position. Every hole is identified against the source body. The
 generated SIZE column is hidden (its stacked REAM band prints at the
-document's two places); each tag's size and process is written into its own
-NOTE cell instead (machinist review r7, rules 9 and 10: the size once per
-tag group in the table, never deferred to a callout sheet), with the mate it
-serves (r8, rule 10: one column naming the mate).
+document's two places); each size group's count, size, process and mate are
+written once into one NOTE cell merged across the group's rows instead
+(machinist review r7, rules 9 and 10: the size once per tag group in the
+table, never deferred to a callout sheet; #2649: never once per hole).
 
 Owner review 2026-11-07 (rule 10): X/Y LOC run from the plate's lower-left
 corner, where the left end meets the -Y edge, which an edge finder picks up;
@@ -56,19 +56,20 @@ TABLE_ANCHOR = (0.020, 0.173)
 # the glyph estimate: at 110 mm, farm r10 (20261108T083048016Z) measured
 # A1 (lines of 22 and 23 glyphs) at 11.2 mm, two rows, while every row with
 # a 25-glyph or longer line grew a row per wrapped line (15.7/20.2 mm) and
-# the table ran 219 mm. So each cell holds two lines of at most 23 glyphs
-# (A1's proven pair): the size, then the mate. The note flags left the rows:
-# NOTES 1 and 2 name their own tags. Thirteen ~11.2 mm rows and the header
-# run ~152 mm from the .173 top. Right edge 20 + 160 = 180 mm.
+# the table ran 219 mm. So a NOTE line holds at most 23 glyphs (A1's proven
+# pair), and a size group's merged NOTE cell at most two lines per row it
+# spans. Thirteen ~11.2 mm rows and the header run ~152 mm from the .173
+# top. Right edge 20 + 160 = 180 mm.
 TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.110)
 # The longest NOTE line, in printed glyphs (each <MOD-DIAM> prints one),
-# and the most lines a NOTE cell holds.
+# and the most lines a NOTE cell holds per table row it spans.
 NOTE_MAX_GLYPHS = 23
-NOTE_MAX_LINES = 2
+NOTE_LINES_PER_ROW = 2
 # The physical columns, in the IncludeHidden=True index domain every read
 # and write below uses: SIZE stays generated (and compared) while hidden.
 COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")
 SIZE_COLUMN = COLUMNS.index("SIZE")
+NOTE_COLUMN = COLUMNS.index("NOTE")
 TABLED_HOLES = dict(spec.TABLE_HOLES)
 # Sheet metres relative to the actual projected hole centre. Keep the close
 # A1/A2 and B1/B2 pairs on opposite sides of their respective rows; A2's tag
@@ -104,29 +105,16 @@ A1_RELATION_NOTE = (
 ORIGIN_NOTE = "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER; HUB X/Y REF"
 
 
-def _tap_size(drill: float, thread: str) -> str:
-    """A tap row's size as its sheet-1 callout prints it: the tap drill at
-    the callout's places, then the thread, through."""
-    return f"<MOD-DIAM>{spec.inch_text(drill, CALLOUT_PLACES)}, {thread.lstrip('#')} UNC THRU"
+def _drill_and_tap(count: int, drill: float, thread: str) -> str:
+    """A tap group's size as its sheet-1 callout prints it: the count and
+    tap drill at the callout's places, then the thread, both through."""
+    return (
+        f"{count}X <MOD-DIAM>{spec.inch_text(drill, CALLOUT_PLACES)} THRU\n"
+        f"{thread.lstrip('#')} UNC THRU"
+    )
 
 
-# Each tag's size and process (rules 9, 10): the reamed pins at their limits
-# in ASME Y14.5's single-line limit form, low limit first (the sheet-1 4X
-# REAM's .3750 +.0015/+.0010), the taps as drill and thread.
-PIN_SIZE = (
-    f"<MOD-DIAM>{spec.inch_text(spec.PIN_HOLE_DIA + min(spec.PIN_HOLE_BAND), 4)}-"
-    f"{spec.inch_text(spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND), 4)} REAM THRU"
-)
-ROW_SIZES = {
-    **dict.fromkeys(spec.PIN_HOLES, PIN_SIZE),
-    **dict.fromkeys(spec.END_CLAMPS, _tap_size(spec.CLAMP_TAP_DRILL, spec.CLAMP_THREAD)),
-    **{f"R{i}": _tap_size(spec.RISER_TAP_DRILL, spec.RISER_THREAD) for i in range(1, 5)},
-    **{f"L{i}": _tap_size(spec.LEVER_TAP_DRILL, spec.LEVER_THREAD) for i in range(1, 3)},
-    # Drilled and tapped at assembly (TL-00 step 10, its HUB CLAMP sheet
-    # callout), so its size line says when.
-    "HUB": f"{spec.HUB_THREAD.lstrip('#')} UNC AT ASSEMBLY",
-}
-# Each tag group's mate, once in the table (machinist review r8, rule 10),
+# Each group's mate, once in the table (machinist review r8, rule 10),
 # MHA-CH-06's own parts by their same-parent short TL- form.
 _PARENT_PREFIX = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"].rsplit(
     "TL-", 1
@@ -138,24 +126,60 @@ def _short(number: str) -> str:
 
 
 FEED_LEVER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
-ROW_MATES = {
-    **dict.fromkeys(spec.PIN_HOLES, f"RUNNING FIT ON {_short(spec.PIN_NUMBER)}"),
-    **dict.fromkeys(spec.END_CLAMPS, f"CLAMPS {spec.STRAP_NUMBER}"),
-    **{f"R{i}": f"HOLDS {_short(spec.RISER_NUMBER)}" for i in range(1, 5)},
-    **{f"L{i}": f"HOLDS {_short(FEED_LEVER_NUMBER)}" for i in range(1, 3)},
-    "HUB": f"CLAMPS {spec.STRAP_NUMBER} HUB",
-}
+# The reamed pins' fit and mate; the sheet-1 4X REAM callout prints the same.
+PIN_MATE = f"RUNNING FIT ON {_short(spec.PIN_NUMBER)}"
+# NOTE 1's tags, as its model-owned text names them.
+OUTER_PAIR = ("A2", "B2")
+if not spec.OUTER_Y_NOTE.startswith(f"{', '.join(OUTER_PAIR)}: "):
+    raise AssertionError("NOTE 1 no longer names the outer pair it governs")
+if spec.HUB_THREAD != spec.CLAMP_THREAD or spec.TABLE_HOLES["HUB"][2] != spec.CLAMP_TAP_DRILL:
+    raise AssertionError("the HUB is no longer the end clamps' #8-32 tap")
+_RISERS = tuple(f"R{i}" for i in range(1, 5))
+_LEVERS = tuple(f"L{i}" for i in range(1, 3))
 
 
-# Two lines a cell: size and process, then the mate.
-ROW_NOTES = {tag: f"{ROW_SIZES[tag]}\n{ROW_MATES[tag]}" for tag in TABLED_HOLES}
-if set(ROW_SIZES) != set(TABLED_HOLES) or set(ROW_MATES) != set(TABLED_HOLES) or any(
-    len(note.splitlines()) > NOTE_MAX_LINES
+def _see_notes(tags: tuple[str, ...]) -> str:
+    """The numbered notes governing any of ``tags``, flagged where the
+    group is stated (rule 7: a note links to its feature by SEE NOTE n)."""
+    numbers = [str(number) for number, governed in ((1, OUTER_PAIR), (2, A1_RELATED))
+               if set(governed) & set(tags)]
+    if not numbers:
+        return ""
+    return f"\nSEE NOTE{'S' if len(numbers) > 1 else ''} {', '.join(numbers)}"
+
+
+# Rule 10 (Main's ruling 2026-11-12, #2649): identical holes take one
+# callout. Each size group's size, process and mate are stated once, in one
+# NOTE cell merged across the group's rows, with its count; the rows carry
+# only their tag and X/Y (the jig steps cite the tags individually). The
+# native table orders its rows by size, so every group is a contiguous run
+# (_group_spans refuses one that is not). The HUB is the end clamps' #8-32
+# tap, drilled and tapped at assembly (TL-00 step 10).
+_PINS = tuple(spec.PIN_HOLES)
+_CLAMPS = (*spec.END_CLAMPS, "HUB")
+NOTE_GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (_PINS,
+     f"<MOD-DIAM>{spec.inch_text(spec.PIN_HOLE_DIA + min(spec.PIN_HOLE_BAND), 4)}-"
+     f"{spec.inch_text(spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND), 4)}\n"
+     f"{len(_PINS)}X REAM THRU\n{PIN_MATE}{_see_notes(_PINS)}"),
+    (_CLAMPS,
+     f"{_drill_and_tap(len(_CLAMPS), spec.CLAMP_TAP_DRILL, spec.CLAMP_THREAD)}\n"
+     f"CLAMPS {spec.STRAP_NUMBER}\nHUB AT ASSEMBLY{_see_notes(_CLAMPS)}"),
+    (_RISERS,
+     f"{_drill_and_tap(len(_RISERS), spec.RISER_TAP_DRILL, spec.RISER_THREAD)}\n"
+     f"HOLDS {_short(spec.RISER_NUMBER)}{_see_notes(_RISERS)}"),
+    (_LEVERS,
+     f"{_drill_and_tap(len(_LEVERS), spec.LEVER_TAP_DRILL, spec.LEVER_THREAD)}\n"
+     f"HOLDS {_short(FEED_LEVER_NUMBER)}{_see_notes(_LEVERS)}"),
+)
+_grouped = [tag for tags, _note in NOTE_GROUPS for tag in tags]
+if sorted(_grouped) != sorted(TABLED_HOLES) or any(
+    len(note.splitlines()) > NOTE_LINES_PER_ROW * len(tags)
     or any(len(line.replace("<MOD-DIAM>", "\u00d8")) > NOTE_MAX_GLYPHS
            for line in note.splitlines())
-    for note in ROW_NOTES.values()
+    for tags, note in NOTE_GROUPS
 ):
-    raise AssertionError("every tabled row needs a size and mate that fit the NOTE column")
+    raise AssertionError("every tabled hole needs one size group whose note fits its NOTE cell")
 # SolidWorks may read the diameter code back as its glyph (the riser's
 # native SIZE cells: draw_ch_rocker_arm_tl_oblique_riser), and a cell's
 # line break as CR LF.
@@ -364,31 +388,67 @@ def _size_semantics(tag: str, text: str) -> tuple[Any, ...]:
     return tuple(tokens)
 
 
+def _group_spans(
+    rows: dict[str, tuple[int, tuple[str, ...]]],
+) -> list[tuple[int, int, tuple[str, ...], str]]:
+    """Each size group's (top row, bottom row, tags, note) in the current table.
+
+    The native table orders its rows by size, so a group's rows are one
+    contiguous run; anything else is refused rather than merged across
+    another group's rows."""
+    spans = []
+    for tags, note in NOTE_GROUPS:
+        indices = sorted(rows[tag][0] for tag in tags)
+        if indices != list(range(indices[0], indices[0] + len(indices))):
+            raise RuntimeError(f"carrier size group {tags} is not one run of rows: {indices}")
+        spans.append((indices[0], indices[-1], tags, note))
+    return spans
+
+
+def _merged(table: Any, row: int) -> bool:
+    """Whether ``row``'s NOTE cell is merged (IsCellMerged's BOOL; the
+    WithRow/WithColumn outputs are not relied on)."""
+    state = table.IsCellMerged(row, NOTE_COLUMN)
+    return bool(state[0] if isinstance(state, tuple) else state)
+
+
 def _frozen_rows(
     table: Any, generated: dict[str, tuple[str, ...]], *,
-    notes: dict[str, str] | None, stage: str,
+    grouped: bool, stage: str,
 ) -> dict[str, tuple[int, tuple[str, ...]]]:
     """TAG/X/Y/SIZE as first generated, plus the NOTE column, by tag.
 
-    ``notes=None`` requires the freshly inserted NOTE cells to be empty. The
-    row's identity is its tag at its exact corner location (``_rows``); X/Y
-    compare by printed decimal value and SIZE by ``_size_semantics``, never
-    by serialization. TAG/NOTE compare byte for byte. Failures name the row,
-    expected and actual cells.
+    ``grouped=False`` requires the freshly inserted NOTE cells to be empty.
+    ``grouped=True`` requires each size group's NOTE cell merged across its
+    rows (_group_spans), its top row holding the group's note; the rows the
+    merge covers read empty or the same note. The row's identity is its tag
+    at its exact corner location (``_rows``); X/Y compare by printed decimal
+    value and SIZE by ``_size_semantics``, never by serialization. TAG/NOTE
+    compare byte for byte. Failures name the row, expected and actual cells.
     """
     rows = _rows(table)
     columns = _inventory(table)[1]
     if columns != len(COLUMNS):
         raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
+    notes = {tag: ("",) for tag in rows}
+    if grouped:
+        for top, bottom, tags, note in _group_spans(rows):
+            for tag in tags:
+                row = rows[tag][0]
+                notes[tag] = (note,) if row == top else ("", note)
+                if bottom > top and not _merged(table, row):
+                    raise RuntimeError(
+                        f"carrier size group {tags} NOTE is not merged {stage}: {tag} (row {row})"
+                    )
     for tag, (row, cells) in rows.items():
-        expected = (*generated[tag], "" if notes is None else notes[tag])
-        if (cells[0], *map(_location_value, cells[1:3]), _size_semantics(tag, cells[3]),
-                _note_text(cells[4])) != (
-                expected[0], *map(_location_value, expected[1:3]),
-                _size_semantics(tag, expected[3]), _note_text(expected[4])):
+        expected = generated[tag]
+        if ((cells[0], *map(_location_value, cells[1:3]), _size_semantics(tag, cells[3]))
+                != (expected[0], *map(_location_value, expected[1:3]),
+                    _size_semantics(tag, expected[3]))
+                or _note_text(cells[4]) not in notes[tag]):
             raise RuntimeError(
                 f"carrier generated row or flag changed {stage}: {tag} (row {row}) "
-                f"expected={expected!r} actual={cells!r}"
+                f"expected={(*expected, notes[tag])!r} actual={cells!r}"
             )
     return rows
 
@@ -674,34 +734,42 @@ def create_carrier_hole_table(
         raise RuntimeError("carrier table refused the NOTE title")
     rebuild_drawing(adapter, label="carrier NOTE column")
     # Re-identify rows after the structural edit: a regenerated hole table may
-    # reorder them, so NOTE text is written by each tag's CURRENT row only.
-    rows = _frozen_rows(table, generated, notes=None, stage="after the NOTE column")
-    for tag, (row, _cells) in rows.items():
-        if not table.IsCellTextEditable(row, 4):
-            raise RuntimeError(f"carrier {tag} NOTE cell (row {row}) is not editable")
-        note = ROW_NOTES[tag]
-        table.SetText2(row, 4, True, note)  # void put: read back below
-        written = (str(table.Text2(row, 4, True) or ""), _cell(table, row, 4))
+    # reorder them, so each group is merged and written at its CURRENT rows.
+    rows = _frozen_rows(table, generated, grouped=False, stage="after the NOTE column")
+    for top, bottom, tags, note in _group_spans(rows):
+        # Merged while empty, then written once at the merged cell's top row.
+        if bottom > top and not table.MergeCells(top, NOTE_COLUMN, bottom, NOTE_COLUMN):
+            raise RuntimeError(f"carrier size group {tags} NOTE rows {top}-{bottom} refused the merge")
+        if not table.IsCellTextEditable(top, NOTE_COLUMN):
+            raise RuntimeError(f"carrier size group {tags} NOTE cell (row {top}) is not editable")
+        table.SetText2(top, NOTE_COLUMN, True, note)  # void put: read back below
+        written = (str(table.Text2(top, NOTE_COLUMN, True) or ""), _cell(table, top, NOTE_COLUMN))
         if tuple(map(_note_text, written)) != (note, note):
             raise RuntimeError(
-                f"carrier {tag} NOTE (row {row}) did not take: expected={note!r} "
+                f"carrier size group {tags} NOTE (row {top}) did not take: expected={note!r} "
                 f"driving/displayed={written!r}"
             )
+        _telemetry.info(
+            f"carrier size group {tags} NOTE rows {top}-{bottom}: merged="
+            f"{[_merged(table, row) for row in range(top, bottom + 1)]!r} displayed="
+            f"{[_cell(table, row, NOTE_COLUMN) for row in range(top, bottom + 1)]!r}"
+        )
     for column, width in enumerate(TABLE_WIDTHS):
         actual = float(table.SetColumnWidth(column, width, 0))
         if abs(actual - width) > 1e-6:
             raise RuntimeError(
                 f"carrier table column {column} rejected its width: expected={width} actual={actual}"
             )
-    # Each tag's size and process is in its NOTE cell (ROW_SIZES); the
-    # generated SIZE column, at the document's places, is hidden.
+    # Each size group's size and process is in its merged NOTE cell
+    # (NOTE_GROUPS); the generated SIZE column, at the document's places, is hidden.
     # SetColumnHidden is VT_VOID; the BOOL readback proves it after rebuild.
     table.SetColumnHidden(SIZE_COLUMN, True)
     tabled_edges = {tag: edges[tag] for tag in TABLED_HOLES}
     _tags(adapter, view, tabled_edges, place=True)
     # NOTE 1 names A2/B2; the exact owner text is linked to the saved model
     # property and checked against both native local controls. NOTE 2
-    # (A1_RELATION_NOTE) names its own tags; the rows carry no flags.
+    # (A1_RELATION_NOTE) names its own tags. Each group governed by either
+    # flags it in its merged NOTE cell (SEE NOTE n, _see_notes).
     # The notes stand beside the table's top, risen with it (TABLE_ANCHOR).
     add_note(adapter, "1", .225, .178)
     flagged = add_property_linked_note(adapter, "Outer Pin Row Note", .235, .178)
@@ -727,7 +795,7 @@ def create_carrier_hole_table(
                        for edge in current.values())
                 or annotation.IsDangling()):
             raise RuntimeError("carrier table datum left its corner vertex")
-        rows = _frozen_rows(table, generated, notes=ROW_NOTES, stage="at settled readback")
+        rows = _frozen_rows(table, generated, grouped=True, stage="at settled readback")
         _size_column_hidden(table, "at settled readback")
         # Every tag, the HUB's included, stays on its own physical hole.
         _tags(adapter, view, {tag: current[tag] for tag in TABLED_HOLES}, place=False)

@@ -41,7 +41,8 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert not hasattr(drawing, "SECTION_NOTE")
     assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
-    assert set(table.ROW_NOTES) == set(TABLED) and "AT ASSEMBLY" in table.ROW_NOTES["HUB"]
+    assert sorted(tag for tags, _note in table.NOTE_GROUPS for tag in tags) == sorted(TABLED)
+    assert any("HUB" in tags and "HUB AT ASSEMBLY" in note for tags, note in table.NOTE_GROUPS)
     assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
     assert "parent" not in drawing._PIN_ROWS["A1"]
     assert assembly.STATION_BAND == pytest.approx(.0005 * I)
@@ -164,21 +165,45 @@ def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
             spec.correlated_pin_budget(band, row)
 
 
+# The native table orders its rows by size group, each group's holes in
+# selection order (carrier render, proof 20261112T074730410Z: A2 A1 B1 B2 |
+# CL HUB CR | R3 R1 R2 R4 | L2 L1). The fake keeps TABLED's order within
+# each group, so A1 stays row 1.
+_GROUP_OF = {tag: index for index, (tags, _note) in enumerate(table.NOTE_GROUPS) for tag in tags}
+NATIVE_ORDER = sorted(TABLED, key=_GROUP_OF.__getitem__)
+
+
+def _group_notes(order) -> dict[str, str]:
+    """Each row's displayed NOTE once its group is merged and written: the
+    group's note at its top row, the rows the merge covers empty."""
+    notes = {}
+    for tags, note in table.NOTE_GROUPS:
+        top = min(tags, key=order.index)
+        notes.update({tag: note if tag == top else "" for tag in tags})
+    return notes
+
+
 class NativeCells:
     """A generated hole table: physical rows/columns (``Total*Count``), the
     native ``ColumnHidden``/``SetColumnHidden`` visibility, and
     ``DisplayedText2``'s IncludeHidden index domain: with False, hidden
-    columns are skipped, so a reader in the wrong domain gets the wrong cell."""
+    columns are skipped, so a reader in the wrong domain gets the wrong cell.
+    Each size group's NOTE cell is merged across its rows (``IsCellMerged``)."""
 
     def __init__(self):
+        notes = _group_notes(NATIVE_ORDER)
         self.cells = [list(table.COLUMNS)] + [
             [tag, *(f"{value / I:.3f}" for value in table.table_location(tag)),
-             "native size", table.ROW_NOTES[tag]]
-            for tag in TABLED
+             "native size", notes[tag]]
+            for tag in NATIVE_ORDER
         ]
         self.TotalRowCount = len(self.cells)
         self.TotalColumnCount = len(table.COLUMNS)
         self.hidden = {}
+        self.merged = {
+            1 + NATIVE_ORDER.index(tag)
+            for tags, _note in table.NOTE_GROUPS if len(tags) > 1 for tag in tags
+        }
 
     def _physical(self, col, include_hidden):
         if include_hidden:
@@ -188,6 +213,9 @@ class NativeCells:
     def DisplayedText2(self, row, col, include_hidden):
         return self.cells[row][self._physical(col, include_hidden)]
 
+    def IsCellMerged(self, row, col):
+        return (col == table.NOTE_COLUMN and row in self.merged, row, col)
+
     def ColumnHidden(self, col):
         return self.hidden.get(col, False)
 
@@ -196,6 +224,42 @@ class NativeCells:
 
     def RowHidden(self, _row):
         return False
+
+
+def test_size_groups_are_one_merged_note_each_with_their_count_and_flags():
+    """#2649 (rule 10): each size group's size, process and mate print once,
+    with its count, in one NOTE cell merged across its rows; the groups that
+    NOTE 1 or 2 govern flag them there (rule 7)."""
+    notes = dict(table.NOTE_GROUPS)
+    assert notes[("A1", "B1", "A2", "B2")] == (
+        "<MOD-DIAM>.3760-.3765\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
+    )
+    assert notes[("CL", "CR", "HUB")] == (
+        "3X <MOD-DIAM>.136 THRU\n8-32 UNC THRU\nCLAMPS MHA-CH-13\nHUB AT ASSEMBLY\nSEE NOTE 2"
+    )
+    assert notes[("R1", "R2", "R3", "R4")] == (
+        "4X <MOD-DIAM>.089 THRU\n4-40 UNC THRU\nHOLDS TL-24\nSEE NOTE 2"
+    )
+    assert notes[("L1", "L2")] == "2X <MOD-DIAM>.257 THRU\n5/16-18 UNC THRU\nHOLDS TL-26"
+    for tags, note in table.NOTE_GROUPS:
+        assert note.count(f"{len(tags)}X ") == 1, tags
+        lines = note.splitlines()
+        assert len(lines) <= table.NOTE_LINES_PER_ROW * len(tags), tags
+        assert max(len(line.replace("<MOD-DIAM>", "D")) for line in lines) <= table.NOTE_MAX_GLYPHS
+    # The flags follow the notes' own tags.
+    assert spec.OUTER_Y_NOTE.startswith("A2, B2: ")
+    assert table.A1_RELATION_NOTE.startswith(", ".join(("B1", "A2", "B2", "CL", "CR")))
+    assert table.PIN_MATE in drawing.PIN_FIT_CALLOUT.splitlines()
+    # A merged run must be the group's own contiguous rows.
+    native = NativeCells()
+    rows = table._rows(native)
+    assert [(top, bottom) for top, bottom, _tags, _note in table._group_spans(rows)] == [
+        (1, 4), (5, 7), (8, 11), (12, 13)
+    ]
+    split = dict(rows)
+    split["HUB"], split["R1"] = rows["R1"], rows["HUB"]
+    with pytest.raises(RuntimeError, match=r"size group \('CL', 'CR', 'HUB'\) is not one run"):
+        table._group_spans(split)
 
 
 def _row_of(native: NativeCells, tag: str) -> int:
@@ -357,14 +421,16 @@ def test_native_table_renames_default_tags_and_keeps_the_corner_origin():
     # generated rows are frozen.
     assert (source.index("insert_hole_table(") < source.index("_assign_tags(feature, table)")
             < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
-    # NOTE text goes into each tag's row as re-read AFTER the column rebuild,
-    # every void SetText2 put is read back, and settle compares whole rows,
-    # all in the physical (IncludeHidden=True) column domain.
+    # NOTE text goes into each size group's merged cell at its rows as re-read
+    # AFTER the column rebuild, merged while empty, every void SetText2 put
+    # read back, and settle compares whole rows and the merges, all in the
+    # physical (IncludeHidden=True) column domain.
     assert (source.index('label="carrier NOTE column"')
-            < source.index('_frozen_rows(table, generated, notes=None')
-            < source.index("table.SetText2(row, 4, True, note)")
-            < source.index("table.Text2(row, 4, True)")
-            < source.index('_frozen_rows(table, generated, notes=ROW_NOTES'))
+            < source.index('_frozen_rows(table, generated, grouped=False')
+            < source.index("table.MergeCells(top, NOTE_COLUMN, bottom, NOTE_COLUMN)")
+            < source.index("table.SetText2(top, NOTE_COLUMN, True, note)")
+            < source.index("table.Text2(top, NOTE_COLUMN, True)")
+            < source.index('_frozen_rows(table, generated, grouped=True'))
     assert "carrier table datum left its corner vertex" in source
     assert "DisplayedText2(row, column, True)" in inspect.getsource(table._cell)
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
@@ -532,39 +598,57 @@ def test_hole_table_format_is_set_and_read_back_on_the_drawing(monkeypatch, faul
     assert source.index("_hole_table_format(adapter)") < source.index("insert_hole_table(")
 
 
-@pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "columns"])
+@pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "follower_note", "columns"])
 def test_frozen_rows_name_the_row_and_both_values(fault):
     native = NativeCells()
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
     if fault == "size":
         native.cells[2][3] = "other size"
     elif fault == "note":
-        native.cells[2][4] = ""
+        native.cells[1][4] = ""
     elif fault == "moved_note":
-        # Like holes share one NOTE (A1 and B1 both read the pin size and
-        # mate), so the swap is with the first row whose note differs.
+        # The pin group's note swapped with the next group's top row.
         other = next(
             row for row, cells in enumerate(native.cells[1:], 1)
-            if cells[4] != native.cells[1][4]
+            if cells[4] and cells[4] != native.cells[1][4]
         )
         native.cells[1][4], native.cells[other][4] = native.cells[other][4], native.cells[1][4]
+    elif fault == "follower_note":
+        # A row the merge covers reads empty or its group's note, never another's.
+        native.cells[2][4] = native.cells[5][4]
     elif fault == "columns":
         native.TotalColumnCount = 4
     if fault is None:
-        rows = table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
+        rows = table._frozen_rows(native, generated, grouped=True, stage="now")
         assert set(rows) == set(TABLED)
+        covered = NativeCells()
+        covered.cells[2][4] = covered.cells[1][4]
+        assert set(table._frozen_rows(covered, generated, grouped=True, stage="now")) == set(TABLED)
         return
     with pytest.raises(RuntimeError) as failure:
-        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
+        table._frozen_rows(native, generated, grouped=True, stage="now")
     message = str(failure.value)
     if fault == "columns":
         assert "has 4 columns now" in message
     else:
-        row = 1 if fault == "moved_note" else 2  # rows are checked in table order
+        row = 1 if fault in ("note", "moved_note") else 2  # rows are checked in table order
         tag = native.cells[row][0]
         assert f"changed now: {tag} (row {row})" in message
         assert "expected=" in message and "actual=" in message
         assert repr(native.cells[row][3 if fault == "size" else 4]) in message
+
+
+def test_frozen_rows_refuse_a_size_group_that_is_not_merged():
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    native.merged.discard(2)
+    with pytest.raises(RuntimeError, match=r"NOTE is not merged now: B1 \(row 2\)"):
+        table._frozen_rows(native, generated, grouped=True, stage="now")
+    # The freshly inserted column is checked empty, never for merges.
+    for row in native.cells[1:]:
+        row[4] = ""
+    native.merged.clear()
+    assert set(table._frozen_rows(native, generated, grouped=False, stage="now")) == set(TABLED)
 
 
 def _strip_leading_zero(text):
@@ -606,7 +690,7 @@ def test_frozen_location_cells_ignore_zero_style_only(side):
             row[:4] = restyled[row[0]]
     else:
         generated = restyled
-    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
+    assert set(table._frozen_rows(native, generated, grouped=True, stage="now")) \
         == set(TABLED)
 
 
@@ -630,7 +714,7 @@ def test_frozen_location_cells_still_refuse_real_drift(drift):
         native.cells[row][column] = native.cells[row][column][:-1]
         match = "is not measured from the corner"
     with pytest.raises(RuntimeError, match=match):
-        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
+        table._frozen_rows(native, generated, grouped=True, stage="now")
 
 
 @pytest.mark.parametrize("side", ["table", "generated"])
@@ -651,7 +735,7 @@ def test_frozen_location_cells_accept_value_equal_leading_and_trailing_zeros(sid
                 row[:4] = restyled[row[0]]
         else:
             expected = restyled
-        assert set(table._frozen_rows(table_cells, expected, notes=table.ROW_NOTES, stage="now")) \
+        assert set(table._frozen_rows(table_cells, expected, grouped=True, stage="now")) \
             == set(TABLED)
         assert set(table._row_holes(table_cells).values()) == set(TABLED)
 
@@ -722,14 +806,15 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     generated["L2"] = (*generated["L2"][:2], before, generated["L2"][3])
     native.cells[l2][2] = after
     native.cells[1][3] = actual_size
-    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
+    assert set(table._frozen_rows(native, generated, grouped=True, stage="now")) \
         == set(TABLED)
     # Real changes on the same row still fail: size, depth, coordinate, note,
     # another hole's identity, and a missing row.
     for mutate, match in (
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".38", ".39")), r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[1].__setitem__(3, actual_size.replace(".46", ".47")), r"changed now: A1 \(row 1\)"),
-        (lambda cells: cells[1].__setitem__(4, table.ROW_NOTES["CL"]), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[1].__setitem__(4, dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]),
+         r"changed now: A1 \(row 1\)"),
         (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from the corner"),
         (lambda cells: cells[2].__setitem__(0, "A1"), "extra/duplicate"),
     ):
@@ -737,21 +822,21 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
         bad.cells[1][3] = actual_size
         mutate(bad.cells)
         with pytest.raises(RuntimeError, match=match):
-            table._frozen_rows(bad, generated, notes=table.ROW_NOTES, stage="now")
+            table._frozen_rows(bad, generated, grouped=True, stage="now")
     missing = NativeCells()
     missing.TotalRowCount -= 1
     with pytest.raises(RuntimeError, match="row/column inventory"):
-        table._frozen_rows(missing, generated, notes=table.ROW_NOTES, stage="now")
+        table._frozen_rows(missing, generated, grouped=True, stage="now")
 
 
 def test_freshly_inserted_note_cells_must_be_empty_before_writing():
     native = NativeCells()
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
     with pytest.raises(RuntimeError, match="expected=.*actual="):
-        table._frozen_rows(native, generated, notes=None, stage="after the NOTE column")
+        table._frozen_rows(native, generated, grouped=False, stage="after the NOTE column")
     for row in native.cells[1:]:
         row[4] = ""
-    assert set(table._frozen_rows(native, generated, notes=None, stage="x")) == set(TABLED)
+    assert set(table._frozen_rows(native, generated, grouped=False, stage="x")) == set(TABLED)
 
 
 class DefaultTagTable(NativeCells):
@@ -1031,7 +1116,8 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     # Complete: every tabled location cell but the HUB's, which are REF (it
     # is drilled and tapped at assembly, TL-00 step 10; ORIGIN_NOTE says so).
     expected = {(tag, axis) for tag in TABLED if tag != "HUB" for axis in (0, 1)}
-    assert "HUB X/Y REF" in table.ORIGIN_NOTE and "AT ASSEMBLY" in table.ROW_NOTES["HUB"]
+    assert "HUB X/Y REF" in table.ORIGIN_NOTE
+    assert "HUB AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
     assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
@@ -1059,10 +1145,15 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     # (test_outer_note_reads_actual_model_limits_and_never_writes_them).
     assert spec.inch_text(spec.OUTER_Y_NOMINAL, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
     assert spec.inch_text(spec.OUTER_Y_BAND, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
-    # NOTE 1 names its own tags; the rows carry no flags (farm r10: a longer
-    # NOTE line wrapped and grew its row).
+    # NOTE 1 and NOTE 2 name their own tags, and each group they govern
+    # flags them once in its merged NOTE cell (#2649), never per row.
     assert spec.OUTER_Y_NOTE.startswith("A2, B2: ")
-    assert not any("NOTE" in note for note in table.ROW_NOTES.values())
+    flagged = {tags: note.splitlines()[-1] for tags, note in table.NOTE_GROUPS if "NOTE" in note}
+    assert flagged == {
+        ("A1", "B1", "A2", "B2"): "SEE NOTES 1, 2",
+        ("CL", "CR", "HUB"): "SEE NOTE 2",
+        ("R1", "R2", "R3", "R4"): "SEE NOTE 2",
+    }
 
 
 @pytest.mark.parametrize("glyph", ["<MOD-DIAM>", "\u2300", "\u00d8"])
@@ -1074,11 +1165,11 @@ def test_note_cells_read_back_with_the_diameter_as_code_or_glyph(glyph):
     for row in native.cells[1:]:
         row[4] = row[4].replace("<MOD-DIAM>", glyph)
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
-    assert set(table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")) \
+    assert set(table._frozen_rows(native, generated, grouped=True, stage="now")) \
         == set(TABLED)
     native.cells[1][4] = native.cells[1][4].replace("REAM", "DRILL")
     with pytest.raises(RuntimeError, match="changed now"):
-        table._frozen_rows(native, generated, notes=table.ROW_NOTES, stage="now")
+        table._frozen_rows(native, generated, grouped=True, stage="now")
 
 
 def _settled_harness(monkeypatch, *, fail_check=False):
@@ -1117,13 +1208,14 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         HoleTable=feature, TotalRowCount=len(TABLED) + 1, TotalColumnCount=5,
         InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
         IsCellTextEditable=lambda *_: True,
+        MergeCells=lambda *_: True, IsCellMerged=lambda *_: (True, 0, 0),
         SetText2=lambda row, _col, _hidden, text: notes.__setitem__(row, text),
-        Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes[row],
+        Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes.get(row, ""),
         SetColumnWidth=lambda _col, width, _style: width,
         SetColumnHidden=lambda col, state: hidden.append((col, state)),
         GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: visible_widths[col],
     )
-    rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(TABLED, 1)}
+    rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(NATIVE_ORDER, 1)}
     sheet_doc = SimpleNamespace(
         GetCurrentSheet=current, ActivateSheet=activate, ClearSelection2=lambda *_: None,
         SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),

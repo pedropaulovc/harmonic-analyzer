@@ -69,6 +69,7 @@ from _drawing_notes import add_property_linked_note
 from _oblique_carrier_hole_table import (
     A1_RELATED,
     FEED_LEVER_NUMBER,
+    PIN_MATE,
     create_carrier_hole_table,
     table_location,
 )
@@ -154,10 +155,11 @@ TABLE_ROW_DIMENSIONS = frozenset({"EdgeX", "PlateNearY"})
 # parts' limits of size and named by its standard fit name, the clearance
 # only as REF. The spec's PIN_HOLE_CALLOUT still says "DIAMETRAL CLEARANCE":
 # changing it there re-keys the part and every importer of the carrier spec
-# (riser, jig assembly), so the sheet owns its wording.
+# (riser, jig assembly), so the sheet owns its wording. Two lines of words
+# (rule 7; #2649, review 20261112T122336032Z read three): the fit and its
+# mate in the hole table's short TL- form, then the REF clearance.
 PIN_FIT_CALLOUT = (
-    "4X REAM THRU\nRUNNING FIT ON\n"
-    f"{part_spec.PIN_NUMBER}\n"
+    f"4X REAM THRU\n{PIN_MATE}\n"
     f"(CLEARANCE {part_spec.inch_text(part_spec.PIN_CLEARANCE_MIN, 4)}-"
     f"{part_spec.inch_text(part_spec.PIN_CLEARANCE_MAX, 4)})"
 )
