@@ -84,6 +84,15 @@ _STL_SUFFIX = ".stl"
 _NORMAL_STEP = 1e-4
 _OFFSET_STEP = 1e-3
 _TOUCHING = tuple(d for d in itertools.product((-1, 0, 1), repeat=4) if any(d))
+# Two builds' STL vertices within this many float32 ulps of the STL's largest
+# |coordinate| (eps: 3.05e-5 mm on the 100 mm fr_nameplate) are one point
+# (:func:`_paired`). Measured basis, 2026-11-12: of 13 fresh fr_nameplate
+# builds kept in the remote cache, the same model on five workers, 10 wrote
+# byte-identical STLs and 3 each moved 415-458 of 25348 vertices, by at most
+# 7.2e-7 mm: float64 residues of 2e-16 to 9e-16 mm where the value is exactly
+# 0 (float32 keeps them there), elsewhere 1-3 float32 ulps of the coordinate.
+_STL_VERTEX_ULPS = 4
+_NEIGHBOURS = tuple(itertools.product((-1, 0, 1), repeat=3))
 _LISTED = 10
 # Bound on a judge fault's message recorded in the result.
 _ERROR_CHARS = 300
@@ -131,7 +140,10 @@ def judge(
     Never raises. A fault of this judgement costs only what it judges: the
     cause reads ``error:<type>``, a signal ``absent`` (so the outcome is at
     best ``unknown``), each with its message in ``outcome_details``. The
-    diff's result, whose request divergence is the ground truth, is kept."""
+    diff's result, whose request divergence is the ground truth, is kept.
+    ``judge_faults`` lists every fault (``step``: ``truth_cause``, a signal,
+    or ``outcome`` for all of them; ``error``), so a signal absent because its
+    judgement raised is told from one absent from both logs."""
     cause, cause_error = _attempt(
         lambda: truth_cause(
             conv.recipe_calls(base.calls), conv.recipe_calls(new.calls), divergence
@@ -143,10 +155,12 @@ def judge(
             "outcome": Outcome.UNKNOWN.value,
             "outcome_signals": {name: Signal.ABSENT.value for name in _SIGNALS},
             "outcome_details": {name: {"error": error} for name in _SIGNALS},
+            "judge_faults": [{"step": "outcome", "error": error}],
         }
     if cause_error is not None:
         cause = "error:" + cause_error.split(":", 1)[0]
         found["outcome_details"]["truth_cause"] = {"error": cause_error}
+        found["judge_faults"].insert(0, {"step": "truth_cause", "error": cause_error})
     return {"truth_cause": cause, **found}
 
 
@@ -174,16 +188,18 @@ def outcome(
     new_captures: Path,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
-    :class:`Signal` (``outcome_signals``) and what differed
-    (``outcome_details``). Signals, all order-independent:
+    :class:`Signal` (``outcome_signals``), what differed
+    (``outcome_details``) and the signals whose judgement raised
+    (``judge_faults``). Signals, all order-independent:
 
     * ``mass``: every mass-property measurement, matched as a multiset
       within :data:`REL_TOL` (:func:`_mass_signal`);
     * ``requests``: the multiset of recipe requests;
     * ``answers``: the multiset of (request, answer) pairs, but for mass
       properties and answers about the session (``_SESSION_SITE``);
-    * ``stl``: the geometry of every STL file SolidWorks wrote (:func:`_mesh`;
-      last write per path).
+    * ``stl``: the geometry of every STL file SolidWorks wrote, vertices
+      within float32 noise as one (:func:`_stl_comparison`; last write per
+      path).
 
     Handles are erased (an object's identity number depends on call order),
     strings and floats are normalised as for noise. SLDPRT and BMP captures
@@ -206,11 +222,13 @@ def outcome(
     }
     signals: dict[str, Signal] = {}
     details: dict[str, Any] = {}
+    faults: list[dict[str, str]] = []
     for name, compute in attempts.items():
         keyed_only = keyed_error is not None and name in ("requests", "answers")
         result, error = (None, keyed_error) if keyed_only else _attempt(compute)
         if error is not None:
             result = Signal.ABSENT, {"error": error}
+            faults.append({"step": name, "error": error})
         signals[name], details[name] = result
     found = Outcome.SAME
     if Signal.ABSENT in signals.values():
@@ -221,6 +239,7 @@ def outcome(
         "outcome": found.value,
         "outcome_signals": {name: signal.value for name, signal in signals.items()},
         "outcome_details": details,
+        "judge_faults": faults,
     }
 
 
@@ -491,18 +510,30 @@ def _multiset_signal(
 
 
 _Point = tuple[float, float, float]
+_Triangle = tuple[_Point, _Point, _Point]
 _Cell = tuple[int, int, int, int]
+_Bin = tuple[int, int, int]
 
 
 @dataclass(frozen=True)
 class _Mesh:
     """A binary STL's geometry (:func:`_mesh`)."""
 
-    vertices: frozenset[_Point]
     # Per plane, its outline (each edge just one of the plane's triangles
     # uses, in that triangle's winding): the plane's area.
     outlines: dict[frozenset[tuple[_Point, _Point]], float]
     area: float
+
+
+@dataclass(frozen=True)
+class _Pairing:
+    """Each vertex one STL has and the other lacks, mapped to the point it is
+    one with (:func:`_paired`); empty when both have the same vertices."""
+
+    points: dict[_Point, _Point]
+    count: int
+    eps: float
+    shift: float
 
 
 def _stl_signal(
@@ -512,36 +543,41 @@ def _stl_signal(
     new_captures: Path,
 ) -> tuple[Signal, dict[str, str] | None]:
     """Per STL path either build had SolidWorks write, whether the two last
-    writes are the same geometry (:func:`_mesh_difference`)."""
-    a, b = _stl_meshes(base, base_captures), _stl_meshes(new, new_captures)
+    writes are the same geometry (:func:`_stl_comparison`). A path whose
+    vertices were paired within eps keeps how in the detail, also when the
+    geometry is the same."""
+    a, b = _stl_files(base, base_captures), _stl_files(new, new_captures)
     if a is None or b is None or (not a and not b):
         return Signal.ABSENT, None
     differing: dict[str, str] = {}
+    paired: dict[str, str] = {}
     for rel in sorted(a.keys() | b.keys()):
         if rel not in b or rel not in a:
             differing[rel] = "base only" if rel in a else "new only"
             continue
-        found = _mesh_difference(a[rel], b[rel])
-        if found is not None:
-            differing[rel] = found
+        same, detail = _stl_comparison(a[rel], b[rel])
+        if not same:
+            differing[rel] = detail or "different"
+        elif detail is not None:
+            paired[rel] = detail
     if differing:
         return Signal.DIFFERENT, differing
-    return Signal.SAME, None
+    return Signal.SAME, paired or None
 
 
-def _stl_meshes(
+def _stl_files(
     conversation: conv.Conversation, captures: Path
-) -> dict[str, _Mesh | str] | None:
+) -> dict[str, list[_Triangle] | str] | None:
     """Per STL path the build had SolidWorks write, its last write's
-    :func:`_mesh`; ``None`` when a capture is missing or not the bytes the log
-    describes."""
+    :func:`_triangles`; ``None`` when a capture is missing or not the bytes
+    the log describes."""
     captured = conversation.trailer.get("captured", {})
     final: dict[str, dict[str, Any]] = {}
     for seq in sorted(captured, key=int):
         for rel, kept in captured[seq].items():
             if rel.lower().endswith(_STL_SUFFIX):
                 final[rel] = kept
-    found: dict[str, _Mesh | str] = {}
+    found: dict[str, list[_Triangle] | str] = {}
     for rel, kept in final.items():
         try:
             data = gzip.decompress((captures / kept["file"]).read_bytes())
@@ -549,14 +585,131 @@ def _stl_meshes(
             return None
         if hashlib.sha256(data).hexdigest() != kept["sha256"]:
             return None
-        found[rel] = _mesh(data)
+        found[rel] = _triangles(data)
     return found
 
 
-def _mesh(data: bytes) -> _Mesh | str:
-    """A binary STL as geometry that does not depend on how SolidWorks split
-    its faces into triangles: the set of vertices and, per plane, the outline
-    of the plane's triangles and their area. On 2026-11-11 two builds of
+def _triangles(data: bytes) -> list[_Triangle] | str:
+    """A binary STL's triangles, three float32 corners each. Triangle order,
+    corner rotation, facet normals, attribute bytes and the header are no
+    part of its geometry (:func:`_mesh`). Anything but a well-formed binary
+    STL of finite corners is its digest."""
+    count = int.from_bytes(data[80:84], "little") if len(data) >= 84 else -1
+    if len(data) != 84 + 50 * count:
+        return "bytes:" + hashlib.sha256(data).hexdigest()
+    rows = list(struct.iter_unpack("<12x9f2x", data[84:]))
+    # A NaN or an infinity anywhere makes the float64 sum of float32 corners
+    # non-finite; finite ones cannot overflow it.
+    if not math.isfinite(sum(itertools.chain.from_iterable(rows))):
+        return "bytes:" + hashlib.sha256(data).hexdigest()
+    return [
+        ((x0, y0, z0), (x1, y1, z1), (x2, y2, z2))
+        for x0, y0, z0, x1, y1, z1, x2, y2, z2 in rows
+    ]
+
+
+def _stl_comparison(
+    a: list[_Triangle] | str, b: list[_Triangle] | str
+) -> tuple[bool, str | None]:
+    """Whether two STLs are the same geometry, and what differed or how
+    vertices were paired. Vertices within eps are one point (:func:`_paired`):
+    both STLs take that point's one representative, so the planes, outlines
+    and areas compared (:func:`_mesh_difference`) see the same corners on
+    both sides, never the residue that told them apart."""
+    if isinstance(a, str) or isinstance(b, str):
+        return (True, None) if a == b else (False, "bytes")
+    pairing = _paired(a, b)
+    if isinstance(pairing, str):
+        return False, pairing
+    note = None
+    if pairing.count:
+        a, b = _substituted(a, pairing.points), _substituted(b, pairing.points)
+        note = (
+            f"{pairing.count} vertices paired within eps {pairing.eps:.3g} mm, "
+            f"max shift {pairing.shift:.3g} mm"
+        )
+    found = _mesh_difference(_mesh(a), _mesh(b))
+    if found is None:
+        return True, note
+    return False, found if note is None else f"{found} ({note})"
+
+
+def _paired(a: Sequence[_Triangle], b: Sequence[_Triangle]) -> _Pairing | str:
+    """The two STLs' vertex sets as one: each vertex one has and the other
+    lacks paired one-to-one with the other's within eps
+    (:data:`_STL_VERTEX_ULPS` float32 ulps of the largest |coordinate|,
+    Chebyshev distance), both mapped to the smaller of the two. Otherwise why
+    not, as ``vertices: ...``: a count that differs, or a vertex with no
+    counterpart within eps, several, one exactly matched, or one that another
+    vertex of its own STL is also within eps of. Eps is orders of magnitude
+    below any STL's vertex spacing, so a pairing that is not unique is not
+    noise; refusing reads it as other geometry, the conservative direction.
+
+    O(n log n) at most: the vertices are hashed into cubes of side eps (a
+    point within eps of another lies in its cube or one of the 26 around it)
+    and the unmatched ones sorted, for a deterministic first refusal. Work
+    stops at the first vertex that does not pair."""
+    va = {p for triangle in a for p in triangle}
+    vb = {p for triangle in b for p in triangle}
+    only_a, only_b = va - vb, vb - va
+    if not only_a and not only_b:
+        return _Pairing({}, 0, 0.0, 0.0)
+    counts = f"vertices: {len(only_a)} base only, {len(only_b)} new only"
+    if len(only_a) != len(only_b):
+        return counts
+    largest = max(abs(c) for p in itertools.chain(va, vb) for c in p)
+    eps = _STL_VERTEX_ULPS * math.ldexp(1.0, math.frexp(largest)[1] - 24)
+    near_a, near_b = _bins(va, eps), _bins(vb, eps)
+    points: dict[_Point, _Point] = {}
+    shift = 0.0
+    for p in sorted(only_a):
+        found = _within(near_b, p, eps)
+        if len(found) != 1:
+            return f"{counts}: one with {len(found)} within eps {eps:.3g} mm"
+        q = found[0]
+        if q not in only_b:
+            return f"{counts}: one within eps {eps:.3g} mm of a matched vertex"
+        if _within(near_a, q, eps) != [p]:
+            return f"{counts}: one not mutually unique within eps {eps:.3g} mm"
+        points[p] = points[q] = min(p, q)
+        shift = max(shift, abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2]))
+    return _Pairing(points, len(only_a), eps, shift)
+
+
+def _bins(points: set[_Point], eps: float) -> dict[_Bin, list[_Point]]:
+    found: dict[_Bin, list[_Point]] = {}
+    for p in points:
+        found.setdefault(_bin(p, eps), []).append(p)
+    return found
+
+
+def _bin(p: _Point, eps: float) -> _Bin:
+    return math.floor(p[0] / eps), math.floor(p[1] / eps), math.floor(p[2] / eps)
+
+
+def _within(bins: dict[_Bin, list[_Point]], p: _Point, eps: float) -> list[_Point]:
+    """The points of ``bins`` within eps of ``p`` in every coordinate."""
+    i, j, k = _bin(p, eps)
+    return [
+        q
+        for di, dj, dk in _NEIGHBOURS
+        for q in bins.get((i + di, j + dj, k + dk), ())
+        if max(abs(q[0] - p[0]), abs(q[1] - p[1]), abs(q[2] - p[2])) <= eps
+    ]
+
+
+def _substituted(
+    triangles: Sequence[_Triangle], points: dict[_Point, _Point]
+) -> list[_Triangle]:
+    return [
+        (points.get(p, p), points.get(q, q), points.get(r, r)) for p, q, r in triangles
+    ]
+
+
+def _mesh(triangles: Sequence[_Triangle]) -> _Mesh:
+    """An STL's triangles as geometry that does not depend on how SolidWorks
+    split its faces into triangles: per plane, the outline of the plane's
+    triangles and their area. On 2026-11-11 two builds of
     dt_cone_swing_platform that made the same part wrote 35 of 1226 triangles
     otherwise: the same 724 vertices, a polygon of the top face and two
     rectangles of side walls split along other diagonals.
@@ -569,22 +722,7 @@ def _mesh(data: bytes) -> _Mesh | str:
     triangle without area is in a plane of its own kind. A curved face has no
     plane: each flat facet of it is one, so a curved face re-tessellated over
     the same vertices reads as other geometry. That is the conservative
-    direction: a missed reuse, never an unsound one. Triangle order, corner
-    rotation, facet normals, attribute bytes and the header are no part of
-    it. Anything but a well-formed binary STL of finite corners is its
-    digest."""
-    count = int.from_bytes(data[80:84], "little") if len(data) >= 84 else -1
-    if len(data) != 84 + 50 * count:
-        return "bytes:" + hashlib.sha256(data).hexdigest()
-    rows = list(struct.iter_unpack("<12x9f2x", data[84:]))
-    # A NaN or an infinity anywhere makes the float64 sum of float32 corners
-    # non-finite; finite ones cannot overflow it.
-    if not math.isfinite(sum(itertools.chain.from_iterable(rows))):
-        return "bytes:" + hashlib.sha256(data).hexdigest()
-    triangles = [
-        ((x0, y0, z0), (x1, y1, z1), (x2, y2, z2))
-        for x0, y0, z0, x1, y1, z1, x2, y2, z2 in rows
-    ]
+    direction: a missed reuse, never an unsound one."""
     cells: list[_Cell | None] = []
     areas: list[float] = []
     for a, b, c in triangles:
@@ -626,11 +764,7 @@ def _mesh(data: bytes) -> _Mesh | str:
             (p, q) for p, q in edges if uses[(p, q) if p <= q else (q, p)] == 1
         )
         outlines[outline] = outlines.get(outline, 0.0) + sum(areas[i] for i in members)
-    return _Mesh(
-        frozenset(p for triangle in triangles for p in triangle),
-        outlines,
-        sum(areas),
-    )
+    return _Mesh(outlines, sum(areas))
 
 
 def _planes(cells: set[_Cell]) -> dict[_Cell, _Cell]:
@@ -658,17 +792,10 @@ def _planes(cells: set[_Cell]) -> dict[_Cell, _Cell]:
     return {cell: root(cell) for cell in cells}
 
 
-def _mesh_difference(a: _Mesh | str, b: _Mesh | str) -> str | None:
-    """What differs between two STLs' geometry, ``None`` for nothing: the
-    vertex set, a plane's outline, or a plane's area beyond :data:`REL_TOL` of
-    the larger total area."""
-    if isinstance(a, str) or isinstance(b, str):
-        return None if a == b else "bytes"
-    if a.vertices != b.vertices:
-        return (
-            f"vertices: {len(a.vertices - b.vertices)} base only, "
-            f"{len(b.vertices - a.vertices)} new only"
-        )
+def _mesh_difference(a: _Mesh, b: _Mesh) -> str | None:
+    """What differs between two STLs' geometry over one vertex set
+    (:func:`_paired`), ``None`` for nothing: a plane's outline, or a plane's
+    area beyond :data:`REL_TOL` of the larger total area."""
     if a.outlines.keys() != b.outlines.keys():
         return (
             f"plane outlines: {len(a.outlines.keys() - b.outlines.keys())} base "
