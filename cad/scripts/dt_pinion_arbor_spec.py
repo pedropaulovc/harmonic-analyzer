@@ -173,9 +173,9 @@ REFERENCE_SKETCHES = (
 # three on the bonded cross hole (.250 +.005/+.001); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
 # web and run-out stacks read them.  The crown sags, the overall and the drum
-# station are REFs; the overall prints one place, (9.6), because its rounded
-# chain (.05 + 8.93 + .48 + (.12)) sums to 9.58 and a two-place (9.57) read as
-# a mismatch.
+# station are REFs; the overall prints one place, (10.0), because its rounded
+# chain (.05 + 9.35 + .48 + (.12)) sums to 10.00 and a two-place (9.99) read
+# as a mismatch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 2},
     "NeckProfile": {"NeckDia": 2},

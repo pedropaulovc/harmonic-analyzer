@@ -48,9 +48,11 @@ def on_xx_grid(value_mm: float) -> float:
 # 5/16 in (owner ruling 2026-10-30): the arbor follows the owned .3135 over
 # reamer that cuts its strap and drum bores; 8 mm has no owned reamer.
 SHAFT_DIA = 7.9375
-# Origin to back-crown root: the back rim prints 8.93 (226.822) from the head
-# rear face at -0.66 (#290; was 226.25, 0.088 longer).
-SHAFT_LEN = 236.83  # back rim 9.35 in; #1038 re-pitch seed; S3 proves it
+# Origin to back-crown root: the back rim prints 9.35 (237.490) from the head
+# rear face at -0.66.  #1038 re-pitch: the 6.06 in drum moved the back land
+# .42 in aft (198.882 -> 209.550 from the head rear face), so the shaft grew
+# the same 10.668 (226.162 -> 236.830) to keep the land clear of the crown.
+SHAFT_LEN = 236.83
 # Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Every other Ø5/16
 # span, the two MHA-DT-01 bond lands included, is 5/16 -.0004/-.0038 in: the
@@ -352,12 +354,12 @@ if (
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 # --- Bond lands and middle relief (#2360; owner, 2026-11-11) -----------------
-# The 5.64 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
+# The 6.06 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
 # (about 4.25 in), so it is drilled and reamed from both ends and its two
 # halves meet near mid-length with whatever small step the re-chucking
 # leaves.  The owner's direction: hold the fit only at the two ends and let
 # the middle be clearance.  A recess in the drum's bore cannot be cut with
-# owned tools (it would need a boring bar reaching 2.9 in through a .3135
+# owned tools (it would need a boring bar reaching 3.0 in through a .3135
 # land), so the clearance is turned on the arbor instead: a plain relief
 # between two bond lands.  The drum then bears and bonds only on those lands,
 # and the long shaft no longer has to follow the bore's straightness over its
@@ -372,7 +374,7 @@ if (
 # of 7454ba6d gated a chain off the front land), and its length is its own
 # size, as each journal's is.  Both at .XX.  The front land is the longer:
 # the operator's torque enters at the head and reaches the drum through it.
-# The back shoulder stands 15 mm ahead of the bond-zone diameter's witness
+# The back shoulder stands 25.78 mm ahead of the bond-zone diameter's witness
 # (BOND_ZONE_DIA_FROM_HEAD_REAR), which must sit on the back land.
 BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
 BOND_RELIEF_LEN = 66.04  # 2.60
@@ -400,9 +402,12 @@ BACK_BOND_OVERLAP_MIN = (
 ) - (BOND_RELIEF_FROM_HEAD_REAR + BOND_RELIEF_LEN + 2.0 * LINEAR_XX_BAND)
 # The relief spans the drum's mid-length, where halves reamed to about half
 # depth from each end meet.  This is not a requirement: a deeper pass (the
-# reamer's reach, about 4.25 in, puts the step anywhere from 3.79 to 6.65 in
-# from the head rear face) may leave the step under the front land, where
-# the slide check above already bounds it.
+# reamer's reach, about 4.25 in, puts the step anywhere from 4.21 to 6.65 in
+# from the head rear face) may leave the step under a land, where the slide
+# check above already bounds it.  #1038 re-pitch: the 6.06 in drum keeps
+# this relief; its mid moved 5.22 -> 5.43 in, the front land stays the longer
+# (1.80 in against the back land's 1.66, was 1.24) and both hold over three
+# times the hand torque.
 _DRUM_MID = DRUM_STATION + DRUM_LEN / 2.0
 if not (
     BOND_RELIEF_FROM_HEAD_REAR + LINEAR_XX_BAND < _DRUM_MID - DRUM_STATION_BAND
@@ -457,8 +462,11 @@ if (
 # 492a7be5).  The witness station lies on the back bond land, clear of the
 # relief and the back journal, so the diameter reads as the bond lands'.
 # Machinist review r1 of #1685: the callout hangs below the shaft in the open
-# run between the back land and the front land's diameter block.
-BOND_ZONE_DIA_FROM_HEAD_REAR = 188.0
+# run between the back land and the front land's diameter block, its line
+# under the back Ra symbol.  #1038 re-pitch: 188.0 -> 198.5, 11.05 ahead of
+# the back land as at the 5.64 in drum (10.88), since that land and its Ra
+# symbol moved .42 in aft.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 198.5
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
 BOND_ZONE_LAND_CLEARANCE = 10.0
 if not (

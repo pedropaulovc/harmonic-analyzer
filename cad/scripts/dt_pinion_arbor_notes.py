@@ -21,7 +21,9 @@ import dt_pinion_arbor_spec as spec
 # the back stub's between the back land and the crown.
 BOND_ZONE_WITNESS_LEN = 4.0
 SPAN_WITNESS_LEN = 4.0
-BACK_STUB_DIA_FROM_HEAD_REAR = 221.0
+# #1038 re-pitch: 221.0 -> 231.7 with the back land's .42 in move, so the
+# witness still starts ~2.1 past the land and ends ~1.8 short of the rim.
+BACK_STUB_DIA_FROM_HEAD_REAR = 231.7
 BACK_STUB_DIA_Z = spec.HEAD_REAR_Z + BACK_STUB_DIA_FROM_HEAD_REAR
 # One size for both spans outside the journals.
 BACK_STUB_DIA_PREFIX = "2X <MOD-DIAM>"

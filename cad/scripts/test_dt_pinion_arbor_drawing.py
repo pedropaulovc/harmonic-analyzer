@@ -77,7 +77,8 @@ def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> No
     assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.CROSS_HOLE_STATION)
     assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_REAR_Z - spec.HEAD_LEN)
     assert spec.NECK_END_Z == pytest.approx(9.754)
-    assert spec.SHAFT_LEN == pytest.approx(226.162)
+    # #1038 re-pitch: the 6.06 in drum moves the back land .42 in aft.
+    assert spec.SHAFT_LEN == pytest.approx(236.83)
     assert spec.OVERALL_LEN == pytest.approx(
         spec.SHAFT_LEN + spec.BACK_CAP_SAG - (spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
     )
@@ -350,7 +351,7 @@ def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
         inches = value / 25.4
         assert inches == pytest.approx(round(inches, places), abs=1e-9), name
     # No toleranced .X anywhere: every stack on the sheet reads these lengths.
-    # The overall is an untoleranced REF at one place, (9.6), so its rounded
+    # The overall is an untoleranced REF at one place, (10.0), so its rounded
     # chain cannot disagree with it.
     toleranced = {
         name: places
@@ -381,15 +382,17 @@ def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> Non
 
 def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> None:
     """Below the shaft the back land is boxed in: the back-crown/overall
-    witnesses (x 0.079-0.081) on its crown side ran through its text at
-    30620a85, and the 199.9 witness and Ra leader sit on its head side.  Its
-    diameter hangs above, text right of the line; its 19.0 goes below."""
+    witnesses (x 0.079-0.081 at the 226.162 shaft) on its crown side ran
+    through its text at 30620a85, and the 199.9 witness and Ra leader sit on
+    its head side.  Its diameter hangs above, text right of the line; its
+    19.0 goes below."""
     width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
     assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
-    assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
+    # Clear of the crown witnesses rising to the sag.
+    assert x - (0.081 - _BACK_SHIFT_MM / 1000.0) >= 0.010
     detail_left = drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH
     # The two-line callout (r1 of #1685) is ~23 mm wider; the label's own
     # text measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
@@ -479,7 +482,7 @@ def test_bond_relief_clears_the_drum_and_leaves_two_bonded_ends() -> None:
 
 def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     """The relief's station runs in the station rows below the shaft, between
-    the 1.82 and 7.83 rows and under the front Ra symbol; its length stands
+    the 1.82 and 8.25 rows and under the front Ra symbol; its length stands
     just above the shaft, under detail A's label; its diameter hangs below,
     clear of both diameter blocks and of the station's shoulder witness."""
     x, y = drawing.PRINCIPAL_KEEP["BondReliefFromHeadRear"]
@@ -599,10 +602,13 @@ def test_fence_judges_an_unread_or_misread_dimension_as_all_extension_lines() ->
 # text tail at x 48.8 mm to a right arrow tail ending at x 86.0, 6.4 mm past
 # the rim witness (x 79.6); its two witnesses (x 78.4, 79.6) rise from the
 # crown (y 171.0) 1.0 mm past the line; its "(.05)" text spans x 50.0-60.0
-# from 3.2 mm under its text position to 3.2 mm over.
+# from 3.2 mm under its text position to 3.2 mm over.  All on the 226.162
+# shaft: the #1038 re-pitch's longer shaft runs the back end (crown, sag row
+# and stub) this much further left with the head end held (PRINCIPAL_CENTER).
+_BACK_SHIFT_MM = spec.SHAFT_LEN - 226.162
 _SAG_LINE_BELOW_TEXT_MM = 2.8
-_SAG_TAIL_END_X_MM = 86.0
-_SAG_TEXT_X_MM = (50.0, 60.0)
+_SAG_TAIL_END_X_MM = 86.0 - _BACK_SHIFT_MM
+_SAG_TEXT_X_MM = (50.0 - _BACK_SHIFT_MM, 60.0 - _BACK_SHIFT_MM)
 _SAG_TEXT_HALF_HEIGHT_MM = 3.2
 _SAG_LINE_Y_MM = drawing.BACK_CAP_SAG_TEXT_XY[1] * 1000.0 - _SAG_LINE_BELOW_TEXT_MM
 # Sheet obstacles near the principal view's plain-span diameters, in sheet mm
@@ -615,9 +621,9 @@ _PRINCIPAL_LINES_MM = (
     (260.2, 136.2, 260.2, 165.0),
     (241.8, 141.4, 241.8, 166.0),
     (253.2, 124.0, 259.3, 166.0),
-    (78.4, 171.0, 78.4, _SAG_LINE_Y_MM + 1.0),
-    (79.6, 171.0, 79.6, _SAG_LINE_Y_MM + 1.0),
-    (48.8, _SAG_LINE_Y_MM, _SAG_TAIL_END_X_MM, _SAG_LINE_Y_MM),
+    (78.4 - _BACK_SHIFT_MM, 171.0, 78.4 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM + 1.0),
+    (79.6 - _BACK_SHIFT_MM, 171.0, 79.6 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM + 1.0),
+    (48.8 - _BACK_SHIFT_MM, _SAG_LINE_Y_MM, _SAG_TAIL_END_X_MM, _SAG_LINE_Y_MM),
     (133.6, 227.6, 133.6, 243.0),
 )
 # A "Ø.3125 -.0004/-.0038" block over a "SEE NOTE 2" row, measured from its
@@ -878,13 +884,14 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
         pytest.approx(46.228),  # 1.82
-        pytest.approx(198.882),  # 7.83
+        pytest.approx(209.55),  # 8.25 (7.83 at the 5.64 in drum)
     )
     # In the world the lands moved under .03 mm when they snapped to the
-    # .01 in grid (45.55 / 198.25 before #290).
+    # .01 in grid (45.55 / 198.25 before #290); the #1038 re-pitch's 6.06 in
+    # drum then moved the back land 10.668 aft.
     assert (spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z) == (
         pytest.approx(45.568),
-        pytest.approx(198.222),
+        pytest.approx(208.89),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
