@@ -2601,21 +2601,29 @@ oracle. Every `noop` gets exactly one `noop_judgement`; each but `confirmed`
   did not, of pywin32 protocol and listed reads and selections only
   (`_DETOUR_READS`, `_DETOUR_SELECTS`, by exact member; a method call or a
   property get, never a put; a member not listed is no read, whatever its
-  name), right after the one answer that steered it. Every other answer to a
-  request both builds made must be the same under the `answers` signal's
-  rules, and in both builds `ClearSelection2` must come after each block
-  before anything but a read, a selection or the measure tool's own
-  `IMeasure.ArcOption`. The streams are aligned greedily and bounded: at most
-  16 blocks of at most 4096 calls, each resuming on 8 equal requests or the
-  end of both. Anything else (`unaligned`, `not_read`, `answer`,
-  `selection_kept`, or `error`, a judge fault) stays a soundness alarm. It is
-  counted (a marker on the INFO line, `seat_path_divergence` and `seat_path`,
-  the verdict, in the record and span), never an alarm, never a revocation,
-  on the shadow and the audit path alike. 2026-11-12, `mg_magnifying_wheel`:
-  an edge `SelectByID2` by a point answered False on one build of five, and
-  the vendored `_select_entity_geometric` fallback found the closest edge
-  (164 `IEdge.GetClosestPointOn`) and selected it itself; mass properties
-  within 1e-14, the STL byte-identical.
+  name), right after the one selection (`SelectByID2`, `IEntity.Select2` or
+  `Select4`) whose answer steered it. Every other answer to a request both
+  builds made, including a request other than a selection right before a
+  block, must be the same under the `answers` signal's rules. In both builds
+  the selection before each block and those in it must select in one
+  document the log establishes (a `SelectByID2` through the extension an
+  `IModelDoc2.Extension` get answered, an entity of a body
+  `IPartDoc.GetBodies2` answered; handles followed through `QueryInterface`),
+  and `ClearSelection2` on that document must come after the block before
+  anything but a read, a selection (a clear on another document is one) or
+  the measure tool's own `IMeasure.ArcOption`. The streams are aligned
+  greedily and bounded: at most 16 blocks of at most 4096 calls, each
+  resuming on 8 equal requests or the end of both. Anything else
+  (`unaligned`, `not_read`, `answer`, `selection_kept`, or `error`, a judge
+  fault) stays a soundness alarm. It is counted (a marker on the INFO line,
+  `seat_path_divergence` and `seat_path`, the verdict, in the record and
+  span), never an alarm, never a revocation, on the shadow and the audit path
+  alike. 2026-11-12, `mg_magnifying_wheel`: an edge `SelectByID2` by a point
+  answered False on one build of five, and the vendored
+  `_select_entity_geometric` fallback found the closest edge (164
+  `IEdge.GetClosestPointOn`) and selected it itself; mass properties within
+  1e-14, the STL byte-identical. Its face variant (`IBody2.GetFaces`,
+  `IFace2.GetClosestPointOn`) is listed too.
 - `noop_unexplained_divergence` is a `noop` with `ground_truth=diverged`,
   `artefact_outcome=same` and no earlier answer differing
   (`truth_cause=request`): neither the source nor SolidWorks explains the
@@ -2830,9 +2838,12 @@ Not proven off-seat:
 - That a `seat_path_divergence`'s detour selected what the base's path
   selected. The claim rests on the base's mass properties and STL, on the
   detour being only reads and selections, and on the selection being cleared
-  before any later request that is not a read or a selection; a request that
-  consumed the selection inside that window (the measurement after the
-  2026-11-12 detour) is compared like any other, answer for answer.
+  on its document before any later request that is not a read or a
+  selection; a request that consumed the selection inside that window (the
+  measurement after the 2026-11-12 detour) is compared like any other, answer
+  for answer. A document is known by its handle's root through
+  `QueryInterface` answers, so one document reached by two routes (two
+  `ActiveDoc` reads) counts as two: an alarm, the safe direction.
 - That the seat's state outside the template and the build's own document
   settings is the same: system options, add-ins, material and Toolbox
   databases and licensing are machine image, not inputs.

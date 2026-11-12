@@ -836,7 +836,8 @@ class NoopJudgement(StrEnum):
     UNEXPLAINED_DIVERGENCE = "noop_unexplained_divergence"
     # Requests that differ only by a detour SolidWorks steered, and the base's
     # geometry: the requests and answers the base did not make are reads and
-    # selections, after one answer that differed (Shadow.seat_path_detour;
+    # selections, after one selection whose answer differed, the selection
+    # cleared on its document (Shadow.seat_path_detour;
     # 2026-11-12, mg_magnifying_wheel: an edge SelectByID2 answered False,
     # and the vendored geometric fallback found and selected the same edge).
     SEAT_PATH_DIVERGENCE = "seat_path_divergence"

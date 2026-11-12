@@ -153,9 +153,10 @@ class SeatPath(StrEnum):
 
     # Only by blocks of reads and selections one build made and the other
     # did not (:data:`_DETOUR_READS`, :data:`_DETOUR_SELECTS`), each right
-    # after the one answer that steered it; every other answer the same, and
-    # in both builds the selection cleared after each block before anything
-    # but a read or a selection.
+    # after the one selection whose answer steered it; every other answer the
+    # same, and in both builds the selection cleared on the document the
+    # block selected in, after each block, before anything but a read or a
+    # selection.
     DETOUR = "detour"
     # No alignment by at most :data:`_DETOUR_BLOCKS` blocks of at most
     # :data:`_DETOUR_CALLS` calls, each resuming on :data:`_RESUME_CALLS`
@@ -163,12 +164,31 @@ class SeatPath(StrEnum):
     UNALIGNED = "unaligned"
     # A block holds a call that is no listed read or selection.
     NOT_READ = "not_read"
-    # An answer to a request both builds made differs, other than the one
-    # right before a block.
+    # An answer to a request both builds made differs, other than a
+    # selection's right before a block (:data:`_SELECTION_OWNERS`).
     ANSWER = "answer"
     # After a block, a call other than a read or a selection before
-    # ``ClearSelection2``: the selection the detour made could reach it.
+    # ``ClearSelection2`` on the document the block selected in, or that
+    # document not established from the log (:func:`_selection_kept`):
+    # the selection the detour made could reach a later request.
     SELECTION_KEPT = "selection_kept"
+
+
+@dataclass(frozen=True)
+class _Streams:
+    """Both builds' recipe calls and their keys (:func:`_keyed_calls`; ``None``
+    and ``keyed_error`` when keying raised), made once per judgement."""
+
+    a: list[conv.Call]
+    b: list[conv.Call]
+    keyed: tuple[list[tuple[str, str, str | None]], ...] | None
+    keyed_error: str | None
+
+
+def _streams(base: conv.Conversation, new: conv.Conversation) -> _Streams:
+    a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
+    keyed, keyed_error = _attempt(lambda: (_keyed_calls(a), _keyed_calls(b)))
+    return _Streams(a, b, keyed, keyed_error)
 
 
 def judge(
@@ -194,12 +214,16 @@ def judge(
     ``outcome`` for all of them, or ``seat_path``; ``error``), so a signal
     absent because its judgement raised is told from one absent from both
     logs."""
-    cause, cause_error = _attempt(
-        lambda: truth_cause(
-            conv.recipe_calls(base.calls), conv.recipe_calls(new.calls), divergence
+    streams, streams_error = _attempt(lambda: _streams(base, new))
+    cause, cause_error = (None, streams_error)
+    found, error = (None, streams_error)
+    if streams is not None:
+        cause, cause_error = _attempt(
+            lambda: truth_cause(streams.a, streams.b, divergence)
         )
-    )
-    found, error = _attempt(lambda: outcome(base, new, base_captures, new_captures))
+        found, error = _attempt(
+            lambda: outcome(base, new, base_captures, new_captures, streams)
+        )
     if error is not None:
         found = {
             "outcome": Outcome.UNKNOWN.value,
@@ -219,9 +243,7 @@ def judge(
         and signals.get("mass") == signals.get("stl") == Signal.SAME.value
     ):
         path, path_error = _attempt(
-            lambda: seat_path(
-                conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
-            )
+            lambda: seat_path(streams.a, streams.b, streams.keyed)
         )
         if path_error is not None:
             path = {"path": "error", "detail": path_error}
@@ -315,6 +337,7 @@ def outcome(
     new: conv.Conversation,
     base_captures: Path,
     new_captures: Path,
+    streams: _Streams,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
     :class:`Signal` (``outcome_signals``), what differed
@@ -335,9 +358,10 @@ def outcome(
     strings and floats are normalised as for noise. SLDPRT and BMP captures
     are no signal: a part file's bytes differ on every save, a screenshot's
     with the seat's window. A signal whose judgement raises is ``absent``,
-    its message its detail."""
-    a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
-    keyed, keyed_error = _attempt(lambda: (_keyed_calls(a), _keyed_calls(b)))
+    its message its detail. ``streams``: both builds' recipe calls and keys,
+    which :func:`judge` made once for every judgement of the pair."""
+    a, b = streams.a, streams.b
+    keyed, keyed_error = streams.keyed, streams.keyed_error
     attempts: dict[str, Callable[[], tuple[Signal, Any]]] = {
         "mass": lambda: _mass_signal(a, b),
         "requests": lambda: _multiset_signal(
@@ -412,7 +436,9 @@ def label_feature(divergence: dict[str, Any] | None) -> None:
 # edge by a point answered False on one build of five, so the vendored
 # ``_select_entity_geometric`` asked the part's type, its body's edges and
 # each edge's closest point (164) and selected the nearest; the next
-# measurement and every later request matched the other builds'.
+# measurement and every later request matched the other builds'. A face is
+# found the same way (its ``_BODY_ENTITY_MEMBERS``: ``IBody2.GetFaces``, one
+# ``IFace2.GetClosestPointOn`` per face), as is ``_select_faces_geometric``'s.
 _DETOUR_READS = frozenset(
     {
         "IModelDoc2.GetType",
@@ -420,6 +446,8 @@ _DETOUR_READS = frozenset(
         "IPartDoc.GetBodies2",
         "IBody2.GetEdges",
         "IEdge.GetClosestPointOn",
+        "IBody2.GetFaces",
+        "IFace2.GetClosestPointOn",
         # A measure tool (IModelDocExtension::CreateMeasure) and what it
         # measures of the selected entities (IMeasure::Calculate, properties).
         "IModelDocExtension.CreateMeasure",
@@ -455,17 +483,25 @@ _DETOUR_READS = frozenset(
         ),
     }
 )
-# The members that select (by name or point, or the entity itself) or clear
-# the selection: the document's selection list is all they change.
-_CLEAR_SELECTION = "IModelDoc2.ClearSelection2"
-_DETOUR_SELECTS = frozenset(
-    {
-        "IModelDocExtension.SelectByID2",
-        "IEntity.Select2",
-        "IEntity.Select4",
-        _CLEAR_SELECTION,
-    }
+# The members that select (by name or point, or the entity itself), and how
+# each reaches the document it selects in from the handle it is called on:
+# per step, the members one of whose answers that handle is (through any
+# QueryInterface, :func:`_root`); the last step's call is on the document. An
+# entity the vendored fallback selects is an edge or face of a body that
+# IPartDoc.GetBodies2 answered. Only a selection's answer may steer a detour.
+_ENTITY_OWNERS = (
+    frozenset({"IBody2.GetEdges", "IBody2.GetFaces"}),
+    frozenset({"IPartDoc.GetBodies2"}),
 )
+_SELECTION_OWNERS: dict[str, tuple[frozenset[str], ...]] = {
+    "IModelDocExtension.SelectByID2": (frozenset({"IModelDoc2.Extension"}),),
+    "IEntity.Select2": _ENTITY_OWNERS,
+    "IEntity.Select4": _ENTITY_OWNERS,
+}
+# Selections, and the clearing of a document's selection list: the selection
+# list is all they change.
+_CLEAR_SELECTION = "IModelDoc2.ClearSelection2"
+_DETOUR_SELECTS = frozenset({*_SELECTION_OWNERS, _CLEAR_SELECTION})
 # pywin32's own protocol on an object SolidWorks already returned (interface
 # and name lookups, type information, identity): no SolidWorks member runs.
 _PROTOCOL_OPS = frozenset(
@@ -493,23 +529,29 @@ _DETOUR_CALLS = 4096
 _RESUME_CALLS = 8
 
 
-def seat_path(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> dict[str, Any]:
-    """Whether two recipe request streams differ only by detours
-    (:class:`SeatPath`): ``path``, and ``detail`` (what failed) or, for
-    ``detour``, the blocks (``base`` and ``new`` call ranges, ``steered_by``:
-    the member whose answer precedes the block; the first
-    :data:`_LISTED`) and their ``count``.
+def seat_path(
+    a: Sequence[conv.Call],
+    b: Sequence[conv.Call],
+    keyed: tuple[list[tuple[str, str, str | None]], ...],
+) -> dict[str, Any]:
+    """Whether two recipe request streams (keyed by :func:`_keyed_calls`, in
+    ``keyed``) differ only by detours (:class:`SeatPath`): ``path``, and
+    ``detail`` (what failed) or, for ``detour``, the blocks (``base`` and
+    ``new`` call ranges, ``steered_by``: the selection whose answer before the
+    block differs; the first :data:`_LISTED`) and their ``count``.
 
     Requests are aligned as :func:`_answers_signal` keys them (member and
-    arguments, handles erased, float noise rounded) by :func:`_detours`, then
-    checked in order: every call in a block is pywin32 protocol or a listed
-    read or selection (:func:`_detour_call`); every answer to a request both
-    builds made is the same under the answers signal's rules (equal keys, or
-    :func:`_answer_close`; mass properties and the session are judged
-    elsewhere), but the one right before each block; after each block, in
-    both builds, ``ClearSelection2`` comes before any call but a detour call
-    or a measure option (:func:`_uncleared`)."""
-    keyed_a, keyed_b = _keyed_calls(a), _keyed_calls(b)
+    arguments, handles erased, floats rounded to :data:`REL_TOL`) by
+    :func:`_detours`, then checked in order: every call in a block is pywin32
+    protocol or a listed read or selection (:func:`_detour_call`); every
+    answer to a request both builds made is the same under the answers
+    signal's rules (equal keys, or :func:`_answer_close`; mass properties and
+    the session are judged elsewhere), but a selection's right before a block
+    (:func:`_selects`); after each block, in both builds, the selection
+    before it and those in it selected in one document the log establishes,
+    and ``ClearSelection2`` on that document comes before any call but a
+    detour call or a measure option (:func:`_selection_kept`)."""
+    keyed_a, keyed_b = keyed
     aligned = _detours(
         [f"{site}\n{request}" for site, request, _ in keyed_a],
         [f"{site}\n{request}" for site, request, _ in keyed_b],
@@ -529,7 +571,11 @@ def seat_path(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> dict[str, Any]:
                     "detail": f"{call.site} ({call.kind.value}) in the block at "
                     f"base {i} new {j}",
                 }
-    steered = {(i - 1, j - 1) for i, _, j, _ in blocks}
+    steered = {
+        (i - 1, j - 1)
+        for i, _, j, _ in blocks
+        if i and j and _selects(a[i - 1]) and _selects(b[j - 1])
+    }
     for i, j, length in runs:
         for x, y in zip(range(i, i + length), range(j, j + length), strict=True):
             left, right = keyed_a[x][2], keyed_b[y][2]
@@ -540,14 +586,17 @@ def seat_path(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> dict[str, Any]:
                     "path": SeatPath.ANSWER.value,
                     "detail": f"{a[x].site} answered otherwise at base {x} new {y}",
                 }
+    origins = (_origins(a), _origins(b))
     for i, i_end, j, j_end in blocks:
-        for side, calls, start in (("base", a, i_end), ("new", b, j_end)):
-            member = _uncleared(calls, start)
-            if member is not None:
+        for side, calls, owners, start, end in (
+            ("base", a, origins[0], i, i_end),
+            ("new", b, origins[1], j, j_end),
+        ):
+            why = _selection_kept(calls, owners, start, end)
+            if why is not None:
                 return {
                     "path": SeatPath.SELECTION_KEPT.value,
-                    "detail": f"{side} called {member} before {_CLEAR_SELECTION} "
-                    f"after the block at base {i} new {j}",
+                    "detail": f"{side}: {why}, after the block at base {i} new {j}",
                 }
     return {
         "path": SeatPath.DETOUR.value,
@@ -556,7 +605,7 @@ def seat_path(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> dict[str, Any]:
             {
                 "base": [i, i_end],
                 "new": [j, j_end],
-                "steered_by": a[i - 1].site if i and j else None,
+                "steered_by": a[i - 1].site if (i - 1, j - 1) in steered else None,
             }
             for i, i_end, j, j_end in blocks[:_LISTED]
         ],
@@ -621,12 +670,106 @@ def _detour_call(call: conv.Call) -> bool:
     return call.site in _DETOUR_READS or call.site in _DETOUR_SELECTS
 
 
-def _uncleared(calls: Sequence[conv.Call], start: int) -> str | None:
+def _selects(call: conv.Call) -> bool:
+    """A selection (:data:`_SELECTION_OWNERS`) called as a method: the only
+    call whose differing answer may steer a detour, since all it changes is
+    the selection list, which must then be cleared."""
+    return call.site in _SELECTION_OWNERS and call.kind is conv.Kind.CALL
+
+
+def _selection_kept(
+    calls: Sequence[conv.Call],
+    origins: dict[int, conv.Call],
+    start: int,
+    end: int,
+) -> str | None:
+    """Why the selection made right before a block (``calls[start - 1]``) or
+    in it (``calls[start:end]``) could reach a later request, or ``None``.
+    Those selections must select in one document the log establishes
+    (:func:`_document`), and ``ClearSelection2`` on it must come after the
+    block before any call but a detour call or a measure option
+    (:func:`_uncleared`)."""
+    selections = [call for call in calls[max(start - 1, 0) : end] if _selects(call)]
+    documents = {_document(origins, call) for call in selections}
+    if not documents:
+        return "no selection"
+    if None in documents:
+        return "a selection's document is not established"
+    if len(documents) > 1:
+        return f"selections in {len(documents)} documents"
+    member = _uncleared(calls, end, documents.pop(), origins)
+    if member is None:
+        return None
+    return f"{member} before {_CLEAR_SELECTION} on the document selected in"
+
+
+def _document(origins: dict[int, conv.Call], call: conv.Call) -> int | None:
+    """The handle (:func:`_root`) of the document selection ``call`` selects
+    in, reached from the handle it is called on by :data:`_SELECTION_OWNERS`;
+    ``None`` when the log does not establish it."""
+    handle = _root(origins, call.handle)
+    for members in _SELECTION_OWNERS.get(call.site, (frozenset(),)):
+        source = origins.get(handle)
+        if source is None or source.site not in members:
+            return None
+        handle = _root(origins, source.handle)
+    return handle
+
+
+def _origins(calls: Sequence[conv.Call]) -> dict[int, conv.Call]:
+    """Per handle, the call whose answer (result or out parameters) first
+    held it: the recorder numbers each object it wraps anew."""
+    found: dict[int, conv.Call] = {}
+    for call in calls:
+        for handle in _handles([call.result, call.outs]):
+            found.setdefault(handle, call)
+    return found
+
+
+def _handles(value: Any) -> Iterator[int]:
+    if isinstance(value, list):
+        for item in value:
+            yield from _handles(item)
+    elif isinstance(value, dict):
+        if isinstance(value.get("h"), int):
+            yield value["h"]
+            return
+        for item in value.values():
+            yield from _handles(item)
+
+
+def _root(origins: dict[int, conv.Call], handle: int) -> int:
+    """The handle a chain of QueryInterface answers ending at ``handle``
+    started from: one COM object, whichever interface the script holds it
+    by. Another route to the same document (a second ``ActiveDoc``) is
+    another root: the safe direction."""
+    seen = set()
+    while handle not in seen:
+        seen.add(handle)
+        source = origins.get(handle)
+        if source is None or source.op != "QueryInterface":
+            return handle
+        handle = source.handle
+    return handle
+
+
+def _uncleared(
+    calls: Sequence[conv.Call],
+    start: int,
+    document: int,
+    origins: dict[int, conv.Call],
+) -> str | None:
     """The first member from ``start`` that is neither a detour call nor a
-    measure option put, if it comes before ``ClearSelection2``; ``None`` when
-    the selection is cleared first, or nothing else follows."""
+    measure option put, if it comes before ``ClearSelection2`` on
+    ``document`` (a clear on another document clears nothing of it);
+    ``None`` when that selection is cleared first, or nothing else
+    follows."""
     for call in calls[start:]:
-        if call.site == _CLEAR_SELECTION and call.kind is conv.Kind.CALL:
+        if (
+            call.site == _CLEAR_SELECTION
+            and call.kind is conv.Kind.CALL
+            and _root(origins, call.handle) == document
+        ):
             return None
         if _detour_call(call):
             continue
