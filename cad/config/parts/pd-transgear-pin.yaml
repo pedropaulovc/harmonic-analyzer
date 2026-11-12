@@ -6,5 +6,5 @@ pd-transgear-pin:
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
-  process: "turned from bar (steel): turn the head and shank, cut the ring groove, dome both ends"
+  process: "turned from bar (steel): turn the head, press land and shank, cut the ring groove, dome both ends"
   drawing_unit: in

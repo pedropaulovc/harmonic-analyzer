@@ -52,14 +52,9 @@ def clearance_budget(
     set_amplification = (pivot_distance - drive_south) / pivot_distance
     bore_float = (bore_max - (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1])) / 2.0
     disc_tilt = math.atan(2.0 * bore_float / thickness_min)
-    set_stack = (
-        setup.TOOTH_RUNOUT_TIR_MM / 2.0
-        + setup.SET_FEELER_READING_MM
-        + (setup.T120_TIP_RADIUS_LIMITS_MM[1] - setup.T120_TIP_RADIUS_LIMITS_MM[0])
-        / 2.0
-        + (setup.DRUM_ROOT_RADIUS_LIMITS_MM[1] - setup.DRUM_ROOT_RADIUS_LIMITS_MM[0])
-        / 2.0
-    )
+    # The feel set's largest departure of the T120 centre from the CAD
+    # placement, carried to the 64T through the swing.
+    set_stack = setup.SWING_SET_FROM_PLACEMENT_MM
     pivot_stack = (
         setup.PIVOT_BORE_FLOAT_MM
         + setup.PIVOT_SEAT_POSITION_MM
@@ -77,7 +72,7 @@ def clearance_budget(
         "64T tip size": drive.OUTSIDE_DIA_TOLERANCE_MM / 2.0,
         "64T tooth runout": drive.TOOTH_RUNOUT_TIR_MM / 2.0,
         "south datum projected": datum_band * s,
-        "T120 set amplified": set_amplification * set_stack,
+        "swing feel set amplified": set_amplification * set_stack,
         "pivot translation residual": abs(1.0 - set_amplification) * pivot_stack,
         "T120 seat floats amplified": set_amplification
         * (setup.CONE_SEAT_FLOAT_MM + setup.DRUM_SEAT_FLOAT_MM),

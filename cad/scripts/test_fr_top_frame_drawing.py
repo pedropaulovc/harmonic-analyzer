@@ -326,6 +326,18 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     )
     assert part.KEEPER_RELIEF_CAP_RECESS_WALL == pytest.approx(wall)
     assert wall >= part.WALL_TARGET_MM
+    # On the boss top the recess's mouth lead-in, at its largest printed
+    # leg, comes off that wall; the land left still meets the target.  The
+    # former .03 lead-in left 1.803 there (codjiflo, PR #2599).
+    assert part.BORE_CHAMFER / spec.IN == pytest.approx(0.02)
+    mouth_places = spec.DRAWING_REFERENCE_PRECISION["top bore mouth chamfer"]
+    mouth_max = part.BORE_CHAMFER + spec.PRINTED_LINEAR_BAND_MM[mouth_places]
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(wall - mouth_max)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(2.0574, abs=5e-4)
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND >= part.WALL_TARGET_MM
+    assert wall - (0.03 * spec.IN + spec.PRINTED_LINEAR_BAND_MM[mouth_places]) < (
+        part.WALL_TARGET_MM
+    )
     assert chord - part.CAP_RECESS_DIAMETER / 2.0 == pytest.approx(3.2639)
     # The relief removes only the band over the faced top: the cross screws
     # and the cast datum targets lie under it.
@@ -334,13 +346,29 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     # Two caps of the proud band, less its taken-out draft and rim break.
     prism = 2.0 * part._circle_cap_area(part.BOSS_DIA / 2.0, chord) * part.BOSS_ABOVE
     assert 0.85 * prism < part._keeper_relief_removal() < prism
+    # Each foot's outboard end rests on the relief's floor, inside the
+    # barrel's cast footprint, so the floor is the faced top and the step's
+    # root is held under the foot tip's stand-off at the printed limits (the
+    # title block's R.040 would not be: codjiflo, PR #2599).
+    assert part.KEEPER_FOOT_TIP_Z_FRONT < part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0
+    assert part.KEEPER_FOOT_TIP_Z_REAR > part.REAR_COLUMN_Z - part.BOSS_DIA / 2.0
+    root = spec.KEEPER_BOSS_RELIEF_ROOT_R_MAX
+    assert root / spec.IN == pytest.approx(0.02)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(
+        min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) - root
+    )
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN == pytest.approx(0.2286, abs=5e-4)
+    assert part.KEEPER_FOOT_RELIEF_ROOT_MARGIN > 0.0
+    title_block_inside_corner = 0.040 * spec.IN
+    assert title_block_inside_corner > min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
 
 
 def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> None:
     """The step prints .67, 2X, on A-A (the cut through the two west
     bosses), native between the rear socket's axis and the step's cut-face
-    line; its line stands over the boss top and its text parks over the
-    rail, both under the mouth chamfer's parked text."""
+    line, and nothing else rides on that location; the step's mate, floor
+    and root limit are its own leader callout on the front boss's step,
+    over the rail and under the mouth chamfer's parked text."""
     label = "keeper relief step from socket axis"
     places = spec.DRAWING_REFERENCE_PRECISION[label]
     assert places == spec.KEEPER_BOSS_RELIEF_PLACES == 2
@@ -354,10 +382,19 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     body = body[: body.index("    keeper_relief_station()")]
     assert "entities=(bore_axes[1], steps[0])" in body
     assert "expected_mm=KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
-    assert "suffix=KEEPER_RELIEF_CALLOUT," in body
+    assert 'suffix="2X",' in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
-    # The depth is the words: the floor is the faced top the 4X .18 locates.
-    assert drawing.KEEPER_RELIEF_CALLOUT == "2X KEEPER FOOT\nRELIEF TO FACED TOP"
+    # The step's callout: the mate by its drawing number (rule 4), the
+    # faced top it runs down to (the feet's outboard ends rest on it), the
+    # root's limit.  A leader note, so the location carries no requirement
+    # (machinist review, farm run 20261112T014216327Z), of two rows of
+    # words (rule 7; farm run 20261112T030307472Z).
+    assert drawing.KEEPER_RELIEF_CALLOUT == (
+        "2X MHA-CH-07 FOOT STEP TO\nFACED TOP, ROOT R.02 MAX"
+    )
+    assert "KEEPER_RELIEF_CALLOUT,\n            text_xy=KEEPER_RELIEF_NOTE_XY," in body
+    assert "HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET" in body
+    assert "view=detail_section," in body
     scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
     axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
     step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
@@ -371,14 +408,31 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert line_y - boss_top_y > 0.005
     assert 0.162 - line_y > 0.005
     text_x, text_y = drawing.KEEPER_RELIEF_TEXT_XY
-    # Three rows of .12 text about the centre (19 characters at 2.2 mm):
-    # left of the step, over the rail top, under the chamfer's parked rows.
-    half_w, half_h = 0.021, 0.0075
-    assert text_x + half_w < step_x - 0.005
     rail_top_y = drawing.DETAIL_SECTION_CENTER[1] + part.HALF_H * scale
-    assert text_y - half_h > rail_top_y + 0.003
     chamfer_rows_bottom = drawing.BORE_CHAMFER_TEXT_OFFSET_XY[1] - 0.008
-    assert text_y + half_h < chamfer_rows_bottom
+    # Printed .12 text measures 2.7 mm a character, rows 5.3 mm apart (farm
+    # run 20261112T014216327Z).  The station's two rows (".67", "2X") stand
+    # about their centre just left of the step, under the chamfer's rows.
+    char_w, row_h = 0.0027, 0.0053
+    half_w = 3 * char_w / 2.0
+    assert text_x + half_w < step_x - 0.002
+    assert text_y - row_h > boss_top_y + 0.003
+    assert text_y + row_h < chamfer_rows_bottom
+    # The callout's two rows hang from its upper-left corner: clear of the
+    # station's text on the right and the front boss's recess witnesses on
+    # the left, over the rail top, under the chamfer's rows.
+    note_x, note_y = drawing.KEEPER_RELIEF_NOTE_XY
+    rows = drawing.KEEPER_RELIEF_CALLOUT.split("\n")
+    assert len(rows) == 2
+    note_w = max(map(len, rows)) * char_w
+    assert note_x + note_w < text_x - half_w - 0.003
+    front_axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.FRONT_COLUMN_Z * scale
+    front_step_x = front_axis_x + spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
+    assert front_step_x - front_axis_x > part.CAP_RECESS_DIAMETER / 2.0 * scale
+    # The leader runs down-left to the front step's root from past it.
+    assert note_x - front_step_x > 0.005
+    assert note_y - len(rows) * row_h > rail_top_y + 0.002
+    assert note_y < chamfer_rows_bottom - 0.002
 
 
 @pytest.mark.parametrize("front_station_direction", (-1, 1))
@@ -4377,6 +4431,13 @@ _R7_DATUM_D_ASKED = (0.1441, 0.124)
 _R7_BAR_WIDTH_ARROW_X = 0.1410842
 _R7_ROW_GLYPH = 0.0569868 / 21
 _R7_ROW_PITCH = 0.128 - 0.1224437
+# That run's underside view stood centred on x 150; the sheet's whole group
+# has since moved right with the view (rule 15 balance), its ink with it.
+_R7_VIEW_CENTRE_X = 0.150
+
+
+def _r7_sheet_shift() -> float:
+    return drawing.DATUM_BOTTOM_CENTER[0] - _R7_VIEW_CENTRE_X
 
 
 def _r7_datum_d_display_data():
@@ -4386,9 +4447,11 @@ def _r7_datum_d_display_data():
     width's rows stand about their offset, the value last, the callout's
     sized at that run's mean glyph."""
     asked_x, line_y = _R7_DATUM_D_ASKED
-    tag_dx = asked_x - drawing.CROSSBAR_MEDIAN_DATUM_XY[0]
+    shift = _r7_sheet_shift()
+    tag_dx = asked_x - (drawing.CROSSBAR_MEDIAN_DATUM_XY[0] - shift)
     tag_dy = drawing.DATUM_BOTTOM_KEEP["BarWidth"][1] - line_y
-    arrow_x, y = _R7_BAR_WIDTH_ARROW_X, 0.124 + tag_dy
+    arrow_x, y = _R7_BAR_WIDTH_ARROW_X + shift, 0.124 + tag_dy
+    tag_dx += shift
     x0, x1 = 0.1310683 + tag_dx, 0.1380683 + tag_dx
     datum = {
         "lines": [
@@ -4466,7 +4529,7 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     )
     assert asked[1] - 0.0035 - view_top >= drawing.INK_CLEARANCE
     scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
-    arrow_x = _R7_BAR_WIDTH_ARROW_X
+    arrow_x = _R7_BAR_WIDTH_ARROW_X + _r7_sheet_shift()
     assert arrow_x < asked[0] < arrow_x + (part.BAR_X1 - part.BAR_X0) * scale
     datum, rows = _r7_datum_d_display_data()
     tag_right = max(x for line in datum["lines"][1:] for x in (line[4], line[7]))
@@ -7528,12 +7591,13 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
-    # Owner ruling K5 (#1038): the feet end past the end rails' window faces,
-    # in the corners, where the end rail's own faced flange carries on under
-    # them to the relief step at every printed limit.
+    # Owner ruling K5 (#1038): the feet end past the end rails' window
+    # faces.  No edge of the faced top lies there: each foot stands on the
+    # west rail's own flange, which runs on under the barrel to the corner,
+    # its two sides inside that rail's rims (below).
     assert abs(part.KEEPER_FOOT_TIP_Z_FRONT) > part.INNER_Z
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN == pytest.approx(1.397)
-    assert part.KEEPER_FOOT_CORNER_FLANGE_MARGIN > 0.0
+    assert not hasattr(part, "KEEPER_FOOT_CORNER_FLANGE_MARGIN")
+    assert part.KEEPER_TAP_X - 7.0 > part.INNER_X
     # Across it the widest printed foot (on the keeper's own sheet), at the
     # farthest printed fit-up offset from the web's median, stays inside the
     # narrowest as-cast flange less the largest printed top-rim break leg

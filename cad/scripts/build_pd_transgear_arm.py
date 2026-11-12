@@ -70,7 +70,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -105,6 +105,7 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_BORE_DIA,
+    PIVOT_BORE_DIA_BAND,
     PIVOT_END_R,
     PIVOT_TANGENT_X,
     PIVOT_TANGENT_Y,
@@ -126,7 +127,6 @@ from pd_transgear_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
 )
@@ -156,17 +156,6 @@ _R_PIN_BORE = PIN_BORE_DIA / 2.0
 _R_PLATE = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 # Small ordinary entry/exit breaks retain full thread; neither mouth needs
 # the old wide countersink. The rear screw is inserted by its actual thread.
-
-
-def _author_pivot_fit_annotation(adapter: Any) -> None:
-    """Native reference diameter plus the measured matched-set acceptance."""
-    display, _dimension = _named_dimension(adapter, "PivotBoreProfile", "PivotBoreDia")
-    display = _early_bound(display, "IDisplayDimension")
-    # SetText is void (VT_VOID); only GetText's BSTR readback proves it took.
-    for channel, text in ((1, "(<MOD-DIAM>"), (2, ")"), (4, PIVOT_BORE_CALLOUT)):
-        display.SetText(channel, text)
-        if str(display.GetText(channel) or "") != text:
-            raise RuntimeError("native matched pivot reference/callout did not persist")
 
 
 def _outline_area() -> float:
@@ -956,6 +945,10 @@ async def build(adapter: Any) -> dict[str, str]:
         display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
+        adapter, "PivotBoreProfile", "PivotBoreDia", *deviations(PIVOT_BORE_DIA_BAND),
+        display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
         adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
         display_unit=UNIT,
     )
@@ -966,7 +959,6 @@ async def build(adapter: Any) -> dict[str, str]:
         PIN_MOUTH_CHAMFER_TOLERANCE, display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _author_pivot_fit_annotation(adapter)
     author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

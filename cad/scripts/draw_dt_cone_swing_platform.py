@@ -8,7 +8,8 @@ model.
 
 The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
 bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
-west-edge lock notch, four rounded plan corners and the counterbored #4
+west-edge lock notch, three rounded plan corners, the chamfered south-east
+corner and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
 underside (user ruling 2026-09-29).  Sheet 1 carries the 1:2 plate-profile
 plan, pivot section A-A at 2:1, section C-C (3:2, cropped to the strip, cut on
@@ -121,6 +122,7 @@ from dt_cone_swing_platform_spec import (
     TIP_DOWEL_LOCAL_X,
     UNIT,
 )
+from dt_cone_swing_platform_geometry import PLATE_OUTLINE
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 
 
@@ -165,11 +167,40 @@ def _planned(x: float, y: float) -> tuple[float, float]:
     return (x, y - PLAN_DROP)
 
 
-PROFILE_CENTER = _planned(0.075, 0.190)
+# Each 1:2 plan is placed by its outline's centre, so a longer plate would
+# move the pivot end on the sheet.  The pivot is what stays put instead:
+# both plans' centres follow the outline from a fixed pivot station, the
+# pivot-end annotations keep their proven stations, and only the south end
+# (sheet-up) moves with the plate's length.
+_PLAN_PER_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+_PLAN_MID_MM = tuple(
+    (
+        min(vertex[axis] for vertex in PLATE_OUTLINE)
+        + max(vertex[axis] for vertex in PLATE_OUTLINE)
+    )
+    / 2.0
+    for axis in (1, 2)
+)
+
+
+def _plan_center(pivot_xy: tuple[float, float]) -> tuple[float, float]:
+    """View centre that lands the pivot at ``pivot_xy``: model (x, z) maps to
+    sheet (x, -z)."""
+    return (
+        pivot_xy[0] + _PLAN_MID_MM[0] * _PLAN_PER_MM,
+        pivot_xy[1] - _PLAN_MID_MM[1] * _PLAN_PER_MM,
+    )
+
+
+# The pivot on the profile plan, where the farm run at 039e557da landed it,
+# less PLAN_DROP.
+PROFILE_PIVOT_XY = _planned(0.0718, 0.1357)
+PROFILE_CENTER = _plan_center(PROFILE_PIVOT_XY)
 # Sheet 2's plan stands where the hole-location plan stood on the one-sheet
 # package, so its proven annotation stations (FEATURE_KEEP, the callouts,
 # detail B and its parent letter) carry over unchanged.
-FEATURE_CENTER = _planned(0.180, 0.190)
+FEATURE_PIVOT_XY = _planned(0.1767, 0.1357)
+FEATURE_CENTER = _plan_center(FEATURE_PIVOT_XY)
 ISO_CENTER = (0.355, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
@@ -198,10 +229,6 @@ BASE_SLIDE_FINISH_XY = (0.370, 0.099)
 # into the open band above the title block (top 0.066).
 SECTION_LABEL_XY = _shifted(0.335, 0.077)
 
-# The pivot on the profile plan, where the farm run at 039e557da landed it
-# (the plate's current outline re-centres the 1:2 view), less PLAN_DROP.
-PROFILE_PIVOT_XY = _planned(0.0718, 0.1357)
-
 
 def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
     """Model plan (x, z) of a corner fillet's centre, from the part's own corners.
@@ -222,45 +249,18 @@ def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
     return (x + bx / norm * reach, z + bz / norm * reach)
 
 
-# A left-standing radius's leader knee (where its shelf meets the radial
-# leader) relative to the text position SetPosition sets: measured on the R12
-# corner, (+8.6, -2.8) mm on the run-20261009T172850508Z render, and the
-# ray from the arc centre through it read 183.5 deg against the 183.3 deg
-# arrow of run 20261010T072401692Z. The leader runs this far past the arc.
-RADIUS_KNEE_FROM_TEXT = (0.0086, -0.0028)
-CORNER_LEADER_REACH = 0.004
-
-
-def corner_radius_text_xy(label: str) -> tuple[float, float]:
-    """Text position that lands a corner radius's arrow at its arc's middle.
-
-    The arc's middle lies on the ray from the fillet centre to the sharp
-    ``PLATE_CORNERS`` vertex it rounds, in model space; the 1:2 plan maps
-    model (x, z) to sheet (x, -z) about PROFILE_PIVOT_XY. A fixed sheet
-    station went stale when the plate outline moved: CornerSER's
-    near-horizontal shelf landed its arrow 5 deg past the R12 arc's end, on
-    the east edge (run 20261010T072401692Z).
-    """
-    per_mm = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
-    corners = {corner[0]: corner for corner in _part.PLATE_CORNERS}
-    _label, vx, vz, radius = corners[label]
-    cx, cz = corner_fillet_centre_mm(label)
-    length = math.hypot(vx - cx, vz - cz)
-    ux, uy = (vx - cx) / length, -(vz - cz) / length
-    reach = radius * per_mm + CORNER_LEADER_REACH
-    knee = (
-        PROFILE_PIVOT_XY[0] + cx * per_mm + ux * reach,
-        PROFILE_PIVOT_XY[1] - cz * per_mm + uy * reach,
-    )
-    return (knee[0] - RADIUS_KNEE_FROM_TEXT[0], knee[1] - RADIUS_KNEE_FROM_TEXT[1])
-
-
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": _planned(0.045, 0.105),
     "NorthWestX": _planned(0.100, 0.115),
-    "SouthWestX": _planned(0.104, 0.258),
-    "SouthEastX": _planned(0.045, 0.259),
+    "SouthWestX": _planned(0.104, 0.2640),
+    # Two rows over the south edge (y 0.2443): the chamfer's run from the
+    # sharp corner under the corner's own station from the pivot axis.
+    "SouthEastX": _planned(0.045, 0.2650),
+    "CornerSERun": _planned(0.045, 0.2590),
+    # Left of the east edge and of the two rows' text, which its outside
+    # arrows would otherwise cross.
+    "CornerSERise": _planned(0.038, 0.2455),
     # Radial rays must meet actual trimmed corners, not circle extensions.
     # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Keep
     # their shelves down/outward from the fillet centres so native radius
@@ -270,10 +270,7 @@ PROFILE_KEEP = {
     # ~0.1272 lay on that line.
     "CornerNER": _planned(0.045, 0.1225),
     "CornerNWR": _planned(0.137, 0.110),
-    "CornerSWR": _planned(0.110, 0.249),
-    # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
-    # text stands between the 223.4 south witness and the 24.0 line.
-    "CornerSER": corner_radius_text_xy("SE"),
+    "CornerSWR": _planned(0.110, 0.2545),
 }
 FEATURE_KEEP = {
     # Short lines (12 characters, ~34 mm at most) between the 195.09 line
@@ -297,7 +294,7 @@ NOTCH_KEEP = {
     # right of detail B's parent letter (x 0.1861..0.1897).
     "NorthEdgeZ": _planned(0.205, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
-    "CapECx": _planned(0.2652 - NOTCH_SHIFT, 0.258),
+    "CapECx": _planned(0.2652 - NOTCH_SHIFT, 0.2635),
     # Outboard of the 7.756 line (x 0.225, text to ~0.239): the longer
     # station stands outside the shorter one.
     "CapECz": _planned(0.252, 0.180),
@@ -305,7 +302,7 @@ NOTCH_KEEP = {
     # on the left it ends 10.0455 mm to the right.  Aim down-left at the
     # physical concave cap, below the 1.30 line.  Saved-envelope prediction
     # only, translated with the plan; require a new native sheet eye proof.
-    "CapEDia": _planned(0.2355 - NOTCH_SHIFT, 0.209),
+    "CapEDia": _planned(0.2355 - NOTCH_SHIFT, 0.2145),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -2782,7 +2779,7 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for label, _x, _z, radius in _part.PLATE_CORNERS:
+    for label, _x, _z, radius in _part.ROUNDED_CORNERS:
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
             name=f"Corner{label}R", feature_name=f"Corner{label}", radius_m=radius / 1000.0,

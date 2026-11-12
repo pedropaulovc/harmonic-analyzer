@@ -57,7 +57,7 @@ fr-top-frame:
   # printed limit at once the cross-screw head can stand .029 proud of the
   # counterbore mouth (.041 under it at nominal); that residual is the
   # owner's (#2516).
-  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, the four boss tops, the two west bosses' keeper reliefs (owner ruling 2026-11-11, #1038, option K5: a chord .67 from each socket axis, the proud .18 down to the faced top), the edge breaks bordering those faced planes, tube sockets, cap recesses and their mouth chamfers, gooseneck bore and its mouth chamfer, set-screw tap and spot face, cross-screw counterbores, clearance holes and far-wall taps, hanger holes, dowel reams and knockouts, and the keeper taps transferred at assembly"
+  process: "gray iron casting from a 3D-printed pattern, machined on the seats: the faced top and underside planes, the four boss tops, the faced top carried into the two west bosses under the MHA-CH-07 keeper feet (owner ruling 2026-11-11, #1038, option K5: the proud .18 removed inboard of a step .67 from each socket axis, its floor one plane with the faced top, root R.02 max), the edge breaks bordering those faced planes, tube sockets, cap recesses and their mouth chamfers, gooseneck bore and its mouth chamfer, set-screw tap and spot face, cross-screw counterbores, clearance holes and far-wall taps, hanger holes, dowel reams and knockouts, and the keeper taps transferred at assembly"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"

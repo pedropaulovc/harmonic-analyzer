@@ -191,6 +191,7 @@ from fr_top_frame_spec import (
     HUB_SET_SPOT_PLACES,
     IN,
     KEEPER_BOSS_RELIEF_FROM_SOCKET,
+    KEEPER_RELIEF_CALLOUT,
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_X,
     SCREW_AXIS_BELOW_RAIL_TOP,
@@ -424,10 +425,12 @@ HANGER_CENTER_QUALIFIER = "2X"
 # against the arrow at 135.8 it stood at 129.7 (farm run 20261014T055244900Z),
 # requested 133 against 141.1 at 149.2, its leader then printed along the
 # whole line (farm run 20261111T015941119Z, line-on-dimension-line).  Asking
-# 3 mm right of the arrow (x 141.1) stands it 3 mm left, on the line's
-# extension, clear of the width's text, which parks right of the line.  The
-# height is the width's line's (DATUM_BOTTOM_KEEP), over the view.
-CROSSBAR_MEDIAN_DATUM_XY = (0.1441, 0.1945)
+# 3 mm right of the arrow stands it 3 mm left, on the line's extension,
+# clear of the width's text, which parks right of the line.  The arrow now
+# stands at x 177.1 (141.1 on those runs, before the sheet's group moved 36
+# mm right).  The height is the width's line's (DATUM_BOTTOM_KEEP), over
+# the view.
+CROSSBAR_MEDIAN_DATUM_XY = (0.1801, 0.1945)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -503,19 +506,28 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # A-A cuts the two west bosses, so it shows each keeper relief as a step in
 # the boss top (owner ruling 2026-11-11, #1038, K5).  The rear one's station
 # from its socket axis reads over the boss top, under the mouth chamfer's
-# parked text; 8.5 mm of paper cannot hold the value and its words, so they
-# park left of the step over the rail.  The words carry the depth: the cut
-# ends on the faced top, the plane the 4X .18 already locates.
-KEEPER_RELIEF_CALLOUT = "2X KEEPER FOOT\nRELIEF TO FACED TOP"
+# parked text; 8.5 mm of paper cannot hold its two rows, so they park just
+# left of the step.  The step's own callout (the spec's rows) stands over
+# the rail, upper-left at KEEPER_RELIEF_NOTE_XY: two rows of note text (2.6
+# mm a character, rows 4.4 apart, measured on farm run
+# 20261112T030307472Z), 65 x 9 mm, its foot 7 over the rail top and its
+# head 6 under the chamfer text's underline, pointing at the FRONT boss's
+# step root so its leader crosses neither the station nor its text.  The
+# station's rows stand 1 mm over its own line and 4 under the chamfer's
+# rows: asked at y 157.5 over a line at 153.5 the lower row's box began at
+# y 153.0 and the line ran 2.2 mm through it (layout audit, farm run
+# 20261112T041757594Z); at y 159.0 the rows stood 3.1 under the chamfer's
+# and read as one call with them (farm run 20261112T043515872Z).
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)
     * DETAIL_SECTION_SCALE[0]
     / DETAIL_SECTION_SCALE[1]
     / 1000.0,
-    0.1535,
+    0.1525,
 )
-KEEPER_RELIEF_TEXT_XY = (0.309, 0.1555)
+KEEPER_RELIEF_TEXT_XY = (0.331, 0.158)
+KEEPER_RELIEF_NOTE_XY = (0.250, 0.160)
 
 
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).
@@ -1455,9 +1467,15 @@ _TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 # planes' traces to the corner sheet 3's table counts from, datum D on the
 # crossbar's width and D's station from G; the rear elevation over it
 # carries F1, F2 and the barrel targets' height.
+# The pair and everything hung on it stand 36 mm right of where they first
+# stood (view centres x 150): the group, callouts and all, ran x 44 to 315
+# of the border's 12 to 420, bunched left of an empty field (machinist
+# review, farm runs 20261111T233555541Z to 20261112T034811190Z, rule 15).
+# Now x 80 to 351, centred; nothing of it stands under y 70, so the title
+# block (top y 64.7) is not met.
 CAST_DATUM_FRAME = ("E", "F", "G")
-DATUM_BOTTOM_CENTER = (0.150, 0.140)
-DATUM_FRONT_CENTER = (0.150, 0.222)
+DATUM_BOTTOM_CENTER = (0.186, 0.140)
+DATUM_FRONT_CENTER = (0.186, 0.222)
 # No dimension's rows stand inside the part's outline (machinist review of
 # fad41f8525: the width's and the gusset run's stood in the west window with
 # half the sheet empty, rule 14).  The width stands across the bar OVER the
@@ -1465,11 +1483,11 @@ DATUM_FRONT_CENTER = (0.150, 0.222)
 # to a line 9.7 mm over the rear bosses (y 184.8), D's tag left of it on the
 # line's extension.  The gusset run stands UNDER the view, 8.2 mm under the
 # front bosses (y 95.2), and D's station under that, from the G trace (x
-# 222.7) to the bar's median (x 145.0), 5 mm over the title block.
+# 258.7) to the bar's median (x 181.0), 5 mm over the title block.
 DATUM_BOTTOM_KEEP = {
-    "BarWidth": (0.145, 0.1945),
-    "GussetRunE": (0.1522, 0.087),
-    "DStation": (0.184, 0.0738),
+    "BarWidth": (0.181, 0.1945),
+    "GussetRunE": (0.1882, 0.087),
+    "DStation": (0.220, 0.0738),
 }
 # The width's callout row goes above its value, so the leader from the
 # line's right end to the value passes under it.  It stays one row: farm
@@ -1479,14 +1497,14 @@ DATUM_BOTTOM_KEEP = {
 DATUM_BOTTOM_CALLOUTS_ABOVE = {"BarWidth": "CROSSBAR AT UNDERSIDE"}
 DATUM_BOTTOM_CALLOUTS = {"GussetRunE": "4X 45° GUSSET"}
 # The width's two rows stand right of its line, the value's underline (y
-# 194.9) on the line's own height.  The callout's 57.0 mm row (x 149.6 to
-# 206.6, y 200.5 to 204.0) ends 2.3 mm off F1's symbol (centre 215.9,
+# 194.9) on the line's own height.  The callout's 57.0 mm row (x 185.6 to
+# 242.6, y 200.5 to 204.0) ends 2.3 mm off F1's symbol (centre 251.9,
 # 199.4, radius 7.0) and 12.5 under the elevation's rail (y 216.5).  The
 # gusset run's two rows stand right of its line, their underline (y 78.6)
 # 3.1 mm over the station's value.
 DATUM_BOTTOM_TEXT_OFFSETS = {
-    "BarWidth": (0.1781, 0.20046),
-    "GussetRunE": (0.180, 0.0842),
+    "BarWidth": (0.2141, 0.20046),
+    "GussetRunE": (0.216, 0.0842),
 }
 # Each target symbol's centre from its point, sheet m: on the underside E1
 # in the west window, G1 and E2 beside the view, E3 under its front-east
@@ -1508,13 +1526,13 @@ DATUM_TARGETS_ON_ELEVATION = frozenset({"F1", "F2"})
 # One BASIC radius places the three boss-bottom targets, each on its own
 # socket's centre line, and one BASIC height the three barrel targets.
 DATUM_TARGET_COUNT = "3X"
-DATUM_E_RADIUS_LINE_XY = (0.071, 0.100)
-DATUM_E_RADIUS_TEXT_XY = (0.048, 0.106)
+DATUM_E_RADIUS_LINE_XY = (0.107, 0.100)
+DATUM_E_RADIUS_TEXT_XY = (0.084, 0.106)
 # The height's phantom line across the rear-west boss in the elevation,
 # this far (model mm) either side of its socket axis.
 DATUM_HEIGHT_LINE_REACH = (30.0, 32.0)
-DATUM_HEIGHT_LINE_XY = (0.230, 0.2143)
-DATUM_HEIGHT_TEXT_XY = (0.250, 0.226)
+DATUM_HEIGHT_LINE_XY = (0.266, 0.2143)
+DATUM_HEIGHT_TEXT_XY = (0.286, 0.226)
 
 
 def _datum_elevation_xy(x: float, y: float) -> tuple[float, float]:
@@ -1571,8 +1589,8 @@ DATUM_FRONT_CALLOUTS = {
     "BossesUpperDraft": "DRAFT, FLANGE RIMS, SET-BOSS FACE,\n4X BOSS AND HUB BARRELS",
 }
 DATUM_FRONT_TEXT_OFFSETS = {
-    "WebRingDraft": (0.136, 0.2506),
-    "BossesUpperDraft": (0.2731, 0.2533),
+    "WebRingDraft": (0.172, 0.2506),
+    "BossesUpperDraft": (0.3091, 0.2533),
 }
 
 
@@ -5473,8 +5491,18 @@ async def build(adapter: Any) -> dict[str, str]:
             orientation="horizontal",
             entity_types=("SKETCHSEGMENT", "EDGE"),
             entities=(bore_axes[1], steps[0]),
-            suffix=KEEPER_RELIEF_CALLOUT,
+            suffix="2X",
             offset_text=KEEPER_RELIEF_TEXT_XY,
+        )
+        add_leader_note(
+            adapter,
+            KEEPER_RELIEF_CALLOUT,
+            text_xy=KEEPER_RELIEF_NOTE_XY,
+            attach_xy=a_a_sheet(
+                HALF_H, FRONT_COLUMN_Z + KEEPER_BOSS_RELIEF_FROM_SOCKET
+            ),
+            view=detail_section,
+            label="keeper relief step callout",
         )
 
     keeper_relief_station()

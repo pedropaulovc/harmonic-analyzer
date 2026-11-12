@@ -21,6 +21,10 @@ from dt_pinion_arbor_geometry import (
     BACK_JOURNAL_FROM_HEAD_REAR as BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z as BACK_JOURNAL_Z,
     BACK_RIM_FROM_HEAD_REAR as BACK_RIM_FROM_HEAD_REAR,
+    BOND_RELIEF_DIA as BOND_RELIEF_DIA,
+    BOND_RELIEF_FROM_HEAD_REAR as BOND_RELIEF_FROM_HEAD_REAR,
+    BOND_RELIEF_LEN as BOND_RELIEF_LEN,
+    BOND_RELIEF_Z as BOND_RELIEF_Z,
     BOND_ZONE_DIA_FROM_HEAD_REAR as BOND_ZONE_DIA_FROM_HEAD_REAR,
     BOND_ZONE_DIA_Z as BOND_ZONE_DIA_Z,
     BOND_ZONE_LAND_CLEARANCE as BOND_ZONE_LAND_CLEARANCE,
@@ -145,6 +149,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BackJournalLen",
         "BackJournalDia",
     },
+    # #2360: the relief between the two MHA-DT-01 bond lands: its front
+    # shoulder from the head rear face, its length and its diameter.
+    "BondReliefProfile": {"BondReliefFromHeadRear", "BondReliefLen", "BondReliefDia"},
 }
 
 # The construction-only sketches that carry printed dimensions: the part saves
@@ -193,6 +200,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BackJournalFromHeadRear": 2,
         "BackJournalLen": 2,
         "BackJournalDia": 4,
+    },
+    "BondReliefProfile": {
+        "BondReliefFromHeadRear": 2,
+        "BondReliefLen": 2,
+        "BondReliefDia": 2,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -268,8 +280,9 @@ DRUM_STATION_CALLOUT = (
 # The drum joint's one step covers MHA-DT-01 too (dt_alignment_pinion_spec).
 # The journals' bore moved onto their callouts (JOURNAL_CALLOUT), so the one
 # note is the inside-corner ceiling at the Ø5/16-Ø.41 and Ø.41/Ø.59 shoulders
-# (machinist review r1 of #1685; the dt-crankshaft precedent: the title
-# block's edge-break radius, until #1625 puts the default in the title block).
+# and, since #2360, the bond relief's two Ø5/16-Ø.28 shoulders (machinist
+# review r1 of #1685; the dt-crankshaft precedent: the title block's
+# edge-break radius, until #1625 puts the default in the title block).
 INSIDE_CORNER_R_MAX = edge_break_radius_mm(unit=UNIT)  # R.010
 DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX.".replace(
     "R0.", "R."
