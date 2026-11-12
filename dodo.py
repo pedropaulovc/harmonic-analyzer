@@ -82,7 +82,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from doit.tools import config_changed
@@ -996,10 +996,11 @@ def _exec_com(
     loading add-ins is the one unhealthy state that heals by waiting, and the
     re-run's own gate waits again.
 
-    ``recording`` (``cmd`` runs a part build under the COM-recording driver,
-    :mod:`_replay_shadow`): the driver's exit ``EXIT_RECORD_FAULT`` -- the
-    recorder failed where the build's results cannot be trusted, not the script
-    or SolidWorks -- re-runs the build at once, unrecorded, on the same seat,
+    ``recording`` (``cmd`` runs a part, FULL assembly or drawing build under the
+    COM-recording driver, :mod:`_replay_shadow`): the driver's exit
+    ``EXIT_RECORD_FAULT`` -- the recorder failed where the build's results cannot
+    be trusted, not the script or SolidWorks -- re-runs the build at once,
+    unrecorded (with its own arguments), on the same seat,
     and only that re-run's exit code reaches the handling above. Every other
     exit code is the build's own (a recorder fault after the build had its
     results only stops the recording: ``Recording.exited``)."""
@@ -2441,6 +2442,7 @@ def _cached_com_action(
     outputs: list[Path],
     log_stem: str,
     stamp: str | None = None,
+    recorded: Callable[[str], _replay_shadow.Recording | None] | None = None,
 ) -> None:
     """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
@@ -2459,7 +2461,14 @@ def _cached_com_action(
     ``cad/out/reports/<gate>.ok`` writes it HERE, after the gate passed, so a failed
     gate leaves no stamp (it stays stale and re-runs) while a cached gate restores
     the stamp instead of reopening the models. Every ``outputs`` path MUST live
-    under ``cad/out`` -- the cache refuses to extract anything else."""
+    under ``cad/out`` -- the cache refuses to extract anything else.
+
+    ``recorded`` (drawings): given the key, the build's COM-conversation
+    recording or None (``_replay_shadow.plan_dependent``), asked only when it
+    builds on the seat; a recorded build runs under the recording driver, and
+    the recording is published and judged after the store, off the seat
+    (telemetry only)."""
+    recording: _replay_shadow.Recording | None = None
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
@@ -2483,7 +2492,14 @@ def _cached_com_action(
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _tag_cache_key(sp, key)
-            _exec_com(cmd, label, log_stem=log_stem)
+            if recorded is not None:
+                recording = recorded(key)
+            _exec_com(
+                cmd if recording is None else recording.command,
+                label,
+                log_stem=log_stem,
+                recording=recording,
+            )
             if stamp is not None:
                 _write_stamp(label, stamp)
 
@@ -2498,6 +2514,7 @@ def _cached_com_action(
         _cache.require_refresh_store(label, outcome)
     if outcome == "lost":
         _adopt_canonical(key, outputs, label)
+    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
 
 
 @_farm.leaf_action
@@ -2511,6 +2528,42 @@ def _cached_drawing_action(stem: str) -> None:
         _drawing_file_deps(stem),
         _drawing_cache_outputs(stem),
         log_stem=f"drawing-{stem}",
+        recorded=lambda key: _replay_shadow.plan_dependent(
+            _replay_shadow.BuildKind.DRAWING, lambda: _drawing_dependent(stem), key
+        ),
+    )
+
+
+def _drawing_dependent(stem: str) -> _replay_shadow.Dependent:
+    """What a drawing build's COM-conversation recording needs: its script and
+    argument, and the identity of the model it draws (transitively for an
+    assembly)."""
+    spec = DRAWINGS_BY_NAME[stem]
+    if spec.source_kind == "assembly":
+        children = _child_identities([spec.part])
+    else:
+        token = _part_execution_token(spec.part)
+        children = {_rel_tag(token): _execution_identity(token)}
+    return _replay_shadow.Dependent(
+        _replay_shadow.BuildKind.DRAWING,
+        stem,
+        spec.script.resolve(),
+        (spec.artifact_stem,),
+        children,
+    )
+
+
+def _assembly_dependent(stem: str, script: Path) -> _replay_shadow.Dependent:
+    """What a FULL assembly build's COM-conversation recording needs: its
+    script, every model it opens and the files it writes that the outcome
+    compares."""
+    return _replay_shadow.Dependent(
+        _replay_shadow.BuildKind.ASSEMBLY,
+        stem,
+        script,
+        (),
+        _child_identities(references_of(stem)),
+        _assembly_judged_sidecars(stem),
     )
 
 
@@ -2551,6 +2604,59 @@ def _assembly_file_deps(stem: str) -> list[str]:
         for r in refs
     ]
     return [*_recipe_files(stem), *ref_targets, *ref_identities]
+
+
+def _child_identities(stems: Iterable[str]) -> dict[str, str]:
+    """Every model a build opens through ``stems`` (an assembly's references, an
+    assembly drawing's source), transitively through subassemblies: the tag of
+    each one's execution token -> the SHA-256 it holds, or why it holds none
+    (``_execution_identity``). A COM-conversation recording is judged only
+    against one made on the same (``_replay_shadow.Dependent``); telemetry only,
+    never a key input."""
+    found: dict[str, str] = {}
+    pending = list(stems)
+    while pending:
+        stem = pending.pop()
+        subassembly = stem in ASSEMBLY_ORDER
+        token = (
+            _assembly_execution_token(stem)
+            if subassembly
+            else _part_execution_token(stem)
+        )
+        tag = _rel_tag(token)
+        if tag in found:
+            continue
+        found[tag] = _execution_identity(token)
+        if subassembly:
+            pending.extend(references_of(stem))
+    return found
+
+
+def _execution_identity(token: str) -> str:
+    """The SHA-256 an execution token holds (``_stamp_execution``), or why it
+    holds none: ``missing``, ``unreadable: <error>`` or ``malformed:
+    <content>``."""
+    try:
+        identity = Path(token).read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return "missing"
+    except (OSError, ValueError) as exc:
+        return f"unreadable: {exc!r}"
+    if re.fullmatch(r"[0-9a-f]{64}", identity):
+        return identity
+    return f"malformed: {identity[:80]!r}"
+
+
+def _assembly_judged_sidecars(stem: str) -> tuple[Path, ...]:
+    """What Python writes beside an assembly that its COM-conversation recording's
+    outcome compares byte for byte: every cache output but the models, the renders
+    and the input ledger (which names the build's inputs, not its result)."""
+    skipped = {Path(_sldasm(stem)), _png_dir(stem), _input_ledger(stem)}
+    return tuple(
+        path
+        for path in map(Path, _assembly_cache_outputs(stem))
+        if path not in skipped and path.suffix.lower() not in (".sldasm", ".sldprt")
+    )
 
 
 def _cache_key(file_deps: list[str], label: str | None = None) -> str:
@@ -3098,6 +3204,10 @@ def build_or_refresh(stem, dependencies, changed, targets):
         plan = explode_plan(stem)
         base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
 
+    # A FULL build's COM-conversation recording (telemetry only; None: run as
+    # ever). REFRESH tiers are not recorded: another script and argument whose
+    # conversations no FULL build's could be judged against.
+    recording: _replay_shadow.Recording | None = None
     with _com_seat(label) as waited:
         if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
             _stamp_assembly_execution(stem)
@@ -3135,13 +3245,24 @@ def build_or_refresh(stem, dependencies, changed, targets):
             sp.set_attribute("mode_reason", why)
 
             def full_build(reason: str) -> None:
+                nonlocal recording
                 asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
+                recording = _replay_shadow.plan_dependent(
+                    _replay_shadow.BuildKind.ASSEMBLY,
+                    lambda: _assembly_dependent(stem, asm_script),
+                    cache_key,
+                )
                 _exec_com(
-                    [sys.executable, str(asm_script)],
+                    [sys.executable, str(asm_script)]
+                    if recording is None
+                    else recording.command,
                     f"FULL build {stem} ({reason})",
                     log_stem=f"assembly-{stem}",
                     task=label,
+                    recording=recording,
                 )
+                # A POST_ASSEMBLY hook (none today) changes the model after the
+                # recorded window: its effect is in no recording.
                 for hook in (SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())):
                     _exec_com(
                         [sys.executable, str(hook)],
@@ -3196,6 +3317,9 @@ def build_or_refresh(stem, dependencies, changed, targets):
         _stamp_assembly_execution(stem)
         _write_input_ledger(ledger, _ledger_inputs(file_deps))
         outputs = _assembly_cache_outputs(stem)
+    # Off the seat, after the publication: publish the FULL build's recording
+    # and judge it against its base. Telemetry only; never raises.
+    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
     # The same archive is the explode base for this operational model. An
     # EXPLODE run started from that base, which the cache already holds.
     if not base_key or tier is RefreshTier.EXPLODE:

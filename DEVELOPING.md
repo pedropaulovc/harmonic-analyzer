@@ -2381,7 +2381,8 @@ in the log's environment. A replay runs with the fresh recording's
 environment and refuses (`input_mismatch`) a base recorded under another seed
 or none.
 
-Assemblies, drawings and gates are not recorded. Nothing under
+Gates are not recorded; FULL assembly builds and drawings are, and nothing of
+theirs is reused ("Assemblies and drawings" below). Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
 input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 `_com_outcome.py`, `com_replay.py`) are in no recipe closure
@@ -2390,7 +2391,13 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 
 ### The switch
 
-`HARMONIC_COM_REPLAY` is read in one place (`_replay_shadow.mode`):
+`HARMONIC_COM_REPLAY` is read in one place (`_replay_shadow.mode`). It holds
+comma-separated items, each a mode for every kind (`shadow`) or for one kind
+(`part=`, `assembly=` or `drawing=`), a later item winning: `shadow,drawing=off`
+shadows parts and assemblies and leaves drawings unrecorded. Unset or empty is
+`_replay_shadow.DEFAULT_MODES`: parts `reuse`, assemblies and drawings `shadow`.
+An assembly or drawing never runs above `shadow` (`reuse` shadows them). The
+modes, for a part:
 
 | value | effect |
 | --- | --- |
@@ -2399,14 +2406,15 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 | `record` | record and publish; no lookup or replay (a forced refresh still revokes what it replaces) |
 | `off` | the kill switch: the build runs the command it ran before recording existed, and the engine is never imported |
 
-Any other value is treated as `off` with one warning. A farm leaf takes the mode
-from the worker's environment, not the submitter's: environment variables are
-not forwarded to workers, so the fleet's mode is the in-source default. To turn
-reuse off for the whole fleet without touching workers, change `DEFAULT_MODE`
-in `_replay_shadow.py` to `ReplayMode.SHADOW` (or `ReplayMode.OFF` to stop
-recording too) and launch from that commit; because the module is in no recipe
-closure, no cache key moves. On one machine, `HARMONIC_COM_REPLAY=shadow`
-does the same for local builds.
+Anything else (an unknown mode or kind) is treated as `off` for every kind with
+one warning. A farm leaf takes the mode from the worker's environment, not the
+submitter's: environment variables are not forwarded to workers, so the fleet's
+mode is the in-source default. To turn reuse off for the whole fleet without
+touching workers, set `DEFAULT_MODES[BuildKind.PART]` in `_replay_shadow.py` to
+`ReplayMode.SHADOW` (or a kind's entry to `ReplayMode.OFF` to stop recording
+it) and launch from that commit; because the module is in no recipe closure, no
+cache key moves. On one machine, `HARMONIC_COM_REPLAY=shadow` (or
+`part=shadow`) does the same for local builds.
 
 ### Failure handling
 
@@ -2940,8 +2948,9 @@ jq -s '
   }' cad/out/reports/cache.jsonl
 ```
 
-To turn reuse off, see "The switch": `DEFAULT_MODE = ReplayMode.SHADOW` for the
-fleet, `HARMONIC_COM_REPLAY=shadow` on one machine.
+To turn reuse off, see "The switch": `DEFAULT_MODES[BuildKind.PART] =
+ReplayMode.SHADOW` for the fleet, `HARMONIC_COM_REPLAY=part=shadow` on one
+machine.
 
 ### What it costs a task
 
@@ -2977,7 +2986,8 @@ audited, or no attempt) adds the mean seat-held overhead plus the mean
 `replay.after_build` holds only the comparison. A reused task runs neither:
 its seat build and `replay.after_build` are replaced by its `replay.reuse`
 span plus the store, so it costs that and saves the build. Part cache hits,
-assemblies, drawings, gates and every task under `ro`/`off` add nothing. How
+gates and every task under `ro`/`off` add nothing; recorded assemblies and
+drawings pay the first two ("Assemblies and drawings" below). How
 much of that sum reaches a build's wall clock depends on how many part
 leaves run at once and which of them are on the critical path; the farm's
 slot time grows by the whole sum.
@@ -2998,7 +3008,7 @@ dependencies
 
 ### Where results land
 
-All spans are on service `build-infra` and carry `label=part:<stem>`:
+All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 
 | span | attributes |
 | --- | --- |
@@ -3006,8 +3016,9 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 | `replay.after_build <label>` | `replay.outcome`, `replay.reuse_decision` (mode `reuse`); encloses every span below and the whole off-seat step |
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
-| `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
+| `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read`; an assembly or drawing also `replay.candidates` and `replay.same_children` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
+| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement`, `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -3142,9 +3153,154 @@ jq -s '
   }' cad/out/reports/cache.jsonl
 ```
 
-Only part builds that actually run under `rw` produce records, so a target
-restored from the cache records nothing. To exercise specific parts, force a
-refresh of them (see "Refreshing one unchanged leaf").
+Only part, FULL assembly and drawing builds that actually run under `rw`
+produce records, so a target restored from the cache records nothing. To
+exercise specific leaves, force a refresh of them (see "Refreshing one
+unchanged leaf").
+
+### Assemblies and drawings
+
+Measured 2026-11-09..12, assemblies cost 34 seat-hours and drawings 35, and
+91% of that was builds whose own closure (script, helpers, configuration)
+changed. Keying them on their children's content instead saves about 1%. The
+question part reuse answered for parts is open for them: when an assembly's or
+drawing's own closure changes and its children do not, how often does the new
+source issue the identical COM conversation? These recordings answer it. They
+are telemetry only: every output, exit code and cache key is an unrecorded
+build's, and nothing is ever reused.
+
+**What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
+including the fallback after a failed EXPLODE) and every drawing build
+(`_cached_drawing_action`, through `_cached_com_action(recorded=...)`) run
+under the same driver as a part, planned by `_replay_shadow.plan_dependent`,
+which describes the build (script, argument, children, sidecars) only once the
+mode and cache role call for a recording; a description that raises builds
+unrecorded with a WARN.
+A drawing script keeps its argument: `com_replay.py record <script> ... --
+<artifact stem>` puts it back into `sys.argv` around the engine (whose
+`run_script` passes none), and a recorder fault's unrecorded re-run (exit 92)
+is `python <script> <artifact stem>`. REFRESH tiers (`refresh_assembly.py
+<stem> <tier>`) are not recorded: another script and argument, which no FULL
+recording could be judged against, and the farm always builds FULL. A
+`POST_ASSEMBLY` hook (none today) would run after the recorded window. The
+recording lives in `cad/out/replay/<kind>-<stem>/` and is published under
+`com-replay/<engine 16>/<kind>-<stem>/` (stems hold no `-`, so a drawing never
+shares its part's recordings); the engine is unchanged, so part recordings and
+part reuse are untouched. An assembly's bundle also carries `outputs/`: the
+files Python writes beside it that the outcome compares (every assembly cache
+output but the models, the renders and the input ledger: `.massprops.sha`,
+`.dof.json`, the jig's `.sweep.json`, the top assembly's BOM), copied when the
+driver exits 0, before a lost store could adopt the winner's.
+
+**Children.** `dodo._child_identities` names every model the build opens, by
+the SHA-256 in its `.execution` token: an assembly's references, transitively
+through subassemblies; a drawing's part, or its assembly plus that assembly's
+children. A token that holds none names why instead: `missing`, `unreadable:
+<error>` or `malformed: <content>`. The manifest carries them as `children`,
+with `kind`, `argv` and `replay_gaps`. A build with such a child can match no
+base: the judgement logs one WARN naming each child and its reason, and the
+record (`children_unreadable`), the `replay.split` span and the INFO line's
+`children_unreadable` marker carry it, so a worker that lacks a token is told
+from one that cannot read it.
+
+**Judgement** (`_replay_shadow._judge_dependent`, after the store, off the
+seat). Nothing is replayed. The lookup reads at most 16 manifests of the stem,
+newest first, within 3 s. A candidate is another recording of the same kind
+under the same cache salt; the base is the nearest candidate (fewest differing
+key inputs, then newest) made on exactly the same children. The fresh
+recording, the ground truth of what the current source asked, is then diffed
+against the base's (`com_replay.py diff --kind <kind>`):
+
+| `split` | meaning |
+| --- | --- |
+| `noop` | same children, the base's exact requests: the own-closure change was a no-op for SolidWorks |
+| `diverged` | same children, other requests; `truth_cause` says what preceded the first difference: `request` (the source asked something else) or `response:<member>` (SolidWorks answered differently first; `seat_nondeterminism` when it also made the same model, `seat_path_divergence` when the requests differ only by detours of reads and selections on the same geometry) |
+| `children_changed` | candidates were read, none made on these children: not comparable |
+| `children_unknown` | a child's token held no SHA-256 (`children_unreadable` names which and why) |
+| `oversize`, `timeout`, `unavailable`, `error` | no judgement: a log past 500,000 calls, the 60 s comparison budget, the base bundle, the diff |
+
+No candidate at all (or the lookup's budget spent) is the record outcome
+`no_base`. The outcome is judged per kind (`_com_outcome.SIGNALS`): an
+assembly on `mass`, `requests`, `answers` and `sidecars` (byte for byte); a
+drawing on `requests`, `answers` and `pdf`, the ink of every PDF SolidWorks
+wrote (text runs and path pieces per page, coordinates to 1 um), never its
+bytes, which carry the export's date. A `noop` whose outcome is `different`
+is a `SOUNDNESS ALARM` (ERROR, never fatal, nothing revoked: no base is ever
+reused). `own_differing` counts the differing key inputs that are not child
+identities. The seat path (`_com_outcome.seat_path`) is judged for these kinds
+as for a part, since the same vendored selection fallback runs in their
+scripts, on their own geometry (`_com_outcome.GEOMETRY`): an assembly's mass
+and sidecars, a drawing's PDF ink. A `noop` issued the base's exact requests,
+so it never has a seat path; a `diverged` one whose requests differ only by
+detours on the same geometry is `seat_path_divergence` (counted, never an
+alarm).
+
+**What a replay would need.** Each summary and manifest carries
+`replay_gaps`, measured on the recording (`com_replay._replay_gaps`): `argv`
+(arguments the engine's replay would not pass), `out_paths_unredirected`
+(output-root paths the log names outside `sldprt/`, `sldasm/`, `png/` and
+`stl/`, the only ones the replay redirects: a drawing's `slddrw/` and `pdf/`),
+`out_inputs` (named output-root files the log did not capture as written: the
+models it opened, which a replay would have to stage at their recorded bytes)
+and `python_out_reads` (output-root files the script's own Python read, an
+upper bound). Their counts size a second engine identity for these kinds.
+
+**Bounds and cost.** Every recording name fits the farm's path budget with 32
+characters to spare (`test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit`);
+a bundle over 512 MiB is not published (`publish=oversize`). On 788 recorded
+part builds (2026-11-12) the recorder cost 1.8% of the window at p50 and 2.8%
+at p95, at 101 recipe requests per window second (p95 156) and 176 bundle
+bytes per request (p95 680); the diff took about 3 s plus 0.5 ms per request.
+At those rates a 1,500 s assembly would add 30 to 45 s on the seat and log up
+to 2.4e5 requests, about 2 minutes of diff. The comparison runs inside the
+leaf's doit action, after the store but before the leaf's process exits and
+reports, so on a farm worker it holds the leaf's slot with the seat idle: it
+is capped at 60 s (`DEPENDENT_SECONDS`), which judges builds of up to about
+1e5 requests and reads `timeout` for the largest assemblies. The INFO line
+shows the seat cost as `record=+<engine and audit s>/<window s> <percent>`:
+
+```text
+[com-replay] drawing:pn_pen: evaluated | publish=stored bytes=2310144 | lookup=found base=9c1e04b2a7f3 differing=2 own=1 listed=4 read=4 0.388s | split=noop same_children=3/4 41.2s | truth=same | outcome=same cause=- | record=+12.41s/598.7s 2.11%
+```
+
+The three-way split per stem:
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.split "
+| extend label=tostring(customDimensions.label),
+         kind=tostring(split(tostring(customDimensions.label), ":")[0]),
+         split=tostring(customDimensions["replay.split"]),
+         cause=tostring(customDimensions["replay.truth_cause"]),
+         alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
+         detour=tolower(tostring(customDimensions["replay.seat_path_divergence"])) == "true"
+| summarize judged=count(), noop=countif(split == "noop"),
+            diverged_request=countif(split == "diverged" and cause == "request"),
+            diverged_seat=countif(split == "diverged" and cause startswith "response:"),
+            seat_path=countif(detour),
+            children_changed=countif(split == "children_changed"),
+            children_unknown=countif(split == "children_unknown"),
+            no_judgement=countif(split !in ("noop", "diverged", "children_changed",
+                                            "children_unknown")),
+            alarms=countif(alarm)
+            by kind, label
+| extend noop_share=round(1.0 * noop / max_of(noop + diverged_request, 1), 3)
+| order by kind asc, judged desc
+```
+
+The seat cost per kind:
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.record_overhead "
+| extend kind=tostring(split(tostring(customDimensions.label), ":")[0]),
+         seat_s=todouble(customDimensions["replay.engine_s"])
+                + todouble(customDimensions["replay.escape_audit_s"]),
+         pct=todouble(customDimensions["replay.overhead_pct"])
+| summarize builds=count(), p50_seat_s=percentile(seat_s, 50),
+            p95_seat_s=percentile(seat_s, 95), p50_pct=percentile(pct, 50),
+            p95_pct=percentile(pct, 95) by kind
+```
 
 ## Native projected geometric-control zones
 

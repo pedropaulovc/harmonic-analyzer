@@ -1,16 +1,20 @@
 """Record or replay one build's COM conversation.
 
-``record <script> --log P [--summary P] [--out-root DIR] [--callers MODE]``
-    Run a build script against the live seat exactly as ``python <script>``
-    would (``run_build``: connect, discard, template pin, teardown), recording
-    its build window into ``P``. ``--summary`` writes the recording's facts as
-    JSON for dodo. ``--out-root`` redirects the outputs (side-by-side
-    diagnostic runs only; dodo's part builds never pass it). ``--callers``
-    keeps the Python caller of every call (``full``), none (``divergence``: a
-    replay names its own at a divergence) or none at all (``off``). Exits with
-    the build's own exit code, or 92 when the recorder failed where the build's
-    results cannot be trusted (``Recovery.RERUN``): dodo re-runs the build once
-    unrecorded. A recorder failure after a call's result was in hand
+``record <script> --log P [--summary P] [--out-root DIR] [--callers MODE] [-- ARG...]``
+    Run a build script against the live seat exactly as ``python <script>
+    ARG...`` would (``run_build``: connect, discard, template pin, teardown),
+    recording its build window into ``P``. ``ARG...`` are the script's own
+    arguments (a drawing's artifact stem), kept in ``sys.argv`` around the
+    engine, whose ``run_script`` passes none. ``--summary`` writes the
+    recording's facts as JSON for dodo, with ``replay_gaps``: what a replay of
+    this recording would need that the engine's replay lacks. ``--out-root``
+    redirects the outputs (side-by-side diagnostic runs only; dodo's builds
+    never pass it). ``--callers`` keeps the Python caller of every call
+    (``full``), none (``divergence``: a replay names its own at a divergence)
+    or none at all (``off``). Exits with the build's own exit code, or 92 when
+    the recorder failed where the build's results cannot be trusted
+    (``Recovery.RERUN``): dodo re-runs the build once unrecorded, with its
+    arguments. A recorder failure after a call's result was in hand
     (``Recovery.DEGRADED``) stops recording and lets the build finish: the exit
     code is the build's, and the summary's ``faults`` mark the recording
     unusable.
@@ -32,24 +36,30 @@
     document title counter (``title_echoes``). Exits 0 for a no-op verdict,
     91 for any other verdict, 1 for an infrastructure failure.
 
-``diff <a> <b> [--result P]``
+``diff <a> <b> [--result P] [--kind K] [--base-sidecars DIR] [--new-sidecars DIR]``
     Request divergence and per-member response differences between two logs
     (JSON on stdout), plus what caused the divergence and whether the two
-    builds made the same part (``_com_outcome``: ``truth_cause``,
-    ``outcome``); exit 0 when the recipe requests are identical.
+    builds made the same part, assembly or drawing (``_com_outcome``, on
+    ``--kind``'s signals: ``truth_cause``, ``outcome``; an assembly's sidecar
+    files are compared from the two directories); exit 0 when the recipe
+    requests are identical.
 
-dodo records every part build through ``record``, and before a build tries
-to reuse a base's part, or after it evaluates the shadow replay, through
-``replay`` and ``diff`` (``_replay_shadow``). Nothing here is imported by a
-recipe; ``--help`` imports neither pywin32 nor the build modules.
+dodo records every part, FULL assembly and drawing build through ``record``;
+before a part build tries to reuse a base's part, or after it evaluates the
+shadow replay, it runs ``replay`` and ``diff``, and after an assembly or a
+drawing it runs ``diff`` against the nearest base (``_replay_shadow``).
+Nothing here is imported by a recipe; ``--help`` imports neither pywin32 nor
+the build modules.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
+from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -61,6 +71,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _NOT_INPUTS = (".venv", "cad/out")
 # Bound on the requests a ``title_echoes`` result lists (all are counted).
 _ECHOES_LISTED = 10
+# The output-root subdirectories the engine's replay redirects into its
+# scratch root (_com_conversation.redirect_outputs; pinned by test). A build
+# naming any other output-root path (a drawing's slddrw/ and pdf/) cannot be
+# replayed inside the sandbox as the engine stands.
+_REDIRECTED = ("sldprt", "sldasm", "png", "stl")
+# Bound on the paths each ``replay_gaps`` list names (all are counted).
+_GAPS_LISTED = 10
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -73,6 +90,7 @@ def _parser() -> argparse.ArgumentParser:
 
     record = sub.add_parser("record", help="run a build on the live seat, recorded")
     record.add_argument("script", type=Path)
+    record.add_argument("argv", nargs="*", help="the script's own arguments (after --)")
     record.add_argument("--log", type=Path, required=True)
     record.add_argument("--summary", type=Path, help="write the recording's facts")
     record.add_argument("--out-root", type=Path, help="redirect the build's outputs")
@@ -108,6 +126,14 @@ def _parser() -> argparse.ArgumentParser:
     diff.add_argument("base", type=Path)
     diff.add_argument("new", type=Path)
     diff.add_argument("--result", type=Path)
+    diff.add_argument(
+        "--kind",
+        choices=("part", "assembly", "drawing"),
+        default="part",
+        help="what the two builds made: the outcome's signals",
+    )
+    diff.add_argument("--base-sidecars", type=Path, help="the base's sidecar files")
+    diff.add_argument("--new-sidecars", type=Path, help="the new build's sidecars")
     return parser
 
 
@@ -236,6 +262,24 @@ def _code_file(name: str) -> str:
     return os.path.normcase(os.path.abspath(name))
 
 
+def _out_paths(trailer: dict[str, Any]) -> list[str]:
+    """The output-root paths (relative, ``/``-separated) the log's COM
+    arguments name."""
+    found = set()
+    for canonical in trailer.get("internal_paths", []):
+        for placeholder in ("<OUT>", "<OUT/>"):
+            if canonical.startswith(placeholder):
+                rest = canonical[len(placeholder) :].lstrip("\\/").replace("\\", "/")
+                if rest:
+                    found.add(rest)
+    return sorted(found)
+
+
+def _captured(trailer: dict[str, Any]) -> set[str]:
+    """The output-root paths of the files SolidWorks wrote that the log keeps."""
+    return {rel for files in trailer.get("captured", {}).values() for rel in files}
+
+
 def _solidworks_inputs(conversation: Any) -> tuple[list[str], list[str]]:
     """Files the log's COM arguments name that SolidWorks opens itself:
     ``(repository-relative paths outside the output root, output-root paths
@@ -248,15 +292,51 @@ def _solidworks_inputs(conversation: Any) -> tuple[list[str], list[str]]:
             if canonical.startswith(placeholder):
                 rest = canonical[len(placeholder) :].lstrip("\\/")
                 named.append(rest.replace("\\", "/"))
-    captured = {rel for files in trailer.get("captured", {}).values() for rel in files}
-    inside = []
-    for canonical in trailer.get("internal_paths", []):
-        for placeholder in ("<OUT>", "<OUT/>"):
-            if canonical.startswith(placeholder):
-                rest = canonical[len(placeholder) :].lstrip("\\/").replace("\\", "/")
-                if rest and rest not in captured:
-                    inside.append(rest)
-    return sorted(set(named)), sorted(set(inside))
+    captured = _captured(trailer)
+    inside = [path for path in _out_paths(trailer) if path not in captured]
+    return sorted(set(named)), inside
+
+
+def _replay_gaps(trailer: dict[str, Any], argv: list[str]) -> dict[str, Any]:
+    """What a replay of this recording would need that the engine's replay
+    lacks, measured on the recording (each list: its ``count`` and the
+    ``first`` :data:`_GAPS_LISTED` paths, relative to the output root).
+
+    ``argv``: how many arguments the script ran with (the replay passes
+    none). ``out_paths``: every output-root path the log's COM arguments name;
+    ``out_paths_unredirected``: those outside :data:`_REDIRECTED`, which
+    SolidWorks would write or read outside the replay's scratch root.
+    ``out_inputs``: named output-root files the log did not capture as
+    written (the models it opened, which a replay would have to stage at their
+    recorded bytes); ``out_inputs_unredirected`` likewise. ``python_out_reads``:
+    output-root files the script's own Python read inside the window that the
+    log did not capture (the replay neither stages nor pins them; an upper
+    bound, as files the build wrote itself count)."""
+    captured = _captured(trailer)
+    out_paths = _out_paths(trailer)
+    inputs = [path for path in out_paths if path not in captured]
+    reads = sorted(
+        {
+            str(entry[0])
+            for entry in trailer.get("reads") or []
+            if entry and str(entry[0]) not in captured
+        }
+    )
+
+    def unredirected(paths: list[str]) -> list[str]:
+        return [p for p in paths if p.split("/", 1)[0].lower() not in _REDIRECTED]
+
+    def listed(paths: list[str]) -> dict[str, Any]:
+        return {"count": len(paths), "first": paths[:_GAPS_LISTED]}
+
+    return {
+        "argv": len(argv),
+        "out_paths": listed(out_paths),
+        "out_paths_unredirected": listed(unredirected(out_paths)),
+        "out_inputs": listed(inputs),
+        "out_inputs_unredirected": listed(unredirected(inputs)),
+        "python_out_reads": listed(reads),
+    }
 
 
 def _title_echoes(log: Any) -> dict[str, Any]:
@@ -281,6 +361,7 @@ def _summary(
     timing: dict[str, Any] | None,
     faults: list[dict[str, str]],
     exit_code: int,
+    argv: list[str],
 ) -> dict[str, Any]:
     """What dodo publishes and measures about one recorded build."""
     timing = timing or {}
@@ -315,7 +396,40 @@ def _summary(
         "capture_files": trailer.get("capture_files"),
         "capture_bytes": trailer.get("capture_bytes"),
         "capture_stored_bytes": trailer.get("capture_stored_bytes"),
+        "argv": argv,
+        "replay_gaps": _replay_gaps(trailer, argv),
     }
+
+
+@contextlib.contextmanager
+def _keep_argv(conversation: Any, argv: list[str]) -> Iterator[None]:
+    """Run the build script with ``argv`` after its name, as ``python <script>
+    ARG...`` would: the engine's ``run_script`` sets ``sys.argv`` to the
+    script alone just before it runs the script, so the arguments are put
+    back at that moment, around the engine and without changing it."""
+    if not argv:
+        yield
+        return
+    import runpy
+
+    run_script, run_path = conversation.run_script, runpy.run_path
+
+    def run_with_argv(path: str, *args: Any, **kwargs: Any) -> Any:
+        sys.argv[1:] = argv
+        return run_path(path, *args, **kwargs)
+
+    def run_script_with_argv(script: Path) -> int:
+        runpy.run_path = run_with_argv
+        try:
+            return run_script(script)
+        finally:
+            runpy.run_path = run_path
+
+    conversation.run_script = run_script_with_argv
+    try:
+        yield
+    finally:
+        conversation.run_script = run_script
 
 
 def _record(args: argparse.Namespace, script: Path) -> int:
@@ -326,14 +440,15 @@ def _record(args: argparse.Namespace, script: Path) -> int:
     timing: dict[str, Any] | None = None
     propagated = False
     try:
-        timing = conversation.record_build(
-            script,
-            args.log.resolve(),
-            out_root=args.out_root.resolve() if args.out_root else None,
-            callers=conversation.CallerCapture(args.callers)
-            if args.callers
-            else conversation.DEFAULT_CALLERS,
-        )
+        with _keep_argv(conversation, args.argv):
+            timing = conversation.record_build(
+                script,
+                args.log.resolve(),
+                out_root=args.out_root.resolve() if args.out_root else None,
+                callers=conversation.CallerCapture(args.callers)
+                if args.callers
+                else conversation.DEFAULT_CALLERS,
+            )
     except conversation.RecordFault:
         propagated = True
     faults = conversation.record_faults()
@@ -364,10 +479,13 @@ def _record(args: argparse.Namespace, script: Path) -> int:
         )
     if args.summary is not None:
         try:
-            _write_json(args.summary, _summary(conversation, timing, faults, exit_code))
-        except OSError as exc:
+            _write_json(
+                args.summary,
+                _summary(conversation, timing, faults, exit_code, args.argv),
+            )
+        except Exception as exc:  # noqa: BLE001 - the recording's, never the build's
             # No summary means dodo publishes nothing; the build itself stands.
-            _telemetry.warn(f"[com-replay] summary not written: {exc}")
+            _telemetry.warn(f"[com-replay] summary not written: {exc!r}")
     if propagated:
         # The fault unwound run_build before its own flush.
         _telemetry.shutdown()
@@ -403,6 +521,9 @@ def main(argv: list[str] | None = None) -> int:
                 payload["request_divergence"],
                 conversation.capture_dir_of(args.base),
                 conversation.capture_dir_of(args.new),
+                kind=args.kind,
+                base_sidecars=args.base_sidecars,
+                new_sidecars=args.new_sidecars,
             )
         )
         if args.result is not None:

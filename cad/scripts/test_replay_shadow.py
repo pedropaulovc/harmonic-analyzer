@@ -37,7 +37,12 @@ import _com_outcome  # noqa: E402
 import _replay_shadow as shadow  # noqa: E402
 import _telemetry  # noqa: E402
 from test_artifact_cache import _BlockBlobService  # noqa: E402
-from test_com_conversation import _RECORD_DRIVER  # noqa: E402
+from test_com_conversation import (  # noqa: E402
+    _RECORD_DRIVER,
+    DEPENDENT_DRIVER,
+    DRAWING_SCRIPT,
+    drawing_outputs,
+)
 
 _STEM = "sh_widget"
 _ENGINE = "e" * 64
@@ -2961,3 +2966,713 @@ def test_an_audited_key_builds_on_the_seat(blob, tmp_path, monkeypatch, spans):
     assert order == ["seat", "sw.connect", "build", "store", "observe"]
     assert recording.reuse.value == "audited" and recording.reuse.replayed
     assert [task["cache"] for task in spans.named("task ")] == ["miss"]
+
+
+# --------------------------------------------------------------------------- #
+# Assemblies and drawings: recorded, judged against the nearest earlier
+# recording made on the same children, never reused
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, ("reuse", "shadow", "shadow")),
+        ("reuse", ("reuse", "shadow", "shadow")),
+        ("record", ("record", "record", "record")),
+        ("off", ("off", "off", "off")),
+        ("shadow,drawing=off", ("shadow", "shadow", "off")),
+        ("assembly=record", ("reuse", "record", "shadow")),
+        ("drawing=reuse", ("reuse", "shadow", "shadow")),
+        (" Drawing = Record , part=off ", ("off", "shadow", "record")),
+        ("off,assembly=shadow", ("off", "shadow", "off")),
+    ],
+)
+def test_each_kind_has_its_mode_and_dependents_never_reuse(
+    monkeypatch, logged, value, expected
+):
+    if value is None:
+        monkeypatch.delenv(shadow.MODE_ENV, raising=False)
+    else:
+        monkeypatch.setenv(shadow.MODE_ENV, value)
+    assert tuple(shadow.mode(kind).value for kind in shadow.BuildKind) == expected
+    assert logged["warn"] == []
+
+
+@pytest.mark.parametrize(
+    "value", ["drawing=on", "gear=shadow", "drawing=", "shadow,=off"]
+)
+def test_an_unknown_kind_or_mode_is_off_for_every_kind(monkeypatch, logged, value):
+    monkeypatch.setattr(shadow, "_UNKNOWN_MODES", set())
+    monkeypatch.setenv(shadow.MODE_ENV, value)
+    modes = {shadow.mode(kind) for kind in shadow.BuildKind for _ in range(2)}
+    assert modes == {shadow.ReplayMode.OFF}
+    assert len(logged["warn"]) == 1 and repr(value) in logged["warn"][0]
+
+
+_CHILD = "cad/out/sldprt/.sh-widget.execution"
+
+
+def _drawing(script: Path, token: str = "a" * 64) -> shadow.Dependent:
+    return shadow.Dependent(
+        shadow.BuildKind.DRAWING, _STEM, script, (_STEM,), {_CHILD: token}
+    )
+
+
+def _planned(dependent: shadow.Dependent, key: str) -> shadow.Recording | None:
+    return shadow.plan_dependent(dependent.kind, lambda: dependent, key)
+
+
+def test_a_drawing_recording_keeps_its_argument_and_a_name_of_its_own(
+    blob, tmp_path, monkeypatch, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    script = tmp_path / f"draw_{_STEM}.py"
+    recording = _planned(_drawing(script), "k" * 64)
+    assert recording is not None and recording.mode is shadow.ReplayMode.SHADOW
+    assert (recording.label, recording.name) == (f"drawing:{_STEM}", f"drawing-{_STEM}")
+    assert recording.directory == shadow.RECORDINGS / f"drawing-{_STEM}"
+    assert recording.command[:4] == [
+        sys.executable,
+        str(shadow.DRIVER),
+        "record",
+        str(script),
+    ]
+    assert recording.command[-2:] == ["--", _STEM]
+    assert recording.unrecorded == [sys.executable, str(script), _STEM]
+    # The part of the same stem keeps its recordings, locally and published.
+    part = shadow.plan(_STEM, tmp_path / f"build_{_STEM}.py", "k" * 64)
+    assert part.directory == shadow.RECORDINGS / _STEM and "--" not in part.command
+    assert shadow.blob_prefix(_ENGINE, recording.name) != shadow.blob_prefix(
+        _ENGINE, part.name
+    )
+
+    # Off for its kind, or a cache that cannot publish: run as ever, without
+    # describing the build.
+    def undescribable() -> shadow.Dependent:
+        raise AssertionError("described")
+
+    monkeypatch.setenv(shadow.MODE_ENV, "drawing=off")
+    assert shadow.plan_dependent(shadow.BuildKind.DRAWING, undescribable, "k") is None
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
+    assert shadow.plan_dependent(shadow.BuildKind.DRAWING, undescribable, "k") is None
+    assert logged["warn"] == []
+    # A build its recording cannot describe builds unrecorded.
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    assert shadow.plan_dependent(shadow.BuildKind.DRAWING, undescribable, "k") is None
+    assert len(logged["warn"]) == 1 and "building unrecorded" in logged["warn"][0]
+
+
+def test_a_drawing_rerun_after_a_recorder_fault_keeps_its_argument(
+    blob, tmp_path, monkeypatch, logged
+):
+    dodo = _load_dodo()
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    script = tmp_path / f"draw_{_STEM}.py"
+    recording = _planned(_drawing(script), "k" * 64)
+    commands: list[list[str]] = []
+
+    def run_subprocess(cmd, label, log_stem=None, *, task=None, env_pins=None):
+        commands.append(cmd)
+        if len(commands) > 1:
+            return 0
+        fault = {"where": "Recorder.call", "recovery": "rerun", "type": "OSError"}
+        recording.summary_path.write_text(
+            json.dumps(_summary(exit_code=92, complete=False, faults=[fault])), "utf-8"
+        )
+        return shadow.EXIT_RECORD_FAULT
+
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_run_subprocess", run_subprocess)
+    dodo._exec_com(
+        recording.command, f"drawing:{_STEM}", f"drawing-{_STEM}", recording=recording
+    )
+    assert commands == [recording.command, [sys.executable, str(script), _STEM]]
+    assert recording.recovery is shadow.Recovery.RERUN
+
+
+def test_sidecars_are_kept_as_the_build_wrote_them(blob, tmp_path, monkeypatch):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    proof = tmp_path / "out" / "sldasm" / ".sh-widget.massprops.sha"
+    proof.parent.mkdir(parents=True)
+    proof.write_text("built\n", encoding="utf-8")
+    dof = proof.with_name(".sh-widget.dof.json")  # this assembly frees no DOF
+    dependent = shadow.Dependent(
+        shadow.BuildKind.ASSEMBLY,
+        _STEM,
+        tmp_path / f"build_{_STEM}_assembly.py",
+        (),
+        {_CHILD: "a" * 64},
+        (proof, dof),
+    )
+    recording = _planned(dependent, "k" * 64)
+    recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    assert not recording.exited(1)  # the build failed: nothing kept
+    assert not recording.sidecar_copies.exists()
+    assert not recording.exited(0)
+    proof.write_text("adopted from the store's winner\n", encoding="utf-8")
+    copies = {p.name: p.read_text("utf-8") for p in recording.sidecar_copies.iterdir()}
+    assert copies == {proof.name: "built\n"}
+
+
+def test_children_are_every_model_opened_transitively_by_token(monkeypatch, tmp_path):
+    dodo = _load_dodo()
+    graph = {"top": ["sub", "p1"], "sub": ["p1", "p2", "p3", "p4"]}
+    monkeypatch.setattr(dodo, "ASSEMBLY_ORDER", ["sub", "top"])
+    monkeypatch.setattr(dodo, "references_of", lambda stem: graph[stem])
+    monkeypatch.setattr(
+        dodo, "_part_execution_token", lambda s: str(tmp_path / f".{s}.part")
+    )
+    monkeypatch.setattr(
+        dodo, "_assembly_execution_token", lambda s: str(tmp_path / f".{s}.asm")
+    )
+    (tmp_path / ".sub.asm").write_text("a" * 64 + "\n", encoding="utf-8")
+    (tmp_path / ".p1.part").write_text("b" * 64 + "\n", encoding="utf-8")
+    (tmp_path / ".p2.part").write_text("not a digest\n", encoding="utf-8")
+    (tmp_path / ".p4.part").mkdir()  # a token that cannot be read
+    found = dodo._child_identities(graph["top"])
+    assert found.pop(".p4.part").startswith("unreadable: ")
+    assert found == {
+        ".sub.asm": "a" * 64,
+        ".p1.part": "b" * 64,
+        ".p2.part": "malformed: 'not a digest'",
+        ".p3.part": "missing",  # no token at all
+    }
+
+
+def test_a_drawing_dependent_names_its_script_argument_and_model(monkeypatch, tmp_path):
+    dodo = _load_dodo()
+    monkeypatch.setattr(
+        dodo, "_part_execution_token", lambda s: str(tmp_path / f".{s}.part")
+    )
+    monkeypatch.setattr(
+        dodo, "_assembly_execution_token", lambda s: str(tmp_path / f".{s}.asm")
+    )
+    specs = {
+        spec.source_kind: (name, spec) for name, spec in dodo.DRAWINGS_BY_NAME.items()
+    }
+    for kind in ("part", "assembly"):
+        name, spec = specs[kind]
+        dependent = dodo._drawing_dependent(name)
+        assert (dependent.kind, dependent.stem, dependent.script, dependent.argv) == (
+            shadow.BuildKind.DRAWING,
+            name,
+            spec.script.resolve(),
+            (spec.artifact_stem,),
+        )
+        if kind == "part":
+            assert dependent.children == {f".{spec.part}.part": "missing"}
+        else:
+            assert dependent.children == dodo._child_identities([spec.part])
+            assert f".{spec.part}.asm" in dependent.children
+            assert len(dependent.children) > 1
+
+
+def _com_action_runs(dodo: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """``_cached_com_action`` on a miss for a drawing: seat and build faked."""
+    script = tmp_path / f"draw_{_STEM}.py"
+    deps = [str(script)]
+    order: list[str] = []
+    runs: list[tuple[list[str], Any]] = []
+    observed: list[tuple[Any, list[str]]] = []
+    outcomes = iter((False, False))  # probe MISS, re-probe under the seat MISS
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
+    monkeypatch.setattr(
+        dodo._cache, "store", lambda *_a: (order.append("store"), "stored")[1]
+    )
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+
+    @contextlib.contextmanager
+    def seat(_label: str):
+        order.append("seat")
+        yield 0.0
+        order.append("seat released")
+
+    def exec_com(cmd, label, log_stem=None, **options):
+        order.append("build")
+        runs.append((cmd, options.get("recording")))
+
+    def after_build(recording, file_deps, digest):
+        order.append("observe")
+        observed.append((recording, file_deps))
+
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(dodo._replay_shadow, "after_build", after_build)
+    dodo._cached_com_action(
+        f"drawing:{_STEM}",
+        [sys.executable, str(script), _STEM],
+        deps,
+        [tmp_path / f"{_STEM}.SLDDRW"],
+        log_stem=f"drawing-{_STEM}",
+        recorded=lambda key: _planned(_drawing(script), key),
+    )
+    return script, deps, order, runs, observed
+
+
+@pytest.mark.parametrize("value", ["shadow", "drawing=off"])
+def test_a_drawing_builds_under_the_driver_and_is_observed_off_the_seat(
+    blob, tmp_path, monkeypatch, value
+):
+    dodo = _load_dodo()
+    monkeypatch.setenv(shadow.MODE_ENV, value)
+    script, deps, order, runs, observed = _com_action_runs(dodo, monkeypatch, tmp_path)
+    assert order == ["seat", "build", "seat released", "store", "observe"]
+    [(command, recording)] = runs
+    assert observed == [(recording, deps)]
+    if value == "drawing=off":
+        assert (command, recording) == ([sys.executable, str(script), _STEM], None)
+        return
+    assert recording.kind is shadow.BuildKind.DRAWING and recording.key == "k" * 64
+    assert command == recording.command and command[-2:] == ["--", _STEM]
+
+
+@pytest.mark.parametrize("tier", ["full", "refresh"])
+def test_only_a_full_assembly_build_is_recorded(blob, tmp_path, monkeypatch, tier):
+    dodo = _load_dodo()
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    stem = "ms_measuring_stick"
+    target = tmp_path / f"{stem}.SLDASM"
+    ledger = tmp_path / f".{stem}.inputs.json"
+    proof = tmp_path / f".{stem}.massprops.sha"
+    # The recipe's content is no concern here: its script alone, so the test
+    # never walks the helper closure.
+    deps = [str(dodo.SCRIPTS_DIR / f"build_{stem}_assembly.py")]
+    if tier == "refresh":
+        # Built from exactly the current recipe: only a reference could differ.
+        target.write_bytes(b"asm")
+        dodo._write_input_ledger(ledger, dodo._ledger_inputs(deps))
+    order: list[str] = []
+    runs: list[tuple[list[str], Any]] = []
+    observed: list[tuple[Any, list[str]]] = []
+
+    @contextlib.contextmanager
+    def seat(_label: str):
+        order.append("seat")
+        yield 0.0
+        order.append("seat released")
+
+    def exec_com(cmd, label, log_stem=None, **options):
+        order.append("build")
+        runs.append((cmd, options.get("recording")))
+
+    def after_build(recording, file_deps, digest):
+        order.append("observe")
+        observed.append((recording, file_deps))
+
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: deps)
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: deps)
+    monkeypatch.setattr(dodo, "POST_ASSEMBLY", {})
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
+    monkeypatch.setattr(
+        dodo._cache, "store", lambda *_a, **_kw: (order.append("store"), "stored")[1]
+    )
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_input_ledger", lambda _stem: ledger)
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [target, proof])
+    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(dodo._replay_shadow, "after_build", after_build)
+    dodo.build_or_refresh(stem, [], [], [str(target)])
+    assert order == ["seat", "build", "seat released", "store", "observe"]
+    [(command, recording)] = runs
+    assert observed == [(recording, deps)]
+    if tier == "refresh":
+        assert recording is None and Path(command[1]).name == "refresh_assembly.py"
+        return
+    assert command == recording.command
+    assert (recording.kind, recording.stem, recording.argv) == (
+        shadow.BuildKind.ASSEMBLY,
+        stem,
+        (),
+    )
+    assert recording.unrecorded == [
+        sys.executable,
+        str(dodo.SCRIPTS_DIR / f"build_{stem}_assembly.py"),
+    ]
+    assert recording.sidecars == (proof,)
+    assert recording.children == dodo._child_identities(dodo.references_of(stem))
+    assert recording.children
+
+
+def test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit(
+    monkeypatch,
+):
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    dodo = _load_dodo()
+    parts = [s.stem.removeprefix("build_") for s in _buildgraph.part_scripts()]
+    dependents = [
+        *(
+            (shadow.BuildKind.ASSEMBLY, stem, dodo._assembly_judged_sidecars(stem))
+            for stem in _buildgraph.ASSEMBLY_ORDER
+        ),
+        *((shadow.BuildKind.DRAWING, stem, ()) for stem in dodo.DRAWINGS_BY_NAME),
+    ]
+    assert len(dependents) > 100
+    # Stems hold no "-", so no recording name is another's.
+    stems = [*parts, *(stem for _kind, stem, _sidecars in dependents)]
+    assert not [stem for stem in stems if "-" in stem]
+    names = [
+        *parts,
+        *(shadow.recording_name(kind, stem) for kind, stem, _ in dependents),
+    ]
+    assert len(names) == len(set(names))
+    checkout = PureWindowsPath(shadow.REPO_ROOT)
+    repo = max(_FARM_REPO, checkout, key=lambda root: len(str(root)))
+
+    def under(path: Path) -> PureWindowsPath:
+        return repo / PureWindowsPath(path.relative_to(shadow.REPO_ROOT))
+
+    tightest: list[tuple[int, str, str]] = []
+    for kind, stem, sidecars in dependents:
+        files = [path.name for path in sidecars]
+        needs = shadow.path_needs(
+            shadow.recording_name(kind, stem),
+            under(shadow.RECORDINGS),
+            under(shadow.SCRATCH),
+            sidecars=files,
+        )
+        assert {f"sidecar {file}" for file in files} <= {n.purpose for n in needs}
+        need = min(needs, key=lambda n: n.headroom)
+        tightest.append((need.headroom, stem, need.path))
+    assert any(
+        sidecars for kind, _stem, sidecars in dependents if kind.value == "assembly"
+    )
+    headroom, stem, path = min(tightest)
+    assert headroom >= _FARM_HEADROOM, (stem, len(path), path)
+
+
+def test_an_oversize_dependent_bundle_is_not_published(blob, tmp_path, monkeypatch):
+    monkeypatch.setenv(shadow.MODE_ENV, "record")
+    monkeypatch.setattr(shadow, "BUNDLE_LIMIT", 16)
+    script = tmp_path / f"draw_{_STEM}.py"
+    script.write_text("# the drawing\n", encoding="utf-8")
+    deps = [str(script)]
+    key, _ = cache.key_inputs(deps, _digest)
+    recording = _planned(_drawing(script), key)
+    recording.log.write_bytes(b"log of " + key.encode())
+    recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    _stored(key)
+    shadow.after_build(recording, deps, _digest)
+    [record] = _events(tmp_path, "replay_shadow")
+    assert (record["outcome"], record["publish"]) == ("recorded", "oversize")
+    assert blob.committed == {}
+
+
+def test_a_dependent_comparison_past_a_bound_is_no_judgement(
+    blob, tmp_path, monkeypatch
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    recording = _planned(_drawing(tmp_path / "draw.py"), "k" * 64)
+    big = shadow.Base({"calls": shadow.DIFF_CALLS_LIMIT + 1}, (), 0.0)
+    found = shadow._compare_dependent(recording, big, {"calls": 10})
+    assert (found.verdict, found.verdict_class) == (
+        "oversize",
+        shadow.VerdictClass.INFRASTRUCTURE,
+    )
+    base = shadow.Base({"calls": 10}, (), 0.0)
+    monkeypatch.setattr(shadow, "_bundle_of", lambda *_a: (None, "timeout"))
+    assert (
+        shadow._compare_dependent(recording, base, {"calls": 10}).verdict == "timeout"
+    )
+    monkeypatch.setattr(
+        shadow, "_bundle_of", lambda *_a: (shadow.bundle(recording), None)
+    )
+    recording.log.write_bytes(b"log")
+    monkeypatch.setattr(shadow, "_diff", lambda *_a: (None, None))
+    found = shadow._compare_dependent(recording, base, {"calls": 10})
+    assert (found.verdict, found.reason) == ("timeout", "diff exceeded the budget")
+    assert list(shadow.SCRATCH.iterdir()) == []
+
+
+_SELECTED = "response:IModelDocExtension.SelectByID2"
+
+
+def test_a_dependent_detour_the_seat_steered_keeps_its_own_geometry(
+    blob, tmp_path, monkeypatch
+):
+    assert {
+        kind.value: names for kind, names in shadow.GEOMETRY_SIGNALS.items()
+    } == _com_outcome.GEOMETRY
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    recording = _planned(_drawing(tmp_path / "draw.py"), "k" * 64)
+    recording.log.write_bytes(b"log")
+    base = shadow.Base({"calls": 10}, (), 0.0)
+    monkeypatch.setattr(
+        shadow, "_bundle_of", lambda *_a: (shadow.bundle(recording), None)
+    )
+    budgets: list[float] = []
+
+    def diff(pdf: str):
+        def run(_work, _recording, _env, deadline):
+            budgets.append(deadline - time.monotonic())
+            return 0, {
+                "request_divergence": {"index": 4},
+                "truth_cause": _SELECTED,
+                "outcome": "different",
+                "outcome_signals": {
+                    "requests": "different",
+                    "answers": "different",
+                    "pdf": pdf,
+                },
+                "seat_path": {"path": shadow.SEAT_PATH_DETOUR},
+                "judge_faults": [],
+            }
+
+        return run
+
+    monkeypatch.setattr(shadow, "_diff", diff("same"))
+    found = shadow._compare_dependent(recording, base, {"calls": 10})
+    assert (found.verdict, found.kind) == ("diverged", shadow.BuildKind.DRAWING)
+    assert found.seat_path_detour and found.noop_judgement is None
+    monkeypatch.setattr(shadow, "_diff", diff("different"))
+    assert not shadow._compare_dependent(
+        recording, base, {"calls": 10}
+    ).seat_path_detour
+    # The comparison holds a farm leaf's slot with the seat idle: a minute.
+    assert all(0 < budget <= 60.0 for budget in budgets)
+    # An assembly's geometry is its mass and sidecars, never a part's STL.
+    assembly = shadow.Shadow(
+        "diverged",
+        ground_truth="diverged",
+        truth_cause=_SELECTED,
+        outcome="different",
+        outcome_signals={"mass": "same", "stl": "same", "sidecars": "different"},
+        seat_path={"path": shadow.SEAT_PATH_DETOUR},
+        kind=shadow.BuildKind.ASSEMBLY,
+    )
+    assert not assembly.seat_path_detour
+
+
+def test_a_dependent_record_names_its_seat_path_and_unreadable_children(
+    blob, tmp_path, monkeypatch, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    published = {"salt": "s", "recording_id": "fresh"}
+    other = {"schema": shadow.MANIFEST_SCHEMA, "salt": "s", "kind": "drawing"}
+    base = shadow.Base(
+        {**other, "key": "b" * 64, "children": {_CHILD: "a" * 64}}, (), 0
+    )
+
+    def lookup(*_args: Any, usable: Any, **_kwargs: Any) -> shadow.LookupResult:
+        found = base if usable({**base.manifest, "recording_id": "old"}) else None
+        return shadow.LookupResult(shadow.Lookup.FOUND, found, 1, 1)
+
+    detour = shadow.Shadow(
+        "diverged",
+        ground_truth="diverged",
+        truth_cause=_SELECTED,
+        outcome="different",
+        outcome_signals={
+            "requests": "different",
+            "answers": "different",
+            "pdf": "same",
+        },
+        seat_path={"path": shadow.SEAT_PATH_DETOUR},
+        kind=shadow.BuildKind.DRAWING,
+    )
+    monkeypatch.setattr(shadow, "find_base", lookup)
+    monkeypatch.setattr(shadow, "_compare_dependent", lambda *_a: detour)
+
+    def judged(token: str) -> dict[str, Any]:
+        recording = _planned(_drawing(tmp_path / "draw.py", token), "k" * 64)
+        record: dict[str, Any] = {}
+        shadow._judge_dependent(recording, {"engine": _ENGINE}, {}, published, record)
+        return record
+
+    record = judged("a" * 64)
+    assert (record["split"], record["seat_path"]) == ("diverged", "detour")
+    assert record["seat_path_divergence"] and not record["seat_nondeterminism"]
+    assert record["children_unreadable"] is None and logged["warn"] == []
+    assert shadow.report_line(f"drawing:{_STEM}", record).endswith(
+        "| seat_path_divergence"
+    )
+    # A token the worker lacks: which child, and why, before anything else.
+    record = judged("missing")
+    assert (record["split"], record["same_children"]) == ("children_unknown", 0)
+    assert record["children_unreadable"] == f"{_CHILD}: missing"
+    assert len(logged["warn"]) == 1 and f"{_CHILD}: missing" in logged["warn"][0]
+    assert shadow.report_line(f"drawing:{_STEM}", record).endswith(
+        "| children_unreadable"
+    )
+
+
+def _run_dependent(recording: shadow.Recording, deps: list[str]) -> None:
+    """The driver on the fake seat for this assembly or drawing recording (its
+    outputs under the output root), then dodo's side: the exit, the store,
+    the observation, which never writes an output."""
+    command = recording.command[2:]
+    at = command.index("--") if "--" in command else len(command)
+    command[at:at] = ["--out-root", str(shadow.OUT_ROOT)]
+    proc = subprocess.run(
+        [sys.executable, "-c", DEPENDENT_DRIVER, *command],
+        cwd=SCRIPTS,
+        env=dict(os.environ, OTEL_EXPORTER_OTLP_ENDPOINT=""),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert not recording.exited(proc.returncode)
+    built = _outputs(shadow.OUT_ROOT)
+    _stored(recording.key)
+    shadow.after_build(recording, deps, _digest)
+    assert _outputs(shadow.OUT_ROOT) == built
+
+
+def test_a_drawing_is_judged_against_the_nearest_base_on_its_children(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    source = tmp_path / "src"
+    source.mkdir()
+    script = source / f"draw_{_STEM}.py"
+    script.write_text(DRAWING_SCRIPT, encoding="utf-8")
+    settings = source / "drawing.json"
+    token = source / ".sh-widget.execution"  # the drawn model's identity
+    deps = [str(script), str(settings), str(token)]
+    drawing_outputs(shadow.OUT_ROOT)
+
+    def build(line: int, note: str, identity: str) -> tuple[Any, dict[str, Any]]:
+        settings.write_text(json.dumps({"line": line, "note": note}), "utf-8")
+        token.write_text(identity + "\n", encoding="utf-8")
+        dependent = shadow.Dependent(
+            shadow.BuildKind.DRAWING,
+            _STEM,
+            script,
+            (_STEM,),
+            {cache._rel(token): identity},
+        )
+        recording = _planned(dependent, cache.key_inputs(deps, _digest)[0])
+        _run_dependent(recording, deps)
+        return recording, _events(tmp_path, "replay_shadow")[-1]
+
+    first, record = build(100, "a", "a" * 64)
+    assert (record["outcome"], record["lookup"], record["candidates"]) == (
+        "no_base",
+        "none",
+        0,
+    )
+    # An own-source change SolidWorks never sees: a no-op on the same model,
+    # the same sheet although the PDF's bytes differ.
+    second, record = build(100, "b", "a" * 64)
+    assert record["outcome"] == "evaluated", record
+    assert (record["split"], record["ground_truth"], record["artefact_outcome"]) == (
+        "noop",
+        "same",
+        "same",
+    ), record
+    assert record["outcome_signals"] == "answers:same,pdf:same,requests:same"
+    assert (record["candidates"], record["same_children"]) == (1, 1)
+    assert record["base_key"] == first.key
+    assert (
+        record["differing"] == [cache._rel(settings)] and record["own_differing"] == 1
+    )
+    assert record["noop_judgement"] == "confirmed" and not record["soundness_alarm"]
+    line = [m for m in logged["info"] if m.startswith(f"[com-replay] {second.label}")][
+        -1
+    ]
+    assert " | split=noop same_children=1/1 " in line and " | record=+" in line
+    assert " | truth=same | outcome=same cause=- | " in line and "\n" not in line
+    engine = json.loads(second.summary_path.read_text("utf-8"))["engine"]
+    _, manifest_name = shadow.blob_names(engine, second.name, second.key)
+    published = json.loads(cache.fetch_sidecar(manifest_name))
+    assert (published["kind"], published["argv"]) == ("drawing", [_STEM])
+    assert published["children"] == {cache._rel(token): "a" * 64}
+    assert published["replay_gaps"]["out_inputs"]["first"] == [
+        "sldprt/sh-widget.SLDPRT"
+    ]
+    # A change SolidWorks sees: the source asked something else, another sheet.
+    third, record = build(120, "b", "a" * 64)
+    assert (record["split"], record["truth_cause"], record["artefact_outcome"]) == (
+        "diverged",
+        "request",
+        "different",
+    ), record
+    assert "pdf:different" in record["outcome_signals"]
+    assert (record["candidates"], record["same_children"]) == (2, 2)
+    assert record["base_key"] == second.key and not record["seat_nondeterminism"]
+    # Another model: no earlier recording was made on it.
+    _, record = build(120, "b", "c" * 64)
+    assert (record["split"], record["candidates"], record["same_children"]) == (
+        "children_changed",
+        3,
+        0,
+    )
+    assert "base_key" not in record and record["outcome"] == "evaluated"
+    assert [s["replay.split"] for s in spans.named("replay.split ")] == [
+        "noop",
+        "diverged",
+        "children_changed",
+    ]
+    assert list(shadow.SCRATCH.iterdir()) == []
+    assert logged["error"] == []
+
+
+_ASSEMBLY_SCRIPT = (
+    "import json, sys\n"
+    "from pathlib import Path\n"
+    "import _paths\n"
+    "from _session import run_build\n"
+    "import test_com_conversation  # noqa: F401 -- the fake seat's interfaces\n"
+    "async def build(adapter):\n"
+    "    out = _paths.OUT_SLDPRT.parent\n"
+    "    settings = json.loads((Path(__file__).parent / 'assembly.json').read_text())\n"
+    "    app = adapter.swApp\n"
+    "    if not app.Open(str(out / 'sldprt' / 'sh-widget.SLDPRT')):\n"
+    "        raise RuntimeError('the part is missing')\n"
+    "    total = app.Add(1.5, 2.25)\n"
+    "    app.SaveTo(str(out / 'sldasm' / 'sh-widget.SLDASM'))\n"
+    "    proof = out / 'sldasm' / '.sh-widget.massprops.sha'\n"
+    "    proof.write_text(f\"{total.hex()} {settings['proof']}\\n\", encoding='utf-8')\n"
+    "    return {}\n"
+    "if __name__ == '__main__':\n"
+    "    sys.exit(run_build(build))\n"
+)
+
+
+def test_an_assembly_noop_whose_sidecar_differs_is_a_soundness_alarm(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    source = tmp_path / "src"
+    source.mkdir()
+    script = source / f"build_{_STEM}_assembly.py"
+    script.write_text(_ASSEMBLY_SCRIPT, encoding="utf-8")
+    settings = source / "assembly.json"
+    deps = [str(script), str(settings)]
+    drawing_outputs(shadow.OUT_ROOT)
+    proof = shadow.OUT_ROOT / "sldasm" / ".sh-widget.massprops.sha"
+
+    def build(written: str, note: str) -> dict[str, Any]:
+        settings.write_text(json.dumps({"proof": written, "note": note}), "utf-8")
+        dependent = shadow.Dependent(
+            shadow.BuildKind.ASSEMBLY, _STEM, script, (), {_CHILD: "a" * 64}, (proof,)
+        )
+        recording = _planned(dependent, cache.key_inputs(deps, _digest)[0])
+        _run_dependent(recording, deps)
+        return _events(tmp_path, "replay_shadow")[-1]
+
+    assert build("x", "a")["outcome"] == "no_base"
+    record = build("x", "b")
+    # The fake measures no mass property: a no-op it can neither confirm nor
+    # contradict, its proof the same.
+    assert (record["split"], record["artefact_outcome"]) == ("noop", "unknown"), record
+    assert record["outcome_signals"] == (
+        "answers:same,mass:absent,requests:same,sidecars:same"
+    )
+    assert record["noop_outcome_unknown"] and logged["error"] == []
+    # The same requests, a proof Python wrote differently: another assembly.
+    record = build("y", "b")
+    assert (record["split"], record["artefact_outcome"]) == ("noop", "different")
+    assert "sidecars:different" in record["outcome_signals"]
+    assert record["soundness_alarm"] and record["outcome"] == "evaluated"
+    [alarm] = logged["error"]
+    assert alarm.startswith(f"[com-replay] SOUNDNESS ALARM assembly:{_STEM}: ")
+    # Nothing of it is ever reused, so nothing is revoked.
+    assert not [name for name in blob.committed if "/revoked/" in name]

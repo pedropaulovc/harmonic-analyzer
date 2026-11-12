@@ -350,11 +350,13 @@ def _cache_refresh_isolated(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _com_replay_off(monkeypatch):
-    """Part builds under test run unrecorded unless a test opts in.
+    """Part, assembly and drawing builds under test run unrecorded unless a test
+    opts in.
 
-    ``HARMONIC_COM_REPLAY`` defaults to ``shadow``, which would swap the build
-    command a test asserts for the recording driver's and record under the
-    real ``cad/out/replay``. Tests of the recording set the mode themselves.
+    ``HARMONIC_COM_REPLAY`` unset records every kind (parts ``reuse``, assemblies
+    and drawings ``shadow``), which would swap the build command a test asserts for
+    the recording driver's and record under the real ``cad/out/replay``. Tests of
+    the recording set the mode themselves.
     """
     monkeypatch.setenv("HARMONIC_COM_REPLAY", "off")
 

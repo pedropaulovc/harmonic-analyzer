@@ -1,4 +1,5 @@
-"""Judge two live recordings of one part build beyond request order.
+"""Judge two live recordings of one part, assembly or drawing build beyond
+request order.
 
 The engine's ``compare_conversations`` aligns two recordings by position and
 reports the first request that differs. The shadow's ``ground_truth`` is the
@@ -15,11 +16,13 @@ diff``:
   differently first), a title counter the script echoed into the request
   (:data:`TITLE_COUNTER_CAUSE`), or none (``request``: the script asked
   something else of the same answers).
-* :func:`outcome`: whether the two builds made the same part, on signals that
-  do not depend on call order (:class:`Outcome`).
+* :func:`outcome`: whether the two builds made the same part (assembly,
+  drawing), on signals that do not depend on call order (:class:`Outcome`;
+  each kind's in :data:`SIGNALS`).
 * :func:`seat_path`: for two builds SolidWorks steered apart (a response
-  cause) that made the same geometry but not the same requests, whether the
-  requests differ only by detours of reads and selections (:class:`SeatPath`).
+  cause) that made the same geometry (:data:`GEOMETRY`) but not the same
+  requests, whether the requests differ only by detours of reads and
+  selections (:class:`SeatPath`).
 
 Noise, everywhere here: SolidWorks' new-document title counters (``Part11``
 against ``Part12``), the masked provenance value
@@ -118,7 +121,27 @@ _NEIGHBOURS = tuple(itertools.product((-1, 0, 1), repeat=3))
 _LISTED = 10
 # Bound on a judge fault's message recorded in the result.
 _ERROR_CHARS = 300
-_SIGNALS = ("mass", "requests", "answers", "stl")
+_PDF_SUFFIX = ".pdf"
+# Sheet coordinates of a drawing PDF's ink are compared rounded to this many
+# decimals of a metre (1 um: a PDF point is 353 um, written to a few decimals).
+_PDF_ROUND = 6
+# The signals of :func:`outcome` per kind of build: a drawing holds no mass
+# property and writes no STL; an assembly writes no STL, and the outputs Python
+# writes beside it (its geometry proof, DOF manifest, BOM) are compared as
+# ``sidecars``.
+SIGNALS: dict[str, tuple[str, ...]] = {
+    "part": ("mass", "requests", "answers", "stl"),
+    "assembly": ("mass", "requests", "answers", "sidecars"),
+    "drawing": ("requests", "answers", "pdf"),
+}
+# The signals of a kind that say its geometry is the base's: the precondition
+# of :func:`seat_path`, under which an outcome ``different`` can only come from
+# the requests and answers. A drawing's is its sheets' ink.
+GEOMETRY: dict[str, tuple[str, ...]] = {
+    "part": ("mass", "stl"),
+    "assembly": ("mass", "sidecars"),
+    "drawing": ("pdf",),
+}
 
 
 class Outcome(StrEnum):
@@ -197,13 +220,19 @@ def judge(
     divergence: dict[str, Any] | None,
     base_captures: Path,
     new_captures: Path,
+    *,
+    kind: str = "part",
+    base_sidecars: Path | None = None,
+    new_sidecars: Path | None = None,
 ) -> dict[str, Any]:
     """``truth_cause``, the :func:`outcome` fields and ``seat_path`` of two
     recordings whose request divergence (``compare_conversations``) is
     ``divergence``; ``*_captures`` hold the files each build had SolidWorks
-    write. ``seat_path`` (:func:`seat_path`, ``None`` when not judged) is
-    judged only for a divergence with a ``response:`` cause, a ``different``
-    outcome, and the same mass properties and STL geometry.
+    write, ``kind`` names the outcome's signals (:data:`SIGNALS`),
+    ``*_sidecars`` an assembly's sidecar files. ``seat_path``
+    (:func:`seat_path`, ``None`` when not judged) is judged only for a
+    divergence with a ``response:`` cause, a ``different`` outcome, and the
+    same geometry signals of ``kind`` (:data:`GEOMETRY`).
 
     Never raises. A fault of this judgement costs only what it judges: the
     cause reads ``error:<type>``, a signal ``absent`` (so the outcome is at
@@ -222,13 +251,22 @@ def judge(
             lambda: truth_cause(streams.a, streams.b, divergence)
         )
         found, error = _attempt(
-            lambda: outcome(base, new, base_captures, new_captures, streams)
+            lambda: outcome(
+                base,
+                new,
+                base_captures,
+                new_captures,
+                streams,
+                kind,
+                base_sidecars,
+                new_sidecars,
+            )
         )
     if error is not None:
         found = {
             "outcome": Outcome.UNKNOWN.value,
-            "outcome_signals": {name: Signal.ABSENT.value for name in _SIGNALS},
-            "outcome_details": {name: {"error": error} for name in _SIGNALS},
+            "outcome_signals": {name: Signal.ABSENT.value for name in SIGNALS[kind]},
+            "outcome_details": {name: {"error": error} for name in SIGNALS[kind]},
             "judge_faults": [{"step": "outcome", "error": error}],
         }
     if cause_error is not None:
@@ -240,7 +278,7 @@ def judge(
     if (
         str(cause).startswith("response:")
         and found["outcome"] == Outcome.DIFFERENT.value
-        and signals.get("mass") == signals.get("stl") == Signal.SAME.value
+        and all(signals.get(name) == Signal.SAME.value for name in GEOMETRY[kind])
     ):
         path, path_error = _attempt(
             lambda: seat_path(streams.a, streams.b, streams.keyed)
@@ -338,11 +376,15 @@ def outcome(
     base_captures: Path,
     new_captures: Path,
     streams: _Streams,
+    kind: str = "part",
+    base_sidecars: Path | None = None,
+    new_sidecars: Path | None = None,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
     :class:`Signal` (``outcome_signals``), what differed
     (``outcome_details``) and the signals whose judgement raised
-    (``judge_faults``). Signals, all order-independent:
+    (``judge_faults``). The signals of ``kind`` (:data:`SIGNALS`), all
+    order-independent:
 
     * ``mass``: every mass-property measurement, matched as a multiset
       within :data:`REL_TOL` (:func:`_mass_signal`);
@@ -352,17 +394,21 @@ def outcome(
       to one request within float noise are one (:func:`_answers_signal`);
     * ``stl``: the geometry of every STL file SolidWorks wrote, vertices
       within float32 noise as one (:func:`_stl_comparison`; last write per
-      path).
+      path);
+    * ``pdf``: the ink of every PDF SolidWorks wrote, page by page
+      (:func:`_pdf_signal`; last write per path);
+    * ``sidecars``: the files in ``base_sidecars`` and ``new_sidecars``, byte
+      for byte (:func:`_sidecar_signal`).
 
     Handles are erased (an object's identity number depends on call order),
-    strings and floats are normalised as for noise. SLDPRT and BMP captures
-    are no signal: a part file's bytes differ on every save, a screenshot's
-    with the seat's window. A signal whose judgement raises is ``absent``,
-    its message its detail. ``streams``: both builds' recipe calls and keys,
-    which :func:`judge` made once for every judgement of the pair."""
+    strings and floats are normalised as for noise. SLDPRT, SLDASM, SLDDRW and
+    BMP captures are no signal: a model file's bytes differ on every save, a
+    screenshot's with the seat's window. A signal whose judgement raises is
+    ``absent``, its message its detail. ``streams``: both builds' recipe calls
+    and keys, which :func:`judge` made once for every judgement of the pair."""
     a, b = streams.a, streams.b
     keyed, keyed_error = streams.keyed, streams.keyed_error
-    attempts: dict[str, Callable[[], tuple[Signal, Any]]] = {
+    computed: dict[str, Callable[[], tuple[Signal, Any]]] = {
         "mass": lambda: _mass_signal(a, b),
         "requests": lambda: _multiset_signal(
             [(site, request) for site, request, _ in keyed[0]],
@@ -370,7 +416,10 @@ def outcome(
         ),
         "answers": lambda: _answers_signal(keyed[0], keyed[1], a, b),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
+        "pdf": lambda: _pdf_signal(base, new, base_captures, new_captures),
+        "sidecars": lambda: _sidecar_signal(base_sidecars, new_sidecars),
     }
+    attempts = {name: computed[name] for name in SIGNALS[kind]}
     signals: dict[str, Signal] = {}
     details: dict[str, Any] = {}
     faults: list[dict[str, str]] = []
@@ -1162,13 +1211,25 @@ def _stl_files(
     """Per STL path the build had SolidWorks write, its last write's
     :func:`_triangles`; ``None`` when a capture is missing or not the bytes
     the log describes."""
+    found = _last_writes(conversation, captures, _STL_SUFFIX)
+    if found is None:
+        return None
+    return {rel: _triangles(data) for rel, data in found.items()}
+
+
+def _last_writes(
+    conversation: conv.Conversation, captures: Path, suffix: str
+) -> dict[str, bytes] | None:
+    """Per path ending in ``suffix`` the build had SolidWorks write, the
+    bytes of its last write; ``None`` when a capture is missing or not the
+    bytes the log describes."""
     captured = conversation.trailer.get("captured", {})
     final: dict[str, dict[str, Any]] = {}
     for seq in sorted(captured, key=int):
         for rel, kept in captured[seq].items():
-            if rel.lower().endswith(_STL_SUFFIX):
+            if rel.lower().endswith(suffix):
                 final[rel] = kept
-    found: dict[str, list[_Triangle] | str] = {}
+    found: dict[str, bytes] = {}
     for rel, kept in final.items():
         try:
             data = gzip.decompress((captures / kept["file"]).read_bytes())
@@ -1176,8 +1237,130 @@ def _stl_files(
             return None
         if hashlib.sha256(data).hexdigest() != kept["sha256"]:
             return None
-        found[rel] = _triangles(data)
+        found[rel] = data
     return found
+
+
+def _pdf_signal(
+    base: conv.Conversation,
+    new: conv.Conversation,
+    base_captures: Path,
+    new_captures: Path,
+) -> tuple[Signal, dict[str, str] | None]:
+    """Per PDF path either build had SolidWorks write, whether the two last
+    writes print the same ink (:func:`_pdf_ink`). A PDF's bytes are no
+    signal: SolidWorks writes the export's date into them."""
+    a = _last_writes(base, base_captures, _PDF_SUFFIX)
+    b = _last_writes(new, new_captures, _PDF_SUFFIX)
+    if a is None or b is None or (not a and not b):
+        return Signal.ABSENT, None
+    differing: dict[str, str] = {}
+    for rel in sorted(a.keys() | b.keys()):
+        if rel not in b or rel not in a:
+            differing[rel] = "base only" if rel in a else "new only"
+            continue
+        found = _ink_difference(_pdf_ink(a[rel]), _pdf_ink(b[rel]))
+        if found is not None:
+            differing[rel] = found
+    if differing:
+        return Signal.DIFFERENT, differing
+    return Signal.SAME, None
+
+
+def _pdf_ink(data: bytes) -> list[tuple[Any, ...]] | str:
+    """A PDF's ink (``_pdf_ink.read_pdf_ink``), page by page: its size, the
+    sorted text runs (text and box) and the sorted path pieces (ends, width,
+    colour, dash, fill, stroke), sheet coordinates rounded to
+    :data:`_PDF_ROUND`. The order things were drawn in is no part of what
+    prints. A PDF pdfium cannot read is its digest."""
+    import tempfile
+
+    import _pdf_ink  # pypdfium2: loaded for a drawing's judgement only
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "ink.pdf"
+        path.write_bytes(data)
+        try:
+            pages = _pdf_ink.read_pdf_ink(path)
+        except _pdf_ink.pdfium.PdfiumError:
+            return "bytes:" + hashlib.sha256(data).hexdigest()
+
+    def rounded(*values: float) -> tuple[float, ...]:
+        return tuple(round(float(value), _PDF_ROUND) for value in values)
+
+    return [
+        (
+            rounded(page.width, page.height),
+            sorted(
+                (span.text, rounded(span.xmin, span.ymin, span.xmax, span.ymax))
+                for span in page.spans
+            ),
+            sorted(
+                (
+                    rounded(s.x0, s.y0, s.x1, s.y1, s.width),
+                    s.rgb,
+                    s.dashed,
+                    s.filled,
+                    s.stroked,
+                )
+                for s in page.strokes
+            ),
+        )
+        for page in pages
+    ]
+
+
+def _ink_difference(
+    a: list[tuple[Any, ...]] | str, b: list[tuple[Any, ...]] | str
+) -> str | None:
+    """What differs between two PDFs' :func:`_pdf_ink`, or None."""
+    if isinstance(a, str) or isinstance(b, str):
+        return None if a == b else "bytes"
+    if len(a) != len(b):
+        return f"{len(a)} pages, new {len(b)}"
+    for number, (x, y) in enumerate(zip(a, b, strict=True), start=1):
+        if x[0] != y[0]:
+            return f"page {number}: size {x[0]}, new {y[0]}"
+        for what, index in (("text runs", 1), ("path pieces", 2)):
+            base_only = Counter(x[index]) - Counter(y[index])
+            new_only = Counter(y[index]) - Counter(x[index])
+            if base_only or new_only:
+                return (
+                    f"page {number}: {base_only.total()} {what} base only, "
+                    f"{new_only.total()} new only"
+                )
+    return None
+
+
+def _sidecar_signal(
+    base: Path | None, new: Path | None
+) -> tuple[Signal, dict[str, str] | None]:
+    """Per file in either directory, whether the two builds wrote the same
+    bytes. These are Python's outputs beside an assembly, written from
+    SolidWorks' answers already rounded for noise (the geometry digest), so
+    they are compared exactly."""
+    a, b = _digests_in(base), _digests_in(new)
+    if not a and not b:
+        return Signal.ABSENT, None
+    differing: dict[str, str] = {}
+    for name in sorted(a.keys() | b.keys()):
+        if name not in b or name not in a:
+            differing[name] = "base only" if name in a else "new only"
+        elif a[name] != b[name]:
+            differing[name] = "bytes"
+    if differing:
+        return Signal.DIFFERENT, differing
+    return Signal.SAME, None
+
+
+def _digests_in(directory: Path | None) -> dict[str, str]:
+    if directory is None or not directory.is_dir():
+        return {}
+    return {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in directory.iterdir()
+        if path.is_file()
+    }
 
 
 def _triangles(data: bytes) -> list[_Triangle] | str:
