@@ -74,20 +74,19 @@ STEM_PLACES = 4
 # depth from DT-04's end; .XX.  Research: spigot .73, socket .19.  At the
 # limits (.XX lengths, two face widths, the end recess's range) the spigot
 # must keep air at the socket floor and at least 1.5 D in the socket.  At the
-# .300 in pitch (#1038) the spigot crosses two 7.4528 faces.  With the faces
-# at +/-.001 and the .025 recess, .74 to .76 do both (engagement 2.384 to
-# 2.892, floor air 0.674 to 0.166; the shaft spec proves the chosen one); with
-# the +/-.002 faces and .030 recess of #2314 only .76 does (2.587 and 0.115:
-# .75 falls to 2.333, under 1.5 D, and .77 bottoms).  .76 holds in both, so
-# the length does not move with the bands.
+# .300 in pitch (#1038) the spigot crosses two 7.4528 faces.  With their
+# +/-.002 band and the .030 recess (#2314) one .XX length does both with the
+# .20 socket: .76 (engagement 2.587, floor air 0.115; the shaft spec proves
+# it).  .75 falls to 2.333, under 1.5 D, and .77 bottoms.  .76 also held on
+# the +/-.001 faces and .025 recess it was first chosen on (2.892, 0.166).
 SPIGOT_LENGTH_MM = 19.304  # .76
 SOCKET_DEPTH_MM = 5.08  # .20
 SPIGOT_SOCKET_ENGAGEMENT_MIN_MM = 1.5 * STEM_DIA_MM
 
 # DT-04's end stands this far inside T024's bore (nominal, .XXX); the shaft
-# spec proves it positive at every limit of T024's feeler-set station and the
-# printed land-2 end.
-TIP_END_RECESS_MM = 0.635  # .025
+# spec proves it positive at every limit of T024's feeler-set station (the
+# cone gears' +/-.002 faces, #2314) and the printed land-2 end.
+TIP_END_RECESS_MM = 0.762  # .030
 
 # T006's pivot length from its leaves' north face, .XX: through the bushing
 # and into the end screw's hole, never bottoming there.

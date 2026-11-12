@@ -29,7 +29,6 @@ import cone_tip_cluster
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from cone_pitch import SEAT_PITCH
-from gear_face_band import GEAR_FACE_WIDTH_BAND
 from cone_shaft_land_bands import GEAR_SEAT_BAND, SECTION_CONE_GEAR_TEETH
 from gear_seat_fit import seat_bore_band
 from stock_form_cutter import (
@@ -362,11 +361,17 @@ BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip 
 # stack closes without interference; it is a stack closure, so it is not
 # snapped to the inch grid and prints .2934 at four inch places, inside its
 # band.  Every gear grew SOUTH: its north face stays on the station layout
-# (cone_line).  The band is the cylinder bank's L20 d' rule (+/-.001 in per
-# gear, the 20-gear stack accepted at +/-0.20 mm), so it is faced to a
-# micrometer on both sides.
+# (cone_line).  The 20-gear stack is accepted at +/-0.20 mm (the cylinder
+# bank's L20 d' rule, dt_cone_gear_stack); each gear's own band is +/-.002 in
+# (#2314, the owner's 2026-11-11 loosening pass): the stack's partial bands
+# book it, and the land step (dt_cone_gear_shaft_spec.SEAT_STEP_BUDGET), the
+# tip recess (TIP_END_RECESS_LIMITS_MM) and the key's north margin keep their
+# margins at it.  The 2026-09-28 ruling asked only that the gears touch; the
+# +/-.001 it shipped with was the implementer's cylinder-bank precedent
+# (13e941c941), not a ruled band.  The 64T (MHA-DT-07) keeps
+# gear_face_band's +/-.001, which its own stacks read.
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
-FACE_WIDTH_BAND = GEAR_FACE_WIDTH_BAND
+FACE_WIDTH_BAND = (0.0508, -0.0508)  # (upper, lower), +/-.002 in
 # Keyway clock: on the keyed land 1 (owner decision 2026-11-09, C1 keyed, PR
 # #1992) the hub keyway is the gear's angular datum on MHA-DT-04, and its
 # centreline passes through the centre of the phase-0 tooth on local +X, so
@@ -823,8 +828,8 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # both ends of each narrow floor window print without rounding inward.  The
 # tip diameter prints four too, and every blank is floored to that grid, so
 # the printed size is the modelled one.  The face width prints four, like the
-# cylinder gear's OverallThickness under the same rule: three would round its
-# nominal by a third of the +/-.001 band.  The keyway's width and T print at
+# cylinder gear's OverallThickness: three would round its nominal by a sixth
+# of the +/-.002 band.  The keyway's width and T print at
 # cone_land_key's places.  RV-03's T012 web prints its ruled .0646 MIN at
 # four.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {

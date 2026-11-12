@@ -370,12 +370,12 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
 
 
 def test_the_step_sits_one_setback_inside_t030() -> None:
-    """The step T030|T024 sits 1.0 south of T030's north face, inside T030,
-    and at print-worst the step and its root stay south of T024."""
+    """The step T030|T024 sits one setback south of T030's north face, inside
+    T030, and at print-worst the step and its root stay south of T024."""
     spec = dt_cone_gear_shaft_spec
     station = spec.SECTION_ENDS[1] - spec.FRONT_STUB
     south, north = spec.gear_faces(15)
-    assert station == pytest.approx(north - 1.0)
+    assert station == pytest.approx(north - spec.SEAT_STEP_SETBACK)
     assert south < station - _band(3) and station + _band(3) + spec.FILLET_RADIUS < north
     margin = _setback_margin(
         15,
@@ -1342,7 +1342,13 @@ def test_the_keyseat_end_is_located_from_the_collar_face_on_the_sheet() -> None:
         + key.KEY_LENGTH_MM
         + key_band
     )
-    t024_south = spec.FRONT_STUB + spec.gear_faces(16)[0]
+    # T024's south face with the stack pushed onto the collar at its shortest.
+    t024_south = (
+        spec.FRONT_STUB
+        + spec.gear_faces(16)[0]
+        + cone_tip_cluster.TIP_SET_SHIFT_MM
+        + dt_cone_gear_stack.face_band(16, "south")[1]
+    )
     assert spec.KEY_NORTH_MARGIN_MM == pytest.approx(t024_south - north)
     assert spec.KEY_NORTH_MARGIN_MM > 0.0
     # Its text sits right of the web's and left of its own left arrow, its
