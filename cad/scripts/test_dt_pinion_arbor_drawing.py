@@ -839,10 +839,10 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
     assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
     note_2 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[1].split())
-    # #1038 r8 machinist review (rules 1 and 10): the note names both spans
-    # the one 2X block sizes, so neither is found by elimination.
+    # #1038 r9 machinist review (rules 1 and 26): a leadered tag, not the
+    # note's words, reaches the second span (SPAN_TAGS).
     assert note_2 == (
-        "PIN-HOLE SPAN AND BACK-END SPAN: SLIDING FIT IN MHA-DT-33 "
+        "SPANS (2X): SLIDING FIT IN MHA-DT-33 "
         "PINION ARBOR RETENTION COLLAR (CLEARANCE .0004-.0078)."
     )
     # The clearance from both parts' printed limits; its minimum is the
@@ -866,6 +866,57 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
     assert max(map(len, rows)) <= 66
+
+
+def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
+    """#1038 r9 machinist review (rules 1 and 26): each 2X diameter's
+    dimension reached one span; the front journal was marked only by its Ra
+    symbol and the collar span only by note 2's words.  A native dimension
+    takes one leader, so each second span carries a SEE NOTE tag whose
+    leader rises straight to its lower flank, the tag centred under the span
+    between its two witnesses and over the station rows."""
+    import inspect
+
+    tags = drawing.SPAN_TAGS
+    assert set(tags) == {"front_journal", "collar_span"}
+    assert tags["front_journal"][1] == "SEE\nNOTE 1"
+    assert tags["collar_span"][1] == "SEE\nNOTE 2"
+    assert drawing.DIMENSION_CALLOUTS["BackJournalDia"].endswith("SEE NOTE 1")
+    assert drawing.DIMENSION_CALLOUTS["BackStubDia"] == "SEE NOTE 2"
+    front_land = (
+        drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN),
+        drawing._sheet_x(spec.FRONT_JOURNAL_Z),
+    )
+    collar_span = (
+        drawing._sheet_x(spec.FRONT_JOURNAL_Z),
+        drawing._sheet_x(spec.NECK_END_Z),
+    )
+    shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
+    keep = drawing.PRINCIPAL_KEEP
+    rows_under = {
+        # The 2.61 row's line spans under the front land; the 1.82 row's text
+        # (top ~0.141) sits under the collar span.
+        "front_journal": keep["FrontJournalEndFromHeadRear"][1] - 0.0028,
+        "collar_span": keep["FrontJournalFromHeadRear"][1] + 0.0010,
+    }
+    for key, (left_witness, right_witness) in (
+        ("front_journal", front_land),
+        ("collar_span", collar_span),
+    ):
+        station_z, text, (x, top) = tags[key]
+        centre = drawing._sheet_x(station_z)
+        assert left_witness < centre < right_witness
+        assert x + drawing.SPAN_TAG_ROW_WIDTH / 2.0 == pytest.approx(centre)
+        assert x - left_witness >= 0.002
+        assert right_witness - (x + drawing.SPAN_TAG_ROW_WIDTH) >= 0.002
+        assert max(map(len, text.split("\n"))) <= 6
+        assert 0.005 <= shaft_bottom - top <= 0.010
+        assert top - drawing.SPAN_TAG_HEIGHT - rows_under[key] >= 0.003
+    # Clear of the collar pin hole (Ø1.59) on its span.
+    assert abs(tags["collar_span"][0] - spec.PIN_Z) > 5.0
+    source = inspect.getsource(drawing.build)
+    assert "_span_tag_picks(adapter, principal)" in source
+    assert 'entity_type="FACE"' in source
 
 
 def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:

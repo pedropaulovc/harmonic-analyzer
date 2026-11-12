@@ -39,10 +39,12 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
@@ -68,6 +70,7 @@ from dt_pinion_arbor_spec import (
     HEAD_REAR_Z,
     JOURNAL_DIA_BAND,
     JOURNAL_LEN,
+    NECK_END_Z,
     OVERALL_LEN,
     PIN_Z,
     RETAINING_COMPOUND,
@@ -144,14 +147,14 @@ SPAN_CALLOUT = "SEE NOTE 2"
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
-# Note 2 names both spans the back stub's 2X sizes (#1038 r8 machinist
-# review: "OUTSIDE THE JOURNALS" left the collar span to elimination, and
-# round 5 found no open space for its own block).
+# Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
+# note says what the spans are, not where (#1038 r9 machinist review, rules
+# 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
 SHEET_NOTES = (
     f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
     f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
-    f"2. PIN-HOLE SPAN AND BACK-END SPAN: SLIDING FIT IN {COLLAR_NUMBER}\n"
+    f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER}\n"
     f"   {COLLAR_NAME} (CLEARANCE {_inch(COLLAR_CLEARANCE[0])}-"
     f"{_inch(COLLAR_CLEARANCE[1])})."
 )
@@ -283,6 +286,37 @@ BACK_RA_XY = (
 # on the c6eb7f6f sheet.
 RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
 FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
+# Each 2X diameter's dimension reaches one span; a leadered tag reaches the
+# other (#1038 r9 machinist review, rules 1 and 26: the front journal was
+# marked only by its Ra symbol and the collar span only by note 2's words;
+# a native dimension takes one leader, and neither span has room for a block
+# of its own).  Each tag hangs under the shaft in its span's open pocket,
+# two short rows centred on the span, its leader rising straight to the
+# span's lower flank: the front journal's between the 2.61 and 1.82
+# witnesses (x ~0.2408 / ~0.2602, over the 2.61 row's line at ~0.1278), the
+# collar span's between the 1.82 witness and the neck's (x 0.296), over the
+# 1.82 row's text (~0.1372-0.141).  key -> (landing z, text, top-left xy).
+SPAN_TAG_ROW_WIDTH = 0.0147  # "NOTE n", six capitals at ~2.45 mm
+SPAN_TAG_TOP_Y = 0.158
+SPAN_TAG_HEIGHT = 0.0112  # two rows, 5.6 mm apart
+_FRONT_TAG_Z = FRONT_JOURNAL_Z + JOURNAL_LEN / 2.0
+_COLLAR_TAG_Z = (FRONT_JOURNAL_Z + NECK_END_Z) / 2.0
+_COLLAR_TAG_X = _sheet_x(_COLLAR_TAG_Z)
+SPAN_TAGS = {
+    "front_journal": (
+        _FRONT_TAG_Z,
+        "SEE\nNOTE 1",
+        (_sheet_x(_FRONT_TAG_Z) - SPAN_TAG_ROW_WIDTH / 2.0, SPAN_TAG_TOP_Y),
+    ),
+    "collar_span": (
+        _COLLAR_TAG_Z,
+        "SEE\nNOTE 2",
+        (_COLLAR_TAG_X - SPAN_TAG_ROW_WIDTH / 2.0, SPAN_TAG_TOP_Y),
+    ),
+}
+# The collar span's face: the shaft cylinder whose span holds the tag's
+# station (the pin hole, ~9 mm toward the front land, does not split it).
+COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=_COLLAR_TAG_Z)
 # The back land's 2X diameter (one size for both lands, #1038 ruling) is
 # measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
 # crown-side end (build_pinion_arbor, pinned equal by test), and its line
@@ -693,6 +727,34 @@ def _journal_finish_picks(
         )
         landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
         picks[key] = (faces[key], landing, symbol_xy)
+    return picks
+
+
+def _span_tag_picks(
+    adapter: Any, view: Any
+) -> dict[str, tuple[Any, tuple[float, float], str, tuple[float, float]]]:
+    """Each SPAN_TAGS target: ``(span face, lower-flank landing, text, xy)``.
+
+    The faces resolve on the part the view references, as the Ra targets do
+    (:func:`_journal_finish_picks`): the front journal's is its Ra control's.
+    """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    front = surface_finish_by_key(SURFACE_FINISHES, "front_journal").face
+    faces = resolve_faces(
+        document, {"front_journal": front, "collar_span": COLLAR_SPAN_FACE}
+    )
+    picks = {}
+    for key, (station_z, text, note_xy) in SPAN_TAGS.items():
+        land_x, axis_y = model_point_in_view(
+            adapter,
+            view,
+            (0.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} tag station",
+        )
+        landing = (land_x, axis_y + FLANK_SIGN["lower"] * SHAFT_DIA / 2000.0)
+        picks[key] = (faces[key], landing, text, note_xy)
     return picks
 
 
@@ -1466,6 +1528,18 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"arbor {key} finish",
             entity_type="FACE",
             char_height=0.0025,
+        )
+    tags = _span_tag_picks(adapter, principal)
+    for key, (face, landing, text, note_xy) in tags.items():
+        add_attached_note(
+            adapter,
+            principal,
+            text=text,
+            entity=face,
+            entity_type="FACE",
+            leader_attach_xy=landing,
+            note_xy=note_xy,
+            label=f"arbor {key} tag",
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
