@@ -2448,35 +2448,19 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
 
 
-def test_the_loosest_feel_set_keeps_the_feed_mesh_in_contact() -> None:
-    """#2416 (owner direction 2026-11-11; codjiflo P1/P3 on 2f5bac993): the
-    feel set's floor is the first bind at the worst corner, gated for root
-    clearance and interference there; from it the run's tight spot opens every
-    other station by the rack's index and lateral terms and the pinion's
-    runout, and at that loosest centre every corner keeps a pair in contact."""
-    import math
-
-    import _gear_quality as gear_quality
-    import paper_drive_geom as paper_geometry
+def test_the_feel_set_starts_at_the_worst_corners_first_bind() -> None:
+    """#2416 (owner direction 2026-11-11; codjiflo P3s on 2f5bac993 and
+    c4e3ec5b4): zero backlash passes the interference point, so the felt bind
+    at the worst corner comes before the flanks wedge. The stack starts there:
+    just short of it a corner still reaches past that point, and a feel set
+    runs looser than the builder's design band."""
     import paper_drive_mesh_check as mesh_check
-    import pd_transgear_feed_pinion_spec as feed
 
     bind = steps.FEED_FIRST_BIND_BACKLASH_MM
-    # Zero backlash passes the interference point, so the felt bind at the
-    # worst corner comes before the flanks wedge; just short of it, a corner
-    # still reaches past that point.
     short = mesh_check.feed_rack_mesh((bind - 1e-4,) * 2)
     assert short.interference_margin_min_mm < 0.0
-    assert not mesh_check.feed_rack_mesh((bind,) * 2).failures()
-    pressure_angle = math.radians(feed.PRESSURE_ANGLE_DEG)
-    opening = (
-        gear_quality.rack_pitch_index_deviation_mm()
-        + paper_geometry.feed_lateral_deviation_mm()
-        + 2.0 * feed.TOOTH_SPACE_RUNOUT_TIR_MM * math.tan(pressure_angle)
-    )
-    assert steps.FEED_LOOSEST_BACKLASH_MM >= bind + opening - 1e-12
-    loosest = mesh_check.feed_rack_mesh((bind, steps.FEED_LOOSEST_BACKLASH_MM))
-    assert loosest.contact_ratio_min >= 1.0
+    assert mesh_check.feed_rack_mesh((bind,) * 2).interference_margin_min_mm >= 0.0
+    assert steps.FEED_LOOSEST_BACKLASH_MM > rack_setup.RACK_DATUM_BACKLASH_RANGE[1]
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:

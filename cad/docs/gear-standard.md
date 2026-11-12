@@ -191,8 +191,14 @@ skip sends the fitter to the parts.
 The latched mesh is then accepted on function: no tight spot over the whole
 engaged feed, no skipped tooth, a steady advance.
 
-No binding is what the feel set itself guarantees: the arm sits at the first
-bind. At some printed corners a rack crest reaches the pinion's flank below its
+No binding is what the feel set itself guarantees, at the pinion/rack phase
+felt in step 24: the arm sits at the first bind. A later re-latch enters at
+another tooth offset, and the pinion's toothspace runout can then bring its
+high tooth to the tightest station, up to one TIR (0.051 mm) radial past the
+felt bind, about 0.037 mm of backlash. That residual is accepted under the
+ruling below: a bind there is felt in service and cured by re-setting the arm
+(step 25's remedy), as on the original. At some printed corners a rack crest
+reaches the pinion's flank below its
 base circle before the flanks wedge, at 0.069 mm of tooth-centred backlash, so
 the stack starts from that later bind, where every corner keeps the 0.25 mm
 root clearance. The run's tight spot sets the arm, so every other station runs

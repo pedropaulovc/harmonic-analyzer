@@ -264,9 +264,16 @@ FEED_LOOSEST_BACKLASH_MM = (
 # Against coming loose and for a feed at constant speed: a contact ratio of at
 # least 1.0 at the loosest feel set, at every printed corner, keeps one tooth
 # pair in conjugate contact through every handover. Delegated ruling (Main,
-# 2026-11-11, under the owner direction on #2416; no precedent at a loose
-# extreme): it replaces the 1.1 the removed .003 leaf fallback held under
-# option C, which only a gauged set could hold.
+# 2026-11-11, under the owner direction on #2416; owner review #2144): no
+# precedent; it departs from the owner's 1.1 continuous-action floors at a
+# loose extreme (the reducer's runout extreme, 2026-10-11, and option C's 1.1
+# for the removed .003 leaf fallback), which only a gauged set could hold here.
+# Residual accepted under the same ruling: the floor holds at the pinion/rack
+# phase felt in step 24. A later re-latch enters at another tooth offset, and
+# the pinion's toothspace runout can bring its high tooth to the tightest
+# station, up to one TIR (0.051 mm) radial past the felt bind, about 0.037 mm
+# of backlash. A bind there is felt in service and cured by re-setting the arm
+# (step 25's remedy), as on the original.
 FEED_CONTACT_RATIO_FLOOR = 1.0
 FEED_LOOSEST_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_LOOSEST_BACKLASH_MM)

@@ -2481,7 +2481,7 @@ def _step_text(
             "IF IT SKIPS, INSPECT THE "
             f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-platen-rack']} RACK "
             "TO THEIR SHEETS.",
-            f"REPLACE THE PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",
+            f"REPLACE ANY PART FOUND OUTSIDE AND REPEAT FROM {s('hanger-meshed', 0)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
