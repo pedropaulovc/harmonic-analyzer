@@ -312,8 +312,9 @@ CALLOUTS_BELOW = {
     "PinionSeatDiaDim": FIT_CALLOUT,
     "SpigotDiaDim": SPIGOT_CALLOUT,
 }
-# The three-place far-end collar stations and the Depth name their stack on
-# their own row: a callout below would lift the value into the row above.
+# The Depth names its stack, and the three-place far-end collar stations
+# link note 2, on their own row: a callout below would lift the value into
+# the row above.
 SUFFIXES = {
     "CollarRearStation": COLLAR_REAR_MATE,
     "CollarSeatStation": COLLAR_SEAT_MATE,
@@ -345,9 +346,9 @@ JOURNAL_FINISHES = {
 # planar face itself (_collar_rear_face): selected by its rim, SolidWorks
 # lands a point on an edge-on circle at its projected extreme, the corner
 # (run 20261001T051043622Z: requested y 0.1986, landed 0.2006).  The symbol
-# sits 1 mm higher than when it landed on the corner, under the spigot's Ø block,
-# so the near-level leader keeps the head 2 mm clear of the Ø9.5's printed
-# Ø; any lower a landing and the head closes on that Ø.
+# stands under the spigot's Ø block, right of the face; its short leader
+# falls 2.4 mm to the landing on the Ø.689 face (run
+# 20261111T221902124Z: the head ends on the face, clear of both Ø blocks).
 COLLAR_REAR_FINISH = (
     (COLLAR_REAR_X, _sheet_y(SPIGOT_DIA / 2.0 - 0.8)),
     (COLLAR_REAR_X + 0.0069, 0.1983),
