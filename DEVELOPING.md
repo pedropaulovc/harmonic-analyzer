@@ -2583,14 +2583,47 @@ oracle. Every `noop` gets exactly one `noop_judgement`; each but `confirmed`
 (the base's exact requests and the base's part) is also a marker:
 
 - A **soundness alarm** (`soundness_alarm`) is a `noop` whose
-  `artefact_outcome` is `different`: if recordings had been reused, another
-  part would have been reused. It is logged at ERROR
-  (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence with the signals) and
-  never fails the build.
+  `artefact_outcome` is `different` and that is no `seat_path_divergence`:
+  if recordings had been reused, another part would have been reused. It is
+  logged at ERROR (`[com-replay] SOUNDNESS ALARM ...`, bounded evidence with
+  the signals and the diff's `seat_path`), revokes the base, and never fails
+  the build.
 - `seat_nondeterminism` is a `noop` with `ground_truth=diverged`,
   `truth_cause=response:<member>` and `artefact_outcome=same`: SolidWorks
   answered differently and the part is the same. It is counted (a marker on
   the INFO line, a field in the record and span), never an alarm.
+- `seat_path_divergence` is a `noop` with `ground_truth=diverged`,
+  `truth_cause=response:<member>` and `artefact_outcome=different` only in the
+  requests and answers (the `mass` and `stl` signals `same`), whose requests
+  differ from the base's only by detours: the diff's `seat_path` (judged by
+  `_com_outcome.seat_path` for exactly such a diff, `None` otherwise) has
+  `path=detour`. A detour is a block of requests one build made and the other
+  did not, of pywin32 protocol and listed reads and selections only
+  (`_DETOUR_READS`, `_DETOUR_SELECTS`, by exact member; a method call or a
+  property get, never a put; a member not listed is no read, whatever its
+  name), right after the one selection (`SelectByID2`, `IEntity.Select2` or
+  `Select4`) whose answer steered it. Every other answer to a request both
+  builds made, including a request other than a selection right before a
+  block, must be the same under the `answers` signal's rules. In both builds
+  the selection before each block and those in it must select in one
+  document the log establishes (a `SelectByID2` through the extension an
+  `IModelDoc2.Extension` get answered, an entity of a body
+  `IPartDoc.GetBodies2` answered; handles followed through `QueryInterface`),
+  and `ClearSelection2` on that document must come after the block before
+  anything but a read, a selection (a clear on another document is one) or
+  the measure tool's own `IMeasure.ArcOption`. The streams are aligned
+  greedily and bounded: at most 16 blocks of at most 4096 calls, each
+  resuming on 8 equal requests or the end of both. Anything else
+  (`unaligned`, `not_read`, `answer`, `selection_kept`, or `error`, a judge
+  fault) stays a soundness alarm. It is counted (a marker on the INFO line,
+  `seat_path_divergence` and `seat_path`, the verdict, in the record and
+  span), never an alarm, never a revocation, on the shadow and the audit path
+  alike. 2026-11-12, `mg_magnifying_wheel`: an edge `SelectByID2` by a point
+  answered False on one build of five, and the vendored
+  `_select_entity_geometric` fallback found the closest edge (164
+  `IEdge.GetClosestPointOn`) and selected it itself; mass properties within
+  1e-14, the STL byte-identical. Its face variant (`IBody2.GetFaces`,
+  `IFace2.GetClosestPointOn`) is listed too.
 - `noop_unexplained_divergence` is a `noop` with `ground_truth=diverged`,
   `artefact_outcome=same` and no earlier answer differing
   (`truth_cause=request`): neither the source nor SolidWorks explains the
@@ -2764,12 +2797,12 @@ reuses.
 `com-replay/epoch-<n>/<engine[:16]>/<stem>/revoked/<base key>.json` retires a
 base: no attempt reuses it again (`revoked_base`). It is written when a
 shadow or audit judgement raises a `SOUNDNESS ALARM` against the base (the
-`replay_shadow` record's `revoked`), and when a forced cache refresh targets a
-key in modes `reuse`, `shadow` or `record` under `rw`: the origin its
-`reused/` marker names is revoked, and so is the key itself when a recording
-of it is published (it is a base). A revocation that cannot be written is a
-WARN and never fails the build; one that cannot be read declines the attempt
-(`fault`).
+`replay_shadow` record's `revoked`; a `seat_path_divergence` revokes nothing),
+and when a forced cache refresh targets a key in modes `reuse`, `shadow` or
+`record` under `rw`: the origin its `reused/` marker names is revoked, and so
+is the key itself when a recording of it is published (it is a base). A
+revocation that cannot be written is a WARN and never fails the build; one
+that cannot be read declines the attempt (`fault`).
 
 **Soundness.** A reuse claims the base's archive is an outcome the current
 source's build could have had. The replay fed the current source the base's
@@ -2802,6 +2835,15 @@ Not proven off-seat:
   vertices vary from run to run (`seat_nondeterminism`, the 2026-11-12
   `fr_nameplate` vertices). The claim is only that the archive is one outcome
   of the current source, which the audit and the alarm keep measuring.
+- That a `seat_path_divergence`'s detour selected what the base's path
+  selected. The claim rests on the base's mass properties and STL, on the
+  detour being only reads and selections, and on the selection being cleared
+  on its document before any later request that is not a read or a
+  selection; a request that consumed the selection inside that window (the
+  measurement after the 2026-11-12 detour) is compared like any other, answer
+  for answer. A document is known by its handle's root through
+  `QueryInterface` answers, so one document reached by two routes (two
+  `ActiveDoc` reads) counts as two: an alarm, the safe direction.
 - That the seat's state outside the template and the build's own document
   settings is the same: system options, add-ins, material and Toolbox
   databases and licensing are machine image, not inputs.
@@ -2953,7 +2995,7 @@ All spans are on service `build-infra` and carry `label=part:<stem>`:
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read` |
-| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
+| `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
 `cache.sidecar.download` and `cache.sidecar.list`.
@@ -2976,15 +3018,16 @@ and ends with one INFO line in the task log, for example:
 ```
 
 (`-` marks a step the build never reached). A `SOUNDNESS ALARM`,
-`seat_nondeterminism`, `noop_unexplained_divergence`, `noop_outcome_unknown`
-or `judge_fault` marker ends the line when it applies; in mode `reuse` a
-`reuse=<decision>` segment follows the outcome. On a farm leaf
-`cache.jsonl` stays on the worker, so use Application Insights for fleet-wide
-results. The `replay_shadow` record's outcome fields are `artefact_outcome`
-and `truth_cause`: `outcome` is the step's. It also carries `bound` (the
-manifest names the archive this process stored), in mode `reuse`
-`reuse_decision`, and after a `SOUNDNESS ALARM` `revoked` (the base's
-revocation: `stored`, `exists`, or `error` after a WARN).
+`seat_nondeterminism`, `seat_path_divergence`, `noop_unexplained_divergence`,
+`noop_outcome_unknown` or `judge_fault` marker ends the line when it applies;
+in mode `reuse` a `reuse=<decision>` segment follows the outcome. On a farm
+leaf `cache.jsonl` stays on the worker, so use Application Insights for
+fleet-wide results. The `replay_shadow` record's outcome fields are
+`artefact_outcome`, `truth_cause` and `seat_path` (the diff's verdict, when
+judged): `outcome` is the step's. It also carries `bound` (the manifest names
+the archive this process stored), in mode `reuse` `reuse_decision`, and after
+a `SOUNDNESS ALARM` `revoked` (the base's revocation: `stored`, `exists`, or
+`error` after a WARN).
 
 Every reuse attempt appends one `replay_reuse` record (the span's fields, with
 `seconds` per phase) and logs one INFO line, for example:
@@ -2995,9 +3038,9 @@ Every reuse attempt appends one `replay_reuse` record (the span's fields, with
 
 A decline ends the line with its detail instead of the store segment.
 
-Verdict classes, alarms, seat nondeterminism, unexplained divergences,
-unconfirmed no-ops, false divergences and judge faults per stem (drop
-`by stem` for the fleet total):
+Verdict classes, alarms, seat nondeterminism, seat path divergences,
+unexplained divergences, unconfirmed no-ops, false divergences and judge
+faults per stem (drop `by stem` for the fleet total):
 
 ```kusto
 dependencies
@@ -3006,6 +3049,7 @@ dependencies
          kind=tostring(customDimensions["replay.verdict_class"]),
          alarm=tolower(tostring(customDimensions["replay.soundness_alarm"])) == "true",
          seat=tolower(tostring(customDimensions["replay.seat_nondeterminism"])) == "true",
+         seat_path=tolower(tostring(customDimensions["replay.seat_path_divergence"])) == "true",
          unknown=tolower(tostring(customDimensions["replay.noop_outcome_unknown"])) == "true",
          unexplained=tolower(tostring(customDimensions["replay.noop_unexplained_divergence"])) == "true",
          false_divergence=tolower(tostring(customDimensions["replay.false_divergence"])) == "true",
@@ -3016,6 +3060,7 @@ dependencies
             refusal=countif(kind == "refusal"),
             infrastructure=countif(kind == "infrastructure"),
             alarms=countif(alarm), seat_nondeterminism=countif(seat),
+            seat_path_divergence=countif(seat_path),
             noop_unexplained_divergence=countif(unexplained),
             noop_outcome_unknown=countif(unknown),
             false_divergences=countif(false_divergence),
@@ -3067,6 +3112,7 @@ jq -s '
               | map({key: .[0].verdict_class, value: length}) | from_entries),
     false_divergences: [$s[] | select(.false_divergence == true)] | length,
     seat_nondeterminism: [$s[] | select(.seat_nondeterminism == true)] | length,
+    seat_path_divergence: [$s[] | select(.seat_path_divergence == true) | {label, key, base_key, truth_cause, seat_path}],
     noop_unexplained_divergence: [$s[] | select(.noop_unexplained_divergence == true)] | length,
     noop_outcome_unknown: [$s[] | select(.noop_outcome_unknown == true)] | length,
     judge_faults: [$s[] | select(.judge_fault == true) | {label, key, base_key, verdict, judge_faults}],

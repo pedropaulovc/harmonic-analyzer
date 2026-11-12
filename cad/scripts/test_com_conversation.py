@@ -1409,6 +1409,225 @@ def test_a_request_echoing_a_title_counter_is_caused_by_the_seat():
     assert not _com_outcome.carries_title_counter(["Partial11", 11, {"f": "0x1p0"}])
 
 
+def _sw(
+    site: str, *values: Any, flags: int = 1, result: Any = True, on: int = 3
+) -> conv.Call:
+    """SolidWorks member ``site`` called (``flags`` 1), read (2) or put (4) on
+    handle ``on`` (3: the part document)."""
+    header = [1, 0, flags, {"t": [11, 0]}, {"t": []}]
+    return conv.Call(0, on, "InvokeTypes", [*header, *values], site, result=result)
+
+
+def _qi(on: int, interface: str, handle: int) -> conv.Call:
+    return conv.Call(
+        0, on, "QueryInterface", [interface], "early_bound", result={"h": handle}
+    )
+
+
+def _f(value: float) -> dict[str, str]:
+    return {"f": value.hex()}
+
+
+def _fallback(member: str = "GetEdges", interface: str = "IEdge") -> list[conv.Call]:
+    """The vendored ``_select_entity_geometric`` (its ``_BODY_ENTITY_MEMBERS``):
+    the part's type, its body's edges or faces, each one's closest point, and
+    the nearest selected."""
+    return [
+        _sw("IModelDoc2.GetType", result=1),
+        _qi(3, "IPartDoc", 9),
+        _sw("IPartDoc.GetBodies2", 0, False, result={"t": [{"h": 10}]}, on=9),
+        _sw(f"IBody2.{member}", result={"t": [{"h": 11}, {"h": 12}]}, on=10),
+        _sw(
+            f"{interface}.GetClosestPointOn",
+            _f(0.05),
+            result={"t": [_f(0.04)] * 5},
+            on=11,
+        ),
+        _sw(
+            f"{interface}.GetClosestPointOn",
+            _f(0.05),
+            result={"t": [_f(0.05)] * 5},
+            on=12,
+        ),
+        _qi(12, "IEntity", 13),
+        _sw("IEntity.Select2", False, 0, on=13),
+    ]
+
+
+_EDGE_FALLBACK = _fallback()
+_MEASURED = [
+    _sw("IModelDocExtension.CreateMeasure", result={"h": 14}, on=4),
+    _sw("IMeasure.ArcOption", 0, flags=4, result=None, on=14),
+    _sw("IMeasure.Calculate", None, on=14),
+    _sw("IMeasure.Diameter", flags=2, result=_f(0.012), on=14),
+]
+_FILLETED = [
+    _sw("IModelDoc2.ClearSelection2", True),
+    _sw("IFeatureManager.FeatureFillet3", _f(0.001), result={"h": 15}, on=2),
+]
+
+
+def _picked(
+    found: bool,
+    fallback=_EDGE_FALLBACK,
+    measured=_MEASURED,
+    after=_FILLETED,
+    steering: conv.Call | None = None,
+):
+    """mg_magnifying_wheel's shape (2026-11-12): an edge selected by a point
+    (``SelectByID2`` through the part document's extension); when it answers
+    False, the vendored geometric fallback selects the closest edge itself;
+    then the edge measured, the selection cleared, and the next feature."""
+    selection = _sw(
+        "IModelDocExtension.SelectByID2", "", "EDGE", _f(0.05), result=found, on=4
+    )
+    return [
+        _sw("IFeatureManager.FeatureExtrusion3", _f(0.004), result={"h": 20}, on=2),
+        _sw("IModelDoc2.ClearSelection2", True),
+        _sw("IModelDoc2.Extension", flags=2, result={"h": 4}),
+        steering or selection,
+        *([] if found else fallback),
+        *measured,
+        *after,
+    ]
+
+
+def _seat_path(a: list[conv.Call], b: list[conv.Call]) -> dict[str, Any]:
+    keyed = (_com_outcome._keyed_calls(a), _com_outcome._keyed_calls(b))
+    return _com_outcome.seat_path(a, b, keyed)
+
+
+def test_a_detour_of_reads_and_selections_is_a_seat_path(monkeypatch):
+    path = _seat_path
+    base, detour = _picked(True), _picked(False)
+    block = {
+        "base": [4, 4],
+        "new": [4, 4 + len(_EDGE_FALLBACK)],
+        "steered_by": "IModelDocExtension.SelectByID2",
+    }
+    assert path(base, detour) == {"path": "detour", "count": 1, "blocks": [block]}
+    # The detour in the base build: the same, the other way round.
+    assert path(detour, base)["blocks"] == [
+        {**block, "base": block["new"], "new": [4, 4]}
+    ]
+    # The same fallback for a face.
+    faced = _picked(False, _fallback("GetFaces", "IFace2"))
+    assert path(base, faced)["path"] == "detour"
+    # A put, even to a listed member, or a member not listed, is no read: the
+    # detour changed something.
+    for changed in (
+        _sw("IFeature.Name", "Edge1", flags=4, result=None),
+        _sw("IModelDoc2.Extension", {"h": 4}, flags=4, result=None),
+        _sw("IModelDoc2.EditRebuild3"),
+    ):
+        fallback = [*_EDGE_FALLBACK[:-1], changed, _EDGE_FALLBACK[-1]]
+        found = path(base, _picked(False, fallback))
+        assert found["path"] == "not_read" and changed.site in found["detail"]
+    # The measure tool's own option, after the detour only.
+    assert path(base, _picked(False, [*_EDGE_FALLBACK, _MEASURED[1]]))["path"] == (
+        "not_read"
+    )
+    # Any other answer differing, beyond noise.
+    wider = [*_MEASURED[:3], _sw("IMeasure.Diameter", flags=2, result=_f(0.013), on=14)]
+    found = path(base, _picked(False, measured=wider))
+    assert found["path"] == "answer" and "IMeasure.Diameter" in found["detail"]
+    # A request replaced, not inserted: no detour.
+    chamfered = [_FILLETED[0], _sw("IFeatureManager.InsertFeatureChamfer", _f(0.001))]
+    assert path(base, _picked(False, after=chamfered))["path"] == "unaligned"
+    # Beyond the bound: blocks too long, or too many.
+    monkeypatch.setattr(_com_outcome, "_DETOUR_CALLS", len(_EDGE_FALLBACK) - 1)
+    assert path(base, detour)["path"] == "unaligned"
+    monkeypatch.setattr(_com_outcome, "_DETOUR_CALLS", len(_EDGE_FALLBACK))
+    monkeypatch.setattr(_com_outcome, "_DETOUR_BLOCKS", 0)
+    assert path(base, detour)["path"] == "unaligned"
+
+
+def test_only_a_selection_answer_steers_a_detour():
+    # A request that changes the document answered otherwise (a property
+    # added in one build only), then reads: the document differs where mass
+    # and STL do not look.
+    def added(answer: int) -> conv.Call:
+        return _sw("ICustomPropertyManager.Add3", "Mat", 30, "Steel", 1, result=answer)
+
+    found = _seat_path(
+        _picked(True, steering=added(0)), _picked(False, steering=added(1))
+    )
+    assert found == {
+        "path": "answer",
+        "detail": "ICustomPropertyManager.Add3 answered otherwise at base 3 new 3",
+    }
+
+
+def test_a_detour_must_clear_the_selection_on_the_document_it_selected_in():
+    kept = "after the block at base 4 new 4"
+    # Never cleared before the next feature.
+    found = _seat_path(
+        _picked(True, after=_FILLETED[1:]), _picked(False, after=_FILLETED[1:])
+    )
+    assert found == {
+        "path": "selection_kept",
+        "detail": "base: IFeatureManager.FeatureFillet3 before "
+        f"IModelDoc2.ClearSelection2 on the document selected in, {kept}",
+    }
+    # Cleared on another document (handle 30): the part's selection stays.
+    elsewhere = [_sw("IModelDoc2.ClearSelection2", True, on=30), _FILLETED[1]]
+    found = _seat_path(_picked(True, after=elsewhere), _picked(False, after=elsewhere))
+    assert found["path"] == "selection_kept" and found["detail"].startswith(
+        "base: IFeatureManager.FeatureFillet3 before"
+    )
+
+    # The document a selection selects in cannot be established: SelectByID2
+    # on an extension (31) no IModelDoc2.Extension answered.
+    def unowned(found: bool) -> conv.Call:
+        return _sw("IModelDocExtension.SelectByID2", "", "EDGE", result=found, on=31)
+
+    found = _seat_path(
+        _picked(True, steering=unowned(True)), _picked(False, steering=unowned(False))
+    )
+    assert found == {
+        "path": "selection_kept",
+        "detail": f"base: a selection's document is not established, {kept}",
+    }
+
+
+def test_a_seat_path_is_judged_only_for_the_same_geometry_after_a_response(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    signals = {"mass": "same", "requests": "different", "answers": "different"}
+
+    def judged(stl: str, outcome: str = "different") -> dict[str, Any]:
+        found = {
+            "outcome": outcome,
+            "outcome_signals": {**signals, "stl": stl},
+            "outcome_details": {},
+            "judge_faults": [],
+        }
+        monkeypatch.setattr(_com_outcome, "outcome", lambda *args: found)
+        base, new = (
+            SimpleNamespace(calls=_picked(True)),
+            SimpleNamespace(calls=_picked(False)),
+        )
+        return _com_outcome.judge(base, new, {"index": 4}, Path(), Path())
+
+    found = judged("same")
+    assert found["truth_cause"] == "response:IModelDocExtension.SelectByID2"
+    assert found["seat_path"]["path"] == "detour" and found["judge_faults"] == []
+    assert judged("different")["seat_path"] is None
+    assert judged("absent", outcome="unknown")["seat_path"] is None
+
+    def raising(*args):
+        raise ValueError("misaligned")
+
+    monkeypatch.setattr(_com_outcome, "seat_path", raising)
+    found = judged("same")
+    assert found["seat_path"] == {"path": "error", "detail": "ValueError: misaligned"}
+    assert found["judge_faults"] == [
+        {"step": "seat_path", "error": "ValueError: misaligned"}
+    ]
+
+
 def test_a_replay_reports_the_requests_that_carry_a_title_counter():
     import types
 
