@@ -4431,6 +4431,13 @@ _R7_DATUM_D_ASKED = (0.1441, 0.124)
 _R7_BAR_WIDTH_ARROW_X = 0.1410842
 _R7_ROW_GLYPH = 0.0569868 / 21
 _R7_ROW_PITCH = 0.128 - 0.1224437
+# That run's underside view stood centred on x 150; the sheet's whole group
+# has since moved right with the view (rule 15 balance), its ink with it.
+_R7_VIEW_CENTRE_X = 0.150
+
+
+def _r7_sheet_shift() -> float:
+    return drawing.DATUM_BOTTOM_CENTER[0] - _R7_VIEW_CENTRE_X
 
 
 def _r7_datum_d_display_data():
@@ -4440,9 +4447,11 @@ def _r7_datum_d_display_data():
     width's rows stand about their offset, the value last, the callout's
     sized at that run's mean glyph."""
     asked_x, line_y = _R7_DATUM_D_ASKED
-    tag_dx = asked_x - drawing.CROSSBAR_MEDIAN_DATUM_XY[0]
+    shift = _r7_sheet_shift()
+    tag_dx = asked_x - (drawing.CROSSBAR_MEDIAN_DATUM_XY[0] - shift)
     tag_dy = drawing.DATUM_BOTTOM_KEEP["BarWidth"][1] - line_y
-    arrow_x, y = _R7_BAR_WIDTH_ARROW_X, 0.124 + tag_dy
+    arrow_x, y = _R7_BAR_WIDTH_ARROW_X + shift, 0.124 + tag_dy
+    tag_dx += shift
     x0, x1 = 0.1310683 + tag_dx, 0.1380683 + tag_dx
     datum = {
         "lines": [
@@ -4520,7 +4529,7 @@ def test_datum_d_hangs_on_the_as_cast_crossbar_width_on_sheet_seven(monkeypatch)
     )
     assert asked[1] - 0.0035 - view_top >= drawing.INK_CLEARANCE
     scale = drawing.GEOMETRY_VIEW_SCALE / 1000.0
-    arrow_x = _R7_BAR_WIDTH_ARROW_X
+    arrow_x = _R7_BAR_WIDTH_ARROW_X + _r7_sheet_shift()
     assert arrow_x < asked[0] < arrow_x + (part.BAR_X1 - part.BAR_X0) * scale
     datum, rows = _r7_datum_d_display_data()
     tag_right = max(x for line in datum["lines"][1:] for x in (line[4], line[7]))
