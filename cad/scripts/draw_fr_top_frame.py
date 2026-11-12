@@ -505,8 +505,10 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # from its socket axis reads over the boss top, under the mouth chamfer's
 # parked text; 8.5 mm of paper cannot hold the value and its words, so they
 # park left of the step over the rail.  The words carry the depth: the cut
-# ends on the faced top, the plane the 4X .18 already locates.
-KEEPER_RELIEF_CALLOUT = "2X KEEPER FOOT\nRELIEF TO FACED TOP"
+# ends on the faced top, the plane the 4X .18 already locates.  The mate
+# prints by its number (machinist review, farm run 20261111T233555541Z:
+# "KEEPER" alone named no drawing).
+KEEPER_RELIEF_CALLOUT = "2X MHA-CH-07 FOOT\nRELIEF TO FACED TOP"
 KEEPER_RELIEF_LINE_XY = (
     DETAIL_SECTION_CENTER[0]
     + (REAR_COLUMN_Z - KEEPER_BOSS_RELIEF_FROM_SOCKET / 2.0)

@@ -357,7 +357,8 @@ def test_section_a_a_locates_the_keeper_relief_step_from_its_socket_axis() -> No
     assert "suffix=KEEPER_RELIEF_CALLOUT," in body
     assert "offset_text=KEEPER_RELIEF_TEXT_XY," in body
     # The depth is the words: the floor is the faced top the 4X .18 locates.
-    assert drawing.KEEPER_RELIEF_CALLOUT == "2X KEEPER FOOT\nRELIEF TO FACED TOP"
+    # The mate is named by its drawing number (rule 4).
+    assert drawing.KEEPER_RELIEF_CALLOUT == "2X MHA-CH-07 FOOT\nRELIEF TO FACED TOP"
     scale = drawing.DETAIL_SECTION_SCALE[0] / drawing.DETAIL_SECTION_SCALE[1] / 1000.0
     axis_x = drawing.DETAIL_SECTION_CENTER[0] + part.REAR_COLUMN_Z * scale
     step_x = axis_x - spec.KEEPER_BOSS_RELIEF_FROM_SOCKET * scale
