@@ -7,7 +7,9 @@ on the end of the end screw (MHA-DT-39) threaded through the moved tip block
 swing none of the three may reach the bank:
 
 * the bushing rides the shaft at its model station (cone_tip_cluster: the
-  layout T006 north face plus TIP_SET_SHIFT_MM);
+  layout T006 north face plus TIP_SET_SHIFT_MM), its corner toward T006
+  broken by its chamfer at the smallest printed leg (dt_cone_tip_bushing_spec,
+  #2697);
 * the end screw's end stands proud of the block's south face toward the
   cone, set against the bushing at assembly (dt_cone_tip_block_spec);
 * the block's south face, only where it stands over G19 (inside its tip
@@ -68,6 +70,7 @@ import dt_cone_gear_stack as stack
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as plate
 import dt_cone_tip_block_spec as tip
+import dt_cone_tip_bushing_spec as bushing
 import dt_cone_tip_end_screw_spec as end_screw
 import dt_cylinder_gear_spec as drum
 import dt_vn_cone_tip_block_screw_spec as holddown_screw
@@ -98,6 +101,9 @@ class ShaftTier:
     # The tier's own limits split by physical source: name -> (axial loss,
     # radial gain), summing to -south_lower_mm and radius_upper_mm.
     limits: dict[str, tuple[float, float]]
+    # A 45 deg break on the south O.D. corner, at its smallest printed leg
+    # (0: a square corner).
+    south_chamfer_mm: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -132,6 +138,7 @@ TIERS = (
         _BUSHING_LENGTH_BAND,
         _BUSHING_OD_BAND / 2.0,
         {"bushing outside diameter": (0.0, _BUSHING_OD_BAND / 2.0)},
+        bushing.END_CHAMFER_MIN,
     ),
     # The thread's major at its 2A maximum stands in for the proud end.
     ShaftTier(
@@ -263,7 +270,7 @@ POST_END_TERMS_MM = {
 TIP_END_TERMS_MM = {
     "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
-    "tip block foot tap station": tip.FOOT_TAP_STATION_TOL_MM,
+    "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
     "tip passage centre": tip.printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     "tip block square on its one screw": _SCREW_REACH * math.sin(_ANGULAR_RAD),
     "end screw in its thread": _THREAD_FLOAT + _BLOCK_DEPTH_MAX * _SCREW_COCK,
@@ -275,7 +282,7 @@ TIP_END_TERMS_MM = {
 BLOCK_AXIAL_TERMS_MM = {
     "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
-    "tip block foot tap station": tip.FOOT_TAP_STATION_TOL_MM,
+    "tip block foot tap station": tip.FOOT_TAP_Z_TOL_MM,
     "tip block depth": _BLOCK_DEPTH_BAND,
     "tip block square on its one screw": _BLOCK_HALF_WIDTH_MAX * math.sin(_ANGULAR_RAD),
 }
@@ -284,7 +291,7 @@ BLOCK_AXIAL_TERMS_MM = {
 BLOCK_LATERAL_TERMS_MM = {
     "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
-    "tip block foot tap station": tip.FOOT_TAP_STATION_TOL_MM,
+    "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
 }
 BLOCK_PLAN_SHIFT_SOURCE = "tip block plan shift over G19"
 # The swing's frame (cone_set_stack's set-at-assembly terms).
@@ -449,14 +456,18 @@ def projection_nominal_mm(tier: str, fixed: DrumTier, angle_deg: float = 0.0) ->
         return block_shadow_low_z(angle_deg, fixed.radius_mm) - stationary
     shaft_tier = next(t for t in TIERS if t.name == tier)
     origin, axis = tip_pose_frame(angle_deg)
-    moving = cylinder_support(
-        origin,
-        axis,
-        shaft_tier.south_mm,
-        shaft_tier.north_mm,
-        shaft_tier.radius_mm,
-        Z,
-        maximum=False,
+    # A chamfered tier is the convex hull of two cylinders: the full radius
+    # from the chamfer's top on, and the south face's radius over the whole
+    # length.  Its support is the lesser of theirs.
+    chamfer = shaft_tier.south_chamfer_mm
+    moving = min(
+        cylinder_support(
+            origin, axis, south, shaft_tier.north_mm, radius, Z, maximum=False
+        )
+        for south, radius in (
+            (shaft_tier.south_mm + chamfer, shaft_tier.radius_mm),
+            (shaft_tier.south_mm, shaft_tier.radius_mm - chamfer),
+        )
     )
     return moving - stationary
 

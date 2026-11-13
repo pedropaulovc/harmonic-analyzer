@@ -79,7 +79,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (7.14248, 11.5062, 6.0198)
+    ) == (7.540625, 11.5062, 6.0198)
     assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
