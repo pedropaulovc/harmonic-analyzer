@@ -1,9 +1,12 @@
 r"""Manufacturing drawing of the DT6-FORM1 fly-cutter bar (MHA-DT-37-TL-02).
 
-Issue #2358: one sheet at 2:1 -- the front view with the bar's Ø and length,
-the right view with the reamed cross hole end-on and its station from the
-cutting end, the bottom view with the #4-40 tap's native callout (TO CROSS
-HOLE), and the isometric.  Every number is the part's own
+Issue #2358: one sheet at 2:1, laid as the bar sits in the lathe (rule 11):
+the front view with its axis horizontal, the faced, tapped cutting end on the
+right, carrying the bar's Ø and length; the top view above it with the reamed
+cross hole end-on and its station from that end; the end view of the cutting
+end projected right of the front view with the #4-40 tap's native blind
+callout (size, DRILL, drill depth; thread, full-thread depth); and the
+isometric.  Every number is the part's own
 (``dt_cone_tip_gear_tl_cutter_bar_spec``), imported from the model.
 """
 
@@ -39,7 +42,7 @@ from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -62,12 +65,21 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 _S = RATIO / 1000.0
-# The cutting end's centre (the model origin) on each view: the front view
-# standing up from it, the right view beside it, the bottom view (the cutting
-# end, end-on) projected below; the isometric in the free upper right.
-FRONT_ORIGIN = (0.110, 0.100)
-RIGHT_ORIGIN = (0.200, FRONT_ORIGIN[1])
-BOTTOM_ORIGIN = (FRONT_ORIGIN[0], 0.060)
+# The cutting end's centre (the model origin) on each view.  Each view is
+# turned so model +Y (toward the collet end) runs to the sheet's left: the
+# front view (*Front, model +X up); the top view above it (*Right, the view
+# from +X, model -Z up, so the front view's viewer is toward it); the end
+# view of the cutting end right of the front view (*Bottom, the view from -Y,
+# model +X up and -Z to the right).  The isometric in the free upper right.
+FRONT_ORIGIN = (0.200, 0.110)
+TOP_ORIGIN = (FRONT_ORIGIN[0], 0.190)
+END_ORIGIN = (0.260, FRONT_ORIGIN[1])
+# (model direction, sheet direction) pairs each turned view must show.
+VIEW_TURNS = {
+    "*Front": (((0.0, 1.0, 0.0), (-1.0, 0.0)), ((1.0, 0.0, 0.0), (0.0, 1.0))),
+    "*Right": (((0.0, 1.0, 0.0), (-1.0, 0.0)), ((0.0, 0.0, -1.0), (0.0, 1.0))),
+    "*Bottom": (((1.0, 0.0, 0.0), (0.0, 1.0)), ((0.0, 0.0, -1.0), (1.0, 0.0))),
+}
 ISO_CENTER = (0.320, 0.200)
 ISO_SCALE = VIEW_SCALE
 # The isometric prints at the sheet scale, so its label carries no scale.
@@ -75,55 +87,69 @@ ISO_NOTE = "ISOMETRIC VIEW"
 ISO_NOTE_XY = (0.290, 0.150)
 _R = part.BAR_RADIUS
 
+# Front view: the Ø above the bar at 0.6 of its length from the cutting end,
+# the length below it.  Top view: the cross hole's callout up and left of the
+# hole, its station above the view, both clear of the front view's Ø.
 FRONT_KEEP = {
     "BarDia": (
-        FRONT_ORIGIN[0] - (_R + 12.0) * _S,
-        FRONT_ORIGIN[1] + part.BAR_LENGTH * 0.6 * _S,
+        FRONT_ORIGIN[0] - part.BAR_LENGTH * 0.6 * _S,
+        FRONT_ORIGIN[1] + (_R + 10.0) * _S,
     ),
     "BarLength": (
-        FRONT_ORIGIN[0] + (_R + 8.0) * _S,
-        FRONT_ORIGIN[1] + part.BAR_LENGTH * 0.5 * _S,
+        FRONT_ORIGIN[0] - part.BAR_LENGTH * 0.5 * _S,
+        FRONT_ORIGIN[1] - (_R + 8.0) * _S,
     ),
 }
-RIGHT_KEEP = {
+TOP_KEEP = {
     "CrossHoleDia": (
-        RIGHT_ORIGIN[0] + (_R + 18.0) * _S,
-        RIGHT_ORIGIN[1] + (part.CROSS_HOLE_STATION + 10.0) * _S,
+        TOP_ORIGIN[0] - (part.CROSS_HOLE_STATION + 32.0) * _S,
+        TOP_ORIGIN[1] + (_R + 17.0) * _S,
     ),
     "CrossHoleStation": (
-        RIGHT_ORIGIN[0] - (_R + 6.0) * _S,
-        RIGHT_ORIGIN[1] + part.CROSS_HOLE_STATION / 2.0 * _S,
+        TOP_ORIGIN[0] - part.CROSS_HOLE_STATION / 2.0 * _S,
+        TOP_ORIGIN[1] + (_R + 6.0) * _S,
     ),
 }
 _TAP_R = part.TAP_DRILL_DIA / 2.0 * _S
-TAP_EDGE_XY = (BOTTOM_ORIGIN[0] - _TAP_R, BOTTOM_ORIGIN[1])
-# The callout's two lines (about 70 mm wide) centre here, their left end
-# 15 mm right of the end view's circle, so only the leader crosses the
-# outline (farm run 20261113T012650242Z printed TAP 4-40 across the circle).
-TAP_CALLOUT_XY = (BOTTOM_ORIGIN[0] + (_R + 25.0) * _S, BOTTOM_ORIGIN[1] - 0.012)
-TAP_PROCESS = "TAP"
-TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
+TAP_EDGE_XY = (END_ORIGIN[0] + _TAP_R, END_ORIGIN[1])
+# The callout's two lines (about 50 mm wide) centre here, below and right of
+# the end view's circle and above the title block, so only the leader
+# crosses the outline (farm run 20261113T012650242Z printed TAP 4-40 across
+# the circle).
+TAP_CALLOUT_XY = (END_ORIGIN[0] + (_R + 22.0) * _S, END_ORIGIN[1] - (_R + 6.0) * _S)
+TAP_PRECISION = dict.fromkeys(
+    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION
+)
+DRILL_PROCESS = "DRILL"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
+_DEPTH_TOKENS = ("<hw-tapdrldepth>", "<hw-threaddepth>")
 
 
 def sheet_dimension_names() -> set[str]:
     return set().union(*part.DRAWING_DIMENSIONS.values())
 
 
-if {*FRONT_KEEP, *RIGHT_KEEP} != sheet_dimension_names():
+if {*FRONT_KEEP, *TOP_KEEP} != sheet_dimension_names():
     raise AssertionError("every marked bar dimension prints once, in one view")
 
 
 def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Rewrite the native tap callout's definition parts (5..8)
-    (draw_dt_arbor_pedestal's apex tap): both ``<hw-thru>`` extents become TO
-    CROSS HOLE and the thread class goes (the title block states it)."""
+    """Rewrite the native blind tap callout's definition parts (5..8) to the
+    standard form, size then process then depth (draw_ch_rocker_arm_tl_
+    oblique_end_bracket's DRILL after the drill's size): DRILL after the tap
+    drill's Ø; the thread class goes (the title block states it).  Both ↧
+    depths stay native variables."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
-    if "\n".join(definitions.values()).count("<hw-thru>") != 2:
-        raise RuntimeError(f"tap callout lacks its two native extents: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if joined.count("<hw-tapdrldia>") != 1 or any(
+        joined.count(token) != 1 for token in _DEPTH_TOKENS
+    ):
+        raise RuntimeError(f"tap callout is not one blind tap: {definitions!r}")
+    if DRILL_PROCESS in joined or "<hw-thru>" in joined:
+        raise RuntimeError(f"tap callout already carries its rows: {definitions!r}")
     updated = {
-        key: text.replace("<hw-thru>", part.SET_SCREW_EXTENT)
+        key: text.replace("<hw-tapdrldia>", f"<hw-tapdrldia> {DRILL_PROCESS}", 1)
         for key, text in definitions.items()
     }
     thread_parts = [
@@ -175,6 +201,45 @@ def _place_point(
         raise RuntimeError(f"{label}: point sits at {here!r}, not {target!r}")
 
 
+def _sheet_direction(
+    adapter: Any, view: Any, direction: tuple[float, float, float], *, label: str
+) -> tuple[float, float]:
+    """The unit sheet direction ``view`` prints a model direction in."""
+    tail, head = model_points_in_view(
+        adapter,
+        view,
+        ((0.0, 0.0, 0.0), tuple(value / 1000.0 for value in direction)),
+        label=label,
+    )
+    dx, dy = head[0] - tail[0], head[1] - tail[1]
+    length = math.hypot(dx, dy)
+    if length < 1e-9:
+        raise RuntimeError(f"{label}: model direction {direction!r} is end-on")
+    return dx / length, dy / length
+
+
+def _turn_view(adapter: Any, view: Any, name: str) -> None:
+    """Turn ``view`` in the sheet so its VIEW_TURNS directions read as asked
+    (draw_dt_crank_hub's turned side view; the carrier section's angle from
+    the read-back direction), and prove both."""
+    label = f"fly-cutter bar {name} view"
+    native = _early_bound(view, "IView")
+    (model_dir, sheet_dir), (check_dir, check_sheet) = VIEW_TURNS[name]
+    here = _sheet_direction(adapter, view, model_dir, label=label)
+    native.Angle = (
+        float(native.Angle)
+        + math.atan2(sheet_dir[1], sheet_dir[0])
+        - math.atan2(here[1], here[0])
+    ) % (2.0 * math.pi)
+    rebuild_drawing(adapter, label=f"turn {label}")
+    for direction, wanted in ((model_dir, sheet_dir), (check_dir, check_sheet)):
+        read = _sheet_direction(adapter, view, direction, label=label)
+        if math.dist(read, wanted) > 1e-6:
+            raise RuntimeError(
+                f"{label}: model {direction!r} prints toward {read!r}, not {wanted!r}"
+            )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source fly-cutter bar missing: {SOURCE}")
@@ -202,27 +267,29 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_ORIGIN, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_ORIGIN, scale=VIEW_SCALE)
-    bottom = place_view(
-        adapter, str(SOURCE), "*Bottom", *BOTTOM_ORIGIN, scale=VIEW_SCALE
-    )
+    top = place_view(adapter, str(SOURCE), "*Right", *TOP_ORIGIN, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Bottom", *END_ORIGIN, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     origin = (0.0, 0.0, 0.0)
-    _place_point(adapter, front, origin, FRONT_ORIGIN, label="front view")
-    _place_point(adapter, right, origin, RIGHT_ORIGIN, label="right view")
-    _place_point(adapter, bottom, origin, BOTTOM_ORIGIN, label="bottom view")
+    for view, name, target, label in (
+        (front, "*Front", FRONT_ORIGIN, "front view"),
+        (top, "*Right", TOP_ORIGIN, "top view"),
+        (end, "*Bottom", END_ORIGIN, "end view"),
+    ):
+        _turn_view(adapter, view, name)
+        _place_point(adapter, view, origin, target, label=label)
     # The iso too (draw_pn_pen_rod): a new view already reads Shaded With
     # Edges, so finalize_drawing's SetDisplayMode4 is a no-op that leaves the
     # tap's cosmetic thread at draft quality (farm run 20261112T203021325Z:
     # readback cosmetic_threads=False). From HLR the shading call really
     # changes the mode and takes precision.
-    for view in (front, right, bottom, iso):
+    for view in (front, top, end, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations: list[Any] = []
     for view, keep, label in (
         (front, FRONT_KEEP, "front view"),
-        (right, RIGHT_KEEP, "right view"),
+        (top, TOP_KEEP, "top view"),
     ):
         annotations += curate_view_dimensions(
             adapter,
@@ -239,23 +306,22 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part.DIMENSION_CALLOUTS)
 
-    # The set-screw tap, end-on in the bottom view: native callout, TAP first,
-    # its extent the cross hole it stops at.
+    # The set-screw tap, end-on in the end view: the native blind callout in
+    # standard form, Ø DRILL ↧ depth over thread ↧ full-thread depth.
     adapter.currentModel.GraphicsRedraw2()
     tap_callout = add_native_hole_callout(
         adapter,
-        bottom,
+        end,
         edge_xy=TAP_EDGE_XY,
         callout_xy=TAP_CALLOUT_XY,
         label="set-screw tap",
-        process=TAP_PROCESS,
     )
     resolved = _rewrite_callout_definitions(tap_callout, tap_callout_definitions)
     joined = "\n".join(resolved.values())
-    if joined.count(part.SET_SCREW_EXTENT) != 2 or "2B" in joined:
+    if joined.count(DRILL_PROCESS) != 1 or "2B" in joined or "THRU" in joined:
         raise RuntimeError(f"set-screw tap callout text did not resolve: {resolved!r}")
     set_hole_callout_precision(tap_callout, TAP_PRECISION, label="set-screw tap")
-    for view in (front, right, bottom):
+    for view in (front, top, end):
         set_hidden_lines_removed(adapter, view)
 
     drawing.ClearSelection2(True)

@@ -19,6 +19,7 @@ import dt_cone_tip_gear_spec as tip
 import dt_cone_tip_gear_tl_form_cutter_spec as part
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
+from _printed_tolerance import printed_band_mm
 
 SCRIPTS = Path(__file__).resolve().parent
 # ASME B landscape: inside the border, clear of the title block's corner.
@@ -114,6 +115,16 @@ def test_each_cut_removes_stock_and_the_volume_oracle_has_converged() -> None:
     assert (
         abs(part.bit_volume_mm3("form", slices=96) - volumes[-1]) < part.VOLUME_TOL_MM3
     )
+    # The flat leaves its face FACE_HEIGHT above the axis: the flat stage is
+    # half the rod plus the upper half behind the flat plus that thin strip.
+    rod = math.pi * part.BIT_RADIUS**2
+    strip = volumes[1] - rod / 2.0 * (
+        2.0 * part.BIT_LENGTH - part.FLAT_LENGTH + part.TIP_STOCK
+    )
+    width = 2.0 * part.BIT_RADIUS
+    assert strip == pytest.approx(
+        width * part.FACE_HEIGHT * (part.FLAT_LENGTH + part.TIP_STOCK), rel=1e-4
+    )
 
 
 def test_the_sheet_prints_each_marked_dimension_once_inside_the_border() -> None:
@@ -133,17 +144,26 @@ def test_the_sheet_prints_each_marked_dimension_once_inside_the_border() -> None
 
 def test_the_flat_prints_its_length_and_its_micrometer_depth_bare() -> None:
     """The flat's depth is a native model dimension, the thickness from the
-    face to the rod's far side, nominal half the rod (zero rake), at four
-    places under the title block's .XXX band; neither flat dimension
-    carries words."""
+    face to the rod's far side, a plain .063 on the title block's .XXX grid
+    and band (the face .0005 above the axis); neither flat dimension
+    carries words or its own band."""
     assert part.DRAWING_DIMENSIONS["FlatProfile"] == {"FlatLength", "FlatDepth"}
-    assert part.FLAT_DEPTH == pytest.approx(part.BIT_DIA / 2.0)
-    assert part.FLAT_DEPTH / 25.4 == pytest.approx(0.0625)
-    assert part.DRAWING_PRECISION_BY_NAME["FlatDepth"] == 4
-    assert part.FLAT_DEPTH_TOL == pytest.approx(0.005 * 25.4)
+    assert part.FLAT_DEPTH == pytest.approx(0.063 * 25.4)
+    assert part.DRAWING_PRECISION_BY_NAME["FlatDepth"] == 3
+    assert part.FLAT_DEPTH_TOL == pytest.approx(printed_band_mm(3, unit="in"))
+    assert part.FACE_HEIGHT == pytest.approx(0.0005 * 25.4)
     assert "FlatLength" not in part.DIMENSION_CALLOUTS
     assert "FlatDepth" not in part.DIMENSION_CALLOUTS
     assert "CENTER" not in " ".join(part.DIMENSION_CALLOUTS.values())
+    # The builder drives the depth from its own .063 global, no band of its
+    # own, and floors the flat at FACE_HEIGHT.
+    builder = (SCRIPTS / "build_dt_cone_tip_gear_tl_form_cutter.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'flat.record("FlatDepth", \'"FlatDepth"\')' in builder
+    assert '("FlatDepth", f"{FLAT_DEPTH}mm")' in builder
+    assert "FLAT_DEPTH_TOL" not in builder
+    assert "(-FLAT_LENGTH, FACE_HEIGHT)" in builder
     # The depth's text sits right of the tip, between the face and the far
     # side, left of the end view's rod.
     x, y = drawing.FRONT_KEEP["FlatDepth"]
@@ -157,10 +177,20 @@ def test_the_flat_band_holds_zero_rake_and_the_tooth_space() -> None:
     import dt_cone_tip_gear_tl_cutter_spec as fixture
 
     assert part.FLAT_FACE_OFFSET_MAX == pytest.approx(
-        part.FLAT_DEPTH_TOL + part.BIT_DIA_TOL / 2.0
+        part.FACE_HEIGHT + part.FLAT_DEPTH_TOL + part.BIT_DIA_TOL / 2.0
     )
     assert 0.0 < fixture.RAKE_ERROR_DEG_MAX <= fixture.RAKE_ERROR_DEG_LIMIT
     assert 0.0 < fixture.FORM_DISTORTION_MAX < fixture.FORM_DISTORTION_LIMIT
+    # Sliding the edge along the relieved walls: width under half the gear's
+    # thickness band, and the forward run keeps the stems' runoff.
+    assert fixture.FACE_SHIFT_WIDTH_MAX == pytest.approx(
+        2.0 * part.FLAT_FACE_OFFSET_MAX * part.TAN_SIDE
+    )
+    assert 0.0 < fixture.FACE_SHIFT_WIDTH_MAX < fixture.FACE_SHIFT_WIDTH_LIMIT
+    assert (
+        fixture.RUNOFF_OVER_STEMS - fixture.FACE_SHIFT_FORWARD_MAX
+        >= fixture.tip.CUTTER_RUNOFF_MM - 1e-9
+    )
 
 
 def test_the_notes_state_facts_in_at_most_four_lines() -> None:

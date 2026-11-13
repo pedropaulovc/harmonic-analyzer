@@ -78,8 +78,7 @@ from dt_cone_tip_gear_tl_form_cutter_spec import (
     DRAWING_PRECISION,
     FLANK_END_Z,
     FLAT_DEPTH,
-    FLAT_DEPTH_PLACES,
-    FLAT_DEPTH_TOL,
+    FACE_HEIGHT,
     FLAT_LENGTH,
     FORM_CUT_DEPTH,
     FORM_DEPTH,
@@ -125,14 +124,15 @@ PROFILE_POINTS = [
 # The flat: a Front-plane box over the face from the flat's start to past the
 # tip, cut through the rod both ways along Z.  Its floor (the face) stands
 # FLAT_DEPTH above a construction line on the rod's far side, so the depth the
-# sheet prints is the thickness a micrometer reads across the flat.
+# sheet prints is the thickness a micrometer reads across the flat; on the
+# .001 grid it leaves the face FACE_HEIGHT above the axis.
 _FLAT_FAR_X = TIP_STOCK + 1.0
 _FLAT_TOP = BIT_RADIUS + 1.0
 FLAT_POINTS = [
-    (-FLAT_LENGTH, 0.0),
+    (-FLAT_LENGTH, FACE_HEIGHT),
     (-FLAT_LENGTH, _FLAT_TOP),
     (_FLAT_FAR_X, _FLAT_TOP),
-    (_FLAT_FAR_X, 0.0),
+    (_FLAT_FAR_X, FACE_HEIGHT),
 ]
 # The rod's far side at the flat's start, run to under P1.
 FAR_SIDE_ENDS = ((-FLAT_LENGTH, -BIT_RADIUS), (0.0, -BIT_RADIUS))
@@ -454,6 +454,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("BitDia", f"{BIT_DIA}mm"),
         ("BitLength", f"{BIT_LENGTH}mm"),
         ("FlatLength", f"{FLAT_LENGTH}mm"),
+        ("FlatDepth", f"{FLAT_DEPTH}mm"),
         ("FrontClearance", f"{FRONT_CLEARANCE_DEG}deg"),
         ("SideClearance", f"{SIDE_CLEARANCE_DEG}deg"),
     ):
@@ -569,13 +570,13 @@ async def build(adapter: Any) -> dict[str, str]:
         FLAT_DEPTH,
         "flat depth",
     )
-    flat.record("FlatDepth", '"BitDia"/2')
+    flat.record("FlatDepth", '"FlatDepth"')
     await dimension_between(
         adapter,
         f"{flat_lines[0]}.start",
         f"{flat_lines[0]}.end",
         "vertical_distance",
-        _FLAT_TOP,
+        _FLAT_TOP - FACE_HEIGHT,
         "flat box height",
     )
     flat.record(None)
@@ -677,15 +678,7 @@ async def build(adapter: Any) -> dict[str, str]:
         places=BIT_DIA_PLACES,
         display_unit=UNIT,
     )
-    # The flat's depth carries the title block's .XXX band at four places.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "FlatProfile",
-        "FlatDepth",
-        FLAT_DEPTH_TOL,
-        places=FLAT_DEPTH_PLACES,
-        display_unit=UNIT,
-    )
+    # The flat's depth takes the title block's .XXX row, like every other size.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

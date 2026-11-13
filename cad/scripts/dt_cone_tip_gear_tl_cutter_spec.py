@@ -125,14 +125,21 @@ if not -bar.BAR_RADIUS < TAIL_X_RANGE[0] < TAIL_X_RANGE[1] < -set_screw.MAJOR_DI
 #     cross-hole station (its socket face then stands proudest).
 if bar.SET_SCREW_ENGAGED_MIN < bar.SET_SCREW_MIN_ENGAGEMENT:
     raise AssertionError("the seated set screw must keep 1.5D of thread")
-# (g) The flat's band (bit.FLAT_DEPTH_TOL, the title block's .XXX, plus the
-#     rod's half-band) sets the face at most bit.FLAT_FACE_OFFSET_MAX off the
-#     bar axis.  At the shortest swing, on the form's deepest point, that
-#     turns the rake by RAKE_ERROR_DEG_MAX (1.28 deg) and moves each face
-#     point outward by sqrt(r^2 + e^2) - r: under .002 mm, near-uniform
-#     across the form, which the plunge to over-pins absorbs.  What changes
-#     the tooth space's shape is that shift's spread across the form's depth
-#     (.0002 mm), held under half the MHA-DT-37 sheet 2 table's last place.
+# (g) The flat's .063 nominal (bit.FACE_HEIGHT, .0005 above the axis), its
+#     band (bit.FLAT_DEPTH_TOL, the title block's .XXX) and the rod's
+#     half-band set the face at most bit.FLAT_FACE_OFFSET_MAX off the bar
+#     axis.  At the shortest swing, on the form's deepest point, that turns
+#     the rake by RAKE_ERROR_DEG_MAX (1.40 deg) and moves each face point
+#     outward by sqrt(r^2 + e^2) - r: under .002 mm, near-uniform across the
+#     form, which the plunge to over-pins absorbs.  What changes the tooth
+#     space's shape is that shift's spread across the form's depth (.0002
+#     mm), held under half the MHA-DT-37 sheet 2 table's last place.
+#     The same offset slides the cutting edge along the relieved walls: the
+#     form widens or narrows uniformly by FACE_SHIFT_WIDTH_MAX (2 e tan(side)),
+#     which the plunge to over-pins also takes up, held under half the gear's
+#     tooth-thickness band so the plunge keeps the other half; and the edge
+#     runs forward by FACE_SHIFT_FORWARD_MAX (e tan(front)), still clear of
+#     the stems by the (a) runoff.
 _SWING_MIN = bar.BAR_RADIUS + STICK_OUT_WINDOW[0]
 _FORM_R_MIN = _SWING_MIN - bit.FORM_DEPTH
 _FORM_R_MAX = _SWING_MIN + bit.FORM_X_MAX
@@ -151,6 +158,15 @@ if RAKE_ERROR_DEG_MAX > RAKE_ERROR_DEG_LIMIT:
     raise AssertionError("the flat's band lets the rake drift past its limit")
 if FORM_DISTORTION_MAX >= FORM_DISTORTION_LIMIT:
     raise AssertionError("the flat's band would distort the tooth space")
+FACE_SHIFT_WIDTH_MAX = 2.0 * bit.FLAT_FACE_OFFSET_MAX * bit.TAN_SIDE
+FACE_SHIFT_WIDTH_LIMIT = 0.5 * abs(
+    tip.TOOTH_THICKNESS_BAND[1] - tip.TOOTH_THICKNESS_BAND[0]
+)
+FACE_SHIFT_FORWARD_MAX = bit.FLAT_FACE_OFFSET_MAX * bit.TAN_FRONT
+if FACE_SHIFT_WIDTH_MAX >= FACE_SHIFT_WIDTH_LIMIT:
+    raise AssertionError("the flat's band would move the form past the gear's band")
+if RUNOFF_OVER_STEMS - FACE_SHIFT_FORWARD_MAX < tip.CUTTER_RUNOFF_MM - 1e-9:
+    raise AssertionError("a high face would carry the edge nearer the stems")
 
 # --- Sheet words ---------------------------------------------------------------
 BOM_COMPONENTS = (BAR, BIT, SET_SCREW)
