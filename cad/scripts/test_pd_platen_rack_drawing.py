@@ -15,6 +15,7 @@ import _gear_quality as quality
 
 import build_pd_platen_rack as builder
 import draw_pd_platen_rack as drawing
+import pd_platen_rack_callouts as callouts
 import pd_platen_rack_spec as spec
 import pd_transgear_feed_pinion_spec as feed
 from _drawing_contract import (
@@ -831,11 +832,15 @@ def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() 
         "RackHeight": quality.rack_stock_height_max_mm(),
         "RackDepth": quality.rack_face_width_max_mm(),
     }
-    assert set(spec.DIMENSION_CALLOUTS) == set(ceilings)
+    assert set(callouts.DIMENSION_CALLOUTS) == set(ceilings)
+    assert drawing.DIMENSION_CALLOUTS is callouts.DIMENSION_CALLOUTS
     assert set(ceilings) <= spec.DRAWING_REFERENCE_DIMENSIONS
-    step = 10.0 ** -spec.DRAWING_PRECISION_BY_NAME["RackHeight"]
+    # Rule 4: a plain inch step, not a converted millimetre (v49 review).
+    step = 10.0 ** -callouts.RECEIVING_LIMIT_PLACES
     for name, ceiling_mm in ceilings.items():
-        printed = float(spec.DIMENSION_CALLOUTS[name].split()[0])
+        value = callouts.DIMENSION_CALLOUTS[name].split()[0]
+        assert len(value.partition(".")[2]) == callouts.RECEIVING_LIMIT_PLACES
+        printed = float(value)
         # Rounded down: never admits a section above the ceiling, never
         # rejects one more than a print step below it.
         assert printed * 25.4 <= ceiling_mm
@@ -843,9 +848,9 @@ def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() 
         assert printed > spec.RACK_HEIGHT / 25.4
     # Each limit names the mate it protects (round 5: a supplier size's limit
     # with no mate read as invented).
-    assert spec.DIMENSION_CALLOUTS["RackHeight"].splitlines()[1] == (
+    assert callouts.DIMENSION_CALLOUTS["RackHeight"].splitlines()[1] == (
         f"CLEARS {_config.parts('pd-platen-guide')['number']}"
     )
-    assert spec.DIMENSION_CALLOUTS["RackDepth"].endswith(
+    assert callouts.DIMENSION_CALLOUTS["RackDepth"].endswith(
         f" FOR {_config.parts('pd-transgear-feed-pinion')['number']} MESH"
     )
