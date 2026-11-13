@@ -159,17 +159,23 @@ def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
 # 20261113T085510850Z's review: a 1:1 top view over a 2:1 right view turned
 # 90 deg is no projected pair). The front view shows the clock pin behind
 # the stub; sheet 2's exploded right view shows it. The isometric sits
-# under them with its balloon ring inside the left border (that run rang
-# items 2 and 4 outside it from x .045) and clear of the title block
-# (x >= 0.216 m, y <= 0.066 m); the BOM, steps and checks fill the right
-# half, the steps under the BOM's two-line rows (that run printed them over
-# rows 4 and 5 from y .214).
+# under them with its balloon ring inside the left border and clear of the
+# title block (x >= 0.216 m, y <= 0.066 m): run 20261113T085510850Z rang
+# items 2 and 4 outside the border from x .045; run 20261113T171903296Z,
+# from (.060, .052), still put item 2's circle 1.67 mm over it (left edge
+# x 11.0 mm) and item 5's 1.38 mm from the front view's item 1. The
+# isometric moved 14 mm right and 5 mm down (item 2's edge at about 25 mm,
+# 12 mm inside) and the front view 15 mm up (items 1 and 5 about 15 mm apart,
+# centre to centre), every view and balloon translating with its view. The
+# BOM, steps and checks fill the right half, the steps under the BOM's
+# two-line rows (run 20261113T085510850Z printed them over rows 4 and 5
+# from y .214).
 TOP_CENTER = (0.090, 0.200)
-FRONT_CENTER = (TOP_CENTER[0], 0.120)
-ISO_CENTER = (0.060, 0.052)
+FRONT_CENTER = (TOP_CENTER[0], 0.135)
+ISO_CENTER = (0.074, 0.047)
 TOP_CAPTION_XY = (0.140, 0.255)
-FRONT_CAPTION_XY = (0.150, 0.100)
-ISO_NOTE_XY = (0.105, 0.040)
+FRONT_CAPTION_XY = (0.150, 0.115)
+ISO_NOTE_XY = (0.119, 0.035)
 BOM_ANCHOR = (0.219, 0.262)
 STEPS_XY = (0.219, 0.184)
 CHECKS_XY = (0.219, 0.112)
