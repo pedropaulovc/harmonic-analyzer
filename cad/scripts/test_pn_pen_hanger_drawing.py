@@ -261,7 +261,7 @@ def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> N
     # Just above the plate: the 1:1 cutting line clears its top edge, and the
     # strap edge it cuts still reads the plate's overhang to the printed place.
     assert top + 0.5 <= draw.SECTION_Y < top + 1.0
-    places = spec.DRAWING_REFERENCE_PRECISION
+    places = spec.DRAWING_PRECISION_BY_NAME["PlateOverhang"]
     assert round(draw._OVERHANG_AT_CUT / 25.4, places) == 0.06
     assert round(spec.UPPER_PLATE_OVERHANG / 25.4, places) == 0.06
     source = inspect.getsource(draw._create_section)
@@ -308,7 +308,7 @@ def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> N
 def test_slot_width_text_is_parked_clear_of_every_extension_line() -> None:
     # Every vertical extension line of the width rows lies inside the plate,
     # and the section's rightmost ink is the strap end: the slot width's
-    # ~49 mm text block starts right of both.
+    # ~75 mm text block starts right of both.
     rightmost_ink = draw._ax(draw._SECTION_X[0])
     left_end = draw.SLOT_WIDTH_TEXT_XY[0] - draw._SLOT_TEXT_HALF_WIDTH
     assert left_end > rightmost_ink > draw._ax(-draw._HALF_PLATE)
@@ -353,25 +353,29 @@ def test_slot_corner_radius_prints_its_single_max_limit(monkeypatch) -> None:
     assert spec.DIMENSION_PREFIXES == {("UpperSlotCorner", "SlotCornerR"): "2X R"}
 
 
-def test_overhang_reference_spans_the_strap_cut_and_the_plate_edge() -> None:
+def test_upper_plate_is_located_across_the_strap_by_a_model_dimension() -> None:
+    # Rule 10: the overhang past the strap's edge is the upper plate's
+    # controlling side-to-side station, a marked model dimension at the
+    # title block's .XX, not a reference.
+    assert "PlateOverhang" in spec.DRAWING_DIMENSIONS["UpperGuideProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["PlateOverhang"] == 2
+    assert "PlateOverhang" not in spec.REFERENCE_DIMENSIONS
+    # The builder's drive equation (globals in model mm) is the spec's value.
+    drive = (
+        spec.GUIDE_PLATE_WIDTH / 2.0
+        - spec.STRAP_BOT_X[1] * spec.GUIDE_PLATE_DROPS[1] / spec.STRAP_RISE
+    )
+    assert drive == pytest.approx(spec.UPPER_PLATE_OVERHANG)
     strap_x = draw._ax(draw._STRAP_CUT_X[1])
     plate_x = draw._ax(draw._HALF_PLATE)
     # Model +x prints left: the plate edge stands left of the strap's cut.
     assert strap_x - plate_x == pytest.approx(draw._OVERHANG_AT_CUT * 0.002)
-    # Picks inside the strap's thickness and on the plate's reach, between
-    # the plate-back and slot-bottom extension lines.
-    assert spec.STRAP_Z[0] < draw.OVERHANG_PICK_Z[0] < spec.STRAP_Z[1]
-    assert spec.SLOT_BOTTOM_Z < draw.OVERHANG_PICK_Z[1] < spec.STRAP_Z[0]
     # Its row above the strap back face, its value left of the plate edge,
     # above the plate reach's value.
-    text_x, text_y = draw.OVERHANG_TEXT_XY
+    text_x, text_y = draw.SECTION_KEEP["PlateOverhang"]
     assert text_y > draw._az(spec.STRAP_Z[1]) + 0.006
     assert text_x + 0.0045 < plate_x
     assert draw.SECTION_KEEP["PlateReach"][1] < draw._az(spec.STRAP_Z[1])
-    assert "_add_overhang_reference(adapter, section)" in inspect.getsource(draw.build)
-    source = inspect.getsource(draw._add_overhang_reference)
-    assert "set_reference_dimension(" in source
-    assert 'orientation="horizontal"' in source
 
 
 def test_slots_share_one_drawn_centreline_in_the_front_view() -> None:
@@ -452,5 +456,9 @@ def test_each_numbered_note_is_flagged_from_its_feature() -> None:
     assert "UpperPlateDrop" not in spec.DIMENSION_CALLOUTS
     for name in spec.DIMENSION_CALLOUTS:
         assert name in draw.FRONT_KEEP or name in draw.SECTION_KEEP, name
-    # Rule 7: at most two lines of words under a size.
-    assert all(len(c.splitlines()) <= 2 for c in spec.DIMENSION_CALLOUTS.values())
+
+
+def test_callouts_carry_at_most_two_lines_of_words() -> None:
+    # Rule 7: a callout is short, at most two lines of words under its value.
+    for name, callout in spec.DIMENSION_CALLOUTS.items():
+        assert len(callout.splitlines()) <= 2, name

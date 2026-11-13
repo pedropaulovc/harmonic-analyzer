@@ -252,8 +252,9 @@ if NUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
 # thickness.
 # Section A-A just above the upper plate, looking down onto it: its U
 # outline (the slot depth and the reach both from the plate's free end), the
-# slot-corner radius and the strap stock thickness (the lower plate is
-# identical and flush with the strap bottom end -- notes). ---
+# plate's overhang past the strap's edge (its braze station across the
+# strap), the slot-corner radius and the strap stock thickness (the lower
+# plate is identical and flush with the strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"},
     "Strap": {"StrapThick"},
@@ -266,6 +267,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ArmWidth",
         "PlateReach",
         "PlateWidth",
+        "PlateOverhang",
     },
     "UpperSlotCorner": {"SlotCornerR"},
 }
@@ -292,6 +294,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ArmWidth": 2,
         "PlateReach": 2,
         "PlateWidth": 2,
+        "PlateOverhang": 2,
     },
     "UpperSlotCorner": {"SlotCornerR": 2},
 }
@@ -359,14 +362,14 @@ if SCREW_HOLE_WALL_MIN < WALL_TARGET_MM:
 # Every tight band names its mate on the dimension it governs.  The two
 # numbered notes are flagged from the features they govern (rule 7: SEE NOTE
 # n puts the note at the callout): note 1, the plates' braze to the strap
-# front, from the lower plate's stock callout in the front view (a location
-# dimension carries only its value and band, so the upper plate's drop takes
-# no flag; #2721 review 20261113T172037696Z); note 2, the slots in line, from
-# the slot width.  Rule 7: at most two lines of words under the slot's limits.
+# front, from each plate's place in the front view (the upper plate's drop,
+# the lower plate's stock); note 2, the slots cut together, from the slot
+# width.  Rule 7: at most two lines of words under the slot's limits.
 BRAZE_NOTE = 1
 SLOTS_NOTE = 2
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
+    "UpperPlateDrop": f"SEE NOTE {BRAZE_NOTE}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
     # The strap's and the plates' thickness is the bar's as supplied, not a
@@ -395,20 +398,19 @@ DRAWING_NOTES = "\n".join(
         f"   {PEN_ROD_NUMBER} SLIDES FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
-# The upper plate's lateral station is the lower plate's: both slots sit on
-# one centreline the front view draws through them (drawing-guidelines.md
-# rule 26: features in line share a drawn centreline), and the lower plate
-# is fixed by the strap's foot corners (note 1).  What that station leaves the
-# reader to work out (rule 10): the upper plate's +x edge stands past the
-# tapered strap's edge at the plate's top face.  Section A-A prints it as a
-# reference, measured on the sheet.
+# The upper plate's braze station across the strap (rule 10: a location is a
+# dimension, not the centreline alone): its +x edge past the tapered strap's
+# edge at the plate's top face, a model dimension (build_pn_pen_hanger's
+# construction line in the upper guide profile) that section A-A prints at
+# .XX.  The lower plate is fixed by the strap's foot corners (note 1); both
+# slots are then cut through the plates together (note 2), so the plates'
+# relative offset reaches only the lower plate's arms, not the slots' line.
 UPPER_PLATE_OVERHANG = GUIDE_PLATE_WIDTH / 2.0 - (
     STRAP_TOP_X[1]
     + (STRAP_BOT_X[1] - STRAP_TOP_X[1])
     * (GUIDE_PLATE_YS[1] + GUIDE_PLATE_T)
     / STRAP_BOT_Y
 )
-DRAWING_REFERENCE_PRECISION = 2
 if UPPER_PLATE_OVERHANG <= 0.0:
     raise AssertionError("the upper guide plate no longer overhangs the strap edge")
 # The front view is projected and at the sheet's 1:1 (no label, rule 9); the
