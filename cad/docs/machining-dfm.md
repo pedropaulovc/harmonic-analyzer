@@ -46,8 +46,8 @@ its first-root position; no second general note restates that location.
      MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
      ends .030 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
      stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner rulings
-     2026-11-09 and 2026-11-10: one blade per gear in the tooth space beside its phase-0 tooth, T030 to
-     T006), and let it cure before load; a bonded
+     2026-11-09, 2026-11-10 and 2026-11-13: one brass sheet cut to shape, one blade per gear in the tooth
+     space beside its phase-0 tooth, T030 to T006), and let it cure before load; a bonded
      slip fit has nothing to adjust afterwards. The bonds cure in two rounds (#2470), each accepted on the
      comb once cured. Step 1 bonds T024 alone, its joint degreased, then T030's back face, the key's back end
      and the feeler waxed (none on the land) against its squeeze-out; once T024 has cured and the wax is

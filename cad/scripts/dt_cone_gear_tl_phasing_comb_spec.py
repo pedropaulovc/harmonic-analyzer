@@ -4,36 +4,41 @@ Shop tooling, not a machine part (cad/docs/subsystem-identities.md): the
 fixture MHA-DT-00 step 1 engages while LOCTITE 638 grabs, so the bonded tip
 gears cure in phase with the keyed stack (owner ruling 2026-11-09 (b1) via PR
 #1992, C1 keyed; single blade per gear, owner ruling 2026-11-10 via PR #1992).
+The 1898 machine has no such tool (its gears are fixed differently); this is
+shop tooling for the replica's bonded tip. Owner ruling 2026-11-13: the comb
+is cut to shape from a single sheet of metal. It is one flat brass sheet,
+SHEET_THICK thick as bought, its stepped edge the whole part: no blade is
+thinned and no face is a datum.
+
 Every cone gear has a tooth centred on its local +X (phase 0; the keyway runs
-through T030's), so a tooth space is centred at SPACE_ANGLE = +180/N deg on
-every gear: from +X toward the gear model's +Y, counter-clockwise looking
-down the gear model's +Z (its Front plane's normal). One flat plate lying
-parallel to the +X radial plane drops one blade into that space of T030 (the
-reference, keyed) and of the bonded T024, T018, T012 (MHA-DT-03) and T006
-(MHA-DT-37) at once.
+through T030's), so a tooth space is centred at +180/N deg on every gear. A
+space's centre stands about half a circular pitch off the +X radial plane on
+every 48 DP gear at its pitch circle, so one sheet lying parallel to that
+plane, that far off it, passes down the space beside the phase-0 tooth of
+T030 (the reference, keyed) and of the bonded T024, T018, T012 (MHA-DT-03)
+and T006 (MHA-DT-37) at once. Its edge is a staircase: one level (a blade)
+per gear, each deeper than the last, south to north.
 
-Frame (the SolidWorks model). X runs along the cone axis, north (the plate's
+Frame (the SolidWorks model). X runs along the cone axis, north (the sheet's
 length); Y runs radially outward, along the gears' +X (its height); Z is the
-tangential direction, the gears' +Y (its thickness). Z0 is the plate's back
-face, the blades' datum. The origin is the north end of the T030 blade on the
-SEAT line, T030's largest tip radius: the plate's edge over T030 bears on the
-tip land of T030's phase-0 tooth there. Over each gear the plate's edge
-stands clear of that gear's tips (a STEP), and one blade drops from it: a
-slab BLADE_WIDTH thick whose near face stands BLADE_FACE off the back face,
-its tip between its gear's root and pitch circles.
+tangential direction, the gears' +Y (its thickness). The origin is the
+sheet's south end on its T030 blade's edge: the SEAT line.
 
-Every blade is cut to the shop's own rows (drawing-guidelines.md "What the
-shop holds"): its thickness at the milled-slot row, its location from the back
-face and its tip depth at the milled-step row. A blade's walls are parallel
-to the +X radial plane while its space is centred on SPACE_ANGLE, so the
-play is worked on the real slab against each gear's four printed tooth
-corners (``play_window_rad``). ``PHASE_ERROR_MM`` proves every bonded gear's
-worst phase against T030 at those limits inside the booked error_budget.yaml
-cone_tip_bond_clock tolerance.
+The seat: T030's blade drops into T030's space until it bottoms on T030's
+root; on the thickest sheet over the narrowest root space it binds between
+the flanks just above it instead. Where it bottoms, the sheet may slide
+across the space as far as the space lets it (``SEAT_POSITIONS``). Every other
+blade stands at its printed depth under the seat line, at the title block's
+.XXX band; each bonded gear turns until its space holds its blade, anywhere
+in that space's play. The depths are the deepest on the .001 grid at which no
+blade bottoms on its gear's root or binds in its space at any printed limit:
+the deeper the blade, the narrower the space and the less play.
+``PHASE_ERROR_MM`` proves every bonded gear's worst phase against T030 at
+every limit inside the booked error_budget.yaml cone_tip_bond_clock.
 
-Assumption: the fitter presses the comb radially, so its edge over T030
-bears flat on the phase-0 tooth's tip land and the plate stays parallel to
-the radial plane; it slides tangentially only as far as T030's blade lets it.
+Assumption: the fitter presses the comb radially and holds the sheet
+parallel to the radial plane; it slides tangentially only as far as T030's
+space lets it.
 """
 
 from __future__ import annotations
@@ -86,6 +91,8 @@ def gear_tag(teeth: int) -> str:
 
 # --- The title block's bands (inch sheet) -------------------------------------
 _XX = printed_band_mm(2, unit=UNIT)
+DEPTH_PLACES = 3
+_XXX = printed_band_mm(DEPTH_PLACES, unit=UNIT)
 
 
 def inch_grid_mm(value_mm: float, places: int, rounding=round) -> float:
@@ -95,6 +102,22 @@ def inch_grid_mm(value_mm: float, places: int, rounding=round) -> float:
 
 def inch_text(value_mm: float, places: int) -> str:
     return family.inch_text(value_mm, places)
+
+
+# --- The sheet ----------------------------------------------------------------
+# Half-hard brass shim stock, .020 in, as bought (ASTM B36); its listed
+# thickness tolerance is +/-.002 in (McMaster-Carr 9011K111, 8 x 12 in sheet,
+# read 2026-11-13). Of the stock gauges .015, .020 and .025, .020 is the one
+# whose worst phase stays inside the booked bond clock: thinner leaves more
+# play in every space, and .025 binds in T030's space at a depth that its
+# +/-.001 moves by several times as much.
+SHEET_THICK = 0.020 * INCH
+SHEET_THICK_TOLERANCE_MM = 0.002 * INCH
+SHEET_LIMITS_MM = (
+    SHEET_THICK - SHEET_THICK_TOLERANCE_MM,
+    SHEET_THICK,
+    SHEET_THICK + SHEET_THICK_TOLERANCE_MM,
+)
 
 
 # --- Gear radii, read from the family's tooth layer ---------------------------
@@ -114,7 +137,7 @@ def space_angle_rad(teeth: int) -> float:
     return math.pi / teeth
 
 
-# --- Axial: each blade stands inside its gear's face --------------------------
+# --- Axial: each blade starts inside its gear's face --------------------------
 FACE_WIDTH = family.FACE_WIDTH
 
 
@@ -125,32 +148,34 @@ def _south_face_mm(teeth: int) -> float:
     return index * FACE_WIDTH + (STACK_FEELER if index else 0.0)
 
 
-# A blade never overhangs the larger gear south of it (it would strike that
-# gear's teeth), and the T006 blade never reaches past T006's north face (the
-# MHA-DT-38 bushing); a blade's north end over the smaller gear beyond it
-# clears that gear's tips (its tip stands over them, below).  The blades stop
-# BLADE_INSET short of both faces; T030..T012 blades are BLADE_LENGTH long,
-# and the T006 blade runs to the plate's north end. Every length is .XX at
-# the title block's band (rule 3): the inset keeps each blade inside its
-# face at that band (AXIAL_PLACEMENT_WINDOW).
+# Each blade's level runs from the step at its south end north to the next
+# step: over its own gear's face, then over the smaller gear beyond it, whose
+# tips it clears (below). A step never stands over the larger gear south of
+# it (the deeper level would strike that gear's teeth), the sheet's south
+# end never over T030's south neighbour, and its north end never past
+# T006's north face (the MHA-DT-38 bushing). The sheet stops BLADE_INSET
+# inside T030's south face and T006's north face, and each step stands
+# BLADE_INSET north of its gear's south face. T006's level is BLADE_LENGTH
+# long. Every length is .XX at the title block's band (rule 3): the inset
+# keeps every step clear at that band (AXIAL_PLACEMENT_WINDOW).
 BLADE_INSET = 0.030 * INCH
 BLADE_LENGTH_PLACES = 2
 BLADE_LENGTH = inch_grid_mm(
     FACE_WIDTH - 2.0 * BLADE_INSET, BLADE_LENGTH_PLACES, math.floor
 )
-# Blade south ends from the plate's south end (the T030 blade's), printed.
+# Blade south ends (the steps) from the sheet's south end, printed.
 BLADE_START_MM: dict[int, float] = {
     teeth: inch_grid_mm(_south_face_mm(teeth), BLADE_LENGTH_PLACES) for teeth in GEARS
 }
-PLATE_LENGTH = BLADE_START_MM[GEARS[-1]] + BLADE_LENGTH
+SHEET_LENGTH = BLADE_START_MM[GEARS[-1]] + BLADE_LENGTH
 
 
 def _placement_window_mm(
     feeler: float, faces: tuple[float, ...], ends: tuple[float, ...]
 ) -> float:
-    """Width of the comb shifts that keep every blade inside its face, for one
-    stack (the feeler's and each face's deviation, T030 first) and one print
-    (``ends``: each blade start's deviation, T006's last, then the plate
+    """Width of the comb shifts that keep every step and both ends clear, for
+    one stack (the feeler's and each face's deviation, T030 first) and one
+    print (``ends``: each step's deviation, T006's last, then the sheet
     length's)."""
     south: list[float] = []
     station = 0.0
@@ -159,13 +184,13 @@ def _placement_window_mm(
             station += FACE_WIDTH + faces[index - 1] + (feeler if index == 1 else 0.0)
         south.append(station)
     # Comb placed with its south end BLADE_INSET north of T030's south face,
-    # then shifted by s: blade g's south end at INSET + START_g + end_g + s.
+    # then shifted by s: step g at INSET + START_g + end_g + s.
     low = max(
         south[index] - (BLADE_INSET + BLADE_START_MM[teeth] + ends[index])
         for index, teeth in enumerate(GEARS)
     )
     north_face = south[-1] + FACE_WIDTH + faces[-1]
-    high = north_face - (BLADE_INSET + PLATE_LENGTH + ends[-1])
+    high = north_face - (BLADE_INSET + SHEET_LENGTH + ends[-1])
     return high - low
 
 
@@ -175,8 +200,8 @@ def _placement_window_min_mm() -> float:
     for signs in itertools.product((-1.0, 1.0), repeat=len(GEARS) + 3):
         faces = tuple(sign * face for sign in signs[: len(GEARS)])
         stack_feeler = signs[len(GEARS)] * feeler
-        # Every print: the blade starts at either end of their .XX band
-        # (together), the plate's length at either end of its own.
+        # Every print: the steps at either end of their .XX band (together),
+        # the sheet's length at either end of its own.
         start, length = signs[-2] * printed, signs[-1] * printed
         ends = (0.0, *(start for _ in GEARS[1:]), length)
         widths.append(_placement_window_mm(stack_feeler, faces, ends))
@@ -186,80 +211,17 @@ def _placement_window_min_mm() -> float:
 # The fitter centres the comb on the stack by eye; at the worst stack and
 # print it still has this much axial freedom.
 AXIAL_PLACEMENT_WINDOW_MM = _placement_window_min_mm()
-if AXIAL_PLACEMENT_WINDOW_MM < 0.1:
+if AXIAL_PLACEMENT_WINDOW_MM <= 0.0:
     raise AssertionError(
-        f"comb placement window {AXIAL_PLACEMENT_WINDOW_MM:.3f} mm: a blade overhangs"
+        f"comb placement window {AXIAL_PLACEMENT_WINDOW_MM:.3f} mm: a step overhangs"
     )
 
-# --- Radial: the seat and the steps -------------------------------------------
-RADIAL_PLACES = 3
-# The comb seats on the tip of T030's phase-0 tooth: the seat line is T030's
-# largest tip radius; a smaller tip lets the comb down by its band.
-SEAT_RADIUS_MM = tip_radius_limits_mm(REFERENCE_TEETH)[1]
-SEAT_DROP_MM = SEAT_RADIUS_MM - tip_radius_limits_mm(REFERENCE_TEETH)[0]
 # Before the compound grabs a bonded gear may float radially by half its bond
 # clearance (T024 on land 2; T018, T012 and T006's spigot on .0625).
 BOND_FLOAT_MM = max(
     *(family.bond_clearance_mm(teeth)[1] / 2.0 for teeth in (24, 18, 12)),
     cluster.SPIGOT_BOND_CLEARANCE_MM[1] / 2.0,
 )
-# Each step (the plate's edge north of a blade) stands this far over the
-# largest tip it passes over, after the seat's drop, its band and the float.
-TIP_AIR = 0.010 * INCH
-
-
-def _below_seat(radius_mm: float, places: int, rounding=round) -> float:
-    return inch_grid_mm(SEAT_RADIUS_MM - radius_mm, places, rounding)
-
-
-# The step north of each of T030..T012's blades passes over that gear's tip
-# and the next, smaller one's: .XX, rounded toward the seat (never less air).
-# T030's step is the seat line itself.
-STEP_PLACES = 2
-_STEP_BAND = printed_band_mm(STEP_PLACES, unit=UNIT)
-STEP_DEPTH_MM: dict[int, float] = {
-    teeth: (
-        0.0
-        if teeth == REFERENCE_TEETH
-        else _below_seat(
-            tip_radius_limits_mm(teeth)[1]
-            + SEAT_DROP_MM
-            + _STEP_BAND
-            + BOND_FLOAT_MM
-            + TIP_AIR,
-            STEP_PLACES,
-            math.floor,
-        )
-    )
-    for teeth in GEARS[:-1]
-}
-# The plate stands this high over the seat (.XX).
-PLATE_HEIGHT = 0.25 * INCH
-
-
-def blade_root_depth_mm(teeth: int) -> float:
-    """Where ``teeth``'s blade leaves the plate, seat line down: the step
-    south of it (T030's at the seat itself), which clears this gear's tips."""
-    index = GEARS.index(teeth)
-    return 0.0 if index == 0 else STEP_DEPTH_MM[GEARS[index - 1]]
-
-
-def _radius_limits(depth_mm: float, band_mm: float) -> tuple[float, float]:
-    """(lowest, highest) radius a printed depth below the seat reaches."""
-    return (
-        SEAT_RADIUS_MM - SEAT_DROP_MM - depth_mm - band_mm,
-        SEAT_RADIUS_MM - depth_mm + band_mm,
-    )
-
-
-# Each step clears the tips of the gear south of it and the next, smaller one.
-for _south, _north in zip(GEARS, GEARS[1:], strict=False):
-    if _south == REFERENCE_TEETH:
-        continue
-    _step = _radius_limits(STEP_DEPTH_MM[_south], _STEP_BAND)[0]
-    for _teeth in (_south, _north):
-        if _step - BOND_FLOAT_MM <= tip_radius_limits_mm(_teeth)[1]:
-            raise AssertionError(f"step north of T{_south:03d} reaches T{_teeth:03d}")
 
 
 # --- The tooth space against a blade -----------------------------------------
@@ -291,322 +253,204 @@ def _half_space_rad(teeth: int, corner: int, radius_mm: float) -> float:
     return gaps[index] + share * (gaps[index + 1] - gaps[index])
 
 
-def root_radius_max_mm(teeth: int) -> float:
-    return max(profile.root_radius_max_mm for profile in _profiles(teeth))
+def root_radius_mm(teeth: int, corner: int) -> float:
+    return _profiles(teeth)[corner].root_radius_max_mm
 
 
 def play_window_rad(
-    teeth: int, corner: int, tip_mm: float, near_mm: float, far_mm: float
+    teeth: int, corner: int, edge_mm: float, near_mm: float, far_mm: float
 ) -> tuple[float, float]:
     """(least, greatest) turn of ``teeth``'s gear (printed ``corner``) from its
     phase that keeps every point of a blade in the space centred on
-    SPACE_ANGLE: the blade's tip face at ``tip_mm`` along the gear's +X, its
-    walls at ``near_mm`` and ``far_mm`` along +Y. Each radius from the tip
-    face's nearest corner out to the gear's tip meets the blade over one arc;
-    the space must hold it."""
+    SPACE_ANGLE: the blade's edge at ``edge_mm`` along the gear's +X, the
+    sheet's faces at ``near_mm`` and ``far_mm`` along +Y. Each radius from the
+    edge's nearest corner out to the gear's tip meets the blade over one arc;
+    the space must hold it. Raises ValueError where the blade bottoms on the
+    root."""
     radii, _gaps = _gap_table(teeth, corner)
-    nearest = math.hypot(tip_mm, near_mm)
+    nearest = math.hypot(edge_mm, near_mm)
     if nearest <= radii[0]:
         raise ValueError(f"T{teeth:03d} blade bottoms on the root")
     samples = sorted(
-        {nearest, *(r for r in (math.hypot(tip_mm, far_mm),) if r < radii[-1])}
+        {nearest, *(r for r in (math.hypot(edge_mm, far_mm),) if r < radii[-1])}
         | {r for r in radii if r > nearest}
     )
     centre = space_angle_rad(teeth)
     low, high = -math.inf, math.inf
     for radius in samples:
         half = _half_space_rad(teeth, corner, radius)
-        reach = min(far_mm, math.sqrt(max(0.0, radius * radius - tip_mm * tip_mm)))
+        reach = min(far_mm, math.sqrt(max(0.0, radius * radius - edge_mm * edge_mm)))
         high = min(high, math.asin(near_mm / radius) + half - centre)
         low = max(low, math.asin(reach / radius) - half - centre)
     return low, high
 
 
-# --- Blade: tip depth, thickness and location ---------------------------------
-# Every blade carries the shop's rows: its tip depth from the seat and its
-# location from the back face at the milled-step row (+/-.002), its thickness
-# at the milled-slot row (+/-.001).
-BLADE_PLACES = 3
-BLADE_DEPTH_BAND_MM = 0.002 * INCH
-BLADE_DEPTH_DEVIATIONS_MM = (-BLADE_DEPTH_BAND_MM, BLADE_DEPTH_BAND_MM)
-BLADE_WIDTH_BAND_MM = 0.001 * INCH
-BLADE_WIDTH_DEVIATIONS_MM = (-BLADE_WIDTH_BAND_MM, BLADE_WIDTH_BAND_MM)
-BLADE_FACE_BAND_MM = 0.002 * INCH
-BLADE_FACE_DEVIATIONS_MM = (-BLADE_FACE_BAND_MM, BLADE_FACE_BAND_MM)
-# A blade's centre plane stands within this of its nominal from the back face.
-BLADE_CENTRE_BAND_MM = BLADE_FACE_BAND_MM + BLADE_WIDTH_BAND_MM / 2.0
-# The widest blade still turns its gear through this much play (at its tip).
-BLADE_CLEARANCE_MM = 0.0005 * INCH
-# The lowest blade tip stands this far off the largest root.
-ROOT_AIR = 0.002 * INCH
-# Tooth over the highest blade tip: at least this much of its addendum.
-ENGAGEMENT_MIN = 0.10
+def _window(
+    teeth: int, corner: int, edge_mm: float, mid_mm: float, sheet_mm: float
+) -> tuple[float, float]:
+    """``play_window_rad`` for the sheet's mid-plane at ``mid_mm``."""
+    return play_window_rad(
+        teeth, corner, edge_mm, mid_mm - sheet_mm / 2.0, mid_mm + sheet_mm / 2.0
+    )
 
 
+def _bisect(holds, low: float, high: float) -> float:
+    """The boundary of a predicate false at ``low`` and true at ``high``."""
+    if holds(low) or not holds(high):
+        raise AssertionError("bisection bounds do not bracket the boundary")
+    for _ in range(56):
+        middle = (low + high) / 2.0
+        if holds(middle):
+            high = middle
+        else:
+            low = middle
+    return (low + high) / 2.0
+
+
+# --- The seat on T030 ---------------------------------------------------------
+# The sheet's mid-plane is searched over this band along T030's +Y (half a
+# circular pitch is .0327).
+_MID_SEARCH_MM = (0.020 * INCH, 0.042 * INCH)
+
+
+def _slide_mm(corner: int, sheet_mm: float, edge_of) -> tuple[float, float]:
+    """(least, greatest) mid-plane along T030's +Y that holds T030 at its
+    phase, the blade's edge at ``edge_of(mid)``: the window's top meets the
+    phase at the least, its bottom at the greatest (both rise with it)."""
+
+    def window(mid: float) -> tuple[float, float]:
+        return _window(REFERENCE_TEETH, corner, edge_of(mid), mid, sheet_mm)
+
+    return (
+        _bisect(lambda mid: window(mid)[1] >= 0.0, *_MID_SEARCH_MM),
+        _bisect(lambda mid: window(mid)[0] > 0.0, *_MID_SEARCH_MM),
+    )
+
+
+def _seat(corner: int, sheet_mm: float) -> tuple[tuple[float, float], ...]:
+    """(edge, mid-plane) of the comb resting on T030 at one printed corner and
+    sheet: bottomed on the root at either end of its slide, or bound between
+    the flanks above the root (one point)."""
+    root = root_radius_mm(REFERENCE_TEETH, corner) * (1.0 + 1e-7)
+
+    def on_root(mid: float) -> float:
+        return math.sqrt(root * root - (mid - sheet_mm / 2.0) ** 2)
+
+    least, greatest = _slide_mm(corner, sheet_mm, on_root)
+    if least <= greatest:
+        return (on_root(least), least), (on_root(greatest), greatest)
+    # Bound above the root: lift the blade until some slide holds T030 (it
+    # does well before its edge reaches the pitch circle).
+    top = pitch_radius_mm(REFERENCE_TEETH) * math.cos(space_angle_rad(REFERENCE_TEETH))
+
+    def lifted(lift: float):
+        return lambda mid: on_root(mid) + lift
+
+    def clear(lift: float) -> bool:
+        low, high = _slide_mm(corner, sheet_mm, lifted(lift))
+        return low <= high
+
+    lift = _bisect(clear, 0.0, top - root)
+    least, greatest = _slide_mm(corner, sheet_mm, lifted(lift))
+    mid = (least + greatest) / 2.0
+    return ((lifted(lift)(mid), mid),)
+
+
+# (edge, mid-plane, sheet) of every seat at every printed corner and sheet.
+SEAT_CONDITIONS: tuple[tuple[float, float, float], ...] = tuple(
+    (edge, mid, sheet)
+    for corner in range(len(_profiles(REFERENCE_TEETH)))
+    for sheet in SHEET_LIMITS_MM
+    for edge, mid in _seat(corner, sheet)
+)
+SEAT_EDGE_MM = (
+    min(edge for edge, _mid, _sheet in SEAT_CONDITIONS),
+    max(edge for edge, _mid, _sheet in SEAT_CONDITIONS),
+)
+# How far the comb slides across T030's space, along its +Y.
+COMB_SLIDE_MM = (
+    min(mid for _edge, mid, _sheet in SEAT_CONDITIONS),
+    max(mid for _edge, mid, _sheet in SEAT_CONDITIONS),
+)
+_SEAT_EDGE_MID = sum(SEAT_EDGE_MM) / 2.0
+
+
+# --- Each bonded blade's depth below the seat line -----------------------------
 def _float_mm(teeth: int) -> float:
     return 0.0 if teeth == REFERENCE_TEETH else BOND_FLOAT_MM
 
 
-def blade_tip_limits_mm(teeth: int, depth_mm: float) -> tuple[float, float]:
-    """(lowest, highest) blade tip along the gear's +X at the print's limits:
-    the seat's drop, the depth band and the gear's float."""
-    low, high = _radius_limits(depth_mm, BLADE_DEPTH_BAND_MM)
-    return low - _float_mm(teeth), high + _float_mm(teeth)
+def _conditions(teeth: int, depth_mm: float):
+    """Every printed limit a bonded blade meets: each seat, each tooth corner
+    of its gear, the depth's band and the gear's float either way. Yields
+    (corner, edge, mid-plane, sheet)."""
+    for edge, mid, sheet in SEAT_CONDITIONS:
+        for corner in range(len(_profiles(teeth))):
+            for band in (-_XXX, _XXX):
+                for drift in (-_float_mm(teeth), _float_mm(teeth)):
+                    yield corner, edge - depth_mm + band + drift, mid, sheet
 
 
-def _centred_mm(teeth: int, tip_mm: float, width_mm: float) -> float:
-    """The blade centre (along the gear's +Y) that centres its play on the
-    phase over the four printed corners, at ``tip_mm``."""
-
-    def balance(centre: float) -> float:
-        windows = [
-            play_window_rad(
-                teeth, corner, tip_mm, centre - width_mm / 2.0, centre + width_mm / 2.0
-            )
-            for corner in range(len(_profiles(teeth)))
-        ]
-        return sum(low + high for low, high in windows)
-
-    guess = tip_mm * math.tan(space_angle_rad(teeth))
-    low, high = guess - 0.3, guess + 0.3
-    for _ in range(48):
-        middle = (low + high) / 2.0
-        if balance(middle) < 0.0:
-            low = middle
-        else:
-            high = middle
-    return (low + high) / 2.0
-
-
-def _conditions(teeth: int, depth_mm: float, width_mm: float):
-    """Every printed limit a blade meets: each tooth corner, the lowest and
-    highest tip, the thinnest and thickest blade."""
-    for corner in range(len(_profiles(teeth))):
-        for tip in blade_tip_limits_mm(teeth, depth_mm):
-            for width in (
-                width_mm - BLADE_WIDTH_BAND_MM,
-                width_mm + BLADE_WIDTH_BAND_MM,
-            ):
-                yield corner, tip, width
-
-
-def _fits(teeth: int, depth_mm: float, width_mm: float, centre_mm: float) -> bool:
-    """The thickest blade turns its gear through BLADE_CLEARANCE at its tip,
-    on every corner at both tip limits."""
-    for corner, tip, width in _conditions(teeth, depth_mm, width_mm):
-        if width < width_mm:
-            continue
-        low, high = play_window_rad(
-            teeth, corner, tip, centre_mm - width / 2.0, centre_mm + width / 2.0
-        )
-        if (high - low) * math.hypot(tip, centre_mm) < BLADE_CLEARANCE_MM:
+def _enters(teeth: int, depth_mm: float) -> bool:
+    """At every limit the blade neither bottoms on the root nor binds."""
+    for corner, edge, mid, sheet in _conditions(teeth, depth_mm):
+        try:
+            low, high = _window(teeth, corner, edge, mid, sheet)
+        except ValueError:
+            return False
+        if high <= low:
             return False
     return True
 
 
-def _space_chord_mm(teeth: int, radius_mm: float) -> float:
-    """The narrowest space (thickest tooth) of the four corners at a radius."""
-    return min(
-        2.0 * radius_mm * math.sin(_half_space_rad(teeth, corner, radius_mm))
-        for corner in range(len(_profiles(teeth)))
-    )
+def _design_depth(teeth: int) -> float:
+    """The deepest .001 depth below the seat line at which ``teeth``'s blade
+    enters at every limit, searched down from the gear's pitch circle."""
+    mil = 0.001 * INCH
+    shallow = math.floor((_SEAT_EDGE_MID - pitch_radius_mm(teeth)) / mil)
+    deep = math.ceil((SEAT_EDGE_MM[1] + _XXX - root_radius_mm(teeth, 0)) / mil) + 1
+    if not _enters(teeth, shallow * mil) or _enters(teeth, deep * mil):
+        raise AssertionError(f"T{teeth:03d}: depth search does not bracket")
+    while deep - shallow > 1:
+        middle = (shallow + deep) // 2
+        if _enters(teeth, middle * mil):
+            shallow = middle
+        else:
+            deep = middle
+    return shallow * mil
 
 
-def _design_blade(teeth: int) -> tuple[float, float, float]:
-    """(tip depth, thickness, centre) of ``teeth``'s blade. The tip: the
-    shallowest .XXX depth whose highest tip face centre stands on or under the
-    pitch circle. The thickness: the narrowest space at the lowest tip less
-    the clearance and its band, on the .001 grid, thinned until the thickest
-    blade clears the slab-on-space walls. The centre: the play centred on the
-    phase."""
-    angle = space_angle_rad(teeth)
-    pitch = pitch_radius_mm(teeth)
-    depth = _below_seat(pitch * math.cos(angle), BLADE_PLACES, math.floor)
-    while True:
-        lowest, highest = blade_tip_limits_mm(teeth, depth)
-        chord = _space_chord_mm(teeth, lowest / math.cos(angle))
-        width = inch_grid_mm(
-            chord - BLADE_CLEARANCE_MM - BLADE_WIDTH_BAND_MM, BLADE_PLACES, math.floor
-        )
-        while True:
-            centre = _centred_mm(teeth, SEAT_RADIUS_MM - depth, width)
-            if _fits(teeth, depth, width, centre):
-                break
-            width -= 0.001 * INCH
-            if width <= 0.010 * INCH:
-                raise AssertionError(f"T{teeth:03d}: no blade fits its tooth space")
-        if math.hypot(highest, centre) <= pitch:
-            return depth, width, centre
-        depth += 0.001 * INCH
+# Printed, seat line down (positive): each bonded blade's edge.
+BLADE_DEPTH_MM: dict[int, float] = {t: _design_depth(t) for t in BONDED_TEETH}
 
 
-_DESIGN = {teeth: _design_blade(teeth) for teeth in GEARS}
-# Printed, seat line down (positive): each blade tip.
-BLADE_TIP_DEPTH_MM: dict[int, float] = {t: d for t, (d, _w, _c) in _DESIGN.items()}
-BLADE_WIDTH_MM: dict[int, float] = {t: w for t, (_d, w, _c) in _DESIGN.items()}
-# The space centre's offset (along the gear's +Y) at each blade's working
-# radius: where the blade's play is centred on the phase.
-BLADE_CENTRE_MM: dict[int, float] = {t: c for t, (_d, _w, c) in _DESIGN.items()}
-WORKING_RADIUS_MM: dict[int, float] = {
-    t: BLADE_CENTRE_MM[t] / math.sin(space_angle_rad(t)) for t in GEARS
-}
-BLADE_TIP_LIMITS_MM = {
-    teeth: blade_tip_limits_mm(teeth, BLADE_TIP_DEPTH_MM[teeth]) for teeth in GEARS
-}
-for _teeth in GEARS:
-    _low, _high = BLADE_TIP_LIMITS_MM[_teeth]
-    _near = (
-        BLADE_CENTRE_MM[_teeth] - (BLADE_WIDTH_MM[_teeth] + BLADE_WIDTH_BAND_MM) / 2.0
-    )
-    if math.hypot(_low, _near) < root_radius_max_mm(_teeth) + ROOT_AIR:
-        raise AssertionError(f"T{_teeth:03d} blade bottoms on its root")
-    if math.hypot(_high, BLADE_CENTRE_MM[_teeth]) > pitch_radius_mm(_teeth) + 1e-6:
-        raise AssertionError(f"T{_teeth:03d} blade tip stands over its pitch circle")
-    if (
-        math.hypot(_high, BLADE_CENTRE_MM[_teeth]) + ENGAGEMENT_MIN
-        > tip_radius_limits_mm(_teeth)[0]
-    ):
-        raise AssertionError(f"T{_teeth:03d} blade catches under {ENGAGEMENT_MIN} mm")
+def blade_depth_mm(teeth: int) -> float:
+    return 0.0 if teeth == REFERENCE_TEETH else BLADE_DEPTH_MM[teeth]
 
 
-# --- The comb's tangential play on T030 and each gear's phase -----------------
-def _shift_limits_mm(
-    teeth: int, corner: int, tip: float, width: float
-) -> tuple[float, float]:
-    """(least, greatest) shift of ``teeth``'s blade from its centre (along +Y)
-    that still holds the gear at its phase: the comb's slide on T030."""
-    centre = BLADE_CENTRE_MM[teeth]
-
-    def window(shift: float) -> tuple[float, float]:
-        return play_window_rad(
-            teeth,
-            corner,
-            tip,
-            centre + shift - width / 2.0,
-            centre + shift + width / 2.0,
-        )
-
-    def edge(side: int) -> float:
-        # Both ends of the window rise with the shift. side 0: where its top
-        # meets the phase (the least shift); side 1: where its bottom does
-        # (the greatest).
-        low, high = -0.3, 0.3
-        for _ in range(48):
-            middle = (low + high) / 2.0
-            if window(middle)[1 - side] < 0.0:
-                low = middle
-            else:
-                high = middle
-        return (low + high) / 2.0
-
-    return edge(0), edge(1)
-
-
-def _comb_slide_mm() -> tuple[float, float]:
-    """(least, greatest) shift of the comb on T030 over every printed limit."""
-    limits = [
-        _shift_limits_mm(REFERENCE_TEETH, corner, tip, width)
-        for corner, tip, width in _conditions(
-            REFERENCE_TEETH,
-            BLADE_TIP_DEPTH_MM[REFERENCE_TEETH],
-            BLADE_WIDTH_MM[REFERENCE_TEETH],
-        )
-    ]
-    return min(low for low, _ in limits), max(high for _, high in limits)
-
-
-COMB_SLIDE_MM = _comb_slide_mm()
-
-# --- The plate's faces: T030's blade sets the frame --------------------------
-# The plate's edge over T030 covers the whole tip land of the phase-0 tooth
-# (half its chord either side of +X) at the comb's farthest slide, with this
-# much to spare.
-SEAT_COVER = 0.002 * INCH
-BLADE_FACE_PLACES = 3
-SEAT_LAND_HALF_MM = max(
-    profile.blank_radius_mm
-    * math.sin(
-        space_angle_rad(REFERENCE_TEETH)
-        - profile._gap_angle_at_radius(profile.blank_radius_mm)
-    )
-    for profile in _profiles(REFERENCE_TEETH)
-)
-_REFERENCE_FACE_MM = inch_grid_mm(
-    BLADE_CENTRE_MM[REFERENCE_TEETH]
-    - BLADE_WIDTH_MM[REFERENCE_TEETH] / 2.0
-    + SEAT_LAND_HALF_MM
-    + COMB_SLIDE_MM[1]
-    + BLADE_FACE_BAND_MM
-    + SEAT_COVER,
-    BLADE_FACE_PLACES,
-    math.ceil,
-)
-# The back face along the gears' +Y with T030's blade at its centre.
-BACK_FACE_MM = (
-    BLADE_CENTRE_MM[REFERENCE_TEETH]
-    - BLADE_WIDTH_MM[REFERENCE_TEETH] / 2.0
-    - _REFERENCE_FACE_MM
-)
-# Each blade's near face from the back face, on the .001 grid; its centre
-# then stands BLADE_OFFSET from its ideal (T030's on it).
-BLADE_FACE_MM: dict[int, float] = {
-    teeth: (
-        _REFERENCE_FACE_MM
-        if teeth == REFERENCE_TEETH
-        else inch_grid_mm(
-            BLADE_CENTRE_MM[teeth] - BLADE_WIDTH_MM[teeth] / 2.0 - BACK_FACE_MM,
-            BLADE_FACE_PLACES,
-        )
-    )
-    for teeth in GEARS
-}
-BLADE_OFFSET_MM: dict[int, float] = {
-    teeth: BACK_FACE_MM
-    + BLADE_FACE_MM[teeth]
-    + BLADE_WIDTH_MM[teeth] / 2.0
-    - BLADE_CENTRE_MM[teeth]
-    for teeth in GEARS
-}
-if BACK_FACE_MM + COMB_SLIDE_MM[1] + BLADE_FACE_BAND_MM > -SEAT_LAND_HALF_MM:
-    raise AssertionError("the comb's edge leaves T030's tip land")
-# Either side of a blade the plate is cut away down its length: at least
-# this much on the thinnest side at the print's worst.
-RELIEF_MIN = 0.005 * INCH
-THICKNESS_PLACES = 2
-THICKNESS = inch_grid_mm(
-    max(BLADE_FACE_MM[t] + BLADE_WIDTH_MM[t] for t in GEARS)
-    + BLADE_FACE_BAND_MM
-    + BLADE_WIDTH_BAND_MM
-    + _XX
-    + RELIEF_MIN,
-    THICKNESS_PLACES,
-    math.ceil,
-)
-for _teeth in GEARS:
-    if BLADE_FACE_MM[_teeth] - BLADE_FACE_BAND_MM < RELIEF_MIN:
-        raise AssertionError(f"T{_teeth:03d} blade's near face leaves no relief")
+for _teeth in BONDED_TEETH:
+    # Engaged: at the shallowest limit the blade's edge stands inside the
+    # gear's smallest tip circle.
+    _shallowest = SEAT_EDGE_MM[1] - BLADE_DEPTH_MM[_teeth] + _XXX + BOND_FLOAT_MM
+    if math.hypot(_shallowest, COMB_SLIDE_MM[1]) >= tip_radius_limits_mm(_teeth)[0]:
+        raise AssertionError(f"T{_teeth:03d} blade stands over its gear's tips")
+# Each level passes over the next, smaller gear's tips (its own blade's step
+# stands BLADE_INSET into that gear's face) at the lowest print and seat and
+# the smaller gear's highest float.
+for _south, _north in zip(GEARS, GEARS[1:], strict=False):
+    _band = 0.0 if _south == REFERENCE_TEETH else _XXX
+    _lowest = SEAT_EDGE_MM[0] - blade_depth_mm(_south) - _band
+    if _lowest <= tip_radius_limits_mm(_north)[1] + BOND_FLOAT_MM:
+        raise AssertionError(f"T{_south:03d} level reaches T{_north:03d}'s tips")
 
 
 def phase_error_mm(teeth: int) -> float:
-    """A bonded gear's worst phase against T030, pitch arc: the comb slides
-    on T030 as far as T030's blade lets it, the two blades' centres stand
-    apart by both centre bands and their nominal offsets, and the gear turns
-    to either end of its own blade's play at every printed limit."""
-    apart = 2.0 * BLADE_CENTRE_BAND_MM
-    offset = BLADE_OFFSET_MM[teeth] - BLADE_OFFSET_MM[REFERENCE_TEETH]
-    up = COMB_SLIDE_MM[1] + apart + offset
-    down = COMB_SLIDE_MM[0] - apart + offset
-    centre = BLADE_CENTRE_MM[teeth]
+    """A bonded gear's worst phase against T030, pitch arc: the comb on T030
+    at every seat, the gear's corner, its blade's depth band and its float,
+    the gear turned to either end of its space's play about the blade."""
     worst = 0.0
-    for corner, tip, width in _conditions(
-        teeth, BLADE_TIP_DEPTH_MM[teeth], BLADE_WIDTH_MM[teeth]
-    ):
-        high = play_window_rad(
-            teeth, corner, tip, centre + up - width / 2.0, centre + up + width / 2.0
-        )[1]
-        low = play_window_rad(
-            teeth, corner, tip, centre + down - width / 2.0, centre + down + width / 2.0
-        )[0]
+    for corner, edge, mid, sheet in _conditions(teeth, BLADE_DEPTH_MM[teeth]):
+        low, high = _window(teeth, corner, edge, mid, sheet)
         worst = max(worst, high, -low)
     return worst * pitch_radius_mm(teeth)
 
@@ -624,108 +468,73 @@ for _teeth, _error in PHASE_ERROR_MM.items():
             f"booked {BOND_CLOCK_TOLERANCE_MM} mm"
         )
 
-# The thinnest blade anywhere: printed on the sheet as a plain fact.
-BLADE_MIN_MM = min(BLADE_WIDTH_MM.values()) - BLADE_WIDTH_BAND_MM
-BLADE_MIN_IN = math.floor(BLADE_MIN_MM / INCH * 1000.0 + 1e-9) / 1000.0
-
 # --- Pose in the shop kit (MHA-DT-03-TL-00) -----------------------------------
 # The comb's model origin (mm) in the kit frame, in the index plate's front
 # plane under its rim, clear of it by about a balloon's diameter; the kit's
 # build places it here and its sheet shows it there under item 1.
-KIT_POSITION_MM = (-11.0, -70.0, 0.0)
+KIT_POSITION_MM = (-17.0, -70.0, 0.0)
 
 # --- Model --------------------------------------------------------------------
-# Each relief cut runs this far past the plate's faces, the blade's south end
-# and its tip.
-RELIEF_RUNOUT = 0.010 * INCH
+# The sheet stands this high over the seat line (.XX): a grip.
+SHEET_HEIGHT = 0.25 * INCH
 
 
-def blade_width_name(teeth: int) -> str:
-    return f"BladeWidth{gear_tag(teeth)}"
+def blade_depth_name(teeth: int) -> str:
+    return f"BladeDepth{gear_tag(teeth)}"
 
 
-def blade_face_name(teeth: int) -> str:
-    return f"BladeFace{gear_tag(teeth)}"
-
-
-def blade_tip_name(teeth: int) -> str:
-    return f"BladeTip{gear_tag(teeth)}"
+def blade_start_name(teeth: int) -> str:
+    return f"Start{gear_tag(teeth)}"
 
 
 # Model globals: name -> value (mm); the build sets each and drives from it.
 GLOBALS: dict[str, float] = {
-    "PlateLength": PLATE_LENGTH,
-    "PlateHeight": PLATE_HEIGHT,
-    "PlateThick": THICKNESS,
-    "BladeLength": BLADE_LENGTH,
-    "ReliefRunout": RELIEF_RUNOUT,
-    **{f"Start{gear_tag(t)}": BLADE_START_MM[t] for t in BONDED_TEETH},
-    **{blade_tip_name(t): BLADE_TIP_DEPTH_MM[t] for t in GEARS},
-    **{f"Step{gear_tag(t)}": STEP_DEPTH_MM[t] for t in BONDED_TEETH[:-1]},
-    **{blade_width_name(t): BLADE_WIDTH_MM[t] for t in GEARS},
-    **{blade_face_name(t): BLADE_FACE_MM[t] for t in GEARS},
+    "SheetLength": SHEET_LENGTH,
+    "SheetHeight": SHEET_HEIGHT,
+    "SheetThick": SHEET_THICK,
+    **{blade_start_name(t): BLADE_START_MM[t] for t in BONDED_TEETH},
+    **{blade_depth_name(t): BLADE_DEPTH_MM[t] for t in BONDED_TEETH},
 }
-
-# Profile vertices (model mm: x north along the plate, y outward), the
-# closed chain the plate sketch draws: the south end up from the T030 blade
-# tip, then each blade's full-thickness stock and the step north of it, then
-# the north end and the top.
-_SOUTH_X = -BLADE_LENGTH
 
 
 def blade_x_mm(teeth: int) -> tuple[float, float]:
-    """(south, north) model x of ``teeth``'s blade."""
-    south = _SOUTH_X + BLADE_START_MM[teeth]
-    north = _SOUTH_X + PLATE_LENGTH if teeth == GEARS[-1] else south + BLADE_LENGTH
+    """(south, north) model x of ``teeth``'s level: its step to the next
+    step (T030's from the south end, T006's to the north end)."""
+    index = GEARS.index(teeth)
+    south = BLADE_START_MM[teeth]
+    north = SHEET_LENGTH if teeth == GEARS[-1] else BLADE_START_MM[GEARS[index + 1]]
     return south, north
 
 
 def profile_points_mm() -> list[tuple[float, float]]:
-    points = [(_SOUTH_X, PLATE_HEIGHT)]
-    for index, teeth in enumerate(GEARS):
-        south, north = blade_x_mm(teeth)
-        tip = -BLADE_TIP_DEPTH_MM[teeth]
-        if index:
-            points.append(
-                (south, -STEP_DEPTH_MM[GEARS[index - 1]] if index > 1 else 0.0)
-            )
-        points.append((south, tip))
-        points.append((north, tip))
-        if teeth != GEARS[-1]:
-            points.append((north, -STEP_DEPTH_MM[teeth]))
-    points.append((_SOUTH_X + PLATE_LENGTH, PLATE_HEIGHT))
+    """The closed staircase the sheet sketch draws (model mm: x north, y
+    outward): the south end down to the seat line, each level north to its
+    step and down the step, T006's level to the north end, up and back along
+    the top."""
+    points = [(0.0, SHEET_HEIGHT), (0.0, 0.0)]
+    for teeth in GEARS[1:]:
+        south, _north = blade_x_mm(teeth)
+        points.append((south, -blade_depth_mm(GEARS[GEARS.index(teeth) - 1])))
+        points.append((south, -blade_depth_mm(teeth)))
+    points.append((SHEET_LENGTH, -blade_depth_mm(GEARS[-1])))
+    points.append((SHEET_LENGTH, SHEET_HEIGHT))
     return points
 
 
-if profile_points_mm()[3] != (0.0, 0.0):
-    raise AssertionError("the model origin is the T030 blade's north end on the seat")
-# The relief cuts run RELIEF_RUNOUT twice past a blade's south end, where
-# only air stands under its root: the gap to the blade south of it.
-for _south, _north in zip(GEARS, GEARS[1:], strict=False):
-    if blade_x_mm(_north)[0] - blade_x_mm(_south)[1] <= 2.0 * RELIEF_RUNOUT:
-        raise AssertionError(f"T{_north:03d} relief reaches the T{_south:03d} blade")
+def step_corner_index(teeth: int) -> int:
+    """Index in ``profile_points_mm`` of the lower corner of the step at
+    ``teeth``'s level's south end, where its start and depth are measured."""
+    return 1 + 2 * GEARS.index(teeth)
 
 
-def relief_outline_mm(teeth: int) -> list[tuple[float, float]]:
-    """(x, z) of ``teeth``'s relief: one closed rectilinear outline round its
-    blade, open at the blade's north end. From the blade's near face at the
-    north end (the anchor: its x and BladeFace from the back face), south past
-    the blade's south end, across its width, north along its far face, out
-    past the plate's front face, south, back past the back face and north to
-    the start. It is cut from the blade's root down past its tip."""
-    south, north = blade_x_mm(teeth)
-    near = BLADE_FACE_MM[teeth]
-    far = near + BLADE_WIDTH_MM[teeth]
-    return [
-        (north, near),
-        (south - RELIEF_RUNOUT, near),
-        (south - RELIEF_RUNOUT, far),
-        (north, far),
-        (north, THICKNESS + RELIEF_RUNOUT),
-        (south - 2.0 * RELIEF_RUNOUT, THICKNESS + RELIEF_RUNOUT),
-        (south - 2.0 * RELIEF_RUNOUT, -RELIEF_RUNOUT),
-        (north, -RELIEF_RUNOUT),
-    ]
+if profile_points_mm()[1] != (0.0, 0.0):
+    raise AssertionError("the model origin is the south end on the seat line")
+for _teeth in BONDED_TEETH:
+    if profile_points_mm()[step_corner_index(_teeth)] != (
+        BLADE_START_MM[_teeth],
+        -BLADE_DEPTH_MM[_teeth],
+    ):
+        raise AssertionError(f"T{_teeth:03d} step corner out of order")
 
 
 def _area(points: list[tuple[float, float]]) -> float:
@@ -737,66 +546,29 @@ def _area(points: list[tuple[float, float]]) -> float:
     )
 
 
-PLATE_VOLUME = _area(profile_points_mm()) * THICKNESS
-# Each relief removes the plate beside its blade, root to tip, along the
-# blade's length.
-RELIEF_VOLUME_MM3 = {
-    teeth: (
-        (blade_x_mm(teeth)[1] - blade_x_mm(teeth)[0])
-        * (BLADE_TIP_DEPTH_MM[teeth] - blade_root_depth_mm(teeth))
-        * (THICKNESS - BLADE_WIDTH_MM[teeth])
-    )
-    for teeth in GEARS
-}
-FINISHED_VOLUME = PLATE_VOLUME - sum(RELIEF_VOLUME_MM3.values())
+SHEET_VOLUME = _area(profile_points_mm()) * SHEET_THICK
 
 # --- Drawing -------------------------------------------------------------------
-PROFILE_SKETCH = "PlateProfile"
-PLATE_FEATURE = "Plate"
-
-
-def blade_sketch(teeth: int) -> str:
-    return f"BladeProfile{gear_tag(teeth)}"
-
-
-def relief_feature(teeth: int) -> str:
-    return f"BladeRelief{gear_tag(teeth)}"
-
-
-def root_plane(teeth: int) -> str | None:
-    """The reference plane at ``teeth``'s blade root, or None on the Top
-    plane (the seat)."""
-    return None if blade_root_depth_mm(teeth) == 0.0 else f"BladeRoot{gear_tag(teeth)}"
-
-
+PROFILE_SKETCH = "SheetProfile"
+SHEET_FEATURE = "Sheet"
 PROFILE_DIMENSIONS = frozenset(
     {
-        "PlateLength",
-        "PlateHeight",
-        "BladeLength",
-        *(f"Start{gear_tag(t)}" for t in BONDED_TEETH),
-        *(blade_tip_name(t) for t in GEARS),
-        *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1]),
+        "SheetLength",
+        "SheetHeight",
+        *(blade_start_name(t) for t in BONDED_TEETH),
+        *(blade_depth_name(t) for t in BONDED_TEETH),
     }
 )
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     PROFILE_SKETCH: set(PROFILE_DIMENSIONS),
-    PLATE_FEATURE: {"PlateThick"},
-    **{blade_sketch(t): {blade_width_name(t), blade_face_name(t)} for t in GEARS},
+    SHEET_FEATURE: {"SheetThick"},
 }
-# Every length and height no fit depends on is .XX (rule 3).
-_TWO_PLACE = frozenset(
-    {
-        "PlateLength",
-        "PlateHeight",
-        "PlateThick",
-        "BladeLength",
-        *(f"Start{gear_tag(t)}" for t in BONDED_TEETH),
-        *(f"Step{gear_tag(t)}" for t in BONDED_TEETH[:-1]),
-    }
-)
+# Every length and height no fit depends on is .XX (rule 3); each blade's
+# depth (it decides where the blade meets its space) and the stock's
+# thickness are .XXX, at the title block's band.
+_THREE_PLACE = frozenset({"SheetThick", *(blade_depth_name(t) for t in BONDED_TEETH)})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {name: 2 if name in _TWO_PLACE else 3 for name in names}
+    feature: {name: DEPTH_PLACES if name in _THREE_PLACE else 2 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -810,42 +582,20 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
     _places = DRAWING_PRECISION_BY_NAME[_name]
     if abs(inch_grid_mm(_value, _places) - _value) > 1e-9:
         raise AssertionError(f"{_name} {_value} mm is off its .{'X' * _places} grid")
-# The bands tighter than the title block, each at its shop row and set on the
-# model's own dimension: (feature, dimension) -> (lower, upper) deviation, mm.
-MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
-    **{(PROFILE_SKETCH, blade_tip_name(t)): BLADE_DEPTH_DEVIATIONS_MM for t in GEARS},
-    **{
-        (blade_sketch(t), blade_width_name(t)): BLADE_WIDTH_DEVIATIONS_MM for t in GEARS
-    },
-    **{(blade_sketch(t), blade_face_name(t)): BLADE_FACE_DEVIATIONS_MM for t in GEARS},
-}
 
 # --- Sheet words ----------------------------------------------------------------
-# Every banded dimension serves one gear's tooth space. Each blade names its
-# gear once, at its thickness (rule 4); its location and tip depth point at
-# note 1, which ties the whole blade to the gear named at its thickness.
-# Words only, no narration (rule 7).
-BLADE_NOTE_NUMBER = 1
-BLADE_NOTE_FLAG = f"SEE NOTE {BLADE_NOTE_NUMBER}"
+# Note 1 names the gear each blade serves, south (left) to north, once
+# (rule 4). The thickness is the stock's. Words only, no narration (rule 7).
+_NAMES = [gear_number(t) for t in GEARS]
 SHEET_NOTES = "\n".join(
     (
-        f"{BLADE_NOTE_NUMBER}. EACH BLADE: CLEARANCE FIT IN ONE TOOTH SPACE OF THE GEAR",
-        "   NAMED AT ITS THICKNESS, ITS TIP BETWEEN THAT GEAR'S ROOT AND",
-        "   PITCH CIRCLES.",
+        "1. LEFT TO RIGHT IN THE FRONT VIEW, THE BLADES DROP INTO ONE",
+        f"   TOOTH SPACE EACH OF {_NAMES[0]}, {_NAMES[1]},",
+        f"   {_NAMES[2]}, {_NAMES[3]} AND {_NAMES[4]}.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
     raise AssertionError("at most four note lines")
-# The thin blades print as a plain fact (rule 20).
-BLADE_WALL_TEXT = f"BLADE WALL {inch_text(BLADE_MIN_IN * INCH, 3)} MIN"
-CALLOUTS_BELOW: dict[str, str] = {
-    **{blade_width_name(t): f"{gear_number(t)}\n{BLADE_NOTE_FLAG}" for t in GEARS},
-    **{blade_face_name(t): BLADE_NOTE_FLAG for t in GEARS},
-    **{blade_tip_name(t): BLADE_NOTE_FLAG for t in GEARS},
-    "PlateThick": BLADE_WALL_TEXT,
-}
-# The five blade lengths are equal (T006's runs to the plate's north end,
-# PLATE_LENGTH = its start + BLADE_LENGTH) and print once, counted from the
-# blades drawn.
-CALLOUTS_ABOVE: dict[str, str] = {"BladeLength": f"{len(GEARS)}X"}
+STOCK_TEXT = "SHEET STOCK"
+CALLOUTS_BELOW: dict[str, str] = {"SheetThick": STOCK_TEXT}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
