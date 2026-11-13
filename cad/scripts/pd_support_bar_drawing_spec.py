@@ -60,19 +60,17 @@ CLAMP_CALLOUT_PRECISION = {
     "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
     "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
 }
-# The west slots' runs print .XX: at ±.01 the shortest still closes the
-# column-pitch stack (build_pd_support_bar.clamp_slot_closure_margin) and the
-# longest stays inside the shortest counterbore (clamp_slot_head_clearance),
-# so the .XXX grade bought nothing (v49 machinist review). Their width
-# carries the drilled holes' +.004/0 at .XXX. Their counterbore width
+# The west slots' runs need .XXX for the slid head's clearance to the slot
+# counterbore's wall (DIMENSION_CALLOUTS states it), and their
+# width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
 # carries explicit asymmetric limits: the minimum (.330) clears the head's
 # full-float envelope, while the upper deviation stays the ordinary .XX
 # band. The round counterbores' head stays coaxial, while a slid head adds
-# the slot run's overrun (build_pd_support_bar.clamp_slot_head_clearance),
+# the slot run's .XXX overrun (build_pd_support_bar.clamp_slot_head_clearance),
 # so the callout says the minimum is for the slid head (3de09b9 machinist
 # review).
 CLAMP_SLOT_WIDTH_PLACES = 3
-CLAMP_SLOT_PLACES = 2
+CLAMP_SLOT_PLACES = 3
 CLAMP_SLOT_CBORE_WIDTH_PLACES = 3
 CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.127, 0.254)  # -.005/+.010
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
@@ -109,7 +107,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # stacked callouts (below); the tap drill is the TAP size's.
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
     "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
-    # The counterbore's run is the slot's: one .12 between the shared end
+    # The counterbore's run is the slot's: one .118 between the shared end
     # centres serves both (machinist review round 2: printed twice).
     "ClampSlotCboreProfile": {"ClampSlotCboreWidth"},
     "ClampSlotCounterbores": {"ClampSlotCboreDepth"},
@@ -208,9 +206,14 @@ DIMENSION_CALLOUTS = {
     # the centred rows stand clear.
     "ClampSlotWidth": "\u00a0THRU, CLEARANCE FOR\u00a0\nMHA-SH-VN-53",
     # The counterbore slot shares the through slot's radius centres, the one
-    # .12 detail C dimensions (rule 12; round 4 machinist review). Two short
-    # lines keep the block inside its old width, clear of section B-B.
-    "ClampSlotCboreWidth": "ON .12\nSLOT CENTRES",
+    # .118 detail C dimensions (rule 12; round 4 machinist review). The .118
+    # keeps .XXX for the head: at .XX the slid head's overrun leaves .002 to
+    # the counterbore's wall (clamp_slot_head_clearance), so the callout
+    # states that function once (v49 machinist review: .118 had no stated
+    # function). The screw is named once, on the slot width (rule 4). Two
+    # lines of at most 16 characters keep the block, which grows left from
+    # its shoulder at the leader, clear of section B-B.
+    "ClampSlotCboreWidth": "ON .118 CENTRES\nCLEARS THE HEAD",
 }
 # Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
 DIMENSION_CALLOUTS_ABOVE = {

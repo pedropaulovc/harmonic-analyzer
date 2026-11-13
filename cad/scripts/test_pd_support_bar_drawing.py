@@ -601,17 +601,15 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     height = station + EAR_HEIGHT_BAND
     slack = math.sqrt(radial**2 - height**2)
     assert slack == pytest.approx(0.3358, abs=1e-4)
-    # Each slot's least travel each way: its .118 model run printed .12 at
-    # .XX (v49 machinist review: the .XXX grade bought nothing).
+    # Each slot's least travel each way: its .118 run at .XXX.
     assert part.CLAMP_SLOT_RUN == 2.0 * part.CLAMP_SLOT_TRAVEL == 2.9972
     assert part.CLAMP_SLOT_WIDTH == part.CLAMP_HOLE_DIA == pytest.approx(4.978)
-    assert sheet_spec.CLAMP_SLOT_PLACES == 2
-    travel = (0.12 * 25.4 - printed_band_mm(2, unit="in")) / 2.0
+    travel = (part.CLAMP_SLOT_RUN - printed_band_mm(3, unit="in")) / 2.0
     # Between an east and a west screw: both bar stations, both clamps' tap
     # stations and both clamps' shift on their columns.
     between = 2.0 * (station + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
     assert between == pytest.approx(0.762)
-    for pitch, margin in ((top, 0.7965), (base, 0.2865)):
+    for pitch, margin in ((top, 0.8346), (base, 0.3246)):
         left = travel + 2.0 * slack - (pitch + between)
         assert left == pytest.approx(margin, abs=5e-4)
         assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)
@@ -639,13 +637,12 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     assert part.CLAMP_HEAD_BEARING_MIN == pytest.approx(bearing)
     assert part.clamp_head_bearing(widest) == pytest.approx(bearing)
     band = printed_band_mm(3, unit="in")
-    run = 0.12 * 25.4  # the .118 model run prints .12 at .XX
-    run_band = printed_band_mm(2, unit="in")
-    overrun = ((run + run_band) - (run - run_band)) / 2.0
+    run = part.CLAMP_SLOT_RUN
+    overrun = ((run + band) - (run - band)) / 2.0
     reach = head_r + shift + overrun
     lower, upper = sheet_spec.CLAMP_SLOT_CBORE_WIDTH_LIMITS
     room = (part.CLAMP_SLOT_CBORE_WIDTH + lower) / 2.0  # .335 printed exactly
-    assert room - reach == pytest.approx(0.0508, abs=1e-4)
+    assert room - reach == pytest.approx(0.1778, abs=1e-4)
     assert part.clamp_slot_head_clearance() == pytest.approx(room - reach)
     # The explicit minimum preserves the proven head envelope; the maximum
     # is relaxed on a clearance feature.
@@ -1613,11 +1610,15 @@ def test_locations_and_overall_sizes_carry_no_words() -> None:
         in drawing.DIMENSION_CALLOUTS["Depth"]
     )
     # The counterbored slot names its mate once, on its width, in the
-    # standard clearance form; the counterbore says only whose centres it
-    # shares; the round holes name theirs once.
+    # standard clearance form; the counterbore says whose centres it shares
+    # and the one function their .XXX serves (v49 machinist review: the .118
+    # had none); the round holes name theirs once.
     callouts = [*drawing.DIMENSION_CALLOUTS.values(), sheet_spec.CLAMP_CBORE_CALLOUT]
     assert "ClampSlotCboreDepth" not in words
-    assert "MHA-SH-VN-53" not in drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
+    cbore = drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
+    assert "MHA-SH-VN-53" not in cbore
+    assert sheet_spec.SHEET_PRECISION["ClampSlotProfile"]["ClampSlotTravel"] == 3
+    assert cbore.splitlines() == ["ON .118 CENTRES", "CLEARS THE HEAD"]
     assert sum("CLEARANCE FOR MHA-SH-VN-53" in " ".join(text.split()) for text in callouts) == 2
     for text in callouts:
         assert not re.search(r"\b(LOCATE TO|SEATS|HEADS|SLIDING|TO SUIT)\b", text), text
