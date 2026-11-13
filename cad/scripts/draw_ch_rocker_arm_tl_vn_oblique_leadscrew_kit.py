@@ -1984,7 +1984,8 @@ def _pcd_circle(adapter: Any, end: Any) -> Any:
         if int(segment.GetType()) != _SW_SKETCH_ARC or not bool(segment.ConstructionGeometry):
             continue
         arc = _early_bound(raw, "ISketchArc")
-        centre = tuple(float(value) for value in arc.GetCenterPoint2())
+        point = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")  # a sketch point
+        centre = (float(point.X), float(point.Y), float(point.Z))
         if (
             int(arc.IsCircle()) == 1
             and math.isclose(float(arc.GetRadius()), feed_nut.HOLE_PCD / 2000.0, abs_tol=1e-9)
@@ -2005,7 +2006,7 @@ def _add_pcd_reference(adapter: Any, end: Any, text_xy: tuple[float, float]) -> 
     """The holes' PCD as a driven diameter on the bolt circle, dressed as the
     supplier's untoleranced reference; returns its annotation."""
     circle = _pcd_circle(adapter, end)
-    draw = adapter.currentModel
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
     if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, end)):
         raise RuntimeError("cannot activate the end view for the PCD reference")
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
