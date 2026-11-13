@@ -416,8 +416,19 @@ NOSE_TEXT_AIR = 0.004
 NOSE_KEEP: dict[str, tuple[float, float]] = {
     "FlatToAxis": (NOSE_CENTER[0] + HALF_OD + NOSE_TEXT_AIR, NOSE_CENTER[1] - 0.0287)
 }
-# The caption's top centre, under the view.
-NOSE_CAPTION_TOP = (NOSE_CENTER[0], NOSE_CENTER[1] - HALF_OD - 0.0025)
+# The caption hangs REAR_CAPTION_GAP_M under the view's measured outline (the
+# tips plus ~6.5 mm, 187.0 mm bottom in leaf 20261113T084309Z), as the rear
+# view's does.  There it stands beside B-B's outline, whose right edge (the
+# nose plus its margin, x ~277 mm) ends left of the caption.  Hung 2.5 mm
+# under the tips it stood inside the outline and passed the layout gate only
+# as a "small tag" under 15 mm wide: the same caption read 14.8 mm wide on a
+# 1010x598 px window and 15.5 mm on a 1010x678 px one, which failed (#2708,
+# leaf 20261113T084309Z, swmaker000004).
+NOSE_OUTLINE_MARGIN = 0.0065
+NOSE_CAPTION_TOP = (
+    NOSE_CENTER[0],
+    NOSE_CENTER[1] - HALF_OD - NOSE_OUTLINE_MARGIN - REAR_CAPTION_GAP_M,
+)
 # Inserted by its upper left at VIEW C's caption's measured width.
 NOSE_CAPTION_XY = (NOSE_CAPTION_TOP[0] - LEFT_CAPTION_EXTENT[0] / 2.0, NOSE_CAPTION_TOP[1])
 # E's arrow points left (model -Z) at B-B's nose, level with the axis, the
@@ -743,12 +754,15 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
 
 
 def _place_nose_caption(adapter: Any, view: Any) -> None:
-    """Hang VIEW E's caption, centred on the view, under the flat's text."""
+    """Hang VIEW E's caption, centred, below the view's measured outline
+    (:data:`NOSE_CAPTION_TOP`)."""
     _pin_sheet_scale(adapter)
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    target = ((outline[0] + outline[2]) / 2.0, outline[1] - REAR_CAPTION_GAP_M)
     extent = _hang_caption(
-        adapter, view, NOSE_CAPTION, NOSE_CAPTION_XY, NOSE_CAPTION_TOP, "nose view"
+        adapter, view, NOSE_CAPTION, NOSE_CAPTION_XY, target, "nose view"
     )
-    _telemetry.info(f"nose view caption: extent {extent}")
+    _telemetry.info(f"nose view caption: outline {outline}, extent {extent}")
 
 
 def _hide_tangent_edges(view: Any) -> None:
