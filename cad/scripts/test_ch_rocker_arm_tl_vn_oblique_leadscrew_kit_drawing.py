@@ -1042,16 +1042,30 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     }
     assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 2, "FacedLength": 1}
     assert set(draw.REWORK_CALLOUTS) == set(nut.REWORK_CONTROLS)
+    # The PCD is no imported limit: it prints as the supplier's untoleranced
+    # reference (v49 machinist review, rule 4), as sheet 1 prints it, while
+    # the model's ±0.1 stays the walls' stack-up assumption.
     assert draw.RECEIPT_EXPECTED == {
         "ReceiptFlangeDia": pytest.approx((0.022, -0.0002, 0.0002)),
         "ReceiptBodyDia": pytest.approx((0.0102, -0.0002, 0.0001)),
         "ReceiptHoleDia": pytest.approx((0.0035, -0.00004, 0.0001)),
-        "ReceiptHolePcd": pytest.approx((0.016, -0.0001, 0.0001)),
     }
     assert draw.RECEIPT_PRECISION == {
-        "ReceiptFlangeDia": 1, "ReceiptBodyDia": 1, "ReceiptHoleDia": 2, "ReceiptHolePcd": 1,
+        "ReceiptFlangeDia": 1, "ReceiptBodyDia": 1, "ReceiptHoleDia": 2,
     }
     assert set(draw.RECEIPT_CALLOUTS) == set(draw.RECEIPT_TEXT_XY) == set(nut.RECEIPT_CONTROLS)
+    assert set(draw.IMPORTED_RECEIPT_CALLOUTS) == set(draw.RECEIPT_EXPECTED)
+    assert draw.PCD_REFERENCE == "ReceiptHolePcd"
+    assert draw._PCD_REFERENCE_FORMAT == {
+        "label": "PCD reference",
+        "units": "mm",
+        "precision": 0,
+        "expected_mm": nut.HOLE_PCD,
+        "presentation": "diameter",
+        "fraction_denominator": None,
+        "callout": "PCD",
+    }
+    assert draw.RECEIPT_CALLOUTS[draw.PCD_REFERENCE] == ("below", "PCD")
 
 
 def test_rework_bands_name_their_mates_at_their_callouts() -> None:
@@ -1071,11 +1085,13 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     # The lug is the feed block's, and the screws are the registry row that
     # buys the SKU whose head the spec sizes the countersink for.
     assert draw.FEED_BLOCK_NUMBER == feed_block.NUMBER
-    assert flange.startswith(f"SEAT FACE ON {feed_block.NUMBER} LUG, ")
+    # One reason (rule 7, v49 machinist review): the flange is the screws'
+    # grip; the lug is named on the flange OD and hole callouts.
+    assert "LUG" not in flange
     screw_row = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")
     assert screw_row["supplier_skus"] == [nut.SCREW_SKU]
     assert draw.NUT_SCREW_NUMBER == screw_row["number"]
-    assert flange.endswith(f", GRIP OF {nut.SCREW_COUNT}X {screw_row['number']}")
+    assert flange == f"GRIP OF {nut.SCREW_COUNT}X {draw.short_number(screw_row['number'])}"
     # The fastener table's nut row is that flat head, through the flange
     # (the grip) into the feed block.
     row = fasteners.NUT_TO_FEED_BLOCK
@@ -1934,7 +1950,8 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
             "hidden_sketches.curate_view_dimensions(",
             "set_near_side_diameter(",
             "verify_machining_controls(",
-            "_set_callouts(adapter, receipt, RECEIPT_CALLOUTS)",
+            "_set_callouts(adapter, receipt, IMPORTED_RECEIPT_CALLOUTS)",
+            "_add_pcd_reference(adapter, end, text_xy[PCD_REFERENCE])",
         )
     ]
     assert steps == sorted(steps)
@@ -2074,7 +2091,7 @@ def _rework_readback(monkeypatch, caption):
     monkeypatch.setattr(draw, "_callout_block", lambda _adapter, _dim, _label: (ink, text))
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(draw, "_rework_outlines", lambda _adapter, _end, _section: ({}, {}))
-    return (spigot, end, section), ink
+    return (spigot, end, section, {}), ink
 
 
 def test_rework_readback_keeps_leaders_off_the_view_captions(monkeypatch) -> None:

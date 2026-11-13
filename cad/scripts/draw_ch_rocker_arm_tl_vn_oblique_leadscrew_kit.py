@@ -24,9 +24,9 @@ Sheet 3 (FEED NUT REWORK) is the FeedNut member's rework and receipt (Codjiflo
 P2 and 4475311251 on #2187): section F-F through two countersunk holes,
 carrying the native ``FlangeThick`` and ``CskDia`` LIMITs, the countersink's
 82° callout and the faced length's LIMIT; and the end view, carrying the native
-receipt limits: the flange OD, the body's MAX, the holes and their PCD. TL-00's
-F1A cites this sheet (``feed_nut.REWORK_SHEET_REFERENCE``) and types none of
-them.
+receipt limits: the flange OD, the body's MAX and the holes, with the holes'
+PCD a driven supplier reference. TL-00's F1A cites this sheet
+(``feed_nut.REWORK_SHEET_REFERENCE``) and types none of them.
 
 Run with SolidWorks open::
 
@@ -94,6 +94,10 @@ from _purchased_variant_drawing import (
 from _rebuild import active_configuration_name
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 import _telemetry
@@ -591,8 +595,24 @@ RECEIPT_HOLE_MODEL = (0.0, 0.0, feed_nut.HOLE_PCD / 2000.0)
 # seat bears on TL-32's lug face and the flange is the four nut screws' grip;
 # the countersinks seat those screws' 82° heads. The faced length keeps the
 # nut clear of the KP08 at the travel end; the flange OD sits within the lug
-# face; the body clears the screws' heads; the holes and their PCD match the
-# lug's transferred taps.
+# face; the body clears the screws' heads; the holes match the lug's
+# transferred taps.
+# The PCD prints as the supplier's untoleranced reference, "(Ø16 mm)" over
+# "PCD", as sheet 1 prints it (guidelines: supplier dimensions are REF, the
+# catalogue tolerance governs): the holes are plain clearance for the #4-40
+# heads and TL-32's taps are transferred from them, so no fit needs a band on
+# their station (machinist review, v49 release run 20261113T004939203Z, rule
+# 4). It is a driven drawing diameter on ReceiptReference's bolt circle, so
+# it stays associative; the model's ReceiptHolePcd band stays unprinted, the
+# stack-up's assumption for RV-01's walls and TL-32's taps.
+PCD_REFERENCE = "ReceiptHolePcd"
+_PCD_SUPPLIER = "SupplierHolePitchDiameter"
+if (_PCD_SUPPLIER, feed_nut.HOLE_PCD, "vertical") not in feed_nut.SUPPLIER_REFERENCE_DIMENSIONS:
+    raise AssertionError("the supplier's PCD is not the receipt circle's")
+PCD_REFERENCE_PRECISION, PCD_REFERENCE_PRESENTATION, _PCD_FRACTION, PCD_REFERENCE_CALLOUT = (
+    feed_nut.SUPPLIER_REFERENCE_FORMATS[_PCD_SUPPLIER]
+)
+PCD_REFERENCE_UNITS = feed_nut.SUPPLIER_REFERENCE_UNITS[_PCD_SUPPLIER]
 # Rule 17: the countersink's and the body's callouts state their walls as a
 # plain fact (RV-01, RV-02, as dt-cone-gear-tl-index-plate prints WEB .03
 # MIN). Rule 7: each leadered callout is its size line plus at most two
@@ -604,10 +624,11 @@ if feed_nut.SCREW_SKU not in _config.parts("ch-rocker-arm-tl-vn-oblique-riser-sc
 ]:
     raise AssertionError("the nut screws' number is not the screw the spec sizes")
 # One line: SolidWorks keeps a line-broken ABOVE callout but never prints it
-# (run 20261105T010614057Z printed this one's limits alone).
+# (run 20261105T010614057Z printed this one's limits alone). One reason (rule
+# 7): the flange is the four nut screws' grip; the lug is named on the flange
+# OD and hole callouts (machinist review, v49 release run 20261113T004939203Z).
 FLANGE_THICK_CALLOUT = (
-    f"SEAT FACE ON {FEED_BLOCK_NUMBER} LUG, "
-    f"GRIP OF {feed_nut.SCREW_COUNT}X {NUT_SCREW_NUMBER}"
+    f"GRIP OF {feed_nut.SCREW_COUNT}X {short_number(NUT_SCREW_NUMBER)}"
 )
 # The size line is the dimension's own: "4X ⌵ Ø4.76/4.50 X 82°", the
 # countersink symbol in the model's prefix and the angle this sheet's suffix.
@@ -634,10 +655,13 @@ RECEIPT_CALLOUTS = {
     "ReceiptHoleDia": (
         "below", f"AS SUPPLIED, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG",
     ),
-    # A location carries no words (rule 7): the PCD names itself; the 4X
-    # hole size callout names the mate once (machinist review, farm run
-    # 20261108T031012373Z).
-    "ReceiptHolePcd": ("below", "PCD"),
+    # The PCD: the supplier reference's own below-callout (rule 7: a location
+    # carries no words; the 4X hole size callout names the mate once).
+    PCD_REFERENCE: ("below", PCD_REFERENCE_CALLOUT),
+}
+# The receipt limits imported from the model: all but the PCD reference.
+IMPORTED_RECEIPT_CALLOUTS = {
+    name: callout for name, callout in RECEIPT_CALLOUTS.items() if name != PCD_REFERENCE
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
 if any(
@@ -665,11 +689,18 @@ REWORK_PRECISION = {
 RECEIPT_EXPECTED = {
     name: (nominal / 1000.0, lower / 1000.0, upper / 1000.0)
     for name, (nominal, lower, upper, _places) in feed_nut.RECEIPT_CONTROLS.items()
+    if name != PCD_REFERENCE
 }
 RECEIPT_PRECISION = {
-    name: places for name, (_n, _l, _u, places) in feed_nut.RECEIPT_CONTROLS.items()
+    name: places
+    for name, (_n, _l, _u, places) in feed_nut.RECEIPT_CONTROLS.items()
+    if name != PCD_REFERENCE
 }
-if set(RECEIPT_TEXT_XY) != set(RECEIPT_CALLOUTS) or set(RECEIPT_TEXT_XY) != set(RECEIPT_EXPECTED):
+if (
+    set(RECEIPT_TEXT_XY) != set(RECEIPT_CALLOUTS)
+    or set(RECEIPT_TEXT_XY) != set(feed_nut.RECEIPT_CONTROLS)
+    or set(IMPORTED_RECEIPT_CALLOUTS) != set(RECEIPT_EXPECTED)
+):
     raise AssertionError("the end view's receipt dimensions are not the spec's")
 REWORK_ITEM = f"[2] {feed_nut.BOM_DESCRIPTION}"
 SOURCE_PROPERTIES = (
@@ -1758,7 +1789,12 @@ def caption_leader_keepouts(
 
 
 def _assert_rework_ink(
-    adapter: Any, annotations: list[Any], spigot: Any, end: Any, section: Any
+    adapter: Any,
+    annotations: list[Any],
+    spigot: Any,
+    end: Any,
+    section: Any,
+    references: Mapping[str, Any],
 ) -> None:
     """Every leadered callout block, the spigot note and each view's caption,
     as SolidWorks draws them, stay inside the sheet's zone frame, off the
@@ -1769,10 +1805,11 @@ def _assert_rework_ink(
     spans its own leader down to the seat face, where the faced length's
     witness starts, so leaders are checked against the callouts' text and the
     captions alone. (No readback shows whether an ABOVE callout printed; its
-    one-line guard stands in.)"""
+    one-line guard stands in.) ``references`` names the sheet's drawing-owned
+    leadered dimensions, which carry no model dimension name."""
     rebuild_drawing(adapter, label="feed nut rework ink")
     region = sheet_region(adapter)
-    named = _named(adapter, annotations)
+    named = {**_named(adapter, annotations), **references}
     missing = sorted(set(LEADERED) - set(named))
     if missing:
         raise RuntimeError(f"sheet 3 is missing its leadered callouts {missing}")
@@ -1880,9 +1917,10 @@ def _assert_spigot_note(adapter: Any, note: Any, tip: tuple[float, float]) -> No
         )
 
 
-def _receipt_dimensions(adapter: Any, end: Any) -> list[Any]:
+def _receipt_dimensions(adapter: Any, end: Any) -> tuple[list[Any], Any]:
     """Import the receipt limits onto the end view as near-side leadered
-    diameters, each naming its mate below its limits (4475311251)."""
+    diameters, each naming its mate below its limits (4475311251), and add
+    the holes' PCD as the supplier's driven reference."""
     centre, hole = model_points_in_view(
         adapter,
         end,
@@ -1899,10 +1937,11 @@ def _receipt_dimensions(adapter: Any, end: Any) -> list[Any]:
             f"the end view lays the +Z hole at {hole!r}, not right of its axis {centre!r}"
         )
     shift = (centre[0] - REWORK_END_CENTER[0], centre[1] - REWORK_END_CENTER[1])
+    text_xy = {name: (x + shift[0], y + shift[1]) for name, (x, y) in RECEIPT_TEXT_XY.items()}
     receipt = hidden_sketches.curate_view_dimensions(
         adapter,
         end,
-        keep={name: (x + shift[0], y + shift[1]) for name, (x, y) in RECEIPT_TEXT_XY.items()},
+        keep={name: xy for name, xy in text_xy.items() if name != PCD_REFERENCE},
         view_label="feed nut end view receipt",
         dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
     )
@@ -1919,8 +1958,102 @@ def _receipt_dimensions(adapter: Any, end: Any) -> list[Any]:
         tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
         precision=RECEIPT_PRECISION,
     )
-    _set_callouts(adapter, receipt, RECEIPT_CALLOUTS)
-    return receipt
+    _set_callouts(adapter, receipt, IMPORTED_RECEIPT_CALLOUTS)
+    return receipt, _add_pcd_reference(adapter, end, text_xy[PCD_REFERENCE])
+
+
+_SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+_SW_SKETCH_ARC = 1  # swSketchSegments_e.swSketchARC
+_SW_DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
+
+
+def _pcd_circle(adapter: Any, end: Any) -> Any:
+    """ReceiptReference's bolt circle as the end view shows it: its one
+    construction circle of the PCD's radius on the nut's axis."""
+    require_source_configuration(adapter, end, feed_nut.CONFIGURATION)
+    native = _early_bound(end, "IView")
+    feature = _early_bound(native.ReferencedDocument, "IPartDoc").FeatureByName(
+        feed_nut.RECEIPT_SKETCH
+    )
+    if feature is None:
+        raise RuntimeError(f"the end view's part has no {feed_nut.RECEIPT_SKETCH} sketch")
+    sketch = _early_bound(_early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch")
+    matches = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if int(segment.GetType()) != _SW_SKETCH_ARC or not bool(segment.ConstructionGeometry):
+            continue
+        arc = _early_bound(raw, "ISketchArc")
+        point = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")  # a sketch point
+        centre = (float(point.X), float(point.Y), float(point.Z))
+        if (
+            int(arc.IsCircle()) == 1
+            and math.isclose(float(arc.GetRadius()), feed_nut.HOLE_PCD / 2000.0, abs_tol=1e-9)
+            and all(abs(value) < 1e-9 for value in centre)
+        ):
+            matches.append(segment)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{feed_nut.RECEIPT_SKETCH}: {len(matches)} construction circles are the PCD"
+        )
+    in_view = native.GetCorresponding(matches[0])
+    if in_view is None:
+        raise RuntimeError("the PCD circle has no instance in the end view")
+    return _early_bound(in_view, "ISketchSegment")
+
+
+def _add_pcd_reference(adapter: Any, end: Any, text_xy: tuple[float, float]) -> Any:
+    """The holes' PCD as a driven diameter on the bolt circle, dressed as the
+    supplier's untoleranced reference; returns its annotation."""
+    circle = _pcd_circle(adapter, end)
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, end)):
+        raise RuntimeError("cannot activate the end view for the PCD reference")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    draw.ClearSelection2(True)
+    data = selection.CreateSelectData()
+    data.View = end
+    if not circle.Select4(False, data):
+        raise RuntimeError("cannot select the PCD circle in the end view")
+    if int(selection.GetSelectedObjectType3(1, -1)) != _SW_SEL_EXT_SKETCH_SEGS:
+        raise RuntimeError("the PCD circle pick resolved to another entity")
+    display = draw.AddDiameterDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("no native PCD reference diameter was created")
+    display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) != _SW_DIAMETER_DIMENSION:
+        raise RuntimeError("the PCD reference is not a native diameter")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    set_near_side_diameter(annotation, "PCD reference near-side diameter")
+    supplier_reference_dimension(adapter, display, **_PCD_REFERENCE_FORMAT)
+    rebuild_drawing(adapter, label="feed nut PCD reference")
+    _assert_pcd_reference(adapter, annotation)
+    return annotation
+
+
+_PCD_REFERENCE_FORMAT = {
+    "label": "PCD reference",
+    "units": PCD_REFERENCE_UNITS,
+    "precision": PCD_REFERENCE_PRECISION,
+    "expected_mm": feed_nut.HOLE_PCD,
+    "presentation": PCD_REFERENCE_PRESENTATION,
+    "fraction_denominator": _PCD_FRACTION,
+    "callout": PCD_REFERENCE_CALLOUT,
+}
+
+
+def _assert_pcd_reference(adapter: Any, annotation: Any) -> None:
+    """The PCD still prints "(Ø16 mm)" over "PCD", a diameter with no band."""
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    assert_supplier_reference_dimension(adapter, display, **_PCD_REFERENCE_FORMAT)
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError("the PCD reference gained a tolerance")  # swTolNONE
+    if int(display.Type2) != _SW_DIAMETER_DIMENSION:
+        raise RuntimeError("the PCD reference is no longer a native diameter")
 
 
 @_telemetry.traced("drawing.feed_nut_rework_sheet")
@@ -2032,7 +2165,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
     )
     _set_callouts(adapter, annotations, REWORK_CALLOUTS)
     _set_countersink_angle(adapter, annotations)
-    receipt = _receipt_dimensions(adapter, end)
+    receipt, pcd = _receipt_dimensions(adapter, end)
     spigot, spigot_tip = _add_spigot_note(adapter, section)
     note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
     notes = [(note, REWORK_ITEM, REWORK_ITEM, ITEM_LABEL_CELL)]
@@ -2064,9 +2197,12 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         )
         _assert_callouts(adapter, annotations, REWORK_CALLOUTS)
         _assert_countersink_text(adapter, annotations)
-        _assert_callouts(adapter, receipt, RECEIPT_CALLOUTS)
+        _assert_callouts(adapter, receipt, IMPORTED_RECEIPT_CALLOUTS)
+        _assert_pcd_reference(adapter, pcd)
         _assert_spigot_note(adapter, spigot, spigot_tip)
-        _assert_rework_ink(adapter, [*annotations, *receipt], spigot, end, section)
+        _assert_rework_ink(
+            adapter, [*annotations, *receipt], spigot, end, section, {PCD_REFERENCE: pcd}
+        )
         title_fit()
 
     settled()
