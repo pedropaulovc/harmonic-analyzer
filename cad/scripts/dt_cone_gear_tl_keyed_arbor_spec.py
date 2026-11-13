@@ -178,12 +178,12 @@ if SEAT_LENGTH + _PAIR >= FACE_MIN_MM:
     raise AssertionError("the seat's end can reach a blank's far face")
 SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _PAIR
 # Pilot: the collars' bore slides on it, under the keyseat floor so the keyseat
-# runs out over it, over the thread's major so the thread is reduced. Its
-# .XXX holds the collar's float on it, which sets the Ø.50 collar's reach
-# under T030's root (a .XX pilot leaves no collar clear of it). It only
-# carries the loose backing collars, so the title block's .XXX band serves and
-# the callout names the collar it carries, never a fit it does not set
-# (machinist review of farm 20261113T071241685Z: a named fit with no limits).
+# runs out over it, over the thread's major so the thread is reduced. A plain
+# clearance size for the collar's drilled bore at the title block's .XXX band,
+# never a fit (machinist review of farm 20261113T090619426Z: a 3-place size
+# with no fit). A .XX pilot cannot serve: Ø.28 ±.01 meets the Ø.290 bore
+# line to line and its keyseat run-out cuts it; Ø.27 ±.01 floats the Ø.50
+# collar over T030's root.
 PILOT_DIA = 0.275 * INCH
 PILOT_END = 0.42 * INCH
 # Thread relief, at least one pitch wide and under the thread's root (rule 16).
@@ -702,7 +702,7 @@ CALLOUTS_BELOW: dict[str, str] = {
     "KeyseatS": SEAT_NOTE_FLAG,
     "ShoulderR": SEAT_NOTE_FLAG,
     "GripDia": "STOCK OK",
-    "PilotDia": f"FOR {_COLLAR_SHORT}",
+    "PilotDia": f"CLEARS {_COLLAR_SHORT}",
     "HeadCentreDia": "CENTRE HOLE",
     "TailCentreDia": (
         f"CENTRE HOLE\nHOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"

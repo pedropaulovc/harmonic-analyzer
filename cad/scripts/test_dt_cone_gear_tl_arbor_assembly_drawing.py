@@ -446,12 +446,12 @@ def test_the_exploded_view_draws_one_setup_in_fitting_order() -> None:
     boxes = _exploded_part_boxes()
     for stem in drawing.SPARES:
         assert boxes[stem][3] < boxes[item2][1] - drawing.SPARE_DROP / 1000.0 + 1e-9
-    # The axis runs through every stacked item.
-    axis = _box(*drawing.EXPLODED_AXIS_MM)
-    assert axis[1] == axis[3]
-    for stem in (spec.ARBOR, item2, spec.NUT):
-        box = boxes[stem]
-        assert box[1] < axis[1] < box[3] and axis[0] < box[0] and box[2] < axis[2]
+    # The stack stands on one axis height; no owned centreline joins the
+    # views (one in item 1's view grew its outline over items 2 and 6).
+    for stem in (item2, spec.NUT):
+        assert (boxes[stem][1] + boxes[stem][3]) / 2.0 == pytest.approx(
+            (boxes[spec.ARBOR][1] + boxes[spec.ARBOR][3]) / 2.0
+        ), stem
     names = list(boxes)
     for i, name in enumerate(names):
         assert _inside(boxes[name]) and not _overlap(boxes[name], TITLE_BLOCK), name
@@ -502,3 +502,41 @@ def test_the_exploded_labels_and_balloons_stand_clear_of_the_ink() -> None:
         for stem, part in parts.items():
             if name != f"ring {stem}":
                 assert not _overlap(boxes[name], part), (name, stem)
+
+
+def test_the_exploded_labels_never_read_as_one_block_or_start_on_their_text() -> (
+    None
+):
+    """The layout audit's merged-blocks rule on the planned label boxes: two
+    leadered notes sharing any column stand at least its row pitch apart
+    (farm 20261113T090619426Z: items 5 and 2, 4.79 mm, under 5.53). Each
+    label stands wholly beside its tip and above it, so its leader leaves
+    the text's near end, never across the text."""
+    from _layout_audit import ROW_PITCH_HEIGHTS
+
+    text_height = 0.0035  # the default note height the audit measured
+    tips = {}
+    for stem, point in drawing.LABEL_TIPS_MM.items():
+        offset = drawing.EXPLODE_OFFSETS_MM[drawing._view_stem(stem)]
+        tips[stem] = drawing.nominal_sheet_point(
+            tuple(p + o for p, o in zip(point, offset, strict=True))
+        )
+    boxes = {
+        stem: drawing.label_box(text, drawing.label_position(stem, tips[stem]))
+        for stem, text in drawing.EXPLODED_LABELS.items()
+    }
+    for stem, (x0, y0, x1, _y1) in boxes.items():
+        tip_x, tip_y = tips[stem]
+        assert x0 >= tip_x + drawing.LABEL_RUN - 1e-9 or (
+            x1 <= tip_x - drawing.LABEL_RUN + 1e-9
+        ), stem
+        assert y0 > tip_y, stem
+    stems = list(boxes)
+    for i, a in enumerate(stems):
+        for b in stems[i + 1 :]:
+            ax0, ay0, ax1, ay1 = boxes[a]
+            bx0, by0, bx1, by1 = boxes[b]
+            if min(ax1, bx1) <= max(ax0, bx0):
+                continue  # side by side
+            gap = max(ay0 - by1, by0 - ay1)
+            assert gap >= ROW_PITCH_HEIGHTS * text_height + 0.001, (a, b)
