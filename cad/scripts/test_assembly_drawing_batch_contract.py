@@ -297,7 +297,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_dt_cylinder_gear_tl_cam_turning_assembly:
             scripts_dir = Path(drawing.__file__).resolve().parent
-            # The fixture spec whose throw and pin station the sheet prints.
+            # The fixture spec whose stand, runout and engagement the steps print.
             assert str(scripts_dir / "dt_cylinder_gear_tl_cam_fixture_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:

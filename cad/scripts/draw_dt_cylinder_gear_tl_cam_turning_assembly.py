@@ -6,13 +6,11 @@ The kit is the fixture body (item 1, MHA-DT-12-TL-01) with its pressed stub
 (issue #2361). The gear is the workpiece: never placed in the model, drawn
 in phantom on the exploded sheet only.
 
-Sheet 1: the top view (items 4 and 5 off) with the cam throw and the clock
-pin's station from the register axis as native reference dimensions, the
-front view projected under it at the same 1:1 with item 1 ballooned, the
-shaded isometric with items 2-5 ballooned, the BOM, the kit's one-time
-presses, the three fitting steps (the gear is turned CLOCKWISE in the top
-view onto item 3 before item 5 is tightened: the cut then pushes it harder
-onto the pin) and the checks.
+Sheet 1: the top view (items 4 and 5 off), the front view projected under
+it at the same 1:1 with item 1 ballooned, the shaded isometric with items
+2-5 ballooned, the BOM, the kit's one-time presses, the three fitting steps
+(the gear is turned CLOCKWISE in the top view onto item 3 before item 5 is
+tightened: the cut then pushes it harder onto the pin) and the checks.
 Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
 off the stub's axis in fitting order. Numbers come from
 ``dt_cylinder_gear_tl_cam_fixture_spec``; this recipe never edits the source
@@ -51,8 +49,6 @@ from _drawing_common import (
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_dimensions import set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -185,24 +181,14 @@ TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
 FRONT_CAPTION = "FRONT VIEW"
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
-# Reference dimensions in the top view: the throw and the clock pin's
-# station, each from the register's centre (the lathe axis once item 1 is
-# indicated true), at the body sheet's printed places.
-REFERENCE_PLACES = fixture.POSITION_PLACES
+# Kit-frame radii and heights the exploded view and its labels use. The top
+# view carries no dimensions: the throw and pin station are item 1's own
+# geometry, printed on its sheet, and check 1 accepts the throw by indicator
+# (run 20261113T204849556Z's review: over-specification).
 _R = fixture.BODY_DIA / 2.0
 _STUB_R = fixture.DOWEL_DIA / 2.0
-_PIN_R = fixture.PIN_DIA / 2.0
 _STUB_TOP = fixture.THICKNESS + fixture.STUB_STAND
 _PIN_TOP = fixture.THICKNESS + fixture.PIN_STAND
-REGISTER_PICK = (-_R, 0.0, fixture.THICKNESS)
-STUB_PICK = (-_STUB_R, -fixture.STUB_OFFSET, _STUB_TOP)
-PIN_PICK = (fixture.PIN_X - _PIN_R, fixture.PIN_Y, _PIN_TOP)
-# name -> (second pick, orientation, expected mm, text offset from TOP_CENTER)
-REFERENCE_DIMENSIONS = {
-    "cam throw": (STUB_PICK, "vertical", fixture.STUB_OFFSET, (0.052, -0.004)),
-    "clock pin height": (PIN_PICK, "vertical", fixture.PIN_Y, (0.052, 0.012)),
-    "clock pin offset": (PIN_PICK, "horizontal", -fixture.PIN_X, (-0.012, 0.052)),
-}
 
 KIT_STEPS = "\n".join(
     (
@@ -443,65 +429,6 @@ def _kit_view(
     return view
 
 
-def _reference_dimensions(adapter: Any, view: Any) -> Callable[[], None]:
-    """The throw and the clock pin's station, each a native driven dimension
-    from the register's circle to the stub's or pin's circle, parenthesized
-    as reference and checked against the spec."""
-    names = list(REFERENCE_DIMENSIONS)
-    picks = model_points_in_view(
-        adapter,
-        view,
-        [_kit(REGISTER_PICK), *(_kit(REFERENCE_DIMENSIONS[n][0]) for n in names)],
-        label="cam turning kit reference picks",
-    )
-    register = picks[0]
-    authored = []
-    for name, second in zip(names, picks[1:], strict=True):
-        _pick, orientation, expected_mm, offset = REFERENCE_DIMENSIONS[name]
-        label = f"cam turning kit {name}"
-        # add_edge_dimension returns the raw dispatch: GetAnnotation on it
-        # is "Member not found" natively (run 6f63c0c9), so bind it as the
-        # passing sheets do (draw_dt_cone_tip_gear._add_overall_reference).
-        display = _early_bound(
-            add_edge_dimension(
-                adapter,
-                view,
-                p0=register,
-                p1=second,
-                text_xy=(TOP_CENTER[0] + offset[0], TOP_CENTER[1] + offset[1]),
-                label=label,
-                orientation=orientation,
-            ),
-            "IDisplayDimension",
-        )
-        # Value-only: the picks are circle rims at exact projected model
-        # points; the register, stub and pin are the only circles there.
-        assert_dimension_measures(
-            adapter, display, expected_mm=expected_mm, label=label
-        )
-        display = _early_bound(
-            set_reference_dimension(adapter, display.GetAnnotation(), label=label),
-            "IDisplayDimension",
-        )
-        display.SetPrecision3(REFERENCE_PLACES, -1, -1, -1)
-        if int(display.GetPrimaryPrecision2()) != REFERENCE_PLACES:
-            raise RuntimeError(f"{label} precision did not persist")
-        authored.append((label, display, expected_mm))
-
-    def settled() -> None:
-        for label, display, expected_mm in authored:
-            assert_dimension_measures(
-                adapter, display, expected_mm=expected_mm, label=f"{label} settled"
-            )
-            if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != (
-                "(",
-                ")",
-            ):
-                raise RuntimeError(f"{label} is no longer a reference dimension")
-
-    return settled
-
-
 def _place_sheet(adapter: Any) -> Callable[[], None]:
     fixture_only = frozenset({BODY, STUB, CLOCK_PIN})
     top = _kit_view(adapter, "*Top", TOP_CENTER, SHEET_SCALE, fixture_only)
@@ -550,7 +477,6 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
             f"cam turning kit carries {len(landings)} balloons, "
             f"expected {len(BOM_COMPONENTS)}"
         )
-    references_settled = _reference_dimensions(adapter, top)
     for text, xy, label in (
         (ASSEMBLY_STEPS, STEPS_XY, "steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
@@ -560,11 +486,7 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
     ):
         _add_note(adapter, text, xy, label=label)
 
-    def settled() -> None:
-        assert_balloon_landings(adapter, landings)
-        references_settled()
-
-    return settled
+    return lambda: assert_balloon_landings(adapter, landings)
 
 
 def _activate_sheet(adapter: Any, name: str) -> None:

@@ -162,18 +162,11 @@ def test_the_sheet_states_the_engagement_shortfall_and_the_runout_window() -> No
     assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
 
 
-def test_reference_dimensions_are_the_throw_and_the_pin_station() -> None:
-    expected = {
-        name: value for name, (_p, _o, value, _t) in sheet.REFERENCE_DIMENSIONS.items()
-    }
-    assert expected == pytest.approx(
-        {
-            "cam throw": fixture.STUB_OFFSET,
-            "clock pin height": fixture.PIN_Y,
-            "clock pin offset": -fixture.PIN_X,
-        }
-    )
-    assert sheet.REFERENCE_PLACES == 4
+def test_the_top_view_carries_no_part_dimensions() -> None:
+    # The throw and pin station are item 1's geometry, printed on its sheet;
+    # check 1 accepts the throw by indicator (run 20261113T204849556Z).
+    for name in ("REFERENCE_DIMENSIONS", "REFERENCE_PLACES", "_reference_dimensions"):
+        assert not hasattr(sheet, name), name
 
 
 def test_exploded_view_stacks_in_fitting_order_and_labels_stay_inside() -> None:
