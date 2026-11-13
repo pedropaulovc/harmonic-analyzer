@@ -86,7 +86,9 @@ def test_member_volumes_and_dimensions_are_the_disc_and_bore() -> None:
     assert len(features) == len(set(features))
 
 
-def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_backs() -> None:
+def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_backs() -> (
+    None
+):
     """Which blanks a member backs is assembly information: the kit's setup
     table lists it by item number, and a part-sheet note repeating it was
     narration (rule 7, machinist review of farm 20261113T042822797Z)."""

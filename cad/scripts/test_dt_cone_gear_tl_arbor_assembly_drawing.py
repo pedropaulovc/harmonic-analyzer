@@ -145,7 +145,9 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         str(number) for number in range(1, len(steps) + 1)
     ]
     assert all(len(step.splitlines()) <= 6 for step in steps)
-    assert all(len(line) <= spec.STEP_WIDTH for line in spec.ASSEMBLY_STEPS.splitlines())
+    assert all(
+        len(line) <= spec.STEP_WIDTH for line in spec.ASSEMBLY_STEPS.splitlines()
+    )
     for step in steps:
         body = _flat(step).split(". ", 1)[1]
         assert body.count(". ") == 0 and "; " not in body and " THEN " not in body
@@ -466,8 +468,9 @@ def _exploded_part_boxes() -> dict[str, tuple[float, float, float, float]]:
         if stem == spec.NUT:
             half, length = nut.ACROSS_CORNERS / 2.0, nut.THICKNESS
         else:
-            half, length = collar.OD_BY_CONFIGURATION[stem.split("--")[1]] / 2.0, (
-                collar.LENGTH
+            half, length = (
+                collar.OD_BY_CONFIGURATION[stem.split("--")[1]] / 2.0,
+                (collar.LENGTH),
             )
         boxes[stem] = _box((0.0, dy - half, z), (0.0, dy + half, z + length))
     near = drawing.EXPLODED_BLANK_Z
@@ -571,9 +574,7 @@ def test_the_exploded_labels_and_balloons_stand_clear_of_the_ink() -> None:
                 assert not _overlap(boxes[name], part), (name, stem)
 
 
-def test_the_exploded_labels_never_read_as_one_block_or_start_on_their_text() -> (
-    None
-):
+def test_the_exploded_labels_never_read_as_one_block_or_start_on_their_text() -> None:
     """The layout audit's merged-blocks rule on the planned label boxes: two
     leadered notes sharing any column stand at least its row pitch apart
     (farm 20261113T090619426Z: items 5 and 2, 4.79 mm, under 5.53). Each
