@@ -2326,21 +2326,33 @@ def _certificate(identity: str, *, default: str = "Default", indent: int = 1) ->
 
 
 _OWN_NATIVES = (_certificate(_sha(_CAPTURE)), _certificate(_sha(_NATIVE)))
+_ANOTHER_FIELD = _certificate(_sha(_CAPTURE), default="Other")
 _CERTIFICATES = {
-    # (the replay's certificate, the base archive's, the replay kept its own)
+    # (the certificate the replay reported, the base archive's, the bytes kept
+    # of the replay's: None when none were)
     # Each names its own side's native part, every other byte the same.
-    "own_natives": (*_OWN_NATIVES, True),
+    "own_natives": (*_OWN_NATIVES, _OWN_NATIVES[0]),
     # A Python change: another field, or the bytes' formatting, differs too.
-    "another_field": (
-        _certificate(_sha(_CAPTURE), default="Other"),
+    "another_field": (_ANOTHER_FIELD, _OWN_NATIVES[1], _ANOTHER_FIELD),
+    "formatting": (
+        _certificate(_sha(_CAPTURE), indent=2),
         _OWN_NATIVES[1],
-        True,
+        _certificate(_sha(_CAPTURE), indent=2),
     ),
-    "formatting": (_certificate(_sha(_CAPTURE), indent=2), _OWN_NATIVES[1], True),
     # The field is not the native part's digest on one side.
-    "replay_names_other_bytes": (_certificate("d" * 64), _OWN_NATIVES[1], True),
-    "archive_names_other_bytes": (_OWN_NATIVES[0], _certificate("e" * 64), True),
-    "not_kept": (*_OWN_NATIVES, False),
+    "replay_names_other_bytes": (
+        _certificate("d" * 64),
+        _OWN_NATIVES[1],
+        _certificate("d" * 64),
+    ),
+    "archive_names_other_bytes": (
+        _OWN_NATIVES[0],
+        _certificate("e" * 64),
+        _OWN_NATIVES[0],
+    ),
+    "not_kept": (*_OWN_NATIVES, None),
+    # Bytes that would pass, but not the output the replay reported.
+    "kept_not_reported": (_ANOTHER_FIELD, _OWN_NATIVES[1], _OWN_NATIVES[0]),
 }
 
 
@@ -2358,7 +2370,7 @@ def test_an_export_certificate_may_differ_only_by_each_sides_own_native_part(
     _replay_as(
         monkeypatch,
         shop,
-        certificate=replayed if kept else None,
+        certificate=kept,
         com_outputs={"sldprt/fake.SLDPRT": _sha(_CAPTURE)},
         py_outputs={shadow.certificate_path(_STEM): _sha(replayed)},
     )
@@ -2366,6 +2378,8 @@ def test_an_export_certificate_may_differ_only_by_each_sides_own_native_part(
     reuse = shop.attempt()
     if case != "own_natives":
         assert reuse.value == "declined:python_output_differs", reuse.detail
+        unreported = "is not the replay's reported" in str(reuse.detail)
+        assert unreported == (case == "kept_not_reported"), reuse.detail
         return
     assert reuse.value == "reused", reuse.detail
     # The base's own outputs installed: its native part and its certificate.

@@ -2236,8 +2236,9 @@ def _verify_outputs(part: PartBuild, reuse: Reuse) -> None:
     byte (those SolidWorks wrote come from the base's captures, and the
     archive is what the base's own build stored), but an export certificate
     whose only difference is its native identity, each side naming its own
-    native part (:func:`native_identity_only`); the native part is among
-    them, its digest the token a reuse must re-stamp."""
+    native part (:func:`native_identity_only`), judged on the very bytes the
+    replay reported writing; the native part is among them, its digest the
+    token a reuse must re-stamp."""
     replay = reuse.replay or {}
     python = {
         _fold(rel): digest for rel, digest in (replay.get("py_outputs") or {}).items()
@@ -2269,6 +2270,12 @@ def _verify_outputs(part: PartBuild, reuse: Reuse) -> None:
     differing = sorted(rel for rel, digest in python.items() if members[rel] != digest)
     certificate = _fold(certificate_path(part.stem))
     if certificate in differing and reuse.certificate and reuse.archive is not None:
+        if hashlib.sha256(reuse.certificate).hexdigest() != python[certificate]:
+            raise Declined(
+                Decline.PYTHON_OUTPUT_DIFFERS,
+                f"the certificate kept of the replay is not the replay's reported "
+                f"{certificate}",
+            )
         named = {_fold(rel): rel for rel in reuse.members}
         theirs = _cache.archive_member(reuse.archive, named[certificate])
         if theirs is not None and native_identity_only(
