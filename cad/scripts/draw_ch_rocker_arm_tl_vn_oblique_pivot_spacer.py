@@ -27,10 +27,11 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
 ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
-# How the jig uses the part is a design note, not supplier operating data: it
-# rides the general line (at most the default's 74 characters), every printed
-# size already being the supplier's parenthesised reference.
-GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. LOOSE BORE: NOT A LOCATING BUSHING."
+# The general line says only what the shop does with the part. That the bore
+# runs loose on the pivot screw (never a locating bushing) is design rationale
+# for an unbanded stock size, narration under guideline rule 7 (v49 machinist
+# review); the drawing test's loose-fit check guards it instead.
+GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED."
 # The OD and length texts shelve right of their own witnesses, clear of the
 # lines: the OD on the Top's bottom lane, the length beside it. The bore is
 # dimensioned on the Front's visible bore circle, its text up-right of the
