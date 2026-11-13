@@ -276,6 +276,21 @@ JOURNAL_FINISH_SYMBOL = (STEP_X - 0.010, SIDE_CENTER[1] + 0.020)
 FINISH_CHAR_HEIGHT = 0.0025
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (BACK_X + 0.020, SIDE_CENTER[1] + 0.003)
+# v49 machinist review (rule 4): the Ø callout's fits name their mates by
+# number only; a note leadered to the same shank names them. The callout is
+# part-authored (#1942), so the names cannot ride it from this sheet without
+# re-keying the part and the assemblies over it. The note stands under the
+# shank between the back end's extension line and the step's, over the
+# shank length's row; its leader lands on the shank's lower silhouette.
+MATE_NAMES = {
+    callouts.BAR: "WHEEL BAR",
+    callouts.WHEEL: "MAGNIFYING WHEEL",
+}
+MATES_NOTE = "MATES: " + ",\n".join(
+    f"{number} {name}" for number, name in MATE_NAMES.items()
+)
+MATES_PICK = (BACK_X + 0.012, SIDE_CENTER[1] - PIN_DIA / 2.0 * _S / 1000.0)
+MATES_NOTE_XY = (BACK_X + 0.026, SIDE_CENTER[1] - 0.0115)
 
 
 def _view_center_delta(
@@ -955,6 +970,15 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=spt(*THREAD_PICK),
         note_xy=spt(*THREAD_NOTE_XY),
         label="wheel axle thread callout",
+        entity_type="SILHOUETTE",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=MATES_NOTE,
+        entity_xy=spt(*MATES_PICK),
+        note_xy=spt(*MATES_NOTE_XY),
+        label="wheel axle fit mates",
         entity_type="SILHOUETTE",
     )
     journal_finish = add_surface_finish(

@@ -215,8 +215,10 @@ def test_journal_finish_and_no_gdt() -> None:
 def test_thread_callout_and_no_general_notes() -> None:
     assert spec.THREAD_CALLOUT == "#4-40 UNC"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_attached_note(") == 1
+    # Two leadered notes: the thread callout and the fit mates' names.
+    assert source.count("add_attached_note(") == 2
     assert "text=THREAD_CALLOUT" in source
+    assert "text=MATES_NOTE" in source
     # Rule 7: the press-to-gauge step is MHA-MG-00's, and the optional
     # thread locker is gone; no general note remains.
     assert "Manufacturing Notes" not in source
@@ -231,6 +233,18 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert callouts.RUNNING_CLEARANCE_TEXT == "-".join(
         f"{value / 25.4:.4f}".lstrip("0") for value in group.HUB_RUNNING
     )
+
+
+def test_fit_mates_named_by_number_and_name() -> None:
+    # v49 machinist review (rule 4): each mate the Ø callout's fits name by
+    # number is named in full at the shank, number then name.
+    assert drawing.MATES_NOTE.splitlines() == [
+        "MATES: MHA-MG-08 WHEEL BAR,",
+        "MHA-MG-05 MAGNIFYING WHEEL",
+    ]
+    for number in drawing.MATE_NAMES:
+        assert number in callouts.PIN_DIA_CALLOUT
+    assert set(drawing.MATE_NAMES) == {callouts.BAR, callouts.WHEEL}
 
 
 def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
