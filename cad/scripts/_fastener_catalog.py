@@ -505,27 +505,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Medium-Strength Zinc-Plated Steel Hex Nut",
         "95462A505",
     ),
-    # MHA-DT-12-TL-VN-50, -52, -53: the cylinder gears' cam turning fixture
-    # kit's bought hardware (MHA-DT-12-TL-00, #2361). Its clock pin (-VN-51)
-    # is a gauge pin cut to length, built and drawn as its own part.
-    "dt-cylinder-gear-tl-vn-cam-stub": _stock(
-        "dt-cylinder-gear-tl-vn-cam-stub",
-        "Pull-Out Dowel Pin",
-        "97175A344",
-        material="Alloy Steel",
-    ),
-    "dt-cylinder-gear-tl-vn-cam-clamp-screw": _stock(
-        "dt-cylinder-gear-tl-vn-cam-clamp-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A337",
-        material="Alloy Steel",
-    ),
-    "dt-cylinder-gear-tl-vn-cam-clamp-washer": _stock(
-        "dt-cylinder-gear-tl-vn-cam-clamp-washer",
-        "18-8 Stainless Steel Washer",
-        "92141A011",
-        material="AISI 304",
-    ),
 }
 
 
