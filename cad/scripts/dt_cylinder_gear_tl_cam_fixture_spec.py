@@ -558,18 +558,23 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 # Hole callouts name the bought pin each hole presses (rule 4: a REAM names
-# its mate and fit); the locations name what they set.
+# its mate and fit); the locations name what they set. Two short rows each,
+# so the callouts stand inside the border clear of the register and the
+# edge view (run 20261112T203156536Z's PinHoleDia ran 35 mm off the sheet).
 STUB_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-stub")["number"])
 CLOCK_PIN_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-clock-pin")["number"])
 PIN_HOLE_DEPTH_TEXT = inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)
 CALLOUTS_BELOW: dict[str, str] = {
-    "StubHoleDia": f"REAM THRU\nPRESS FIT ON {STUB_NUMBER}",
-    "PinHoleDia": f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}\nPRESS FIT ON {CLOCK_PIN_NUMBER}",
+    "StubHoleDia": f"REAM THRU, PRESS FIT\nON {STUB_NUMBER}",
+    "PinHoleDia": f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}, PRESS FIT\nON {CLOCK_PIN_NUMBER}",
     "StubOffset": "SETS CAM THROW",
     "PinY": "CLOCKS NOTCHED\nTOOTH SPACE",
 }
-# The one functional note: what the fixture is for, and its kit.
-FUNCTION_NOTE = "1. TURNS THE CAM OF MHA-DT-12; PINS AND CLAMP:\n   MHA-DT-12-TL-00."
+# The one functional note: what the fixture is for, and its kit; rows short
+# enough to end inside the right border from the note's column.
+FUNCTION_NOTE = (
+    "1. TURNS THE CAM OF MHA-DT-12;\n   PINS AND CLAMP ARE KIT\n   MHA-DT-12-TL-00."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
 # --- Kit sheet facts (MHA-DT-12-TL-00), worded here so the sheet only places them --
