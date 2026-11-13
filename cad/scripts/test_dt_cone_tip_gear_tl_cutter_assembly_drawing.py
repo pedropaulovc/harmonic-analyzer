@@ -116,11 +116,19 @@ def test_the_references_are_the_spec_values_at_the_spec_places() -> None:
     assert fixture.SWING_RADIUS == pytest.approx(
         fixture.bar.BAR_RADIUS + fixture.STICK_OUT
     )
-    assert fixture.DRAWING_REFERENCE_PRECISION == 3
+    assert fixture.DRAWING_PRECISION == {
+        fixture.SETTINGS_SKETCH: {
+            fixture.STICK_OUT_DIMENSION: 3,
+            fixture.SWING_RADIUS_DIMENSION: 3,
+        }
+    }
+    assert (
+        set(fixture.DIMENSION_CALLOUTS)
+        == fixture.DRAWING_DIMENSIONS[fixture.SETTINGS_SKETCH]
+    )
     left, bottom, right, top = SHEET_INNER
     for name, (x, y) in {
-        "stick-out": drawing.STICK_OUT_TEXT_XY,
-        "swing": drawing.SWING_TEXT_XY,
+        **drawing.SETTINGS_TEXT_XY,
         "bom": drawing.BOM_ANCHOR,
         "steps": drawing.STEPS_XY,
         "iso": drawing.ISO_CENTER,
@@ -133,12 +141,39 @@ def test_the_references_are_the_spec_values_at_the_spec_places() -> None:
     assert drawing.FRONT_ORIGIN[1] + fixture.bar.BAR_LENGTH * drawing._S < top
 
 
-def test_the_references_end_on_a_true_vertex_that_prints_as_the_tip() -> None:
-    """The form's edges are equation-driven splines, so the references end on
-    the face's root-arc/relief corner, a real vertex, not on the arc at P1."""
-    segments = {s.name: s for s in fixture.bit.form_segments(1.0)}
-    corner = fixture.bit.face_point(*segments["UpperRelief"].point(1.0))
-    assert drawing.TIP_CORNER_MM == pytest.approx((corner[0], 0.0, corner[1]))
-    # Ahead of P1, but by less than half the references' last place.
-    half_place = 0.5 * 25.4 * 10.0**-fixture.DRAWING_REFERENCE_PRECISION
-    assert 0.0 < drawing.TIP_CORNER_MM[0] < half_place
+def test_the_settings_chain_runs_from_the_bar_axis_to_p1() -> None:
+    """Both references end on the assembly's own settings sketch, never on
+    the bit's form edges (equation-curve topology the farm could not find)."""
+    axis, surface, tip_point = fixture.SETTINGS_CHAIN
+    station = fixture.bar.CROSS_HOLE_STATION
+    assert axis == pytest.approx((0.0, station))
+    assert surface == pytest.approx((fixture.bar.BAR_RADIUS, station))
+    # P1, the bit's origin as placed.
+    assert (*tip_point, 0.0) == pytest.approx(fixture.BIT_POSITION)
+    assert tip_point[0] - surface[0] == pytest.approx(fixture.STICK_OUT)
+    assert tip_point[0] - axis[0] == pytest.approx(fixture.SWING_RADIUS)
+    assert drawing.SETTINGS_EXPECTED_MM == {
+        fixture.STICK_OUT_DIMENSION: fixture.STICK_OUT,
+        fixture.SWING_RADIUS_DIMENSION: fixture.SWING_RADIUS,
+    }
+
+
+def test_the_settings_texts_clear_every_extension_line_and_the_bar() -> None:
+    """Texts sit right of P1, outside both references' extension lines; the
+    stick-out's (lower) row is the one the swing radius's P1 extension line
+    passes, so its text must start right of that line."""
+    tip_x = drawing.FRONT_ORIGIN[0] + fixture.SWING_RADIUS * drawing._S
+    stick = drawing.SETTINGS_TEXT_XY[fixture.STICK_OUT_DIMENSION]
+    swing = drawing.SETTINGS_TEXT_XY[fixture.SWING_RADIUS_DIMENSION]
+    assert stick[1] < swing[1]
+    char_width = 0.0025  # ~3.5 mm text, generous
+    widest = max(len(text) for text in fixture.DIMENSION_CALLOUTS.values())
+    for x, _y in (stick, swing):
+        assert x - widest * char_width / 2.0 > tip_x
+        assert x + widest * char_width / 2.0 < drawing.ISO_CENTER[0] - 0.015
+    # Both rows clear the bit's top edge at the station.
+    bit_top = (
+        drawing.FRONT_ORIGIN[1]
+        + (fixture.bar.CROSS_HOLE_STATION + fixture.bit.BIT_RADIUS) * drawing._S
+    )
+    assert stick[1] - bit_top > 0.008

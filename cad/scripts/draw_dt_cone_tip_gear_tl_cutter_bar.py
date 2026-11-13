@@ -70,7 +70,8 @@ RIGHT_ORIGIN = (0.200, FRONT_ORIGIN[1])
 BOTTOM_ORIGIN = (FRONT_ORIGIN[0], 0.060)
 ISO_CENTER = (0.320, 0.200)
 ISO_SCALE = VIEW_SCALE
-ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]}:{ISO_SCALE[1]}"
+# The isometric prints at the sheet scale, so its label carries no scale.
+ISO_NOTE = "ISOMETRIC VIEW"
 ISO_NOTE_XY = (0.290, 0.150)
 _R = part.BAR_RADIUS
 
@@ -96,7 +97,10 @@ RIGHT_KEEP = {
 }
 _TAP_R = part.TAP_DRILL_DIA / 2.0 * _S
 TAP_EDGE_XY = (BOTTOM_ORIGIN[0] - _TAP_R, BOTTOM_ORIGIN[1])
-TAP_CALLOUT_XY = (BOTTOM_ORIGIN[0] + (_R + 10.0) * _S, BOTTOM_ORIGIN[1] - 0.004)
+# The callout's two lines (about 70 mm wide) centre here, their left end
+# 15 mm right of the end view's circle, so only the leader crosses the
+# outline (farm run 20261113T012650242Z printed TAP 4-40 across the circle).
+TAP_CALLOUT_XY = (BOTTOM_ORIGIN[0] + (_R + 25.0) * _S, BOTTOM_ORIGIN[1] - 0.012)
 TAP_PROCESS = "TAP"
 TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)

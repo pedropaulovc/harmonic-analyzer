@@ -89,31 +89,41 @@ def top_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     return TOP_P1[0] + x_mm * _S, TOP_P1[1] - z_mm * _S
 
 
-# --- Front view: the rod's length under it, its Ø left of the shank end, the
-# flat's length over the face line, the front clearance under the tip, its
-# text clear right of the plumb line (farm run 20261112T203021325Z printed
-# FRONT CLEARANCE across it at 1.2 mm).
+# --- Front view: the rod's length under it; its Ø far enough left of the
+# shank end that the three-line callout stays clear of the outline; the flat's
+# length with its text left of both extension lines (between them the lines
+# ran up through FLAT TO CENTER LINE, farm run 20261113T012650242Z); the front
+# clearance low and right of the plumb line, under the end view's side
+# clearance arc, whose extension line crossed it at 3.5 mm.
 FRONT_KEEP = {
     "BitLength": front_xy(-part.BIT_LENGTH / 2.0, -_R - 1.2),
-    "BitDia": front_xy(-part.BIT_LENGTH - 2.0, 0.0),
-    "FlatLength": front_xy(-part.FLAT_LENGTH / 2.0, _R + 1.0),
-    "FrontClearance": front_xy(3.5, -_R - 0.6),
+    "BitDia": front_xy(-part.BIT_LENGTH - 4.5, 0.0),
+    "FlatLength": front_xy(-part.FLAT_LENGTH - 2.8, _R + 1.2),
+    "FrontClearance": front_xy(3.0, -_R - 4.5),
 }
 # --- Face view: the three widths right of the tip, one column each a
 # reference's text width apart (at 1 mm pitch the same run printed them over
-# one another), the two stations from P1 above the view, one row each, clear
-# of the front view's flat length below it.
+# one another).  The tip width's text hangs below the form's widest extension
+# line (between its own lines, 2.9 mm apart on the sheet, they struck it).
+# The two stations from P1 stand above the view, one row each, their texts
+# right of P1 outside every extension line (the longer one's lines cross the
+# shorter one's row left of P1).
 WIDTH_PITCH_MM = 2.5
+_DEPTH_TEXT_X = 1.2
 TOP_KEEP = {
-    "TipWidth": top_xy(WIDTH_PITCH_MM, 0.0),
+    "TipWidth": top_xy(WIDTH_PITCH_MM, part.FORM_WIDTH / 2.0 + 0.6),
     "JunctionWidth": top_xy(2.0 * WIDTH_PITCH_MM, 0.0),
     "FormWidth": top_xy(3.0 * WIDTH_PITCH_MM, 0.0),
-    "JunctionDepth": top_xy(-abs(part.JUNCTION_DEPTH) / 2.0, -_R - 0.9),
-    "FormDepth": top_xy(-abs(part.FORM_DEPTH) / 2.0, -_R - 1.8),
+    "JunctionDepth": top_xy(_DEPTH_TEXT_X, -_R - 0.9),
+    "FormDepth": top_xy(_DEPTH_TEXT_X, -_R - 2.0),
 }
-# --- End view: the side clearance right of the rod.
+# --- End view: the side clearance right of and below the rod, its text clear
+# of the circle (the run printed SIDE touching it).
 RIGHT_KEEP = {
-    "SideClearance": (RIGHT_AXIS[0] + (_R + 1.0) * _S, RIGHT_AXIS[1] - _R * _S),
+    "SideClearance": (
+        RIGHT_AXIS[0] + (_R + 1.6) * _S,
+        RIGHT_AXIS[1] - (_R + 0.3) * _S,
+    ),
 }
 
 
