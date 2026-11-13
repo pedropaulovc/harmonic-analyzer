@@ -127,24 +127,41 @@ BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     stem: (stem, None) for stem in BOM_COMPONENTS
 }
 # The right view sees every bought item's rims edge-on, each drawn as one
-# line. A leader asked onto such a line near either end reads back at that
-# end: run 20261112T203156536Z walked item 2 to a top-rim point 1.42 mm
-# (sheet) in from the line's left end and the leader landed on the end
-# (_assert_leader_lands, limit 0.2 mm). So items 2-5 each take the front
-# point of one rim (part frame: +X toward the right view's viewer, +Y the
-# item's axis, z = 0), which draws at the line's middle, on the item's axis,
-# nowhere near an end; nothing stands in front of it. Item 1's walked point
-# lands 18 mm from any end and held.
-BALLOON_RIMS_MM: dict[str, tuple[float, float]] = {
-    # (rim radius, rim height along the item's axis)
-    STUB: (fixture.DOWEL_DIA / 2.0, fixture.DOWEL_LENGTH),  # tapped top end
-    CLOCK_PIN: (fixture.PIN_DIA / 2.0, fixture.PIN_LENGTH),  # top end
-    WASHER: (fixture.WASHER_OD / 2.0, 0.0),  # outer rim, gear side
-    SCREW_STEM: (SCREW.head_dia / 2.0, SCREW.head_h),  # head top
+# line across the item's axis. A leader asked on such a line near its end
+# lands ON the end: run 20261112T203156536Z walked item 2 to its top rim
+# 1.42 mm (sheet) in from the line's end and the leader read back on the
+# end (_assert_leader_lands, limit 0.2 mm); item 1's walked rim point, 39 mm
+# from either end, landed where asked. Mid-line is not safe either: the
+# clock pin's rim line is 1.9 mm long, so its middle is under 1 mm from both
+# ends, and run 20261113T012650242Z found no edge under the clamp screw's
+# head-top front point (3.96875, 4.826, 0) though run 20261112T203156536Z's
+# walk had hit that rim at 58 deg from it. So items 2-5 each take a point of
+# a real rim of their builder's revolve or extrude RIM_END_GAP_MM short of
+# the line's end on ``side`` (part frame: +X toward the right view's viewer,
+# +Y the item's axis, z across the sheet): a leader that lands on the end
+# is RIM_END_GAP_MM * 2 (the 2:1 scale) off, a quarter of the limit, and one
+# that lands as asked is exact. Each point lies on the viewer's half of its
+# rim, off the screw's hex socket (corner radius 2.29 mm < 3.94).
+RIM_END_GAP_MM = 0.025
+BALLOON_RIMS_MM: dict[str, tuple[float, float, float]] = {
+    # (rim radius, rim height along the item's axis, side of the sheet's axis)
+    STUB: (fixture.DOWEL_DIA / 2.0, fixture.DOWEL_LENGTH, 1.0),  # tapped top end
+    CLOCK_PIN: (fixture.PIN_DIA / 2.0, fixture.PIN_LENGTH, -1.0),  # top end
+    WASHER: (fixture.WASHER_OD / 2.0, 0.0, -1.0),  # outer rim, gear side
+    SCREW_STEM: (SCREW.head_dia / 2.0, SCREW.head_h, 1.0),  # head top
 }
+
+
+def rim_end_point(radius: float, height: float, side: float) -> tuple[float, float, float]:
+    """The rim point RIM_END_GAP_MM short of its edge-on line's ``side`` end,
+    on the viewer's (+X) half of the rim, part millimetres."""
+    z = side * (radius - RIM_END_GAP_MM)
+    return (math.sqrt(radius * radius - z * z), height, z)
+
+
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
-    stem: BalloonAnchor(point_mm=(radius, height, 0.0))
-    for stem, (radius, height) in BALLOON_RIMS_MM.items()
+    stem: BalloonAnchor(point_mm=rim_end_point(*rim))
+    for stem, rim in BALLOON_RIMS_MM.items()
 }
 BALLOON_MARGIN = 0.012
 

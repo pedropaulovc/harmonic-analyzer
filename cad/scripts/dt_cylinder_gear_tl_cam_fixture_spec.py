@@ -45,24 +45,33 @@ stands on -Y so the cam lobe points +Y, as on the gear; the clock pin stands
 gear's own NOTCH_PHASE_DEG. Every number of the gear is imported from
 ``dt_cylinder_gear_spec``.
 
-Accuracy (this module asserts only what is true):
+Accuracy (this module asserts only what is true). Each error is split into
+(a) terms fixed in the fixture and so the same on all 20 gears (the stub and
+pin hole stations, the register's indication, the printed stations'
+rounding) and (b) per-gear terms (the gear's bore clearance on the stub,
+the gear's tooth form within its own bands): (b) is asserted inside the
+gear's printed band for the fixture's worst as-made state; (a) and the total
+are recorded, not asserted.
 
-* Throw: worst case inside the gear's printed band (``THROW_ERROR_MAX_MM``).
-* Phase, split into (a) terms fixed in the fixture and so common to all 20
-  gears (stub and pin hole positions, register indication, the printed pin
-  station's rounding) and (b) per-part terms (the gear's bore clearance on
-  the stub and the pin's play in a tooth space within the gear's own tip and
-  plunge bands): (b) is asserted inside the printed band for the fixture's
-  worst as-made state. The total (a)+(b) is recorded, not asserted:
-  ``PHASE_TOTAL_WORST_DEG`` exceeds the printed +/-.25 deg by arithmetic, an
-  open owner question on #2356 (GearKit2356); no precision was added to the
-  fixture to hide it.
+* Throw: (a) ``THROW_FIXED_MAX_MM`` .0023, (b) ``THROW_PER_PART_MAX_MM``
+  .0007, total .0030 against the print's +/-.0020. A common throw error is a
+  uniform gain on every channel.
+* Phase: (a) ``PHASE_FIXED_WORST_DEG`` .39 deg, (b)
+  ``PHASE_PER_PART_WORST_DEG`` .13 deg, total ``PHASE_TOTAL_WORST_DEG`` .60
+  deg against the print's +/-.25 deg. Every gear seats on the same flank of
+  the pin (TL-00 step 2), so the pin stands its mean half-play
+  (``SEATED_HALF_PLAY_DEG``, .19 deg) counter-clockwise of the phase and a
+  nominal fixture's common error is nil. A common phase error phi0 is NOT a
+  uniform gain: every channel draws cos(k theta + phi0), the same angle in
+  each gear's own turn, and zeroing (MHA-DT-00 check 5) sets the notches,
+  not the lobes, so nothing in the machine removes it.
 
-The hole positions carry +/-.0005 from the register axis, tighter than the
-shop table's +/-.002 row for a reamed hole: the lobe direction turns by
-e/throw rad for a stub error e across the throw line (.0005/.3402 rad =
-.084 deg), so +/-.002 would spend the whole phase band on one hole. The TL-00
-checks accept the as-made stub runout and the pin's seat in a gear.
+The hole stations carry the shop table's +/-.002 for a reamed hole from its
+datum and nothing tighter: one tool made once, cut to a number. The fixed
+parts exceed the gear's printed bands at the fixture's worst as-made state;
+whether MHA-DT-12's 1.5 +/-.25 deg and .3402 +/-.0020 stand is an owner
+question on #2356. The TL-00 checks accept the as-made stub runout and the
+pin's seat in a gear.
 """
 
 from __future__ import annotations
@@ -146,7 +155,9 @@ if BODY_WEIGHT_LB > 3.0:
 # 8.64 mm prints at four places; the fixture's print IS its model).
 POSITION_PLACES = 4
 STUB_OFFSET = round(THROW / INCH, POSITION_PLACES) * INCH
-POSITION_BAND = 0.0005 * INCH  # +/- on each hole coordinate from the register axis
+# +/- on each hole coordinate from the register axis: the shop table's row for
+# a reamed hole up to 6 in from its datum, the narrowest band cut to a number.
+POSITION_BAND = 0.002 * INCH
 POSITION_DEVIATIONS = (-POSITION_BAND, POSITION_BAND)
 # Press ream for the 97175A344 dowel (+.0001/+.0003 over 3/8): the .3745
 # reamer, REAM_H7's +.0005/0.
@@ -194,11 +205,15 @@ if STUB_RETENTION_LBF <= CLAMP_PRELOAD_LBF:
 # register axis then sits within half of it of the lathe axis.
 REGISTER_TIR = 0.0005 * INCH
 REGISTER_OFFSET = REGISTER_TIR / 2.0
-THROW_ERROR_MAX_MM = (
-    abs(STUB_OFFSET - THROW) + POSITION_BAND + BORE_FLOAT + REGISTER_OFFSET
-)
-if THROW_ERROR_MAX_MM > THROW_TOLERANCE:
-    raise AssertionError("the fixture cannot hold the gear's printed throw band")
+# Fixed in the fixture, so the same on all 20 gears: the stub's station and
+# the register's indication. Per gear: the gear's bore floating on the stub.
+THROW_FIXED_MAX_MM = abs(STUB_OFFSET - THROW) + POSITION_BAND + REGISTER_OFFSET
+THROW_PER_PART_MAX_MM = BORE_FLOAT
+if THROW_PER_PART_MAX_MM > THROW_TOLERANCE:
+    raise AssertionError("the 20 gears' throw scatter exceeds the printed band")
+# Recorded, not asserted: at the shop row the fixed part alone exceeds the
+# gear's printed +/-.0020 (MHA-DT-12 print vs this tool: owner question).
+THROW_ERROR_MAX_MM = THROW_FIXED_MAX_MM + THROW_PER_PART_MAX_MM
 
 # --- Clamp: one 10-32 SHCS into the dowel's tap, a #10 washer on the cam face --------
 # The screw centres in the dowel's thread; the washer floats on the screw.
@@ -266,13 +281,15 @@ if not CUT_TURNS_GEAR_CLOCKWISE:
 # --- Clock pin: a class Z gauge pin in the notched tooth space ---------------------
 # Printed coordinates from the register axis, on the .0001 grid. The pin
 # stands at radius PIN_RADIUS from the stub, PIN_PHASE_DEG from the throw
-# line: the notched space's centre for the gear's NOTCH_PHASE_DEG.
-PIN_X = -0.0330 * INCH  # -X: counter-clockwise of +Y seen from the tailstock
-PIN_Y = 0.9214 * INCH
+# line: the gear's NOTCH_PHASE_DEG plus the seated half-play
+# (``SEATED_HALF_PLAY_DEG``, below). Its radius is a function, not a number:
+# the pin enters a tooth space only from about 1.260 out (``_play_table``),
+# and the stub and pin stations each move it .002, so it stands .004 farther
+# out than the bare entry radius.
+PIN_X = -0.0373 * INCH  # -X: counter-clockwise of +Y seen from the tailstock
+PIN_Y = 0.9260 * INCH
 PIN_RADIUS = math.hypot(PIN_X, PIN_Y + STUB_OFFSET)
 PIN_PHASE_DEG = math.degrees(math.atan2(-PIN_X, PIN_Y + STUB_OFFSET))
-if abs(PIN_PHASE_DEG - PHASE_DEG) > 0.01:
-    raise AssertionError("the clock pin's printed station is off the notch phase")
 # Press ream for the .0375 minus pin (the .0365 reamer, REAM_H7).
 PIN_HOLE_DIA = 0.0365 * INCH
 PIN_HOLE_DEVIATIONS = REAM_H7[::-1]
@@ -384,6 +401,25 @@ def _play_table(pin_dia: float) -> tuple[tuple[tuple[float, float], ...], ...]:
     return tuple(tables)
 
 
+# Every gear seats on the counter-clockwise flank of its notched space: TL-00
+# fitting step 2 turns it clockwise (seen from the tailstock) onto the pin and
+# the cut pushes it the same way (``CUT_TURNS_GEAR_CLOCKWISE``), so the
+# space's centre stands one half-play clockwise of the pin (side -1). The pin
+# is clocked that mean half-play counter-clockwise of the notch phase, so a
+# nominal gear's seated notch lands on the phase.
+SEATED_SIDE = -1.0
+_SEATED_PLAYS = [
+    pin_half_play_rad(profile, PIN_RADIUS, dia)
+    for profile in PROFILES
+    for dia in (PIN_DIA_MIN, PIN_DIA_MAX)
+]
+if None in _SEATED_PLAYS:
+    raise AssertionError("the clock pin does not enter the notched space")
+SEATED_HALF_PLAY_DEG = math.degrees(sum(_SEATED_PLAYS) / len(_SEATED_PLAYS))
+if abs(PIN_PHASE_DEG - SEATED_HALF_PLAY_DEG - PHASE_DEG) > 0.01:
+    raise AssertionError("the clock pin's printed station misses the seated phase")
+
+
 def _play(table, radius: float) -> float:
     for (r0, p0), (r1, p1) in zip(table, table[1:]):
         if r0 <= radius <= r1:
@@ -397,10 +433,13 @@ _DIRECTIONS = tuple(
 )
 
 
-def _phase_errors_deg(stub_error, pin_error, axis_error, pin_dia: float) -> list[float]:
+def _phase_errors_deg(
+    stub_error, pin_error, axis_error, pin_dia: float, side: float = SEATED_SIDE
+) -> list[float]:
     """Every per-part phase error (deg) for one as-made fixture: the gear's
     bore anywhere on the stub's clearance circle, each corner profile, the
-    pin against either flank."""
+    gear seated on the ``side`` flank (``SEATED_SIDE``: all 20 gears seat on
+    the same flank of the same pin)."""
     errors = []
     for cx, cy in _DIRECTIONS:
         gx = stub_error[0] + BORE_FLOAT * cx
@@ -411,18 +450,18 @@ def _phase_errors_deg(stub_error, pin_error, axis_error, pin_dia: float) -> list
         lobe = math.atan2(axis_error[1] - gy, axis_error[0] - gx)
         for table in _play_table(pin_dia):
             play = _play(table, radius)
-            for side in (-1.0, 1.0):
-                errors.append(math.degrees(space + side * play - lobe) - PHASE_DEG)
+            errors.append(math.degrees(space + side * play - lobe) - PHASE_DEG)
     return errors
 
 
 def phase_budget_deg() -> dict[str, float]:
     """(a) fixed, (b) per-part and total worst-case phase errors, deg.
 
-    (a): the lobe-to-space angle error with every hole and indication error
-    at its limit and no per-part term; (b): half the scatter of the 20 gears
-    on the worst as-made fixture; total: the largest error any gear on any
-    as-made fixture can show."""
+    (a): the lobe-to-seated-notch angle error, the mean half-play seated,
+    with every hole and indication error at its limit; (b): half the scatter
+    of the 20 gears on the worst as-made fixture, all seated on one flank of
+    its one pin; total: the largest error any gear on any as-made fixture can
+    show."""
     signs = (-1.0, 1.0)
     fixed = 0.0
     scatter = 0.0
@@ -444,6 +483,7 @@ def phase_budget_deg() -> dict[str, float]:
                                     math.atan2(py - gy, px - gx)
                                     - math.atan2(axis[1] - gy, axis[0] - gx)
                                 )
+                                - SEATED_HALF_PLAY_DEG
                                 - PHASE_DEG
                             ),
                         )
@@ -459,9 +499,8 @@ PHASE_FIXED_WORST_DEG = _BUDGET["fixed"]  # (a), common to all 20 gears
 PHASE_PER_PART_WORST_DEG = _BUDGET["per_part"]  # (b), gear-to-gear scatter
 if PHASE_PER_PART_WORST_DEG > PHASE_TOLERANCE_DEG:
     raise AssertionError("the 20 gears' phase scatter exceeds the printed band")
-# Recorded, not asserted: (a)+(b) exceeds the printed +/-.25 deg by
-# arithmetic (about .37 deg). Open owner question on #2356 (GearKit2356);
-# the fixture is left simple rather than tightened to hide it.
+# Recorded, not asserted: (a) alone exceeds the printed +/-.25 deg at the
+# shop row (module docstring); the fixture is cut to that row, not tightened.
 PHASE_TOTAL_WORST_DEG = _BUDGET["total"]
 
 
@@ -557,24 +596,37 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# Hole callouts name the bought pin each hole presses (rule 4: a REAM names
-# its mate and fit); the locations name what they set. Two short rows each,
-# so the callouts stand inside the border clear of the register and the
-# edge view (run 20261112T203156536Z's PinHoleDia ran 35 mm off the sheet).
+# Each REAM callout names its pressed pin by its short form (a member of this
+# sheet's MHA-DT-12-TL-00 kit) and, once, what its stations' +/-.002 sets on
+# the gear (rules 4 and 7); the location dimensions carry value and band
+# only. The clock pin's blind press is permanent: no knockout behind a .0375
+# pin (rule 16's permanent pair). Rows short enough to stand between the
+# register and the edge view.
 STUB_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-stub")["number"])
 CLOCK_PIN_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-clock-pin")["number"])
+GEAR_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
+_KIT_PREFIX = f"{GEAR_NUMBER}-"
+
+
+def kit_short_form(number: str) -> str:
+    """A kit member's drawing number less the prefix it shares with this sheet."""
+    if not number.startswith(_KIT_PREFIX):
+        raise AssertionError(f"{number} is not a member of {_KIT_PREFIX}TL-00")
+    return number[len(_KIT_PREFIX) :]
+
+
 PIN_HOLE_DEPTH_TEXT = inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)
 CALLOUTS_BELOW: dict[str, str] = {
-    "StubHoleDia": f"REAM THRU, PRESS FIT\nON {STUB_NUMBER}",
-    "PinHoleDia": f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}, PRESS FIT\nON {CLOCK_PIN_NUMBER}",
-    "StubOffset": "SETS CAM THROW",
-    "PinY": "CLOCKS NOTCHED\nTOOTH SPACE",
+    "StubHoleDia": (
+        f"REAM THRU\nPRESS FIT ON {kit_short_form(STUB_NUMBER)}\n"
+        f"SETS {GEAR_NUMBER} CAM THROW"
+    ),
+    "PinHoleDia": (
+        f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}\n"
+        f"PRESS FIT ON {kit_short_form(CLOCK_PIN_NUMBER)}, PERMANENT PAIR\n"
+        f"SETS {GEAR_NUMBER} CAM PHASE"
+    ),
 }
-# The one functional note: what the fixture is for, and its kit; rows short
-# enough to end inside the right border from the note's column.
-FUNCTION_NOTE = (
-    "1. TURNS THE CAM OF MHA-DT-12;\n   PINS AND CLAMP ARE KIT\n   MHA-DT-12-TL-00."
-)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
 # --- Kit sheet facts (MHA-DT-12-TL-00), worded here so the sheet only places them --
