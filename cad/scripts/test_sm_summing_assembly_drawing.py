@@ -333,6 +333,12 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
         ".0002-.0017 DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
     )
     assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
+    # Rule 22: the four-place clearance names the instruments that read it,
+    # each an owned shop gauge with a TOOLS row.
+    (bar_step,) = [
+        line for line in notes.ASSEMBLY_STEPS if notes.KNIFE_GAUGE_BAR in line
+    ]
+    assert "MIC" in bar_step and "PIN GAUGES" in bar_step
     assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
     assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE

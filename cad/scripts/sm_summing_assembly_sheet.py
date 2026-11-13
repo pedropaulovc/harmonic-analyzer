@@ -204,7 +204,12 @@ ASSEMBLY_STEPS = (
     "ON THE DOWEL AT ITS HANGER HOLE.",
     "5A. TURN EACH CUT MHA-SM-VN-52 DOWN THROUGH ITS WASHER AND HOLE INTO ITS "
     "MOUNT BY HAND UNTIL ITS HEAD MEETS THE WASHER (FINGER-TIGHT).",
-    f"5B. SLIDE A {KNIFE_GAUGE_BAR}, THROUGH BOTH MOUNTS.",
+    # Rule 22: the bar's four-place clearance names what reads it (machinist
+    # review of PR #2717's head, gating clarity r2/r3): the micrometer on the
+    # bar and the pin gauges in each bore (shop-equipment.toml
+    # gauges.gauge-bar-0472x8 is made to the measured bores).
+    f"5B. SLIDE A {KNIFE_GAUGE_BAR} (MIC THE BAR AGAINST PIN GAUGES IN EACH "
+    "BORE), THROUGH BOTH MOUNTS.",
     "5C. TIGHTEN THE FRONT MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT "
     "TO THE CROSSBAR UNDERSIDE (THE REAR MOUNT IS SET AT 6G).",
     "5D. WITHDRAW THE BAR (CHECK 5).",
