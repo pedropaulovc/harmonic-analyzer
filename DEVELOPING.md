@@ -3275,9 +3275,12 @@ and the cause are kept, and the INFO line ends with `title_echo`.
 The judge names a dependent's causes more finely than a part's (only for
 `_com_outcome.DEPENDENT_KINDS`; a part's reuse and audit judgement is
 unchanged). `truth_cause` names the earliest answer before the divergence
-that differs beyond noise and beyond handle numbers (an object's number is its
-allocation order, so one more object listed earlier renumbers every later
-one), where a part's names the nearest. A diverging request that is the base's
+that differs beyond noise, where a part's names the nearest. It passes over a
+renumbering, an answer that differs only by handles both builds numbered with
+that very answer (an object's number is its allocation order, so one more
+object listed earlier renumbers every later one), and names it only when
+nothing else differed; a handle either build had numbered before is another
+object, a real difference. A diverging request that is the base's
 member on the same object, with arguments the same but for float noise
 (`REL_TOL`), after an answer that differed only by float noise, is that
 answer's `response:<member>`: the script carried SolidWorks' noise into a
@@ -3308,27 +3311,32 @@ same two unchanged points.
 
 The recorder numbers handles in allocation order, so the elements of an array
 answer such as `IAssemblyDoc.GetComponents` are numbered in the seat's
-enumeration order. A script that visits components by name
-(`_component_order.by_name`) therefore asks the same thing of each component
-under a seat-dependent number. Before a dependent's split,
-`_com_outcome.name_bound` binds such an array to the base's by name. It does so
-only when all of these hold:
+enumeration order. A script that reads every component's name and then visits
+the components in name order (the sort #2686 brings) therefore asks the same
+thing of each component under a seat-dependent number. Before a dependent's
+split, `_com_outcome.name_bound` binds such an array to the base's by name. It
+does so only when all of these hold:
 
 - both builds issued the request alike and were answered with the same handle
   numbers;
 - the calls right after it identify every element and do nothing else: pywin32
-  wraps (`GetTypeInfo`), `early_bound` QueryInterfaces, and one `*.Name2` read
-  per element;
+  wraps (`GetTypeInfo`), `early_bound` QueryInterfaces, and one identity read
+  per element (`*.Name2`, or `IDrawingComponent.Name` for a drawing view's
+  components);
 - each build's names are distinct and are the same set in both builds.
 
-When the array is bound, the new build's pre-pass is put in the base's element
-order. Each of its element handles, including those the pre-pass allocated, is
-renamed to the base's handle of the same-named component, in the pre-pass and
-in every later call. The engine's comparison then runs on that stream. The diff
-keeps how many arrays were bound and the positional divergence they replaced
-(`name_bound`; the record and span carry `name_bound`, the count). Anything else
-stays positional: a visit in enumeration order, or a request on another
-component than the base's, still diverges.
+When the array is bound, the new build is read as if SolidWorks had enumerated
+in the base's order. The array's answer stays as recorded (the same numbers as
+the base's), and the pre-pass is put in the base's element order. Each element
+handle, including those the pre-pass allocated, is renamed to the base's handle
+of the same-named component, in the pre-pass and in every later call. The
+engine's comparison then runs on that stream. The diff keeps how many arrays
+were bound and the positional divergence they replaced (`name_bound`; the
+record and span carry `name_bound`, the count). A binding that raises is a
+judge fault (`judge_faults` step `name_bound`), and the comparison stays
+positional. Anything else stays positional too: a visit in enumeration order
+(the explode authors' `by_name` dicts iterate in insertion order) or a request
+on another component than the base's still diverges.
 
 **Evidence copies.** A recording left unpublished because another writer's
 bytes already stand under its key (`_replay_shadow.EVIDENCE_OF`:

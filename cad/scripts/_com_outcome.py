@@ -40,6 +40,7 @@ the driver only; in no recipe closure.
 
 from __future__ import annotations
 
+import functools
 import gzip
 import hashlib
 import itertools
@@ -175,9 +176,10 @@ DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
 # points is a witness. 2026-11-13, dt_drive_train built twice under one key:
 # 6.882839 mm both times, the witnesses 17.47 mm apart along the faces.
 _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
-# The read that identifies a component in a dependent's array pre-pass
-# (:func:`name_bound`): its instance name, unique within its assembly.
-_IDENTITY_READ = re.compile(r"\.Name2$")
+# The reads that identify a component in a dependent's array pre-pass
+# (:func:`name_bound`): a component's instance name, a drawing component's
+# name (the keys #2686's name-order sort reads).
+_IDENTITY_READ = re.compile(r"\.Name2$|^IDrawingComponent\.Name$")
 # ``_com._early_bound``'s QueryInterface, as the recorder logs it.
 _EARLY_BOUND = ("QueryInterface", "early_bound")
 
@@ -286,6 +288,7 @@ def judge(
     when :func:`jagged_outline`, else ``None``) only for a ``different``
     ``pdf`` signal."""
     streams, streams_error = _attempt(lambda: _streams(base, new))
+    inks = _read_once(base, new, base_captures, new_captures)
     cause, cause_error = (None, streams_error)
     found, error = (None, streams_error)
     if streams is not None:
@@ -302,6 +305,7 @@ def judge(
                 kind,
                 base_sidecars,
                 new_sidecars,
+                inks,
             )
         )
     if error is not None:
@@ -335,9 +339,7 @@ def judge(
             found["judge_faults"].append({"step": "title_echo", "error": echo_error})
     ink = None
     if signals.get("pdf") == Signal.DIFFERENT.value:
-        jagged, ink_error = _attempt(
-            lambda: jagged_outline(base, new, base_captures, new_captures)
-        )
+        jagged, ink_error = _attempt(lambda: jagged_outline(base, new, *inks()))
         if ink_error is not None:
             found["judge_faults"].append({"step": "pdf_cause", "error": ink_error})
         if jagged:
@@ -365,10 +367,10 @@ def truth_cause(
     ``None`` without a divergence.
 
     A part names the nearest such response. An assembly or drawing
-    (:data:`DEPENDENT_KINDS`) names the earliest one that differs in more than
-    handle numbers (:func:`_handles_only`), and files a request that differs
-    from the base's only by float noise after an answer that did
-    (:func:`_noise_carried`) as that answer's response cause."""
+    (:data:`DEPENDENT_KINDS`) names the earliest (:func:`_earliest_response`),
+    and files a request that differs from the base's only by float noise
+    after an answer that did (:func:`_noise_carried`) as that answer's
+    response cause."""
     if divergence is None:
         return None
     end = min(int(divergence["index"]), len(a), len(b))
@@ -377,10 +379,9 @@ def truth_cause(
             if not _close(_answer(a[index]), _answer(b[index])):
                 return f"response:{a[index].site}"
     else:
-        for index in range(end):
-            x, y = _answer(a[index]), _answer(b[index])
-            if not _close(x, y) and not _handles_only(x, y):
-                return f"response:{a[index].site}"
+        found = _earliest_response(a, b, end)
+        if found is not None:
+            return f"response:{a[found].site}"
     if _echoes_title(a, b, end):
         return TITLE_COUNTER_CAUSE
     if kind in DEPENDENT_KINDS:
@@ -390,13 +391,43 @@ def truth_cause(
     return "request"
 
 
-def _handles_only(a: Any, b: Any) -> bool:
-    """Two answers equal once handle numbers are erased: an object's number
-    is its allocation order, so a build that saw another count of objects
-    earlier numbers every later one apart (2026-11-13, pd_transgear_knob_shaft:
-    a QueryInterface answered h1327 against h1319 after one build listed 8
-    fewer visible edges)."""
-    return _close(_erased(a), _erased(b))
+def _earliest_response(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], end: int
+) -> int | None:
+    """The index of the earliest answer before ``end`` that differs beyond
+    noise and is no renumbering (:func:`_renumbered`); else of the earliest
+    renumbering, which is still SolidWorks answering otherwise first; else
+    ``None``. 2026-11-13, pd_transgear_knob_shaft: the nearest difference was
+    a QueryInterface answering h1327 against h1319, a renumbering behind the
+    first one that matters, one build listing 8 fewer visible edges."""
+    newest = [0, 0]  # the largest handle number each build had used
+    renumbered = None
+    for index in range(end):
+        x, y = _answer(a[index]), _answer(b[index])
+        if not _close(x, y):
+            if not _renumbered(x, y, newest):
+                return index
+            if renumbered is None:
+                renumbered = index
+        for side, (call, answer) in enumerate(((a[index], x), (b[index], y))):
+            used = _handles([call.args, answer])
+            newest[side] = max(newest[side], call.handle, *used)
+    return renumbered
+
+
+def _renumbered(x: Any, y: Any, newest: list[int]) -> bool:
+    """Two answers that differ only by handles each build numbered with this
+    answer: the same new objects, numbered apart (an object's number is its
+    allocation order, so a build that allocated another count of objects
+    earlier numbers every later one apart). A handle either build had
+    already used (``newest``: the largest number each had) is another
+    object than the base's, so a real difference."""
+    if not _close(_erased(x), _erased(y)):
+        return False
+    return all(
+        p == q or (p > newest[0] and q > newest[1])
+        for p, q in zip(_handles(x), _handles(y), strict=True)
+    )
 
 
 def _noise_carried(
@@ -435,19 +466,22 @@ def name_bound(
 
     The recorder numbers handles in allocation order, so an array answer's
     elements are numbered in the seat's enumeration order: two seats number
-    the same components apart, and a script that visits them by name
-    (``_component_order.by_name``) asks the same of each component under
-    another number. An array is bound only when, at a request both builds
-    issued alike (``request_field``) whose answers are the same handle
-    numbers, both builds then :func:`_identify` every element, each by one
-    distinct name, the same names in both. The new build's calls of that
-    pre-pass are put in the base's element order, and every one of its
-    handles of an element (the element and what its pre-pass calls
-    allocated) is renamed, there and in every later call, to the base's
-    handle of the component of the same name. Anything else stays
-    positional: an array visited in its enumeration order still differs, a
-    request on another component than the base's still diverges, and a
-    component that is not the base's by name binds nothing."""
+    the same components apart, and a script that reads every component's name
+    and then visits the components in name order (the sort #2686 brings) asks
+    the same of each component under another number. An array is bound only
+    when, at a request both builds issued alike (``request_field``) whose
+    answers are the same handle numbers, both builds then :func:`_identify`
+    every element, each by one distinct name, the same names in both. The new
+    build is then read as if SolidWorks had enumerated in the base's order:
+    the array's answer stays as recorded (the same numbers as the base's),
+    the pre-pass is put in the base's element order, and every handle of an
+    element (the element and what its pre-pass calls allocated) is renamed,
+    in the pre-pass and in every later call, to the base's handle of the
+    component of the same name. Anything else stays positional: components
+    visited in enumeration order (as the explode authors' ``by_name`` dicts
+    are, in insertion order) still differ, a request on another component
+    than the base's still diverges, and a component that is not the base's
+    by name binds nothing."""
     a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
     bound = 0
     index = 0
@@ -511,9 +545,9 @@ def _bind(
     if set(rename) != set(rename.values()):
         return None
     prepass = [right.calls[of[element]][count] for element, count in left.owners]
-    renamed = [_renamed(call, rename) for call in [b[index], *prepass]]
+    renamed = [_renamed(call, rename) for call in prepass]
     rest = [_renamed(call, rename) for call in b[left.end :]]
-    return [*b[:index], *renamed, *rest], left.end
+    return [*b[: index + 1], *renamed, *rest], left.end
 
 
 def _handle_array(answer: Any) -> list[int] | None:
@@ -681,6 +715,7 @@ def outcome(
     kind: str = "part",
     base_sidecars: Path | None = None,
     new_sidecars: Path | None = None,
+    inks: Callable[[], tuple[Any, Any]] | None = None,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
     :class:`Signal` (``outcome_signals``), what differed
@@ -707,7 +742,11 @@ def outcome(
     BMP captures are no signal: a model file's bytes differ on every save, a
     screenshot's with the seat's window. A signal whose judgement raises is
     ``absent``, its message its detail. ``streams``: both builds' recipe calls
-    and keys, which :func:`judge` made once for every judgement of the pair."""
+    and keys, which :func:`judge` made once for every judgement of the pair;
+    ``inks``: both builds' :func:`pdf_inks`, read once when first asked for
+    (by default here)."""
+    if inks is None:
+        inks = _read_once(base, new, base_captures, new_captures)
     a, b = streams.a, streams.b
     keyed, keyed_error = streams.keyed, streams.keyed_error
     computed: dict[str, Callable[[], tuple[Signal, Any]]] = {
@@ -718,7 +757,7 @@ def outcome(
         ),
         "answers": lambda: _answers_signal(*_distance_only(keyed, a, b, kind)),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
-        "pdf": lambda: _pdf_signal(base, new, base_captures, new_captures),
+        "pdf": lambda: _pdf_signal(*inks()),
         "sidecars": lambda: _sidecar_signal(base_sidecars, new_sidecars),
     }
     attempts = {name: computed[name] for name in SIGNALS[kind]}
@@ -1577,17 +1616,37 @@ def _last_writes(
     return found
 
 
-def _pdf_signal(
+def pdf_inks(
+    conversation: conv.Conversation, captures: Path
+) -> dict[str, list[tuple[Any, ...]] | str] | None:
+    """Per PDF path the build had SolidWorks write, its last write's
+    :func:`_pdf_ink`; ``None`` when a capture is missing or not the bytes
+    the log describes. Read once per judgement: :func:`judge` hands both
+    builds' to the ``pdf`` signal and to :func:`jagged_outline`."""
+    found = _last_writes(conversation, captures, _PDF_SUFFIX)
+    if found is None:
+        return None
+    return {rel: _pdf_ink(data) for rel, data in found.items()}
+
+
+def _read_once(
     base: conv.Conversation,
     new: conv.Conversation,
     base_captures: Path,
     new_captures: Path,
+) -> Callable[[], tuple[Any, Any]]:
+    """Both builds' :func:`pdf_inks`, read on the first call and kept."""
+    return functools.cache(
+        lambda: (pdf_inks(base, base_captures), pdf_inks(new, new_captures))
+    )
+
+
+def _pdf_signal(
+    a: dict[str, Any] | None, b: dict[str, Any] | None
 ) -> tuple[Signal, dict[str, str] | None]:
-    """Per PDF path either build had SolidWorks write, whether the two last
-    writes print the same ink (:func:`_pdf_ink`). A PDF's bytes are no
+    """Per PDF path either build had SolidWorks write (:func:`pdf_inks`),
+    whether the two last writes print the same ink. A PDF's bytes are no
     signal: SolidWorks writes the export's date into them."""
-    a = _last_writes(base, base_captures, _PDF_SUFFIX)
-    b = _last_writes(new, new_captures, _PDF_SUFFIX)
     if a is None or b is None or (not a and not b):
         return Signal.ABSENT, None
     differing: dict[str, str] = {}
@@ -1595,7 +1654,7 @@ def _pdf_signal(
         if rel not in b or rel not in a:
             differing[rel] = "base only" if rel in a else "new only"
             continue
-        found = _ink_difference(_pdf_ink(a[rel]), _pdf_ink(b[rel]))
+        found = _ink_difference(a[rel], b[rel])
         if found is not None:
             differing[rel] = found
     if differing:
@@ -1671,26 +1730,25 @@ def _ink_difference(
 def jagged_outline(
     base: conv.Conversation,
     new: conv.Conversation,
-    base_captures: Path,
-    new_captures: Path,
+    a: dict[str, Any] | None,
+    b: dict[str, Any] | None,
 ) -> bool:
-    """Whether two drawings' PDFs differ only by a jagged crop outline drawn
-    again: SolidWorks breaks a cropped view's outline along a random wiggle
-    each time it draws it (2026-11-13, dt_pinion_arbor's detail A: three
-    builds of the same requests, three wiggles). True only when both builds
-    read the same jagged views (:func:`_jagged_boxes`), wrote the same PDFs
-    with the same pages and text runs, and on every page that differs the
-    differing path pieces are :func:`_rewiggled`. Any doubt is False."""
+    """Whether two drawings' PDFs (``a``, ``b``: :func:`pdf_inks`) differ
+    only by a jagged crop outline drawn again: SolidWorks breaks a cropped
+    view's outline along a random wiggle each time it draws it (2026-11-13,
+    dt_pinion_arbor's detail A: three builds of the same requests, three
+    wiggles). True only when both builds read the same jagged views
+    (:func:`_jagged_boxes`), wrote the same PDFs with the same pages and text
+    runs, and on every page that differs the differing path pieces are
+    :func:`_rewiggled`. Any doubt is False."""
     boxes = _jagged_boxes(conv.recipe_calls(base.calls))
     if not boxes or boxes != _jagged_boxes(conv.recipe_calls(new.calls)):
         return False
-    a = _last_writes(base, base_captures, _PDF_SUFFIX)
-    b = _last_writes(new, new_captures, _PDF_SUFFIX)
     if not a or not b or a.keys() != b.keys():
         return False
     rewiggled = False
     for rel in sorted(a):
-        x, y = _pdf_ink(a[rel]), _pdf_ink(b[rel])
+        x, y = a[rel], b[rel]
         if isinstance(x, str) or isinstance(y, str) or len(x) != len(y):
             return False
         for page_a, page_b in zip(x, y, strict=True):

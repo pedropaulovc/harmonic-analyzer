@@ -48,7 +48,8 @@
     are identical. An assembly's or drawing's requests are compared with the
     component arrays SolidWorks enumerated in another order bound to the
     base's by name (``_com_outcome.name_bound``; ``name_bound``: how many,
-    and the positional divergence it replaced).
+    and the positional divergence it replaced; a binding that raised is the
+    ``judge_faults`` step ``name_bound``, the comparison kept positional).
 
 dodo records every part, FULL assembly and drawing build through ``record``;
 before a part build tries to reuse a base's part, or after it evaluates the
@@ -636,13 +637,17 @@ def main(argv: list[str] | None = None) -> int:
         base, new = conversation.load(args.base), conversation.load(args.new)
         payload = conversation.compare_conversations(base, new)
         positional = payload["request_divergence"]
+        bound_fault = None
         if positional is not None and args.kind in _com_outcome.DEPENDENT_KINDS:
             # The components an array lists, by name rather than by the
             # seat's enumeration order (_com_outcome.name_bound).
             try:
                 named, bound = _com_outcome.name_bound(base, new)
             except Exception as exc:  # noqa: BLE001 - costs the binding only
-                payload["name_bound"] = {"error": f"{type(exc).__name__}: {exc}"}
+                bound_fault = {
+                    "step": "name_bound",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
             else:
                 if bound:
                     new = named
@@ -664,6 +669,9 @@ def main(argv: list[str] | None = None) -> int:
                 new_sidecars=args.new_sidecars,
             )
         )
+        if bound_fault is not None:
+            # A judge fault like the judge's own: counted and logged at WARN.
+            payload["judge_faults"].insert(0, bound_fault)
         try:
             # Each recording's own drawing display, for a base whose manifest
             # predates ``display``.
