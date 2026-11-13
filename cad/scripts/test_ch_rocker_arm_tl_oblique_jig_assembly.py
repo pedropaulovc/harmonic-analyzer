@@ -653,9 +653,9 @@ def test_named_views_are_the_machine_frame() -> None:
 
 
 def test_r4_holding_hardware_fits_loose() -> None:
-    # Nothing in the strap holding is pressed: the top-hat washer's bore
+    # Nothing in the strap holding is pressed: the bought washer's least bore
     # clears its #8-32 screw and the stock stop pins slip in the riser.
-    assert spec.hub_washer.BORE_LIMITS[0] > fasteners.HUB_CLAMP.major_mm
+    assert spec.hub_washer.ID_MIN > fasteners.HUB_CLAMP.major_mm
     assert riser.STOP_HOLE_DIA > riser.STOP_PIN_DIA_LIMITS[1]
     assert (spec.stop_pin.DIA, spec.stop_pin.LENGTH) == (riser.STOP_PIN_DIA, riser.STOP_PIN_LENGTH)
 
@@ -1172,7 +1172,7 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     }
     assert all(pair <= names for pair in pairs)
     assert len(pairs) == sum(spec.QUANTITIES[s] for s in SCREW_ROWS) + 8 + 1 + 2
-    # R4 holding presses nothing: the loose stop pins and the top-hat washer
+    # R4 holding presses nothing: the loose stop pins and the hub washer
     # name no pair; only the strap clamps' threads meet the carrier.
     for loose in (spec.STOP_PIN, spec.HUB_WASHER):
         assert not any(
@@ -1614,11 +1614,11 @@ FASTENER_TABLE = {
         0.75 * 25.4 - (riser.THICKNESS + trammel.STRAP_THICK),
         0.75 * 25.4 - (riser.THICKNESS + trammel.STRAP_THICK) - carrier.THICKNESS,
     ),
-    # The same at HUB, its grip also the top-hat washer's flange.
+    # The same at HUB, its grip also the hub washer's modelled thickness.
     "HUB_CLAMP": (
         "#8-32 X 3/4 SHCS", 1,
-        0.75 * 25.4 - (spec.hub_washer.THICK + trammel.STRAP_THICK + riser.THICKNESS),
-        0.75 * 25.4 - (spec.hub_washer.THICK + trammel.STRAP_THICK + riser.THICKNESS)
+        0.75 * 25.4 - (spec.hub_washer.THICKNESS + trammel.STRAP_THICK + riser.THICKNESS),
+        0.75 * 25.4 - (spec.hub_washer.THICKNESS + trammel.STRAP_THICK + riser.THICKNESS)
         - carrier.THICKNESS,
     ),
     "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, 10.414 - carrier.THICKNESS),
@@ -1678,7 +1678,7 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
     assert fasteners.WASHERS == (fasteners.LEVER_LOCK_WASHER, fasteners.HUB_WASHER)
     assert fasteners.HUB_WASHER.count == fasteners.HUB_CLAMP.count == 1
-    assert fasteners.HUB_WASHER.thickness_mm == spec.hub_washer.THICK
+    assert fasteners.HUB_WASHER.thickness_mm == spec.hub_washer.THICKNESS
     # The nut screws' flat heads seat in the TL-VN-84 FeedNut's countersinks
     # (owner ruling 2026-11-04, option B; no washers): the grip is the flange
     # plus the head's nominal stand-proud above it.
@@ -2093,9 +2093,9 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
     assert spec.HUB_DRILL_STEPS[-1] == "25/64" and all(d in steps["20A"] for d in spec.HUB_DRILL_STEPS)
     assert spec.strap.NUMBER in steps["20B"] and order.index("20A") < order.index("20B")
     assert spec._torque(spec.holding.HUB_TORQUE_NM) in steps["21A"]
-    assert "HEAD SEATED ON THE FLANGE" in steps["21A"]
+    assert "HEAD SEATED ON THE WASHER" in steps["21A"]
     assert steps["21B"] == "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS."
-    assert spec._item(spec.HUB_WASHER) in steps["21"]
+    assert spec._item(spec.HUB_WASHER) in steps["21"] and "FLAT ON THE STRAP" in steps["21"]
     for text in steps.values():
         assert "350 MM" not in text and "REAMER" not in text
     assert "ALL 3 CLAMP SCREWS" in steps["21F"]
@@ -2138,7 +2138,7 @@ def test_r4_holding_hardware_placements_close_on_actual_seats() -> None:
     cl, cr, hub_screw = (origin for origin, _rows in spec.STRAP_CLAMP_SCREW_PLACEMENTS)
     assert cl[2] == cr[2] == pytest.approx(spec.PART_TOP_Z)
     assert hub_screw[:2] == pytest.approx(hub)
-    assert hub_screw[2] == pytest.approx(spec.PART_TOP_Z + spec.hub_washer.THICK)
+    assert hub_screw[2] == pytest.approx(spec.PART_TOP_Z + spec.hub_washer.THICKNESS)
     for role, (origin, _rows) in zip(
         spec.STRAP_CLAMP_ROLES, spec.STRAP_CLAMP_SCREW_PLACEMENTS, strict=True
     ):
@@ -2890,7 +2890,7 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
         riser.STOP_PIN_DIA_LIMITS[1] / 2.0 + spec.holding.STOP_PIN_TOP_FLOAT_MAX
     )
     washer = spec._component_local_boxes()[spec.HUB_WASHER]
-    assert washer[2] == (-spec.hub_washer.SPIGOT_LENGTH, spec.hub_washer.THICK)
+    assert washer[2] == (spec.hub_washer.BOTTOM_Z, spec.hub_washer.TOP_Z) == (0.0, spec.hub_washer.THICKNESS)
     # Both tops print: the true fixture top (the feed-lever heads) and the
     # stop pins, tallest over the strap.
     assert spec.LEVER_HEAD_TOP_Z > spec.TOOLING_TOP_Z_MAX
@@ -2898,12 +2898,12 @@ def test_stop_pins_govern_the_tooling_top_and_the_holding_check_prints_it() -> N
     assert f"{spec._length(spec.TOOLING_TOP_Z_MAX, 3)} MAX" in spec.REFERENCE_HEIGHTS
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
     assert "BOTH STOP PINS AT FULL HEIGHT" in steps["17A"]
-    # Q5 (Owner ruling 2026-11-08 (Pedro), #2144 item 13.2): the washer clearance prints inch,
-    # rounded up from the holding proof's minimum, every designed gap above it.
-    printed = f"{spec._length(spec.WASHER_CLEARANCE_PRINTED, 3)} MIN"
-    assert printed == ".060 MIN" and printed in steps["21D"]
-    assert spec.WASHER_CLEARANCE_PRINTED >= spec.holding.WASHER_CLEARANCE_MIN
-    assert min(spec.holding.WASHER_GAPS_MIN.values()) >= spec.WASHER_CLEARANCE_PRINTED
+    # Owner ruling 2026-11-13 (#2448): the washer's cutter-gap floor is > 0,
+    # so 21D checks clearance at each flank with no printed minimum.
+    assert steps["21D"].endswith("CLEARANCE SEEN OR MEASURED AT EACH.")
+    assert "MIN" not in steps["21D"]
+    assert not hasattr(spec, "WASHER_CLEARANCE_PRINTED")
+    assert min(spec.holding.WASHER_GAPS_MIN.values()) > 0.0
 
 
 def test_hold_down_clearance_prints_on_the_safe_side_of_the_kit() -> None:

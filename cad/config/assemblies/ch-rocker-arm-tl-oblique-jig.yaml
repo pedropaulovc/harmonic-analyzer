@@ -19,7 +19,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-vn-oblique-pivot-spacer
   - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-washer
+  - ch-rocker-arm-tl-vn-oblique-hub-washer
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-rail-kit
   - sm-vn-knife-mount-dowel
@@ -37,7 +37,7 @@ required_free_stems:
   - ch-rocker-arm-tl-vn-oblique-pivot-spacer
   - ch-rocker-arm-tl-vn-oblique-pivot-shim
   - ch-rocker-arm-tl-oblique-riser
-  - ch-rocker-arm-tl-oblique-hub-washer
+  - ch-rocker-arm-tl-vn-oblique-hub-washer
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-rail-kit
   - sm-vn-knife-mount-dowel

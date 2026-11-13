@@ -72,6 +72,9 @@ _STOCK_REQUIREMENTS = {
     "ch-rocker-arm-tl-vn-oblique-lever-washer": (
         ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
     ),
+    "ch-rocker-arm-tl-vn-oblique-hub-washer": (
+        ("90231A116",), "MHA-CH-06-TL-VN-85", 1,
+    ),
     "ch-rocker-arm-tl-vn-oblique-pivot-screw": (
         ("BLTS40-0375-1500188P",), "MHA-CH-06-TL-VN-77", 2,
     ),

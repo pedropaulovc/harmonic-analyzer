@@ -75,6 +75,9 @@ retiredTooling.push(...[
   // 2026-11-06 R3 hold-down: the bonded gauge pin retired; its turned hub-stud
   // replacement was removed before release.
   ['hub-pin', null, '80', true, '2026-10-23'],
+  // Owner ruling 2026-11-13 (#2448): the turned top-hat washer gives way to
+  // the bought brass #8 SAE flat washer MHA-CH-06-TL-VN-85.
+  ['hub-washer', null, '52', false, '2026-11-06'],
 ].map(([suffix, previousSequence, sequence, vendor, introduced]) => ({
   old_stem: `ch-rocker-arm-tl-${vendor && previousSequence === null ? 'vn-' : ''}oblique-${suffix}`,
   old_number: previousSequence === null ? null : `MHA-CH-006-TL-${previousSequence}`,

@@ -141,7 +141,7 @@ callback: a smaller early `GetOutline` does not prove the finished view fits.
 TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
 arrangement's named plan of the same assembly with the TL-21 carrier and
 every occurrence locked to it (riser and its four screws, feed lever with its
-screws and wedge-lock washers, the TL-52 top-hat washer, the two loose
+screws and wedge-lock washers, the TL-VN-85 hub washer, the two loose
 SM-VN-53 stop pins and the common TL-VN-61 screw's CL, CR and HUB clamp
 occurrences) hidden in that one drawing view. The common screw is hidden by
 occurrence, not by stem: its rail and TL-28 bar occurrences stay drawn. The
@@ -157,8 +157,9 @@ shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock);
 the CL and CR end clamps and the HUB clamp are the common MHA-CH-06-TL-VN-61
 #8-32 X 3/4 SHCS (McMaster 91251A197) into TL-21's ordinary #8-32 THRU taps; the HUB
 is tapped in situ and its strap reamed at the same position. The HUB clamp bears on the
-brass top-hat washer MHA-CH-06-TL-52 (Ø9.95 spigot in the reamed hub hole, 13/64 bore,
-Ø11 flange); the end clamps bear directly on the strap. The TL-VN-53 CL dowel (McMaster
+bought brass #8 SAE flat washer MHA-CH-06-TL-VN-85 (McMaster 90231A116, used as
+supplied; owner ruling 2026-11-13, #2448), centred by its screw and seated flat on the
+strap over the reamed hole; the end clamps bear directly on the strap. The TL-VN-53 CL dowel (McMaster
 98381A542) and the TL-VN-68 CR clamp screw are retired; no hub stud, sleeve or low-head
 screw is carried. The loose 1/8 in stops physically reuse the existing MHA-SM-VN-53 stock
 pin (`sm-vn-knife-mount-dowel`, SKU 98381A473) with no CH alias. The clamps and washer
@@ -166,7 +167,7 @@ belong only to the jig, never a machine assembly.
 New identity-map rows use their canonical stem as source key,
 `old_number: null`, and the introduction date.
 
-Retirement records below reserve TL-23, TL-25, TL-27, TL-29, TL-30, TL-31,
+Retirement records below reserve TL-23, TL-25, TL-27, TL-29, TL-30, TL-31, TL-52,
 TL-VN-50, TL-VN-51, TL-VN-52, TL-VN-53, TL-VN-54, TL-VN-55, TL-VN-63, TL-VN-65, TL-VN-66, TL-VN-68, TL-VN-70,
 TL-VN-73 through TL-VN-76, TL-VN-80, TL-VN-81 and TL-VN-82 (assigned to the
 feed nut on 2026-11-04 but never released) permanently.
@@ -496,7 +497,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | — | MHA-CH-06-TL-30 (retired 2026-10-23; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | — | MHA-CH-06-TL-31 (retired 2026-10-23; never reissued) |
 | new tooling part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 |
-| new tooling part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 | — | MHA-CH-06-TL-52 (retired 2026-11-13; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | — | MHA-CH-06-TL-27 (retired 2026-11-04; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | — | MHA-CH-06-TL-VN-50 (retired 2026-11-04 into TL-VN-83 `Rail`; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | — | MHA-CH-06-TL-VN-51 (retired 2026-11-04 into TL-VN-83 `Carriage`; never reissued) |
@@ -532,6 +533,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | reserved tooling vendor Number | — | — | — | — | — | MHA-CH-06-TL-VN-82 (assigned to `ch-rocker-arm-tl-vn-oblique-feed-nut` 2026-11-04, never released; now TL-VN-84 `FeedNut`; never reissued) |
 | new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-rail-kit` | MHA-CH-06-TL-VN-83 |
 | new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | MHA-CH-06-TL-VN-84 |
+| new tooling vendor part (2026-11-13) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-hub-washer` | MHA-CH-06-TL-VN-85 |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |
@@ -759,7 +761,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | MHA-CH-06-TL-VN-84 | 2026-11-04 owner ruling (#2187 comment 4473182209; same exception): one native model of the ReliaBot 600 mm T8 Tr8x2 screw and brass nut (Amazon B085DDHJTW, sold by ReliaBot, USD 18.99) with configurations `LeadScrew` ×1 (SUS304, cut to 410, in two KP08 pillow blocks) and `FeedNut` ×1 (flange Ø22 x 3.5, 4 x Ø3.5 on PCD 16, body Ø10.2 x 10, Ø10.2 x 1.5 spigot faced off to 13.5 overall, four holes countersunk 82° to Ø4.6, flat on the TL-32 lug's -X face on four TL-VN-67 screws at 0.3 N·m, holes at 45°); bought fixture hardware for the jig assembly |
 | changed | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-06-TL-20 | 2026-11-06 oblique simplification PR2: one native model, one Number, with configurations `Bar1` (rail 1, the four #8 end-bracket holes, #12 drill Ø.189 counterbored from below) and `Bar2` (rail 2, plain; turned over in the jig) ×1 each, each drawn on its own sheet (BAR 1, BAR 2) of the one drawing; the jig BOM lists BASE BAR 1 and BASE BAR 2 as member rows |
 | changed | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-06-TL-28 | Owner A″ 2026-11-07: two #29 THRU bores at the unchanged KP08 42 mm span; full #8-32 thread .370–.496 in from the bar face and .429–.555 in from the KP08 face. Owned hand taps, plug start then bottoming finish; unused middle thread may double-cut but neither screw enters the opposed-phase cut. TL-20 counterbores .200 ±.005; 1 in bracket stock and axis height unchanged. No extension-tap purchase required. |
-| changed | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | Owner A″ and R4 cutover 2026-11-07: McMaster 91251A197 #8-32 X 3/4 SHCS ×19, one BOM row: 16 rail screws and the CL/CR/HUB clamps (instances 17/18/19) into TL-21's ordinary #8-32 THRU taps, the HUB tapped in situ and bearing on top-hat washer MHA-CH-06-TL-52. The four lower TL-28 screws belong to TL-VN-62. |
+| changed | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | Owner A″ and R4 cutover 2026-11-07: McMaster 91251A197 #8-32 X 3/4 SHCS ×19, one BOM row: 16 rail screws and the CL/CR/HUB clamps (instances 17/18/19) into TL-21's ordinary #8-32 THRU taps, the HUB tapped in situ and bearing on hub washer MHA-CH-06-TL-VN-85 (top-hat MHA-CH-06-TL-52 until 2026-11-13). The four lower TL-28 screws belong to TL-VN-62. |
 | changed | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 | Owner A″: McMaster 91251A196 #8-32 X 5/8 SHCS ×8: four down through KP08 feet at 1.0 N·m, four up through TL-20's .200 counterbores at 2.8 N·m, no washers. Same Number/SKU, one BOM row; both thread-entry limits protect the complete screw reaches. |
 | retired | `ch-rocker-arm-tl-vn-oblique-kp08-screw` | MHA-CH-06-TL-VN-65 | 2026-11-06 owner ruling (Main, option B): the KP08 screws are the #8-32 X 5/8 SHCS TL-VN-62; McMaster 91255A150 #6-32 button heads leave the jig; no registry, builder or drawing; Number never reissued |
 | retired | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | 2026-11-06 R3 hold-down: the bonded gauge pin cannot take a clamp screw; the R4 cutover (2026-11-07) holds the HUB with the common screw and top-hat washer instead; no registry, builder or drawing; Number never reissued |
@@ -785,3 +787,5 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | shared | `sh-vn-pivot-pin` | MHA-SH-VN-58 | 2026-11-11 (#2339): McMaster-Carr 90145A299 18-8 stainless 5/64 x 5/16 dowel (0/+.0002 in diameter), one SKU in two installed members, `RodPin` x20 (rod fork, .240 long installed) and `BarPin` x20 (bar notch, .250 long installed), each pressed through and dressed flush at MHA-CH-00; replaces MHA-CH-10 and MHA-CH-11 |
 | added | `pd-vn-transgear-hub-key-pin` | MHA-PD-VN-69 | Main ruling 2026-11-11 ([#2409](https://github.com/pedropaulovc/harmonic-analyzer/issues/2409)): alloy-steel dowel pin, 1/16 x 5/16, Round x Chamfer ends, Rockwell C47 minimum, McMaster-Carr 98381A416, x1; the MHA-PD-17 disc hub's bore is plain round, and this pin, pressed along a chord of the hub body into a .0615 ream to its stop, lies with its side over the MHA-PD-10 feed sleeve's existing flat and keys the hub to the sleeve; the flat runs out at the nose, so the hub slides off with the pin in it |
 | added | `pd-vn-transgear-collar-flat-pin` | MHA-PD-VN-70 | Main ruling 2026-11-11 ([#2409](https://github.com/pedropaulovc/harmonic-analyzer/issues/2409)): 18-8 stainless steel dowel pin, 1/16 x 3/16, chamfered ends, unhardened, McMaster-Carr 90145A414, x1; pressed to the floor of a blind .0615 ream parallel to the MHA-PD-22 drive collar's round bore, so its crest forms the drive flat on the MHA-PD-08 knob shaft's D-flat; the collar's rear-face facing to fit faces it flush (cut to length only) |
+| retired | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 | Owner ruling 2026-11-13 ([#2448](https://github.com/pedropaulovc/harmonic-analyzer/issues/2448)): the turned top-hat washer and its traveler give way to the bought MHA-CH-06-TL-VN-85 flat washer, the holding's cutter-gap floor becoming > 0; no registry, builder or drawing; stem and Number never reissued |
+| added | `ch-rocker-arm-tl-vn-oblique-hub-washer` | MHA-CH-06-TL-VN-85 | Owner ruling 2026-11-13 ([#2448](https://github.com/pedropaulovc/harmonic-analyzer/issues/2448)): McMaster-Carr 90231A116 brass #8 SAE flat washer (ASME B18.21.1 Table 11 No. 8 Type A: ID .188 +.008/-.005, OD .438 +.015/-.005, thickness .036-.065), used as supplied, x1; seated flat on the strap over the reamed hub hole under the common MHA-CH-06-TL-VN-61 HUB clamp screw, which centres it |

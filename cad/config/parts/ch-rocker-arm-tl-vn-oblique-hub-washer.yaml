@@ -1,0 +1,19 @@
+ch-rocker-arm-tl-vn-oblique-hub-washer:
+  title: Rocker Oblique Trammel Hub Washer
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-13 (#2448): bought, in place of the retired turned
+  # top-hat washer MHA-CH-06-TL-52.
+  number: MHA-CH-06-TL-VN-85
+  stock_name: Brass SAE Washer for Number 8 Screw Size
+  supplier: McMaster-Carr
+  supplier_skus: ["90231A116"]
+  material: Brass
+  material_specification: "Brass SAE flat washer, #8, 0.188 ID x 0.438 OD x 0.036-0.065 thick; McMaster-Carr 90231A116"
+  finish: AS SUPPLIED
+  # https://www.mcmaster.com/90231A116/ read live 2026-11-13: $10.52 per
+  # pack of 50. One under the common #8-32 x 3/4 SHCS HUB clamp's head.
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in

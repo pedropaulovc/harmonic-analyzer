@@ -2198,17 +2198,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-hub-washer",
-      "old_number": null,
-      "introduced": "2026-11-06",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
-          "number": "MHA-CH-06-TL-52"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-vn-locating-pin",
       "old_number": null,
       "introduced": "2026-11-07",
@@ -2342,6 +2331,18 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-collar-flat-pin",
           "number": "MHA-PD-VN-70"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-13",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-VN-85"
         }
       ]
     }
@@ -2784,6 +2785,18 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
           "number": "MHA-CH-06-TL-VN-80"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-52"
         }
       ],
       "status": "retired"

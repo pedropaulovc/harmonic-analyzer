@@ -151,7 +151,7 @@ def _pivot_cluster_extent():
 
 def _hub_hardware_points():
     """Actual R4 strap-holding envelopes, including their distinct explode
-    lifts: the top-hat washer, the stop pins and the common screw's CL, CR
+    lifts: the hub washer, the stop pins and the common screw's CL, CR
     and HUB clamp occurrences (keyed by instance)."""
     boxes = spec._component_local_boxes()
     points = {

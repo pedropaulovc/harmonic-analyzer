@@ -7,8 +7,8 @@ by hold-down studs in T-nuts under flange nuts, an HGR15 rail screwed on each
 bar with an HGH15 carriage on it, a plain pivot block on rail 2 and an
 integral nut-lug feed block on rail 1. Purchased shoulder screws, selected
 shims and loose spacers support and capture the carrier. The strap is held
-by three common #8-32 SHCS (CL and CR direct, HUB through the brass top-hat
-washer) against two loose stock stop pins in the riser.
+by three common #8-32 SHCS (CL and CR direct, HUB through the brass #8 SAE
+flat washer) against two loose stock stop pins in the riser.
 The raised leadscrew runs in two KP08 blocks on on-edge end brackets and
 through the feed block's nut. Every bought item and screw is inserted.
 
@@ -101,7 +101,7 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-pivot-spacer", "ch-rocker-arm-tl-vn-oblique-pivot-spacer"),
     ("ch-rocker-arm-tl-vn-oblique-pivot-shim", "ch-rocker-arm-tl-vn-oblique-pivot-shim"),
     ("ch-rocker-arm-tl-oblique-riser", "ch-rocker-arm-tl-oblique-riser"),
-    ("ch-rocker-arm-tl-oblique-hub-washer", "ch-rocker-arm-tl-oblique-hub-washer"),
+    ("ch-rocker-arm-tl-vn-oblique-hub-washer", "ch-rocker-arm-tl-vn-oblique-hub-washer"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
     ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"),

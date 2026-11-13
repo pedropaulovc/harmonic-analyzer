@@ -30,6 +30,7 @@ recipes:
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90145A299 | `sh-vn-pivot-pin` (MHA-SH-VN-58, `RodPin` and `BarPin`; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90145A414 | `pd-vn-transgear-collar-flat-pin` (MHA-PD-VN-70; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
+| 90231A116 | `ch-rocker-arm-tl-vn-oblique-hub-washer` (MHA-CH-06-TL-VN-85; catalogue-only, the vendor STEP is evidence only) | Brass SAE Washer for Number 8 Screw Size |
 | 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -1298,6 +1299,25 @@ Catalog specifications checked on September 10, 2026:
   collar's rear when that face is faced to fit (cut to length only).
   `diag_build_90145A414.py` models the plain nominal cylinder;
   catalogue-only, no vendor model, no replica gate.
+- [90231A116](https://www.mcmaster.com/90231A116/) (`ch-rocker-arm-tl-vn-oblique-hub-washer`,
+  MHA-CH-06-TL-VN-85, quantity one; owner ruling 2026-11-13, #2448) was read
+  live on November 13, 2026: brass SAE washer for #8 screw size, ID 0.188 in,
+  OD 0.438 in, thickness 0.036-0.065 in, made in the United States, $10.52
+  per package of 50. It replaces the turned top-hat washer MHA-CH-06-TL-52
+  under the oblique jig's HUB clamp screw, seated flat on the strap and
+  centred by the screw; brass leaves the strap unmarked. The page prints no
+  ID/OD tolerance, so the limits are
+  [ASME B18.21.1-2009, Table 11](https://ssmalloys.com/wp-content/uploads/2024/10/ASME-B18.21.1.pdf)
+  No. 8 Type A: ID .188 +.008/-.005, OD .438 +.015/-.005, basic thickness
+  .049; §4.5's OD-to-ID runout (.013) is charged as a full 0.3302 mm radial
+  offset, as for 96659A104. The vendor STEP (SHA-256
+  `f7576b1941ead483c984bd6fec843654a92f03275068c16c1808a40413ac15d1`; SLDPRT
+  `c8e909af21fafabbf6f216e7e483aca21ff115e94fbde624524ea87366e6c7f9`, 2-D
+  drawing GIF `baad234b5a3cf17af485e8c7268d261a31dd88932c4774208e7f37eca7587055`)
+  measured headlessly with OCP: one solid, Ø4.7752 / Ø11.1252 mm cylinders,
+  faces 1.651 mm (.065 in) apart, torus-rounded rims. The STEP is evidence
+  only and is not tracked. `diag_build_90231A116.py` extrudes the ID x OD
+  annulus at the basic .049 thickness; catalogue-only, no replica gate.
 - 93600A189 (MHA-PD-VN-64 until #290) was a passivated 316 ISO 2338-m6
   2 x 6 mm dowel, read live on October 9, 2026. Retired 2026-11-02: the
   metric dowel went to inch (owner ruling 2026-10-30) and its recipe and

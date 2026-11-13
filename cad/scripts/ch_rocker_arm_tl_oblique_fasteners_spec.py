@@ -40,7 +40,7 @@ McMaster 91251A197, #8-32 x 3/4 SHCS (``COMMON_SCREW``), wherever its head
 and engagement fit: the rail screws and the strap's CL, CR and HUB clamps
 into TL-21's ordinary #8-32 THRU taps, 19 in all, one BOM row
 (``ch-rocker-arm-tl-vn-oblique-rail-screw``). The HUB clamp bears on the
-brass top-hat washer (TL-52); the end clamps bear directly on the strap.
+brass #8 SAE flat washer (TL-VN-85); the end clamps bear directly on the strap.
 Every other screw or stud is in ``COMMON_SCREW_EXCEPTIONS`` with the reason
 it cannot be the common one. Both TL-28 joints use the owner-selected
 91251A196 #8-32 x 5/8 (A″, 2026-11-07): their whole reaches stay out of the
@@ -64,7 +64,7 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
-import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
+import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as hub_washer
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
@@ -225,16 +225,15 @@ END_CLAMP = Fastener(
     riser.THICKNESS + trammel.STRAP_THICK,
     carrier.THICKNESS,  # tapped THRU
 )
-# The HUB clamp: the same screw through the brass top-hat washer, whose
-# flange alone adds to the grip (its spigot sits in the strap's reamed hole),
-# the strap and the riser's relief into TL-21's in-situ #8-32 THRU tap.
+# The HUB clamp: the same screw through the bought brass flat washer, the
+# strap and the riser's relief into TL-21's in-situ #8-32 THRU tap.
 HUB_CLAMP = Fastener(
-    "HUB clamp: top-hat washer, strap and riser to TL-21 carrier",
+    "HUB clamp: flat washer, strap and riser to TL-21 carrier",
     carrier.HUB_THREAD,
     SHCS,
     "3/4",
     1,
-    hub_washer.THICK + trammel.STRAP_THICK + riser.THICKNESS,
+    hub_washer.THICKNESS + trammel.STRAP_THICK + riser.THICKNESS,
     carrier.THICKNESS,  # tapped THRU
 )
 LEVER_TO_CARRIER = Fastener(
@@ -267,7 +266,9 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-HUB_WASHER = Washer(HUB_CLAMP.joint, "#8", "BRASS TOP-HAT WASHER", 1, hub_washer.THICK)
+HUB_WASHER = Washer(
+    HUB_CLAMP.joint, hub_washer.SCREW_SIZE, "BRASS SAE FLAT WASHER", 1, hub_washer.THICKNESS
+)
 WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER, HUB_WASHER)
 
 # --- The common screw and its exceptions ---------------------------------------

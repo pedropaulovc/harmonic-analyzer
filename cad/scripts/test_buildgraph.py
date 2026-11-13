@@ -156,7 +156,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
     "ch_rocker_arm_tl_vn_oblique_pivot_shim "
-    "ch_rocker_arm_tl_oblique_hub_washer",
+    "ch_rocker_arm_tl_vn_oblique_hub_washer",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",

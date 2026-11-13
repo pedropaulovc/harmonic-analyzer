@@ -1,10 +1,13 @@
-"""R4 workholding: common end clamps, loose stops and spigot-centred washer.
+"""R4 workholding: common end clamps, loose stops and screw-centred washer.
 
 Pure geometry. Product geometry stays main's .4000 strap hole. Partial head
 bearing at 1 Nm is owner-accepted; there is no new bearing-strength or
 complete-annulus rejection gate. The carrier's #2151 hole table supplies the
 correlated pin errors: ``PIN_RELATIVE_ERROR`` against the in-situ HUB, and
-the table-row/sweep displacement for the end heads and stop pins.
+the table-row/sweep displacement for the end heads and stop pins. The HUB
+washer is the bought brass #8 SAE flat washer TL-VN-85 (owner ruling
+2026-11-13, #2448): it must clear every complete cutter sweep (gap > 0), the
+real limit, not the retired top hat's 1.5 mm margin.
 """
 from __future__ import annotations
 
@@ -14,17 +17,18 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_oblique_hub_washer_spec as washer
+import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as washer
 import ch_rocker_arm_tl_oblique_blank_spec as blank
+import ch_rocker_strap_spec as strap
 from _mcmaster_91251a197 import DIMS as COMMON_SCREW
 from _printed_tolerance import printed_band_mm
+from ch_rocker_hub_fit import STRAP_HOLE_BAND
 
-# Actual printed product/washer interfaces, not duplicated conceptual sizes.
-PRODUCT_HOLE_LIMITS = washer.STRAP_HOLE_LIMITS
-SPIGOT_DIA_LIMITS = washer.SPIGOT_DIA_LIMITS
-SPIGOT_FLOAT_MAX = washer.SPIGOT_FLOAT_MAX
-SPIGOT_LAND_MIN = washer.SPIGOT_LAND_MIN
-WASHER_CLEARANCE_MIN = washer.CUTTER_CLEARANCE_MIN
+# The strap's printed hub hole (main's MHA-CH-13), reamed in place at HUB.
+PRODUCT_HOLE_LIMITS = (
+    strap.HOLE_DIA + STRAP_HOLE_BAND[1],
+    strap.HOLE_DIA + STRAP_HOLE_BAND[0],
+)
 HUB_TORQUE_NM = 1.0
 
 # ASME B18.3-2012 Tables 1/2, supplier envelopes, NOT custom jig bands.
@@ -35,6 +39,8 @@ SCREW_HEAD_RADIAL_RUNOUT_MAX = 0.006 * trammel.INCH / 2.0
 SCREW_FILLET_DIA_MAX = 0.188 * trammel.INCH
 SCREW_FILLET_LENGTH_MAX = 0.020 * trammel.INCH
 SCREW_TIP_INCOMPLETE_MAX = COMMON_SCREW.pitch  # conservative full pitch, not recipe's .75P
+# ASME B1.1 #8-32 UNC-3A least major (base bar spec's bracket-screw float).
+SCREW_MAJOR_MIN = 0.1585 * trammel.INCH
 
 END_GRIP_LIMITS = (
     riser.THICKNESS - riser.THICKNESS_BAND + trammel.STRAP_THICK + min(rocker.ARM_THICKNESS_BAND),
@@ -47,8 +53,8 @@ END_INSERTION_LIMITS = (
 END_FULL_THREAD_MIN = END_INSERTION_LIMITS[0] - SCREW_TIP_INCOMPLETE_MAX - carrier.TAP_MOUTH_BREAK
 END_UNDERSIDE_CLEARANCE_MIN = carrier.THICKNESS - carrier.THICKNESS_BAND - END_INSERTION_LIMITS[1]
 HUB_GRIP_LIMITS = (
-    END_GRIP_LIMITS[0] + washer.THICK_LIMITS[0],
-    END_GRIP_LIMITS[1] + washer.THICK_LIMITS[1],
+    END_GRIP_LIMITS[0] + washer.THICKNESS_MIN,
+    END_GRIP_LIMITS[1] + washer.THICKNESS_MAX,
 )
 HUB_FULL_THREAD_MIN = (
     SCREW_LENGTH_LIMITS[0] - HUB_GRIP_LIMITS[1]
@@ -58,22 +64,26 @@ HUB_UNDERSIDE_CLEARANCE_MIN = (
     carrier.THICKNESS - carrier.THICKNESS_BAND
     - (SCREW_LENGTH_LIMITS[1] - HUB_GRIP_LIMITS[0])
 )
-# Ordinary independent tap-location error is absent: the carrier tap and each
-# strap hole use the SAME DRO position with spindle-guided tools. During
-# ordinary flat seating the washer may translate within the product hole.
-# Free-assembly existence is the intersection of two clearance disks, so their
-# radii ADD. Flat seating limits washer translation by the ROOT fillet's
-# clearance to the sharp hole edge, not the bare spigot clearance.
-# This capacity is not a new manufactured band or measured centring gate.
-HUB_ASSEMBLY_OFFSET_CAPACITY = (
-    (washer.BORE_LIMITS[0] - SCREW_FILLET_DIA_MAX) / 2.0
-    + washer.ROOT_SEAT_CLEARANCE_MIN
-)
+# The screw, not a spigot, centres the washer: its largest bore floats on the
+# screw's least major, and its O.D. may run out of its bore by the supplier
+# bound (ASME B18.21.1 section 4.5, taken as a full radial offset). The screw
+# stands in the carrier's in-situ HUB tap, whose 60° flanks centre it under
+# the clamp load (no thread play is charged, as for the base bar's bracket
+# screws); HUB_RADIAL_STACK charges the HUB setting itself.
+WASHER_FLOAT_MAX = (washer.ID_MAX - SCREW_MAJOR_MIN) / 2.0
+WASHER_OFFSET_MAX = WASHER_FLOAT_MAX + washer.OD_ID_RUNOUT_MAX
+# The washer passes the screw, and its least O.D. spans the largest hole.
+WASHER_SCREW_CLEARANCE_MIN = (washer.ID_MIN - COMMON_SCREW.major_dia) / 2.0
+STRAP_BEARING_LAND_CONCENTRIC = (washer.OD_MIN - PRODUCT_HOLE_LIMITS[1]) / 2.0
+# At the worst offset the washer's rim overhangs the hole on one side: the
+# partial bearing the owner accepted (#2448), disclosed here, not gated.
 STRAP_BEARING_LAND_MIN = (
-    (washer.OD_LIMITS[0] - PRODUCT_HOLE_LIMITS[1]) / 2.0
-    - SPIGOT_FLOAT_MAX - washer.FLANGE_EDGE_BREAK_MAX
-    - washer.STRAP_HOLE_ENTRY_BREAK_MAX
+    STRAP_BEARING_LAND_CONCENTRIC - WASHER_OFFSET_MAX - carrier.HUB_RADIAL_STACK
 )
+# The SHCS under-head fillet (ASME B18.3, .188 MAX) can exceed the washer's
+# least bore (.183): at those limits the head first bears on the bore's edge,
+# which the soft brass coins under the 1 N·m clamp. Disclosed, not gated.
+FILLET_BORE_OVERLAP_MAX = (SCREW_FILLET_DIA_MAX - washer.ID_MIN) / 2.0
 
 
 def cutter_gap(
@@ -89,18 +99,18 @@ def cutter_gap(
 
 
 def washer_cutter_gaps(correlated_pin_error: float = 0.0) -> dict[str, float]:
-    """Spigot-centred full-sweep gaps with play and one correlated pin error.
+    """Screw-centred full-sweep gaps with play and one correlated pin error.
 
-    OD/spigot/bore are turned in one chucking. Screw/tap drift affects the
-    fillet fit-up, not washer centring; no thread crest enters this stack.
-    HUB_RADIAL_STACK already charges shoulder clearance; carriage play is
-    a separate term, included once just as in carrier.pin_relative_stack.
+    The largest O.D., offset by the bore's float on the screw and the
+    supplier's O.D.-to-bore runout, then the HUB setting stack (shoulder
+    clearance included) and carriage play, each charged once as in
+    carrier.pin_relative_stack.
     """
     if correlated_pin_error < 0.0:
         raise ValueError("correlated pin error must be nonnegative")
     return {
-        name: cutter_gap(trammel.HUB, washer.OD_LIMITS[1] / 2.0, name)
-        - SPIGOT_FLOAT_MAX - carrier.HUB_RADIAL_STACK
+        name: cutter_gap(trammel.HUB, washer.OD_MAX / 2.0, name)
+        - WASHER_OFFSET_MAX - carrier.HUB_RADIAL_STACK
         - trammel.CARRIAGE_PLAY_RADIUS - correlated_pin_error
         for name in trammel.SWEEP
     }
@@ -108,7 +118,7 @@ def washer_cutter_gaps(correlated_pin_error: float = 0.0) -> dict[str, float]:
 
 WASHER_GAPS = {name: cutter_gap(trammel.HUB, washer.OD / 2.0, name) for name in trammel.SWEEP}
 # Each pass charges its own correlated pin-shape error against the SAME
-# in-situ HUB once, beside the spigot float, HUB setting stack and carriage play.
+# in-situ HUB once, beside the washer offset, HUB setting stack and carriage play.
 WASHER_GAPS_MIN = {
     name: washer_cutter_gaps(carrier.PIN_RELATIVE_ERROR[name])[name]
     for name in trammel.SWEEP
@@ -202,7 +212,7 @@ PART_TOP_Z = trammel.CARRIER_TOP_Z + riser.THICKNESS + trammel.STRAP_THICK
 CLAMP_TOP_Z = {
     "CL": PART_TOP_Z + COMMON_SCREW.head_h,
     "CR": PART_TOP_Z + COMMON_SCREW.head_h,
-    "hub": PART_TOP_Z + washer.THICK + COMMON_SCREW.head_h,
+    "hub": PART_TOP_Z + washer.THICKNESS + COMMON_SCREW.head_h,
 }
 TOOLING_TOP_Z_MAX = trammel.CARRIER_TOP_Z + max(
     HUB_GRIP_LIMITS[1] + COMMON_SCREW.head_h,
@@ -246,9 +256,9 @@ def require_clearance() -> None:
         raise AssertionError("a plain stop pin reaches a self-cut sweep")
     if min(END_HEAD_MATERIAL_MARGINS.values()) <= 0.0:
         raise AssertionError("an end-clamp head leaves the retained end waste")
-    if min(WASHER_GAPS_MIN.values()) < WASHER_CLEARANCE_MIN:
-        raise AssertionError("washer violates the owner's 1.5 mm cutter floor")
-    if min(HUB_ASSEMBLY_OFFSET_CAPACITY, SPIGOT_LAND_MIN, STRAP_BEARING_LAND_MIN) <= 0.0:
-        raise AssertionError("the top-hat loses its fillet allowance, spigot land or strap seat")
+    if min(WASHER_GAPS_MIN.values()) <= 0.0:
+        raise AssertionError("the HUB washer reaches a complete cutter sweep")
+    if min(WASHER_SCREW_CLEARANCE_MIN, STRAP_BEARING_LAND_CONCENTRIC) <= 0.0:
+        raise AssertionError("the HUB washer binds on its screw or drops into the hub hole")
     if min(DRILL_DEPTH_RESERVE, REAMER_DEPTH_RESERVE) <= 0.0:
         raise AssertionError("a compatible drill/reamer reaches the carrier")

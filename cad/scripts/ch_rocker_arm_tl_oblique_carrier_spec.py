@@ -4,8 +4,8 @@ R4 workholding uses three ordinary #8-32 THRU taps: two end-waste clamps
 at CL/CR and a HUB clamp. All use the common 91251A197 screw. There is no
 precision carrier HUB bore, underside flange seat, CL dowel or LEFT receiver.
 The strap is registered by the riser's end-waste stops, clamped at both ends,
-then drilled and reamed in place over the riser's relief. The product's hub
-hole, not this plate's thread, locates the top-hat washer.
+then drilled and reamed in place over the riser's relief. The HUB clamp
+screw in this plate's in-situ tap centres the bought flat washer on the strap.
 
 Carrier coordinates: origin midway between A1/B1, X along the pin line,
 Y toward the strap, Z0 at the top face. The 6061 plate is faced to .47 in

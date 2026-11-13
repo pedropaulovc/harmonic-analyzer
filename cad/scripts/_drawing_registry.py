@@ -849,10 +849,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_oblique_hub_washer",
-        part="ch_rocker_arm_tl_oblique_hub_washer",
-        artifact_stem="ch-rocker-arm-tl-oblique-hub-washer",
-        script_name="draw_ch_rocker_arm_tl_oblique_hub_washer.py",
+        name="ch_rocker_arm_tl_vn_oblique_hub_washer",
+        part="ch_rocker_arm_tl_vn_oblique_hub_washer",
+        artifact_stem="ch-rocker-arm-tl-vn-oblique-hub-washer",
+        script_name="draw_ch_rocker_arm_tl_vn_oblique_hub_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

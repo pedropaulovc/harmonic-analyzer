@@ -472,6 +472,16 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91812A230",
         material="AISI 304",  # native library stand-in; purchased grade is 316
     ),
+    # MHA-CH-06-TL-VN-85: the oblique trammel jig's brass #8 SAE flat washer
+    # under the HUB clamp's common screw head (the fastener table's
+    # HUB_WASHER row; owner ruling 2026-11-13, #2448); shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-vn-oblique-hub-washer": _stock(
+        "ch-rocker-arm-tl-vn-oblique-hub-washer",
+        "Brass SAE Washer for Number 8 Screw Size",
+        "90231A116",
+        material="Brass",
+    ),
     # AISI 304 below is a native-library surrogate for appearance/approximate
     # mass only. Supplier authority for the screw is 18-8 stainless, not a
     # certified 304 grade; the YAML material_specification owns it.
