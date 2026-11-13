@@ -516,10 +516,11 @@ def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
         raise RuntimeError(f"{label}: no configuration {configuration_name!r}")
     root = _early_bound(configuration, "IConfiguration").GetRootComponent3(True)
     spares = []
-    pending = by_name(root.GetChildren()) if root is not None else []
+    # Stacked reversed, so pop() visits siblings in ascending name order.
+    pending = list(reversed(by_name(root.GetChildren()))) if root is not None else []
     while pending:
         name, component = pending.pop()
-        pending.extend(by_name(component.GetChildren()))
+        pending.extend(reversed(by_name(component.GetChildren())))
         # A pattern member or virtual part may carry no file path, so the
         # stem is read without _component_stem's refusal.
         if (

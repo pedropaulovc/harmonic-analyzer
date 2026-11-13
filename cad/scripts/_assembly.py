@@ -21,7 +21,7 @@ from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
-from _component_order import by_name, natural_key
+from _component_order import by_name
 from _component_references import (
     bind_component_selectors,
     component_identity,
@@ -2181,14 +2181,11 @@ def assert_free_dof_necessity(
 
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly, in natural
-    name order (never the seat's enumeration order, issue #2686)."""
+    name order (never the seat's enumeration order, issue #2686); an unnamed
+    component fails closed (:mod:`_component_order`)."""
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-    # No flag: Name2 is a property read (issue #87).
-    return sorted(
-        (str(_read_member(component, "Name2")) for component in components),
-        key=natural_key,
-    )
+    components = adapter._attempt(lambda: asm.GetComponents(True), default=None)
+    return [name for name, _component in by_name(components)]
 
 
 def delete_assembly_feature(adapter: Any, name: str) -> None:

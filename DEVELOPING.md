@@ -2392,17 +2392,23 @@ anchor search walks the view's components that way prints differently. So
 every assembly-, drawing- and verify-tier loop over one iterates
 `_component_order.by_name` (or `drawing_components_by_name`) on the
 enumeration's result: each element is bound and its name read in the order
-given, one bind and one read each and nothing else, then visited in natural
-name order (`part-2` before `part-10`, a pattern seed before its instances).
+given, one bind and one read each and nothing else, then visited in ascending
+natural name order (`part-2` before `part-10`, a pattern seed before its
+instances). The depth-first tree walks (balloon leaves, drawing visibility,
+configuration instance paths, the complete machine's spare sprocket) stack
+each level reversed, so they too visit siblings in ascending order.
 Callers use the name it returns instead of reading it again, and an element
 that is `None` or answers no name raises there: an unnamed component is never
 skipped, labelled or ordered under a placeholder. Only those name reads'
 answers follow the seat, and two seats' recordings pair their elements by
 name; the recorder still numbers the elements' handles in the seat's order. A
 loop that only collects names into a set is left as it is (its requests are
-the same name reads), and a part drawing view's one
-visible component needs no order (`_drawing_edges.visible_view_entities`
-sorts only an assembly view's). `test_component_order.py` (`check:recipe`)
+the same name reads), and a part drawing view's one visible component needs
+no order (`_drawing_edges.visible_view_entities` sorts only an assembly
+view's). Exempt: scripts no doit task runs (`build_motion_study`,
+`build_mobility_probe`, `export_glb`, `diagnostics/`), and `_drawing_tables`'
+failure evidence, whose `collect()` records a failed row's first native
+component after the failure. `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the
 same requests, and requires an unnamed component to fail closed.
 

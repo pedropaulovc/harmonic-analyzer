@@ -501,8 +501,6 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     actual_counts = {stem: len(group) for stem, group in groups.items()}
     if actual_counts != quantities:
         raise RuntimeError(f"{view_name} component counts: {actual_counts!r} != {quantities!r}")
-    for group in groups.values():
-        group.sort(key=lambda member: member[0])
     baseline = {name: _explode_transform(component) for name, component in components}
     if len(baseline) != sum(quantities.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
