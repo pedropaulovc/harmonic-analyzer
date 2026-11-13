@@ -367,7 +367,7 @@ async def build(adapter) -> dict[str, str]:
             display_unit=UNIT,
         )
     for name, band in (
-        ("Sec1KeyseatWidth", KEYSEAT_WIDTH_PRINT_BAND),
+        ("Sec1KeyseatWidth", cone_land_key.KEYSEAT_WIDTH_BAND),
         ("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND),
     ):
         set_dimension_bilateral_tolerance(
@@ -500,37 +500,6 @@ KEYSEAT_END_STATION = COLLAR_END_STATION + cone_land_key.KEY_END_SET_MM
 if cone_land_key.KEY_END_SET_MM <= cone_land_key.KEYSEAT_WIDTH_MM / 2.0:
     raise AssertionError(
         "the keyseat's end radius reaches the collar face in the model"
-    )
-# The keyseat's PRINTED width band (#2467).  cone_land_key.KEYSEAT_WIDTH_BAND
-# (+.0020/-.0000) is the width the largest key slides into; most catalogue
-# 1/16 end mills are ground at or under size (shop-equipment.toml
-# tools.keyseat-endmill-1-16), so one pass can leave the keyseat under
-# .0625 and that band rejected a keyseat the key still seats in.  The print
-# keeps that band's upper limit (the guards that read it: the key's seat
-# depth at its edge, the end radius's clearance to the collar face) and
-# admits .0010 under: the undersize key stock (.0605-.0625) enters such a
-# keyseat as supplied or with its sides dressed, the fit ANSI B17.1 gives a
-# parallel key in its shaft keyseat (Class 2: .002 clearance to .001
-# interference; Machinery's Handbook, Table 4, printed p. 2367).  A key held
-# by its keyseat does not shift under the gears,
-# which slide on it by the keyway's own clearance; that band is untouched.
-# The band is here, not in cone_land_key, so only this part and what stands
-# on it re-key.
-KEYSEAT_WIDTH_UNDER_MM = 0.0254  # .0010
-KEYSEAT_WIDTH_PRINT_BAND = (
-    cone_land_key.KEYSEAT_WIDTH_BAND[0],
-    cone_land_key.KEYSEAT_WIDTH_BAND[1] - KEYSEAT_WIDTH_UNDER_MM,
-)
-# The most a key at its largest stands over a keyseat at its least: what
-# dressing the key's sides removes.
-KEY_DRESS_MAX_MM = (
-    cone_land_key.limits(cone_land_key.KEY_SIZE_MM, cone_land_key.KEY_STOCK_BAND)[1]
-    - cone_land_key.limits(cone_land_key.KEYSEAT_WIDTH_MM, KEYSEAT_WIDTH_PRINT_BAND)[0]
-)
-if KEY_DRESS_MAX_MM > KEYSEAT_WIDTH_UNDER_MM + 1e-9:
-    raise AssertionError(
-        f"the key stands {KEY_DRESS_MAX_MM:.4f} mm over the narrowest keyseat, "
-        "more than its sides are dressed"
     )
 
 
