@@ -13,6 +13,7 @@ from dt_crank_drive_gear_spec import inch_text
 from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_KNOCKOUT_PROCESS,
+    DRIVE_PIN_KNOCKOUT_RIM_WORST,
     DRIVE_PIN_SPIGOT_RIM_WORST,
     HOLE_CALLOUT_PLACES,
     JOURNAL_BORE_BAND,
@@ -143,8 +144,8 @@ NECKS = "2X"
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
 # the shop holds, under the holes' own callout.
-# Emits approved declaration dt-crankshaft RV-02 (owner ruling 2026-10-18,
-# #991; redesign tracked in #1679).
+# Emits approved declaration dt-crankshaft RV-02 (owner rulings 2026-10-18,
+# #991, and 2026-11-13, #1679: accepted for good, as on the original).
 DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {inch_text(DRIVE_PIN_SPIGOT_RIM_WORST, 3)} MIN."
 
 # Under the native REAM callout on the seat spigot's two blind holes, two
@@ -173,7 +174,11 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{inch_text(DRIVE_PIN_DEPTH_TOL, HOLE_CALLOUT_PL
 # native Hole Wizard callout on the lower hole's floor: the drill reads above
 # the native size so the three short rows fit the field under the end view.
 KNOCKOUT_CALLOUT_ABOVE = DRIVE_PIN_KNOCKOUT_PROCESS
-KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
+# Its wall to the spigot rim prints as a fact under the purpose (rules 17 and
+# 20; declaration dt-crankshaft RV-07, owner ruling 2026-11-13, #1679).
+KNOCKOUT_CALLOUT_BELOW = (
+    f"DRIVE-PIN KNOCKOUT\nWALL {inch_text(DRIVE_PIN_KNOCKOUT_RIM_WORST, 3)} MIN"
+)
 
 # The punched witness on the dome, flagged with a leader to the mark itself
 # (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  Its
