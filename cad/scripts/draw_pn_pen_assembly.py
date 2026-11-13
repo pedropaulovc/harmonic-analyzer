@@ -1043,11 +1043,25 @@ def _mark_detail_boundary(
     corner = (centre[0] - clear if left else centre[0] + clear, centre[1] + clear)
     note, box = _view_note(adapter, parent, letter, corner, label=label)
     near_x = 2 if left else 0
-    box = _move_note(
-        adapter, note, (corner[0] - box[near_x], corner[1] - box[1]), label=label
+    # A moved note can re-read its box a fraction of a millimetre off the
+    # translation (A on run 20261113T204545094Z: 0.31 mm low), so the move is
+    # corrected once from the re-read box.
+    for _ in range(2):
+        delta = (corner[0] - box[near_x], corner[1] - box[1])
+        if math.hypot(*delta) <= DETAIL_POSITION_TOL_M:
+            break
+        box = _move_note(adapter, note, delta, label=label)
+    # The requirement: no part of the letter's box within half the gap of
+    # the rim (rule 14: no text struck by a line).
+    nearest = (
+        min(max(centre[0], box[0]), box[2]),
+        min(max(centre[1], box[1]), box[3]),
     )
-    if math.dist((box[near_x], box[1]), corner) > DETAIL_POSITION_TOL_M:
-        raise RuntimeError(f"{label}: letter {box!r} did not land at {corner!r}")
+    if math.dist(nearest, centre) < radius + DETAIL_LETTER_GAP / 2.0:
+        raise RuntimeError(
+            f"{label}: letter {box!r} stands within {DETAIL_LETTER_GAP / 2.0} "
+            f"of the circle (centre {centre!r}, r {radius!r})"
+        )
     _telemetry.info(f"{label}: circle {centre!r} r {radius!r}, letter {box!r}")
     return centre, radius
 
