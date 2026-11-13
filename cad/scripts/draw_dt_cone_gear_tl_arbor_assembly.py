@@ -110,18 +110,53 @@ if set(WORKING) | set(SPARES) != set(BOM_COMPONENTS):
 # y <= 0.066 m). The parts list's template columns print 196.6 mm wide, so
 # from x 0.219 it ends inside the right border
 # (draw_dt_cone_gear_tl_indexing_assembly); its six rows end by about y 0.189
-# (farm 20261113T071241685Z), the table's 20 lines (4.6 mm a line) below it
-# end over the title block.
+# (farm 20261113T071241685Z). Under it the setup table: its two-line title,
+# then a native general table (draw_ch_rocker_arm_tl_oblique_jig_assembly's
+# setting tables: each column cut to its longest cell, the BOM's 5.5 mm
+# rows), its 18 rows ending over the title block.
 SIDE_ORIGIN = (0.180, 0.190)
 ISO_CENTER = (0.105, 0.085)
 ISO_POINT_MM = (0.0, 0.0, arbor.ARBOR_END_Z / 2.0)
 ISO_NOTE_XY = (0.060, 0.045)
 BOM_ANCHOR = (0.219, 0.262)
-TABLE_XY = (0.219, 0.180)
+TABLE_XY = (0.219, 0.183)  # the title's top left; the table under it
+TABLE_CHAR_WIDTH = 0.0028
+TABLE_CELL_PAD = 0.003
+TABLE_ROW_HEIGHT = 0.0055
+TABLE_TITLE_GAP = 0.0015
+SHEET_CLEARANCE = 0.003  # visible air at the border and the title block
+SHEET_INNER_RIGHT = 0.4191
+TITLE_BLOCK_TOP = 0.066
 BALLOON_MARGIN = 0.012
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
+
+
+def table_column_widths(
+    header: tuple[str, ...], rows: tuple[tuple[str, ...], ...]
+) -> tuple[float, ...]:
+    """Each general-table column cut to its longest cell (metres)."""
+    return tuple(
+        max(len(text) for text in column) * TABLE_CHAR_WIDTH + TABLE_CELL_PAD
+        for column in zip(header, *rows, strict=True)
+    )
+
+
+def setup_table_box() -> tuple[float, float, float, float]:
+    """The setup table's planned box (x0, y0, x1, y1) under its title."""
+    x, top = TABLE_XY
+    top -= len(spec.SETUP_TABLE_TITLE.splitlines()) * LINE_PITCH + TABLE_TITLE_GAP
+    widths = table_column_widths(spec.SETUP_TABLE_HEADER, spec.SETUP_TABLE_ROWS)
+    height = (len(spec.SETUP_TABLE_ROWS) + 1) * TABLE_ROW_HEIGHT
+    return (x, top - height, x + sum(widths), top)
+
+
+_planned = setup_table_box()
+if _planned[2] > SHEET_INNER_RIGHT - SHEET_CLEARANCE:
+    raise AssertionError("the setup table runs past the right border")
+if _planned[1] < TITLE_BLOCK_TOP + SHEET_CLEARANCE:
+    raise AssertionError("the setup table runs into the title block")
 
 # --- The 64T blank in phantom (spec.SHOWN_BLANK) ----------------------------------
 # Drawn in the views' own sketches as MHA-DT-03-TL-00's sheets draw the
@@ -335,6 +370,67 @@ def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -
         raise RuntimeError(f"arbor-kit {label} printed as {printed!r}")
 
 
+def _place_setup_table(adapter: Any) -> None:
+    """The setup table's title, then its native general table under it, every
+    cell read back; its read-back box must clear the border and the title
+    block (draw_ch_rocker_arm_tl_oblique_jig_assembly._place_general_table)."""
+    label = "arbor-kit setup table"
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    _add_note(adapter, spec.SETUP_TABLE_TITLE, TABLE_XY, label=f"{label} title")
+    header, rows = spec.SETUP_TABLE_HEADER, spec.SETUP_TABLE_ROWS
+    x, _y0, _x1, top = setup_table_box()
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # swBOMConfigurationAnchor_TopLeft = 1; no template: a plain general table.
+    raw = ddoc.InsertTableAnnotation2(False, x, top, 1, "", len(rows) + 1, len(header))
+    if raw is None:
+        raise RuntimeError(f"{label}: InsertTableAnnotation2 returned no table")
+    table = _early_bound(raw, "ITableAnnotation")
+    if (int(table.RowCount), int(table.ColumnCount)) != (len(rows) + 1, len(header)):
+        raise RuntimeError(
+            f"{label}: table is {table.RowCount}x{table.ColumnCount}, "
+            f"expected {len(rows) + 1}x{len(header)}"
+        )
+    for column, width in enumerate(table_column_widths(header, rows)):
+        # swTableRowColChange_TableSizeCanChange = 0
+        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+            raise RuntimeError(f"{label}: column {column} width did not persist")
+    for row, cells in enumerate((header, *rows)):
+        for column, text in enumerate(cells):
+            table.SetText2(row, column, True, text)
+            applied = str(table.DisplayedText2(row, column, True) or "")
+            if applied != text:
+                raise RuntimeError(
+                    f"{label}: cell ({row}, {column}) reads {applied!r}, not {text!r}"
+                )
+    for row in range(len(rows) + 1):
+        table.SetRowHeight(row, TABLE_ROW_HEIGHT, 0)
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    heights = [float(table.GetRowHeight(row)) for row in range(len(rows) + 1)]
+    widths = [float(table.GetColumnWidth(column)) for column in range(len(header))]
+    if len(position) != 3 or not all(
+        map(math.isfinite, (*position, *heights, *widths))
+    ):
+        raise RuntimeError(f"{label}: table geometry is unreadable")
+    box = (
+        position[0],
+        position[1] - sum(heights),
+        position[0] + sum(widths),
+        position[1],
+    )
+    _telemetry.event(
+        "drawing.general_table",
+        table=label,
+        box_mm=tuple(value * 1000.0 for value in box),
+        row_heights_mm=tuple(value * 1000.0 for value in heights),
+        column_widths_mm=tuple(value * 1000.0 for value in widths),
+    )
+    if box[2] > SHEET_INNER_RIGHT - SHEET_CLEARANCE:
+        raise RuntimeError(f"{label}: runs past the right border at {box!r}")
+    if box[1] < TITLE_BLOCK_TOP + SHEET_CLEARANCE:
+        raise RuntimeError(f"{label}: runs into the title block at {box!r}")
+
+
 def _bom_items(table: Any, configuration: str) -> dict[str, str]:
     """Each family's row, read through its native components: the steps and
     the setup table cite the spec's item numbers, so the BOM must number the
@@ -529,11 +625,8 @@ def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding]
             f"arbor kit side view carries {len(landings)} balloons, "
             f"expected {len(WORKING)}"
         )
-    for text, xy, label in (
-        (spec.SETUP_TABLE, TABLE_XY, "setup table"),
-        (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
-    ):
-        _add_note(adapter, text, xy, label=label)
+    _place_setup_table(adapter)
+    _add_note(adapter, ISO_NOTE, ISO_NOTE_XY, label="isometric scale note")
     blank_settled = _draw_blank(adapter, side, "sheet 1", arbor.SHOULDER_Z)
 
     def settled() -> None:

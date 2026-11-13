@@ -132,7 +132,7 @@ if key.END_Z_MM + key.LENGTH >= BLANK_FACE_Z:
 # an angle that is not one (machinist review of farm 20261113T071241685Z).
 CONE_FIRST_INDEX_PITCHES = 0.5
 CRANK_FIRST_INDEX_DEG = round(math.degrees(crank.TOOTH_SPACE.azimuth_rad), 2)
-CRANK_FIRST_INDEX_SENSE = "COUNTER-CLOCKWISE SEEN FROM ITS CHAMFERED BORE FACE"
+CRANK_FIRST_INDEX_SENSE = "CCW FROM CHAMFERED BORE FACE"
 
 
 def cone_first_index_deg(teeth: int) -> float:
@@ -156,9 +156,10 @@ def blank_collar(tag: str) -> str:
 
 
 # --- The key's clock on the cutter -------------------------------------------------
-# The key faces the cutter when its two side faces stand equally either side
-# of the cutter's centre plane. Turned by a small angle, both side faces move
-# the same way by their radius times the angle, so the two readings part by
+# The key's centre plane is level when, its side faces level, one test
+# indicator reads the upper one, then the other after a half turn of the
+# head, the same. Turned off level by a small angle, both side faces move the
+# same way by their radius times the angle, so the two readings part by
 # twice that; the least radius a side face shows is the keyseat's edge. The
 # reading's band at the shop's indicator row (.001) holds the key's clock well
 # inside the arbor's setting allowance, which the index then shares.
@@ -198,30 +199,38 @@ _SEAT_TEXT = "Ø" + arbor.inch_text(
 )
 
 # --- Sheet words ------------------------------------------------------------------
-# The setup table (sheet 1, under the parts list): each blank by drawing
-# number and tooth count, the collar item that backs it and its first index.
-_TABLE_ROWS: list[str] = []
-for _blank in arbor.KEYED_GEARS:
-    _teeth = blank_teeth(_blank.tag)
-    _item = BOM_ITEMS[member(blank_collar(_blank.tag))]
-    if _blank.tag.startswith("T"):
-        _TABLE_ROWS.append(
-            f"{_blank.number} ({_teeth}T): ITEM {_item}, "
-            f"{cone_first_index_deg(_teeth):.2f}° EITHER WAY"
-        )
-    else:
-        _TABLE_ROWS += [
-            f"{_blank.number} ({_teeth}T): ITEM {_item}, "
-            f"{CRANK_FIRST_INDEX_DEG:.2f}° COUNTER-CLOCKWISE",
-            f"   {CRANK_FIRST_INDEX_SENSE.removeprefix('COUNTER-CLOCKWISE ')}, "
-            f"WHICH GOES TOWARD ITEM {_item}",
-        ]
-SETUP_TABLE = "\n".join(
+# The setup table (sheet 1, under the parts list): a ruled table, a row per
+# blank by drawing number and tooth count, the collar item that backs it and
+# its first index's angle and direction (rule 22's setting table; machinist
+# review of farm 20261113T204539922Z: prose lines are not a table). The
+# index's acceptance is the title block's angle, set on the dividing head's
+# own dial (the last fitting step).
+SETUP_TABLE_TITLE = "\n".join(
     (
         "SETUP TABLE: EACH BLANK'S COLLAR AND FIRST INDEX",
         f"(THE FIRST INDEX CENTRES A TOOTH, NOT A SPACE, ON ITEM {BOM_ITEMS[KEY]})",
-        *_TABLE_ROWS,
     )
+)
+# Collar cells read "ITEM n" under COLLAR, and the 64T's direction is CCW
+# seen from its chamfered bore face, so every column fits the right half.
+SETUP_TABLE_HEADER = ("BLANK", "TEETH", "COLLAR", "FIRST INDEX", "DIRECTION")
+
+
+def _first_index(tag: str) -> tuple[str, str]:
+    """A blank's first index as the table prints it: angle and direction."""
+    if tag.startswith("T"):
+        return f"{cone_first_index_deg(blank_teeth(tag)):.2f}°", "EITHER WAY"
+    return f"{CRANK_FIRST_INDEX_DEG:.2f}°", CRANK_FIRST_INDEX_SENSE
+
+
+SETUP_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
+    (
+        _blank.number,
+        str(blank_teeth(_blank.tag)),
+        f"ITEM {BOM_ITEMS[member(blank_collar(_blank.tag))]}",
+        *_first_index(_blank.tag),
+    )
+    for _blank in arbor.KEYED_GEARS
 )
 
 # Fitting steps (sheet 2, beside the exploded view): one action each, each
@@ -231,7 +240,12 @@ SETUP_TABLE = "\n".join(
 # named by the features the views show, not by a view the package does not
 # label (machinist review of farm 20261113T171903293Z).
 _K, _A, _N = (BOM_ITEMS[s] for s in (KEY, ARBOR, NUT))
-_STEPS: tuple[str, ...] = (
+_READING = arbor.inch_text(KEY_SIDE_READING, 3)
+# The key's clock: set by its own two side faces, touched in turn by one
+# test indicator, the head turned half a turn between them (the cutter's
+# centre plane is nothing a builder can touch; machinist review of farm
+# 20261113T204539922Z); then a quarter turn brings it to the cutter.
+_FITTING: tuple[str, ...] = (
     f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
     f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
     f"PUSH ITEM {_K} INTO ITEM {_A}'S KEYSEAT AGAINST THE KEYSEAT'S END NEAREST "
@@ -244,13 +258,25 @@ _STEPS: tuple[str, ...] = (
     f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
     f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
     "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
-    f"WITH ITEM {_A} IN THE DIVIDING HEAD, TURN THE HEAD UNTIL ITEM {_K} FACES "
-    "THE CUTTER.",
-    f"CHECK WITH A TEST INDICATOR: ITEM {_K}'S TWO SIDE FACES STAND THE SAME "
-    "DISTANCE FROM THE CUTTER'S CENTRE PLANE WITHIN "
-    f"{arbor.inch_text(KEY_SIDE_READING, 3)}.",
+    f"WITH ITEM {_A} IN THE DIVIDING HEAD, TURN THE HEAD UNTIL ITEM {_K}'S SIDE "
+    "FACES ARE LEVEL, ONE FACING UP.",
+    f"ZERO A TEST INDICATOR ON ITEM {_K}'S UPPER SIDE FACE.",
+)
+ZERO_STEP = len(_FITTING)
+_SETTING: tuple[str, ...] = (
+    "TURN THE HEAD 180°.",
+    f"CHECK: THE INDICATOR, AT THE SAME HEIGHT, READS ZERO WITHIN {_READING} "
+    f"ON ITEM {_K}'S OTHER SIDE FACE.",
+)
+CHECK_STEP = ZERO_STEP + len(_SETTING)
+_SETTING += (
+    f"IF STEP {CHECK_STEP} FAILS, TURN THE HEAD UNTIL THE INDICATOR READS HALF "
+    f"ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
+    f"TURN THE HEAD 90° UNTIL ITEM {_K} FACES THE CUTTER.",
     "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
 )
+_STEPS: tuple[str, ...] = (*_FITTING, *_SETTING)
+INDEX_STEP = len(_STEPS)
 STEP_WIDTH = 66  # characters a printed line, inside the sheet's right border
 
 

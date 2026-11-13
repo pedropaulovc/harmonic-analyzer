@@ -107,7 +107,8 @@ def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_bac
         item = kit.BOM_ITEMS[kit.member(name)]
         for tag in spec.GEARS_BY_CONFIGURATION[name]:
             teeth = kit.blank_teeth(tag)
-            assert f"({teeth}T): ITEM {item}," in kit.SETUP_TABLE, tag
+            row = (str(teeth), f"ITEM {item}")
+            assert row in {r[1:3] for r in kit.SETUP_TABLE_ROWS}, tag
 
 
 def test_the_bore_callout_names_its_process() -> None:
