@@ -16,7 +16,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -33,13 +32,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -156,7 +155,6 @@ SET_SCREW_VIEW_LETTER = "A"
 SET_SCREW_VIEW_LABEL = f"VIEW {SET_SCREW_VIEW_LETTER}"
 SET_SCREW_VIEW_LABEL_XY = (BOTTOM_CENTER[0] - 0.009, 0.082)
 VIEW_LETTER_HEIGHT = 0.005
-VIEW_ARROW_SQUARE_TOL = 0.0003
 _TAP_MOUTH = (_front_x(0.0), _front_y(-ECC - CAM_OD / 2.0))
 # (letter's upper-left, leader tip): the letter hangs below the mouth and
 # its leader rises from the letter's left side, squared on readback.
@@ -205,35 +203,9 @@ def _add_view_arrow(adapter: Any, front: Any) -> None:
         view=front,
         label=label,
     )
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} note has no text format")
-    text_format.CharHeight = VIEW_LETTER_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {label} letter")
-    rebuild_drawing(adapter, label=f"{label} letter")
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-        raise RuntimeError(f"{label} tip moved when its letter was sized")
-    # The leader leaves the letter's side: slide the letter by any miss so
-    # the arrow stands square onto the mouth.
-    miss = tip_xy[0] - points[0]
-    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
-        x, y, z = (float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(x + miss, y, z):
-            raise RuntimeError(f"failed to square the {label}")
-        rebuild_drawing(adapter, label=f"square {label}")
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if (
-            len(points) < 6
-            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
-            or abs(tip_xy[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
-        ):
-            raise RuntimeError(f"{label} did not square: leader {points}")
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f} (square when the x agree)"
+    square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=0, label=label,
+        letter_height=VIEW_LETTER_HEIGHT,
     )
 
 

@@ -59,6 +59,7 @@ from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -287,7 +288,6 @@ END_NOTE_XY = (
 VIEW_LETTER_HEIGHT = 0.005
 VIEW_ARROW_TIP_GAP = 0.0035
 VIEW_ARROW_RUN = 0.010
-VIEW_ARROW_SQUARE_TOL = 0.0003
 _VIEW_A_TIP = (_sx(SQUARE_LENGTH) + VIEW_ARROW_TIP_GAP, _sy(0.0))
 VIEW_A_ARROW = (
     (_VIEW_A_TIP[0] + VIEW_ARROW_RUN, _VIEW_A_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
@@ -313,40 +313,12 @@ def _add_view_arrow(adapter: Any, side: Any) -> None:
     note = add_leader_note(
         adapter, END_VIEW_LETTER, text_xy=text_xy, attach_xy=tip_xy, view=side, label=label
     )
-    # add_note leaves text at the document height; size the letter here and
-    # prove the leader tip did not move with it.
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} note has no text format")
-    text_format.CharHeight = VIEW_LETTER_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {label} letter")
-    rebuild_drawing(adapter, label=f"{label} letter")
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-        raise RuntimeError(f"{label} tip moved when its letter was sized")
-    # The leader leaves the letter's nearer side at the text's mid-height:
-    # slide the letter by any miss in y so the arrow stands level.
-    miss = tip_xy[1] - points[1]
-    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
-        x, y, z = (float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(x, y + miss, z):
-            raise RuntimeError(f"failed to square the {label}")
-        rebuild_drawing(adapter, label=f"square {label}")
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if (
-            len(points) < 6
-            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
-            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
-        ):
-            raise RuntimeError(f"{label} did not square: leader {points}")
+    points = square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=1, label=label,
+        letter_height=VIEW_LETTER_HEIGHT,
+    )
     if points[0] <= tip_xy[0]:
         raise RuntimeError(f"{label} does not point left onto the top face: {points}")
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f} (level when the y agree)"
-    )
 
 
 def _lay_side_view_horizontal(adapter: Any, side: Any) -> None:

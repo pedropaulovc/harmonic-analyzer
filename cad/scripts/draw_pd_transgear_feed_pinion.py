@@ -59,7 +59,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_feature_control_frame
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
-from _drawing_scan import _zoomed_on
+from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -359,18 +359,8 @@ VIEW_LETTER_HEIGHT = 0.005
 VIEW_LETTER_WIDTH = 0.0037
 VIEW_ARROW_TIP_GAP = 0.0035
 VIEW_ARROW_LEADER = 0.009
-VIEW_ARROW_SQUARE_TOL = 0.0003
-# A leader leaves its letter's box, and SolidWorks lays that box out on the
-# drawing window's pixels (the same letter's box read 13 px high, 6.20 mm, on
-# a fitted 1010x598 px window at 2.098 px/mm and 16 px, 6.88 mm, on a
-# 1010x678 px one at 2.325 px/mm).  A pixel is 0.48 and 0.43 mm there, over
-# the squaring tolerance, so a fitted readback cannot square the leader:
-# every 598 px leaf read VIEW E's 0.08 mm off (ten leaves, 20261112T044854Z
-# to 20261112T160955Z); the first 678 px leaf to draw it (20261113T013309Z,
-# release v49 r2) read 0.46 mm off after its correction.  The arrow is read
-# and squared zoomed onto this half-span about its own middle, under 0.05 mm
-# a pixel on either window.
-VIEW_ARROW_ZOOM_HALF = 0.012
+# The letter slides until the leader stands square, read zoomed onto the
+# arrow (_drawing_view_arrow: a fitted readback is a seat window's pixel off).
 # C's arrow points left at the end view's tooth tip level with the bore:
 # model +X in the mirrored *Back view, the sight of B-B's arrows, so VIEW C
 # (*Left) sees that side uncut.  The letter stands right of the tip, short
@@ -656,56 +646,18 @@ def _add_view_arrow(
     arrow: tuple[tuple[float, float], tuple[float, float]],
 ) -> None:
     """A horizontal letter arrow on ``parent`` naming a removed view, square
-    onto the face it looks at (draw_fr_top_frame._add_view_arrow): the
-    letter slides in y by any miss, read zoomed onto the arrow
-    (:data:`VIEW_ARROW_ZOOM_HALF`)."""
+    onto the face it looks at: the letter slides in y by any miss
+    (_drawing_view_arrow.square_view_arrow)."""
     text_xy, tip_xy = arrow
     label = f"view {letter} viewing arrow"
     note = add_leader_note(
         adapter, letter, text_xy=text_xy, attach_xy=tip_xy, view=parent, label=label,
     )
-    # add_note leaves text at the document height; size the letter here and
-    # prove the leader tip did not move with it.
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} note has no text format")
-    text_format.CharHeight = VIEW_LETTER_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {label} letter")
-    rebuild_drawing(adapter, label=f"{label} letter")
-    fitted = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    centre = ((text_xy[0] + tip_xy[0]) / 2.0, (text_xy[1] + tip_xy[1]) / 2.0)
-    with _zoomed_on(adapter, centre, VIEW_ARROW_ZOOM_HALF):
-        adapter.currentModel.GraphicsRedraw2()
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-            raise RuntimeError(f"{label} tip moved when its letter was sized")
-        # The leader leaves the letter's nearer side at the text's mid-height.
-        zoomed_y = points[1]
-        miss = tip_xy[1] - zoomed_y
-        if abs(miss) > VIEW_ARROW_SQUARE_TOL:
-            x, y, z = (float(value) for value in annotation.GetPosition())
-            if not annotation.SetPosition2(x, y + miss, z):
-                raise RuntimeError(f"failed to square the {label}")
-            rebuild_drawing(adapter, label=f"square {label}")
-            adapter.currentModel.GraphicsRedraw2()
-            points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-            if (
-                len(points) < 6
-                or math.dist((points[-3], points[-2]), tip_xy) > 0.001
-                or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
-            ):
-                raise RuntimeError(f"{label} did not square: leader {points}")
-    _telemetry.info(
-        f"{label}: leader start read fitted {fitted[:2]}, zoomed y={zoomed_y:.5f}, "
-        f"tip y={tip_xy[1]:.5f}"
+    square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=1, label=label,
+        letter_height=VIEW_LETTER_HEIGHT,
     )
     _assert_note_inside_border(note, label)
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f} (square when the y agree)"
-    )
 
 
 def _assert_note_inside_border(note: Any, label: str) -> None:

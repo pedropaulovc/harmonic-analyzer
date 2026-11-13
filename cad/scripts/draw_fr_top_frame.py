@@ -76,6 +76,7 @@ from _drawing_gdt import (
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -730,7 +731,6 @@ VIEW_LETTER = "G"
 VIEW_LETTER_HEIGHT = 0.005
 VIEW_ARROW_TIP_GAP = 0.0035
 VIEW_ARROW_LENGTH = 0.013
-VIEW_ARROW_SQUARE_TOL = 0.0003
 VIEW_G_ARROW_Z = -80.0
 _VIEW_G_TIP = (
     HUB_TOP_CENTER[0] - OUTER_X / SHEET_SCALE[1] / 1000.0 - VIEW_ARROW_TIP_GAP,
@@ -3373,39 +3373,9 @@ def _add_view_arrow(
     note = add_leader_note(
         adapter, letter, text_xy=text_xy, attach_xy=tip_xy, view=parent, label=label,
     )
-    # add_note leaves text at the document height; size the letter here and
-    # prove the leader tip did not move with it.
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} note has no text format")
-    text_format.CharHeight = VIEW_LETTER_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {label} letter")
-    rebuild_drawing(adapter, label=f"{label} letter")
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-        raise RuntimeError(f"{label} tip moved when its letter was sized")
-    # The leader leaves the letter's nearer side at the text's mid-height:
-    # slide the letter by any miss across the arrow so it stands square.
-    axis = 0 if vertical else 1
-    miss = tip_xy[axis] - points[axis]
-    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
-        position = [float(value) for value in annotation.GetPosition()]
-        position[axis] += miss
-        if not annotation.SetPosition2(*position):
-            raise RuntimeError(f"failed to square the {label}")
-        rebuild_drawing(adapter, label=f"square {label}")
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if (
-            len(points) < 6
-            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
-            or abs(tip_xy[axis] - points[axis]) > VIEW_ARROW_SQUARE_TOL
-        ):
-            raise RuntimeError(f"{label} did not square: leader {points}")
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f} (square when the {'xy'[axis]} agree)"
+    square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=0 if vertical else 1,
+        label=label, letter_height=VIEW_LETTER_HEIGHT,
     )
 
 

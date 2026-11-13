@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import _config
+import _drawing_view_arrow
 import build_pd_transgear_knob_shaft as part
 import draw_pd_transgear_knob_shaft as drawing
 import pd_transgear_arm_plate_geometry as plate
@@ -1223,10 +1224,10 @@ def test_view_c_arrow_squares_its_letter_onto_the_tip_face(monkeypatch) -> None:
         lambda _adapter, _view, point, *, label: projected.append(point) or face,
     )
     monkeypatch.setattr(drawing, "add_leader_note", leader_note)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(_drawing_view_arrow, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_drawing_view_arrow, "rebuild_drawing", lambda *_a, **_k: None)
     side = object()
-    drawing._add_view_arrow(object(), side)
+    drawing._add_view_arrow(SimpleNamespace(currentModel=MagicMock()), side)
     assert projected == [
         (0.0, drawing.VIEW_ARROW_FACE_RADIUS_MM / 1000.0, spec.TIP_Z / 1000.0)
     ]

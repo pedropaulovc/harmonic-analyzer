@@ -68,6 +68,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -692,37 +693,9 @@ def _add_view_arrow(
         view=top,
         label=label,
     )
-    # add_note leaves text at the document height; size the letter here and
-    # prove the leader tip did not move with it.
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} note has no text format")
-    text_format.CharHeight = VIEW_LETTER_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {label} letter")
-    rebuild_drawing(adapter, label=f"{label} letter")
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-        raise RuntimeError(f"{label} tip moved when its letter was sized")
-    # The leader leaves the letter's nearer side, whose x is the glyph's
-    # width: slide the letter by any miss so the arrow stands square.
-    miss = tip_xy[0] - points[0]
-    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
-        x, y, z = (float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(x + miss, y, z):
-            raise RuntimeError(f"failed to square the {label}")
-        rebuild_drawing(adapter, label=f"square {label}")
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if (
-            len(points) < 6
-            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
-            or abs(tip_xy[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
-        ):
-            raise RuntimeError(f"{label} did not square: leader {points}")
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f} (square when the x agree)"
+    square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=0, label=label,
+        letter_height=VIEW_LETTER_HEIGHT,
     )
 
 
@@ -1902,7 +1875,6 @@ VIEW_F_ARROW = (
 # letter hangs below the edge and the leader leaves its left side, so the
 # note stands at the tip (the left margin is squared on readback); its foot
 # stays 3 mm over the 76.20/39.85 dimension line (y 0.0784).
-VIEW_ARROW_SQUARE_TOL = 0.0003
 _VIEW_G_TIP = _top_xy(7.2, -PLATE_Z_PLUS)
 VIEW_G_ARROW = (
     (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
