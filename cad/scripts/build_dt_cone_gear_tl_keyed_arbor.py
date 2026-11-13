@@ -156,14 +156,6 @@ async def build(adapter) -> dict[str, str]:
             places=spec.DRAWING_PRECISION_BY_NAME[name],
             display_unit=UNIT,
         )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        spec.SHOULDER_FILLET,
-        "ShoulderR",
-        *deviations(spec.SHOULDER_R_BAND),
-        places=spec.DRAWING_PRECISION_BY_NAME["ShoulderR"],
-        display_unit=UNIT,
-    )
     _shoulder_root_max_limit(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -638,13 +630,19 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
 
 @_telemetry.traced("part.keyed_arbor.shoulder_root_max")
 def _shoulder_root_max_limit(adapter: Any) -> None:
-    """ShoulderR as the single limit "R.004 MAX": swTolMAX prints the model
-    value then MAX (build_dt_cone_gear_shaft._shoulder_root_max_limit)."""
-    _, dimension = _named_dimension(adapter, spec.SHOULDER_FILLET, "ShoulderR")
+    """ShoulderR as the single limit "R.004 MAX": no native tolerance, " MAX"
+    its suffix (build_pd_transgear_thumbnut._countersink_max_limit), since
+    swTolMAX prints a lowercase "max."."""
+    display, dimension = _named_dimension(adapter, spec.SHOULDER_FILLET, "ShoulderR")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = spec.SHOULDER_R_TOL_TYPE
-    if int(tolerance.Type) != spec.SHOULDER_R_TOL_TYPE:
-        raise RuntimeError("ShoulderR: swTolMAX did not persist")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(2, spec.SHOULDER_R_SUFFIX)  # swDimensionTextSuffix
+    if (
+        int(tolerance.Type) != spec.SHOULDER_R_TOL_TYPE
+        or str(display.GetText(2) or "") != spec.SHOULDER_R_SUFFIX
+    ):
+        raise RuntimeError("ShoulderR: the MAX single limit did not persist")
 
 
 def _sketch_xy_mm(

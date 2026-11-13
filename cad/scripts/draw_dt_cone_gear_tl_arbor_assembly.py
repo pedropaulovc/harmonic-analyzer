@@ -1,11 +1,18 @@
-r"""Create the fitting sheet for the keyed cutting arbor kit (MHA-DT-03-TL-05).
+r"""Create the fitting sheets for the keyed cutting arbor kit (MHA-DT-03-TL-05).
 
-Shop fixture (issue #2465; ``dt_cone_gear_tl_arbor_assembly_spec``). One
-sheet: the kit's side view at its 64T setup (the Ø1.75 collar and the nut on
-the pilot, the other two collars beyond the arbor's end), every part
-ballooned against the parts list; the blank's near face from the jaw step and
-the seat's length as reference dimensions; three fitting steps; a shaded
-isometric.
+Shop fixture (issue #2465; ``dt_cone_gear_tl_arbor_assembly_spec``).
+Sheet 1: the kit's side view in its working pose, the 64T setup (item 1 with
+item 5 bonded in its keyseat, item 2 and item 6 seated on its pilot), its
+parts ballooned against the parts list; the shaded isometric in the same
+pose; the parts list; the setup table (each blank's collar and first index).
+Sheet 2: the exploded side view (rule 22), one view per item
+(draw_dt_cone_tip_gear_tl_cutter_assembly's ``_item_view``): items 1 and 5
+seated together, item 2 and item 6 drawn off the thread end in fitting
+order on the arbor's axis, items 3 and 4 under item 2, whose place either
+takes; the fitting steps. The spare collars stand off the arbor's end in the
+model, so every sheet-1 view shows only the working pose's parts. Poses,
+items and the sheet words come from the spec; this recipe only lays the
+sheets out and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -13,35 +20,37 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Callable
 from typing import Any
 
 import _telemetry
 import dt_cone_gear_tl_arbor_assembly_spec as spec
 import dt_cone_gear_tl_arbor_collar_spec as collar
+import dt_cone_gear_tl_arbor_key_spec as key
 import dt_cone_gear_tl_keyed_arbor_spec as arbor
+import dt_cone_gear_tl_vn_arbor_nut_spec as nut
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
     BalloonAnchor,
+    BalloonLanding,
     add_component_bom_balloons,
     assert_balloon_landings,
+    isolate_drawing_view_components,
 )
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimension,
-)
-from _drawing_hidden_sketches import _show_base_view_sketches, curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import bom_row_identities, insert_bom_table
 from _drawing_types import DrawingLayout
 from _drawing_view_configuration import (
@@ -52,7 +61,8 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -65,30 +75,51 @@ OUTPUTS = DrawingOutputs(
     png=SPEC.outputs["png"],
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
-    raise AssertionError("the arbor-kit sheet must remain landscape")
+    raise AssertionError("the arbor-kit sheets must remain landscape")
 
 CONTRACT = assembly_contract("dt-cone-gear-tl-arbor")
 DRAWING_NUMBER = CONTRACT.number
+# Sheet 1 at 2:1, so the 1/16 key reads; sheet 2's exploded row at 1:1, so
+# the arbor, the collar and the nut fit the left half end to end with room
+# for the labels.
+SHEET_NAMES = ("ASSEMBLY", "EXPLODED VIEW")
 SHEET_SCALE = (2.0, 1.0)
+EXPLODED_SCALE = (1.0, 1.0)
+SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: EXPLODED_SCALE}
 SIDE_SCALE = (2.0, 1.0)
 ISO_SCALE = (1.0, 1.0)
-# Sheet metres. The side view's 4.0 in kit row spans 203 mm at 2:1 on the
-# left; the parts list and the steps fill the right half above the title
-# block (x >= 0.216 m, y <= 0.066 m); the isometric sits under the side view.
-SIDE_CENTER = (0.120, 0.185)
-ISO_CENTER = (0.110, 0.085)
-ISO_NOTE_XY = (0.060, 0.050)
-BOM_ANCHOR = (0.240, 0.262)
-STEPS_XY = (0.240, 0.175)
-BALLOON_MARGIN = 0.012
-# The two settings' reference dimensions stand under the arbor, in tiers.
-SETTING_DROP = {spec.STANDOFF_DIMENSION: 0.022, spec.SEAT_DIMENSION: 0.034}
 
+# Every BOM row; the working pose's parts, the only ones sheet 1 shows.
 BOM_COMPONENTS = spec.BOM_ORDER
-# Each collar member's family (``<stem>--<member>``) is itself a leaf
-# identity of its one occurrence (``_drawing_balloons._component_leaf``), so
-# the default anchor finds it; an ``@<member>:1`` pin is a semantic reference
-# selector, which only roles registered in ``_component_references`` resolve.
+KIT_COLLAR = spec.member(spec.KIT_COLLAR)
+SPARES = tuple(
+    spec.member(name) for name in collar.CONFIGURATIONS if name != spec.KIT_COLLAR
+)
+WORKING = (spec.ARBOR, KIT_COLLAR, spec.KEY, spec.NUT)
+if set(WORKING) | set(SPARES) != set(BOM_COMPONENTS):
+    raise AssertionError("every kit part is in the working pose or a spare collar")
+
+# --- Sheet 1 (sheet metres) ----------------------------------------------------
+# The side view's model origin (the grip's end-face centre) top left, the
+# 2.58 arbor running 131 mm left of it, the Ø1.75 collar 89 mm tall; the
+# isometric under it; the parts list and the setup table in the right half,
+# above the title block (x >= 0.216 m, y <= 0.066 m). The parts list's
+# template columns print 196.6 mm wide, so from x 0.219 it ends inside the
+# right border (draw_dt_cone_gear_tl_indexing_assembly); its six rows end by
+# about y 0.189 (farm 20261113T071241685Z), the table's 19 lines (4.6 mm a
+# line) below it end over the title block.
+SIDE_ORIGIN = (0.180, 0.200)
+ISO_CENTER = (0.105, 0.085)
+ISO_POINT_MM = (0.0, 0.0, arbor.ARBOR_END_Z / 2.0)
+ISO_NOTE_XY = (0.060, 0.045)
+BOM_ANCHOR = (0.219, 0.262)
+TABLE_XY = (0.219, 0.180)
+BALLOON_MARGIN = 0.012
+ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
+CHAR_WIDTH = 0.00255  # default-format note text, per character
+LINE_PITCH = 0.0046
+
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 # The side view sees every turned edge edge-on, one line across the axis. A
 # leader asked on such a line near its end lands ON the end: farm
@@ -99,7 +130,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 # jig's form (draw_ch_rocker_arm_tl_oblique_jig_assembly: KP08_RIM_DEG,
 # STUD_RIM_DEG): a rim point RIM_DEG round from the viewer's +X toward +Y, so
 # it stands mid-line, on the viewer's half of a real circular edge. The
-# arbor's is the grip step's outer rim (Ø.62 at the jaw step, clear of every
+# arbor's is the grip step's outer rim (Ø.62 at the grip step, clear of every
 # kit part), 7.9 mm (sheet) from either end of its line and 4.8 from the
 # standoff's silhouette; the Ø1.00 collar's walk stood 1.7 mm from its line's
 # end, so its rim is frozen the same way, on the face its walk found drawn.
@@ -121,7 +152,117 @@ BALLOON_ANCHORS[_C100] = BalloonAnchor(
         collar.OD_BY_CONFIGURATION[collar.CONFIGURATIONS[1]] / 2.0, collar.LENGTH
     )
 )
-ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
+
+# --- Sheet 2: the exploded side view (rule 22) ---------------------------------
+# One side view per item at 1:1, each isolated to its item, placed where its
+# explode offset lands in item 1's view (the side view prints model z to the
+# left, y up). Item 5 stays seated in item 1 (bonded first, steps 1-6). Item
+# 2 is drawn off the thread end until its near face clears the arbor's end by
+# EXPLODE_GAP, item 6 the same beyond item 2: the order they go on. Items 3
+# and 4, which take item 2's place per the setup table, stand under item 2,
+# item 3 centred under it, item 4 SPARE_SPREAD toward the thread end, each
+# SPARE_DROP clear. Assembly mm.
+EXPLODED_ORIGIN = (0.175, 0.200)  # item 1's grip end-face centre, sheet m
+EXPLODE_GAP = 25.0
+SPARE_DROP = 30.0
+SPARE_SPREAD = 42.0
+AXIS_OVERRUN = 3.0
+_EXPLODED_ITEM2_Z = arbor.ARBOR_END_Z + EXPLODE_GAP  # its near face
+_ITEM2_MID_Z = _EXPLODED_ITEM2_Z + collar.LENGTH / 2.0
+_EXPLODED_NUT_Z = _EXPLODED_ITEM2_Z + collar.LENGTH + EXPLODE_GAP
+_R = {
+    spec.member(name): collar.OD_BY_CONFIGURATION[name] / 2.0
+    for name in collar.CONFIGURATIONS
+}
+_SPARE_Y = -(_R[KIT_COLLAR] + SPARE_DROP + max(_R[s] for s in SPARES))
+
+
+def _collar_offset(stem: str, mid_z: float, y: float) -> tuple[float, float, float]:
+    """The offset that puts collar ``stem``'s mid-length at ``mid_z``, ``y``."""
+    return (0.0, y, mid_z - (spec.POSITIONS[stem][2] + collar.LENGTH / 2.0))
+
+
+EXPLODE_OFFSETS_MM: dict[str, tuple[float, float, float]] = {
+    spec.ARBOR: (0.0, 0.0, 0.0),
+    KIT_COLLAR: _collar_offset(KIT_COLLAR, _ITEM2_MID_Z, 0.0),
+    spec.NUT: (0.0, 0.0, _EXPLODED_NUT_Z - spec.POSITIONS[spec.NUT][2]),
+    SPARES[0]: _collar_offset(SPARES[0], _ITEM2_MID_Z, _SPARE_Y),
+    SPARES[1]: _collar_offset(SPARES[1], _ITEM2_MID_Z + SPARE_SPREAD, _SPARE_Y),
+}
+# The views: item 1's carries item 5; every other item its own.
+EXPLODED_VIEWS: dict[str, frozenset[str]] = {
+    spec.ARBOR: frozenset({spec.ARBOR, spec.KEY}),
+    **{stem: frozenset({stem}) for stem in EXPLODE_OFFSETS_MM if stem != spec.ARBOR},
+}
+if set().union(*EXPLODED_VIEWS.values()) != set(BOM_COMPONENTS):
+    raise AssertionError("the exploded view shows every kit part once")
+# The arbor's axis through the stack, an owned centreline in item 1's view.
+EXPLODED_AXIS_MM = (
+    (0.0, 0.0, -AXIS_OVERRUN),
+    (0.0, 0.0, _EXPLODED_NUT_Z + nut.THICKNESS + AXIS_OVERRUN),
+)
+# Items 3 and 4 carry BOM balloons here, the one view each shows in; the
+# stack's items are ballooned on sheet 1 and labelled here by leader.
+EXPLODED_BALLOONED = SPARES
+EXPLODED_LABELS: dict[str, str] = {
+    spec.ARBOR: f"ITEM {spec.BOM_ITEMS[spec.ARBOR]}",
+    spec.KEY: (
+        f"ITEM {spec.BOM_ITEMS[spec.KEY]}, BONDED IN ITEM "
+        f"{spec.BOM_ITEMS[spec.ARBOR]}'S KEYSEAT"
+    ),
+    KIT_COLLAR: f"ITEM {spec.BOM_ITEMS[KIT_COLLAR]}",
+    spec.NUT: f"ITEM {spec.BOM_ITEMS[spec.NUT]}",
+}
+# Each leader's tip, seated assembly mm, on a face the view shows.
+LABEL_TIPS_MM: dict[str, tuple[float, float, float]] = {
+    spec.ARBOR: (0.0, arbor.GRIP_DIA / 4.0, arbor.GRIP_LENGTH / 2.0),
+    spec.KEY: (spec.POSITIONS[spec.KEY][0], 0.0, key.END_Z_MM + key.LENGTH / 2.0),
+    KIT_COLLAR: (0.0, 0.6 * _R[KIT_COLLAR], spec.BLANK_FACE_Z + collar.LENGTH / 2.0),
+    spec.NUT: (0.0, nut.ACROSS_FLATS / 4.0, spec.COLLAR_FAR_Z + nut.THICKNESS / 2.0),
+}
+# Each label's upper-left corner from its tip, sheet m: all above the stack,
+# item 5's highest, clear of the others' rows.
+LABEL_OFFSETS: dict[str, tuple[float, float]] = {
+    spec.ARBOR: (-0.008, 0.024),
+    spec.KEY: (-0.065, 0.044),
+    KIT_COLLAR: (-0.008, 0.022),
+    spec.NUT: (-0.008, 0.022),
+}
+EXPLODED_CAPTION = "\n".join(
+    (
+        f"EXPLODED VIEW, {arbor.crank.TEETH}T SETUP",
+        f"ITEM {spec.BOM_ITEMS[SPARES[0]]} OR {spec.BOM_ITEMS[SPARES[1]]} TAKES "
+        f"ITEM {spec.BOM_ITEMS[KIT_COLLAR]}'S PLACE PER THE SETUP TABLE (SHEET 1)",
+    )
+)
+CAPTION_XY = (0.020, 0.090)
+STEPS_XY = (0.219, 0.262)
+
+Box = tuple[float, float, float, float]
+
+
+def nominal_sheet_point(point_mm: tuple[float, float, float]) -> tuple[float, float]:
+    """Where item 1's exploded view (model z left, y up, 1:1) prints an
+    assembly point, sheet m; the build reads the real projection."""
+    s = EXPLODED_SCALE[0] / EXPLODED_SCALE[1] / 1000.0
+    return (EXPLODED_ORIGIN[0] - point_mm[2] * s, EXPLODED_ORIGIN[1] + point_mm[1] * s)
+
+
+def label_box(text: str, upper_left: tuple[float, float]) -> Box:
+    """A note's estimated box (x0, y0, x1, y1) from its upper-left corner."""
+    lines = text.splitlines()
+    x, y = upper_left
+    return (x, y - len(lines) * LINE_PITCH, x + max(map(len, lines)) * CHAR_WIDTH, y)
+
+
+def label_position(stem: str, tip: tuple[float, float]) -> tuple[float, float]:
+    return (tip[0] + LABEL_OFFSETS[stem][0], tip[1] + LABEL_OFFSETS[stem][1])
+
+
+def _view_stem(stem: str) -> str:
+    """The exploded view that shows ``stem``."""
+    (owner,) = (view for view, stems in EXPLODED_VIEWS.items() if stem in stems)
+    return owner
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
@@ -138,8 +279,9 @@ def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -
 
 
 def _bom_items(table: Any, configuration: str) -> dict[str, str]:
-    """Each family's row, read through its native components: the steps cite
-    the spec's item numbers, so the BOM must number the rows in BOM_ORDER."""
+    """Each family's row, read through its native components: the steps and
+    the setup table cite the spec's item numbers, so the BOM must number the
+    rows in BOM_ORDER."""
     rows = bom_row_identities(
         table,
         configuration=configuration,
@@ -153,56 +295,128 @@ def _bom_items(table: Any, configuration: str) -> dict[str, str]:
     return printed
 
 
-def _settings(adapter: Any, side: Any) -> Any:
-    """The two settings as reference dimensions under the arbor."""
-    label = "arbor kit settings"
-    _show_base_view_sketches(adapter, side, (spec.SETTINGS_SKETCH,), label=label)
-    names = list(spec.SETTINGS)
-    points = model_points_in_view(
+def _bom_feature_name(table: Any) -> str:
+    """The inserted BOM's feature name, the key a view links to it by
+    (draw_ch_rocker_arm_tl_oblique_jig_assembly's)."""
+    bom = _early_bound(table, "IBomTableAnnotation")
+    feature = _early_bound(bom.BomFeature, "IBomFeature")
+    name = str(feature.Name or "")
+    if not name:
+        raise RuntimeError("arbor-kit BOM feature has no name")
+    return name
+
+
+def _link_view_to_bom(view: Any, bom_name: str, *, label: str) -> None:
+    """Number a view's balloons from the BOM another view is the parent of
+    (draw_ch_rocker_arm_tl_oblique_jig_assembly's), read back."""
+    view = _early_bound(view, "IView")
+    if not view.SetKeepLinkedToBOM(True, bom_name):
+        raise RuntimeError(f"{label}: SetKeepLinkedToBOM({bom_name!r}) returned false")
+    if (
+        not bool(view.GetKeepLinkedToBOM())
+        or str(view.GetKeepLinkedToBOMName() or "") != bom_name
+    ):
+        raise RuntimeError(f"{label}: view is not linked to BOM {bom_name!r}")
+
+
+def _move_model_point(
+    adapter: Any,
+    view: Any,
+    point_mm: tuple[float, float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Move ``view`` so the model point lands on ``target`` (sheet m)
+    (draw_dt_cone_tip_gear_tl_cutter_assembly's)."""
+    view = _early_bound(view, "IView")
+    point = tuple(value / 1000.0 for value in point_mm)
+    here = model_points_in_view(adapter, view, [point], label=label)[0]
+    position = tuple(float(value) for value in view.Position)
+    moved = [position[i] + target[i] - here[i] for i in range(2)]
+    if not view.SetViewPosition(double_array(moved), False):
+        raise RuntimeError(f"failed to move the {label}")
+    rebuild_drawing(adapter, label=f"place {label}")
+    here = model_points_in_view(adapter, view, [point], label=label)[0]
+    if math.dist(here, target) > 1e-4:
+        raise RuntimeError(f"{label}: origin sits at {here!r}, not {target!r}")
+
+
+def _assert_at(
+    adapter: Any,
+    view: Any,
+    point_mm: tuple[float, float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    point = tuple(value / 1000.0 for value in point_mm)
+    (here,) = model_points_in_view(adapter, view, [point], label=label)
+    if math.dist(here, target) > 1e-4:
+        raise RuntimeError(f"settled {label} sits at {here!r}, not {target!r}")
+
+
+def _centreline(
+    adapter: Any,
+    view: Any,
+    ends_mm: tuple[tuple[float, float, float], ...],
+    *,
+    label: str,
+) -> Any:
+    """One owned centreline in the view's sketch between two assembly points
+    (draw_dt_cone_tip_gear_tl_cutter_assembly's), returned as its segment."""
+    draw = adapter.currentModel
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the arbor-kit view for the {label}")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    ends = []
+    for x, y in model_points_in_view(
         adapter,
-        side,
-        [
-            (0.0, -radius / 1000.0, (start + end) / 2000.0)
-            for radius, start, end in spec.SETTINGS.values()
-        ],
-        label=f"{label} stations",
-        names=names,
-    )
-    keep = {
-        name: (x, y - SETTING_DROP[name])
-        for name, (x, y) in zip(names, points, strict=True)
-    }
-    annotations = curate_view_dimensions(
-        adapter,
-        side,
-        keep=keep,
-        view_label=label,
-        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-    )
-    if len(annotations) != len(names):
-        raise RuntimeError(f"{label}: expected {len(names)} dimensions")
-    assert_imported_precision(
-        adapter, annotations, dict(spec.DRAWING_PRECISION[spec.SETTINGS_SKETCH])
-    )
-    set_dimension_callouts(adapter, annotations, dict(spec.DIMENSION_CALLOUTS))
-    displays = [
-        set_reference_dimension(adapter, annotation, label=f"{label} reference")
-        for annotation in annotations
-    ]
-
-    def settled() -> None:
-        for display in displays:
-            if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != (
-                "(",
-                ")",
-            ):
-                raise RuntimeError(f"{label}: a setting is no longer a reference")
-
-    return settled
+        view,
+        [tuple(value / 1000.0 for value in end) for end in ends_mm],
+        label=f"{label} endpoints",
+    ):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        ends.append(
+            tuple(
+                _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData
+            )
+        )
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*ends[0], *ends[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to create the {label} centreline")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"{label} centreline")
+    return segment
 
 
-def _place_sheet(adapter: Any) -> Any:
-    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
+def _activate_sheet(adapter: Any, name: str) -> None:
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(name):
+        raise RuntimeError(f"failed to activate arbor-kit sheet {name!r}")
+    actual = str(_early_bound(ddoc.GetCurrentSheet(), "ISheet").GetName() or "")
+    if actual != name:
+        raise RuntimeError(f"arbor-kit sheet is {actual!r}, expected {name!r}")
+
+
+def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding], str]:
+    """Sheet 1: the working pose's side view and isometric, the parts list,
+    the balloons and the setup table. Returns its settled check, its
+    balloons and the BOM's feature name."""
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_ORIGIN, scale=SIDE_SCALE)
     set_hidden_lines_removed(adapter, side)
     configuration = apply_view_configuration(adapter, side, label="arbor kit *Right")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -210,8 +424,7 @@ def _place_sheet(adapter: Any) -> Any:
     apply_view_configuration(
         adapter, iso, role=ViewRole.FULL_DETAIL, label="arbor kit *Isometric"
     )
-    assert_full_detail_view(adapter, label="arbor kit")
-
+    # The BOM lists the configuration, every row, whatever a view shows.
     table = insert_bom_table(
         adapter,
         side,
@@ -223,31 +436,135 @@ def _place_sheet(adapter: Any) -> Any:
         label="arbor kit",
     )
     items = _bom_items(table, configuration)
+    working = frozenset(WORKING)
+    side = isolate_drawing_view_components(
+        adapter, side, visible_stems=working, label="arbor kit working side view"
+    )
+    _move_model_point(
+        adapter, side, (0.0, 0.0, 0.0), SIDE_ORIGIN, label="arbor kit side view"
+    )
+    iso = isolate_drawing_view_components(
+        adapter, iso, visible_stems=working, label="arbor kit working isometric"
+    )
+    _move_model_point(
+        adapter, iso, ISO_POINT_MM, ISO_CENTER, label="arbor kit isometric"
+    )
+    assert_full_detail_view(adapter, label="arbor kit")
     landings = add_component_bom_balloons(
         adapter,
         side,
-        items=tuple((stem, items[stem]) for stem in BOM_COMPONENTS),
+        items=tuple((stem, items[stem]) for stem in WORKING),
         anchors=BALLOON_ANCHORS,
-        label="arbor-kit BOM coverage",
+        label="arbor-kit working pose balloons",
         margin=BALLOON_MARGIN,
         explode_offsets={},
     )
-    if len(landings) != len(BOM_COMPONENTS):
+    if len(landings) != len(WORKING):
         raise RuntimeError(
-            f"arbor kit carries {len(landings)} balloons, expected {len(BOM_COMPONENTS)}"
+            f"arbor kit side view carries {len(landings)} balloons, "
+            f"expected {len(WORKING)}"
         )
-    settings_settled = _settings(adapter, side)
     for text, xy, label in (
-        (spec.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
+        (spec.SETUP_TABLE, TABLE_XY, "setup table"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)
 
     def settled() -> None:
-        assert_balloon_landings(adapter, landings)
-        settings_settled()
+        _assert_at(adapter, side, (0.0, 0.0, 0.0), SIDE_ORIGIN, label="side view")
+        _assert_at(adapter, iso, ISO_POINT_MM, ISO_CENTER, label="isometric")
 
-    return settled
+    return settled, landings, _bom_feature_name(table)
+
+
+def _item_view(adapter: Any, owner: str, target: tuple[float, float]) -> Any:
+    """A side view of ``EXPLODED_VIEWS[owner]`` alone, its assembly origin
+    moved onto ``target`` (sheet m)."""
+    label = f"arbor-kit exploded {owner}"
+    view = place_view(adapter, str(SOURCE), "*Right", *target, scale=EXPLODED_SCALE)
+    set_hidden_lines_removed(adapter, view)
+    apply_view_configuration(adapter, view, label=label)
+    view = isolate_drawing_view_components(
+        adapter, view, visible_stems=EXPLODED_VIEWS[owner], label=label
+    )
+    _move_model_point(adapter, view, (0.0, 0.0, 0.0), target, label=label)
+    return view
+
+
+def _place_exploded_sheet(
+    adapter: Any, bom_name: str
+) -> tuple[Callable[[], None], list[BalloonLanding]]:
+    """Sheet 2: item 1 (with item 5) at EXPLODED_ORIGIN, every other item
+    where its explode offset lands in item 1's view; items 3 and 4
+    ballooned, the stack labelled; the axis, the caption and the steps."""
+    label = "arbor-kit exploded view"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    targets = {spec.ARBOR: EXPLODED_ORIGIN}
+    views = {spec.ARBOR: _item_view(adapter, spec.ARBOR, EXPLODED_ORIGIN)}
+    loose = tuple(stem for stem in EXPLODED_VIEWS if stem != spec.ARBOR)
+    targets.update(
+        zip(
+            loose,
+            model_points_in_view(
+                adapter,
+                views[spec.ARBOR],
+                [
+                    tuple(value / 1000.0 for value in EXPLODE_OFFSETS_MM[stem])
+                    for stem in loose
+                ],
+                label=f"{label} offsets",
+            ),
+            strict=True,
+        )
+    )
+    for stem in loose:
+        views[stem] = _item_view(adapter, stem, targets[stem])
+    landings: list[BalloonLanding] = []
+    for stem in EXPLODED_BALLOONED:
+        _activate_sheet(adapter, SHEET_NAMES[1])
+        _link_view_to_bom(views[stem], bom_name, label=f"{label} {stem}")
+        landings += add_component_bom_balloons(
+            adapter,
+            views[stem],
+            items=((stem, spec.BOM_ITEMS[stem]),),
+            anchors=BALLOON_ANCHORS,
+            label=f"{label} {stem} balloon",
+            margin=BALLOON_MARGIN,
+            explode_offsets={},
+        )
+    _centreline(
+        adapter, views[spec.ARBOR], EXPLODED_AXIS_MM, label="exploded arbor axis"
+    )
+    for stem, text in EXPLODED_LABELS.items():
+        owner = _view_stem(stem)
+        (tip,) = model_points_in_view(
+            adapter,
+            views[owner],
+            [tuple(value / 1000.0 for value in LABEL_TIPS_MM[stem])],
+            label=f"{label} {stem} label tip",
+        )
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=label_position(stem, tip),
+            attach_xy=tip,
+            label=f"{label}: {text}",
+            view=views[owner],
+        )
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    for text, xy, note_label in (
+        (EXPLODED_CAPTION, CAPTION_XY, "exploded view caption"),
+        (spec.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
+    ):
+        _add_note(adapter, text, xy, label=note_label)
+
+    def settled() -> None:
+        for stem, view in views.items():
+            _assert_at(
+                adapter, view, (0.0, 0.0, 0.0), targets[stem], label=f"{label} {stem}"
+            )
+
+    return settled, landings
 
 
 @_telemetry.traced("drawing.dt_cone_gear_tl_arbor_assembly")
@@ -268,13 +585,31 @@ async def build(adapter: Any) -> dict[str, str]:
     new_project_drawing(
         adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=CONTRACT.drawing_unit
     )
-    settled = _place_sheet(adapter)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="arbor-kit package")
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    for name in SHEET_NAMES:
+        _activate_sheet(adapter, name)
+        sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+        if not sheet.SetScale(*SHEET_SCALES[name], False, False):
+            raise RuntimeError(f"failed to set arbor-kit sheet scale: {name}")
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    sheet_settled, landings, bom_name = _place_sheet(adapter)
+    exploded_settled, exploded_landings = _place_exploded_sheet(adapter, bom_name)
+
+    def settled() -> None:
+        assert_balloon_landings(adapter, [*landings, *exploded_landings])
+        sheet_settled()
+        exploded_settled()
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,
         pdf_title="Keyed Cutting Arbor Kit Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
         settled_checks=(settled,),
     )
 

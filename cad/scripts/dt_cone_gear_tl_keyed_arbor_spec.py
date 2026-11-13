@@ -180,13 +180,12 @@ SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _PAIR
 # Pilot: the collars' bore slides on it, under the keyseat floor so the keyseat
 # runs out over it, over the thread's major so the thread is reduced. Its
 # .XXX holds the collar's float on it, which sets the Ø.50 collar's reach
-# under T030's root (a .XX pilot leaves no collar clear of it). That third
-# place gives it a function, so its callout names the fit and the collar it
-# locates (rule 4, a standard fit name: machinist review r1-r2 of farm
-# 20261113T042822797Z refused the private word PILOTS).
+# under T030's root (a .XX pilot leaves no collar clear of it). It only
+# carries the loose backing collars, so the title block's .XXX band serves and
+# the callout names the collar it carries, never a fit it does not set
+# (machinist review of farm 20261113T071241685Z: a named fit with no limits).
 PILOT_DIA = 0.275 * INCH
 PILOT_END = 0.42 * INCH
-PILOT_FIT = "LOCATIONAL CLEARANCE FIT"
 # Thread relief, at least one pitch wide and under the thread's root (rule 16).
 THREAD = "1/4-28"
 THREAD_SERIES = "UNF"
@@ -213,10 +212,14 @@ if not GRIP_DIA - _XX <= STOCK_DIA - 0.002 * INCH and STOCK_DIA <= GRIP_DIA + _X
 
 # Shoulder root: the blank bears flat on the shoulder, so its root may not
 # stand proud of the bore's edge break: R.004 MAX, the land-step root of
-# MHA-DT-04 (dt_cone_gear_shaft_spec), printed as a single limit.
+# MHA-DT-04 (dt_cone_gear_shaft_spec), printed as a single limit. No native
+# tolerance: the part authors " MAX" as the value's suffix, since
+# SolidWorks' native swTolMAX prints a lowercase "max." (pd_transgear_thumbnut
+# _spec's countersink). It serves the seat's mates, so it carries the seat's
+# note flag (rule 4: one flag note linked to every dimension of the feature).
 SHOULDER_R = 0.004 * INCH
-SHOULDER_R_BAND = (0.0, -SHOULDER_R)
-SHOULDER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.004 MAX"
+SHOULDER_R_TOL_TYPE = 0  # swTolType_e.swTolNONE
+SHOULDER_R_SUFFIX = " MAX"
 
 # --- Centre holes ------------------------------------------------------------------
 CENTRE_INCLUDED_ANGLE_DEG = 60.0
@@ -307,7 +310,7 @@ if KEY_FAR_END_MAX >= FACE_MIN_MM:
 KEY_ENGAGEMENT_MIN = KEY_LENGTH - _XX
 
 # --- The clock the key carries -------------------------------------------------------
-# The key is bonded in its keyseat (MHA-DT-03-TL-05 step 1), so the keyseat's
+# The key is bonded in its keyseat (MHA-DT-03-TL-05's fitting steps), so the keyseat's
 # own side play never reaches the blank; the blank turns on the key only by
 # half its keyway's side clearance, at the bore's radius (the least radius a
 # keyway flank meets the key at). That must stay inside the gear sheets'
@@ -697,8 +700,9 @@ CALLOUTS_BELOW: dict[str, str] = {
     "SeatDia": SEAT_NOTE_FLAG,
     "KeyseatWidth": SEAT_NOTE_FLAG,
     "KeyseatS": SEAT_NOTE_FLAG,
+    "ShoulderR": SEAT_NOTE_FLAG,
     "GripDia": "STOCK OK",
-    "PilotDia": f"{PILOT_FIT} IN {_COLLAR_SHORT}",
+    "PilotDia": f"FOR {_COLLAR_SHORT}",
     "HeadCentreDia": "CENTRE HOLE",
     "TailCentreDia": (
         f"CENTRE HOLE\nHOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"
