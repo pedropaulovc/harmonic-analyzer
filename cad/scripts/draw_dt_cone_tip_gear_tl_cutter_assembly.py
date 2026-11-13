@@ -53,13 +53,13 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
-from _drawing_types import DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_view_configuration import (
     ViewRole,
     apply_view_configuration,
     assert_full_detail_view,
 )
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
@@ -159,13 +159,12 @@ if set(SETTINGS_TEXT_XY) != fixture.DRAWING_DIMENSIONS[fixture.SETTINGS_SKETCH]:
 
 # --- Sheet 2: the exploded front view (rule 22) --------------------------------
 # One front view per item at the front view's scale, each isolated to its item
-# (draw_dt_cylinder_gear_tl_cam_turning_assembly's ``_kit_view``): item 1 with
-# its hidden edges shown, so its cross hole and tap read; item 2 drawn out
-# along the cross-hole axis until its tail clears item 1's surface by
-# EXPLODE_GAP; item 3 drawn down the bar's axis until its cup clears the
-# cutting end by EXPLODE_GAP. Item 1's sketch carries both axes, through the
-# loose items, as the paths they go in by.  Assembly mm.
-EXPLODED_ORIGIN = (0.110, 0.080)  # item 1's cutting-end centre, sheet m
+# (draw_dt_cylinder_gear_tl_cam_turning_assembly's ``_kit_view``), hidden
+# lines removed (rule 9): item 2 drawn out along the cross-hole axis until its
+# tail clears item 1's surface by EXPLODE_GAP; item 3 drawn down the bar's
+# axis until its cup clears item 1's bottom end by EXPLODE_GAP. Item 1's
+# sketch carries both axes, through the loose items, as the paths they go in
+# by.  Assembly mm.
 EXPLODE_GAP = 4.0
 AXIS_OVERRUN = 2.0
 EXPLODE_OFFSETS_MM: dict[str, tuple[float, float, float]] = {
@@ -195,7 +194,7 @@ EXPLODED_LABELS: dict[str, str] = {
 EXPLODED_CAPTION = "EXPLODED FRONT VIEW - FITTING STEPS ON SHEET 1"
 # Each leader's tip, seated assembly mm, on a face the view shows: item 1's
 # round above the cross hole; item 2's face between the form and the flat's
-# shoulder; item 3's thread beside its axis, mid-length.
+# shoulder; item 3's thread left of its axis, mid-length.
 _FORM_BACK = 0.8 * fixture.bit.FLAT_LENGTH
 LABEL_TIPS_MM: dict[str, tuple[float, float, float]] = {
     BAR: (-fixture.bar.BAR_RADIUS / 2.0, 2.0 * fixture.bar.BAR_LENGTH / 3.0, 0.0),
@@ -205,32 +204,37 @@ LABEL_TIPS_MM: dict[str, tuple[float, float, float]] = {
         0.0,
     ),
     SET_SCREW: (
-        fixture.set_screw.MAJOR_DIA / 4.0,
+        -fixture.set_screw.MAJOR_DIA / 4.0,
         fixture.SET_SCREW_POSITION[1] - fixture.set_screw.LENGTH / 2.0,
         0.0,
     ),
 }
-# Each label's upper-left corner from its tip, sheet m: item 1's left of the
-# bar, item 2's above its face, item 3's right of the screw.
+# Each label's upper-left corner from its tip, sheet m, every label wholly to
+# one side of its tip so its leader leaves the text's end, clear of the
+# letters: items 1 and 3 left of the bar's axis, item 2 up and right of its
+# face.
 LABEL_OFFSETS: dict[str, tuple[float, float]] = {
     BAR: (-0.040, 0.012),
-    BIT: (-0.020, 0.030),
-    SET_SCREW: (0.020, 0.0023),
+    BIT: (0.010, 0.020),
+    SET_SCREW: (-0.065, 0.0023),
 }
 CAPTION_XY = (0.030, 0.255)
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
+_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+SHEET_INNER_BORDER = (
+    0.0127,
+    0.0127,
+    _TEMPLATE.width_m - 0.0127,
+    _TEMPLATE.height_m - 0.0127,
+)
 
 Box = tuple[float, float, float, float]
 
 
-def nominal_sheet_point(point_mm: tuple[float, float, float]) -> tuple[float, float]:
-    """Where the front view (model X right, Y up) prints an assembly point
-    of the exploded group, sheet m; the build reads the real projection."""
-    return (
-        EXPLODED_ORIGIN[0] + point_mm[0] * _S,
-        EXPLODED_ORIGIN[1] + point_mm[1] * _S,
-    )
+def _relative(point_mm: tuple[float, float, float]) -> tuple[float, float]:
+    """An assembly point on the front view, sheet m from item 1's origin."""
+    return point_mm[0] * _S, point_mm[1] * _S
 
 
 def label_box(text: str, upper_left: tuple[float, float]) -> Box:
@@ -242,6 +246,48 @@ def label_box(text: str, upper_left: tuple[float, float]) -> Box:
 
 def label_position(stem: str, tip: tuple[float, float]) -> tuple[float, float]:
     return (tip[0] + LABEL_OFFSETS[stem][0], tip[1] + LABEL_OFFSETS[stem][1])
+
+
+def _exploded_tip_mm(stem: str) -> tuple[float, float, float]:
+    offset = EXPLODE_OFFSETS_MM[stem]
+    return tuple(p + o for p, o in zip(LABEL_TIPS_MM[stem], offset, strict=True))
+
+
+def _group_extent() -> Box:
+    """The exploded group (both axes, which span every item, and every
+    label), sheet m from item 1's origin."""
+    points = [_relative(end) for ends in EXPLODED_AXES_MM.values() for end in ends]
+    for stem, text in EXPLODED_LABELS.items():
+        x0, y0, x1, y1 = label_box(
+            text, label_position(stem, _relative(_exploded_tip_mm(stem)))
+        )
+        points += [(x0, y0), (x1, y1)]
+    xs, ys = zip(*points)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+# Item 1's bottom-end centre (sheet m), placed so the group's extent centres
+# on the sheet inside its border (rule 15).
+_EXTENT = _group_extent()
+EXPLODED_ORIGIN = (
+    round(
+        (SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0
+        - (_EXTENT[0] + _EXTENT[2]) / 2.0,
+        3,
+    ),
+    round(
+        (SHEET_INNER_BORDER[1] + SHEET_INNER_BORDER[3]) / 2.0
+        - (_EXTENT[1] + _EXTENT[3]) / 2.0,
+        3,
+    ),
+)
+
+
+def nominal_sheet_point(point_mm: tuple[float, float, float]) -> tuple[float, float]:
+    """Where the front view (model X right, Y up) prints an assembly point
+    of the exploded group, sheet m; the build reads the real projection."""
+    x, y = _relative(point_mm)
+    return EXPLODED_ORIGIN[0] + x, EXPLODED_ORIGIN[1] + y
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
@@ -478,17 +524,12 @@ def _activate_sheet(adapter: Any, name: str) -> None:
         raise RuntimeError(f"fly-cutter sheet is {actual!r}, expected {name!r}")
 
 
-def _item_view(
-    adapter: Any, stem: str, target: tuple[float, float], *, hidden_lines: bool
-) -> Any:
-    """A front view of ``stem`` alone, its assembly origin moved onto
-    ``target`` (sheet m)."""
+def _item_view(adapter: Any, stem: str, target: tuple[float, float]) -> Any:
+    """A front view of ``stem`` alone, hidden lines removed, its assembly
+    origin moved onto ``target`` (sheet m)."""
     label = f"fly-cutter exploded {stem}"
     view = place_view(adapter, str(SOURCE), "*Front", *target, scale=VIEW_SCALE)
-    if hidden_lines:
-        set_hidden_lines_visible(adapter, view)
-    else:
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, view)
     apply_view_configuration(adapter, view, label=label)
     view = isolate_drawing_view_components(
         adapter, view, visible_stems=frozenset({stem}), label=label
@@ -504,7 +545,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     label = "fly-cutter exploded view"
     _activate_sheet(adapter, SHEET_NAMES[1])
     targets = {BAR: EXPLODED_ORIGIN}
-    views = {BAR: _item_view(adapter, BAR, EXPLODED_ORIGIN, hidden_lines=True)}
+    views = {BAR: _item_view(adapter, BAR, EXPLODED_ORIGIN)}
     loose = (BIT, SET_SCREW)
     targets.update(
         zip(
@@ -522,7 +563,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         )
     )
     for stem in loose:
-        views[stem] = _item_view(adapter, stem, targets[stem], hidden_lines=False)
+        views[stem] = _item_view(adapter, stem, targets[stem])
     for name, ends in EXPLODED_AXES_MM.items():
         _centreline(adapter, views[BAR], ends, label=f"exploded {name}")
     for stem, text in EXPLODED_LABELS.items():
