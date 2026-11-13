@@ -196,9 +196,9 @@ DIMENSION_CALLOUTS = {
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
     # and nears the counterbore's wall (clamp_slot_head_clearance). The
-    # counterbored slot names its mate once, on the width (rule 4, one feature
-    # names its mate once; round 4 machinist review read "MAX SEATS ... HEADS"
-    # as rationale): the standard form, a clearance for the screw. Short
+    # through slot names the screw it clears in the standard form, a
+    # clearance for the screw (round 4 machinist review read "MAX SEATS ...
+    # HEADS" as rationale); the counterbore names the head it serves. Short
     # lines: detail C is 2:1 in a corner. The slot width's broken leader runs
     # down its text's left end to the underline, so the widest row's first
     # glyph rode that line (machinist review round 4). A no-break space each
@@ -209,11 +209,11 @@ DIMENSION_CALLOUTS = {
     # .118 detail C dimensions (rule 12; round 4 machinist review). The .118
     # keeps .XXX for the head: at .XX the slid head's overrun leaves .002 to
     # the counterbore's wall (clamp_slot_head_clearance), so the callout
-    # states that function once (v49 machinist review: .118 had no stated
-    # function). The screw is named once, on the slot width (rule 4). Two
-    # lines of at most 16 characters keep the block, which grows left from
-    # its shoulder at the leader, clear of section B-B.
-    "ClampSlotCboreWidth": "ON .118 CENTRES\nCLEARS THE HEAD",
+    # states that function once, naming the head's screw by number (v49
+    # machinist review: .118 had no stated function; then "THE HEAD" named no
+    # mate). The block grows left from its shoulder at the leader; its widest
+    # row (~49 mm) clears section B-B (draw_pd_support_bar.SLOT_SECTION_CENTER).
+    "ClampSlotCboreWidth": "ON .118 CENTRES FOR\nMHA-SH-VN-53 HEAD",
 }
 # Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
 DIMENSION_CALLOUTS_ABOVE = {

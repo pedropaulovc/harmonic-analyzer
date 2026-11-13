@@ -1233,7 +1233,7 @@ def test_left_b_arrows_flip_and_read_back_before_recentering(slot_marker_native,
     assert state["events"][4] == ("turn", "section B-B")
     event, target, relative = state["events"][5]
     assert event == "position"
-    assert target == pytest.approx((0.041 - 0.014, 0.074 - 0.011))
+    assert target == pytest.approx((0.041 + drawing.SLOT_SECTION_CENTER[0] - 0.067, 0.063))
     assert relative is False
     assert state["events"][6] == ("rebuild", "section B-B profile centre")
 
@@ -1247,7 +1247,7 @@ def test_right_b_arrows_need_no_direction_write(slot_marker_native, reversed_cut
     assert all(event[0] not in ("read direction", "write direction") for event in state["events"])
     event, target, relative = state["events"][1]
     assert event == "position"
-    assert target == pytest.approx((0.041 - 0.014, 0.074 - 0.011))
+    assert target == pytest.approx((0.041 + drawing.SLOT_SECTION_CENTER[0] - 0.067, 0.063))
     assert relative is False
 
 
@@ -1280,7 +1280,9 @@ def test_b_marker_refuses_witness_hits_or_section_geometry_drift(monkeypatch, ca
     arrows = [0.08025, 0.132, 0.0, 0.09225, 0.132, 0.0,
               0.08025, 0.1085, 0.0, 0.09225, 0.1085, 0.0]
     texts = [0.094, 0.137004, 0.0, 0.094, 0.113504, 0.0]
-    outline = [0.042662, 0.028412, 0.063338, 0.067588]
+    # The section's padded outline about its sheet centre (r9 native at x 53).
+    shift = drawing.SLOT_SECTION_CENTER[0] - 0.053
+    outline = [0.042662 + shift, 0.028412, 0.063338 + shift, 0.067588]
     if case == "letter":
         texts[3] = 0.0608632  # original lower B, struck by x=62.75 witness
     elif case == "arrow":
@@ -1609,16 +1611,16 @@ def test_locations_and_overall_sizes_carry_no_words() -> None:
         _config.parts("pd-vn-transgear-pivot-screw")["number"]
         in drawing.DIMENSION_CALLOUTS["Depth"]
     )
-    # The counterbored slot names its mate once, on its width, in the
-    # standard clearance form; the counterbore says whose centres it shares
-    # and the one function their .XXX serves (v49 machinist review: the .118
-    # had none); the round holes name theirs once.
+    # The through slot names its screw in the standard clearance form; the
+    # counterbore says whose centres it shares and the head their .XXX
+    # serves, by the screw's number (v49 machinist review: the .118 had no
+    # function, then "THE HEAD" no mate); the round holes name theirs once.
     callouts = [*drawing.DIMENSION_CALLOUTS.values(), sheet_spec.CLAMP_CBORE_CALLOUT]
     assert "ClampSlotCboreDepth" not in words
     cbore = drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
-    assert "MHA-SH-VN-53" not in cbore
     assert sheet_spec.SHEET_PRECISION["ClampSlotProfile"]["ClampSlotTravel"] == 3
-    assert cbore.splitlines() == ["ON .118 CENTRES", "CLEARS THE HEAD"]
+    screw = _config.parts("sh-vn-clamp-screw")["number"]
+    assert cbore.splitlines() == ["ON .118 CENTRES FOR", f"{screw} HEAD"]
     assert sum("CLEARANCE FOR MHA-SH-VN-53" in " ".join(text.split()) for text in callouts) == 2
     for text in callouts:
         assert not re.search(r"\b(LOCATE TO|SEATS|HEADS|SLIDING|TO SUIT)\b", text), text

@@ -363,9 +363,13 @@ DETAIL_KEEP = {
 # The caption's top centre stands SLOT_CAPTION_DROP under the
 # section's centre: its block (r7: 14.6 tall, its top 0.05 under the anchor)
 # then has 3 mm of air under the cut and 3.4 over the inner border's edge
-# (y 12.9), which the r7 caption touched (0.4) at centre y 45.
+# (y 12.9), which the r7 caption touched (0.4) at centre y 45. The section
+# stands 12 mm further left than r9's x 53 (its ~44 mm caption then clears
+# the inner border by ~6 mm). That widens the room for detail C's counterbore
+# callout, which grows left from its shoulder at x 107: naming its mate takes
+# a 49 mm row, and the old 63.3 outline edge left 41.7 (v49 machinist review).
 SLOT_SECTION_X = min(CLAMP_SLOT_X)
-SLOT_SECTION_CENTER = (0.053, 0.048)
+SLOT_SECTION_CENTER = (0.041, 0.048)
 SLOT_SECTION_SCALE = (1, 1)
 SLOT_CAPTION_DROP = 0.017
 SLOT_SECTION_CAPTION_XY = (
