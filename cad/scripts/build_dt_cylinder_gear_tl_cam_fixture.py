@@ -277,8 +277,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven cam fixture")
 
-    # The hole stations carry their +/-.0005 from the register axis and the
-    # press reams their +.0005/0; each callout names its pin (spec).
+    # The hole stations carry the shop row's +/-.002 from the register axis
+    # and the press reams their +.0005/0; each callout names its pin (spec).
     for (feature_name, dimension_name), deviations in MODEL_BANDS_MM.items():
         set_dimension_bilateral_tolerance(
             adapter,

@@ -3,9 +3,10 @@ r"""Manufacturing drawing of the cylinder gears' cam turning fixture body (MHA-D
 Shop tooling (``dt_cylinder_gear_tl_cam_fixture_spec``, issue #2361): a
 steel disc whose turned OD is the register, a through press ream for the
 stub at the cam throw and a blind press ream for the clock pin. One sheet:
-the face view carries the register, both reams and their stations from the
-register axis (centre-marked); the edge view the thickness; a small shaded
-isometric. The one numbered note names the gear it serves and its kit.
+the face view carries both reams and their stations from the register axis
+(centre-marked), every value outside the disc; the edge view the register's
+diameter beside the thickness (rule 11); a small shaded isometric. No
+numbered note: each REAM callout names its pin and what its stations set.
 
 Run only through the supervised farm launcher:
 ``drawing:dt_cylinder_gear_tl_cam_fixture``.
@@ -26,12 +27,14 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    move_model_dimension,
+    set_dimension_callouts,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -41,7 +44,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -58,7 +60,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A Ø3.25 disc: 2:1 keeps the pin's .0330 offset from the vertical
+# A Ø3.25 disc: 2:1 keeps the pin's .0332 offset from the vertical
 # centreline readable (1.7 mm on the sheet).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
@@ -68,30 +70,35 @@ FACE_CENTER = (0.125, 0.150)
 EDGE_CENTER = (0.300, FACE_CENTER[1])
 ISO_CENTER = (0.385, 0.205)
 ISO_NOTE_XY = (0.350, 0.160)
-FUNCTION_NOTE_XY = (0.335, 0.105)
 
 # Dimension text positions (sheet metres, the text's centre). The register
-# stands 82.5 mm (sheet) from the centre; the stub sits 17 mm below it and
-# the pin 47 mm above. The stations run in one vertical chain right of the
-# centre; the ream sizes stand outside the register, each on a leader.
+# stands 82.5 mm (sheet) from the centre, so the disc spans x .042-.208; the
+# stub sits 17 mm below the centre and the pin 48 mm above. Every text stands
+# outside the disc (rule 14; run 20261113T012650242Z's review read all three
+# stations inside it): the two vertical stations in one chain from the
+# centre, right of the disc and left of the edge view (x .275); the pin's
+# .0332 over the disc's top; each ream size on a leader outside the disc.
 _FX, _FY = FACE_CENTER
+_S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
+_DISC_RIGHT = _FX + part.BODY_DIA / 2.0 * _S
+_DISC_TOP = _FY + part.BODY_DIA / 2.0 * _S
 FACE_KEEP = {
+    # The register's diameter is imported here and moved to the edge view.
     "BodyDia": (_FX - 0.075, _FY + 0.100),
-    # 12 mm below the centre: the PinY arrow at the centre stays 2 mm clear
-    # of this text's top row.
-    "StubOffset": (_FX + 0.035, _FY - 0.012),
-    "PinY": (_FX + 0.035, _FY + 0.024),
-    "PinX": (_FX - 0.030, _FY + 0.068),
-    # Right of the register's lower rim, left of the edge view.
-    "StubHoleDia": (_FX + 0.107, _FY - 0.050),
+    "StubOffset": (_DISC_RIGHT + 0.024, _FY - 0.009),
+    "PinY": (_DISC_RIGHT + 0.024, _FY + 0.025),
+    "PinX": (_FX - 0.020, _DISC_TOP + 0.012),
+    # Below the stations' chain, clear of the disc's lower right and left of
+    # the edge view.
+    "StubHoleDia": (_DISC_RIGHT + 0.028, _FY - 0.055),
     # Above the register's upper right, inside the top border.
     "PinHoleDia": (_FX + 0.065, _FY + 0.100),
 }
-# The register's diameter takes one arrow on its near rim, clear of the
-# station chain through the centre (rule 14).
-NEAR_SIDE_DIAMETERS = ("BodyDia",)
 # Above the edge view's top, clear of its witness lines.
 EDGE_KEEP = {"BodyThick": (EDGE_CENTER[0], _FY + 0.100)}
+# The register's diameter beside the thickness (rule 11): right of the edge
+# view, its text under the isometric's scale note.
+BODY_DIA_ON_EDGE = (EDGE_CENTER[0] + part.THICKNESS / 2.0 * _S + 0.018, _FY - 0.045)
 
 # swCenterMarkStyle_e.swCenterMark_Single; swCenterMarkHandle_e Up/Left/Down/Right.
 CENTER_MARK_SINGLE = 2
@@ -209,13 +216,13 @@ async def build(adapter: Any) -> dict[str, str]:
     edge = place_view(adapter, str(SOURCE), "*Right", *EDGE_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    annotations: list[Any] = []
+    curated: dict[str, list[Any]] = {}
     for view, keep, label in (
         (face, FACE_KEEP, "face view"),
         (edge, EDGE_KEEP, "edge view"),
     ):
         set_hidden_lines_removed(adapter, view)
-        annotations += curate_view_dimensions(
+        curated[label] = curate_view_dimensions(
             adapter,
             view,
             keep=keep,
@@ -223,19 +230,25 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=part.DRAWING_DIMENSIONS,
         )
     set_hidden_lines_removed(adapter, iso)
+    donors = [
+        a for a in curated["face view"] if dimension_name(adapter, a) == "BodyDia"
+    ]
+    if len(donors) != 1:
+        raise RuntimeError(f"expected one BodyDia donor dimension, found {len(donors)}")
+    moved_body_dia = move_model_dimension(
+        adapter, donors[0], edge, BODY_DIA_ON_EDGE, source_view=face
+    )
+    annotations = [
+        *(a for a in curated["face view"] if dimension_name(adapter, a) != "BodyDia"),
+        *curated["edge view"],
+        moved_body_dia,
+    ]
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_BELOW)
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
-    for name in NEAR_SIDE_DIAMETERS:
-        matches = [a for a in annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
-        set_near_side_diameter(matches[0], f"cam fixture {name}")
-    rebuild_drawing(adapter, label="cam fixture near-side diameters")
     _centre_mark_face(adapter, face)
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    add_note(adapter, part.FUNCTION_NOTE, *FUNCTION_NOTE_XY)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
