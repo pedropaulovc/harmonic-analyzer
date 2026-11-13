@@ -42,7 +42,6 @@ from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -78,11 +77,15 @@ FUNCTION_NOTE_XY = (0.335, 0.105)
 _FX, _FY = FACE_CENTER
 FACE_KEEP = {
     "BodyDia": (_FX - 0.075, _FY + 0.100),
-    "StubOffset": (_FX + 0.035, _FY - 0.009),
+    # 12 mm below the centre: the PinY arrow at the centre stays 2 mm clear
+    # of this text's top row.
+    "StubOffset": (_FX + 0.035, _FY - 0.012),
     "PinY": (_FX + 0.035, _FY + 0.024),
     "PinX": (_FX - 0.030, _FY + 0.068),
-    "StubHoleDia": (_FX + 0.110, _FY - 0.045),
-    "PinHoleDia": (_FX - 0.110, _FY + 0.070),
+    # Right of the register's lower rim, left of the edge view.
+    "StubHoleDia": (_FX + 0.107, _FY - 0.050),
+    # Above the register's upper right, inside the top border.
+    "PinHoleDia": (_FX + 0.065, _FY + 0.100),
 }
 # The register's diameter takes one arrow on its near rim, clear of the
 # station chain through the centre (rule 14).
@@ -93,14 +96,24 @@ EDGE_KEEP = {"BodyThick": (EDGE_CENTER[0], _FY + 0.100)}
 # swCenterMarkStyle_e.swCenterMark_Single; swCenterMarkHandle_e Up/Left/Down/Right.
 CENTER_MARK_SINGLE = 2
 _CENTER_MARK_HANDLES = (0, 1, 2, 3)
-# Each arm runs past the register (model metres beyond its rim).
-CENTRE_LINE_OVERRUN_MM = 3.0
+# Each register arm runs past the rim (model metres beyond the rim); the
+# right arm then ends left of the title block.
+CENTRE_LINE_OVERRUN_MM = 0.5
+# Each ream's arms run this far past its rim.
+HOLE_ARM_OVERRUN_MM = 1.0
 
 
-@_telemetry.traced("drawing.cam_fixture_register_centre_mark")
-def _centre_mark_register(adapter: Any, view: Any) -> None:
-    """Centre-mark the register with lines past its rim: the axis every
-    station is measured from (draw_dt_cone_gear_tl_index_plate's bore mark)."""
+def _centre_mark(
+    adapter: Any,
+    view: Any,
+    rim_mm: tuple[float, float, float],
+    arm_mm: float,
+    what: str,
+) -> None:
+    """Centre-mark the circle through ``rim_mm`` (part mm, on its -X side)
+    once, its arms run ``arm_mm`` out (draw_dt_cone_gear_tl_index_plate's
+    bore mark). One explicit mark per circle: the view's auto-insert marked
+    every hole and the register twice (front and back rims)."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     name = view_name(adapter, view)
@@ -110,27 +123,54 @@ def _centre_mark_register(adapter: Any, view: Any) -> None:
     pick = model_point_in_view(
         adapter,
         view,
-        (-part.BODY_DIA / 2000.0, 0.0, part.THICKNESS / 1000.0),
-        label="register rim -X point",
+        tuple(value / 1000.0 for value in rim_mm),
+        label=f"{what} rim -X point",
     )
     extension = _early_bound(draw.Extension, "IModelDocExtension")
     if not extension.SelectByID2(
         "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError("failed to select the register rim")
+        raise RuntimeError(f"failed to select the {what} rim")
     mark = ddoc.InsertCenterMark3(CENTER_MARK_SINGLE, False, False)
     draw.ClearSelection2(True)
     if mark is None:
-        raise RuntimeError("failed to centre-mark the register")
+        raise RuntimeError(f"failed to centre-mark the {what}")
     mark = _early_bound(mark, "ICenterMark")
     mark.UseDocDisplaySettings = False
     mark.ShowLines = True
-    arm = CENTRE_LINE_OVERRUN_MM / 1000.0
     for handle in _CENTER_MARK_HANDLES:
-        if not mark.SetExtendedLength(0, handle, arm):
-            raise RuntimeError(f"register centre mark arm {handle} did not extend")
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"{what} centre mark arm {handle} did not extend")
     if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
-        raise RuntimeError("register centre mark lost its extended lines")
+        raise RuntimeError(f"{what} centre mark lost its extended lines")
+
+
+@_telemetry.traced("drawing.cam_fixture_centre_marks")
+def _centre_mark_face(adapter: Any, view: Any) -> None:
+    """The register's mark, its lines past the rim: the axis every station
+    is measured from; then each ream's own mark."""
+    face = part.THICKNESS
+    _centre_mark(
+        adapter,
+        view,
+        (-part.BODY_DIA / 2.0, 0.0, face),
+        CENTRE_LINE_OVERRUN_MM,
+        "register",
+    )
+    _centre_mark(
+        adapter,
+        view,
+        (-part.STUB_HOLE_DIA / 2.0, -part.STUB_OFFSET, face),
+        HOLE_ARM_OVERRUN_MM,
+        "stub ream",
+    )
+    _centre_mark(
+        adapter,
+        view,
+        (part.PIN_X - part.PIN_HOLE_DIA / 2.0, part.PIN_Y, face),
+        HOLE_ARM_OVERRUN_MM,
+        "clock pin ream",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -191,9 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
         set_near_side_diameter(matches[0], f"cam fixture {name}")
     rebuild_drawing(adapter, label="cam fixture near-side diameters")
-    _centre_mark_register(adapter, face)
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
-        raise RuntimeError("failed to centre-mark the cam fixture's reams")
+    _centre_mark_face(adapter, face)
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
