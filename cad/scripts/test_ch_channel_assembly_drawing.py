@@ -298,9 +298,11 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     assert steps.NORTH_BRACKET_SET_REF in on_washer
     assert spring not in on_washer
     zeroed = _step_body("south-bracket-zeroed")
-    assert "TEST INDICATOR" in zeroed and "ZERO THE DRO" in zeroed
+    assert "TEST INDICATOR" in zeroed and "DRO" not in zeroed
+    assert "ZERO THE DRO" in _step_body("south-bracket-dro-zeroed")
     assert "OFF" in _step_body("south-bracket-slid-off")
-    assert "CLAMP IT LIGHTLY" in _step_body("south-bracket-refitted")
+    assert "CLAMP" not in _step_body("south-bracket-refitted")
+    assert "CLAMP IT LIGHTLY" in _step_body("south-bracket-clamped-lightly")
     setting = _step_body("south-bracket-spring-set")
     assert f"SPRING SET OF {drawing.SOUTH_END.title}, SHEET 4" in setting
     assert f"STEP {steps.step_number('south-bracket-zeroed')} ZERO" in setting
@@ -335,10 +337,12 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
         "south-washer-fitted",
         "south-bracket-on-washer",
         "south-bracket-zeroed",
+        "south-bracket-dro-zeroed",
         "south-bracket-slid-off",
         "bank-spring-checked",
         "bank-spring-fitted",
         "south-bracket-refitted",
+        "south-bracket-clamped-lightly",
         "south-bracket-spring-set",
         "south-bracket-clamped",
         "spring-back-checked",

@@ -1265,12 +1265,12 @@ def _fitup_text() -> dict[str, str]:
             f"THE EAR PUSHING {washer} AND THE BANK LEFT."
         ),
         "south-bracket-zeroed": (
-            "WITH A TEST INDICATOR IN THE SPINDLE, READ ZERO ON THE RIGHT "
-            f"{bracket} FOOT END AND ZERO THE DRO ALONG {shaft} THERE."
+            f"ZERO A SPINDLE TEST INDICATOR ON THE RIGHT {bracket} FOOT END."
         ),
+        "south-bracket-dro-zeroed": f"ZERO THE DRO ALONG {shaft} THERE.",
         "south-bracket-slid-off": (
-            f"MOVE THE INDICATOR CLEAR AND SLIDE THE RIGHT {bracket} OFF {shaft}, "
-            "LEAVING THE BASE UNMOVED ON THE TABLE."
+            f"WITH THE INDICATOR CLEAR, SLIDE THE RIGHT {bracket} OFF {shaft}, "
+            "BASE UNMOVED ON THE TABLE."
         ),
         # Machinist review (#2108): the BOM carries one spring, so its run
         # along the shaft is a check, with its own remedy.
@@ -1286,9 +1286,9 @@ def _fitup_text() -> dict[str, str]:
         # tapped to the indicator (Codjiflo r1 on #2489: the spring alone
         # leaves nothing holding it at the target).
         "south-bracket-refitted": (
-            f"STAND THE RIGHT {bracket} BACK ON {support} WITH {shaft} IN ITS EAR "
-            "AND CLAMP IT LIGHTLY."
+            f"STAND THE RIGHT {bracket} BACK ON {support}, {shaft} IN ITS EAR."
         ),
+        "south-bracket-clamped-lightly": "CLAMP IT LIGHTLY.",
         # The spring-back check runs while the bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
         # (machinist review, PR #1605).
@@ -1298,11 +1298,10 @@ def _fitup_text() -> dict[str, str]:
             "INDICATOR READS ZERO ON IT."
         ),
         "south-bracket-clamped": (
-            f"TIGHTEN THE CLAMP ON THE RIGHT {bracket}, KEEPING THE INDICATOR AT ZERO."
+            f"TIGHTEN THE RIGHT {bracket} CLAMP, INDICATOR STILL AT ZERO."
         ),
         "spring-back-checked": (
-            "CHECK THE BANK, PUSHED RIGHT AND RELEASED, SPRINGS BACK AGAINST "
-            f"THE LEFT {washer}."
+            f"CHECK THE PUSHED-RIGHT BANK SPRINGS BACK TO THE LEFT {washer}."
         ),
         "south-bracket-reset": (
             "IF IT DOES NOT, EASE THE CLAMP AND RETURN TO STEP "
