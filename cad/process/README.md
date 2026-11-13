@@ -232,6 +232,22 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
   has no second vise setup.
 
+The pivot block (`ch_rocker_arm_tl_oblique_pivot_block`, TL-22) and feed block
+(`ch_rocker_arm_tl_oblique_feed_block`, TL-32) plans are written fresh against
+their v49 manifests (no hand traveler): each saws its own blank from the
+OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`),
+faces SEAT and TOP, mills the 1.64 length from the 3 in width on edge (#2083),
+faces the sawn ends on end, then cuts every top hole in one hold: the 4X .180
+holes and .31 counterbores to the .570 floor, and the pivot seat (F tap drill,
+5/16 end-mill floor, boring head to .3755–.3765, as the sheet's BORE calls for;
+then the 5/16-18 tap through). TL-32 adds the lug notch, with LUG END out past
+the jaw side and a spacer at the other jaw end, and the Ø.351 leadscrew bore
+with the block standing on SPINDLE END, after an arrival check of both KP08 axis
+heights (#2184); its four #4-40 nut taps stay with the TL-00 transfer. Their
+adapters (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips
+0.11.0. The boring head and the 5/16-18 tap are recorded to buy
+(`shop-equipment.toml` `tools.boring-head`, `tools.tap-5-16-18`).
+
 ```text
 uv run --frozen python -m doit prechips:<stem>
 uv run --frozen python cad/scripts/prechips_traveler.py <stem>

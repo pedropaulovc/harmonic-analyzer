@@ -244,3 +244,27 @@ tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800
 feed = "8 in/min"
+
+# Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
+# and TL-32, v49). The blocks also use saw-evolution-14, basebar-em-face and
+# its setting, jig-em-half and its setting, jig-spot and basebar-counterbore
+# (the 5/16 in end mill: counterbores and the pivot seat's flat floor).
+# The drills are the 115-piece index sizes the sheets print (#15 .180, F .257
+# tap drill); the 5/16 drill pilots the Ø.351 leadscrew bore. The boring head
+# is the archived LMS 3662 identity (45952b66bc inventory, a #1413 trial
+# assumption, not owned): cad/config/shop-equipment.toml tools.boring-head
+# records it to buy, with the 5/16-18 tap.
+[tools.block-drill-15]
+description = "#15 (.180 in) drill, 115-piece index"
+diameter_mm = 4.572
+[tools.block-drill-f]
+description = "F (.257 in) drill, 115-piece index"
+diameter_mm = 6.5278
+[tools.block-drill-5-16]
+description = "5/16 in drill, 115-piece index"
+diameter_mm = 7.9375
+[tools.block-tap-5-16-18]
+description = "5/16-18 UNC plug tap; T-handle wrench"
+tap_drill_mm = 6.5278
+[tools.block-boring-head]
+description = "R8 2 in boring head; carbide-tipped bar for bores from 5/16 in, square end-cutting tip"

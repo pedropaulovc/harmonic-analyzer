@@ -535,6 +535,25 @@ present = false
 status = "not owned: to buy"
 use = "MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge"
 
+# Carriage blocks MHA-CH-06-TL-22 and TL-32 (their plans under cad/process/):
+# the pivot seat's Ø.3755-.3765 flat-floored BORE and the TL-32 Ø.351
+# leadscrew BORE. The deleted inventory (45952b66bc) named LMS 3662 from a
+# photo of a carbide-tipped bar set, but only as a #1413 trial ownership
+# assumption, so nothing records the shop owning a boring head.
+[tools.boring-head]
+name = "R8 boring head, 2 in, with carbide-tipped bars for bores from 5/16 in"
+kind = "boring_head"
+present = false
+status = "not owned: to buy (or to record, if the shop has the LMS 3662 seen in the archived photo)"
+use = "TL-22/TL-32 pivot seat (Ø.3755-.3765, .359 deep, flat floor) and TL-32 Ø.351 leadscrew bore"
+
+[tools.tap-5-16-18]
+name = "5/16-18 UNC plug tap"
+kind = "tap"
+present = false
+status = "not owned: to buy"
+use = "TL-22/TL-32 5/16-18 tapped through hole under the pivot seat (F .257 drill)"
+
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
@@ -610,6 +629,16 @@ section_mm = [44.45, 6.35]
 length_mm = 609.6
 on_hand = false
 cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). Allocation: ch-rocker-arm-tl-oblique-feed-block (MHA-CH-06-TL-32) and ch-rocker-arm-tl-oblique-pivot-block (MHA-CH-06-TL-22), each from its own blank sawn off the bar end with its 3.47 or 1.58 in Y length along the bar and its 1.64 in length milled from the 3 in width (cad/process/ch_rocker_arm_tl_oblique_{feed,pivot}_block/plan.toml). Restored here: the record was lost when the shop inventory split (02fdd651e0)."
+# Catalogue nominals 1 x 3 in x 12 in = [76.2, 25.4] x 304.8 mm. Not metrology.
+section_mm = [76.2, 25.4]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
 
 # Not ordered: stock still to buy.
 

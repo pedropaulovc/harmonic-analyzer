@@ -255,8 +255,8 @@ disjoint fields; no field is duplicated. See
 `_process_plans.TRAVELER_STEMS` lists the parts with an opt-in
 `prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
 `ch_rocker_arm_tl_oblique_end_bracket`,
-`ch_rocker_arm_tl_oblique_feed_lever` and
-`ch_rocker_arm_tl_oblique_riser`.
+`ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
+`ch_rocker_arm_tl_oblique_pivot_block` and `ch_rocker_arm_tl_oblique_feed_block`.
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a

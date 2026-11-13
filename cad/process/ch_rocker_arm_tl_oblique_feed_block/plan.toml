@@ -1,0 +1,388 @@
+# Source: the v49 MHA-CH-06-TL-32 sheets through the feature manifest (sizes,
+# lug, stations, rows, limits, the flat-floored BORE and its 5/16-18 tap, the
+# Ø.351 leadscrew BORE and its row and height). No hand traveler exists for
+# this block. Route, tools, speeds, workholding and datums are authored here,
+# as for TL-22 (its plan.toml): one blank from the OnlineMetals 1187 1 x 3 in
+# bar with the 3.47 overall along the bar, both faces faced, the 1.64 length
+# milled from the 3 in width on edge (owner ruling #2083: mill to size, no
+# bandsaw rip), the sawn ends faced on end, then the lug notch with LUG END out
+# past the jaw side, the top holes in one hold, and the leadscrew bore with the
+# block standing on SPINDLE END. The four #4-40 nut taps are transferred
+# through the MHA-CH-06-TL-VN-84 feed nut at TL-00 assembly (the sheet's
+# note): no operation here.
+# Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
+# rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
+# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; Ø.376 1676 → 1650,
+# also used for the Ø.351 bore, under its 1796).
+title = "Oblique trammel feed block"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "6061-T6511 aluminium"
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 12 in bar (OnlineMetals 1187, shared with TL-22); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
+note = "Inches. Every face machined. The {{cad.nut_tap_count:d}}X {{cad.nut_thread}} nut taps are transferred at TL-00 assembly, not here."
+shop = "../shop.toml"
+material_key = "6061-t6511"
+
+[cad]
+file = "../../out/features/ch_rocker_arm_tl_oblique_feed_block/features.toml"
+adapter = "harmonic_feed_block"
+
+[parameters]
+blank_length_in = 3.6            # Y 3.47 + two .02 clean-ups + saw allowance.
+blank_min_length_in = 3.55
+blank_width_in = 3.0             # 1187 bar width; mills to the 1.64 length.
+blank_thickness_in = 1.0         # 1187 bar thickness; faces to .96.
+quantity = 1
+kerf_in = 0.125                  # As the jig sheets: about 1/8 in per cut.
+cleanup_in = 0.02                # First face of each pair: just clean.
+layer_in = 0.10                  # Facing layers down to size.
+# Lug notch: LUG END 2.0 in past the right jaw side leaves the step ~.1 clear
+# of it; a block as high as the part fills the left jaw end.
+notch_overhang_mm = 50.8
+spacer_length_in = 1.5
+# HA ch_rocker_arm_tl_vn_oblique_leadscrew_spec.KP08_AXIS_HEIGHT, unverified on
+# the uxcell blocks; the Ø.351 bore clears the KP08 stack by about 0.005 mm
+# (HA #2184), so both blocks are measured before the bore is cut.
+kp08_axis_height_mm = 15.0
+leadscrew_margin_mm = 0.005
+# Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
+# run from spindle nose to tip (holder gauge + projection). Archive values are
+# archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+face_parallel_height_mm = 25.4   # 1 in parallels (shop-equipment parallels-lms-6745).
+edge_parallel_height_mm = 12.7   # 1/2 in parallels, same set.
+face_cutter_dia_mm = 19.05       # 3/4 in end mill.
+half_cutter_dia_mm = 12.7        # 1/2 in end mill.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+# Archive LMS 6784 projections from the R8 collet: 1/4 in 25, 7/16 in 41,
+# 11/16 in 50, 3/4 in 57; the 1/2 and 5/16 in cutters have no member record,
+# so their neighbours bound them.
+face_mill_projection_mm = 57.0
+half_mill_projection_min_mm = 41.0
+half_mill_projection_max_mm = 50.0
+small_mill_projection_min_mm = 25.0
+notch_tip_z_mm = -1.016          # Notch cutter .04 below SEAT (free air).
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# Archive drill-index-115 13/32 in member, 112.8 out of drill-chuck-r8: a
+# recorded jobber above every drill here, so it bounds the longest drill.
+drill_projection_max_mm = 112.8
+# A plug tap runs its 3-5 chamfered threads (5 × 1.411 mm pitch) and a little
+# more past SEAT before full thread reaches it; the parallels leave the gap.
+tap_tip_z_mm = -8.0
+drill_tip_z_mm = -2.54           # 5/16 drill tip ~.1 past the lug's underside.
+# Archive boring-head-lms-3662 (#1413 trial estimate): head body 60 mm below
+# the spindle nose; the 1.5 in reach bar passes the .77 lug.
+boring_head_len_mm = 60.0
+boring_bar_reach_long_mm = 38.1
+
+[[tools]]
+id = "saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "em-face"
+name = "3/4 in end mill"
+ref = "basebar-em-face"
+[[tools]]
+id = "em-half"
+name = "1/2 in end mill"
+ref = "jig-em-half"
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
+[[tools]]
+id = "drill-15"
+name = "#15 drill"
+ref = "block-drill-15"
+[[tools]]
+id = "em-5-16"
+name = "5/16 in end mill"
+ref = "basebar-counterbore"
+[[tools]]
+id = "drill-f"
+name = "F drill"
+ref = "block-drill-f"
+[[tools]]
+id = "drill-5-16"
+name = "5/16 drill"
+ref = "block-drill-5-16"
+[[tools]]
+id = "boring"
+name = "Boring head"
+ref = "block-boring-head"
+[[tools]]
+id = "tap"
+name = "5/16-18 plug tap"
+ref = "block-tap-5-16-18"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw blank"
+machine = "Saw / bench"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+diagram = { file = "diagrams/feed-block/saw.svg", alt = "The feed-block blank from the 1187 bar end" }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+sizing = "other"
+instruction = "From the 1187 bar end: one {{process.blank_length_in:.2f}} blank, waste side of the line; ≥{{process.blank_min_length_in:.2f}}."
+instruction_detailed = "Square the 1187 bar end first if it is rough. Mark {{process.blank_length_in:.2f}} from the end and saw on the waste side of the line (~{{process.kerf_in:fraction}} kerf); the blank must be at least {{process.blank_min_length_in:.2f}} long. The rest of the bar goes to TL-22."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Face SEAT and TOP"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flat on 1 in parallels, as-bought 3 in edges in the jaws, centred."
+diagram = { file = "diagrams/feed-block/faces.svg", alt = "Blank flat in the vise: clean one face (SEAT), flip, face TOP to height" }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_blank_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "Face the up side just clean (≤{{process.cleanup_in:.2dot}}). Mark it SEAT."
+settings = "basebar-face-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "SEAT down; face TOP to height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
+instruction_detailed = "Turn the blank over, SEAT down on the parallels, and tap it down until both parallels are pinned. Touch TOP, then face it in two or three passes until the blank measures {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}} over SEAT; aim for the middle."
+settings = "basebar-face-6061-t6511"
+inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.height_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Mill SPINDLE END and OUTER END"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "On edge on 1/2 in parallels, SEAT and TOP in the jaws, centred."
+diagram = { file = "diagrams/feed-block/width.svg", alt = "Blank on edge: clean one 3 in edge (SPINDLE END), flip, mill the other down to the 1.64 length" }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_width_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_blank_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "Face the up edge just clean (≤{{process.cleanup_in:.2dot}}). Mark it SPINDLE END."
+settings = "basebar-face-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "SPINDLE END down; mill OUTER END down in ≤{{process.layer_in:.2dot}} layers to length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
+instruction_detailed = "Turn the blank over, SPINDLE END down on the 1/2 in parallels, and tap it down. About 1.3 in comes off: face OUTER END in layers no deeper than {{process.layer_in:.2dot}}, two overlapping passes per layer across the .96 edge. Measure from SPINDLE END before the last layer; finish at {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
+settings = "basebar-face-6061-t6511"
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Face ROW SIDE and LUG END"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "On end on 1/2 in parallels, SEAT and TOP in the jaws, SPINDLE END squared to the table, centred."
+diagram = { file = "diagrams/feed-block/ends.svg", alt = "Blank on end: clean one sawn end (ROW SIDE), flip, face LUG END to the overall length" }
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.y_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.blank_length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_x_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "Square SPINDLE END to the table; face the up end just clean (≤{{process.cleanup_in:.2dot}}). Mark it ROW SIDE."
+instruction_detailed = "Stand the blank on a sawn end, SEAT and TOP in the jaws: it stands about 3.6 tall, so take light passes. Before tightening, stand the combination square on the table against SPINDLE END and push it plumb. Face the up end just clean (≤{{process.cleanup_in:.2dot}}) and mark it ROW SIDE: the hole rows measure from it."
+settings = "basebar-face-6061-t6511"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-face"
+sizing = "other"
+instruction = "ROW SIDE down, SPINDLE END square; face LUG END to overall {{cad.overall_y_min_in:.3dot}}–{{cad.overall_y_max_in:.3dot}}."
+settings = "basebar-face-6061-t6511"
+inspection = "Overall {{cad.overall_y_min_in:.3dot}}–{{cad.overall_y_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.overall_y_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Mill the lug notch"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flat on 1 in parallels, SPINDLE END at fixed jaw; LUG END ~2.0 past the right jaw side; {{cad.height_nominal_in:.2dot}} spacer (e.g. TL-22) at the left jaw end."
+datum = "X0 LUG END (touched); Y0 SPINDLE END = fixed jaw face; Z0 TOP."
+diagram = { file = "diagrams/feed-block/notch.svg", alt = "LUG END past the right jaw side, spacer at the left: the notch beside the fixed jaw milled out" }
+# The cutter works only past the jaw side: along the lug plus a cutter
+# diameter either side, across the notch plus one diameter.
+envelope = { x_span_mm = ["{{cad.lug_length_mm}}", "{{process.half_cutter_dia_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{cad.lug_x_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{process.notch_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.length_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.height_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["rest", "{{process.notch_overhang_mm}}"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Notch {{cad.lug_length_in:.2f}} from LUG END × {{cad.lug_x_in:.2dot}} from SPINDLE END, through (tip .04 below SEAT); ≤.10 steps."
+instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SPINDLE END, zero Y on it. The notch is everything within {{cad.lug_x_in:.2dot}} of SPINDLE END for {{cad.lug_length_in:.2f}} back from LUG END, through the full height. Cutter tip .04 below SEAT (it is in free air past the jaws); its flutes must reach that deep (1.00). Step in toward the lug face no more than .10 per pass, feeding along X, and finish the step face square with the cutter's side; the inside corner keeps the cutter's own sharp corner."
+settings = "jig-em-half-6061-t6511"
+inspection = "Lug {{cad.lug_x_min_in:.3dot}}–{{cad.lug_x_max_in:.3dot}} from SPINDLE END; step {{cad.lug_length_min_in:.3f}}–{{cad.lug_length_max_in:.3f}} from LUG END."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lug_x_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.lug_length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Holes from TOP"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flat, SEAT down on 1 in parallels, SPINDLE END at the fixed jaw, ROW SIDE left, centred."
+datum = "X0 ROW SIDE (touched); Y0 SPINDLE END = fixed jaw face; Z0 TOP; +Y toward you."
+diagram = { file = "diagrams/feed-block/holes.svg", alt = "Block SEAT down, SPINDLE END at the fixed jaw: pivot seat B and H1-H4 with their counterbores; section through H1 and B" }
+# Every hole sits inside the block. Longest: a jobber drill in the chuck;
+# shortest: the 5/16 in end mill in its collet. The tap tip runs deepest.
+envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.length_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{process.tap_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.length_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.height_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+sizing = "other"
+instruction = "Spot B and H1–H4 from the table. X, Y ±{{cad.hole_x_tol_in:.3dot}}."
+instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions (±{{cad.hole_x_tol_in:.3dot}}), cone a little under each drill."
+rpm = 3000
+feed = "hand"
+
+[setups.operations.table]
+columns = ["Hole", "X from ROW SIDE", "Y from SPINDLE END"]
+rows = "{{cad.hole_rows}}"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-15"
+sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
+instruction = "H1–H4 through, peck .1."
+rpm = 3000
+feed = "hand"
+inspection = "Rows {{cad.hole_y1_nominal_in:.3dot}}/{{cad.hole_y2_nominal_in:.3dot}}, stations {{cad.hole_x1_nominal_in:.3dot}}/{{cad.hole_x2_nominal_in:.3dot}}, ±{{cad.hole_x_tol_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_x1_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_x2_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_y1_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_y2_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-5-16"
+sizing = { kind = "band", band_mm = "{{cad.cbore_dia_band_mm}}" }
+instruction = "Counterbore H1–H4: floor {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT (≈{{cad.cbore_depth_in:.3dot}} deep)."
+instruction_detailed = "Measure the block's height H. Plunge the 5/16 end mill on each of H1–H4 to Z = −(H − {{cad.cbore_floor_nominal_in:.3dot}}), about {{cad.cbore_depth_in:.3dot}} deep, so each floor stands {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT."
+rpm = 2000
+feed = "hand"
+inspection = "Floors {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cbore_floor_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-f"
+sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
+instruction = "B through (tap drill), peck .1."
+rpm = 2450
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-5-16"
+sizing = "other"
+instruction = "B: plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}; flat floor for the bar."
+instruction_detailed = "Still on B, plunge the 5/16 end mill to Z −{{cad.bore_depth_nominal_in:.3dot}}. Its flat end leaves the floor the boring bar enters and squares."
+rpm = 2000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "boring"
+sizing = "other"
+instruction = "Bore B to Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor; last passes ≤.002."
+instruction_detailed = "Fit the 5/16 in (3/4 reach) bar, set Z stop at −{{cad.bore_depth_nominal_in:.3dot}}. Open the 5/16 bore a few thousandths at a time, feeding to the stop each pass so the bar's tip squares the floor ring; last passes ≤.002 on the dial. Stop at Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the .376 pin enters full depth, the .377 does not."
+rpm = 1650
+feed = "hand"
+inspection = "Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.bore_depth_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap"
+sizing = "other"
+instruction = "Tap B {{cad.pivot_thread}} through."
+instruction_detailed = "Start the 5/16-18 plug tap in B square from the drill chuck, spindle off, about 3 turns; finish through with the T-handle, backing off each half turn to break the chip."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Leadscrew bore through the lug"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "On SPINDLE END on 1/2 in parallels, SEAT at the fixed jaw, LUG END left, centred."
+datum = "X0 LUG END (touched); Y0 SEAT = fixed jaw face; Z0 OUTER END."
+diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on SPINDLE END, SEAT at the fixed jaw: the leadscrew bore down through the lug from OUTER END" }
+# The bore and the LUG END touch lie within the overall length; across, the
+# .96 height. The 5/16 drill tip runs deepest, just past the lug's underside;
+# longest: that jobber drill in the chuck; shortest: the boring head and bar.
+envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.height_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.lug_x_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.boring_head_len_mm}}", "{{process.boring_bar_reach_long_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+instruction = "Hold: both KP08 axis heights (base to bore centre) recorded; either off {{process.kp08_axis_height_mm:.2f}} mm, stop and report (~{{process.leadscrew_margin_mm:g}} mm leadscrew clearance)."
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+sizing = "other"
+instruction = "Spot X {{cad.screw_y_nominal_in:.3dot}}, Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_mm:.2f}} mm)."
+instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SEAT, zero Y on it. Spot at X {{cad.screw_y_nominal_in:.3dot}} ({{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}}), Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_band_text}} from SEAT). Lock both table axes for the rest of the setup."
+rpm = 3000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-5-16"
+sizing = "other"
+instruction = "Drill through the lug, peck .1."
+rpm = 2000
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "boring"
+sizing = "other"
+instruction = "Bore through to Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
+instruction_detailed = "Fit the 1.5 in reach bar. The drill only roughs the hole: open it a few thousandths per pass right through the lug so the bar puts it where the table is locked, to Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
+rpm = 1650
+feed = "hand"
+inspection = "Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}; {{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}} from LUG END; {{cad.screw_z_band_text}} from SEAT."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.screw_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.screw_y_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.screw_z_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr / inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/feed-block/inspect.svg", alt = "Finished block: lug, hole positions from ROW SIDE and SPINDLE END; section through H1 and B" }
+envelope = "other"
+vise_hold = "other"
+
+[[setups.operations]]
+instruction = "Edges and hole ends R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Run a 5/16-18 screw through B."
+inspection = "{{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} × {{cad.overall_y_min_in:.3dot}}–{{cad.overall_y_max_in:.3dot}} × {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}; screw runs through by hand."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.overall_y_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.height_band_mm}}" }]
