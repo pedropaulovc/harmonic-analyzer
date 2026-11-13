@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 
 import pytest
@@ -70,29 +71,37 @@ def test_the_kit_places_each_bought_part_on_its_hole() -> None:
     assert 0.0 < fixture.SCREW_ENGAGEMENT < fixture.DOWEL_THREAD_DEPTH_MIN
 
 
-def test_bought_items_balloon_mid_line_where_their_rims_draw_edge_on() -> None:
+def test_bought_items_balloon_on_a_real_rim_just_short_of_its_lines_end() -> None:
     # The right view draws each bought item's rims as lines across its axis;
-    # a leader asked near a line's end lands on the end. Each anchor is the
-    # front point of a real rim: on the item's axis on the sheet (z = 0),
-    # a full radius from both ends, toward the viewer (+X).
+    # a leader asked near a line's end lands on the end. Each anchor is a
+    # point of a real rim of its builder (radius, end face), on the viewer's
+    # half (+X), RIM_END_GAP_MM short of the line's end: landing on the end
+    # costs at most a quarter of the leader landing limit.
+    from _drawing_balloons import _BALLOON_LANDING_TOLERANCE_M
+
     bought = set(sheet.BOM_COMPONENTS) - {sheet.BODY}
     assert set(sheet.BALLOON_RIMS_MM) == bought
     assert sheet.BALLOON_ANCHORS[sheet.BODY].point_mm is None
-    ends = {
-        sheet.STUB: (0.0, fixture.DOWEL_LENGTH),
-        sheet.CLOCK_PIN: (0.0, fixture.PIN_LENGTH),
-        sheet.WASHER: (0.0, fixture.WASHER_MODEL_THICKNESS),
-        sheet.SCREW_STEM: (0.0, fixture.SCREW.head_h),
+    rims = {
+        sheet.STUB: (fixture.DOWEL_DIA / 2.0, (0.0, fixture.DOWEL_LENGTH)),
+        sheet.CLOCK_PIN: (fixture.PIN_DIA / 2.0, (0.0, fixture.PIN_LENGTH)),
+        sheet.WASHER: (fixture.WASHER_OD / 2.0, (0.0, fixture.WASHER_MODEL_THICKNESS)),
+        sheet.SCREW_STEM: (fixture.SCREW.head_dia / 2.0, (fixture.SCREW.head_h,)),
     }
+    scale = sheet.DETAIL_SCALE[0] / sheet.DETAIL_SCALE[1]
+    end_miss_m = sheet.RIM_END_GAP_MM * scale / 1000.0
+    assert 0.0 < end_miss_m <= _BALLOON_LANDING_TOLERANCE_M / 4.0
     for stem in bought:
-        radius, height = sheet.BALLOON_RIMS_MM[stem]
-        assert height in ends[stem], stem
-        assert sheet.BALLOON_ANCHORS[stem].point_mm == (radius, height, 0.0)
-        assert radius > 0.0
-    assert sheet.BALLOON_RIMS_MM[sheet.STUB][0] == fixture.DOWEL_DIA / 2.0
-    assert sheet.BALLOON_RIMS_MM[sheet.CLOCK_PIN][0] == fixture.PIN_DIA / 2.0
-    assert sheet.BALLOON_RIMS_MM[sheet.WASHER][0] == fixture.WASHER_OD / 2.0
-    assert sheet.BALLOON_RIMS_MM[sheet.SCREW_STEM][0] == fixture.SCREW.head_dia / 2.0
+        radius, heights = rims[stem]
+        x, y, z = sheet.BALLOON_ANCHORS[stem].point_mm
+        assert sheet.BALLOON_RIMS_MM[stem][:2] == (radius, y), stem
+        assert y in heights, stem
+        assert math.hypot(x, z) == pytest.approx(radius, abs=1e-9), stem
+        assert x > 0.0, stem
+        assert radius - abs(z) == pytest.approx(sheet.RIM_END_GAP_MM), stem
+    # Clear of the screw's hex socket mouth in the head top.
+    screw_z = sheet.BALLOON_ANCHORS[sheet.SCREW_STEM].point_mm[2]
+    assert abs(screw_z) > fixture.SCREW.socket_corner_r
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
