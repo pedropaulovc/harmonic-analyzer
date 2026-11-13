@@ -57,6 +57,7 @@ def _leader(
     return points
 
 
+@_telemetry.traced("drawing.view_arrow", label_param="label")
 def square_view_arrow(
     adapter: Any,
     note: Any,

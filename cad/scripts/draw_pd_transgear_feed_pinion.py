@@ -417,14 +417,14 @@ NOSE_KEEP: dict[str, tuple[float, float]] = {
     "FlatToAxis": (NOSE_CENTER[0] + HALF_OD + NOSE_TEXT_AIR, NOSE_CENTER[1] - 0.0287)
 }
 # The caption hangs REAR_CAPTION_GAP_M under the view's measured outline (the
-# tips plus ~6.5 mm, 187.0 mm bottom in leaf 20261113T084309Z), as the rear
+# tips plus 6.25 mm, 187.0 mm bottom in leaf 20261113T084309Z), as the rear
 # view's does.  There it stands beside B-B's outline, whose right edge (the
 # nose plus its margin, x ~277 mm) ends left of the caption.  Hung 2.5 mm
 # under the tips it stood inside the outline and passed the layout gate only
 # as a "small tag" under 15 mm wide: the same caption read 14.8 mm wide on a
 # 1010x598 px window and 15.5 mm on a 1010x678 px one, which failed (#2708,
 # leaf 20261113T084309Z, swmaker000004).
-NOSE_OUTLINE_MARGIN = 0.0065
+NOSE_OUTLINE_MARGIN = 0.00625
 NOSE_CAPTION_TOP = (
     NOSE_CENTER[0],
     NOSE_CENTER[1] - HALF_OD - NOSE_OUTLINE_MARGIN - REAR_CAPTION_GAP_M,

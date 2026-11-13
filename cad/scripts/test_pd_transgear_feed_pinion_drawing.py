@@ -1223,7 +1223,7 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
 def test_nose_caption_hangs_below_its_views_outline() -> None:
     """#2708, leaf 20261113T084309Z on a 1010x678 px window: hung 2.5 mm
     under the tips, VIEW E's caption stood inside its view's outline (the
-    tips plus ~6.5 mm) and passed the layout gate only as a tag under 15 mm
+    tips plus 6.25 mm) and passed the layout gate only as a tag under 15 mm
     wide, 14.8 mm read on a 598 px window, 15.5 mm on 678 px.  Hung under the
     outline it needs no exemption: the settle and the gate read the same box,
     so it clears by the gap less the settle slack on any window."""
