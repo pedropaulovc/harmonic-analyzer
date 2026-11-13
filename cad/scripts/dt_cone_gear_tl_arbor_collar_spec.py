@@ -127,23 +127,18 @@ for _value, _places in (
         raise AssertionError(f"{_value} mm is off its printed grid")
 
 # Sheet words: the bore is a plain drilled hole (the title block's DRILLED
-# HOLES row), through. One Number, three members (the base bar's form, no
-# new part numbers): each member's sheet names its member as the kit's parts
-# list calls it up (its Description of the one Number) with its quantity,
-# then the gears it backs, each by its own drawing number (rule 4).
-BORE_CALLOUT = "THRU"
+# HOLES row), through, its process on its callout (rule 12). One Number,
+# three members (the base bar's form, no new part numbers): each member's
+# sheet carries only its caption, the member as the kit's parts list calls it
+# up (its Description of the one Number) with its quantity. Which blanks each
+# member backs is the kit's step 2 (MHA-DT-03-TL-05), not a part-sheet note
+# (rule 7: machinist review r1-r3 of farm 20261113T042822797Z).
+BORE_CALLOUT = "DRILL THRU"
 STOCK_CALLOUT = "STOCK OK"
 SHEET_NAMES: tuple[str, ...] = tuple(f"COLLAR {name}" for name in CONFIGURATIONS)
 QUANTITY_BY_CONFIGURATION: dict[str, int] = {
     name: int(quantity) for name, quantity in _ROW["configuration_quantities"].items()
 }
-_GEAR_NUMBERS = {blank.tag: blank.number for blank in arbor.KEYED_GEARS}
-# The arbor shares this part's MHA-DT-03 parent: its short form (rule 4).
-ARBOR_SHORT = arbor.PART_NUMBER.removeprefix(
-    PART_NUMBER[: PART_NUMBER.index("-TL-") + 1]
-)
-if ARBOR_SHORT == arbor.PART_NUMBER or not ARBOR_SHORT.startswith("TL-"):
-    raise AssertionError("the arbor no longer shares the collar's parent number")
 
 
 def member_label(configuration: str) -> str:
@@ -152,17 +147,6 @@ def member_label(configuration: str) -> str:
         f"{CONFIGURATION_DESCRIPTIONS[configuration]} OF {PART_NUMBER}, "
         f"QTY {QUANTITY_BY_CONFIGURATION[configuration]}"
     )
-
-
-def member_note(configuration: str) -> str:
-    """The member's label over its one note: which blanks it backs."""
-    tags = GEARS_BY_CONFIGURATION[configuration]
-    cones = [_GEAR_NUMBERS[t] for t in tags if t.startswith("T")]
-    crank = [_GEAR_NUMBERS[t] for t in tags if not t.startswith("T")]
-    backed = f"{cones[0]} TO {cones[-1]}" if len(cones) > 1 else cones[0]
-    if crank:
-        backed += f" AND {crank[0]}"
-    return f"{member_label(configuration)}\n1. BACKS {backed} ON {ARBOR_SHORT}."
 
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

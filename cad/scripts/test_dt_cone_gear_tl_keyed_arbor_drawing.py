@@ -79,7 +79,13 @@ def test_the_note_names_every_mate_by_its_drawing_number() -> None:
     assert f"{numbers[0]} TO {numbers[-2]} AND {numbers[-1]}" in note
     assert numbers[0] == "MHA-DT-03-T030" and numbers[-2] == "MHA-DT-03-T120"
     assert f"KEY {spec.KEY_NUMBER}" in note
-    assert spec.CALLOUTS_BELOW["PilotDia"] == "PILOTS COLLAR TL-04"
+    # The pilot's .XXX has a function: a standard fit name and its collar.
+    pilot = spec.CALLOUTS_BELOW["PilotDia"]
+    assert pilot.startswith(spec.PILOT_FIT) and pilot.endswith(" TL-04")
+    assert spec.PILOT_FIT in {
+        "RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT", "PRESS FIT"
+    }
+    assert spec.COLLAR_BORE - (spec.PILOT_DIA + XXX) > 0.0  # a clearance fit
     assert spec.THREAD_CALLOUT == "1/4-28 UNF"
 
 
@@ -371,6 +377,10 @@ def test_the_end_view_puts_the_keyseat_toward_the_side_view(monkeypatch) -> None
     side_left = drawing.SIDE_CENTER[0] - spec.OVERALL_LENGTH / 2000.0 * scale
     width_x = keep["KeyseatWidth"][0]
     assert end_right < width_x < side_left
+    # The width's text ends short of the thread's and tail centre's shared
+    # dimension line, TEXT_GAP off the arbor's tail face (rule 14).
+    thread_line = side_left - drawing.TEXT_GAP
+    assert width_x + drawing.END_WIDTH_TEXT < thread_line - 0.002
     assert keep["KeyseatS"][1] < drawing.END_CENTER[1] - grip
 
 

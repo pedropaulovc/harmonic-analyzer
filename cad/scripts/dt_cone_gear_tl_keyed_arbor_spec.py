@@ -180,10 +180,13 @@ SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _PAIR
 # Pilot: the collars' bore slides on it, under the keyseat floor so the keyseat
 # runs out over it, over the thread's major so the thread is reduced. Its
 # .XXX holds the collar's float on it, which sets the Ø.50 collar's reach
-# under T030's root (a .XX pilot leaves no collar clear of it): rule 3's
-# clearance form, naming the collar it pilots.
+# under T030's root (a .XX pilot leaves no collar clear of it). That third
+# place gives it a function, so its callout names the fit and the collar it
+# locates (rule 4, a standard fit name: machinist review r1-r2 of farm
+# 20261113T042822797Z refused the private word PILOTS).
 PILOT_DIA = 0.275 * INCH
 PILOT_END = 0.42 * INCH
+PILOT_FIT = "LOCATIONAL CLEARANCE FIT"
 # Thread relief, at least one pitch wide and under the thread's root (rule 16).
 THREAD = "1/4-28"
 THREAD_SERIES = "UNF"
@@ -695,7 +698,7 @@ CALLOUTS_BELOW: dict[str, str] = {
     "KeyseatWidth": SEAT_NOTE_FLAG,
     "KeyseatS": SEAT_NOTE_FLAG,
     "GripDia": "STOCK OK",
-    "PilotDia": f"PILOTS COLLAR {_COLLAR_SHORT}",
+    "PilotDia": f"{PILOT_FIT} IN {_COLLAR_SHORT}",
     "HeadCentreDia": "CENTRE HOLE",
     "TailCentreDia": (
         f"CENTRE HOLE\nHOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"

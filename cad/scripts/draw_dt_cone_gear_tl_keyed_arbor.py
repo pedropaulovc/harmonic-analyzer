@@ -112,10 +112,16 @@ LENGTH_TIER = 0.009
 # arbor and the first tier, where no extension line runs.
 SHOULDER_R_RUN = 0.0176
 SHOULDER_R_DROP = 0.006
-# End view: S under the view, the width toward the side view.
+# End view: S under the view, the width toward the side view. The width's
+# stacked text (.0625 +.0020/.0000 over SEE NOTE 1) runs END_WIDTH_TEXT right
+# of its position (farm 20261113T042822797Z's sheet); at END_WIDTH_RUN 0.027
+# it reached over the thread's and the tail centre's shared dimension line
+# (machinist review r1-r3, rule 14), so it stands between the end view and
+# that line.
 END_S_DROP = 0.014
-END_WIDTH_RUN = 0.027
+END_WIDTH_RUN = 0.015
 END_WIDTH_RISE = 0.012
+END_WIDTH_TEXT = 0.027
 
 
 def _sheet_points(
