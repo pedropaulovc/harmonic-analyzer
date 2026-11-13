@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
@@ -182,8 +183,8 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(f"{view_name}: {configuration_name} unexpectedly contains exploded views")
 
     components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
+        component
+        for _, component in _component_order.by_name(assembly.GetComponents(True))
     )
     groups: dict[str, list[Any]] = {stem: [] for stem in spec.QUANTITIES}
     for component in components:

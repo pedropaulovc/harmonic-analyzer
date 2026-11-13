@@ -110,6 +110,7 @@ from _native_spring_contact import assert_assembly_spring_contacts
 from _native_bank_retention import measure as measure_bank_retention
 # component iteration helpers (read-only)
 from _com import _early_bound, _read_member
+from _component_order import by_name
 
 # solidworks_mcp internals reused read-only: the live gear-mate ratios are not
 # exposed by any public tool (list_mates returns name/type/suppressed only), so
@@ -382,21 +383,20 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             asm_h = _early_bound(
                 asm, "IAssemblyDoc"
             )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-            components = (
-                adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            components = by_name(
+                adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
             )
             over = []
-            for comp in components:
-                # Wrap once as IComponent2 so GetConstrainedStatus invokes its
-                # known DISPID; Name2 remains a property read.
-                comp = _early_bound(comp, "IComponent2")
+            # Bound as IComponent2 by by_name so GetConstrainedStatus invokes
+            # its known DISPID.
+            for comp_name, comp in components:
                 status = int(
                     adapter._attempt(
                         lambda c=comp: c.GetConstrainedStatus(), default=-1
                     )
                 )
                 if status == OVER_CONSTRAINED:
-                    over.append(str(_read_member(comp, "Name2")))
+                    over.append(comp_name)
             ssp.set_attribute("components", len(components))
             ssp.set_attribute("over_constrained", len(over))
         gsp.set_attribute("components", len(components))
@@ -736,12 +736,10 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     )  # IAssemblyDoc for GetComponents; keep `top` for the `model is top` identity compare
     targets: list[tuple[str, Any]] = [("top", top)]
     seen: set[str] = set()
-    components = (
-        adapter._attempt(lambda: top_asm.GetComponents(False), default=None) or []
+    components = by_name(
+        adapter._attempt(lambda: top_asm.GetComponents(False), default=None)
     )
-    for component in components:
-        component = _early_bound(component, "IComponent2")
-        instance = str(_read_member(component, "Name2") or "?")
+    for instance, component in components:
         if "/" in instance:
             continue
         model = adapter._attempt(lambda c=component: c.GetModelDoc2(), default=None)
@@ -925,9 +923,8 @@ def _assert_shared_component_references(adapter: Any, name: str) -> None:
         for number in range(1, count + 1)
     }
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    for raw in assembly.GetComponents(False) or ():
-        component = _early_bound(raw, "IComponent2")
-        native_name = str(component.Name2 or "").replace("\\", "/")
+    for native_name, component in by_name(assembly.GetComponents(False)):
+        native_name = native_name.replace("\\", "/")
         scope, _separator, _leaf = native_name.rpartition("/")
         counts = scopes.get(scope)
         if counts is None:

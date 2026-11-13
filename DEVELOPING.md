@@ -2370,16 +2370,38 @@ build: on 2026-11-11, 5 of 10 identical-source part rebuilds diverged on
 `DRAWING_PRECISION` from sets),
 `_supplier_washer_model.assert_supplier_washer_references`,
 `_assembly_patterns.assert_pattern_targets` and `build_pd_platen_rack`'s
-reference-dimension loop iterate sorted names. The pin stays: the vendored
-`sw_type_info.flag_methods` still flags an
-interface's methods (one `GetIDsOfNames` request each) in set order, reached
-through `_com._flag` (`part:dt_cylinder_gear`), `segment_point_objects`
-(`part:pd_transgear_thumbnut`) and `dimension_full_name`
-(`drawing:mg_magnifying_lever`), and the seed is a process input the replay
+reference-dimension loop iterate sorted names, and since #2655 so does the
+vendored `sw_type_info.flag_methods` (one `GetIDsOfNames` request per method,
+reached through `_com._flag`, `segment_point_objects` and
+`dimension_full_name`). The pin stays: the seed is a process input the replay
 pins. It re-keys nothing, since `dodo.py` is in no recipe closure. The seed is
 in the log's environment. A replay runs with the fresh recording's
 environment and refuses (`input_mismatch`) a base recorded under another seed
 or none.
+
+SolidWorks also hands back a component enumeration
+(`IAssemblyDoc.GetComponents`, `IComponent2.GetChildren`,
+`IView.GetVisibleComponents`, `IView.GetVisibleDrawingComponents`,
+`IDrawingComponent.GetChildren`, `IBomTableAnnotation.GetComponents2`) in an
+order that varies between builds, even on one seat (#2686: three orders of
+`ms_measuring_stick`'s six components in three builds, two on one seat). A
+loop that follows it asks different questions in a different order whenever
+what it asks depends on the component (a per-path cache, a filter, a
+conditional write, a first match), and an assembly drawing whose balloon
+anchor search walks the view's components that way prints differently. So
+every assembly-, drawing- and verify-tier loop over one iterates
+`_component_order.by_name` (or `drawing_components_by_name`) on the
+enumeration's result: each element is bound and its name read in the order
+given, one bind and one read each and nothing else, then visited in natural
+name order (`part-2` before `part-10`, a pattern seed before its instances).
+Only those name reads' answers follow the seat, and two seats' recordings pair
+their elements by name; the recorder still numbers the elements' handles in
+the seat's order. A loop that only collects names into a set is left as it
+is (its requests are the same name reads), and a part drawing view's one
+visible component needs no order (`_drawing_edges.visible_view_entities`
+sorts only an assembly view's). `test_component_order.py` (`check:recipe`)
+runs the Default Simplified pass over two enumeration orders and requires the
+same requests.
 
 Gates are not recorded; FULL assembly builds and drawings are, and nothing of
 theirs is reused ("Assemblies and drawings" below). Nothing under

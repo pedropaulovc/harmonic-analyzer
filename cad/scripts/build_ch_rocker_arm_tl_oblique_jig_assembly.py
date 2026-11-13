@@ -49,6 +49,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _assembly import (
@@ -474,8 +475,8 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         )
 
     components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
+        component
+        for _, component in _component_order.by_name(assembly.GetComponents(True))
     )
     member_names = component_reference_names(model, spec.MEMBER_COMPONENT_REFERENCES)
     groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}

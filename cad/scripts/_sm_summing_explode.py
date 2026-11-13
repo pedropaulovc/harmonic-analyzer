@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
@@ -143,8 +144,8 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
         )
 
     components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
+        component
+        for _, component in _component_order.by_name(assembly.GetComponents(True))
     )
     groups: dict[str, list[Any]] = {stem: [] for stem in spec.QUANTITIES}
     for component in components:

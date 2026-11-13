@@ -41,6 +41,7 @@ import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _drawing_balloons import (
     BalloonAnchor,
     add_component_bom_balloons,
@@ -446,8 +447,7 @@ def _validate_source(source_model: Any) -> None:
                 f"summing {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for _, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")

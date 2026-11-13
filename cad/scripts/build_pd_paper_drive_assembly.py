@@ -105,6 +105,7 @@ from _chain import (
 )
 from _check import check, log
 from _com import _early_bound
+from _component_order import by_name
 from _component_references import component_identity, component_reference_names
 from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
 from _appearance import POLISHED_STEEL
@@ -2301,8 +2302,7 @@ def _chain_station_components(model) -> dict[int, object]:
     assembly = _early_bound(model, "IAssemblyDoc")
     points = tuple(_chain_station_point(station) for station in range(LINK_COUNT))
     stations = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for _, component in by_name(assembly.GetComponents(True)):
         stem, configuration = component_identity(component)
         if stem not in (CHAIN_LINK_STEM, CONNECTING_LINK_STEM):
             continue

@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
@@ -125,8 +126,8 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
     )
 
     components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
+        component
+        for _, component in _component_order.by_name(assembly.GetComponents(True))
     )
     groups: dict[str, list[Any]] = {stem: [] for stem in QUANTITIES}
     for component in components:

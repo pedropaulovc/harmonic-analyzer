@@ -35,6 +35,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _check import check
 from _com import _com_invoke, _early_bound
+from _component_order import by_name
 from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_common import (
@@ -1458,8 +1459,7 @@ def _validate_source(source_model: Any) -> None:
         if names != (wanted,):
             raise RuntimeError(f"jig {owner} exploded views {names!r} != {(wanted,)!r}")
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for _, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")

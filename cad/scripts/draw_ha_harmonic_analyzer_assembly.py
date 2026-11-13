@@ -28,6 +28,7 @@ import ha_harmonic_analyzer_assembly_steps as steps
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _drawing_balloon_display import rendered_balloon_circle
 from _session import run_build
 from _drawing_common import (
@@ -515,10 +516,10 @@ def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
         raise RuntimeError(f"{label}: no configuration {configuration_name!r}")
     root = _early_bound(configuration, "IConfiguration").GetRootComponent3(True)
     spares = []
-    pending = list(root.GetChildren() or ()) if root is not None else []
+    pending = by_name(root.GetChildren()) if root is not None else []
     while pending:
-        component = _early_bound(pending.pop(), "IComponent2")
-        pending.extend(component.GetChildren() or ())
+        _, component = pending.pop()
+        pending.extend(by_name(component.GetChildren()))
         # A pattern member or virtual part may carry no file path, so the
         # stem is read without _component_stem's refusal.
         if (
@@ -764,8 +765,7 @@ def _validate_source(source_model: Any) -> None:
                 f"complete-machine {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for _, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")

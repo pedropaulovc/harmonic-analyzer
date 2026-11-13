@@ -51,6 +51,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
@@ -1549,8 +1550,7 @@ def _validate_source(source_model: Any) -> dict[str, str]:
             )
     counts: Counter[str] = Counter()
     north: dict[str, tuple[float, str]] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_family(component)
         counts[stem] += 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -1561,10 +1561,9 @@ def _validate_source(source_model: Any) -> dict[str, str]:
             for actual, expected in zip(total.ArrayData, values, strict=True)
         ):
             raise RuntimeError(
-                f"channel source must open collapsed: {component.Name2!r} is displaced"
+                f"channel source must open collapsed: {name!r} is displaced"
             )
         z = values[11]
-        name = str(component.Name2)
         if stem not in north or z > north[stem][0]:
             north[stem] = (z, name)
     if dict(counts) != BOM_QUANTITIES:

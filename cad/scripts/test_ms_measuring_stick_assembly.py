@@ -1283,11 +1283,14 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS), spec.STICK_X_MIN
     )
     stick_component = SimpleNamespace(
+        Name2=f"{spec.STICK}-1",
         GetPathName=lambda: f"C:\\models\\{spec.STICK}.SLDPRT",
         edges=(distractor, hidden_face, end, start),
     )
     block_component = SimpleNamespace(
-        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=()
+        Name2=f"{spec.BLOCK}-1",
+        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT",
+        edges=(),
     )
     front = SimpleNamespace(
         GetVisibleComponents=lambda: (block_component, stick_component),
@@ -1349,7 +1352,9 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             message = "expected one visible.*found 0"
         elif defect == "duplicate component":
             duplicate_component = SimpleNamespace(
-                GetPathName=stick_component.GetPathName, edges=stick_component.edges
+                Name2=f"{spec.STICK}-2",
+                GetPathName=stick_component.GetPathName,
+                edges=stick_component.edges,
             )
             front.GetVisibleComponents = lambda: (
                 block_component, stick_component, duplicate_component

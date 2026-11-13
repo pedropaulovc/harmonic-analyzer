@@ -1161,7 +1161,11 @@ def lever_tip_native(monkeypatch, projection_native):
             )),
         )
         full.GetModelDoc2 = lambda full=full: full.source
-        native.drawing_components.append(SimpleNamespace(Component=full, Visible=True))
+        native.drawing_components.append(
+            SimpleNamespace(
+                Name=f"mg-magnifier-1/{stem}-1", Component=full, Visible=True
+            )
+        )
     native.view.GetVisibleDrawingComponents = lambda: native.drawing_components
     native.annotation.Owner = native.view
     native.annotation.OwnerType = 0
@@ -3041,7 +3045,7 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         drawing,
         keep=(
             "build", "validate_bom_number_property",
-            "component_identity", "component_reference_names",
+            "component_identity", "component_reference_names", "by_name",
             "_validate_source", "_source_sha256",
             "_assert_source_identity", "_source_dirty_tracer",
         ),

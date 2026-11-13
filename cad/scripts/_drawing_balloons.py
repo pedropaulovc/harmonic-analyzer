@@ -21,6 +21,7 @@ from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 from _com import _bind, _com_invoke, _early_bound
+from _component_order import by_name, drawing_components_by_name
 from _component_references import (
     REFERENCE_IDENTITIES,
     member_configuration,
@@ -626,8 +627,9 @@ def _drawing_component_stems(
 def _view_component_leaves(
     adapter: Any, view: Any, *, label: str
 ) -> tuple[_ComponentLeaf, ...]:
-    """Every leaf drawing component of ``view``, in depth-first walk order,
-    each marked shown or hidden in this view.
+    """Every leaf drawing component of ``view``, in depth-first walk order
+    (siblings by descending name, :mod:`_component_order`, never the seat's
+    order), each marked shown or hidden in this view.
 
     Balloon anchoring used to repeat this walk once PER BALLOON -- ~3 s of
     fixed cost on every ``drawing.pick_balloon_anchor`` span across the farm
@@ -638,14 +640,19 @@ def _view_component_leaves(
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
     leaves: list[_ComponentLeaf] = []
-    pending = [(child, True) for child in _drawing_component_children(root)]
+    pending = [
+        (child, True)
+        for _, child in drawing_components_by_name(_drawing_component_children(root))
+    ]
     while pending:
         drawing_component, shown = pending.pop()
         shown = shown and bool(
             adapter._attempt(lambda dc=drawing_component: dc.Visible, default=True)
         )
         children = _drawing_component_children(drawing_component)
-        pending.extend((child, shown) for child in children)
+        pending.extend(
+            (child, shown) for _, child in drawing_components_by_name(children)
+        )
         if children:
             continue
         leaf = _component_leaf(adapter, drawing_component, visible=shown)
@@ -856,7 +863,10 @@ def _visibility_components(view: Any, *, label: str) -> list[_VisibilityComponen
     root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    pending = [(child, ()) for child in _drawing_component_children(root)]
+    pending = [
+        (child, ())
+        for _, child in drawing_components_by_name(_drawing_component_children(root))
+    ]
     rows: list[_VisibilityComponent] = []
     names: set[str] = set()
     while pending:
@@ -867,7 +877,10 @@ def _visibility_components(view: Any, *, label: str) -> list[_VisibilityComponen
             raise RuntimeError(f"{label}: empty or duplicate drawing component name {name!r}")
         names.add(name)
         children = _drawing_component_children(component)
-        pending.extend((child, (*ancestors, name)) for child in children)
+        pending.extend(
+            (child, (*ancestors, name))
+            for _, child in drawing_components_by_name(children)
+        )
         visible = component.Visible
         if type(visible) is not bool:
             raise RuntimeError(f"{label}: unreadable drawing visibility for {name!r}: {visible!r}")
@@ -1324,16 +1337,16 @@ def _shown_explode_step_count(
 def _configuration_instance_paths(adapter: Any, configuration: Any) -> dict[str, str]:
     """Every component instance path of ``configuration``, casefolded -> as read,
     walked from its own root (``GetRootComponent3(True)`` resolves a
-    configuration that is not the model's active one)."""
+    configuration that is not the model's active one), siblings by name."""
     root = configuration.GetRootComponent3(True)
     paths: dict[str, str] = {}
-    pending = list(root.GetChildren() or ()) if root is not None else []
+    pending = by_name(root.GetChildren()) if root is not None else []
     while pending:
-        component = _early_bound(pending.pop(), "IComponent2")
+        _, component = pending.pop()
         path = _component_path(adapter, component)
         if path:
             paths[path.casefold()] = path
-        pending.extend(component.GetChildren() or ())
+        pending.extend(by_name(component.GetChildren()))
     return paths
 
 

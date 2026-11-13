@@ -93,6 +93,7 @@ from typing import Any, Callable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _check import check, log  # noqa: E402
 from _com import _early_bound, _read_member  # noqa: E402
+from _component_order import by_name  # noqa: E402
 from _part_save import set_isometric_view  # noqa: E402
 from _paths import CAD_ROOT  # noqa: E402
 from _preferences import (
@@ -341,18 +342,17 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
     they are scaled to MILLIMETRES here so the persisted scene graph matches the
     millimetre STL meshes it is rendered against."""
     model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
-    comps = model.GetComponents(False) or []
+    # Name order, never the seat's (issue #2686): the scene lists the same order.
+    comps = by_name(model.GetComponents(False))
     boxes, scene, stems = [], [], set()
-    for i, comp in enumerate(comps, 1):
+    for i, (name, comp) in enumerate(comps, 1):
         if i % 50 == 0:
             log(f"component scan {i}/{len(comps)} ...")
-        # Early-bind to IComponent2 so the members read below (GetPathName,
-        # GetXform, Name2/Visible/Transform2 properties, GetBox/GetModelDoc2/
-        # GetMaterialPropertyValues2) invoke by DISPID; off-interface members
-        # fall through the wrapper's late-bound fallback.
-        comp = _early_bound(comp, "IComponent2")
+        # Bound as IComponent2 by by_name so the members read below
+        # (GetPathName, GetXform, Visible/Transform2 properties,
+        # GetBox/GetModelDoc2/GetMaterialPropertyValues2) invoke by DISPID;
+        # off-interface members fall through the wrapper's late-bound fallback.
         try:
-            name = str(_read_member(comp, "Name2") or "")
             box = comp.GetBox(False, False)
         except Exception:
             continue

@@ -3960,6 +3960,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # The split simplified helpers' shared policy (1:2 boundary, roles,
         # BOM identity, part derivation and simplified re-save fingerprint).
         SCRIPTS_DIR / "test_simplified_helpers.py",
+        # Assembly and drawing loops visit components by name, never in the
+        # seat's enumeration order (#2686), so every seat asks the same.
+        SCRIPTS_DIR / "test_component_order.py",
         # Recipe-local stock declarations; a missing groove fails loud.
         SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).

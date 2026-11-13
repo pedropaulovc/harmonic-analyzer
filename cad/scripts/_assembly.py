@@ -21,6 +21,7 @@ from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
+from _component_order import by_name, natural_key
 from _component_references import (
     bind_component_selectors,
     component_identity,
@@ -1790,12 +1791,12 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
             asm, "IAssemblyDoc"
         )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
 
-        def _collect() -> list[Any] | None:
+        def _collect() -> list[tuple[str, Any]] | None:
             # None = enumeration FAILED, never "an empty assembly": a failed
             # read must not certify zero free DOF.
             with _telemetry.span("dof.collect_components"):
                 found = adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
-            return None if found is None else list(found)
+            return None if found is None else by_name(found)
 
         components = _collect()
         # Only GetConstrainedStatus goes stale before a solve; IsFixed and
@@ -1811,7 +1812,7 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         rebuilt = False
         if resolve and (
             not components
-            or any(_reads_constrained_status(adapter, c) for c in components)
+            or any(_reads_constrained_status(adapter, c) for _, c in components)
         ):
             with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
@@ -1832,11 +1833,9 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         # offending counts), and any offender is named in the raised error, which
         # this gate's span records. Same de-noising as health.whats_wrong below.
         fixed = pattern = 0
-        for component in components:
-            # Wrap once as IComponent2 so both zero-arg methods invoke known
-            # DISPIDs; Name2/IsFixed remain property reads.
-            component = _early_bound(component, "IComponent2")
-            comp_name = str(_read_member(component, "Name2"))
+        for comp_name, component in components:
+            # Bound as IComponent2 by by_name, so both zero-arg methods invoke
+            # known DISPIDs; IsFixed remains a property read.
             if bool(_read_member(component, "IsFixed")):
                 fixed += 1
                 log(f"{comp_name}: fixed")
@@ -2068,11 +2067,9 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     asm_h = _early_bound(
         asm, "IAssemblyDoc"
     )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-    components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+    components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
     under = []
-    for component in components:
-        component = _early_bound(component, "IComponent2")
-        comp_name = str(_read_member(component, "Name2"))
+    for comp_name, component in by_name(components):
         if bool(_read_member(component, "IsFixed")):
             continue
         if bool(
@@ -2183,14 +2180,15 @@ def assert_free_dof_necessity(
 
 
 def component_names(adapter: Any) -> list[str]:
-    """Top-level component names (``Name2``) of the active assembly."""
+    """Top-level component names (``Name2``) of the active assembly, in natural
+    name order (never the seat's enumeration order, issue #2686)."""
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-    names = []
-    for component in components:
-        # No flag: Name2 is a property read (issue #87).
-        names.append(str(_read_member(component, "Name2")))
-    return names
+    # No flag: Name2 is a property read (issue #87).
+    return sorted(
+        (str(_read_member(component, "Name2")) for component in components),
+        key=natural_key,
+    )
 
 
 def delete_assembly_feature(adapter: Any, name: str) -> None:
@@ -2442,15 +2440,12 @@ def assert_model_healthy(
                 # native API for those directly; enumerating descendants only
                 # to discard slash-qualified names adds hundreds of COM reads.
                 # Paired native repro: diagnostics/probe_assembly_health_targets.py.
-                comps = (
-                    adapter._attempt(lambda: asm_doc.GetComponents(True), default=None)
-                    or []
+                comps = adapter._attempt(
+                    lambda: asm_doc.GetComponents(True), default=None
                 )
-                for comp in comps:
-                    # Wrap once as IComponent2 so GetModelDoc2 invokes its known
-                    # DISPID; Name2 remains a property read.
-                    comp = _early_bound(comp, "IComponent2")
-                    name = str(_read_member(comp, "Name2"))
+                # Bound as IComponent2 by by_name, so GetModelDoc2 invokes its
+                # known DISPID.
+                for name, comp in by_name(comps):
                     if (
                         "/" in name
                     ):  # top-level instances only; their docs cover nested parts
@@ -2675,8 +2670,7 @@ def sync_simplified_configuration(
     rows: list[tuple[str, str, str]] = []
     swapped = kept = 0
     refused: list[str] = []
-    for raw_component in assembly.GetComponents(True) or ():
-        component = _early_bound(raw_component, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         path = str(component.GetPathName())
         if path not in known:
             known[path] = {
@@ -2690,12 +2684,12 @@ def sync_simplified_configuration(
         else:
             component.ReferencedConfiguration = want
             if str(component.ReferencedConfiguration) != want:
-                refused.append(f"{component.Name2}: {current!r} -> {want!r}")
+                refused.append(f"{name}: {current!r} -> {want!r}")
                 continue
             swapped += 1
         rows.append(
             (
-                str(component.Name2),
+                name,
                 want,
                 _referenced_comment(asm_name, component, path, want, comments),
             )
@@ -3466,19 +3460,19 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         with _telemetry.span(
             "geometry_digest.component_poses", configuration=cfg
         ) as psp:
-            comps = (
-                adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+            comps = by_name(
+                adapter._attempt(lambda: asm.GetComponents(True), default=None)
             )
             psp.set_attribute("components", len(comps))
             pose_rows = []
-            for comp in comps:
+            for name, comp in comps:
                 a16 = [
                     float(v)
-                    for v in _read_member(_read_member(comp, "Transform2"), "ArrayData")
+                    for v in _early_bound(comp.Transform2, "IMathTransform").ArrayData
                 ]
                 pose_rows.append(
                     (
-                        str(_read_member(comp, "Name2")),
+                        name,
                         tuple(round(v, 6) for v in a16[0:9]),
                         tuple(round(v, 4) for v in a16[9:12]),
                     )

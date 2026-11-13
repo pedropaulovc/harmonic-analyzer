@@ -15,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _com import _com_invoke, _early_bound
+from _component_order import by_name
 from _drawing_projection import model_points_in_view
 import _telemetry
 
@@ -83,6 +84,10 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     drawing_view = _early_bound(view, "IView")
     entities: list[Any] = []
     components = drawing_view.GetVisibleComponents() or []
+    # An assembly view's components come back in the seat's order (issue
+    # #2686); a part view's one component has no order to fix.
+    if len(components) > 1:
+        components = [component for _, component in by_name(components)]
     for component in components:
         entities.extend(
             visible_component_entities(drawing_view, component, entity_kind)

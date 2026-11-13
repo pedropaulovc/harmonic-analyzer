@@ -35,6 +35,7 @@ import ms_stop_spec as stop
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -394,8 +395,7 @@ def _validate_source(source_model: Any) -> None:
                 f"measuring-stick {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for _, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -729,8 +729,7 @@ def _reference_end_edge(
     """
     view = _early_bound(view, "IView")
     components = []
-    for raw_component in tuple(view.GetVisibleComponents() or ()):
-        component = _early_bound(raw_component, "IComponent2")
+    for _, component in by_name(view.GetVisibleComponents()):
         path = str(component.GetPathName() or "").replace("\\", "/")
         if Path(path).stem == component_stem:
             components.append(component)
