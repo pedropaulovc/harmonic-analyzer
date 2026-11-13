@@ -181,6 +181,23 @@ def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     assert float(printed.group(1)) * 25.4 == pytest.approx(rim)
 
 
+def test_knockout_wall_is_the_shortfall_its_callout_states() -> None:
+    # Owner ruling 2026-11-13 (#1679, RV-07): each knockout runs on its pin
+    # hole's axis, so its wall to the spigot rim is thicker than the pin
+    # hole's and still under the floor; its callout prints the worst case.
+    worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
+        spec.DRIVE_PIN_CIRCLE_RADIUS
+        + spec.DRIVE_PIN_OFFSET_TOL
+        + spec._KNOCKOUT_DIA_MAX / 2.0
+    )
+    wall = spec.DRIVE_PIN_KNOCKOUT_RIM_WORST
+    assert worst - 0.0254 < wall <= worst
+    assert spec.DRIVE_PIN_SPIGOT_RIM_WORST < wall < spec.WALL_FLOOR_MM
+    printed = re.search(r"(\.\d{3}) MIN", notes.KNOCKOUT_CALLOUT_BELOW)
+    assert printed
+    assert float(printed.group(1)) * 25.4 == pytest.approx(wall)
+
+
 def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     # Machinist review of f7c9771b3: the bare 3.95 read under the title
     # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The

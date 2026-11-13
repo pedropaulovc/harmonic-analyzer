@@ -459,6 +459,18 @@ if DRIVE_PIN_SPIGOT_RIM_WORST >= WALL_FLOOR_MM:
     raise AssertionError("the rim meets the floor now: retire RV-02")
 if DRIVE_PIN_SPIGOT_RIM_WORST <= 0.0:
     raise AssertionError("the drive-pin holes break out of the spigot at print-worst")
+# Each knockout runs on its pin hole's axis through the rest of the collar,
+# so its wall to the same rim is thicker than the pin hole's but still under
+# the floor; the sheet prints it (owner ruling 2026-11-13, #1679, RV-07: the
+# pins at the collar rim are the original's design and the knockouts stay).
+DRIVE_PIN_KNOCKOUT_RIM_WORST = _floor(
+    _SPIGOT_R_WORST
+    - (DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_OFFSET_TOL + _KNOCKOUT_DIA_MAX / 2.0),
+    3,
+    UNIT,
+)
+if not DRIVE_PIN_SPIGOT_RIM_WORST < DRIVE_PIN_KNOCKOUT_RIM_WORST < WALL_FLOOR_MM:
+    raise AssertionError("the knockout's rim wall left its declared shortfall: revisit RV-07")
 # Pin spacing errors: this shaft's two centres and the wheel's two holes,
 # each pair at the shared location band.
 DRIVE_PIN_SPACING_ERROR_MAX = 2.0 * DRIVE_PIN_OFFSET_TOL
