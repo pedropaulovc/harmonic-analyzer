@@ -798,15 +798,16 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
     function is a tight band, and its dimension names the mate it serves.
-    The tap's along-axis station is named on that hole's callout.  The
-    locating dowel's station (rule-23 retention, owner ruling 2026-11-07)
-    prints as a reference with no band (round 6, #9), so it holds nothing and
-    names nothing.  #2697: the bore's location and the tap's station across
-    the block print .XX."""
+    The tap's along-axis station states what it holds under its own value
+    (machinist review of 017b38ec2 and 0613bba70 did not read a reason on the
+    hole's callout as the station's).  The locating dowel's station (rule-23
+    retention, owner ruling 2026-11-07) prints as a reference with no band
+    (round 6, #9), so it holds nothing and names nothing.  #2697: the bore's
+    location and the tap's station across the block print .XX."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
     assert "PassageCenter" not in texts
-    texts["FootTapZ"] = drawing.FOOT_TAP_QUALIFIER
+    assert "FootTapX" not in texts
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {"FootTapZ", "DowelX"}
     three_place.discard("DowelX")
@@ -1077,33 +1078,30 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
 
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     """drawing-guidelines.md rule 12 (hole and slot callouts say what to do) on the resolved callout: the thread and its full-thread
-    depth on one line, the tap drill's depth on another, no THRU; rule 4:
-    the mate the stations locate on closes the thread's part."""
+    depth on one line, the tap drill's depth on another, no THRU."""
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES
     thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
     full = spec.length_text(spec.FOOT_THREAD_DEPTH, places)
     drill = spec.length_text(spec.FOOT_DEPTH, places)
-    mate = f"\n{drawing.FOOT_TAP_QUALIFIER}"
-    good = {1: f"{thread} x {full}{mate}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
+    good = {1: f"{thread} x {full}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
     assert drawing._foot_tap_callout_resolved(good)
-    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread} x {full}"})
     assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
-    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread}{mate}"})
+    assert not drawing._foot_tap_callout_resolved({**good, 1: thread})
     assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
 
 
-def test_foot_tap_mate_line_closes_the_native_thread_part() -> None:
-    native = {
-        5: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
-        6: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
-        7: "",
-        8: "",
-    }
-    rewritten = drawing._foot_tap_callout_definitions(native)
-    assert rewritten == {**native, 6: f"{native[6]}\n{drawing.FOOT_TAP_QUALIFIER}"}
-    with pytest.raises(RuntimeError):
-        drawing._foot_tap_callout_definitions({**native, 7: native[6]})
+def test_tap_station_reason_stands_clear_over_the_bottom_view() -> None:
+    """#2697: the .215 and its reason are taller than its span, so the block
+    stands on the extended line over the view's north edge, left of the
+    view, and the dowel's reference value still hangs left of that line."""
+    texts = drawing.sheet_text_boxes()
+    view = drawing.sheet_view_silhouettes()["bottom"]
+    block = texts["FootTapZ"]
+    assert block[2] < view[0]
+    assert block[1] > view[3]
+    assert texts["DowelX"][2] < drawing.FOOT_TAP_Z_LINE_X
+    assert texts["DowelX"][3] < block[1]
 
 
 def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
