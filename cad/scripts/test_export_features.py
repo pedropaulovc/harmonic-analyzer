@@ -62,14 +62,20 @@ def _step_labels(stem: str) -> list[str]:
     return labels
 
 
-def _step(tmp_path: Path, stem: str) -> Path:
-    labels = _step_labels(stem)
+def _write_step(path: Path, labels: list[str]) -> None:
     rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
     rows += [f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(labels, start=10)]
     rows += ["ENDSEC;", "END-ISO-10303-21;"]
+    path.write_bytes("\r\n".join(rows).encode("utf-8"))
+
+
+def _step(tmp_path: Path, stem: str) -> Path:
+    """The bundle STEP, plus each declared member's STEP beside it."""
     path = tmp_path / stem / f"{stem.replace('_', '-')}.STEP"
     path.parent.mkdir(parents=True)
-    path.write_bytes("\r\n".join(rows).encode("utf-8"))
+    _write_step(path, _step_labels(stem))
+    for cfg, member in exporter.member_step_paths(stem).items():
+        _write_step(path.with_name(member.name), [face_name(feature, 1) for feature in exporter.feature_selectors(stem, cfg)])
     return path
 
 
@@ -834,7 +840,14 @@ def test_raw_step_face_sets_and_values_are_bound_into_the_manifest(tmp_path: Pat
     assert manifest["step_sha256"] == hashlib.sha256(content).hexdigest()
     assert manifest["drawing"]["revision"] == "v40"
     assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
-    assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml"}
+    members = {name: path.with_name(member.name) for name, member in exporter.member_step_paths(stem).items()}
+    assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml", *(member.name for member in members.values())}
+    for name, member in members.items():
+        assert manifest["member_steps"][name]["step"] == member.name
+        assert manifest["member_steps"][name]["step_sha256"] == hashlib.sha256(member.read_bytes()).hexdigest()
+        assert {feature for feature, entry in manifest["features"].items() if entry.get("configuration") == name} == set(
+            exporter.feature_selectors(stem, name)
+        )
     assert step.read_bytes() == content
 
 

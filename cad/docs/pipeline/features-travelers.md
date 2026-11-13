@@ -74,6 +74,18 @@ match the producer stem. The feature source closure includes the drawing, the
 selected spec and both transitive Python dependency closures without importing
 them; config reads from those sources remain feature-leaf inputs.
 
+When a configured producer's rework spans members, a requirement for a
+non-default member names it with a literal `configuration="<Member>"` keyword
+(for example the `FeedNut` of `ch_rocker_arm_tl_vn_oblique_leadscrew_kit`,
+whose default member is `LeadScrew`). `export_models --features` shows that
+member after the default export, names only its requirements' faces and saves
+`<part>--<member>.STEP` beside the bundle STEP, the same name as the full
+export's neutral member STEP, which `features_bound` then requires to be that
+exact copy. The manifest marks each such feature with `configuration` and
+records the member STEP and its digest under `member_steps.<Member>`; the
+feature's `faces` bind that STEP. Members are read statically from the
+keywords and must be registry members other than the default.
+
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
 `model_sources` and `precision_sources` cite the shared frame and displayed
