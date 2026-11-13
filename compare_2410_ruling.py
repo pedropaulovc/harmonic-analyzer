@@ -81,23 +81,23 @@ bushing_top_y = pinion_axis_y + RB.OD / 2.0
 rail_bushing_y_gap = strip_top_y - bushing_top_y
 
 # Screws: the existing #0-80 x 1/4 slotted fillister, McMaster 91794A055
-# (MHA-PD-VN-55), cut to length at assembly like the disc screws.
+# (MHA-PD-VN-55), used at its stock length (no trimming).
 import _mcmaster_91794a055 as SCR
 
 SCREW_MAJOR = SCR.SHANK_DIA
 HEAD_DIA = SCR.HEAD_DIA
 HEAD_H = SCR.HEAD_H
 THREAD_PITCH = SCR.PITCH
-UNDER_HEAD_FLOOR = 0.118 * IN  # rail left under the head
+UNDER_HEAD_FLOOR = 0.128 * IN  # rail left under the head
 CB_DIA = 0.110 * IN  # #35 drill, from the rail top
 CLEAR_DIA = 0.067 * IN  # #51 close clearance through the floor
 TAP_DRILL = 0.0465 * IN  # #56
-CUT_LEN = 0.226 * IN
-CUT_BAND = 0.005 * IN
-reach = (CUT_LEN - CUT_BAND - UNDER_HEAD_FLOOR, CUT_LEN + CUT_BAND - UNDER_HEAD_FLOOR)
+CUT_LEN = SCR.SHANK_LEN
+STOCK_BAND = 0.03 * IN  # +0/-.03 (pd_vn_transgear_disc_screw_spec.STOCK_LENGTH_BAND)
+reach = (CUT_LEN - STOCK_BAND - UNDER_HEAD_FLOOR, CUT_LEN - UNDER_HEAD_FLOOR)
 engagement = tuple(r - THREAD_PITCH for r in reach)
-FULL_THREAD = 0.118 * IN
-DRILL_DEPTH = 0.126 * IN  # full diameter
+FULL_THREAD = 0.122 * IN
+DRILL_DEPTH = 0.130 * IN  # full diameter
 point = TAP_DRILL / 2.0 / math.tan(math.radians(59.0))
 cb_depth = new_rail_height - UNDER_HEAD_FLOOR
 below_root_drill = DRILL_DEPTH - root_from_top_worst
@@ -195,7 +195,7 @@ ax.add_patch(Rectangle((screw_z - CB_DIA / 2, cb_floor), CB_DIA, rail_top - cb_f
 ax.add_patch(Rectangle((screw_z - HEAD_DIA / 2, cb_floor), HEAD_DIA, HEAD_H, fc="#e06666", ec="k", lw=0.5))
 ax.add_patch(Rectangle((screw_z - SCREW_MAJOR / 2, cb_floor - CUT_LEN), SCREW_MAJOR, CUT_LEN,
                        fc="#e06666", ec="k", lw=0.5))
-ax.text(t + rail_depth + 0.5, strip_top_y + 0.3, "4x #0-80 fillister\n(VN-55 SKU), cut\nto .226, into taps\nin the strip top",
+ax.text(t + rail_depth + 0.5, strip_top_y + 0.3, "4x #0-80 x 1/4\nfillister (VN-55\nSKU), stock length,\ninto taps in the\nstrip top",
         fontsize=6.5, color="#a00000")
 ax.text(t - 0.3, crest_y + 2.0, "no solder", fontsize=7, color="g", ha="right")
 ax.set_title("Proposed: 3/16 brass rack screwed up under the bottom rail on\n"
@@ -266,7 +266,7 @@ fig.savefig(sys.argv[1], dpi=110)
 print(f"strip top {strip_top_y:.3f}; rail bottom today {rail_bottom_today:.3f}; rail height {new_rail_height:.3f} "
       f"({new_rail_height / IN:.4f} in), grows {rail_bottom_today - strip_top_y:.3f}; tap row local {new_tap_y_local:.3f} ({new_tap_y_local / IN:.4f})")
 print(f"root from strip top {root_from_top:.3f} (worst {root_from_top_worst:.3f}); tooth at root {tooth_at_root:.3f}")
-print(f"reach {reach[0]:.3f}..{reach[1]:.3f}; engagement {engagement[0]:.3f}..{engagement[1]:.3f} = "
+print(f"max reach vs full thread {reach[1]:.3f} <= {FULL_THREAD:.3f}"); print(f"reach {reach[0]:.3f}..{reach[1]:.3f}; engagement {engagement[0]:.3f}..{engagement[1]:.3f} = "
       f"{engagement[0] / SCREW_MAJOR:.2f}..{engagement[1] / SCREW_MAJOR:.2f} D; full thread {FULL_THREAD:.3f}; drill {DRILL_DEPTH:.3f} + point {point:.3f}")
 print(f"over a tooth (worst strip): drill {below_root_drill:.3f} below root, tooth width there {tooth_width_below_root(below_root_drill):.3f} vs drill {TAP_DRILL:.3f}; "
       f"thread {below_root_thread:.3f} below root, width {tooth_width_below_root(below_root_thread):.3f} vs major {SCREW_MAJOR:.3f}; point tip {below_root_point:.3f} below root")
