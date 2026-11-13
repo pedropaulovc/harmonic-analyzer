@@ -435,6 +435,59 @@ def test_south_east_chamfer_is_what_clears_column_socket_0(monkeypatch) -> None:
         bdt.require_swing_clearance({}, bdt.SWING_ROUND_OCCUPANTS)
 
 
+def test_what_the_plate_carries_clears_the_frame_columns_over_the_swing() -> None:
+    """#2616: the crank column and the cone-shaft gears overhang the plate's
+    plan outline and swing with it; each keeps SWING_SEAT_RUNNING_CLEARANCE
+    off every base occupant, the frame column tubes included, over the
+    stop's certified swing.  The pruned sweep reports the every-sample
+    minimum."""
+    import build_dt_drive_train_assembly as bdt
+
+    occupants = set(bdt.SWING_FOOTPRINTS) | set(bdt.SWING_ROUND_OCCUPANTS)
+    assert {"post crank boss", "crank chain wheel", "64T gear", "cone gear 0"} <= set(
+        bdt.SWING_RIDERS
+    )
+    clearances = bdt.SWING_RIDER_CLEARANCE
+    assert set(clearances) == {(r, o) for r in bdt.SWING_RIDERS for o in occupants}
+    for pair, (clear, _swing) in clearances.items():
+        assert clear >= bdt.SWING_SEAT_RUNNING_CLEARANCE, pair
+    rider, occupant = min(clearances, key=lambda pair: clearances[pair][0])
+    assert (rider, occupant) == ("post crank boss", "column socket 0")
+    xz, radius = bdt.SWING_ROUND_OCCUPANTS[occupant]
+    section = bdt.SWING_RIDERS[rider]
+    gaps = []
+    for angle in bdt.SWING_ANGLES:
+        poly = tuple(bdt._swung(point, angle) for point in section)
+        nearest = min(bdt._point_segment_gap(xz, a, b) for a, b in bdt._edges(poly))
+        gaps.append((-nearest if bdt._point_in_polygon(xz, poly) else nearest) - radius)
+    assert clearances[(rider, occupant)] == (
+        min(gaps),
+        bdt.SWING_ANGLES[gaps.index(min(gaps))],
+    )
+
+
+def test_the_certified_swing_ends_before_the_crank_boss_meets_column_0() -> None:
+    """#2616 fail-first control: carried to the 12.38 deg the stop fence
+    certified before (no head/thread or shoulder/thread coaxiality at all),
+    the post crank boss overlaps frame column 0; the stop's certified swing
+    now ends where it still keeps the running clearance, above the nominal
+    disengage."""
+    import build_dt_drive_train_assembly as bdt
+
+    xz, radius = bdt.SWING_ROUND_OCCUPANTS["column socket 0"]
+
+    def boss_gap(angle: float) -> float:
+        poly = tuple(
+            bdt._swung(point, angle) for point in bdt.SWING_RIDERS["post crank boss"]
+        )
+        nearest = min(bdt._point_segment_gap(xz, a, b) for a, b in bdt._edges(poly))
+        return (-nearest if bdt._point_in_polygon(xz, poly) else nearest) - radius
+
+    assert boss_gap(12.38) < 0.0
+    assert bdt.DISENGAGE_DEG < bdt.P1_SWEEP_DEG[1] < 12.38
+    assert boss_gap(bdt.P1_SWEEP_DEG[1]) >= bdt.SWING_SEAT_RUNNING_CLEARANCE
+
+
 def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
     """C1 keyed (owner decision 2026-11-09, PR #1992): the bushing, the end
     screw's proud end and MHA-DT-21's south face (where it stands over G19)

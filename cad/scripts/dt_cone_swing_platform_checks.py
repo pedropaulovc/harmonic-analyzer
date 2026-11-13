@@ -242,15 +242,32 @@ STOP_INTERNAL_PITCH_MAX_MM = 0.0991 * 25.4  # #4-40 UNC-2B
 
 
 def seated_pivot_axis_offset_terms_mm() -> dict[str, float]:
-    """Shoulder centre relative to the printed base tap, without coaxiality.
+    """Shoulder centre relative to the printed base tap.
 
-    The connected thread/shoulder bodies must intersect at their junction;
-    their centres can be at most the sum of their outside radii apart.
     Full-form engagement bounds thread cock; use the whole supplied tail
     as an extrapolation lever rather than presuming runout at the shoulder.
-    This is deliberately loose, not an invented supplier concentricity grade.
+    No supplier coaxiality grade is used (the 91829A560 page lists none).
+    The thread-to-shoulder offset is bounded by containment instead: the
+    screw is run in THRU MHA-DT-20 (MHA-DT-00 step 23), so when the shoulder
+    enters the pivot bore the full-form thread below its neck still fills
+    the rest of that bore.  Both lie inside the one bore at once, so their
+    axes are at most the two radial plays apart, the thread's crest envelope
+    taken at its pitch diameter MIN (smaller than any crest).  #2616.
     """
     clearance = PIVOT_INTERNAL_PITCH_MAX_MM - pivot_stock.EXTERNAL_PITCH_DIA_MIN_MM
+    from dt_cone_swing_platform_spec import PLATE_STOCK_BAND
+
+    bore_max = PIVOT_HOLE_DIA + _DRILL_OVERSIZE_MM
+    # The neck below the shoulder is the vendor model's (the same harvested
+    # tail the extrapolation lever uses); the full thread must reach into the
+    # thinnest bearing the plate's stock band leaves.
+    if (
+        PIVOT_BEARING_THICKNESS - PLATE_STOCK_BAND - pivot_stock.FULL_THREAD_START
+        <= 0.0
+    ):
+        raise ValueError(
+            "the pivot thread no longer reaches the bore before the shoulder"
+        )
     return {
         "pivot thread radial fit": clearance / 2.0,
         "pivot thread extrapolation": (
@@ -258,11 +275,22 @@ def seated_pivot_axis_offset_terms_mm() -> dict[str, float]:
             * clearance
             / pivot_stock.MIN_USEFUL_ENGAGEMENT_MM
         ),
-        "connected shoulder/thread offset": (
-            pivot_stock.SHOULDER_DIA + pivot_stock.THREAD_MAJOR_MAX_MM
+        "shoulder/thread offset, both in the pivot bore": (
+            bore_max - pivot_stock.EXTERNAL_PITCH_DIA_MIN_MM
         )
+        / 2.0
+        + (bore_max - pivot_stock.SHOULDER_DIA - pivot_stock.SHOULDER_DIA_BAND[1])
         / 2.0,
     }
+
+
+# ASME B18.6.3-2013 para. 2.1.5(a), the stop screw's declared standard
+# (dt_swing_stop_screw_spec.STOCK_STANDARD): the head axis lies at true
+# position to the shank axis within a diameter zone of 6% of the maximum head
+# diameter.  Read 2026-11-12 at https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf
+# (standard p. 2).  #2616.
+STOP_HEAD_POSITION_ZONE_FRACTION = 0.06
+STOP_HEAD_POSITION_SOURCE = "ASME B18.6.3-2013 para. 2.1.5(a)"
 
 
 def manufactured_p1_stop_enclosure() -> dict:
@@ -274,9 +302,10 @@ def manufactured_p1_stop_enclosure() -> dict:
     pose: its first physical stop occurs earlier. This is an upper enclosure,
     not the nominal mating angle or a claim that stock was inspected.
 
-    No head/thread or shoulder/thread coaxiality is assumed. Full seating
-    supplies the bearing plane; connected material supplies only a very loose
-    centre offset. Lifting the plate is expressly outside this functional state.
+    Coaxiality enters as sourced or contained bounds only: the stop head at
+    its standard's true-position zone, the pivot shoulder against its thread
+    by both lying in the pivot bore at once. Full seating supplies the
+    bearing plane. Lifting the plate is expressly outside this functional state.
     """
     from dt_cone_swing_platform_spec import PLATE_STOCK_BAND
 
@@ -310,9 +339,8 @@ def manufactured_p1_stop_enclosure() -> dict:
         "stop thread extrapolation": (
             stop_stock.LENGTH_MAX_MM * clearance / stop_stock.MIN_USEFUL_ENGAGEMENT_MM
         ),
-        "connected head/thread offset": (
-            stop_stock.HEAD_DIA_MAX_MM + stop_stock.THREAD_MAJOR_MAX_MM
-        )
+        "stop head true position": STOP_HEAD_POSITION_ZONE_FRACTION
+        * stop_stock.HEAD_DIA_MAX_MM
         / 2.0,
     }
     uncertainty = sum(terms.values())
@@ -434,7 +462,9 @@ def manufactured_p1_stop_enclosure() -> dict:
                     f"engagement >= {pivot_stock.MIN_USEFUL_ENGAGEMENT_MM:.2f} mm, "
                     "shoulder fully seated; stop full-form engagement >= "
                     f"{stop_stock.MIN_USEFUL_ENGAGEMENT_MM:.2f} mm, head fully "
-                    "seated; platform remains seated throughout P1; not stock inspection evidence"
+                    "seated, its true position per "
+                    f"{STOP_HEAD_POSITION_SOURCE}; platform remains seated "
+                    "throughout P1; not stock inspection evidence"
                 ),
             }
     raise ValueError(

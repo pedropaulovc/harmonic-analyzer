@@ -77,7 +77,7 @@ def sheet_notes() -> str:
             f"   ITS END RUNS IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE} "
             f"(DIAMETRAL CLEARANCE {clearance}).",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
-            "THEN BY BACKLASH AT ASSEMBLY,",
+            "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
             "3. CENTRES OK.",
         )
@@ -167,8 +167,10 @@ def gear_data() -> str:
         ),
         ("TOOTH FORM", tooth_form()),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
+        # Reference only: MHA-DT-00 check 4 sets the mesh by feel and
+        # measures no backlash (#2586).
         (
-            "BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
+            "BACKLASH WITH MATE (REF), FEEL SET AT ASSEMBLY",
             f"{inch(minimum, 3)} TO {inch(maximum, 3)}",
         ),
         # cone_set_stack books each gear's tooth runout about its seat; this
