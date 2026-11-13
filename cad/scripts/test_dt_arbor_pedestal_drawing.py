@@ -595,6 +595,18 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)
 
 
+def test_plan_holes_share_one_drawn_centreline_through_both_centres() -> None:
+    """Rule 26: the .47 lateral runs to the hold-down hole, and the apex tap
+    sits on the same line; one centreline runs past both rims."""
+    spec = dt_arbor_pedestal_spec
+    (x0, _, z_far), (x1, _, z_near) = drawing.PLAN_HOLE_CENTRELINE_MM
+    assert x0 == x1 == 0.0
+    tap_radius = blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC) / 2.0
+    assert z_far < spec.SCREW_Z - spec.SCREW_HOLE_DIA / 2.0
+    assert z_near > spec.SET_SCREW_Z + tap_radius
+    assert "_add_plan_hole_centreline(adapter, top)" in _drawing_source()
+
+
 def test_crown_callout_and_flank_angle_define_the_tapered_flanks() -> None:
     """Round-2 review: the flanks run from the foot top (the strap root is the
     full foot width) up to tangency with the crown.  Fan-out local repeat of

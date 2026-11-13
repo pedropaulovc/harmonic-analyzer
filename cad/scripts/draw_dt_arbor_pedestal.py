@@ -9,6 +9,7 @@ from collections.abc import Callable
 from math import atan, degrees, pi, radians, sqrt
 from typing import Any, Literal
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -25,6 +26,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -39,6 +41,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_projection import model_point_in_view
 from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -268,6 +271,27 @@ SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _CROWN_APEX_Y + 0.0114)
 _HOLD_DOWN_RIM = SCREW_HOLE_DIA / 2.0 * _S * sqrt(0.5)
 HOLD_DOWN_EDGE_XY = (TOP_CENTER[0] - _HOLD_DOWN_RIM, _top_y(SCREW_Z) + _HOLD_DOWN_RIM)
 HOLD_DOWN_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _top_y(FOOT_NEAR_Z) - 0.004)
+# The plan's two holes -- the Ø.180 hold-down and the apex 4-40 tap -- both
+# sit on the foot's mid-width, and the .47 lateral runs to the hold-down's
+# centre alone. Their own centre marks stop short of each other, so nothing
+# tied the tap to that .47 (v49 ENFORCE r2, 2 of 2 runs, rule 26: holes in
+# line share a drawn centreline). One centreline, part-frame mm, runs from
+# past the hold-down's far rim to past the tap's, through both centres.
+_PLAN_CENTRELINE_OVERRUN_MM = 1.5
+PLAN_HOLE_CENTRELINE_MM = (
+    (
+        0.0,
+        BORE_HEIGHT + TOP_RADIUS,
+        SCREW_Z - SCREW_HOLE_DIA / 2.0 - _PLAN_CENTRELINE_OVERRUN_MM,
+    ),
+    (
+        0.0,
+        BORE_HEIGHT + TOP_RADIUS,
+        SET_SCREW_Z
+        + blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) / 2.0
+        + _PLAN_CENTRELINE_OVERRUN_MM,
+    ),
+)
 # Half the ink of a drawn line: the 0.25 mm line weight.
 _LINE_HALF_M = 0.000125
 
@@ -666,6 +690,63 @@ def _add_flank_angle(adapter: Any, view: Any, seat: Any, flank: Any) -> Any:
     return display
 
 
+@_telemetry.traced("drawing.arbor.plan_hole_centreline")
+def _add_plan_hole_centreline(adapter: Any, view: Any) -> None:
+    """One black plan-sketch centreline through both plan holes' centres.
+
+    draw_dt_pinion_spring._hole_axis_centerline's recipe: the part-mm ends are
+    projected to the sheet, taken into the view sketch's frame, placed direct
+    to the database (an inferred end snaps onto the centre marks) and read
+    back.
+    """
+    label = "plan hole centreline"
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the plan for the {label}")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for end in PLAN_HOLE_CENTRELINE_MM:
+        x, y = model_point_in_view(
+            adapter, view, tuple(value / 1000.0 for value in end), label=f"{label} end"
+        )
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError(f"failed to create the {label}")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(
+        points, ("GetStartPoint2", "GetEndPoint2"), strict=True
+    ):
+        placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+        drift = max(abs(a - b) for a, b in zip(actual, expected, strict=True))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"{label} {accessor[3:-6].lower()} point sits "
+                f"{drift * 1000.0:.4g} mm from where it was authored"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"{label} colour did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -833,6 +914,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, SET_SCREW_PRECISION, label="apex set-screw tap"
     )
     _prove_set_screw_callout_clear(adapter, tap_callout)
+    _add_plan_hole_centreline(adapter, top)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
