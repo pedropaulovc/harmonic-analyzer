@@ -69,8 +69,8 @@ its first-root position; no second general note restates that location.
      air minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent printed
      manufacturing and set tolerances, minus the swing-interval arc allowance. Fastener and running
      clearances, thread centring, shaft swing in the post journal and G19 cock can all be taken up
-     together; never put them in the RSS. The current calculated least air is 0.125 mm at the bushing,
-     3.985 mm at the end screw and 5.045 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
+     together; never put them in the RSS. The current calculated least air is 0.080 mm at the bushing,
+     3.940 mm at the end screw and 5.001 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
      clearance; `_native_cone_tip_air` checks the saved bodies against it.
      The shaft drawing (one sheet, **Shaft Controls**) dimensions each chucking
      from its own collar face (rule 11): the journal and the collar web from the
@@ -141,17 +141,49 @@ its first-root position; no second general note restates that location.
   `DEPTHS FROM SPOTFACE FLOOR` / `FAR WALL ONLY 10-32 UNF`, naming the face
   the depths start from as the top frame's does, and its associative
   full-thread and minimum-drill depth tokens are unchanged.
-  The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
-  near pedestal axis with the existing ±0.05 mm functional band. Both carry
-  one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
-  lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
-  without prescribing a setup or repeating the numeric offsets, and states
-  that the pivot's table X/Y are reference. Its actual native tag is resolved from the
-  physical pivot station, not a fixed family letter. The generated native
-  hole-table coordinates remain unchanged; that same physical row carries
+  **Cross-screw setup (#2387).** The four paths run along the 11.31 width,
+  so on the PM-30MV the base stands on one long edge (its flange edge on
+  the table, the faced underside clamped to an angle plate so the axis
+  stays parallel to it); the drill thrust bears down into the table. Laying
+  it flat under the 90°-tilted head instead puts the 18.00 length across the
+  8.25 table with the two stations 15.51 apart, past the 8.75 Y travel. On
+  edge the pad face stands 11.06 above the table against the 17 in spindle
+  limit, so each tool is chosen for its projection (drill chuck 3.74 in, an
+  unmeasured placeholder): the Ø.35 spotface with an 11/32 end mill in an R8
+  collet (12.6 in to the spindle nose); the Ø.206 near-wall clearance with a
+  #5 screw-machine drill (2-3/8 OAL, 16.4 in at the first touch); and the
+  far-wall Ø.159 tap drill with a jobber drill dropped through that
+  clearance onto the socket's far wall, 1.50 below the face, before the chuck
+  closes on it (15.7 in, 15.1 at the 1.93 depth). The 10-32 tap is turned
+  by hand, its .194 shank guided by the Ø.206 clearance. The top frame's
+  paths take the same tools at 10.59 on edge. The 11/32 end mill, the stub
+  drill and the angle plate are to buy (`tools.frame-spotface-endmill`,
+  `tools.frame-clearance-stub-drill`, `fixtures.angle-plate-4`, $45.46 in
+  all).
+- **`fr-harmonic-base` socket pattern (#2386).** The four Ø1.004 sockets
+  are transferred from the finished MHA-FR-02 sockets (sheet 2 note 2; their
+  table X/Y are reference), so the bored top frame is the master: its
+  sockets follow its cast bosses within ⌖ Ø.06 | E | F | G, and the base takes
+  whatever pattern it got. The 8.820 row pitch is past the 8.75 Y travel, so
+  each row is a clamping: with the base clamped and the top frame set on
+  it square to its outline, indicate each reachable top-frame socket, lift
+  the frame off and bore the base socket at that DRO position; turn the
+  base 180°, set the frame back on it located by two offcuts of the MHA-FR-03
+  tube through the bored row, and repeat for the other row.
+- **`fr-harmonic-base` pivot seat D1 (#2366).** D1 is transfer-punched
+  through the MHA-DT-20 pivot bore with the cone set at its feel-set pose,
+  then spotted, drilled and tapped with the base still on the mill (MHA-DT-00
+  step 23, owner ruling 2026-11-08). Sheet 2 note 1 says so and makes D1's
+  table X/Y reference; the model keeps its nominal offsets from the nearer
+  pedestal seat as untoleranced, unprinted references. The swing's stacks
+  book the transfer, not a band from the pedestal seats:
+  `cone_set_stack.PIVOT_SEAT_TRANSFER_MM`, the 1/4 in transfer punch's
+  radial play in the Ø.2500-.2505 bore (.00175) plus centring the spindle on
+  the punch mark (.002), 0.095 mm in all; the tip-air sweep still closes
+  arithmetically (bushing 0.080 mm least). The note's native tag is resolved
+  from the physical pivot station, and that hole-table row carries
   `SEE NOTE 1` in a custom NOTE column (#1744), because generated hole-table
-  cells are not editable. Both the numbered note and curated view-tag layout
-  follow station identity if native size families re-letter or merge.
+  cells are not editable.
 
 Owner exception **RV-02**, selected **2026-10-20** and registered under
 `fr-harmonic-base` in its package YAML, permits redundant default **2B** only
@@ -1027,7 +1059,7 @@ keeps D5's floor and the residual is the owner's
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the faced top carried into the two west bosses under the MHA-CH-07 keeper feet (the proud .18 removed inboard of a step .67 ±.01 from each socket axis, its floor one plane with the faced top because each foot's outboard end rests on it, root R.02 max so no root radius lies under a foot tip; owner ruling 2026-11-11, #1038, K5), the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 9.17 in from that edge) and both keeper feet (8.98 in) lie inside one pass of a facing cutter 3.35 in or wider, which the shop records do not yet list; the front hanger station (8.85) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G, then with the top up carry the faced top into the two west bosses to the step .67 from each bored socket axis (square-corner cutter, root R.02 max; pick the floor up on the faced top, so one plane lies under each keeper foot), and transfer-bore the base from it (#2386) |
+| **`fr-top-frame`** | gray-iron casting, ASTM A48 class 25B, about 24.2 lb as cast (18.0 lb finished; 17.35 × 10.59 × 1.93 in finished, 2.09 high as cast), poured by an outside foundry from a shop-printed pattern: the casting `[[stock]]` row in `cad/config/shop-equipment.toml` | T-section rails (.32 flange on the faced top, .51 web on the underside, R.12 roots), the .99 crossbar with its 1.117 pockets and four Ø1.77 bosses (on the faced top) .18 proud, as cast with 2° draft and ±.03; **machined:** the faced top (64.5 in²) and faced underside (23.5 in², datum A and both knife seats), the four boss tops, the faced top carried into the two west bosses under the MHA-CH-07 keeper feet (the proud .18 removed inboard of a step .67 ±.01 from each socket axis, its floor one plane with the faced top because each foot's outboard end rests on it, root R.02 max so no root radius lies under a foot tip; owner ruling 2026-11-11, #1038, K5), the edge breaks bordering those faced planes, 4 Ø1.004 sockets bored from solid bosses, 4 Ø1.083 cap recesses and their mouth chamfers, the Ø.520 gooseneck bore and its mouth chamfer, the 1/4-20 set-screw tap and its Ø.39 spot face, the 4 cross-screw Ø.35 counterbores with their Ø.206 clearance holes and 10-32 far-wall taps, the 2 letter C hanger holes with their Ø.1240 dowel reams and #51 knockouts, and the 2 keeper 2-56 taps transferred from MHA-CH-07 at assembly | flat parting on the faced top plane with no undercut along the pull (mesh audit of the farm-built model: 0.0 in² facing the wrong way, every plane wall and barrel at 2.00°), so the pattern needs no core or loose piece; at the as-cast limits the binding walls are the keeper 2-56 tap drill wall .0807 (target .080, floor .060), the counterbore-to-cap-recess ligament .088, the dowel ream to the crossbar side .105 (.098 at its mouth) and the socket to its barrel .247; the fillister head keeps .0009 under the counterbore mouth at the 3° barrel on its socket's axis and can stand .029 proud with the barrel also the boss position's .03 off its socket (owner question #2516); the set-screw spot face keeps .031 of stock; solid bosses are the heaviest sections, so feed them from the boss tops | the spindle stands 7.5 in from the column cover (`ch_rocker_arm_tl_oblique_trammel_spec.THROAT_TO_COVER`) and the frame is 10.59 deep, so each face takes two setups: with the rear boss barrels at the cover, both knife seats (print-worst hulls end 9.17 in from that edge) and both keeper feet (8.98 in) lie inside one pass of a facing cutter 3.35 in or wider, which the shop records do not yet list; the front hanger station (8.85) and the front socket row (9.705) are past the spindle, so the part is turned 180° and each station and socket row there is picked up from the rear row: the two rows are 8.820 apart, past the 8.75 Y travel, so a test indicator in the spindle reads the near side of an MHA-FR-03 tube offcut in each bored rear socket, 8.32 from the front row's axis and inside the travel (#2386); the cross-screw paths are drilled with the part on edge as the base's (#2387) | stress-relieved casting from the foundry; stand it on the three E boss bottoms against F1–F2 and G1 and face the top and the boss tops, turn it over onto the faced top and face the underside to the 1.437 grip (datum A), bore the socket pattern within Ø.06 of E, F and G, then with the top up carry the faced top into the two west bosses to the step .67 from each bored socket axis (square-corner cutter, root R.02 max; pick the floor up on the faced top, so one plane lies under each keeper foot), and transfer-bore the base from it (#2386) |
 
 ---
 

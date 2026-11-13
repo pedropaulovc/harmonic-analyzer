@@ -2835,26 +2835,7 @@ def test_base_tolerances_print_in_sheet_inch_at_the_nominal_places(monkeypatch) 
         places=depth_places,
         display_unit=part.UNIT,
     ) == (2, pytest.approx(0.0), pytest.approx(0.000508), 3)
-    for name in spec.PIVOT_SEAT_DIMENSIONS:
-        places = spec.DRAWING_PRECISION["PivotSeatReference"][name]
-        assert places == 3
-        assert _authored_tolerance(
-            monkeypatch,
-            _drawing_tolerances.set_dimension_symmetric_tolerance,
-            "PivotSeatReference",
-            name,
-            spec.PIVOT_SEAT_POSITION_BAND_MM,
-            places=places,
-            display_unit=part.UNIT,
-        ) == (4, pytest.approx(-0.0000508), pytest.approx(0.0000508), 3)
-    # Shown in mm, the same .002 band would need four places.
-    assert (
-        _drawing_tolerances._tolerance_places(
-            spec.PIVOT_SEAT_POSITION_BAND_MM, display_unit="mm"
-        )
-        == 4
-    )
-    # The builder authors both in the sheet's unit at those places.
+    # The builder authors it in the sheet's unit at those places.
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     calls = [
         node
@@ -2864,7 +2845,7 @@ def test_base_tolerances_print_in_sheet_inch_at_the_nominal_places(monkeypatch) 
         and node.func.id
         in {"set_dimension_bilateral_tolerance", "set_dimension_symmetric_tolerance"}
     ]
-    assert len(calls) == 2
+    assert len(calls) == 1
     for call in calls:
         keywords = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
         assert keywords["display_unit"] == "UNIT"
@@ -3117,7 +3098,9 @@ def test_socket_note_two_is_flagged_from_the_rows_under_note_one() -> None:
     note = sheet.socket_note(["A1", "A2", "A3", "A4"])
     rows = note.split("\n")
     assert rows[0].startswith("2. A1-A4: MATCHED FIT TO MHA-FR-03 TUBE: SLIDES IN BY HAND")
-    assert "MHA-FR-02" in rows[1]
+    # #2386: the pattern is carried from the top frame, so its X/Y are reference.
+    assert "TRANSFER FROM MHA-FR-02" in rows[1]
+    assert "X/Y" in rows[1]
     assert len(rows) == 2
     for word in ("ASSIGNED", "MATCH MARKS"):
         assert word not in note
@@ -3664,11 +3647,11 @@ def test_pivot_seat_note_names_its_transfer_route_without_numeric_offsets(tag) -
     screen 20261107T081227004Z: the .002 band named no fit route)."""
     import re
 
-    import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    # #2366: the seat is transferred, so the part owns no band for it.
+    assert not hasattr(base_spec, "PIVOT_SEAT_POSITION_BAND_MM")
     text = sheet.pivot_seat_step(tag)
     # Two rows: run 20261107T171816615Z counted a third, repeating the
     # banded offsets, over rule 7's four-line note block.
@@ -3730,7 +3713,7 @@ def test_numbered_pivot_note_is_created_once_as_an_ordinary_free_note() -> None:
     assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
 
 
-def test_pivot_offsets_keep_the_part_band_but_stay_off_the_print() -> None:
+def test_pivot_offsets_are_unbanded_references_off_the_print() -> None:
     import ast
     import inspect
 
@@ -3744,30 +3727,22 @@ def test_pivot_offsets_keep_the_part_band_but_stay_off_the_print() -> None:
     )
     names = set(spec.PIVOT_SEAT_DIMENSIONS)
     assert names == spec.DRAWING_DIMENSIONS["PivotSeatReference"]
-    # Run 20261107T191011860Z: the band is an MHA-DT-00 check after the
-    # MHA-DT-20 transfer, so the drawing imports neither offset.
+    # Run 20261107T191011860Z: D1 is transferred from the MHA-DT-20 bore at
+    # MHA-DT-00 step 23, so the drawing imports neither offset.
     assert not names & set(sheet.SHOWN_PRECISION_BY_NAME)
     assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 3)
-    # Both offsets, not their unprinted origin anchors, receive the unchanged
-    # functional band. This checks bindings rather than a setter's formatting.
+    # #2366: no tolerance is authored on either offset (they are references).
     tree = ast.parse(inspect.getsource(part.build))
-    loops = [
+    banded = [
         node for node in ast.walk(tree)
-        if isinstance(node, ast.For) and isinstance(node.iter, ast.Name)
-        and node.iter.id == "PIVOT_SEAT_DIMENSIONS"
-    ]
-    assert len(loops) == 1
-    setters = [
-        node for node in ast.walk(loops[0])
         if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "set_dimension_symmetric_tolerance"
+        and getattr(node.func, "id", "").startswith("set_dimension_")
+        and any(
+            isinstance(arg, ast.Constant) and arg.value == "PivotSeatReference"
+            for arg in node.args
+        )
     ]
-    assert len(setters) == 1
-    assert ast.literal_eval(setters[0].args[1]) == "PivotSeatReference"
-    assert isinstance(setters[0].args[2], ast.Name)
-    assert setters[0].args[2].id == loops[0].target.id
-    assert isinstance(setters[0].args[3], ast.Name)
-    assert getattr(part, setters[0].args[3].id) == spec.PIVOT_SEAT_POSITION_BAND_MM
+    assert banded == []
 
 
 def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> None:

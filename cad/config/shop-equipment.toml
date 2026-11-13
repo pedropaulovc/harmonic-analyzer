@@ -207,6 +207,7 @@ present = false
 name = "Transfer punch set, fractional and number sizes"
 kind = "transfer_punch_set"
 present = false
+note = "Buy a set ground no more than .003 in under nominal (e.g. Precise spotters, .0025 ±.0005 under from 2.5 mm to 17/32 in, Penn Tool listing read 2026-11-12): cone_set_stack.PIVOT_SEAT_TRANSFER_MM books the 1/4 in punch's radial play in the MHA-DT-20 pivot bore at that grind (#2366)."
 
 [tools.taper-pin-reamer]
 name = "Taper-pin reamer, 1:48, for the MHA-DT-09 pin"
@@ -461,6 +462,36 @@ source = "https://www.harborfreight.com/4-12-in-x-14-in-x-78-in-type-27-metal-gr
 purchase = "Harbor Freight 57245, HERCULES, $4.99 (listing read live 2026-11-11)"
 max_rpm = 13580
 
+# MHA-FR-01 and MHA-FR-02 cross-screw paths (#2387, cad/docs/machining-dfm.md
+# "Cross-screw setup"). The Ø.35 spotface and counterbore print .34-.36; the
+# owned LMS 6784 set jumps from 5/16 to 3/8, so an 11/32 (.3438) end mill is
+# bought. Held in a 3/8 R8 collet it stands far less proud than a drill chuck,
+# which keeps the base on edge (11.06 in face height) under the 17 in limit.
+[tools.frame-spotface-endmill]
+name = "HTC DC-11, 11/32 in 2-flute HSS double-end end mill, 3/8 in shank, 9/16 in LOC, 3-1/8 in OAL, centre cutting"
+kind = "end_mill"
+make = "HTC"
+sku = "DC-11"
+source = "https://fmcarbide.com/products/htc-dc-11"
+purchase = "FM Carbide DC-11 (EDP 17537), $13.11 each (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy"
+use = "MHA-FR-01 4X Ø.35 spotfaces and MHA-FR-02 4X Ø.35 counterbores"
+
+# The near-wall Ø.206 #10 close clearance on the same paths: a jobber #5 from
+# the owned 115-piece index stands too proud in the chuck with the base on
+# edge; the screw-machine length does not.
+[tools.frame-clearance-stub-drill]
+name = "TTC 01-071-005, #5 (.2055 in) HSS screw-machine length drill, 118 deg, 2-3/8 in OAL"
+kind = "drill"
+make = "TTC"
+sku = "01-071-005"
+source = "https://www.travers.com/product/ttc-production-01-071-005-screw-machine-length-stub-drill-01-071-005"
+purchase = "Travers 01-071-005, $2.40 each, 61 in stock (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy"
+use = "MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge"
+
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
@@ -469,6 +500,19 @@ max_rpm = 13580
 make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
 source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
+
+# Holds MHA-FR-01 and MHA-FR-02 on a long edge for the cross-screw paths
+# (#2387): the faced underside is clamped to its face, square to the table,
+# and the drill thrust bears down through the part into the table.
+[fixtures.angle-plate-4]
+name = "LittleMachineShop 5386 angle plate, 4 x 4 x 4 in, webbed end, cast iron"
+make = "LittleMachineShop"
+sku = "5386"
+source = "https://littlemachineshop.com/products/angle-plate-4-webbed-end"
+purchase = "LittleMachineShop 5386, $29.95 sale (regular $34.95), low stock (listing read live 2026-11-12)"
+present = false
+status = "not owned: to buy"
+use = "MHA-FR-01 and MHA-FR-02 on edge for the cross-screw paths"
 
 # Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
 # setups name (plan text and diagrams; prechips has no parallel or jack record).

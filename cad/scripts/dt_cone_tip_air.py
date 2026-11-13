@@ -290,7 +290,7 @@ BLOCK_PLAN_SHIFT_SOURCE = "tip block plan shift over G19"
 # The swing's frame (cone_set_stack's set-at-assembly terms).
 SWING_TERMS_MM = {
     "platform pivot bore on the shoulder": cone_set_stack.PIVOT_BORE_FLOAT_MM,
-    "base pivot seat to the pedestal seats": cone_set_stack.PIVOT_SEAT_POSITION_MM,
+    "base pivot seat transferred through the platform bore": cone_set_stack.PIVOT_SEAT_TRANSFER_MM,
     "pivot thread centring": cone_set_stack.PIVOT_THREAD_CENTRING_MM,
 }
 IN_SERVICE_CLEARANCES = frozenset(
@@ -320,7 +320,7 @@ INDEPENDENT_TOLERANCES = frozenset(
         "tip passage centre",
         "tip block square on its one screw",
         "tip block depth",
-        "base pivot seat to the pedestal seats",
+        "base pivot seat transferred through the platform bore",
         "swing feel set",
         "bushing outside diameter",
         "bushing length",

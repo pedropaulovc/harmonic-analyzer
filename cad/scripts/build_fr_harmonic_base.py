@@ -70,10 +70,7 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _holes import (
     DRILL_POINT_H,
@@ -111,7 +108,6 @@ from fr_harmonic_base_spec import (
     MM_PER_IN,
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
-    PIVOT_SEAT_POSITION_BAND_MM,
     POCKET_CEILING_Y,
     POCKET_CORNER_FILLET_R,
     POCKET_FILLET_TOL_TYPE,
@@ -373,7 +369,7 @@ PEDESTAL_SCREW_XZ = (
     (X_DRUM, BANK_FRONT_STRAP_INNER_Z - _PEDESTAL_LEDGE_OFFSET),
     (X_DRUM, BANK_BACK_STRAP_INNER_Z + _PEDESTAL_LEDGE_OFFSET),
 )
-# The setup offsets use the same live seat stations as the physical cuts.
+# The reference offsets use the same live seat stations as the physical cuts.
 # Top-plane sketch/table Y is machine -Z; retain the signs for point placement
 # and use unsigned native dimensions, as every point-distance sketch does.
 PIVOT_NEAR_PEDESTAL_XZ = min(
@@ -1601,7 +1597,7 @@ async def _build_height_reference(adapter) -> None:
 
 
 async def _build_pivot_seat_reference(adapter) -> None:
-    """Own D1's setup offsets without adding a wire or changing the solid.
+    """Keep D1's nominal offsets from the nearer pedestal seat as a reference.
 
     Two sketch points coincide in projection with the actual pedestal and
     pivot axes. Globals follow the same stations as the Hole Wizard cuts;
@@ -2877,15 +2873,6 @@ async def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"],
         display_unit=UNIT,
     )
-    for dimension_name in PIVOT_SEAT_DIMENSIONS:
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "PivotSeatReference",
-            dimension_name,
-            PIVOT_SEAT_POSITION_BAND_MM,
-            places=DRAWING_PRECISION["PivotSeatReference"][dimension_name],
-            display_unit=UNIT,
-        )
     # Every pocket corner fillet prints as one single limit, "R.23 MAX":
     # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.
     _display, fillet_radius = _named_dimension(

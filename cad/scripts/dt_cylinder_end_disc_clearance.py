@@ -57,7 +57,7 @@ def clearance_budget(
     set_stack = setup.SWING_SET_FROM_PLACEMENT_MM
     pivot_stack = (
         setup.PIVOT_BORE_FLOAT_MM
-        + setup.PIVOT_SEAT_POSITION_MM
+        + setup.PIVOT_SEAT_TRANSFER_MM
         + setup.PIVOT_THREAD_CENTRING_MM
         + setup.ARBOR_RUNNING_FLOAT_MM
     )
