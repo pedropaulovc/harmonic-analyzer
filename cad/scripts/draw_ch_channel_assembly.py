@@ -501,6 +501,7 @@ class BankView:
     exploded: bool = False
     letter: str = ""  # a detail's letter, at its boundary in the parent
     letter_corner: tuple[int, int] = (1, 1)  # letter_xy's corner for it
+    letter_offset: float | None = None  # sheet m past the boundary; None: default
     label_xy: tuple[float, float] | None = None  # caption point, if not under it
     # The scale of the sheet the view is placed on: a view at that scale
     # prints none (drawing-guidelines.md rule 9).
@@ -624,11 +625,13 @@ def letter_xy(
     centre: tuple[float, float],
     radius: float,
     corner: tuple[int, int] = (1, 1),
+    offset: float | None = None,
 ) -> tuple[float, float]:
-    """A detail letter's note point, past its boundary toward ``corner``
-    (x, y signs: (1, 1) upper right)."""
-    offset = radius + DETAIL_LETTER_OFFSET
-    return centre[0] + corner[0] * offset, centre[1] + corner[1] * offset
+    """A detail letter's note point, ``offset`` (sheet m, default
+    DETAIL_LETTER_OFFSET) past its boundary toward ``corner`` (x, y signs:
+    (1, 1) upper right)."""
+    reach = radius + (DETAIL_LETTER_OFFSET if offset is None else offset)
+    return centre[0] + corner[0] * reach, centre[1] + corner[1] * reach
 
 
 LEVER_BANK = BankView(
@@ -857,8 +860,11 @@ NORTH_KEEPER_DETAIL = BankView(
     letter="C",
     # Lower right: at the upper right, lever balloon 14's leader ran through
     # the letter (r8 layout audit, leader-through-text); r7's leaders pass
-    # 10 mm clear of the lower right.
+    # 10 mm clear of the lower right. 6 mm out, not 2: at 2 the letter stood
+    # on the bar bank's right edge and its outline struck through the C
+    # (machinist review on PR #2702).
     letter_corner=(1, -1),
+    letter_offset=0.006,
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 # The partial views with a viewing arrow on sheet 1, and every lettered view.
@@ -2211,7 +2217,7 @@ def _mark_detail(
     _sketch_view_circle(adapter, view, centre, radius, label=label)
     adapter.currentModel.ClearSelection2(True)
     _activate_view(adapter, view, label=parent)
-    point = letter_xy(centre, radius, detail.letter_corner)
+    point = letter_xy(centre, radius, detail.letter_corner, detail.letter_offset)
     if add_note(adapter, detail.letter, *point) is None:
         raise RuntimeError(f"failed to letter the {label}")
 

@@ -606,6 +606,14 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     # Machinist review (PR #1605): at the upper right the letter B sat over
     # the rocker bank's stack beside the circle; the lower left is open.
     assert bracket.letter_corner == (-1, -1)
+    # PR #2702 machinist review: DETAIL C's letter stood on the bar bank's
+    # right edge; it sits farther out than the default, down and right.
+    assert keeper.letter_corner == (1, -1)
+    assert keeper.letter_offset > drawing.DETAIL_LETTER_OFFSET
+    centre, radius = (0.0, 0.0), 0.005
+    assert drawing.letter_xy(centre, radius, keeper.letter_corner, keeper.letter_offset)[0] > (
+        drawing.letter_xy(centre, radius, keeper.letter_corner)[0]
+    )
     # Each cluster member's exploded reference point projects inside its
     # circle with room for the part round it: the washer (Ø10.2), the set
     # screw above the ear apex, the hold-down over its foot hole.
