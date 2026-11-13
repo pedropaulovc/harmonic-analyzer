@@ -44,8 +44,31 @@ QUANTITIES = {BAR: 1, BIT: 1, SET_SCREW: 1}
 STICK_OUT = 2.54  # .100 nominal: P1 beyond the bar's surface
 STICK_OUT_WINDOW = (2.032, 3.048)  # .080-.120, read with a caliper
 SWING_RADIUS = bar.BAR_RADIUS + STICK_OUT
-# Drawing-added references print at the title block's .XXX.
-DRAWING_REFERENCE_PRECISION = 3
+# Both print as references: the assembly's own model dimensions on its hidden
+# settings sketch (build_dt_cone_tip_gear_tl_cutter_assembly), one
+# construction chain along the bit's axis at the cross-hole station from the
+# bar's axis through the bar's surface to P1.  Neither depends on how the
+# bit's form edges are built.
+SETTINGS_SKETCH = "CutterSettingsReference"
+STICK_OUT_DIMENSION = "StickOut"
+SWING_RADIUS_DIMENSION = "SwingRadius"
+# The chain (assembly X, Y; mm): bar axis, bar surface, P1.
+SETTINGS_CHAIN = (
+    (0.0, bar.CROSS_HOLE_STATION),
+    (bar.BAR_RADIUS, bar.CROSS_HOLE_STATION),
+    (SWING_RADIUS, bar.CROSS_HOLE_STATION),
+)
+# The settings print at the title block's .XXX.
+SETTINGS_PLACES = 3
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    SETTINGS_SKETCH: {STICK_OUT_DIMENSION, SWING_RADIUS_DIMENSION},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    SETTINGS_SKETCH: {
+        STICK_OUT_DIMENSION: SETTINGS_PLACES,
+        SWING_RADIUS_DIMENSION: SETTINGS_PLACES,
+    },
+}
 
 # --- Poses (assembly frame, mm; rows are the images of the part axes) ----------
 BAR_POSITION = (0.0, 0.0, 0.0)
@@ -98,9 +121,10 @@ if TRAILING_REACH_EXCESS >= 0.0:
 TAIL_X_RANGE = tuple(bar.BAR_RADIUS + s - bit.BIT_LENGTH for s in STICK_OUT_WINDOW)
 if not -bar.BAR_RADIUS < TAIL_X_RANGE[0] < TAIL_X_RANGE[1] < -set_screw.MAJOR_DIA:
     raise AssertionError("the bit's tail must stay inside the bar, past the screw")
-# (f) The seated screw finishes flush with the cutting end.
-if abs(bar.SET_SCREW_PROUD) > 0.0254:
-    raise AssertionError("the seated set screw must finish flush with the cutting end")
+# (f) Seated on the bit, the screw keeps 1.5D of thread at the bar's shortest
+#     cross-hole station (its socket face then stands proudest).
+if bar.SET_SCREW_ENGAGED_MIN < bar.SET_SCREW_MIN_ENGAGEMENT:
+    raise AssertionError("the seated set screw must keep 1.5D of thread")
 
 # --- Sheet words ---------------------------------------------------------------
 BOM_COMPONENTS = (BAR, BIT, SET_SCREW)
@@ -123,6 +147,9 @@ ASSEMBLY_STEPS = "\n".join(
         "3. TIGHTEN ITEM 3 THROUGH ITEM 1'S CUTTING END ONTO ITEM 2.",
     )
 )
-STICK_OUT_CALLOUT = "STICK-OUT, STEP 2"
-SWING_RADIUS_CALLOUT = "SWING RADIUS"
+# Named above each value; step 2 names the stick-out's window.
+DIMENSION_CALLOUTS: dict[str, str] = {
+    STICK_OUT_DIMENSION: "STICK-OUT",
+    SWING_RADIUS_DIMENSION: "SWING RADIUS",
+}
 ISO_NOTE = "ISOMETRIC VIEW SCALE 2:1"

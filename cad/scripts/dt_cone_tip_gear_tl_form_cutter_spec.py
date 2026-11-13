@@ -402,17 +402,20 @@ if set(DRAWING_PRECISION) != set(DRAWING_DIMENSIONS) or any(
 ):
     raise AssertionError("every printed dimension needs its places, and only those")
 
-# Rule 4: the band names its mate; rule 7: words, no method.
+# Rule 4: the band names its mate; rule 7: words, no method.  The material
+# block names the drill rod, so the Ø says only that it stays as supplied.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "BitDia": f"DRILL ROD, AS SUPPLIED\nSLIP FIT IN {BAR_NUMBER}",
+    "BitDia": f"AS SUPPLIED\nSLIDING FIT IN {BAR_NUMBER}",
     "FlatLength": "FLAT TO CENTER LINE",
     "FrontClearance": "FRONT CLEARANCE",
     "SideClearance": "SIDE CLEARANCE,\nBOTH FLANKS",
 }
+# The flat's callout states the face on the centre line; note 2 does not
+# repeat it.
 SHEET_NOTES = "\n".join(
     (
         f"1. FACE FORM: TOOTH SPACE OF {GEAR_NUMBER}, SHEET 2 (P1-P17), CENTERED ON BIT AXIS.",
-        "2. FACE ON BIT CENTER LINE (ZERO RAKE); CUTTING EDGES SHARP, NO BURR.",
+        "2. ZERO RAKE; CUTTING EDGES SHARP, NO BURR.",
         f"3. ACCEPT BY THE GEAR IT CUTS: {GEAR_NUMBER} OVER-PINS AND ASSEMBLY BACKLASH.",
     )
 )
