@@ -11,11 +11,14 @@ isometric.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
 import dt_cone_gear_tl_arbor_assembly_spec as spec
+import dt_cone_gear_tl_arbor_collar_spec as collar
+import dt_cone_gear_tl_keyed_arbor_spec as arbor
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
@@ -87,6 +90,37 @@ BOM_COMPONENTS = spec.BOM_ORDER
 # the default anchor finds it; an ``@<member>:1`` pin is a semantic reference
 # selector, which only roles registered in ``_component_references`` resolve.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# The side view sees every turned edge edge-on, one line across the axis. A
+# leader asked on such a line near its end lands ON the end: farm
+# 20261113T042822797Z walked the arbor to its thread end's rim at part
+# (1.133, 2.966, 65.532), 0.42 mm (sheet) in from the line's end, and the
+# leader read back on the end (_assert_leader_lands, limit 0.2 mm); the
+# collars' walks that stood far from their ends were not snapped. The oblique
+# jig's form (draw_ch_rocker_arm_tl_oblique_jig_assembly: KP08_RIM_DEG,
+# STUD_RIM_DEG): a rim point RIM_DEG round from the viewer's +X toward +Y, so
+# it stands mid-line, on the viewer's half of a real circular edge. The
+# arbor's is the grip step's outer rim (Ø.62 at the jaw step, clear of every
+# kit part), 7.9 mm (sheet) from either end of its line and 4.8 from the
+# standoff's silhouette; the Ø1.00 collar's walk stood 1.7 mm from its line's
+# end, so its rim is frozen the same way, on the face its walk found drawn.
+RIM_DEG = 30.0
+
+
+def rim_point(radius: float, z: float) -> tuple[float, float, float]:
+    """Part millimetres of the rim of ``radius`` at ``z``, RIM_DEG round."""
+    angle = math.radians(RIM_DEG)
+    return (radius * math.cos(angle), radius * math.sin(angle), z)
+
+
+BALLOON_ANCHORS[spec.ARBOR] = BalloonAnchor(
+    point_mm=rim_point(arbor.GRIP_DIA / 2.0, arbor.GRIP_LENGTH)
+)
+_C100 = spec.member(collar.CONFIGURATIONS[1])
+BALLOON_ANCHORS[_C100] = BalloonAnchor(
+    point_mm=rim_point(
+        collar.OD_BY_CONFIGURATION[collar.CONFIGURATIONS[1]] / 2.0, collar.LENGTH
+    )
+)
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 

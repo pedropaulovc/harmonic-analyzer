@@ -1,9 +1,9 @@
 r"""Create the drawing for MHA-DT-03-TL-04, the keyed arbor's backing collars.
 
 Shop tooling (issue #2465). One sheet per member (the base bar's recipe,
-``draw_ch_rocker_arm_tl_oblique_base_bar``): the end view prints the outside
-diameter (stock) and the drilled bore, the side view the length, and one note
-names the blanks the member backs on MHA-DT-03-TL-03.
+``draw_ch_rocker_arm_tl_oblique_base_bar``): the side view prints the outside
+diameter (stock) and the length, the end view the drilled bore's callout,
+and the member's caption names it as the kit's parts list does.
 """
 
 from __future__ import annotations
@@ -12,7 +12,12 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 import _telemetry
 import dt_cone_gear_tl_arbor_collar_spec as spec
@@ -25,7 +30,11 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    move_model_dimension,
+    set_dimension_callouts,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -60,12 +69,25 @@ SIDE_CENTER = (0.240, 0.165)
 ISO_CENTER = (0.340, 0.150)
 NOTE_XY = (0.030, 0.060)
 ISO_NOTE_XY = (0.305, 0.110)
-OD_RISE = 0.012
+# Both diameters import on the end view, where every diameter line runs
+# through the centre: two crossed there (machinist review r1-r3 of farm
+# 20261113T042822797Z). The bore keeps the end view, its callout up and right
+# of it; the outside diameter is a donor there and moves onto the side view,
+# right of the collar (rule 11: turned parts read like the lathe), the
+# wheel-axle spacer's recipe (draw_mg_wheel_axle_spacer).
+OD_DONOR_RISE = 0.012
+OD_SIDE_RUN = 0.020
 BORE_RUN = 0.030
 # The bore's leader climbs at least this far to its text, clear of the
 # horizontal centreline on the smallest member.
 BORE_RISE_MIN = 0.015
 LENGTH_DROP = 0.014
+# The outside diameter's text on the side view: right of the collar at its
+# axis, so its dimension line stands off the part.
+OD_ON_SIDE = (
+    SIDE_CENTER[0] + spec.LENGTH * VIEW_SCALE[0] / 2000.0 + OD_SIDE_RUN,
+    SIDE_CENTER[1],
+)
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
@@ -84,8 +106,9 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
     for view in (end, side, iso):
         set_hidden_lines_removed(adapter, view)
     configure_reference_views(adapter, configuration, [end, side, iso])
+    od_name = spec.od_name(configuration)
     end_keep = {
-        spec.od_name(configuration): (END_CENTER[0], END_CENTER[1] + half + OD_RISE),
+        od_name: (END_CENTER[0], END_CENTER[1] + half + OD_DONOR_RISE),
         spec.bore_name(configuration): (
             END_CENTER[0] + half + BORE_RUN,
             END_CENTER[1] + max(half / 2.0, BORE_RISE_MIN),
@@ -97,21 +120,30 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
             SIDE_CENTER[1] - half - LENGTH_DROP,
         ),
     }
+    end_annotations = curate_view_dimensions(
+        adapter,
+        end,
+        keep=end_keep,
+        view_label=f"{configuration} end",
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
+    side_annotations = curate_view_dimensions(
+        adapter,
+        side,
+        keep=side_keep,
+        view_label=f"{configuration} side",
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
+    od_donors = [a for a in end_annotations if dimension_name(adapter, a) == od_name]
+    if len(od_donors) != 1:
+        raise RuntimeError(f"expected one {od_name} donor dimension on the end view")
+    moved_od = move_model_dimension(
+        adapter, od_donors[0], side, OD_ON_SIDE, source_view=end
+    )
     annotations = [
-        *curate_view_dimensions(
-            adapter,
-            end,
-            keep=end_keep,
-            view_label=f"{configuration} end",
-            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-        ),
-        *curate_view_dimensions(
-            adapter,
-            side,
-            keep=side_keep,
-            view_label=f"{configuration} side",
-            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-        ),
+        *(a for a in end_annotations if dimension_name(adapter, a) != od_name),
+        *side_annotations,
+        moved_od,
     ]
     printed = set(end_keep) | set(side_keep)
     assert_imported_precision(
@@ -123,14 +155,13 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
         adapter,
         annotations,
         {
-            spec.od_name(configuration): spec.STOCK_CALLOUT,
+            od_name: spec.STOCK_CALLOUT,
             spec.bore_name(configuration): spec.BORE_CALLOUT,
         },
     )
     _activate_view(adapter, end, label=f"{configuration} end")
-    text = spec.member_note(configuration)
-    if add_note(adapter, text, *NOTE_XY) is None:
-        raise RuntimeError(f"failed to add the {configuration} member note")
+    if add_note(adapter, spec.member_label(configuration), *NOTE_XY) is None:
+        raise RuntimeError(f"failed to add the {configuration} member caption")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
 

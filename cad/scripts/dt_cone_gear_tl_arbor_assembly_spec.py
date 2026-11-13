@@ -16,11 +16,14 @@ beyond the arbor's end. Every part is fixed (0 DOF).
 
 from __future__ import annotations
 
+import math
+
 import _config
 import dt_cone_gear_tl_arbor_collar_spec as collar
 import dt_cone_gear_tl_arbor_key_spec as key
 import dt_cone_gear_tl_keyed_arbor_spec as arbor
 import dt_cone_gear_tl_vn_arbor_nut_spec as nut
+import dt_crank_drive_gear_spec as crank
 
 ASM_NAME = "dt-cone-gear-tl-arbor"
 INCH = arbor.INCH
@@ -130,6 +133,29 @@ _COLLAR_ITEMS = "; ".join(
     f"ITEM {BOM_ITEMS[member(name)]} {_gear_span(name)}"
     for name in collar.CONFIGURATIONS
 )
+
+
+# --- The first cut's index ---------------------------------------------------------
+# Both gear families centre a TOOTH, not a gap, on the keyway's centreline
+# (+X): the cone gears cut each gap half a pitch either side of it (the core
+# gap rotated by pi/N, _cone_gear_native.native_gap_segments; the keyway
+# clock in dt_cone_gear_spec), and the 64T's straight inclined space is
+# clocked so a tooth centres on it at mid-face on the pitch circle
+# (dt_crank_drive_gear_spec.TOOTH_SPACE). The key set on the cutter
+# centreline would put the first space on the keyway (Codjiflo review of
+# #2664), so the blank is indexed before the first cut: half a pitch, either
+# way, on a cone gear. The 64T's cutter plane crosses its axis a quarter face
+# from mid-face (TOOTH_SPACE_CROSSING from its chamfered, z = 0, face), where
+# its seed space stands TOOTH_SPACE.azimuth_rad counter-clockwise about the
+# gear's +z from the keyway; half a pitch would leave its mid-face tooth
+# about .55° off the key, over the arbor's setting allowance
+# (KEY_SETTING_ALLOWANCE_DEG). Turning the blank counter-clockwise seen from
+# the chamfered face carries that space under the cutter.
+CONE_FIRST_INDEX_PITCHES = 0.5
+_CONE_FIRST_INDEX_WORDS = {0.5: "HALF A PITCH"}[CONE_FIRST_INDEX_PITCHES]
+CRANK_FIRST_INDEX_DEG = round(math.degrees(crank.TOOTH_SPACE.azimuth_rad), 2)
+CRANK_FIRST_INDEX_SENSE = "COUNTER-CLOCKWISE SEEN FROM ITS CHAMFERED FACE"
+
 # Three fitting steps (rule 22, one action each); the key's clock is the
 # last, the setting every cut depends on. LOCTITE 638 is a consumable.
 ASSEMBLY_STEPS = "\n".join(
@@ -142,9 +168,10 @@ ASSEMBLY_STEPS = "\n".join(
         "FIT ITS",
         f"   COLLAR ({_COLLAR_ITEMS})",
         f"   AND ITEM {BOM_ITEMS[NUT]}; TIGHTEN.",
-        f"3. ITEM {BOM_ITEMS[KEY]} CARRIES THE BLANK'S CLOCK: SET IT ON THE CUTTER "
-        "CENTRELINE",
-        "   BEFORE THE FIRST CUT.",
+        f"3. SET ITEM {BOM_ITEMS[KEY]} ON THE CUTTER CENTRELINE, THEN INDEX "
+        f"{_CONE_FIRST_INDEX_WORDS} ({crank.TEETH}T:",
+        f"   {CRANK_FIRST_INDEX_DEG:.2f}°, {CRANK_FIRST_INDEX_SENSE}) BEFORE THE",
+        "   FIRST CUT: A TOOTH, NOT A GAP, CENTRES ON THE KEY.",
     )
 )
 if sum(1 for line in ASSEMBLY_STEPS.splitlines() if line[:2].rstrip(".").isdigit()) > 3:

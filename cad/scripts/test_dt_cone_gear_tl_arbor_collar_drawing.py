@@ -86,40 +86,52 @@ def test_member_volumes_and_dimensions_are_the_disc_and_bore() -> None:
     assert len(features) == len(set(features))
 
 
-def test_each_member_sheet_names_its_member_and_only_its_own_gears() -> None:
+def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_backs() -> None:
+    """Which blanks a member backs is assembly information: the kit's step 2
+    lists it by item number, and a part-sheet note repeating it was narration
+    (rule 7, machinist review of farm 20261113T042822797Z)."""
+    import dt_cone_gear_tl_arbor_assembly_spec as kit
+
     assert tuple(drawing.MEMBER_SHEETS.values()) == spec.CONFIGURATIONS
     assert len(set(spec.SHEET_NAMES)) == len(spec.SHEET_NAMES)
-    notes = {name: spec.member_note(name) for name in spec.CONFIGURATIONS}
-    labels = set()
-    for name, note in notes.items():
-        label, note_1 = note.splitlines()
+    labels = {name: spec.member_label(name) for name in spec.CONFIGURATIONS}
+    assert len(set(labels.values())) == len(spec.CONFIGURATIONS)
+    for name, label in labels.items():
         assert label == (
             f"{spec.CONFIGURATION_DESCRIPTIONS[name]} OF {spec.PART_NUMBER}, "
             f"QTY {spec.QUANTITY_BY_CONFIGURATION[name]}"
         )
-        labels.add(label)
-        assert note_1.startswith("1. BACKS MHA-DT-03-T")
-        assert note_1.endswith(f" ON {spec.ARBOR_SHORT}.")
-        assert arbor.PART_NUMBER.endswith(spec.ARBOR_SHORT)
-        numbers = {blank.tag: blank.number for blank in arbor.KEYED_GEARS}
-        backed = [t for t in spec.GEARS_BY_CONFIGURATION[name] if t.startswith("T")]
-        assert numbers[backed[0]] in note_1 and numbers[backed[-1]] in note_1
-    assert len(labels) == len(spec.CONFIGURATIONS)
-    crank_tag = arbor.KEYED_GEARS[-1].tag
-    holders = [
-        n for n, tags in spec.GEARS_BY_CONFIGURATION.items() if crank_tag in tags
-    ]
-    assert len(holders) == 1
-    assert "MHA-DT-07" in notes[holders[0]]
-    assert sum("MHA-DT-07" in note for note in notes.values()) == 1
+        assert "\n" not in label
+        item = kit.BOM_ITEMS[kit.member(name)]
+        cones = [int(t[1:]) for t in spec.GEARS_BY_CONFIGURATION[name] if t[0] == "T"]
+        assert f"ITEM {item} {cones[0]}T-{cones[-1]}T" in kit.ASSEMBLY_STEPS
+
+
+def test_the_bore_callout_names_its_process() -> None:
+    """Rule 12: a plain drilled size under DRILLED HOLES says DRILL."""
+    assert spec.BORE_CALLOUT == "DRILL THRU"
+    assert spec.BORE == pytest.approx(arbor.COLLAR_BORE)
 
 
 def test_the_largest_member_fits_the_sheet_at_its_scale() -> None:
     largest = max(spec.OD_BY_CONFIGURATION.values())
     half = largest * drawing.VIEW_SCALE[0] / 2000.0
     assert drawing.END_CENTER[0] + half + drawing.BORE_RUN < drawing.SIDE_CENTER[0]
-    assert drawing.END_CENTER[1] + half + drawing.OD_RISE < 0.2667
+    assert drawing.END_CENTER[1] + half + drawing.OD_DONOR_RISE < 0.2667
     assert drawing.END_CENTER[0] - half > 0.0127
+
+
+def test_the_outside_diameter_reads_on_the_side_view_clear_of_the_isometric() -> None:
+    """Rule 11: the OD stands right of the side view, its two-line text
+    (about 20 mm wide at 2:1) between the collar and the largest isometric."""
+    text_half = 0.010
+    side_right = drawing.SIDE_CENTER[0] + spec.LENGTH * drawing.VIEW_SCALE[0] / 2000.0
+    iso_left = (
+        drawing.ISO_CENTER[0] - max(spec.OD_BY_CONFIGURATION.values()) / 2000.0 * 1.25
+    )
+    assert drawing.OD_ON_SIDE[1] == drawing.SIDE_CENTER[1]
+    assert side_right < drawing.OD_ON_SIDE[0] - text_half
+    assert drawing.OD_ON_SIDE[0] + text_half < iso_left
 
 
 def test_the_isometric_and_its_label_stand_clear_of_the_title_block() -> None:
