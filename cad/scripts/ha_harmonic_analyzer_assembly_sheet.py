@@ -147,6 +147,10 @@ def sub_step(key: str, index: int) -> str:
     return f"{_n(key)}{SUB_STEP_LETTERS[index]}"
 
 
+# MHA-SM-00's last step before its own AT FINAL ASSEMBLY step (that sheet
+# imports this package's step numbers, so the number is stated here and
+# test_ha_assembly_package holds it to the MHA-SM-00 sequence).
+SM_LAST_BENCH_STEP = "8B"
 # Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):
 # the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
 # drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
@@ -178,8 +182,8 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     ),
     "drive-train-built": _BUILT_APART,
     "summing-hung": (
-        "SUMMING LEVER: BUILD MHA-SM-00 UNDER THE TOP-FRAME CROSSBAR, ITS STEPS "
-        "BEFORE FINAL ASSEMBLY IN ORDER, THE MHA-SM-01 POST OUT OF ITS HUB.",
+        f"SUMMING LEVER: BUILD MHA-SM-00 STEPS 1-{SM_LAST_BENCH_STEP} UNDER THE "
+        "TOP-FRAME CROSSBAR, THE MHA-SM-01 POST OUT OF ITS HUB.",
     ),
     "channel-built": (
         f"CHANNEL BANK: BUILD {build.CH_ON_FRAME.text} ON THE FRAME, EACH "
