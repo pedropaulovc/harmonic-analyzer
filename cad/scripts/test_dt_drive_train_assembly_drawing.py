@@ -899,6 +899,86 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
+class _SheetTable:
+    """A native general table that keeps what it was given, as SolidWorks does."""
+
+    ROW_HEIGHT = 0.005525  # GetRowHeight, both seats (leaf 20261112T161937Z)
+
+    def __init__(self, x: float, top: float, rows: int, columns: int) -> None:
+        self.anchor = (x, top, 0.0)
+        self.RowCount, self.ColumnCount = rows, columns
+        self.widths: dict[int, float] = {}
+        self.cells: dict[tuple[int, int], str] = {}
+
+    def SetColumnWidth(self, column, width, _mode):  # noqa: N802
+        self.widths[column] = width
+        return width
+
+    def SetText2(self, row, column, _displayed, text):  # noqa: N802
+        self.cells[row, column] = text
+
+    def DisplayedText2(self, row, column, _displayed):  # noqa: N802
+        return self.cells[row, column]
+
+    def GetAnnotation(self):  # noqa: N802
+        return SimpleNamespace(GetPosition=lambda: self.anchor)
+
+    def GetRowHeight(self, _row):  # noqa: N802
+        return self.ROW_HEIGHT
+
+    def GetColumnWidth(self, column):  # noqa: N802
+        return self.widths[column]
+
+
+@pytest.mark.parametrize("title_read_error", (0.0, -0.0009, 0.0009))
+def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
+    monkeypatch: pytest.MonkeyPatch, title_read_error: float
+) -> None:
+    """Release v49 r2 (leaf 20261113T025825Z): on a 1010x678 px seat window the
+    titles' pixel-read boxes put the pedestal recheck table 0.37 mm inside the
+    station table field; on the 1010x598 px one it cleared by 0.53 mm.  A
+    table hangs off its title's requested top, so a title box read a pixel
+    or two off moves no table, and the stack ends 2 mm clear of the station
+    table field and the interface notes."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_reference_iso", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_stack_sheet_note_fields", lambda *_args: [])
+    monkeypatch.setattr(drawing, "_add_note_block", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        drawing,
+        "_anchor_note",
+        lambda _adapter, _note, corner, **_kwargs: (
+            corner[0],
+            corner[1] - drawing.NOTE_LINE_PITCH + title_read_error,
+            corner[0] + 0.08,
+            corner[1] + title_read_error,
+        ),
+    )
+    tables: list[_SheetTable] = []
+
+    def insert(_bom, x, top, _anchor, _template, rows, columns):
+        tables.append(_SheetTable(x, top, rows, columns))
+        return tables[-1]
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(InsertTableAnnotation2=insert))
+
+    assert drawing._place_setting_sheet(adapter, facts=None) == []
+
+    setting, recheck, feeler = tables
+    assert setting.anchor[1] == pytest.approx(
+        drawing.NOTE_FIELD_LEFT[1] - drawing.TABLE_TITLE_DROP
+    )
+    bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
+    for above, below in zip(bottoms, (recheck, feeler)):
+        assert above - below.anchor[1] == pytest.approx(
+            drawing.SETTING_TABLE_GAP + drawing.TABLE_TITLE_DROP
+        )
+    assert bottoms[1] - drawing.STATION_TABLE_FIELD[1] >= 0.002
+    assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
+
+
 def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     """Owner ruling 2026-11-08 (Pedro): step 23 transfer-punches D1 through
     the MHA-DT-20 pivot bore with the cone set at its working position,

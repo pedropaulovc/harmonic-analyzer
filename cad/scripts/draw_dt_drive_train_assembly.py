@@ -699,6 +699,22 @@ SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
 TABLE_CHAR_WIDTH = 0.0028
 TABLE_CELL_PAD = 0.004
 TABLE_TITLE_GAP = 0.0015
+# A sheet 15 table hangs a fixed drop under its title's requested top: the
+# inset, the title's one line and the gap.  It used to hang off the title's
+# INote.GetExtent bottom, which reads to the seat window's pixel, and each
+# table carried the error down the stack: the same sheet put the pedestal
+# recheck table's bottom at 172.53 mm on a 1010x598 px window (leaf
+# 20261112T161937Z, 2.098 px/mm) and at 171.63 mm, inside the station table
+# field, on a 1010x678 px one (leaf 20261113T025825Z, 2.325 px/mm; release
+# v49 r2).  Only the table's own position and row heights, which SolidWorks
+# holds in sheet metres, set the next table's top.
+TABLE_TITLE_DROP = NOTE_FIELD_INSET + NOTE_LINE_PITCH + TABLE_TITLE_GAP
+# Between one table's last row and the next table's title
+# (draw_ch_rocker_arm_tl_oblique_jig_assembly.TABLE_GAP).  At NOTE_BLOCK_GAP
+# the pedestal recheck table, four rows since PR #2640, ended 0.2 mm over the
+# station table field; at this gap it ends 2.2 mm over it and the feeler
+# stack table 12.9 mm over the interface notes.
+SETTING_TABLE_GAP = 0.004
 # With 27 data rows the first piece ends near y=80 mm (the historical header
 # measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
 # complete metadata, including scale, sits beside it. The native table budget
@@ -3381,13 +3397,16 @@ def _place_general_table(
     top_left: tuple[float, float],
     label: str,
 ) -> tuple[float, float, float, float]:
-    """A titled native general table, every cell read back; returns its box."""
+    """A titled native general table, every cell read back; returns its box.
+
+    The table's top is :data:`TABLE_TITLE_DROP` under ``top``, whatever the
+    title's rendered box reads on this seat's window."""
     x, top = top_left
     title_note = _add_note_block(adapter, title, (x, top), label=f"{label} title")
-    title_extent = _anchor_note(
+    _anchor_note(
         adapter, title_note, (x + NOTE_FIELD_INSET, top - NOTE_FIELD_INSET), label=f"{label} title"
     )
-    table_top = title_extent[1] - TABLE_TITLE_GAP
+    table_top = top - TABLE_TITLE_DROP
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # swBOMConfigurationAnchor_TopLeft = 1; no template: a plain general table.
     raw = ddoc.InsertTableAnnotation2(False, x, table_top, 1, "", len(rows) + 1, len(header))
@@ -3455,7 +3474,7 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
             label=label,
         )
         findings += table_box_violations(box, label=f"sheet {SETTING_SHEET} {label}")
-        top = box[1] - NOTE_BLOCK_GAP
+        top = box[1] - SETTING_TABLE_GAP
     return findings + _stack_sheet_note_fields(adapter, facts, SETTING_SHEET)
 
 
