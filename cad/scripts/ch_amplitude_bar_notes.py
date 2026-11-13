@@ -206,7 +206,7 @@ if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a callout names a dimension the sheet does not print")
 
 # The one sheet note is the pin hole's matched fit. The title-block QTY owns
-# the count, the FINISH field the plating, and the views both notches' depth
+# the count, the FINISH field the finish, and the views both notches' depth
 # and common plane (machinist round 2, #1293: "BOTH END NOTCHES THRU THE FULL
 # DEPTH, IN ONE COMMON PLANE" repeated what the front view and the isometrics
 # show).

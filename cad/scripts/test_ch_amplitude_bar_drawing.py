@@ -661,8 +661,9 @@ def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() ->
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    """Machinist round 1 (#1293): the plating's effect on size and the masked
-    reamed hole belong in the FINISH field, not a note."""
+    """The finish rides the FINISH field, not a note (machinist round 1,
+    #1293), on one line (r1 wrapped at 50 characters). #2342: the original's
+    bars are bare polished steel, so the field asks for no outside plater."""
     source = Path(bar.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
@@ -670,11 +671,10 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "low-carbon cold-finished steel, 1/4 in sq"
-    # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
-    # the unplated press bore states its protection. Fan-out round 1 (rule
-    # 26): 'dims plated' was private shorthand; the sizes apply after plating.
-    assert spec["finish"] == "chrome, sizes after plating; pin hole bare, oiled"
-    assert len(spec["finish"]) < 50
+    finish = spec["finish"].lower()
+    assert "\n" not in finish and len(finish) < 50
+    assert "chrome" not in finish and "after plating" not in finish
+    assert "oil" in finish
     assert int(spec["quantity"]) == 20
 
 

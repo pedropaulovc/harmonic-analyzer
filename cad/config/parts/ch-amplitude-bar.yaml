@@ -4,7 +4,10 @@ ch-amplitude-bar:
   # fit, plating or load needs one grade (machinist review, rule 2).
   material: "LOW-CARBON STEEL CF, 1/4 in sq"
   material_specification: low-carbon cold-finished steel, 1/4 in sq
-  finish: "chrome, sizes after plating; pin hole bare, oiled"
+  # The original's bars are bare polished steel that rusts in patches (ch15
+  # p.32 photos; 1898 predates chromium plating), and nothing the bar does
+  # needs a plate: no outside plater (#2342).
+  finish: "long faces polished bright, oiled; no plating"
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
