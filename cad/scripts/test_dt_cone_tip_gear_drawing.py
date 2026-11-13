@@ -211,8 +211,12 @@ def test_tooth_space_sheet_defines_the_space_point_by_point() -> None:
     data = "\n".join([*lines, *(" ".join(row) for row in table)])
     assert notes.CYLINDER_MATE_NUMBER not in data and "BACKLASH" not in data
     assert "TIF" not in data
-    # Derived values read as reference: the R column and the station radii.
-    assert notes_text.startswith("R (REF)")
+    # With no form band and no frame, every column reads as reference (the
+    # gear accepts the form), and no coordinate is BASIC; so do the radii.
+    designation = notes_text.splitlines()[0].split(":", 1)[0]
+    assert "REF" in designation
+    assert all(column in designation for column in table[0][1:])
+    assert "BASIC" not in data
     assert all(
         text.startswith("(R")
         for text, _xy in drawing.form_plot_labels()

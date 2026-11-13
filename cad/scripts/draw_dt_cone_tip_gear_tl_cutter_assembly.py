@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from pathlib import Path
 from typing import Any
 
 import _config
@@ -38,7 +39,6 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_edges import visible_view_entities
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_tables import insert_bom_table
@@ -52,7 +52,12 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    place_view,
+    view_name,
+    visible_component_entities,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -128,6 +133,12 @@ SWING_TEXT_XY = (
     FRONT_ORIGIN[1] + (_STATION + 11.0) * _S,
 )
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
+# The bit's tip corner in its own frame (mm): the root arc's end on the face
+# (y = 0) where the upper relief starts, .0004 ahead of P1 -- below the
+# references' three places, so they print the spec's stick-out and radius.
+_FORM = {segment.name: segment for segment in fixture.bit.form_segments(1.0)}
+_CORNER_X, _CORNER_Z = fixture.bit.face_point(*_FORM["RootArc"].point(0.0))
+TIP_CORNER_MM = (_CORNER_X, 0.0, _CORNER_Z)
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
@@ -198,19 +209,35 @@ def _move_model_point(
         raise RuntimeError(f"{label}: origin sits at {here!r}, not {target!r}")
 
 
-def _tip_edge(view: Any) -> Any:
-    """The bit's root-arc edge on its face: the tip the references end on."""
+def _tip_corner(view: Any) -> Any:
+    """The bit's tip corner on its face: the vertex where the root arc meets
+    the upper relief, which the references end on.
+
+    The root arc is not a circular edge: the bit's form is cut from native
+    equation curves (``_gear.equation_curve``, an equation-driven spline), so
+    every form edge on the face is a B-spline and ``ICurve.IsCircle`` is false
+    for all of them (farm run 20261112T203021325Z). A linear dimension cannot
+    end on a spline at P1; the corner is a true vertex of the face loop.
+    Vertices read in the bit's own frame, so the bit's are matched by stem."""
+    view = _early_bound(view, "IView")
+    target = TIP_CORNER_MM
     matches = []
-    for raw in visible_view_entities(view, 1, label="fly-cutter tip edges"):
-        curve = _early_bound(_early_bound(raw, "IEdge").GetCurve(), "ICurve")
-        if not curve.IsCircle():
+    for raw_component in view.GetVisibleComponents() or ():
+        component = _early_bound(raw_component, "IComponent2")
+        if Path(str(component.GetPathName() or "")).stem.casefold() != BIT:
             continue
-        params = tuple(float(value) for value in curve.CircleParams)
-        if abs(params[6] * 1000.0 - fixture.bit.ROOT_RADIUS) < 1e-4:
-            matches.append(raw)
+        for raw in visible_component_entities(view, component, 1):
+            edge = _early_bound(raw, "IEdge")
+            for raw_vertex in (edge.GetStartVertex(), edge.GetEndVertex()):
+                if raw_vertex is None:
+                    continue
+                vertex = _early_bound(raw_vertex, "IVertex")
+                point = tuple(float(value) * 1000.0 for value in vertex.GetPoint())
+                if math.dist(point, target) < 1e-4:
+                    matches.append(vertex)
     if not matches:
         raise RuntimeError(
-            "fly-cutter front view shows no root-arc edge on the bit's face"
+            f"fly-cutter front view shows no bit vertex at the tip corner {target!r} mm"
         )
     return matches[0]
 
@@ -352,16 +379,16 @@ def _place_sheet(adapter: Any) -> Any:
         )
 
     # The setting the fitter makes and the radius it gives, both off the bit's
-    # tip (the root arc's nearest point, P1).
-    tip = _tip_edge(front)
+    # tip corner on its face (a vertex; see _tip_corner).
+    tip = _tip_corner(front)
     _reference(
         adapter,
         front,
         label="stick-out",
-        expected_mm=fixture.STICK_OUT,
+        expected_mm=fixture.STICK_OUT + TIP_CORNER_MM[0],
         callout=fixture.STICK_OUT_CALLOUT,
         text_xy=STICK_OUT_TEXT_XY,
-        entity_types=("SILHOUETTE", "EDGE"),
+        entity_types=("SILHOUETTE", "VERTEX"),
         entities=(None, tip),
         p0=SILHOUETTE_PICK,
     )
@@ -370,10 +397,10 @@ def _place_sheet(adapter: Any) -> Any:
         adapter,
         front,
         label="swing radius",
-        expected_mm=fixture.SWING_RADIUS,
+        expected_mm=fixture.SWING_RADIUS + TIP_CORNER_MM[0],
         callout=fixture.SWING_RADIUS_CALLOUT,
         text_xy=SWING_TEXT_XY,
-        entity_types=("SKETCHSEGMENT", "EDGE"),
+        entity_types=("SKETCHSEGMENT", "VERTEX"),
         entities=(axis, tip),
         p0=(0.0, 0.0),
     )
