@@ -144,15 +144,17 @@ TIP_STOCK = 0.254
 FLAT_LENGTH = 1.524  # .06
 FLAT_LENGTH_PLACES = 2
 # The flat's depth, printed as what stays: the flat to the rod's far side,
-# read with a micrometer, nominal half the rod (the face on the axis, zero
-# rake).  A face FLAT_FACE_OFFSET_MAX off the axis turns the rake by at most
-# dt_cone_tip_gear_tl_cutter_spec.RAKE_ERROR_DEG_MAX and moves the form
-# outward under .002 mm, so the title block's .XXX band holds it, printed
-# explicitly because four places give the half-rod nominal exactly.
-FLAT_DEPTH = BIT_RADIUS  # .0625
-FLAT_DEPTH_PLACES = 4
+# read with a micrometer, a plain .063 on the title block's .XXX grid and
+# band, so the face (the cutting edge) stands FACE_HEIGHT (.0005) above the
+# rod's axis.  A face FLAT_FACE_OFFSET_MAX off the axis turns the rake by at
+# most dt_cone_tip_gear_tl_cutter_spec.RAKE_ERROR_DEG_MAX and moves the form
+# outward under .002 mm; along the clearances it moves the edge's form as
+# that spec's FACE_SHIFT_* bound.
+FLAT_DEPTH = 1.6002  # .063
+FLAT_DEPTH_PLACES = 3
 FLAT_DEPTH_TOL = 0.127  # +/-.005, the title block's .XXX row
-FLAT_FACE_OFFSET_MAX = FLAT_DEPTH_TOL + BIT_DIA_TOL / 2.0
+FACE_HEIGHT = FLAT_DEPTH - BIT_RADIUS
+FLAT_FACE_OFFSET_MAX = abs(FACE_HEIGHT) + FLAT_DEPTH_TOL + BIT_DIA_TOL / 2.0
 FRONT_CLEARANCE_DEG = 10.0
 SIDE_CLEARANCE_DEG = 3.0
 CLEARANCE_PLACES = 0
@@ -266,11 +268,20 @@ def _form_area(shifts: tuple[float, ...], chord: float) -> float:
 STAGES = ("revolve", "flat", "form_plus", "form")
 
 
+def _rod_strip(height: float) -> float:
+    """The rod section's area between its axis and ``height`` above it."""
+    return BIT_RADIUS**2 * math.asin(height / BIT_RADIUS) + height * math.sqrt(
+        BIT_RADIUS**2 - height**2
+    )
+
+
 def bit_volume_mm3(stage: str = "form", *, slices: int = 48) -> float:
     """The bit's volume after ``stage`` (mm^3): the face form at depth d
-    under the face is the face section shifted back d tan(front) and, for
-    each prism cut so far, sideways d tan(side); the shank behind the
-    shoulder is the full rod chord."""
+    under the axis plane (the prisms' plane) is the face section shifted back
+    d tan(front) and, for each prism cut so far, sideways d tan(side); the
+    shank behind the shoulder is the full rod chord.  The flat leaves the
+    strip from the axis up to the face (FACE_HEIGHT), its form the same
+    sections at negative d."""
     if stage not in STAGES:
         raise ValueError(f"unknown bit stage {stage!r}")
     rod = math.pi * BIT_RADIUS**2
@@ -278,19 +289,34 @@ def bit_volume_mm3(stage: str = "form", *, slices: int = 48) -> float:
         return rod * (BIT_LENGTH + TIP_STOCK)
     above = rod / 2.0 * (BIT_LENGTH - FLAT_LENGTH)
     if stage == "flat":
-        return above + rod / 2.0 * (BIT_LENGTH + TIP_STOCK)
+        return (
+            above
+            + rod / 2.0 * (BIT_LENGTH + TIP_STOCK)
+            + _rod_strip(FACE_HEIGHT) * (FLAT_LENGTH + TIP_STOCK)
+        )
     sides = (1,) if stage == "form_plus" else (1, -1)
+
+    def section(depth: float, chord: float, shank_length: float) -> float:
+        shank = 2.0 * chord * (shank_length + SHOULDER_X - depth * TAN_FRONT)
+        return shank + _form_area(tuple(s * depth * TAN_SIDE for s in sides), chord)
+
     # d = R sin(theta): the chord is R cos(theta), smooth to the rod's bottom.
     step = (math.pi / 2.0) / slices
     total = 0.0
     for i in range(slices + 1):
         theta = i * step
         depth, chord = BIT_RADIUS * math.sin(theta), BIT_RADIUS * math.cos(theta)
-        shank = 2.0 * chord * (BIT_LENGTH + SHOULDER_X - depth * TAN_FRONT)
-        area = shank + _form_area(tuple(s * depth * TAN_SIDE for s in sides), chord)
         weight = 1 if i in (0, slices) else (4 if i % 2 else 2)
-        total += weight * area * BIT_RADIUS * math.cos(theta)
-    return above + total * step / 3.0
+        total += (
+            weight * section(depth, chord, BIT_LENGTH) * BIT_RADIUS * math.cos(theta)
+        )
+    # The strip up to the face, its shank from the flat's start (Simpson).
+    strip = 0.0
+    for i, weight in enumerate((1, 4, 1)):
+        height = FACE_HEIGHT * i / 2.0
+        chord = math.sqrt(BIT_RADIUS**2 - height**2)
+        strip += weight * section(-height, chord, FLAT_LENGTH)
+    return above + total * step / 3.0 + strip * FACE_HEIGHT / 6.0
 
 
 # The volume gate's band: the sampled form against SolidWorks' exact curves.
