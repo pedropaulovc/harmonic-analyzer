@@ -2,7 +2,7 @@ r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26
 
 An 11.8 x 1 x 1/2 in flat at 1:1: the top view carries the length, the stock
 width, both bolt-hole stations from the inner end, their shared row from the
-back side, the native 2X 5/16 clearance callout (``2X Ø.344 DRILL THRU ALL``:
+back side, the native 2X 11/32 drill callout (``2X Ø.3438 DRILL THRU ALL``:
 size, then process, rule 26) and the grip-end radius; the front view carries
 the stock thickness; the shaded iso rides top-right at 1:4. No datums
 (drawing-guidelines.md rule 5).
@@ -132,8 +132,8 @@ FRONT_KEEP: dict[str, tuple[float, float, float]] = {
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
 HOLE_CALLOUT_MODEL = (70.0, _H, -_W - 22.0)
 HOLE_CALLOUT_LABEL = "feed lever bolt holes"
-# The process follows the size (rule 26): ``2X Ø.344 DRILL THRU ALL``, not
-# a prefix ahead of the count (``DRILL 2X Ø.344 THRU ALL``).
+# The process follows the size (rule 26): ``2X Ø.3438 DRILL THRU ALL``, not
+# a prefix ahead of the count (``DRILL 2X Ø.3438 THRU ALL``).
 DRILL_TEXT = " DRILL"
 _CALLOUT_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions: prefix..below
 # The simple-hole size variable: a plain drilled hole's callout carries
@@ -151,7 +151,6 @@ part_metadata(
 
 _UNIT = part_spec.UNIT
 (_CALLOUT_PLACES,) = set(HOLE_CALLOUT_PRECISION.values())
-_HOLE_DIA_PRINTED = round(round(part_spec.HOLE_DIA / 25.4, _CALLOUT_PLACES) * 25.4, 9)
 
 
 def _limits(model: float, places: int) -> list[float]:
@@ -209,13 +208,15 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "drill": (part_spec.CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
-            # The native callout prints the 5/16 normal-fit size to three
-            # places (.344); the band and nominal are that printed value.
+            # The native callout prints the 11/32 drill to four places
+            # (.3438, its drill-chart decimal; owner ruling 2026-11-13). The
+            # title-block drilled band qualifies the drill's exact size, as
+            # _printed_limits.drilled_limits does for a native wizard hole.
             "dia": (
-                limits(_HOLE_DIA_PRINTED, _CALLOUT_PLACES, part_spec.DRILLED_BAND),
+                limits(part_spec.HOLE_DIA, _CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("HOLE_DIA", "DRILLED_BAND", "SCREW_THREAD"),
             ),
-            "dia_nominal": (_HOLE_DIA_PRINTED, ("HOLE_DIA",)),
+            "dia_nominal": (part_spec.HOLE_DIA, ("HOLE_DIA",)),
             "thru": (True, ("CLEARANCE_SPEC",)),
             # Model X from the inner end: the carrier's lever station.
             "station": (

@@ -6,7 +6,7 @@ broken (``ch_rocker_arm_tl_oblique_feed_lever_spec``).
 
 Layout (the spec's model frame, +Y up): the lever is a Top-plane rectangle
 (sketch v along model -Z) extruded +Y by the stock thickness; the two bolt
-holes are one native 5/16 clearance Hole Wizard feature from the top face;
+holes are one native 11/32 drill Hole Wizard feature from the top face;
 the two grip-end vertical edges are
 filleted last, the printed radius on its own one-edge feature
 (build_pd_guide_lock: an imported fillet dimension attaches to its feature's
@@ -206,7 +206,7 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "lever", V_LEVER, 0.002 * V_LEVER)
 
-    # --- Bolt holes: ONE native 5/16 clearance feature, two THRU instances
+    # --- Bolt holes: ONE native 11/32 drill feature, two THRU instances
     # from the top face on the mid-width line; the second hole's Y repeats
     # the first's and stays off the print.
     holes = wizard_holes(
@@ -214,7 +214,7 @@ async def build(adapter) -> dict[str, str]:
         CLEARANCE_SPEC,
         [[x, LEVER_THICK, -HOLE_Y] for x in HOLE_X],
         (0.0, 1.0, 0.0),
-        "feed lever bolt holes (5/16 clearance)",
+        "feed lever bolt holes (11/32 drill)",
         name="BoltHoles",
         expect_dia_mm=HOLE_DIA,
         placement_dims=[

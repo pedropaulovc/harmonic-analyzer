@@ -45,9 +45,10 @@ def test_lever_holes_land_on_the_carrier_tapped_holes() -> None:
     assert all(_on_grid(x, spec.HOLE_X_PLACES) for x in spec.HOLE_X)
     # The clearance clears the 5/16-18 screw the carrier is tapped for.
     assert holes[0]["dia"][0] > THREAD_MAJOR_MM[spec.SCREW_THREAD]
-    assert spec.CLEARANCE_SPEC.kind == "clearance"
-    assert spec.CLEARANCE_SPEC.size == "5/16"
-    assert spec.CLEARANCE_SPEC.fit == "normal"
+    # Owner ruling 2026-11-13: the shop's 11/32 drill.
+    assert spec.CLEARANCE_SPEC.kind == "drilled_fractional"
+    assert spec.CLEARANCE_SPEC.size == "11/32"
+    assert holes[0]["drill"] == "11/32"
 
 
 def test_lever_lies_on_the_carrier_and_runs_out_past_its_edge() -> None:
@@ -99,10 +100,12 @@ def test_grip_corners_are_broken_clear_of_the_holes() -> None:
 def test_holes_carry_the_title_block_band_only() -> None:
     assert model_toleranced_dimensions(part) == {}
     low, high = _features()["bolt_hole_1"]["dia"]
-    # The 5/16 normal clearance prints .344 with the drilled-hole band.
-    assert low == pytest.approx(round(spec.HOLE_DIA / INCH, 3) * INCH)
+    # The 11/32 drill (.3438 at four places) with the drilled-hole band
+    # about its exact size, so the drill itself is the lower limit.
+    assert low == pytest.approx(11.0 / 32.0 * INCH)
     assert high - low == pytest.approx(spec.DRILLED_BAND[0])
-    assert spec.HOLE_CALLOUT_PRECISION == {"hw-diam": 3}
+    assert spec.HOLE_CALLOUT_PRECISION == {"hw-diam": 4}
+    assert round(spec.HOLE_DIA / INCH, 4) == pytest.approx(0.3438)
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -116,6 +119,8 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     checked = 0
     stock = {("carrier_seat", "thickness"), ("carrier_seat", "width")}
+    # The drilled band qualifies the exact 11/32 drill, which prints .3438.
+    drilled = {("bolt_hole_1", "dia"), ("bolt_hole_2", "dia")}
     for name, feature in _features().items():
         for requirement in feature["requirements"]:
             band = feature.get(requirement)
@@ -125,10 +130,11 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             nominal = feature.get(f"{requirement}_nominal")
             if nominal is not None:
                 assert band[0] <= nominal <= band[1], (name, requirement)
-                assert _on_grid(nominal, places), (name, requirement)
+                if (name, requirement) not in drilled:
+                    assert _on_grid(nominal, places), (name, requirement)
             checked += 1
-            if (name, requirement) in stock:
-                continue  # the supplier's band about the stock size
+            if (name, requirement) in stock | drilled:
+                continue  # a supplier's or the drill's band about its size
             for end in band:
                 assert _on_grid(end, places), (name, requirement)
     assert checked
@@ -173,7 +179,7 @@ class _Callout:
 
 @pytest.mark.parametrize("token", ("<hw-diam>", "<hw-thruholedia>"))
 def test_drill_follows_the_size_in_the_native_callout(token: str) -> None:
-    # Rule 26: size, then process: 2X Ø.344 DRILL THRU ALL.
+    # Rule 26: size, then process: 2X Ø.3438 DRILL THRU ALL.
     native = {5: "", 6: "", 7: f"<NUM_INST>X <MOD-DIAM>{token} THRU ALL", 8: ""}
     callout = _Callout(native)
     drawing._write_drill_after_size(callout)

@@ -7,5 +7,5 @@ ch-rocker-arm-tl-oblique-feed-lever:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "saw and face to length; drill the two 5/16 clearance holes through; file the grip-end corner radii; break edges"
+  process: "saw and face to length; drill the two 11/32 screw-clearance holes through; file the grip-end corner radii; break edges"
   drawing_unit: in
