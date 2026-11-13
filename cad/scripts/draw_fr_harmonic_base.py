@@ -494,12 +494,13 @@ GEOMETRY_CALLOUTS = {
     "DeckCornerRadius": "DECK",
     "DeckEdgeChamfer": "X 45<MOD-DEG>\nDECK EDGE",
 }
-# One chamfer feature breaks both plates' top rims, so its caption names the
-# feature -- in the PLURAL -- rather than whichever of its edges the import
-# attached to. Plural, not spelled out: this column is 32 mm wide, and a
-# caption row wider than that leaves the sheet (see SECTION_KEEP).
+# One chamfer feature breaks both plates' top edges all round, so its caption
+# names both edges rather than whichever one the import attached to: "TOP
+# RIMS" left the builder asking which edges (machinist review run
+# 20261113T004626415Z, 2/3, rule 1). Each row stays inside this 32 mm column;
+# a wider caption row leaves the sheet (see SECTION_KEEP).
 SECTION_CALLOUTS = {
-    "TopRimChamfer": "X 45<MOD-DEG>\nTOP RIMS",
+    "TopRimChamfer": "X 45<MOD-DEG>\nFLANGE + PAD\nTOP EDGES",
     "BottomEdgeChamfer": "X 45<MOD-DEG>\nUNDERSIDE",
 }
 # One spotface callout in symbol form (rule 26): sheet 5's diameter carries
