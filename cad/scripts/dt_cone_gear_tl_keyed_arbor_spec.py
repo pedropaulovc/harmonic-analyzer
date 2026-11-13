@@ -21,10 +21,12 @@ Two holds, one arbor:
   cutter on the vertical stub arbor runs out past the face.
 
 Frame (the SolidWorks model, MHA-DT-04's recipe): the axis is model +Z; z = 0
-is the grip's end face, the shoulder (the blank's datum, rule 11's second
-faced end) stands at SHOULDER_Z, and the keyseat is centred on +X. Every
-station on the blank side is measured from the shoulder; the grip's length
-from its end face, the standoff from the shoulder back to the jaw step.
+is the grip's end face, the shoulder (the blank's datum) stands at
+SHOULDER_Z, and the keyseat is centred on +X. The arbor is turned between
+its centres in one setup, so every length is a station from the grip's end
+face (rule 10's one datum, rule 11's faced end) and the overall length ties
+the thread's end to it; a length between two blank-side stations (the
+shoulder to the seat's end, say) then holds twice the .XX band.
 
 Every number below is derived and asserted here; ``KEYED_GEARS`` names each
 blank the arbor carries with its printed bore, face and root limits.
@@ -54,6 +56,11 @@ if UNIT != "in":
     raise AssertionError("the keyed arbor prints in inch")
 _CONE_NUMBER = str(_config.parts("dt-cone-gear")["number"])
 _CRANK_NUMBER = str(_config.parts("dt-crank-drive-gear")["number"])
+_COLLAR_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-collar")["number"])
+# The collar shares this sheet's MHA-DT-03 parent: its short form (rule 4).
+_COLLAR_SHORT = _COLLAR_NUMBER.removeprefix(f"{_CONE_NUMBER}-")
+if _COLLAR_SHORT == _COLLAR_NUMBER:
+    raise AssertionError("the collar no longer shares the arbor's parent number")
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 _DRILL_PLUS = drilled_oversize_mm(unit=UNIT)
@@ -118,7 +125,7 @@ BORE_MAX_MM = max(blank.bore[1] for blank in KEYED_GEARS)
 FACE_MIN_MM = min(blank.face[0] for blank in KEYED_GEARS)
 FACE_MAX_MM = max(blank.face[1] for blank in KEYED_GEARS)
 
-# --- Seat: its band leaves a stated share of the tooth-cutting TIR -----------
+# --- Seat: a matched sliding fit whose play keeps a share of the tooth TIR -------
 # Both gear families print the same setup allowance about the finished bore
 # (TOOTH CUTTING SETUP ... .002 TIR MAX; crank_mesh.yaml 0.0508 mm). A blank
 # with diametral play c on the seat can sit c/2 off the arbor's axis, so its
@@ -131,27 +138,28 @@ TOOTH_RUNOUT_TIR_MM = min(
     float(_config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")),
 )
 PLAY_SHARE = 2.0 / 3.0
-SEAT_PLACES = 4
-# Largest seat: the smallest bore, line to line (a locational clearance fit,
-# zero minimum clearance: the blank slides on over its .3-in face).
+# That share leaves the seat a band under the turned-diameter row of the shop
+# table, so the seat is not cut to a number: it prints at the title block's
+# three places (the supply size, line to line with the smallest bore) and its
+# flag note states the fit (rule 4): a sliding fit matched to the keyed
+# bores, diametral clearance from line to line up to the share, floored onto
+# the .0001 grid, in every bore.
+SEAT_PLACES = 3
 SEAT_DIA = BORE_MIN_MM
-# Smallest seat: the largest bore less the play share, up onto the .0001 grid
-# (never more play than the share).
-SEAT_DIA_MIN = inch_grid_mm(
-    BORE_MAX_MM - PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 4, math.ceil
+SEAT_CLEARANCE_MM = (
+    0.0,
+    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 4, math.floor),
 )
-SEAT_DIA_BAND = (0.0, round(SEAT_DIA_MIN - SEAT_DIA, 9))  # (upper, lower)
-if abs(SEAT_DIA_BAND[1] + 0.0005 * INCH) > 1e-9:
-    raise AssertionError(f"seat band {SEAT_DIA_BAND} is not the plain -.0005 step")
-SEAT_CLEARANCE_MM = (BORE_MIN_MM - SEAT_DIA, BORE_MAX_MM - SEAT_DIA_MIN)
+# The smallest seat the fit admits: the largest bore less the clearance.
+SEAT_DIA_MIN = BORE_MAX_MM - SEAT_CLEARANCE_MM[1]
+if SEAT_DIA_MIN > SEAT_DIA + 1e-9:
+    raise AssertionError("no one seat fits every keyed bore inside the share")
 SEAT_PLAY_TIR_MM = SEAT_CLEARANCE_MM[1]
-if SEAT_CLEARANCE_MM[0] < -1e-9:
-    raise AssertionError("a blank does not slide onto the largest seat")
-if SEAT_PLAY_TIR_MM > PLAY_SHARE * TOOTH_RUNOUT_TIR_MM + 1e-9:
-    raise AssertionError("seat play takes more than its share of the TIR")
 SEAT_RUNOUT_ALLOWANCE_MM = TOOTH_RUNOUT_TIR_MM - SEAT_PLAY_TIR_MM
 
 # --- Sections, inch (rule 3 grid) ------------------------------------------------
+# Two blank-side stations from the grip's end face: a length between them.
+_PAIR = 2.0 * _XX
 # Grip: 5/8 cold-finished bar left at stock (.623-.625 lies in .62 +/-.01),
 # the 3-jaw's and the dog's land. Its step is the jaw stop.
 GRIP_DIA = 0.62 * INCH
@@ -161,21 +169,24 @@ GRIP_LENGTH = 0.75 * INCH
 STANDOFF_DIA = 0.50 * INCH
 STANDOFF = 0.88 * INCH
 CHUCK_STANDOFF_MIN = 0.75 * INCH  # issue #2465 comment: #2 cutter run-out
-if STANDOFF - _XX < CHUCK_STANDOFF_MIN - 1e-9:
+if STANDOFF - _PAIR < CHUCK_STANDOFF_MIN - 1e-9:
     raise AssertionError("the blank's near face stands closer than .75 to the jaws")
 # The seat stops short of every blank's far face, so the collar always bears
 # on the blank, never on the seat's end (rule 19: held by the loose bands).
-SEAT_LENGTH = 0.23 * INCH
-if SEAT_LENGTH + _XX >= FACE_MIN_MM:
+SEAT_LENGTH = 0.24 * INCH
+if SEAT_LENGTH + _PAIR >= FACE_MIN_MM:
     raise AssertionError("the seat's end can reach a blank's far face")
-SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _XX
+SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _PAIR
 # Pilot: the collars' bore slides on it, under the keyseat floor so the keyseat
-# runs out over it, over the thread's major so the thread is reduced.
+# runs out over it, over the thread's major so the thread is reduced. Its
+# .XXX holds the collar's float on it, which sets the Ø.50 collar's reach
+# under T030's root (a .XX pilot leaves no collar clear of it): rule 3's
+# clearance form, naming the collar it pilots.
 PILOT_DIA = 0.275 * INCH
 PILOT_END = 0.42 * INCH
 # Thread relief, at least one pitch wide and under the thread's root (rule 16).
 THREAD = "1/4-28"
-THREAD_CLASS = "UNF-2A"
+THREAD_SERIES = "UNF"
 THREAD_PITCH = INCH / 28.0
 THREAD_MAJOR = 0.25 * INCH
 # ASME B1.1 1/4-28 UNF-2A: major .2490/.2425; the root (UNR minimum root
@@ -247,7 +258,7 @@ if (
     <= SHOULDER_R
 ):
     raise AssertionError("the keyseat's end radius reaches the shoulder root")
-_SEAT_RADIUS_MIN = (SEAT_DIA + SEAT_DIA_BAND[1]) / 2.0
+_SEAT_RADIUS_MIN = SEAT_DIA_MIN / 2.0
 _SEAT_RADIUS_MAX = SEAT_DIA / 2.0
 # Floor from the axis: S (from the seat's far side) less the far side's radius.
 KEYSEAT_FLOOR_OFFSET = KEYSEAT_S - SEAT_DIA / 2.0
@@ -286,7 +297,7 @@ KEY_TOP_CLEARANCE_MIN = cone_land_key.KEY_TOP_RADIAL_CLEARANCE_MIN_MM
 KEY_LENGTH = 0.15 * INCH
 KEY_LENGTH_PLACES = 2
 KEY_FAR_END_MAX = KEY_END_SET + _XX + KEY_LENGTH + _XX
-if KEY_FAR_END_MAX > SEAT_LENGTH - _XX + 1e-9:
+if KEY_FAR_END_MAX > SEAT_LENGTH - _PAIR + 1e-9:
     raise AssertionError("the key overhangs the seat's end")
 if KEY_FAR_END_MAX >= FACE_MIN_MM:
     raise AssertionError("the key reaches past a blank into the collar")
@@ -316,7 +327,9 @@ KEY_SETTING_ALLOWANCE_DEG = KEY_CLOCK_TOLERANCE_DEG - KEY_CLOCK_PLAY_DEG
 AIR_MIN = 0.010 * INCH
 BACKING_SHARE_MIN = 0.5
 COLLAR_DIAS: tuple[float, ...] = (0.50 * INCH, 1.00 * INCH, 1.75 * INCH)
-COLLAR_LENGTH = 0.32 * INCH
+# .33 long: with every blank-side station held from the grip's end face, the
+# nearest collar face still leaves the nut full thread (the stack below).
+COLLAR_LENGTH = 0.33 * INCH
 # The collar's plain bore on the pilot: a plain drilled size (letter L).
 COLLAR_BORE = 0.290 * INCH
 COLLAR_FLOAT = ((COLLAR_BORE + _DRILL_PLUS) - (PILOT_DIA - _XXX)) / 2.0
@@ -383,20 +396,22 @@ if NUT_ACROSS_FLATS <= COLLAR_BORE + _DRILL_PLUS:
     raise AssertionError("the nut's face does not bear on the collar")
 
 # --- The stack along the arbor (stations from the shoulder, mm) -------------------
-# The collar's near face is the blank's far face; its far face carries the nut.
+# Each blank-side station stands off the shoulder by _PAIR (both from the
+# grip's end face). The collar's near face is the blank's far face; its far
+# face carries the nut.
 COLLAR_FACE_MIN = FACE_MIN_MM + COLLAR_LENGTH - _XX
 COLLAR_FACE_MAX = FACE_MAX_MM + COLLAR_LENGTH + _XX
 # The nut seats on full thread: the relief ends short of the nearest collar face
 # by two pitches (the die's incomplete start).
-NUT_THREAD_MARGIN = COLLAR_FACE_MIN - (RELIEF_END + _XX) - 2.0 * THREAD_PITCH
+NUT_THREAD_MARGIN = COLLAR_FACE_MIN - (RELIEF_END + _PAIR) - 2.0 * THREAD_PITCH
 if NUT_THREAD_MARGIN <= 0.0:
     raise AssertionError("the nut would seat on the thread's run-out")
 # The collar's bore engages the pilot under the thickest blank.
-PILOT_ENGAGEMENT_MIN = (PILOT_END - _XX) - FACE_MAX_MM
+PILOT_ENGAGEMENT_MIN = (PILOT_END - _PAIR) - FACE_MAX_MM
 if PILOT_ENGAGEMENT_MIN < 0.10 * INCH:
     raise AssertionError("the collar barely engages the pilot")
 # The nut bears on the collar, never on the pilot's end.
-if PILOT_END + _XX >= COLLAR_FACE_MIN:
+if PILOT_END + _PAIR >= COLLAR_FACE_MIN:
     raise AssertionError("the pilot's end can reach the collar's far face")
 # Thread left past the farthest nut: at least the die's lead, 1.5 pitches.
 # The thread's end: the relief's station plus the thread's own length.
@@ -411,12 +426,12 @@ KIT_BLANK_FACE = crank.FACE_WIDTH
 
 # --- Model ------------------------------------------------------------------------
 # The model follows MHA-DT-04's recipe (build_dt_cone_gear_shaft): each turned
-# diameter a circle on the plane at its own end station, extruded back to its
-# origin, so every diameter's dimension stands on its own step in the side view
-# and every length is a feature depth. Model +Z is the axis; z = 0 (the Front
-# Plane) is the grip's end face, the first chucking's datum; SHOULDER_Z is the
-# shoulder face (the ShoulderPlane), the blank side's datum. The keyseat is
-# centred on +X (cone_land_key's clock).
+# diameter a circle on the plane at its own end station, extruded back to the
+# grip's end face, so every diameter's dimension stands on its own step in the
+# side view and every length is a feature depth from that one face. Model +Z
+# is the axis; z = 0 (the Front Plane) is the grip's end face, the datum;
+# SHOULDER_Z is the shoulder face (the ShoulderPlane) the blank bears on. The
+# keyseat is centred on +X (cone_land_key's clock).
 SHOULDER_Z = GRIP_LENGTH + STANDOFF
 SEAT_END_Z = SHOULDER_Z + SEAT_LENGTH
 PILOT_END_Z = SHOULDER_Z + PILOT_END
@@ -428,15 +443,15 @@ if abs(ARBOR_END_Z - OVERALL_LENGTH) > 1e-9:
 KEY_END_Z = SHOULDER_Z + KEY_END_SET
 
 # The turned sections in build order: (name, diameter, start z, end z). Each
-# blank-side section runs back from its end to the shoulder inside the larger
-# one before it; the thread, larger than the relief, runs back only to the
-# relief's end.
+# section up to the relief runs back from its end to the grip's end face
+# inside the larger ones before it; the thread, larger than the relief, runs
+# back only to the relief's end.
 SECTIONS: tuple[tuple[str, float, float, float], ...] = (
     ("Grip", GRIP_DIA, 0.0, GRIP_LENGTH),
-    ("Standoff", STANDOFF_DIA, GRIP_LENGTH, SHOULDER_Z),
-    ("Seat", SEAT_DIA, SHOULDER_Z, SEAT_END_Z),
-    ("Pilot", PILOT_DIA, SHOULDER_Z, PILOT_END_Z),
-    ("Relief", RELIEF_DIA, SHOULDER_Z, RELIEF_END_Z),
+    ("Standoff", STANDOFF_DIA, 0.0, SHOULDER_Z),
+    ("Seat", SEAT_DIA, 0.0, SEAT_END_Z),
+    ("Pilot", PILOT_DIA, 0.0, PILOT_END_Z),
+    ("Relief", RELIEF_DIA, 0.0, RELIEF_END_Z),
     ("Thread", THREAD_MAJOR, RELIEF_END_Z, ARBOR_END_Z),
 )
 
@@ -493,28 +508,30 @@ KEYSEAT_END_VOLUME = keyseat_end_volume_mm3()
 FINISHED_VOLUME = TURNED_VOLUME - CENTRE_VOLUME - KEYSEAT_VOLUME - KEYSEAT_END_VOLUME
 
 # Model globals (mm); the build sets each and drives its dimensions from it.
+# Every station is from the grip's end face (the Front Plane).
 GLOBALS: dict[str, float] = {
     "GripDia": GRIP_DIA,
     "GripLength": GRIP_LENGTH,
     "StandoffDia": STANDOFF_DIA,
-    "Standoff": STANDOFF,
+    "ShoulderZ": SHOULDER_Z,
     "SeatDia": SEAT_DIA,
-    "SeatLength": SEAT_LENGTH,
+    "SeatEndZ": SEAT_END_Z,
     "PilotDia": PILOT_DIA,
-    "PilotEnd": PILOT_END,
+    "PilotEndZ": PILOT_END_Z,
     "ReliefDia": RELIEF_DIA,
-    "ReliefEnd": RELIEF_END,
+    "ReliefEndZ": RELIEF_END_Z,
     "ThreadDia": THREAD_MAJOR,
-    "ThreadLength": THREAD_LENGTH,
+    "OverallLength": OVERALL_LENGTH,
     "HeadCentreDia": HEAD_CENTRE_DIA,
     "TailCentreDia": TAIL_CENTRE_DIA,
     "KeyseatW": KEYSEAT_WIDTH,
     "KeyseatS": KEYSEAT_S,
     "KeyseatEndSet": KEY_END_SET,
 }
-SHOULDER_EXPRESSION = '"GripLength" + "Standoff"'
-ARBOR_END_EXPRESSION = '"ReliefEnd" + "ThreadLength"'
-OVERALL_EXPRESSION = '"GripLength" + "Standoff" + "ReliefEnd" + "ThreadLength"'
+SHOULDER_EXPRESSION = '"ShoulderZ"'
+OVERALL_EXPRESSION = '"OverallLength"'
+THREAD_LENGTH_EXPRESSION = '"OverallLength" - "ReliefEndZ"'
+KEYSEAT_LENGTH_EXPRESSION = '"SeatEndZ" - "ShoulderZ" - "KeyseatEndSet"'
 
 # --- Drawing -------------------------------------------------------------------------
 SHOULDER_PLANE = "ShoulderPlane"
@@ -537,21 +554,41 @@ def end_plane(section: str) -> str:
 
 
 # Each section: its diameter on its profile sketch, its length the extrude's
-# depth (the grip's from its end face; the standoff's from the shoulder back
-# to the jaw step; the thread's from its end back to the relief; the rest from
-# the shoulder).
+# depth back to the grip's end face (the thread's from its end back to the
+# relief, left off the sheet: the overall ties the thread's end).
 SECTION_DIMENSIONS: dict[str, tuple[str, str]] = {
     "Grip": ("GripDia", "GripLength"),
-    "Standoff": ("StandoffDia", "Standoff"),
-    "Seat": ("SeatDia", "SeatLength"),
+    "Standoff": ("StandoffDia", "Shoulder"),
+    "Seat": ("SeatDia", "SeatEnd"),
     "Pilot": ("PilotDia", "PilotEnd"),
     "Relief": ("ReliefDia", "ReliefEnd"),
     "Thread": ("ThreadDia", "ThreadLength"),
 }
+# Each section's end station (its plane's offset from the Front Plane; the
+# standoff's is the ShoulderPlane) and its extrude depth, as equations.
+END_STATION_DRIVES: dict[str, str] = {
+    "Seat": '"SeatEndZ"',
+    "Pilot": '"PilotEndZ"',
+    "Relief": '"ReliefEndZ"',
+    "Thread": OVERALL_EXPRESSION,
+}
+LENGTH_DRIVES: dict[str, str] = {
+    "GripLength": '"GripLength"',
+    "Shoulder": SHOULDER_EXPRESSION,
+    "SeatEnd": '"SeatEndZ"',
+    "PilotEnd": '"PilotEndZ"',
+    "ReliefEnd": '"ReliefEndZ"',
+    "ThreadLength": THREAD_LENGTH_EXPRESSION,
+}
+SHEET_LENGTHS = ("GripLength", "Shoulder", "SeatEnd", "PilotEnd", "ReliefEnd")
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     **{profile_sketch(s): {dia} for s, (dia, _length) in SECTION_DIMENSIONS.items()},
-    **{s: {length} for s, (_dia, length) in SECTION_DIMENSIONS.items()},
-    CENTRE_SKETCH: {"HeadCentreDia", "TailCentreDia"},
+    **{
+        s: {length}
+        for s, (_dia, length) in SECTION_DIMENSIONS.items()
+        if length in SHEET_LENGTHS
+    },
+    CENTRE_SKETCH: {"HeadCentreDia", "TailCentreDia", "CentreOverall"},
     KEYSEAT_SKETCH: {"KeyseatWidth", "KeyseatS"},
     KEYSEAT_END_SKETCH: {"KeyseatEndSet"},
     SHOULDER_FILLET: {"ShoulderR"},
@@ -560,15 +597,15 @@ _PLACES_BY_NAME: dict[str, int] = {
     "GripDia": 2,
     "GripLength": 2,
     "StandoffDia": 2,
-    "Standoff": 2,
+    "Shoulder": 2,
     "SeatDia": SEAT_PLACES,
-    "SeatLength": 2,
+    "SeatEnd": 2,
     "PilotDia": 3,
     "PilotEnd": 2,
     "ThreadDia": 3,
-    "ThreadLength": 2,
     "ReliefDia": 2,
     "ReliefEnd": 2,
+    "CentreOverall": 2,
     "HeadCentreDia": 2,
     "TailCentreDia": 3,
     "KeyseatWidth": KEYSEAT_PLACES,
@@ -586,7 +623,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(_PLACES_BY_NAME) != set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every marked arbor dimension needs authored places")
 DRAWING_VALUES_BY_NAME: dict[str, float] = {
-    **{name: GLOBALS[name] for pair in SECTION_DIMENSIONS.values() for name in pair},
+    "GripDia": GRIP_DIA,
+    "GripLength": GRIP_LENGTH,
+    "StandoffDia": STANDOFF_DIA,
+    "Shoulder": SHOULDER_Z,
+    "SeatDia": SEAT_DIA,
+    "SeatEnd": SEAT_END_Z,
+    "PilotDia": PILOT_DIA,
+    "PilotEnd": PILOT_END_Z,
+    "ThreadDia": THREAD_MAJOR,
+    "ReliefDia": RELIEF_DIA,
+    "ReliefEnd": RELIEF_END_Z,
+    "CentreOverall": OVERALL_LENGTH,
     "HeadCentreDia": HEAD_CENTRE_DIA,
     "TailCentreDia": TAIL_CENTRE_DIA,
     "KeyseatWidth": KEYSEAT_WIDTH,
@@ -594,45 +642,51 @@ DRAWING_VALUES_BY_NAME: dict[str, float] = {
     "KeyseatEndSet": KEY_END_SET,
     "ShoulderR": SHOULDER_R,
 }
-# Fabricated nominals sit on their printed grid (rule 3); the seat sits on the
-# bore's own .0001 grid.
+if set(DRAWING_VALUES_BY_NAME) != set(DRAWING_PRECISION_BY_NAME):
+    raise AssertionError("every marked arbor dimension needs its value")
+# Fabricated nominals sit on their printed grid (rule 3).
 for _name, _value in DRAWING_VALUES_BY_NAME.items():
     _places = DRAWING_PRECISION_BY_NAME[_name]
     if abs(inch_grid_mm(_value, _places) - _value) > 1e-9:
         raise AssertionError(f"{_name} {_value} mm is off its .{'X' * _places} grid")
 # The bands tighter than the title block, set on the model's own dimension:
-# (feature, dimension) -> (upper, lower) band, mm.
+# (feature, dimension) -> (upper, lower) band, mm. The keyseat's are
+# cone_land_key's, for its key; the seat has none (its fit is note 1's).
 MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
-    (profile_sketch("Seat"), "SeatDia"): SEAT_DIA_BAND,
     (KEYSEAT_SKETCH, "KeyseatWidth"): KEYSEAT_WIDTH_BAND,
     (KEYSEAT_SKETCH, "KeyseatS"): KEYSEAT_S_BAND,
 }
 
 # --- Sheet words -----------------------------------------------------------------------
-# One numbered note names the seat's and keyseat's mates and the fit (rule 4,
-# one flag note linked to every tight dimension of the one feature). The key's
+# One numbered note states the seat's matched fit with its mates and
+# acceptance, and the keyseat's key (rule 4: one flag note linked to every
+# dimension of the one feature; every mate by its drawing number). The key's
 # clock and its setting are the kit's fitting steps (MHA-DT-03-TL-05), not
 # this sheet's.
 KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
 SEAT_CLEARANCE_TEXT = "-".join(
-    inch_text(value, SEAT_PLACES) if value > 1e-9 else ".0000"
-    for value in SEAT_CLEARANCE_MM
+    inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
 )
+_CONE_SPAN = (KEYED_GEARS[0].number, KEYED_GEARS[-2].number)
+if not all(n.startswith(f"{_CONE_NUMBER}-T") for n in _CONE_SPAN):
+    raise AssertionError("the note's cone span no longer runs over MHA-DT-03's members")
 SHEET_NOTES = "\n".join(
     (
-        f"{SEAT_NOTE_NUMBER}. LOCATIONAL CLEARANCE FIT IN THE KEYED BORES OF "
-        f"{_CONE_NUMBER} 30T-120T",
-        f"   AND {_CRANK_NUMBER} (CLEARANCE {SEAT_CLEARANCE_TEXT}); KEYSEAT FOR "
-        f"KEY {KEY_NUMBER}.",
+        f"{SEAT_NOTE_NUMBER}. SEAT: SLIDING FIT, MATCHED TO THE KEYED BORES OF "
+        f"{_CONE_SPAN[0]}",
+        f"   TO {_CONE_SPAN[1]} AND {_CRANK_NUMBER}, CLEARANCE {SEAT_CLEARANCE_TEXT} "
+        "IN EACH BORE;",
+        f"   KEYSEAT FOR KEY {KEY_NUMBER}.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
     raise AssertionError("at most four note lines")
 CENTRE_PREFIX = "<HOLE-SINK><MOD-DIAM>"
 CENTRE_SUFFIX = f" X {CENTRE_INCLUDED_ANGLE_DEG:.0f}°"
-THREAD_CALLOUT = f"{THREAD} {THREAD_CLASS}"
+# The title block carries the thread class (rule 2).
+THREAD_CALLOUT = f"{THREAD} {THREAD_SERIES}"
 # The thread's schematic major cylinder reads as its designation
 # (_drawing_dimensions.set_dimension_text).
 DIMENSION_TEXT: dict[str, str] = {"ThreadDia": THREAD_CALLOUT}
@@ -641,9 +695,10 @@ CALLOUTS_BELOW: dict[str, str] = {
     "KeyseatWidth": SEAT_NOTE_FLAG,
     "KeyseatS": SEAT_NOTE_FLAG,
     "GripDia": "STOCK OK",
+    "PilotDia": f"PILOTS COLLAR {_COLLAR_SHORT}",
     "HeadCentreDia": "CENTRE HOLE",
     "TailCentreDia": (
-        f"CENTRE HOLE, HOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"
+        f"CENTRE HOLE\nHOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"
     ),
 }
 DIMENSION_PREFIXES: dict[str, str] = {

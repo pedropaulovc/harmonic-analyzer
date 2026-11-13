@@ -1,12 +1,12 @@
 r"""Create the manufacturing drawing for MHA-DT-03-TL-03, the keyed cutting arbor.
 
-Shop tooling (issue #2465). The side view draws the arbor as it lies on the
-lathe (rule 11): every diameter on its own step, the grip's length from the
-grip's end face, the standoff from the shoulder back to the jaw step, every
-blank-side station from the shoulder, both centre holes in symbol form. A
-removed section B-B across the seat prints the keyseat's width and S
-(MHA-DT-04's section A-A form). One note names the seat's and keyseat's mates;
-the kit's fitting steps (MHA-DT-03-TL-05) say how the key is set.
+Shop tooling (issue #2465). The side view draws the arbor as it lies between
+its centres (rule 11): every diameter on its own step, every length a
+baseline from the grip's end face with the overall tying the thread's end
+(rule 10), both centre holes in symbol form. The end view from the thread
+end, projected left of it, prints the keyseat's width and S on the seat's
+outline. One note states the seat's matched fit and the keyseat's key; the
+kit's fitting steps (MHA-DT-03-TL-05) say how the key is set.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 import _telemetry
@@ -40,7 +39,6 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
@@ -58,55 +56,66 @@ OUTPUTS = DrawingOutputs(
     png=SPEC.outputs["png"],
 )
 
-# The 2.58 arbor at 3:1 spans 197 mm of the B sheet's field; section B-B at
-# 6:1 stands right of it, the isometric under B-B, the note block lower left.
+# Sheet metres. The 2.58 arbor at 3:1 spans 197 mm of the B sheet, its grip
+# end right; the end view from the thread end stands left of it at the same
+# scale and height (third-angle), the keyseat's width between the two. The
+# isometric sits right of the grip end above the title block, the note block
+# lower left. Nothing stands in the field below the title block's top (0.066).
 SHEET_SCALE = (3.0, 1.0)
 SIDE_SCALE = (3, 1)
-SECTION_SCALE = (6, 1)
 ISO_SCALE = (1, 1)
-SIDE_CENTER = (0.165, 0.165)
-SECTION_CENTER = (0.345, 0.185)
-ISO_CENTER = (0.345, 0.105)
+SIDE_CENTER = (0.2083, 0.170)
+END_CENTER = (0.045, 0.170)
+ISO_CENTER = (0.375, 0.150)
 NOTES_XY = (0.020, 0.060)
-ISO_NOTE_XY = (0.310, 0.080)
-SECTION_LABEL = "B"
-# The cutting line crosses the seat midway between the shoulder and the
-# keyseat's straight run's end, reaching past the seat by this much (m).
-SECTION_Z = spec.SHOULDER_Z + (spec.KEY_END_SET + spec.SEAT_LENGTH) / 2.0
-SECTION_REACH_MM = spec.SEAT_DIA / 2.0 + 3.0
+ISO_NOTE_XY = (0.345, 0.112)
 
-# Sheet tiers (m) off the arbor's silhouette: diameters stand above or below
-# it, each at the station its circle's sketch occupies (MHA-DT-04's rule);
-# lengths stand in tiers below.
-DIA_RISE = {
-    "GripDia": 0.022,
-    "StandoffDia": 0.030,
-    "SeatDia": -0.030,
-    "PilotDia": 0.020,
-    "ReliefDia": -0.050,
-    "ThreadDia": 0.030,
+# Side view, above the arbor: each diameter's text stands off its own step's
+# dimension line (TEXT_GAP) on one side, at a rise over the grip's top. A
+# text that reaches over a neighbouring step's dimension line stands above
+# that line's own text, so no line strikes it: the thread's and the relief's
+# go toward the tail, low; the tail centre's above the thread's; the seat's,
+# the pilot's and the standoff's toward the head in a staircase over the
+# keyseat end's set (KEYSEAT_END_SET_RISE), the pilot's highest.
+TOWARD_HEAD = 1.0
+TOWARD_TAIL = -1.0
+TEXT_GAP = 0.003
+DIA_TEXT: dict[str, tuple[float, float, float]] = {
+    # name: (model station z mm, side, rise over the grip's top, m)
+    "ThreadDia": (spec.ARBOR_END_Z, TOWARD_TAIL, 0.011),
+    "TailCentreDia": (spec.ARBOR_END_Z, TOWARD_TAIL, 0.028),
+    "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.011),
+    "PilotDia": (spec.PILOT_END_Z, TOWARD_HEAD, 0.036),
+    "SeatDia": (spec.SEAT_END_Z, TOWARD_HEAD, 0.023),
+    "StandoffDia": (spec.SHOULDER_Z, TOWARD_HEAD, 0.014),
+    "GripDia": (0.0, TOWARD_TAIL, 0.014),
+    "HeadCentreDia": (0.0, TOWARD_HEAD, 0.014),
 }
-DIA_STATION_Z = {
-    "GripDia": 0.0,
-    "StandoffDia": spec.SHOULDER_Z,
-    "SeatDia": spec.SEAT_END_Z,
-    "PilotDia": spec.PILOT_END_Z,
-    "ReliefDia": spec.RELIEF_END_Z,
-    "ThreadDia": spec.ARBOR_END_Z,
-}
-LENGTH_SPANS_Z = {
+# The keyseat end's set: its short text toward the tail of the key's end,
+# clear of the seat's step, just over the grip's top.
+KEYSEAT_END_SET_RUN = 0.0066
+KEYSEAT_END_SET_RISE = 0.006
+# Below the arbor: every length a baseline from the grip's end face, the
+# shortest nearest, each text at its span's middle (a longer span's
+# extension line ends above a nearer tier, so none strikes a text).
+LENGTH_SPANS_Z: dict[str, tuple[float, float, int]] = {
     "GripLength": (0.0, spec.GRIP_LENGTH, 1),
-    "Standoff": (spec.GRIP_LENGTH, spec.SHOULDER_Z, 1),
-    "SeatLength": (spec.SHOULDER_Z, spec.SEAT_END_Z, 3),
-    "PilotEnd": (spec.SHOULDER_Z, spec.PILOT_END_Z, 4),
-    "ReliefEnd": (spec.SHOULDER_Z, spec.RELIEF_END_Z, 5),
-    "ThreadLength": (spec.RELIEF_END_Z, spec.ARBOR_END_Z, 1),
+    "Shoulder": (0.0, spec.SHOULDER_Z, 2),
+    "SeatEnd": (0.0, spec.SEAT_END_Z, 3),
+    "PilotEnd": (0.0, spec.PILOT_END_Z, 4),
+    "ReliefEnd": (0.0, spec.RELIEF_END_Z, 5),
+    "CentreOverall": (0.0, spec.ARBOR_END_Z, 6),
 }
-LENGTH_TIER = 0.011
-LENGTH_BASE = 0.016
-KEYSEAT_END_SET_RISE = 0.040
-CENTRE_RUN = 0.030
-SHOULDER_R_DROP = 0.020
+LENGTH_BASE = 0.012
+LENGTH_TIER = 0.009
+# The shoulder root's radius: toward the head of the shoulder, between the
+# arbor and the first tier, where no extension line runs.
+SHOULDER_R_RUN = 0.0176
+SHOULDER_R_DROP = 0.006
+# End view: S under the view, the width toward the side view.
+END_S_DROP = 0.014
+END_WIDTH_RUN = 0.027
+END_WIDTH_RISE = 0.012
 
 
 def _sheet_points(
@@ -130,7 +139,7 @@ def _side_keep(adapter: Any, side: Any) -> dict[str, tuple[float, float]]:
     """Every side-view dimension's text position from the projected model."""
     top = spec.GRIP_DIA / 2.0
     points = {
-        **{f"{name}@": (0.0, 0.0, z) for name, z in DIA_STATION_Z.items()},
+        **{f"{name}@": (0.0, 0.0, z) for name, (z, _side, _rise) in DIA_TEXT.items()},
         **{
             f"{name}@": (0.0, 0.0, (a + b) / 2.0)
             for name, (a, b, _tier) in LENGTH_SPANS_Z.items()
@@ -140,7 +149,7 @@ def _side_keep(adapter: Any, side: Any) -> dict[str, tuple[float, float]]:
         "head": (0.0, 0.0, 0.0),
         "tail": (0.0, 0.0, spec.ARBOR_END_Z),
         "keyend": (0.0, 0.0, spec.KEY_END_Z),
-        "shoulder": (0.0, -spec.STANDOFF_DIA / 2.0, spec.SHOULDER_Z),
+        "shoulder": (0.0, 0.0, spec.SHOULDER_Z),
     }
     sheet = _sheet_points(adapter, side, points, "keyed arbor side stations")
     top_y, bottom_y = sheet["top"][1], sheet["bottom"][1]
@@ -148,88 +157,56 @@ def _side_keep(adapter: Any, side: Any) -> dict[str, tuple[float, float]]:
         raise RuntimeError("the side view does not draw model +Y up")
     outward = math.copysign(1.0, sheet["head"][0] - sheet["tail"][0])
     keep: dict[str, tuple[float, float]] = {}
-    for name, rise in DIA_RISE.items():
-        x = sheet[f"{name}@"][0]
-        keep[name] = (x, top_y + rise if rise > 0 else bottom_y + rise)
+    for name, (_z, toward, rise) in DIA_TEXT.items():
+        x = sheet[f"{name}@"][0] + toward * outward * TEXT_GAP
+        keep[name] = (x, top_y + rise)
     for name, (_a, _b, tier) in LENGTH_SPANS_Z.items():
-        keep[name] = (sheet[f"{name}@"][0], bottom_y - LENGTH_BASE - tier * LENGTH_TIER)
-    keep["KeyseatEndSet"] = (sheet["keyend"][0], top_y + KEYSEAT_END_SET_RISE)
-    keep["HeadCentreDia"] = (sheet["head"][0] + outward * CENTRE_RUN, top_y + 0.012)
-    keep["TailCentreDia"] = (sheet["tail"][0] - outward * CENTRE_RUN, top_y + 0.050)
+        keep[name] = (
+            sheet[f"{name}@"][0],
+            bottom_y - LENGTH_BASE - (tier - 1) * LENGTH_TIER,
+        )
+    keep["KeyseatEndSet"] = (
+        sheet["keyend"][0] - outward * KEYSEAT_END_SET_RUN,
+        top_y + KEYSEAT_END_SET_RISE,
+    )
     keep["ShoulderR"] = (
-        sheet["shoulder"][0],
-        sheet["shoulder"][1] - SHOULDER_R_DROP,
+        sheet["shoulder"][0] + outward * SHOULDER_R_RUN,
+        bottom_y - SHOULDER_R_DROP,
     )
     return keep
 
 
-def _prepare_section(adapter: Any, view: Any) -> None:
-    """Keep only the seat's cut face, at the section's own scale
-    (draw_dt_cone_gear_shaft._prepare_d_section)."""
-    bound = _early_bound(view, "IView")
-    bound.UseParentScale = False
-    bound.UseSheetScale = 0
-    bound.ScaleRatio = double_array([float(SECTION_SCALE[0]), float(SECTION_SCALE[1])])
-    cut = _early_bound(bound.GetSection(), "IDrSection")
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="section B cut face and scale")
-    ratio = tuple(float(value) for value in bound.ScaleRatio)
-    if bool(bound.UseParentScale) or not math.isclose(
-        ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]
-    ):
-        raise RuntimeError(f"section B scale did not persist: {ratio}")
-    if not bool(cut.GetDisplayOnlySurfaceCut()):
-        raise RuntimeError("section B kept geometry beyond the cut")
-
-
-def _section(adapter: Any, side: Any) -> list[Any]:
-    """Section B-B across the seat, carrying the keyseat's width and S."""
-    reach = SECTION_REACH_MM
-    ends = _sheet_points(
+def _end_keep(adapter: Any, end: Any) -> dict[str, tuple[float, float]]:
+    """The keyseat's S under the end view and its width toward the side view."""
+    radius = spec.SEAT_DIA / 2.0
+    z = spec.SEAT_END_Z
+    sheet = _sheet_points(
         adapter,
-        side,
+        end,
         {
-            "start": (0.0, -reach, SECTION_Z),
-            "end": (0.0, reach, SECTION_Z),
+            "keyseat": (radius, 0.0, z),
+            "far": (-radius, 0.0, z),
+            "floor": (spec.KEYSEAT_FLOOR_OFFSET, 0.0, z),
+            "centre": (0.0, 0.0, z),
+            "bottom": (0.0, -spec.GRIP_DIA / 2.0, z),
         },
-        "section B cutting line",
+        "end view keyseat",
     )
-    view = create_section_view(
-        adapter,
-        side,
-        line_start=ends["start"],
-        line_end=ends["end"],
-        view_xy=SECTION_CENTER,
-        section_label=SECTION_LABEL,
-        scale=SECTION_SCALE,
-        partial=False,
-        label="seat section",
-    )
-    _prepare_section(adapter, view)
-    keyseat = _sheet_points(
-        adapter,
-        view,
-        {
-            "keyseat": (spec.SEAT_DIA / 2.0, 0.0, SECTION_Z),
-            "far": (-spec.SEAT_DIA / 2.0, 0.0, SECTION_Z),
-        },
-        "section B keyseat side",
-    )
-    side_sign = math.copysign(1.0, keyseat["keyseat"][0] - keyseat["far"][0])
-    keep = {
-        "KeyseatS": (SECTION_CENTER[0], SECTION_CENTER[1] + 0.040),
+    if sheet["keyseat"][0] <= sheet["far"][0]:
+        raise RuntimeError(
+            "the end view draws the keyseat away from the side view: "
+            f"keyseat {sheet['keyseat']}, far side {sheet['far']}"
+        )
+    return {
+        "KeyseatS": (
+            (sheet["far"][0] + sheet["floor"][0]) / 2.0,
+            sheet["bottom"][1] - END_S_DROP,
+        ),
         "KeyseatWidth": (
-            keyseat["keyseat"][0] + side_sign * 0.025,
-            SECTION_CENTER[1] + 0.012,
+            sheet["keyseat"][0] + END_WIDTH_RUN,
+            sheet["centre"][1] + END_WIDTH_RISE,
         ),
     }
-    return curate_view_dimensions(
-        adapter,
-        view,
-        keep=keep,
-        view_label="section B",
-        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-    )
 
 
 def _set_affixes(adapter: Any, annotations: list[Any]) -> None:
@@ -294,11 +271,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=SIDE_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (side, iso):
+    for view in (side, end, iso):
         set_hidden_lines_removed(adapter, view)
 
-    section_annotations = _section(adapter, side)
+    end_annotations = curate_view_dimensions(
+        adapter,
+        end,
+        keep=_end_keep(adapter, end),
+        view_label="end",
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
     side_annotations = curate_view_dimensions(
         adapter,
         side,
@@ -306,7 +290,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="side",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
-    annotations = [*side_annotations, *section_annotations]
+    annotations = [*side_annotations, *end_annotations]
     assert_imported_precision(adapter, annotations, spec.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, dict(spec.CALLOUTS_BELOW))
     _set_affixes(adapter, annotations)

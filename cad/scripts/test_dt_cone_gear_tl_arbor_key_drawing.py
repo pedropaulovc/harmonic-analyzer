@@ -60,7 +60,8 @@ def test_the_cut_length_lies_on_the_seat_and_under_every_blank() -> None:
     near = arbor.KEY_END_SET - XX
     far = arbor.KEY_END_SET + XX + spec.LENGTH + XX
     assert near > 0.0
-    assert far <= arbor.SEAT_LENGTH - XX + 1e-9
+    # The seat's end and the shoulder are both stations from the grip's end.
+    assert far <= arbor.SEAT_LENGTH - 2.0 * XX + 1e-9
     assert far < min(blank.face[0] for blank in arbor.KEYED_GEARS)
     assert spec.LENGTH - XX >= spec.SIZE
 
