@@ -2225,6 +2225,77 @@
       "kind": "assembly"
     },
     {
+      "old_stem": "dt-cylinder-gear-tl-cam-fixture",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cylinder-gear-tl-cam-fixture",
+          "number": "MHA-DT-12-TL-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-tl-vn-cam-stub",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "parent": "dt-cylinder-gear-tl-cam-turning",
+          "stem": "dt-cylinder-gear-tl-vn-cam-stub",
+          "number": "MHA-DT-12-TL-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-tl-vn-cam-clock-pin",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "parent": "dt-cylinder-gear-tl-cam-turning",
+          "stem": "dt-cylinder-gear-tl-vn-cam-clock-pin",
+          "number": "MHA-DT-12-TL-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-tl-vn-cam-clamp-screw",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "parent": "dt-cylinder-gear-tl-cam-turning",
+          "stem": "dt-cylinder-gear-tl-vn-cam-clamp-screw",
+          "number": "MHA-DT-12-TL-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-tl-vn-cam-clamp-washer",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "parent": "dt-cylinder-gear-tl-cam-turning",
+          "stem": "dt-cylinder-gear-tl-vn-cam-clamp-washer",
+          "number": "MHA-DT-12-TL-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-tl-cam-turning",
+      "old_number": null,
+      "introduced": "2026-11-12",
+      "new_identities": [
+        {
+          "stem": "dt-cylinder-gear-tl-cam-turning",
+          "number": "MHA-DT-12-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",

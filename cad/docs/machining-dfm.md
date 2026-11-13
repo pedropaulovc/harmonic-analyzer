@@ -82,7 +82,7 @@ its first-root position; no second general note restates that location.
 - **The repeat families (make N identical by hand: the shop is manual, so fixtures, stops and indexing carry the repeatability):**
   | family | qty | repeat risk and route |
   |---|---|---|
-  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Teeth with the stock #2 cutter on the BS-0; the cam's throw and phase need an eccentric fixture that is not drawn, so the cam route is **not selected** ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); the notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
+  | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase. Bore and OD first, then teeth and notch together on an arbor with the stock #2 cutter on the BS-0, then the cam on the lathe fixture MHA-DT-12-TL-01 (fitting sheet MHA-DT-12-TL-00): its stub sets the throw and its clock pin, in the notched tooth space, sets the phase, once for all 20 (see [Cylinder-gear cam](#cylinder-gear-cam)). The notch needs a .014 in screw-slotting saw that is not yet owned (`shop-equipment.toml` `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)) |
   | `dt-cone-gear` | 19 | involute teeth cut with stock 48DP PA20 range cutters indexed on the BS-0 dividing head; T006 (`dt-cone-tip-gear`) alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt. T030–T120 are bored and broached first, then cut on the keyed arbor MHA-DT-03-TL-03 (fitting sheet MHA-DT-03-TL-05), which clocks each blank by its keyway. The cutters, cutter arbors and broach are recorded to buy, not owned (`shop-equipment.toml`, "gear cutting kit"; the purchase is the owner's decision on [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356)) |
   | `ch-rocker-arm` / `ch-channel-lever` hubs | 20 each | the integral hubs stack face to face and set the 7.62 (.300) channel pitch; the 19 `pivot-bushing` and 19 `lever-bushing` spacers are retired. Hub width consistency across each set is the point ([#2344](https://github.com/pedropaulovc/harmonic-analyzer/issues/2344)) |
   | `ch-rocker-arm` | 20 | strap with a pressed hub; the R800/R816 arcs are cut on the oblique jig MHA-CH-06-TL-00, by a held reference route that is not yet qualified (`cad/process/ch_rocker_arm/plan.toml`) |
@@ -1245,6 +1245,31 @@ toward the collar. The cone gears run between the BS-0's centres. For the 64T th
 and there is no tail centre: grip the arbor's Ø.62 end in the head's chuck against its step,
 which leaves the blank more than .75 in clear of the jaws for the cutter to run out, and indicate
 the seat within the sheet's setup allowance before cutting.
+
+### Cylinder-gear cam
+
+The cam is turned last, on the fixture MHA-DT-12-TL-01. The body is gripped in the four-jaw chuck,
+indicated true once on its register diameter and left there for all 20 gears. Each gear goes on
+the fixture's Ø3/8 stub by its reamed bore, with the notched tooth space over the clock pin, is
+turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 2) and is clamped
+by the screw in the stub's end. One screw and a Ø.0375 pin hold it, and the cut is interrupted
+until the cam cleans up, so rough each cam close to size before it goes on the fixture and take
+light finishing cuts there. Check the throw with a micrometer over the cam and a Ø.376 pin in the
+bore: 1.1307 in nominal, ±.002. The fixture's holes are located at the shop's ±.002 row, so its
+own errors, which every gear inherits alike, can be larger than what varies from gear to gear:
+
+| | gear to gear | fixed in the fixture | worst total | MHA-DT-12 print |
+|---|--:|--:|--:|--:|
+| cam phase to the notch | .13° | .39° | .60° | ±.25° |
+| throw | .0007 in | .0023 in | .0030 in | ±.0020 in |
+
+Gear-to-gear scatter is inside the print. The fixed part is not guaranteed to be: a common
+throw error scales the whole drawn curve (.7% at .0023 in) and a common phase error mixes each
+harmonic's sine into its cosine (.7% of the summed amplitudes at .39°), the same for all 20
+channels. Measure the first cam's throw: it shows the fixture's throw error directly, and a
+fixture outside the print is corrected before the other 19 are cut. Whether the print's phase
+band applies to the common part is open with the owner
+([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)).
 
 ### T006 special cutter
 

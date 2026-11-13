@@ -55,9 +55,9 @@ they rotate together". The design's 1/16 key (owner decision C1 keyed,
 
 | | route | purchases | what changes |
 |---|---|--:|---|
-| A | Make every gear, as designed | **$2,379** | nothing |
-| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,728** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
-| C | Route A, plus one Boston Y48120 as a 120T master to roll cut gears against | **$2,550** | nothing in the machine; one more shop gauge |
+| A | Make every gear, as designed | **$2,417** | nothing |
+| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,766** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
+| C | Route A, plus one Boston Y48120 as a 120T master to roll cut gears against | **$2,588** | nothing in the machine; one more shop gauge |
 
 All three exclude the C67500 rod for T006 to T024 (5/8 in, about 6 in),
 which every mill found sells by quotation only.
@@ -70,7 +70,7 @@ each gear by its span or over-pins size and by backlash at assembly.
 
 ## Purchase list
 
-Common to every route, $478.69:
+Common to every route, $516.20:
 
 | item | SKU | price |
 |---|---|--:|
@@ -85,9 +85,14 @@ Common to every route, $478.69:
 | 1018 CF round, 3 in x 2 in and 7/8 x 12 in (crank pair) | OnlineMetals 7566, 4796 | $27.36 |
 | O1 drill rod, 1/8 x 36 in (T006 form tool MHA-DT-37-TL-01) | OnlineMetals 4630 | $6.43 |
 | Hex nut, 1/4-28, pack of 100 (keyed arbor kit MHA-DT-03-TL-05) | McMaster 95462A505 | $8.00 |
+| Pull-out dowel pin, 3/8 (cam fixture stub, MHA-DT-12-TL-00) | McMaster 97175A344 | $3.81 |
+| Gauge pin, .0375 (cam fixture clock pin) | McMaster 23065A503 | $7.50 |
+| Socket head screw, 10-32, pack of 50 (cam fixture clamp) | McMaster 91251A337 | $22.41 |
+| Washer, #10, pack of 100 (cam fixture clamp) | McMaster 92141A011 | $3.79 |
 
 The shop-made tools' own bar (5/8 and 3/8 1018 for the arbor and cutter bar,
-collar offcuts) is not priced.
+a Ø3.25 x 1 in 1018 slug for the cam fixture, collar offcuts) and the two
+press reamers the cam fixture's pins need (.3745 and .0365) are not priced.
 
 Route A adds the eleven cutters, $1,379.13, and brass bar, $521.58 (six
 C360 bars for the drive train, $439.04, and the 3-1/4 in bar for the

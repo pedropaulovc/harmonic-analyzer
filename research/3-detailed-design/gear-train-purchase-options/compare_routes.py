@@ -46,9 +46,9 @@ BRASS, BOUGHT, MADE, STEEL = "#c9a227", "#4f81bd", "#c9a227", "#8c8c8c"
 
 # Route totals, USD before shipping and tax, C67500 rod (quotation) excluded.
 ROUTES = (
-    ("A\nmake every gear\n(as designed)", (("cutters x11", 1379.13), ("arbors, broach kit,\npress, small tools", 478.69), ("bar stock", 521.58))),
-    ("B\nbuy catalogue gears,\nmake the rest", (("cutters x9", 1130.04), ("arbors, broach kit,\npress, small tools", 478.69), ("bar stock", 460.39), ("14 cone gears", 1239.32), ("20 x 120T donors", 3420.00))),
-    ("C\nroute A + one bought\n120T rolling master", (("cutters x11", 1379.13), ("arbors, broach kit,\npress, small tools", 478.69), ("bar stock", 521.58), ("1 x Y48120", 171.00))),
+    ("A\nmake every gear\n(as designed)", (("cutters x11", 1379.13), ("arbors, broach kit,\npress, small tools", 516.20), ("bar stock", 521.58))),
+    ("B\nbuy catalogue gears,\nmake the rest", (("cutters x9", 1130.04), ("arbors, broach kit,\npress, small tools", 516.20), ("bar stock", 460.39), ("14 cone gears", 1239.32), ("20 x 120T donors", 3420.00))),
+    ("C\nroute A + one bought\n120T rolling master", (("cutters x11", 1379.13), ("arbors, broach kit,\npress, small tools", 516.20), ("bar stock", 521.58), ("1 x Y48120", 171.00))),
 )  # fmt: skip
 
 
