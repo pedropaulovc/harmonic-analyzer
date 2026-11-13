@@ -606,18 +606,18 @@ HUB_LENGTH_CALLOUT = f"{AXLE_NUMBER} LOCKNUT STACK"
 # names it (drawing-guidelines.md rule 4: a mate serving several features
 # is named once, in one flagged note linked to the features).
 GROOVE_CALLOUT = f"SEE NOTE {GROOVE_SEAT_NOTE}"
-# The .61 locates the groove: it runs from the spigot face to the centre
-# plane the groove, rim and spokes share (WEB_CENTRELINES), its extension
-# line ending on the lower groove's bottom.  Two machinist reviews still read
-# the groove as unlocated (integration proofs 20261109T105251629Z,
-# 20261112T153723793Z).  Rule 7 keeps the location dimension bare and puts
-# what it serves on the feature's size callout, so the groove's R says the
-# groove is centred on the rim, a drawn feature symmetric about the plane the
-# .61 dimensions, with no second value (rule 26: no number in a sentence,
-# and a plain feature name: the sheet names no web).  It stands on the R,
-# whose block has open sheet to its right: the groove bottom's Ø has about
-# 33 mm between the rim's two Ø lines.
-GROOVE_R_CALLOUT = f"{GROOVE_CALLOUT}\nCENTRED ON RIM"
+# The .61 is the groove's one axial location: it runs from the spigot face
+# to the centre plane the groove, rim and spokes share, its extension line
+# ending on the lower groove's bottom.  Reviews that looked only at the
+# upper groove (the R's) found no dimension on its centreline and read the
+# groove as unlocated (integration proofs 20261109T105251629Z,
+# 20261112T153723793Z); a "CENTRED ON RIM" line on the R then read as a
+# second, prose location (release v49 run 20261113T004939203Z, 2 of 3
+# runs; rule 26: a location is a dimension, not a sentence).  So the R
+# carries its note link alone, and the plane is drawn as ONE centreline
+# (WEB_CENTRELINES) from past the upper groove through the hub to past the
+# lower one, where the .61's extension line runs on it: the line through
+# each groove leads to the .61.
 # The web plane's value is ".61 ±.03": its text is centred this many
 # characters (with the margin) right of the spigot face.
 _PLANE_VALUE_CHARS = 8
@@ -665,13 +665,12 @@ SECTION_KEEP = {
     ),
     # The groove's R up right, its leader down-left onto the groove at 35
     # deg, right of the axial rows' line ends; its shoulder over the top of
-    # the rim-bore round's R block (ROUND_TEXT_XY), under its two callout
-    # lines.  Its one-line value leaves the shoulder where the stacked band's
-    # block put it; the second callout line lifts the point half a line, so
-    # the shoulder stays.
+    # the rim-bore round's R block (ROUND_TEXT_XY), under its note link.
+    # Its one-line value leaves the shoulder where the stacked band's block
+    # put it.
     "GrooveR": (
         SECTION_CENTER[0] + 0.0344,
-        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP) + _TEXT_LINE / 2.0,
+        SECTION_CENTER[1] + 0.0701 - (_STACK_UP - _ONE_LINE_UP),
     ),
 }
 # The spigot's two-line block ("(Ø.499)" over its note link) hangs on an
@@ -735,7 +734,7 @@ DIMENSION_CALLOUTS = {
     "BoreDiaDim": BORE_CALLOUT,
     "SpigotDia": f"SEE NOTE {SPIGOT_FIT_NOTE}",
     "GrooveBottomDia": GROOVE_CALLOUT,
-    "GrooveR": GROOVE_R_CALLOUT,
+    "GrooveR": GROOVE_CALLOUT,
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
@@ -759,13 +758,14 @@ NOTES_XY = (0.020, 0.062)
 # locates are drawn lines, not sentences.  On the face, A-A's cutting line
 # runs through the bore's axis and the two spokes on it (the seed spoke on
 # local +X).  On A-A, the groove, web and rim's shared mid-plane (model
-# z = 0, the plane HubFrontZ dimensions) along each cut spoke from the hub,
-# CENTRELINE_OVERRUN past the OD.  Model mm.
+# z = 0, the plane HubFrontZ dimensions) as one line across the whole cut,
+# through the hub, CENTRELINE_OVERRUN past the OD at each groove, so the
+# line through the R's (upper) groove runs on to the .61's extension line
+# at the lower one.  Model mm.
 CENTRELINE_OVERRUN = 2.0
 _CENTRELINE_REACH = RIM_OUTER_DIA / 2.0 + CENTRELINE_OVERRUN
 WEB_CENTRELINES = {
-    side: ((sign * HUB_DIA / 2.0, 0.0, 0.0), (sign * _CENTRELINE_REACH, 0.0, 0.0))
-    for side, sign in (("upper", 1.0), ("lower", -1.0))
+    "web": ((_CENTRELINE_REACH, 0.0, 0.0), (-_CENTRELINE_REACH, 0.0, 0.0)),
 }
 
 # The rim's axial width spans its two side faces where A-A cuts them over

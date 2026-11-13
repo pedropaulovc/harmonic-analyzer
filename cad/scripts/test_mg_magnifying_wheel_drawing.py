@@ -302,13 +302,16 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert not hasattr(drawing, "SPOKE_CENTRELINE")
     assert spec.SPOKE_REFERENCE in spec.REFERENCE_SKETCHES
     # The .61 locates the groove, web and rim's shared mid-plane, drawn on
-    # A-A; the location carries its value and band alone (rule 7).
+    # A-A; the location carries its value and band alone (rule 7).  The
+    # plane is one centreline across the whole cut, past both grooves, so
+    # the line through the R's upper groove runs on to the .61's extension
+    # line at the lower one (release v49 review: a reader of the upper groove
+    # alone found no dimension on its centreline).
     assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
     assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
-    for a, b in drawing.WEB_CENTRELINES.values():
-        assert a[1] == b[1] == a[2] == b[2] == 0.0
-        assert abs(a[0]) == geom.HUB_DIA / 2.0
-        assert abs(b[0]) > rim.RIM_OUTER_DIA / 2.0
+    ((a, b),) = drawing.WEB_CENTRELINES.values()
+    assert a[1] == b[1] == a[2] == b[2] == 0.0
+    assert a[0] == -b[0] > rim.RIM_OUTER_DIA / 2.0
     # Its centre-plane extension line runs up into the lower groove to the
     # groove's bottom, so the .61 visibly lands on the groove (integration
     # proof 20261109T105251629Z, r1).
@@ -344,17 +347,10 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "REAM THRU\nSEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == "SEE NOTE 2"
     assert drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "SEE NOTE 3"
-    # The groove's R links the same note and says the groove is centred on
-    # the rim, which stands symmetric about the plane (the drawn centrelines
-    # at z = 0) the bare .61 dimensions: two reviews read the groove as
-    # unlocated (integration proofs 20261109T105251629Z,
-    # 20261112T153723793Z).  Rule 7: the reason sits on the size callout, at
-    # most two lines of words, no second value; rule 26: a feature the sheet
-    # draws, by its plain name.
-    note_link, relation = drawing.DIMENSION_CALLOUTS["GrooveR"].split("\n")
-    assert note_link == drawing.GROOVE_CALLOUT
-    assert relation.startswith("CENTRED ON") and "RIM" in relation.split()
-    assert not any(c.isdigit() for c in relation)
+    # The groove's R links the same note and nothing else: the .61 is its one
+    # axial location, and a "CENTRED ON RIM" line read as a second, prose one
+    # (release v49 run 20261113T004939203Z; rule 26).
+    assert drawing.DIMENSION_CALLOUTS["GrooveR"] == drawing.GROOVE_CALLOUT
     assert "GrooveR" not in drawing.CALLOUTS_ABOVE
     # The literal mate numbers keep the axle, drum and wire out of the part's
     # recipe; they are the config rows' numbers.
