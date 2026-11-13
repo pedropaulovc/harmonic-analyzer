@@ -30,8 +30,6 @@ from _gear_quality import (
     rack_flank_constraint_deviation_mm,
     pinion_pitch_index_deviation_mm,
     rack_face_lead_deviation_mm,
-    rack_face_width_max_mm,
-    rack_stock_height_max_mm,
     recording_paper_left_inset_deviation_mm,
     recording_paper_width_deviation_mm,
     recording_pen_x_deviation_mm,
@@ -239,6 +237,8 @@ def feed_service_cocking_lateral_deviation_mm() -> float:
     source feed-axis tilt is used, not an assumed world-Z journal.
     Rigid quasi-static kinematics; elastic compliance excluded by scope.
     """
+    import pd_platen_rack_spec as rack
+
     edge = edge_break_chamfer_mm(unit=pd_transgear_feed_pinion_spec.UNIT)
     if not math.isfinite(edge) or edge < 0.0:
         raise ValueError("bore end edge loss must be finite and nonnegative")
@@ -257,7 +257,7 @@ def feed_service_cocking_lateral_deviation_mm() -> float:
     )
     section_slope_factor = 1.0 / math.cos(reducer_axis_tilt_maxima_rad()[1])**2
     return math.nextafter(
-        rack_face_width_max_mm() * slope * section_slope_factor * normal_projection,
+        rack.PURCHASED_RACK_FACE_WIDTH_MAX_MM * slope * section_slope_factor * normal_projection,
         math.inf,
     )
 
@@ -301,9 +301,9 @@ def feed_lateral_deviation_mm() -> float:
 def feed_rack_cut_end_section_maxima_mm() -> tuple[float, float]:
     """Whole actual cut-Y/cut-Z envelope, not the nominal overall-height REF.
 
-    Incoming stock HEIGHT and face WIDTH have separate positive receiving
-    maxima.  The printed SeamHeight, BackerDepth and RackInset bounds locate
-    the soldered stock; rejected incoming sections never enter this domain.
+    The purchased strip's HEIGHT and face WIDTH maxima are the room the
+    receiving geometry gives it (pd_platen_rack_spec, #2694).  The printed
+    SeamHeight, BackerDepth and RackInset bounds locate the soldered stock.
     """
     import pd_platen_rack_spec as rack
     from _printed_tolerance import printed_deviations
@@ -318,8 +318,8 @@ def feed_rack_cut_end_section_maxima_mm() -> tuple[float, float]:
     seam = dimension_band("SeamHeight")
     backer = dimension_band("BackerDepth")
     inset = dimension_band("RackInset")
-    height = seam[1] + rack_stock_height_max_mm()
-    depth = max(backer[1], inset[1] + rack_face_width_max_mm()) - min(0.0, inset[0])
+    height = seam[1] + rack.PURCHASED_RACK_HEIGHT_MAX_MM
+    depth = max(backer[1], inset[1] + rack.PURCHASED_RACK_FACE_WIDTH_MAX_MM) - min(0.0, inset[0])
     if not all(math.isfinite(value) and value > 0.0 for value in (height, depth)):
         raise ValueError("actual rack cut section has no finite positive envelope")
     return math.nextafter(height, math.inf), math.nextafter(depth, math.inf)
