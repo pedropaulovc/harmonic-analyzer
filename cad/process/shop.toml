@@ -214,3 +214,47 @@ tool = "ms-stick-engraver"
 material = "ms-stick-brass"
 rpm = 3000
 feed = "3 in/min"
+
+# Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
+# Number and letter drills are the 115-piece index's (jig-drill-11-32);
+# diameter_mm and tap_drill_mm are the standard nominal sizes × 25.4: #43
+# .089 (4-40 tap drill), F .257 (5/16-18 tap drill), 23/64 .3594 (reamer
+# pilot). The .3760 reamer is the owned over reamer named in
+# cad/scripts/_fit_ream_slide.py (REAM_SLIDE); its cutting size is its nominal.
+[tools.jig-drill-43]
+description = "#43 (.089 in) drill, 115-piece index"
+diameter_mm = 2.2606
+[tools.jig-drill-f]
+description = "F (.257 in) drill, 115-piece index"
+diameter_mm = 6.5278
+[tools.jig-drill-23-64]
+description = "23/64 (.3594 in) drill, 115-piece index"
+diameter_mm = 9.128125
+[tools.reamer-0376]
+description = ".3760 in HSS straight-flute chucking reamer (3/8 in over reamer)"
+diameter_mm = 9.5504
+[tools.jig-tap-4-40-plug]
+description = "4-40 UNC plug tap; T-handle wrench"
+tap_drill_mm = 2.2606
+[tools.jig-tap-5-16-18-plug]
+description = "5/16-18 UNC plug tap; T-handle wrench"
+tap_drill_mm = 6.5278
+[tools.jig-csk-90]
+description = "1/2 in 90° (included) countersink in a T-handle"
+
+# PM-30MV Y DRO scale read as a length gauge (carrier A2/B2 rows from the
+# A1-B1 line, read over a pin with the DTI). Range: machines.pm-30mv Y travel;
+# resolution: the installed MagXact MX-100M DRO's 5 um scales, as
+# gauges.mill-x-dro.
+[gauges.mill-y-dro]
+range_mm = [0.0, 222.25]
+resolution_mm = 0.005
+
+# Vermont Gage class X pins for the carrier's .3760-.3765 REAM_SLIDE bores
+# (cad/config/shop-equipment.toml gauges.pin-0376-go-nogo): GO .3760 plus,
+# NO-GO .3765 minus. A fixed-limit pair reads only its two limits, so
+# range_mm is the band it gauges and resolution_mm is the class X gaugemaker's
+# tolerance, .00004 in.
+[gauges.pin-0376-go-nogo]
+range_mm = [9.5504, 9.5631]
+resolution_mm = 0.001016

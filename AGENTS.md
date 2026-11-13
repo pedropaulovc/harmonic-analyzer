@@ -489,8 +489,8 @@ it checks part identity, the adjacent STEP name and sha256, a non-empty features
 table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
-Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and
-end bracket) has an opt-in `prechips:<stem>` task. `build` and `release` do not
+Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar,
+end bracket and carrier) has an opt-in `prechips:<stem>` task. `build` and `release` do not
 run it, and releases carry no travelers while prechips stabilises (owner ruling
 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502):
 prechips stays out of `uv.lock`, because every prechips release changed the lock

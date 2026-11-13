@@ -142,7 +142,7 @@ Owner rulings (Pedro), recorded for the cutover:
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: the oblique-trammel base bar and end bracket. `build`
+`prechips:<stem>` task: the oblique-trammel base bar, end bracket and carrier. `build`
 and `release` do not run it, and releases carry no travelers while prechips
 stabilises. Each run renders two travelers from the same plan: `traveler.html`
 (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
@@ -193,6 +193,20 @@ in the repository but not enrolled. It declares its vise holds and passes
 drill (8.73125 mm) is below the drawing's hole band (8.7376–8.8392 mm). That is
 a finding for the owner (a different drill, or a drawing change), not a check
 to opt out of; enroll the part once its plan passes.
+
+The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21
+v49) is enrolled. It needs prechips 0.11.0 (the `harmonic_carrier` adapter and
+the `jig-carrier-*` pictures); until that is published `prechips:<stem>` fails
+for it under `@latest`. The 20.5 in plate is made flat on the table, vise off,
+on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
+2026-11-05/06), placed between hole columns; the registry note's "mill to
+width on edge in the vise" grips at most the 1.77 in jaw height of a 6 in-tall
+bar, under the one-third rule. Holes run from the lower-left corner as sheet 2
+prints them; note 2's relations to A1 are read on the DRO over the GO pin
+before unclamping. The .3760-.3765 bores need class X GO/NO-GO pins
+(`gauges.pin-0376-go-nogo`, to buy, `shop-equipment.toml`); section A-A's
+underside chamfer is not in the manifest, so its .012 leg is authored in the
+plan until the drawing exports it.
 
 ```text
 uv run --frozen python -m doit prechips:<stem>

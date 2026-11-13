@@ -253,8 +253,9 @@ disjoint fields; no field is duplicated. See
 ## Travelers
 
 `_process_plans.TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar` and
-`ch_rocker_arm_tl_oblique_end_bracket`. The feed lever's plan is held,
+`prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
+`ch_rocker_arm_tl_oblique_end_bracket` and
+`ch_rocker_arm_tl_oblique_carrier` (needs prechips 0.11.0). The feed lever's plan is held,
 unenrolled (see [`cad/process/README.md`](../../process/README.md)).
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
