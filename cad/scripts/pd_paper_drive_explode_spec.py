@@ -217,6 +217,18 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         -30.0,
         instances=(KNOB_WHEEL_INSTANCE,),
     ),
+    # The MHA-PD-VN-70 flat pin sits flush in the collar's rear blind hole,
+    # on the side the *Isometric does not see, so seated it was drawn nowhere
+    # and balloon 37 landed on the collar's pilot face (ENFORCE review of
+    # #2720's run 20261113T083323978Z, r1/r2). It comes out of the hole the
+    # way it went in, rearward along its own axis, then down below the
+    # collar's outline, where the camera sees it.
+    ExplodeStep(
+        "collar flat pin out rearward", ("pd-vn-transgear-collar-flat-pin",), "z", 8.0
+    ),
+    ExplodeStep(
+        "collar flat pin below the collar", ("pd-vn-transgear-collar-flat-pin",), "y", -12.0
+    ),
     ExplodeStep(
         "knob wheel forward",
         ("pd-transgear-thumbnut",),
