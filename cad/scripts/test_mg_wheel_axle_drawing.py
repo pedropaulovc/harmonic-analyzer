@@ -208,8 +208,12 @@ def test_journal_finish_and_no_gdt() -> None:
     assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
         ("mg_axle_journal", MACHINED_UM)
     ]
-    pin_words = callouts.PIN_DIA_CALLOUT.split()
-    assert "MHA-MG-05" in pin_words and "RUNNING" in pin_words
+    # v49 machinist review (rule 4): each fit names its mate by number and
+    # name, one line each.
+    assert callouts.callout_rows(callouts.PIN_DIA_CALLOUT) == (
+        "PRESS FIT IN MHA-MG-08 WHEEL BAR (INTERFERENCE .0003-.0012)",
+        "RUNNING FIT IN MHA-MG-05 MAGNIFYING WHEEL (CLEARANCE .0008-.0017)",
+    )
 
 
 def test_thread_callout_and_no_general_notes() -> None:
