@@ -169,10 +169,9 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "CrossHole")
     await volume_check(adapter, "cross hole", V_BAR - V_CROSS_HOLE, 0.01 * V_CROSS_HOLE)
 
-    # The set-screw tap: ONE native blind #4-40 hole up the axis from the
-    # cutting end, its drill to the cross hole's axis and its full thread
-    # short of the hole (SET_SCREW_HOLE_SPEC); the drill beyond the hole's
-    # wall cuts only air, so V_TAP is unchanged.
+    # The set-screw tap: ONE native #4-40 hole up the axis from the cutting
+    # end, stopped at the next surface (the cross hole), the pedestal's apex
+    # tap pattern on a planar face.
     tap = wizard_holes(
         adapter,
         SET_SCREW_HOLE_SPEC,
