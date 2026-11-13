@@ -87,9 +87,9 @@ def test_member_volumes_and_dimensions_are_the_disc_and_bore() -> None:
 
 
 def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_backs() -> None:
-    """Which blanks a member backs is assembly information: the kit's step 2
-    lists it by item number, and a part-sheet note repeating it was narration
-    (rule 7, machinist review of farm 20261113T042822797Z)."""
+    """Which blanks a member backs is assembly information: the kit's setup
+    table lists it by item number, and a part-sheet note repeating it was
+    narration (rule 7, machinist review of farm 20261113T042822797Z)."""
     import dt_cone_gear_tl_arbor_assembly_spec as kit
 
     assert tuple(drawing.MEMBER_SHEETS.values()) == spec.CONFIGURATIONS
@@ -103,8 +103,9 @@ def test_each_member_sheet_carries_only_its_caption_and_the_kit_says_what_it_bac
         )
         assert "\n" not in label
         item = kit.BOM_ITEMS[kit.member(name)]
-        cones = [int(t[1:]) for t in spec.GEARS_BY_CONFIGURATION[name] if t[0] == "T"]
-        assert f"ITEM {item} {cones[0]}T-{cones[-1]}T" in kit.ASSEMBLY_STEPS
+        for tag in spec.GEARS_BY_CONFIGURATION[name]:
+            teeth = kit.blank_teeth(tag)
+            assert f"({teeth}T): ITEM {item}," in kit.SETUP_TABLE, tag
 
 
 def test_the_bore_callout_names_its_process() -> None:

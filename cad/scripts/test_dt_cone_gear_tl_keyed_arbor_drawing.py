@@ -79,13 +79,16 @@ def test_the_note_names_every_mate_by_its_drawing_number() -> None:
     assert f"{numbers[0]} TO {numbers[-2]} AND {numbers[-1]}" in note
     assert numbers[0] == "MHA-DT-03-T030" and numbers[-2] == "MHA-DT-03-T120"
     assert f"KEY {spec.KEY_NUMBER}" in note
-    # The pilot's .XXX has a function: a standard fit name and its collar.
+    # The pilot only carries the loose collars: the title block's .XXX band
+    # and the collar it carries, no fit name its limits do not set.
     pilot = spec.CALLOUTS_BELOW["PilotDia"]
-    assert pilot.startswith(spec.PILOT_FIT) and pilot.endswith(" TL-04")
-    assert spec.PILOT_FIT in {
-        "RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT", "PRESS FIT"
-    }
-    assert spec.COLLAR_BORE - (spec.PILOT_DIA + XXX) > 0.0  # a clearance fit
+    assert pilot == "FOR TL-04"
+    assert "FIT" not in pilot
+    assert spec.COLLAR_BORE - (spec.PILOT_DIA + XXX) > 0.0  # a clearance
+    # The shoulder root prints the repo's MAX form and links the seat's note,
+    # which names the bores that seat on the shoulder.
+    assert spec.SHOULDER_R_TOL_TYPE == 0 and spec.SHOULDER_R_SUFFIX == " MAX"
+    assert spec.CALLOUTS_BELOW["ShoulderR"] == spec.SEAT_NOTE_FLAG
     assert spec.THREAD_CALLOUT == "1/4-28 UNF"
 
 
@@ -382,6 +385,27 @@ def test_the_end_view_puts_the_keyseat_toward_the_side_view(monkeypatch) -> None
     thread_line = side_left - drawing.TEXT_GAP
     assert width_x + drawing.END_WIDTH_TEXT < thread_line - 0.002
     assert keep["KeyseatS"][1] < drawing.END_CENTER[1] - grip
+    # S's text stands wholly outside its extension lines, right of the
+    # floor's, so neither strikes its stacked limits (rule 14).
+    floor_x = drawing.END_CENTER[0] + spec.KEYSEAT_FLOOR_OFFSET / 1000.0 * scale
+    s_x = keep["KeyseatS"][0]
+    assert s_x - drawing.END_S_TEXT / 2.0 > floor_x
+    assert s_x + drawing.END_S_TEXT / 2.0 < side_left - 0.002
+
+
+def test_the_standoff_diameter_line_clears_the_keyseat_end_set(monkeypatch) -> None:
+    """The Ø.50's dimension line stands on the standoff, far from the
+    shoulder where the .05 keyseat-end set's outside arrow runs (rule 14)."""
+    monkeypatch.setattr(drawing, "model_points_in_view", _fake_projection)
+    keep = drawing._side_keep(None, None)
+    scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
+    cx = drawing.SIDE_CENTER[0] + spec.OVERALL_LENGTH / 2000.0 * scale
+
+    def x_of(z: float) -> float:
+        return cx - z / 1000.0 * scale
+
+    line = keep["StandoffDia"][0]
+    assert x_of(spec.SHOULDER_Z) + 0.010 < line < x_of(spec.GRIP_LENGTH) - 0.010
 
 
 def test_the_cli_takes_its_own_stem(monkeypatch) -> None:

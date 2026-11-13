@@ -17,6 +17,7 @@ beyond the arbor's end. Every part is fixed (0 DOF).
 from __future__ import annotations
 
 import math
+import textwrap
 
 import _config
 import dt_cone_gear_tl_arbor_collar_spec as collar
@@ -59,10 +60,25 @@ NUMBERS: dict[str, str] = {
     KEY: key.PART_NUMBER,
     NUT: str(_config.parts("dt-cone-gear-tl-vn-arbor-nut")["number"]),
 }
+# The three collars are members of one tabulated drawing, one sheet each
+# (dt_cone_gear_tl_arbor_collar_spec.SHEET_NAMES): each row names its own
+# sheet of TL-04, so a row identifies one part drawing (machinist review of
+# farm 20261113T071241685Z).
+_COLLAR_SHORT = collar.PART_NUMBER.removeprefix("MHA-DT-03-")
+if _COLLAR_SHORT == collar.PART_NUMBER:
+    raise AssertionError("the collar no longer shares the kit's MHA-DT-03 prefix")
+COLLAR_SHEETS: dict[str, int] = {
+    name: index + 1 for index, name in enumerate(collar.CONFIGURATIONS)
+}
+if collar.SHEET_NAMES != tuple(f"COLLAR {name}" for name in collar.CONFIGURATIONS):
+    raise AssertionError("TL-04's sheets no longer run in member order")
 BOM_DESCRIPTIONS: dict[str, str] = {
     ARBOR: "KEYED CUTTING ARBOR",
     **{
-        member(name): collar.CONFIGURATION_DESCRIPTIONS[name]
+        member(name): (
+            f"{collar.CONFIGURATION_DESCRIPTIONS[name]}, "
+            f"{_COLLAR_SHORT} SHEET {COLLAR_SHEETS[name]}"
+        )
         for name in collar.CONFIGURATIONS
     },
     KEY: "ARBOR KEY, 1/16 SQ X .15",
@@ -95,46 +111,6 @@ if COLLAR_FAR_Z + nut.THICKNESS > arbor.ARBOR_END_Z:
 if key.END_Z_MM + key.LENGTH >= BLANK_FACE_Z:
     raise AssertionError("the kit's key reaches the collar")
 
-# --- Sheet ----------------------------------------------------------------------
-# The two settings the sheet states as reference dimensions, on one hidden
-# assembly sketch on the Right Plane (the side view's plane): the blank's
-# near face from the jaw step (the 3-jaw's stop, the #2 cutter's run-out) and
-# the seat's length the blank engages.
-SETTINGS_SKETCH = "ArborSettings"
-STANDOFF_DIMENSION = "BlankStandoff"
-SEAT_DIMENSION = "SeatEngagement"
-SETTINGS: dict[str, tuple[float, float, float]] = {
-    # name: (radius below the axis, start z, end z), mm
-    STANDOFF_DIMENSION: (arbor.STANDOFF_DIA / 2.0, arbor.GRIP_LENGTH, arbor.SHOULDER_Z),
-    SEAT_DIMENSION: (arbor.SEAT_DIA / 2.0, arbor.SHOULDER_Z, arbor.SEAT_END_Z),
-}
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    SETTINGS_SKETCH: {STANDOFF_DIMENSION, SEAT_DIMENSION}
-}
-DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    SETTINGS_SKETCH: {STANDOFF_DIMENSION: 2, SEAT_DIMENSION: 2}
-}
-DIMENSION_CALLOUTS: dict[str, str] = {
-    STANDOFF_DIMENSION: "JAW STEP TO BLANK FACE",
-    SEAT_DIMENSION: "SEAT",
-}
-
-
-def _gear_span(configuration: str) -> str:
-    tags = collar.GEARS_BY_CONFIGURATION[configuration]
-    cones = [int(t[1:]) for t in tags if t.startswith("T")]
-    text = f"{cones[0]}T-{cones[-1]}T"
-    if any(not t.startswith("T") for t in tags):
-        text += f" AND {arbor.crank.TEETH}T"
-    return text
-
-
-_COLLAR_ITEMS = "; ".join(
-    f"ITEM {BOM_ITEMS[member(name)]} {_gear_span(name)}"
-    for name in collar.CONFIGURATIONS
-)
-
-
 # --- The first cut's index ---------------------------------------------------------
 # Both gear families centre a TOOTH, not a gap, on the keyway's centreline
 # (+X): the cone gears cut each gap half a pitch either side of it (the core
@@ -150,29 +126,112 @@ _COLLAR_ITEMS = "; ".join(
 # gear's +z from the keyway; half a pitch would leave its mid-face tooth
 # about .55° off the key, over the arbor's setting allowance
 # (KEY_SETTING_ALLOWANCE_DEG). Turning the blank counter-clockwise seen from
-# the chamfered face carries that space under the cutter.
+# the chamfered face carries that space under the cutter. The setup table
+# prints every blank's index in degrees, so no row says "half a pitch" beside
+# an angle that is not one (machinist review of farm 20261113T071241685Z).
 CONE_FIRST_INDEX_PITCHES = 0.5
-_CONE_FIRST_INDEX_WORDS = {0.5: "HALF A PITCH"}[CONE_FIRST_INDEX_PITCHES]
 CRANK_FIRST_INDEX_DEG = round(math.degrees(crank.TOOTH_SPACE.azimuth_rad), 2)
-CRANK_FIRST_INDEX_SENSE = "COUNTER-CLOCKWISE SEEN FROM ITS CHAMFERED FACE"
+CRANK_FIRST_INDEX_SENSE = "COUNTER-CLOCKWISE SEEN FROM ITS CHAMFERED BORE FACE"
 
-# Three fitting steps (rule 22, one action each); the key's clock is the
-# last, the setting every cut depends on. LOCTITE 638 is a consumable.
-ASSEMBLY_STEPS = "\n".join(
+
+def cone_first_index_deg(teeth: int) -> float:
+    """A cone blank's first index, degrees as printed (either way)."""
+    return round(CONE_FIRST_INDEX_PITCHES * 360.0 / teeth, 2)
+
+
+def blank_teeth(tag: str) -> int:
+    """Tooth count of a keyed blank's tag (``T030`` or ``64T``)."""
+    return int(tag[1:]) if tag.startswith("T") else int(tag.removesuffix("T"))
+
+
+def blank_collar(tag: str) -> str:
+    """The collar member that backs blank ``tag``."""
+    (name,) = (
+        name
+        for name in collar.CONFIGURATIONS
+        if tag in collar.GEARS_BY_CONFIGURATION[name]
+    )
+    return name
+
+
+# --- The key's clock on the cutter -------------------------------------------------
+# The key faces the cutter when its two side faces stand equally either side
+# of the cutter's centre plane. Turned by a small angle, both side faces move
+# the same way by their radius times the angle, so the two readings part by
+# twice that; the least radius a side face shows is the keyseat's edge. The
+# reading's band at the shop's indicator row (.001) holds the key's clock well
+# inside the arbor's setting allowance, which the index then shares.
+KEY_SIDE_READING = 0.001 * INCH
+KEY_SIDE_LEVER_MIN = arbor.KEYSEAT_EDGE_DEPTH_MIN + arbor.KEYSEAT_FLOOR_MAX
+KEY_CLOCK_FROM_READING_DEG = math.degrees(KEY_SIDE_READING / (2.0 * KEY_SIDE_LEVER_MIN))
+if KEY_CLOCK_FROM_READING_DEG >= arbor.KEY_SETTING_ALLOWANCE_DEG / 2.0:
+    raise AssertionError("the key's side-face reading spends half the clock allowance")
+
+# --- Sheet words ------------------------------------------------------------------
+# The setup table (sheet 1, under the parts list): each blank by drawing
+# number and tooth count, the collar item that backs it and its first index.
+_TABLE_ROWS: list[str] = []
+for _blank in arbor.KEYED_GEARS:
+    _teeth = blank_teeth(_blank.tag)
+    _item = BOM_ITEMS[member(blank_collar(_blank.tag))]
+    if _blank.tag.startswith("T"):
+        _TABLE_ROWS.append(
+            f"{_blank.number} ({_teeth}T): ITEM {_item}, "
+            f"{cone_first_index_deg(_teeth):.2f}° EITHER WAY"
+        )
+    else:
+        _TABLE_ROWS += [
+            f"{_blank.number} ({_teeth}T): ITEM {_item}, "
+            f"{CRANK_FIRST_INDEX_DEG:.2f}° COUNTER-CLOCKWISE",
+            f"   {CRANK_FIRST_INDEX_SENSE.removeprefix('COUNTER-CLOCKWISE ')}",
+        ]
+SETUP_TABLE = "\n".join(
     (
-        "FITTING STEPS",
-        f"1. BOND ITEM {BOM_ITEMS[KEY]} IN ITEM {BOM_ITEMS[ARBOR]}'S KEYSEAT WITH "
-        "LOCTITE 638, ITS SQUARE",
-        "   END ON THE END RADIUS'S CENTRE; LET IT CURE.",
-        f"2. SLIDE THE BLANK ON THE SEAT OVER ITEM {BOM_ITEMS[KEY]} TO THE SHOULDER; "
-        "FIT ITS",
-        f"   COLLAR ({_COLLAR_ITEMS})",
-        f"   AND ITEM {BOM_ITEMS[NUT]}; TIGHTEN.",
-        f"3. SET ITEM {BOM_ITEMS[KEY]} ON THE CUTTER CENTRELINE, THEN INDEX "
-        f"{_CONE_FIRST_INDEX_WORDS} ({crank.TEETH}T:",
-        f"   {CRANK_FIRST_INDEX_DEG:.2f}°, {CRANK_FIRST_INDEX_SENSE}) BEFORE THE",
-        "   FIRST CUT: A TOOTH, NOT A GAP, CENTRES ON THE KEY.",
+        "SETUP TABLE: EACH BLANK'S COLLAR AND FIRST INDEX",
+        f"(THE FIRST INDEX CENTRES A TOOTH, NOT A SPACE, ON ITEM {BOM_ITEMS[KEY]})",
+        *_TABLE_ROWS,
     )
 )
-if sum(1 for line in ASSEMBLY_STEPS.splitlines() if line[:2].rstrip(".").isdigit()) > 3:
-    raise AssertionError("at most three fitting steps")
+
+# Fitting steps (sheet 2, beside the exploded view): one action each, each
+# retention or setting followed by its check (rules 22, 23). LOCTITE 638 is
+# a consumable: degrease, coat the key (never the keyseat), keep it off the
+# seat the blanks slide on, cure before the first cut.
+_K, _A, _N = (BOM_ITEMS[s] for s in (KEY, ARBOR, NUT))
+_STEPS: tuple[str, ...] = (
+    f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
+    f"COAT ITEM {_K} WITH LOCTITE 638.",
+    f"PUSH ITEM {_K} INTO ITEM {_A}'S KEYSEAT AGAINST ITS CLOSED END.",
+    f"WIPE ALL 638 OFF ITEM {_A}'S SEAT.",
+    "LET THE BOND CURE 24 H.",
+    f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
+    f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",
+    f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
+    f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
+    "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
+    f"WITH ITEM {_A} IN THE DIVIDING HEAD, TURN THE HEAD UNTIL ITEM {_K} FACES "
+    "THE CUTTER.",
+    f"CHECK WITH A TEST INDICATOR: ITEM {_K}'S TWO SIDE FACES STAND THE SAME "
+    "DISTANCE FROM THE CUTTER'S CENTRE PLANE WITHIN "
+    f"{arbor.inch_text(KEY_SIDE_READING, 3)}.",
+    "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
+)
+STEP_WIDTH = 66  # characters a printed line, inside the sheet's right border
+
+
+def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
+    lines: list[str] = []
+    for number, step in enumerate(steps, start=1):
+        head = f"{number}. "
+        lines += textwrap.wrap(
+            step,
+            STEP_WIDTH,
+            initial_indent=head,
+            subsequent_indent=" " * len(head),
+        )
+    return tuple(lines)
+
+
+ASSEMBLY_STEPS = "\n".join(
+    ("FITTING STEPS (PARTS LIST AND SETUP TABLE ON SHEET 1)", *_numbered(_STEPS))
+)

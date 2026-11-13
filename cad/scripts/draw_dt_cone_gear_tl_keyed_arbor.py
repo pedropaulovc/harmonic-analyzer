@@ -74,9 +74,11 @@ ISO_NOTE_XY = (0.345, 0.112)
 # dimension line (TEXT_GAP) on one side, at a rise over the grip's top. A
 # text that reaches over a neighbouring step's dimension line stands above
 # that line's own text, so no line strikes it: the thread's and the relief's
-# go toward the tail, low; the tail centre's above the thread's; the seat's,
-# the pilot's and the standoff's toward the head in a staircase over the
-# keyseat end's set (KEYSEAT_END_SET_RISE), the pilot's highest.
+# go toward the tail, low; the tail centre's above the thread's; the seat's
+# and the pilot's toward the head in a staircase over the keyseat end's set
+# (KEYSEAT_END_SET_RISE), the pilot's highest. The standoff's stands at its
+# step's middle: at the shoulder its dimension line crossed the keyseat end
+# set's outside arrow (machinist review of farm 20261113T071241685Z).
 TOWARD_HEAD = 1.0
 TOWARD_TAIL = -1.0
 TEXT_GAP = 0.003
@@ -87,7 +89,7 @@ DIA_TEXT: dict[str, tuple[float, float, float]] = {
     "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.011),
     "PilotDia": (spec.PILOT_END_Z, TOWARD_HEAD, 0.036),
     "SeatDia": (spec.SEAT_END_Z, TOWARD_HEAD, 0.023),
-    "StandoffDia": (spec.SHOULDER_Z, TOWARD_HEAD, 0.014),
+    "StandoffDia": ((spec.GRIP_LENGTH + spec.SHOULDER_Z) / 2.0, TOWARD_HEAD, 0.014),
     "GripDia": (0.0, TOWARD_TAIL, 0.014),
     "HeadCentreDia": (0.0, TOWARD_HEAD, 0.014),
 }
@@ -117,8 +119,12 @@ SHOULDER_R_DROP = 0.006
 # of its position (farm 20261113T042822797Z's sheet); at END_WIDTH_RUN 0.027
 # it reached over the thread's and the tail centre's shared dimension line
 # (machinist review r1-r3, rule 14), so it stands between the end view and
-# that line.
+# that line. S's stacked text (.3355 +.0000/-.0040) prints END_S_TEXT wide,
+# about the span between its extension lines, so centred there the floor's
+# extension line struck its limits (machinist review of farm
+# 20261113T071241685Z, rule 14): it stands outside, right of the floor's.
 END_S_DROP = 0.014
+END_S_TEXT = 0.026
 END_WIDTH_RUN = 0.015
 END_WIDTH_RISE = 0.012
 END_WIDTH_TEXT = 0.027
@@ -205,7 +211,7 @@ def _end_keep(adapter: Any, end: Any) -> dict[str, tuple[float, float]]:
         )
     return {
         "KeyseatS": (
-            (sheet["far"][0] + sheet["floor"][0]) / 2.0,
+            sheet["floor"][0] + TEXT_GAP + END_S_TEXT / 2.0,
             sheet["bottom"][1] - END_S_DROP,
         ),
         "KeyseatWidth": (
