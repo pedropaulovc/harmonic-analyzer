@@ -186,19 +186,26 @@ _HOLE_AXIS_X = _front_x(FOOT_END[0] - HOLE_FROM_END)
 # goes east of the hole axis's extension line, which the FootLen and FreeKinkH
 # rows share: centred between the extension lines, pc-r12 printed those lines
 # through the text.  A bare value (".538 ±.020") prints narrower than any
-# former qualifier row.
+# former qualifier row; a one-word qualifier under it, narrower still.
 VALUE_HALF_WIDTH = 0.012
+FREE_STATE_CALLOUT = "FREE"
 QUALIFIER_HALF_WIDTH = {
     PAD_LEN_CALLOUT: 0.024,
+    FREE_STATE_CALLOUT: 0.006,
 }
 # The +/-.020 formed bands are wider than the title-block .XXX row, so they
-# need neither mate nor reason (drawing-guidelines.md rule 4), and a location
-# carries no words (rule 7): the phantom and the general note say which form
-# each prints on.  The wing, located from the hole's axis at .XX, clears the
-# bend at FootLen's low limit, and the web it leaves the hole is stated
-# (rule 20; Codex, PR #1675; owner ruling RV-01).
+# need neither mate nor reason (drawing-guidelines.md rule 4).  The crest's
+# two locations on the FreeForm phantom say the state they hold in, FREE:
+# the loose spring is formed and checked to them, and unlabelled a reviewer
+# read them as on the installed solid (v49 machinist review r2).  Every
+# other formed dimension (the foot, both radii, the flat, the kink angle) is
+# the same on either form.  The wing, located from the hole's axis at .XX,
+# clears the bend at FootLen's low limit, and the web it leaves the hole is
+# stated (rule 20; Codex, PR #1675; owner ruling RV-01).
 DIMENSION_CALLOUTS = {
     "PadLen": PAD_LEN_CALLOUT,
+    "FreeKinkH": FREE_STATE_CALLOUT,
+    "FreeKinkV": FREE_STATE_CALLOUT,
 }
 
 
@@ -207,7 +214,10 @@ def callout_half_width(name: str) -> float:
     callout = DIMENSION_CALLOUTS.get(name)
     if callout is None:
         return VALUE_HALF_WIDTH
-    return max(QUALIFIER_HALF_WIDTH[line] for line in callout.split("\n"))
+    return max(
+        VALUE_HALF_WIDTH,
+        *(QUALIFIER_HALF_WIDTH[line] for line in callout.split("\n")),
+    )
 
 
 TEXT_TO_EXTENSION_GAP = 0.003

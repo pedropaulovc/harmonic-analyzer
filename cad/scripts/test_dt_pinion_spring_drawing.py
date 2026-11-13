@@ -164,9 +164,12 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     banded = set().union(*dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS.values())
     assert banded == set(geometry.FORMED_CONTACT_BANDS)
     assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
-    # The band is wider than the .XXX row: no mate or reason (rule 4), and a
-    # location carries no words (rule 7).
-    assert not banded & set(drawing.DIMENSION_CALLOUTS)
+    # The band is wider than the .XXX row: no mate or reason (rule 4).  The
+    # free crest's two locations say only the state they hold in.
+    assert {
+        name: drawing.DIMENSION_CALLOUTS[name]
+        for name in banded & set(drawing.DIMENSION_CALLOUTS)
+    } == {"FreeKinkH": "FREE", "FreeKinkV": "FREE"}
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
     assert {name: precision[name] for name in banded} == dict.fromkeys(banded, 3)
     assert precision["FlatLen"] == 2
@@ -354,6 +357,11 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     assert {"FreeKinkH", "FreeKinkV"} <= set(drawing.FRONT_KEEP)
     assert dt_pinion_spring_spec.FREE_KINK_ANGLE in drawing.DETAIL_KEEP
     assert "FREE FORM" in dt_pinion_spring_spec.DRAWING_NOTES
+    # v49 machinist review r2 read the unlabelled free locations as on the
+    # installed solid: each prints FREE under its value.
+    for name in ("FreeKinkH", "FreeKinkV"):
+        assert drawing.DIMENSION_CALLOUTS[name] == "FREE"
+        assert drawing.callout_half_width(name) == drawing.VALUE_HALF_WIDTH
 
 
 def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
