@@ -1947,12 +1947,14 @@ class _Shop:
         shadow.after_build(recording, self.deps, self.digest)
         return recording
 
-    def base(self, *, store: bool = True, native: bytes = _NATIVE) -> str:
+    def base(
+        self, *, store: bool = True, native: bytes = _NATIVE, python: bytes = _PY
+    ) -> str:
         """A base as a recorded build leaves one, without running it: its
         outputs stored under its key, its recording published and bound to
         that archive (``store`` False: unbound). Its replay is _replay_as's."""
         key = self.key()
-        self.write(native)
+        self.write(native, python)
         if store:
             assert cache.store(key, self.outputs, _LABEL) == "stored"
         os.environ[shadow.MODE_ENV] = "record"
@@ -2014,11 +2016,13 @@ def _replay_as(
     *,
     rc: int | None | str = "auto",
     absent: bool = False,
+    certificate: bytes | None = None,
     **result: Any,
 ) -> list[str]:
     """The pre-build replay replaced by its result (a synthetic base has no
     real log): by default a clean no-op that executed the script and wrote
-    the synthetic base's outputs. Returns the keys it replayed."""
+    the synthetic base's outputs (and ``certificate``, the export certificate
+    the replay wrote). Returns the keys it replayed."""
     monkeypatch.setattr(shadow, "engine_digest", lambda: _ENGINE)
     replay = {
         "verdict": "noop",
@@ -2043,6 +2047,7 @@ def _replay_as(
         reuse.replay = None if absent else replay
         reuse.replayed = True
         reuse.replay_log = "replayed\n"
+        reuse.certificate = certificate
 
     monkeypatch.setattr(shadow, "_replay_before", replay_before)
     return replayed
@@ -2299,6 +2304,127 @@ def test_every_failed_check_declines_and_says_why(
     ]
     assert line.startswith(f"[com-replay] {_LABEL}: reuse=declined:{reason.value} |")
     assert "\n" not in line
+
+
+_CAPTURE = b"the native part as its SaveAs3 wrote it, before the build's Save3"
+
+
+def _certificate(identity: str, *, default: str = "Default", indent: int = 1) -> bytes:
+    """An export certificate as _part_configuration_exports writes one."""
+    record = {"path": "part-neutral/sh-widget.STEP", "bytes": 3, "sha256": "c" * 64}
+    return json.dumps(
+        {
+            "schema": "harmonic-analyzer/part-member-neutral@1",
+            "source": "sldprt/fake.SLDPRT",
+            shadow.NATIVE_IDENTITY_FIELD: identity,
+            "default_configuration": default,
+            "configurations": {default: {"step": record}},
+        },
+        indent=indent,
+        sort_keys=True,
+    ).encode()
+
+
+_OWN_NATIVES = (_certificate(_sha(_CAPTURE)), _certificate(_sha(_NATIVE)))
+_ANOTHER_FIELD = _certificate(_sha(_CAPTURE), default="Other")
+_CERTIFICATES = {
+    # (the certificate the replay reported, the base archive's, the bytes kept
+    # of the replay's: None when none were)
+    # Each names its own side's native part, every other byte the same.
+    "own_natives": (*_OWN_NATIVES, _OWN_NATIVES[0]),
+    # A Python change: another field, or the bytes' formatting, differs too.
+    "another_field": (_ANOTHER_FIELD, _OWN_NATIVES[1], _ANOTHER_FIELD),
+    "formatting": (
+        _certificate(_sha(_CAPTURE), indent=2),
+        _OWN_NATIVES[1],
+        _certificate(_sha(_CAPTURE), indent=2),
+    ),
+    # The field is not the native part's digest on one side.
+    "replay_names_other_bytes": (
+        _certificate("d" * 64),
+        _OWN_NATIVES[1],
+        _certificate("d" * 64),
+    ),
+    "archive_names_other_bytes": (
+        _OWN_NATIVES[0],
+        _certificate("e" * 64),
+        _OWN_NATIVES[0],
+    ),
+    "not_kept": (*_OWN_NATIVES, None),
+    # Bytes that would pass, but not the output the replay reported.
+    "kept_not_reported": (_ANOTHER_FIELD, _OWN_NATIVES[1], _OWN_NATIVES[0]),
+}
+
+
+@pytest.mark.parametrize("case", _CERTIFICATES)
+def test_an_export_certificate_may_differ_only_by_each_sides_own_native_part(
+    blob, tmp_path, monkeypatch, case
+):
+    replayed, archived, kept = _CERTIFICATES[case]
+    shop = _Shop(tmp_path, monkeypatch)
+    shop.python_output = shop.out / shadow.certificate_path(_STEM)
+    shop.python_output.parent.mkdir(parents=True)
+    shop.outputs = [shop.native, shop.python_output]
+    # The recording's native part is its SaveAs3 capture; the archive's is
+    # what the build's later Save3 left.
+    _replay_as(
+        monkeypatch,
+        shop,
+        certificate=kept,
+        com_outputs={"sldprt/fake.SLDPRT": _sha(_CAPTURE)},
+        py_outputs={shadow.certificate_path(_STEM): _sha(replayed)},
+    )
+    _edited(shop, python=archived)
+    reuse = shop.attempt()
+    if case != "own_natives":
+        assert reuse.value == "declined:python_output_differs", reuse.detail
+        unreported = "is not the replay's reported" in str(reuse.detail)
+        assert unreported == (case == "kept_not_reported"), reuse.detail
+        return
+    assert reuse.value == "reused", reuse.detail
+    # The base's own outputs installed: its native part and its certificate.
+    assert shop.python_output.read_bytes() == archived
+    assert reuse.token == _sha(_NATIVE)
+
+
+def test_the_certificate_and_its_native_field_are_the_member_export_producers(
+    tmp_path,
+):
+    import _part_configuration_exports as exports
+
+    stem = "sh-vn-music-wire"  # a part with export members
+    path = exports.configuration_manifest_path(stem, tmp_path)
+    assert tmp_path / shadow.certificate_path(stem.replace("-", "_")) == path
+    # The field the producer's validator ties to the native part's identity.
+    native = tmp_path / "sldprt" / f"{stem}.SLDPRT"
+    native.parent.mkdir(parents=True)
+    native.write_bytes(b"a native part")
+    identity = _sha(native.read_bytes())
+    native.with_name(f".{stem}.execution").write_text(identity, "utf-8")
+    members = exports.configuration_producer_paths(stem, tmp_path)
+    for paths in members.values():
+        for output in paths.values():
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(output.name.encode())
+    certificate = {
+        "schema": exports._SCHEMA,
+        "source": f"sldprt/{stem}.SLDPRT",
+        "default_configuration": next(iter(members)),
+        "configurations": {
+            name: {kind: exports._file_record(paths[kind], tmp_path) for kind in paths}
+            for name, paths in members.items()
+        },
+    }
+    path.parent.mkdir(parents=True)
+    for named in (identity, "f" * 64):
+        path.write_text(
+            json.dumps({**certificate, shadow.NATIVE_IDENTITY_FIELD: named}), "utf-8"
+        )
+        if named == identity:
+            assert exports.validate_member_exports(stem, tmp_path)
+            continue
+        with pytest.raises(RuntimeError, match="identity"):
+            exports.validate_member_exports(stem, tmp_path)
 
 
 def test_inert_edits_reuse_the_one_real_build_until_a_refresh_revokes_it(

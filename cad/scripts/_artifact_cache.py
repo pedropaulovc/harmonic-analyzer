@@ -2100,6 +2100,30 @@ def archive_members(archive: BinaryIO) -> dict[str, str]:
     return found
 
 
+def archive_member(archive: BinaryIO, relative: str) -> bytes | None:
+    """The bytes of the archive's regular file at ``relative`` (named as
+    :func:`archive_members` names it), or None when it holds none. Raises on
+    any member :func:`restore` would refuse."""
+    archive.seek(0)
+    try:
+        with tarfile.open(fileobj=archive, mode="r:gz") as tar:
+            for member in tar:
+                target = _safe_member(member)
+                if member.isdir():
+                    continue
+                if target.relative_to(_CACHE_OUTPUT_ROOT).as_posix() != relative:
+                    continue
+                stream = tar.extractfile(member)
+                if stream is None:
+                    raise RuntimeError(
+                        f"unreadable cache archive member: {member.name}"
+                    )
+                return stream.read()
+        return None
+    finally:
+        archive.seek(0)
+
+
 def install_archive(
     archive: BinaryIO, outputs: list[Path], label: str, key: str
 ) -> None:

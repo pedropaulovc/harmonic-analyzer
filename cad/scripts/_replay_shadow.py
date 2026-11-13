@@ -183,6 +183,16 @@ BUNDLE_LIMIT = 512 * 1024 * 1024
 # _keep_evidence keeps unless the split is a confirmed NOOP.
 EVIDENCE_OF = ("exists", "lost")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
+# A part with export members writes their certificate from Python
+# (_part_configuration_exports.configuration_manifest_path: under the output
+# root, CERTIFICATE_DIR/<stem>.json), and one field of it,
+# NATIVE_IDENTITY_FIELD, is the SHA-256 of the native part SolidWorks saved.
+# A recording keeps that part as its SaveAs3 wrote it, before the build's
+# in-place Save3 calls, so a replay's certificate names other bytes than the
+# base archive's: the one SolidWorks-derived field of a Python-written file
+# (every ``python_output_differs`` decline, 2026-11-12/13). Pinned by test.
+CERTIFICATE_DIR = "reports/part-neutral"
+NATIVE_IDENTITY_FIELD = "execution_identity"
 
 
 class Recovery(StrEnum):
@@ -1714,6 +1724,9 @@ class Reuse:
     replay_rc: int | None = None
     replay: dict[str, Any] | None = None
     replay_log: str = ""
+    # The export certificate the replay wrote (CERTIFICATE_DIR), if any: its
+    # work directory is gone by the time the outputs are verified.
+    certificate: bytes | None = None
     # The base's verified archive and its members, while a reuse is pending.
     archive: BinaryIO | None = None
     archive_bytes: int | None = None
@@ -1979,7 +1992,8 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
     request echoing a document title counter; the base key's archive,
     verified and the one the recording is bound to; the replay's outputs
     exactly the archive's members, within the task's declared outputs, the
-    Python-written ones byte for byte, the native part among them; the inputs
+    Python-written ones byte for byte (an export certificate but for its
+    native part's identity), the native part among them; the inputs
     unmoved."""
     deadline = time.monotonic() + REUSE_SECONDS
     if revoke_refreshed(part):
@@ -2122,7 +2136,8 @@ def _replay_before(part: PartBuild, reuse: Reuse, deadline: float) -> None:
     absent, standing for the base's seat (its own log is the seat log), under
     the process inputs the build would get. No comparison of Python outputs
     here: :func:`_verify_outputs` compares the replay's own digests with the
-    base archive's members once a no-op makes downloading it worthwhile."""
+    base archive's members once a no-op makes downloading it worthwhile, and
+    the export certificate the replay wrote, kept here, with the archive's."""
     environment = part.environment()
     with _work_directory() as work:
         unbundle(reuse.bundle or b"", work / WORK_BASE)
@@ -2135,6 +2150,10 @@ def _replay_before(part: PartBuild, reuse: Reuse, deadline: float) -> None:
         )
         reuse.replay = _read_json(work / "replay.json")
         reuse.replayed = True
+        with contextlib.suppress(OSError):
+            reuse.certificate = (
+                work / WORK_OUTPUT / certificate_path(part.stem)
+            ).read_bytes()
         with contextlib.suppress(OSError):
             reuse.replay_log = log.read_text("utf-8", errors="replace")[
                 -REUSE_LOG_CHARS:
@@ -2177,17 +2196,57 @@ def _out_relative(path: Path) -> str | None:
     return None if relative.startswith("..") else _fold(relative)
 
 
+def certificate_path(stem: str) -> str:
+    """A part's export certificate, relative to the output root."""
+    return f"{CERTIFICATE_DIR}/{stem.replace('_', '-')}.json"
+
+
+def native_identity_only(
+    ours: bytes, theirs: bytes, our_native: str | None, their_native: str | None
+) -> bool:
+    """Is export certificate ``ours`` the bytes of ``theirs`` but for
+    :data:`NATIVE_IDENTITY_FIELD`, which in each names that side's own native
+    part (``our_native``, ``their_native``: the SHA-256 of each)? Then the
+    same Python wrote both from the same rule, and only SolidWorks' bytes
+    differ."""
+    if not all(
+        isinstance(d, str) and _SHA256.fullmatch(d) for d in (our_native, their_native)
+    ):
+        return False
+    entry = f'"{NATIVE_IDENTITY_FIELD}": "{{}}"'
+    mine, base = entry.format(our_native), entry.format(their_native)
+    try:
+        text, other = ours.decode("utf-8"), theirs.decode("utf-8")
+        named = (
+            json.loads(text).get(NATIVE_IDENTITY_FIELD),
+            json.loads(other).get(NATIVE_IDENTITY_FIELD),
+        )
+    except (ValueError, AttributeError):  # not UTF-8, not JSON, not an object
+        return False
+    return (
+        named == (our_native, their_native)
+        and text.count(mine) == 1
+        and text.replace(mine, base) == other
+    )
+
+
 def _verify_outputs(part: PartBuild, reuse: Reuse) -> None:
     """The replay wrote exactly the base archive's files, all within the
     task's declared outputs; each one Python wrote is the archive's byte for
     byte (those SolidWorks wrote come from the base's captures, and the
-    archive is what the base's own build stored); the native part is among
-    them, its digest the token a reuse must re-stamp."""
+    archive is what the base's own build stored), but an export certificate
+    whose only difference is its native identity, each side naming its own
+    native part (:func:`native_identity_only`), judged on the very bytes the
+    replay reported writing; the native part is among them, its digest the
+    token a reuse must re-stamp."""
     replay = reuse.replay or {}
     python = {
         _fold(rel): digest for rel, digest in (replay.get("py_outputs") or {}).items()
     }
-    produced = set(python) | {_fold(rel) for rel in replay.get("com_outputs") or {}}
+    replayed = {
+        _fold(rel): digest for rel, digest in (replay.get("com_outputs") or {}).items()
+    }
+    produced = set(python) | set(replayed)
     members = {_fold(rel): digest for rel, digest in reuse.members.items()}
     if produced != set(members):
         raise Declined(
@@ -2207,13 +2266,27 @@ def _verify_outputs(part: PartBuild, reuse: Reuse) -> None:
             Decline.OUTPUT_SET_DIFFERS,
             f"archive files outside the task's declared outputs: {outside[:5]}",
         )
+    native = _out_relative(part.native)
     differing = sorted(rel for rel, digest in python.items() if members[rel] != digest)
+    certificate = _fold(certificate_path(part.stem))
+    if certificate in differing and reuse.certificate and reuse.archive is not None:
+        if hashlib.sha256(reuse.certificate).hexdigest() != python[certificate]:
+            raise Declined(
+                Decline.PYTHON_OUTPUT_DIFFERS,
+                f"the certificate kept of the replay is not the replay's reported "
+                f"{certificate}",
+            )
+        named = {_fold(rel): rel for rel in reuse.members}
+        theirs = _cache.archive_member(reuse.archive, named[certificate])
+        if theirs is not None and native_identity_only(
+            reuse.certificate, theirs, replayed.get(native), members.get(native)
+        ):
+            differing.remove(certificate)
     if differing:
         raise Declined(
             Decline.PYTHON_OUTPUT_DIFFERS,
             f"Python-written {differing[:5]} not the base archive's",
         )
-    native = _out_relative(part.native)
     token = members.get(native) if native is not None else None
     if token is None:
         raise Declined(
