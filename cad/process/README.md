@@ -99,7 +99,11 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
 - the MHA-SM-02 knife mount's records to make or buy (owner ruling 2026-11-10
   (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
-  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row.
+  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row;
+- the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
+  and 2026-11-08, #2315): a 4130-N `[[stock]]` row of form `round_tube`
+  (OnlineMetals 7322, one 24 in cut), read by `test_sm_gooseneck_drawing.py`
+  against the bent tube's developed length plus its ~2 in tail.
 
 One fact lives in one file. The same object may appear in both files with
 disjoint fields (the DTI, for example), but no field is duplicated. Together

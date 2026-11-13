@@ -18,7 +18,6 @@ from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
 from sm_knife_mount_spec import (
-    KNIFE_GAUGE_BAR_CLEARANCE_IN,
     KNIFE_GAUGE_BAR_DIA,
     KNIFE_GAUGE_BAR_LENGTH_IN,
 )
@@ -103,16 +102,17 @@ HUB_SET_SCREW_TORQUE = (
 # 11.3): a tool named in the steps, not a BOM part.  Owner ruling 2026-11-10
 # (Pedro), #2334, S2: an 8.0 in bar, long enough to pass both mounts (outer
 # faces 7.67 apart), not a 2 in class ZZ pin.  No gauge class comes that
-# long, so its fit route is a matched fit to the mounts it gauges: the
-# reference Ø and the diametral clearance in each bore (rule 4).
-_KNIFE_GAUGE_BAR_CLEARANCE = "-".join(
-    f"{value:.4f}".lstrip("0") for value in KNIFE_GAUGE_BAR_CLEARANCE_IN
-)
+# long, so the bar is made to the mounts it gauges: its .0002-.0017
+# diametral clearance in each bore (the maximum the rock budget charges) is
+# the bar's own make record, shop-equipment.toml gauges.gauge-bar-0472x8, the
+# tool list's TO MAKE row.  The step states no number that needs an
+# instrument, only the fitter's hand check (rule 22; Main on PR #2717's
+# gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).
 KNIFE_GAUGE_BAR = (
     f"(Ø{_length(KNIFE_GAUGE_BAR_DIA, 4)}) X "
-    f"{_length(KNIFE_GAUGE_BAR_LENGTH_IN * 25.4, 1)} LONG GAUGE BAR, "
-    f"{_KNIFE_GAUGE_BAR_CLEARANCE} DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
+    f"{_length(KNIFE_GAUGE_BAR_LENGTH_IN * 25.4, 1)} LONG GAUGE BAR"
 )
+KNIFE_GAUGE_BAR_FEEL = "IT SLIDES BY HAND WITH NO PERCEPTIBLE SHAKE"
 # The 1:1 knife-edge view is DETAIL A, circled on the sheet 1 front view
 # (rule 9: a view named only in prose is unlabelled).
 DETAIL_LETTER = "A"
@@ -204,12 +204,8 @@ ASSEMBLY_STEPS = (
     "ON THE DOWEL AT ITS HANGER HOLE.",
     "5A. TURN EACH CUT MHA-SM-VN-52 DOWN THROUGH ITS WASHER AND HOLE INTO ITS "
     "MOUNT BY HAND UNTIL ITS HEAD MEETS THE WASHER (FINGER-TIGHT).",
-    # Rule 22: the bar's four-place clearance names what reads it (machinist
-    # review of PR #2717's head, gating clarity r2/r3): the micrometer on the
-    # bar and the pin gauges in each bore (shop-equipment.toml
-    # gauges.gauge-bar-0472x8 is made to the measured bores).
-    f"5B. SLIDE A {KNIFE_GAUGE_BAR} (MIC THE BAR AGAINST PIN GAUGES IN EACH "
-    "BORE), THROUGH BOTH MOUNTS.",
+    f"5B. SLIDE A {KNIFE_GAUGE_BAR}, MADE TO THESE BORES, THROUGH BOTH "
+    f"MOUNTS: {KNIFE_GAUGE_BAR_FEEL}.",
     "5C. TIGHTEN THE FRONT MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT "
     "TO THE CROSSBAR UNDERSIDE (THE REAR MOUNT IS SET AT 6G).",
     "5D. WITHDRAW THE BAR (CHECK 5).",
