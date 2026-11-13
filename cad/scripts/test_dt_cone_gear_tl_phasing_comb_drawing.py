@@ -199,6 +199,14 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
         y for name, (_x, y) in drawing.FRONT_KEEP.items() if name.startswith("Start")
     )
     assert blocks["SheetThick"][3] < lowest_start - 0.004
+    # The thickness's text stands off its 2.5 mm arrows on a leader, below
+    # both extension lines and right of its dimension line.
+    edge_half = spec.SHEET_THICK * 5.0 / 2000.0
+    thick = blocks["SheetThick"]
+    assert set(drawing.OFFSET_TEXT) == {"SheetThick"}
+    assert thick[3] < drawing.BOTTOM_CENTER_Y - edge_half - 0.003
+    assert thick[0] > drawing.SHEET_THICK_X + 0.002
+    assert "offset_dimension_text" in inspect.getsource(drawing.build)
     # The notes sit left of the title block, inside the border.
     width = max(len(line) for line in spec.SHEET_NOTES.splitlines()) * 0.0026
     assert drawing.NOTES_XY[0] + width < title[0]
