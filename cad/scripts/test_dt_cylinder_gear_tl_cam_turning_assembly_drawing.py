@@ -71,17 +71,33 @@ def test_the_kit_places_each_bought_part_on_its_hole() -> None:
 
 
 def test_bought_items_balloon_in_the_isometric_by_walking_their_own_body() -> None:
-    # The right view draws each bought item's rims edge-on, as short lines a
+    # A side view draws each bought item's rims edge-on, as short lines a
     # leader does not land on as asked (runs 20261112T203156536Z,
     # 20261113T012650242Z, 20261113T042822797Z); the isometric draws them as
     # ellipses. No anchor is computed: every item walks its own body.
-    assert sheet.RIGHT_ITEMS == (sheet.BODY,)
+    assert sheet.FRONT_ITEMS == (sheet.BODY,)
     assert set(sheet.ISO_ITEMS) == set(sheet.BOM_COMPONENTS) - {sheet.BODY}
-    assert sheet.RIGHT_ITEMS + sheet.ISO_ITEMS == sheet.BOM_COMPONENTS
+    assert sheet.FRONT_ITEMS + sheet.ISO_ITEMS == sheet.BOM_COMPONENTS
     assert set(sheet.BALLOON_ANCHORS) == set(sheet.BOM_COMPONENTS)
     for stem, anchor in sheet.BALLOON_ANCHORS.items():
         assert anchor.point_mm is None, stem
         assert anchor.instance is None, stem
+
+
+def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_scale() -> (
+    None
+):
+    # Both views are placed by the register's face centre: one x, the top
+    # view above, both at the sheet's own scale (run 20261113T085510850Z's
+    # review: a 1:1 top view over a 2:1 right view turned 90 deg).
+    assert sheet.TOP_CENTER[0] == sheet.FRONT_CENTER[0]
+    assert sheet.TOP_CENTER[1] > sheet.FRONT_CENTER[1]
+    for caption in (sheet.TOP_CAPTION, sheet.FRONT_CAPTION, sheet.EXPLODED_CAPTION):
+        assert not re.search(r"\d:\d", caption), caption
+    # The steps start below the BOM and the checks below the steps.
+    assert sheet.STEPS_XY[1] < sheet.BOM_ANCHOR[1] - 0.070
+    steps_lines = len(sheet.ASSEMBLY_STEPS.splitlines())
+    assert sheet.CHECKS_XY[1] < sheet.STEPS_XY[1] - steps_lines * sheet.LINE_PITCH
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:

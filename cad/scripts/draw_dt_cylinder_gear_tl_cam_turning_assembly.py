@@ -6,13 +6,13 @@ The kit is the fixture body (item 1, MHA-DT-12-TL-01) with its pressed stub
 (issue #2361). The gear is the workpiece: never placed in the model, drawn
 in phantom on the exploded sheet only.
 
-Sheet 1: the top view (from the tailstock, items 4 and 5 off) with the cam
-throw and the clock pin's station from the register axis as native
-reference dimensions, the right view with item 1 ballooned, the shaded
-isometric with items 2-5 ballooned, the BOM, the kit's one-time presses, the
-three fitting steps (the gear is turned CLOCKWISE in the top view onto item 3
-before item 5 is tightened: the cut then pushes it harder onto the pin) and
-the checks.
+Sheet 1: the top view (items 4 and 5 off) with the cam throw and the clock
+pin's station from the register axis as native reference dimensions, the
+front view projected under it at the same 1:1 with item 1 ballooned, the
+shaded isometric with items 2-5 ballooned, the BOM, the kit's one-time
+presses, the three fitting steps (the gear is turned CLOCKWISE in the top
+view onto item 3 before item 5 is tightened: the cut then pushes it harder
+onto the pin) and the checks.
 Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
 off the stub's axis in fitting order. Numbers come from
 ``dt_cylinder_gear_tl_cam_fixture_spec``; this recipe never edits the source
@@ -127,23 +127,23 @@ BOM_DESCRIPTIONS = {
 BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     stem: (stem, None) for stem in BOM_COMPONENTS
 }
-# Item 1 balloons in the right view, items 2-5 in the shaded isometric. The
-# right view sees every round item's rims edge-on, each drawn as one line
+# Item 1 balloons in the front view, items 2-5 in the shaded isometric. A
+# side view sees every round item's rims edge-on, each drawn as one line
 # across the item's axis, and on a short line no anchor holds: run
 # 20261112T203156536Z walked item 2 to its top rim 1.42 mm (sheet) in from
 # the line's end and the leader read back on the end (_assert_leader_lands,
 # limit 0.2 mm); frozen points on those rims then probed as no edge at all
 # (run 20261113T012650242Z, item 5's head top; run 20261113T042822797Z,
-# item 2's top rim .025 short of the line's end). Item 1's walked rim point,
-# 39 mm from either end of its line, landed where asked (run
-# 20261112T203156536Z proved it before item 2 failed). The isometric draws
-# every bought item's rims as ellipses, so each walks its own body there, as
-# the fly cutter's set screw does on its end-on bottom view
-# (draw_dt_cone_tip_gear_tl_cutter_assembly).
+# item 2's top rim .025 short of the line's end). Item 1's walked rim point
+# on its long rim line landed where asked (runs 20261112T203156536Z and
+# 20261113T085510850Z, then in the right view). The isometric draws every
+# bought item's rims as ellipses, so each walks its own body there (run
+# 20261113T085510850Z placed all four), as the fly cutter's set screw does
+# on its end-on bottom view (draw_dt_cone_tip_gear_tl_cutter_assembly).
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
-RIGHT_ITEMS = (BODY,)
+FRONT_ITEMS = (BODY,)
 ISO_ITEMS = (STUB, CLOCK_PIN, WASHER, SCREW_STEM)
-if RIGHT_ITEMS + ISO_ITEMS != BOM_COMPONENTS:
+if FRONT_ITEMS + ISO_ITEMS != BOM_COMPONENTS:
     raise AssertionError("every BOM row is ballooned once")
 BALLOON_MARGIN = 0.012
 
@@ -153,23 +153,30 @@ def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in fixture.kit_point(body_xyz))
 
 
-# Sheet metres, sheet 1. The top view (1:1) sits top-left, the right view
-# (2:1, every item ballooned) under it, the isometric bottom-left clear of
-# the title block (x >= 0.216 m, y <= 0.066 m); the BOM, steps and checks fill
-# the right half.
-TOP_CENTER = (0.070, 0.205)
-RIGHT_CENTER = (0.105, 0.130)
-ISO_CENTER = (0.045, 0.040)
-TOP_CAPTION_XY = (0.120, 0.250)
-RIGHT_CAPTION_XY = (0.150, 0.074)
-ISO_NOTE_XY = (0.075, 0.032)
+# Sheet metres, sheet 1. The top view and the front view are one third-angle
+# pair at the sheet's 1:1: each is placed by the register's face centre at
+# the same x, so the top view projects straight up off the front view (run
+# 20261113T085510850Z's review: a 1:1 top view over a 2:1 right view turned
+# 90 deg is no projected pair). The front view shows the clock pin behind
+# the stub; sheet 2's exploded right view shows it. The isometric sits
+# under them with its balloon ring inside the left border (that run rang
+# items 2 and 4 outside it from x .045) and clear of the title block
+# (x >= 0.216 m, y <= 0.066 m); the BOM, steps and checks fill the right
+# half, the steps under the BOM's two-line rows (that run printed them over
+# rows 4 and 5 from y .214).
+TOP_CENTER = (0.090, 0.200)
+FRONT_CENTER = (TOP_CENTER[0], 0.120)
+ISO_CENTER = (0.060, 0.052)
+TOP_CAPTION_XY = (0.140, 0.255)
+FRONT_CAPTION_XY = (0.150, 0.100)
+ISO_NOTE_XY = (0.105, 0.040)
 BOM_ANCHOR = (0.219, 0.262)
-STEPS_XY = (0.219, 0.214)
-CHECKS_XY = (0.219, 0.128)
+STEPS_XY = (0.219, 0.184)
+CHECKS_XY = (0.219, 0.112)
 # The view placing point: the register axis on the body's front face.
 REGISTER_FACE_MM = (0.0, 0.0, fixture.THICKNESS)
-TOP_CAPTION = "TOP VIEW: FROM THE TAILSTOCK\nITEMS 4 AND 5 OFF"
-RIGHT_CAPTION = "RIGHT VIEW (2:1)"
+TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
+FRONT_CAPTION = "FRONT VIEW"
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 # Reference dimensions in the top view: the throw and the clock pin's
@@ -194,8 +201,9 @@ REFERENCE_DIMENSIONS = {
 KIT_STEPS = "\n".join(
     (
         "KIT ASSEMBLY (ONCE)",
-        "K1. PRESS ITEM 2 INTO ITEM 1 FROM THE FRONT FACE, TAPPED END OUT,",
-        f"    UNTIL IT STANDS {fixture.STUB_STAND_TEXT} ABOVE THE FACE (CALIPER DEPTH ROD).",
+        "K1. PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW,",
+        f"    TAPPED END OUT, UNTIL IT STANDS {fixture.STUB_STAND_TEXT} ABOVE THE FACE",
+        "    (CALIPER DEPTH ROD).",
         "K2. PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
     )
 )
@@ -325,7 +333,7 @@ WASHER_LABEL = "ITEM 4"
 STUB_LABEL = "ITEM 2, TAPPED END OUT"
 PIN_LABEL = "ITEM 3, IN THE GEAR'S\nNOTCHED TOOTH SPACE"
 BODY_LABEL = "ITEM 1, IN THE 4-JAW"
-EXPLODED_CAPTION = "EXPLODED RIGHT VIEW (2:1) - FITTING STEPS ON SHEET 1"
+EXPLODED_CAPTION = "EXPLODED RIGHT VIEW - FITTING STEPS ON SHEET 1"
 LABEL_TIPS: dict[str, Point3] = {
     SCREW_LABEL: _yz((SCREW_SEAT_Y + SCREW_TOP_Y) / 2.0, AXIS_Z - SCREW.head_dia / 2.0),
     WASHER_LABEL: _yz((WASHER_Y0 + WASHER_TOP) / 2.0, AXIS_Z - fixture.WASHER_OD / 2.0),
@@ -491,10 +499,10 @@ def _reference_dimensions(adapter: Any, view: Any) -> Callable[[], None]:
 def _place_sheet(adapter: Any) -> Callable[[], None]:
     fixture_only = frozenset({BODY, STUB, CLOCK_PIN})
     top = _kit_view(adapter, "*Top", TOP_CENTER, SHEET_SCALE, fixture_only)
-    right = _kit_view(
-        adapter, "*Right", RIGHT_CENTER, DETAIL_SCALE, frozenset(BOM_COMPONENTS)
+    front = _kit_view(
+        adapter, "*Front", FRONT_CENTER, SHEET_SCALE, frozenset(BOM_COMPONENTS)
     )
-    for view, name in ((top, "*Top"), (right, "*Right")):
+    for view, name in ((top, "*Top"), (front, "*Front")):
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=f"cam turning kit {name}")
     iso = _kit_view(
@@ -508,7 +516,7 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
 
     table = insert_bom_table(
         adapter,
-        right,
+        front,
         anchor_xy=BOM_ANCHOR,
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
@@ -519,7 +527,7 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
     items = _bom_items(adapter, table)
     landings = []
     for view, stems, label in (
-        (right, RIGHT_ITEMS, "cam turning kit right balloons"),
+        (front, FRONT_ITEMS, "cam turning kit front balloons"),
         (iso, ISO_ITEMS, "cam turning kit isometric balloons"),
     ):
         landings += add_component_bom_balloons(
@@ -541,7 +549,7 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
         (ASSEMBLY_STEPS, STEPS_XY, "steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
         (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
-        (RIGHT_CAPTION, RIGHT_CAPTION_XY, "right view caption"),
+        (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)
