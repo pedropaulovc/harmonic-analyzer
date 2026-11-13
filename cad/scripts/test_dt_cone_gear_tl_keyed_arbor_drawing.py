@@ -51,23 +51,45 @@ def test_the_arbor_serves_every_keyed_cone_and_the_64t() -> None:
     assert tags == [f"T{t:03d}" for t in cone.KEYED_TEETH] + [f"{crank.TEETH}T"]
 
 
-def test_every_blank_slides_on_and_its_play_keeps_inside_the_tir_share() -> None:
-    seat_max = spec.SEAT_DIA + spec.SEAT_DIA_BAND[0]
-    seat_min = spec.SEAT_DIA + spec.SEAT_DIA_BAND[1]
-    assert seat_min < seat_max
+def test_one_seat_fits_every_blank_inside_the_tir_share() -> None:
+    """The seat is a matched sliding fit: line to line with the smallest bore
+    (it prints the supply size at .XXX) and never more play than the share
+    in the largest, so one seat serves every keyed bore."""
+    low, high = spec.SEAT_CLEARANCE_MM
+    assert low == 0.0
+    assert high <= spec.PLAY_SHARE * spec.TOOTH_RUNOUT_TIR_MM + 1e-9
+    assert spec.SEAT_DIA == spec.BORE_MIN_MM
+    assert spec.SEAT_DIA_MIN <= spec.SEAT_DIA
     for blank in spec.KEYED_GEARS:
-        assert blank.bore[0] >= seat_max - 1e-9, blank.tag
-        play = blank.bore[1] - seat_min
-        assert play <= spec.PLAY_SHARE * spec.TOOTH_RUNOUT_TIR_MM + 1e-9, blank.tag
+        assert blank.bore[0] - spec.SEAT_DIA >= low - 1e-9, blank.tag
+        assert blank.bore[1] - spec.SEAT_DIA_MIN <= high + 1e-9, blank.tag
     assert spec.PLAY_SHARE < 1.0
     assert spec.SEAT_RUNOUT_ALLOWANCE_MM > 0.0
+    assert spec.DRAWING_PRECISION_BY_NAME["SeatDia"] == 3
+    assert ("SeatProfile", "SeatDia") not in spec.MODEL_BANDS_MM
+    assert spec.CALLOUTS_BELOW["SeatDia"] == spec.SEAT_NOTE_FLAG
+    assert (
+        "MATCHED" in spec.SHEET_NOTES and ".0000-.0013 IN EACH BORE" in spec.SHEET_NOTES
+    )
+
+
+def test_the_note_names_every_mate_by_its_drawing_number() -> None:
+    numbers = [blank.number for blank in spec.KEYED_GEARS]
+    note = " ".join(spec.SHEET_NOTES.split())
+    assert f"{numbers[0]} TO {numbers[-2]} AND {numbers[-1]}" in note
+    assert numbers[0] == "MHA-DT-03-T030" and numbers[-2] == "MHA-DT-03-T120"
+    assert f"KEY {spec.KEY_NUMBER}" in note
+    assert spec.CALLOUTS_BELOW["PilotDia"] == "PILOTS COLLAR TL-04"
+    assert spec.THREAD_CALLOUT == "1/4-28 UNF"
 
 
 def test_the_blank_stands_clear_of_the_jaws_and_the_seat_ends_inside_it() -> None:
-    assert spec.STANDOFF - XX >= 0.75 * INCH - 1e-9
+    """Every station is from the grip's end face, so a length between two of
+    them holds twice the .XX band."""
+    assert spec.STANDOFF - 2.0 * XX >= 0.75 * INCH - 1e-9
     for blank in spec.KEYED_GEARS:
-        assert spec.SEAT_LENGTH + XX < blank.face[0], blank.tag
-        assert spec.PILOT_END - XX > blank.face[1], blank.tag
+        assert spec.SEAT_LENGTH + 2.0 * XX < blank.face[0], blank.tag
+        assert spec.PILOT_END - 2.0 * XX > blank.face[1], blank.tag
 
 
 def test_every_blank_is_backed_under_its_root_by_the_largest_clear_collar() -> None:
@@ -99,10 +121,10 @@ def test_the_nut_clamps_on_full_thread_with_thread_to_spare() -> None:
     thickest = max(blank.face[1] for blank in spec.KEYED_GEARS)
     nearest_collar_face = thinnest + spec.COLLAR_LENGTH - XX
     farthest_collar_face = thickest + spec.COLLAR_LENGTH + XX
-    assert nearest_collar_face - (spec.RELIEF_END + XX) > 2.0 * pitch
-    assert spec.PILOT_END + XX < nearest_collar_face
     past = (spec.ARBOR_END - 2.0 * XX) - (farthest_collar_face + spec.NUT_THICKNESS_MAX)
     assert past >= 1.5 * pitch
+    assert nearest_collar_face - (spec.RELIEF_END + 2.0 * XX) > 2.0 * pitch
+    assert spec.PILOT_END + 2.0 * XX < nearest_collar_face
     assert spec.RELIEF_DIA + XX < spec.THREAD_ROOT_MIN
     assert (spec.RELIEF_END - XX) - (spec.PILOT_END + XX) >= pitch
 
@@ -120,7 +142,7 @@ def test_the_key_carries_the_clock_and_lies_under_every_blank() -> None:
     )
     assert play < angular_band_deg(unit="in")
     far_end = spec.KEY_END_SET + XX + spec.KEY_LENGTH + XX
-    assert far_end <= spec.SEAT_LENGTH - XX + 1e-9
+    assert far_end <= spec.SEAT_LENGTH - 2.0 * XX + 1e-9
     assert far_end < min(blank.face[0] for blank in spec.KEYED_GEARS)
     # The keyseat's straight run passes out over the pilot, under its floor.
     assert spec.KEYSEAT_FLOOR_MIN > (spec.PILOT_DIA + XXX) / 2.0
@@ -145,6 +167,33 @@ def test_the_stations_and_volume_close_on_the_sections() -> None:
     assert names == set(spec.SECTION_DIMENSIONS)
 
 
+def test_every_printed_length_is_a_baseline_from_the_grip_end() -> None:
+    """Rule 10/11: one datum, the grip's end face; the overall ties the
+    thread's end; the thread's own length is left off the sheet."""
+    printed = {
+        name
+        for names in spec.DRAWING_DIMENSIONS.values()
+        for name in names
+        if name in spec.LENGTH_DRIVES or name == "CentreOverall"
+    }
+    assert printed == {*spec.SHEET_LENGTHS, "CentreOverall"}
+    assert "ThreadLength" not in printed
+    stations = {
+        "GripLength": spec.GRIP_LENGTH,
+        "Shoulder": spec.SHOULDER_Z,
+        "SeatEnd": spec.SEAT_END_Z,
+        "PilotEnd": spec.PILOT_END_Z,
+        "ReliefEnd": spec.RELIEF_END_Z,
+        "CentreOverall": spec.OVERALL_LENGTH,
+    }
+    for name, value in stations.items():
+        assert spec.DRAWING_VALUES_BY_NAME[name] == pytest.approx(value), name
+        a, b, _tier = drawing.LENGTH_SPANS_Z[name]
+        assert a == 0.0 and b == pytest.approx(value), name
+    starts = {name: start for name, _dia, start, _end in spec.SECTIONS}
+    assert all(starts[s] == 0.0 for s in ("Standoff", "Seat", "Pilot", "Relief"))
+
+
 def test_the_tight_bands_live_on_the_model_dimensions() -> None:
     assert model_toleranced_dimensions(part)
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
@@ -155,6 +204,8 @@ def test_the_tight_bands_live_on_the_model_dimensions() -> None:
     assert set(spec.DRAWING_VALUES_BY_NAME) == marked
     assert set(spec.CALLOUTS_BELOW) <= marked
     assert len(spec.SHEET_NOTES.splitlines()) <= 4
+    for callout in spec.CALLOUTS_BELOW.values():
+        assert len(callout.splitlines()) <= 2
 
 
 class _CentreRecorder:
@@ -272,8 +323,12 @@ def test_centre_holes_are_sized_by_axial_depth_never_an_angle(monkeypatch) -> No
 
 
 def _fake_projection(_adapter, _view, points_m, label, names):
-    """The side view at 3:1, the axis horizontal, head right, model +Y up."""
+    """The side view at 3:1, the axis horizontal, head right, model +Y up;
+    the end view at 3:1, model +X right, +Y up."""
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
+    if label.startswith("end view"):
+        cx, cy = drawing.END_CENTER
+        return [(cx + x * scale, cy + y * scale) for x, y, _z in points_m]
     half = spec.OVERALL_LENGTH / 2000.0
     cx, cy = drawing.SIDE_CENTER
     return [(cx + (half - z) * scale, cy + y * scale) for _x, y, z in points_m]
@@ -285,8 +340,8 @@ def test_the_side_view_places_every_marked_dimension_off_the_part(
     monkeypatch.setattr(drawing, "model_points_in_view", _fake_projection)
     keep = drawing._side_keep(None, None)
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    in_section = spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH]
-    assert set(keep) == marked - in_section
+    in_end_view = spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH]
+    assert set(keep) == marked - in_end_view
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
     top = drawing.SIDE_CENTER[1] + spec.GRIP_DIA / 1000.0 / 2.0 * scale
     bottom = drawing.SIDE_CENTER[1] - spec.GRIP_DIA / 1000.0 / 2.0 * scale
@@ -294,14 +349,29 @@ def test_the_side_view_places_every_marked_dimension_off_the_part(
         assert not bottom < y < top, name
     positions = list(keep.values())
     assert len(set(positions)) == len(positions)
-    # Lengths that share a tier must not overlap along the axis.
-    by_tier: dict[int, list[tuple[float, float]]] = {}
-    for a, b, tier in drawing.LENGTH_SPANS_Z.values():
-        by_tier.setdefault(tier, []).append((a, b))
-    for spans in by_tier.values():
-        spans.sort()
-        for (_a0, b0), (a1, _b1) in zip(spans, spans[1:], strict=False):
-            assert a1 >= b0 - 1e-9
+    # Baselines: each tier's span holds every nearer tier's span.
+    spans = sorted(drawing.LENGTH_SPANS_Z.values(), key=lambda span: span[2])
+    assert [tier for _a, _b, tier in spans] == list(range(1, len(spans) + 1))
+    for (_a0, b0, _t0), (_a1, b1, _t1) in zip(spans, spans[1:], strict=False):
+        assert b0 < b1
+    # Lengths stay above the title block (top 0.066 m).
+    assert (
+        min(y for name, (_x, y) in keep.items() if name in drawing.LENGTH_SPANS_Z)
+        > 0.075
+    )
+
+
+def test_the_end_view_puts_the_keyseat_toward_the_side_view(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "model_points_in_view", _fake_projection)
+    keep = drawing._end_keep(None, None)
+    assert set(keep) == spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH]
+    scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
+    grip = spec.GRIP_DIA / 2000.0 * scale
+    end_right = drawing.END_CENTER[0] + grip
+    side_left = drawing.SIDE_CENTER[0] - spec.OVERALL_LENGTH / 2000.0 * scale
+    width_x = keep["KeyseatWidth"][0]
+    assert end_right < width_x < side_left
+    assert keep["KeyseatS"][1] < drawing.END_CENTER[1] - grip
 
 
 def test_the_cli_takes_its_own_stem(monkeypatch) -> None:

@@ -50,17 +50,21 @@ OUTPUTS = DrawingOutputs(
 MEMBER_SHEETS = dict(zip(spec.SHEET_NAMES, spec.CONFIGURATIONS, strict=True))
 
 # Every sheet at 2:1: the Ø1.75 end view spans 89 mm, the side view stands
-# right of it in line, the isometric under the side view.
+# right of it in line, the isometric right of the side view with its label
+# under it, both clear above the title block's top (0.066).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 END_CENTER = (0.110, 0.165)
 SIDE_CENTER = (0.240, 0.165)
-ISO_CENTER = (0.330, 0.095)
+ISO_CENTER = (0.340, 0.150)
 NOTE_XY = (0.030, 0.060)
-ISO_NOTE_XY = (0.290, 0.065)
+ISO_NOTE_XY = (0.305, 0.110)
 OD_RISE = 0.012
 BORE_RUN = 0.030
+# The bore's leader climbs at least this far to its text, clear of the
+# horizontal centreline on the smallest member.
+BORE_RISE_MIN = 0.015
 LENGTH_DROP = 0.014
 
 
@@ -84,7 +88,7 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
         spec.od_name(configuration): (END_CENTER[0], END_CENTER[1] + half + OD_RISE),
         spec.bore_name(configuration): (
             END_CENTER[0] + half + BORE_RUN,
-            END_CENTER[1] + half / 2.0,
+            END_CENTER[1] + max(half / 2.0, BORE_RISE_MIN),
         ),
     }
     side_keep = {
