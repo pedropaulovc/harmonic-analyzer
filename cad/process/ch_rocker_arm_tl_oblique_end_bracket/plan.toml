@@ -7,7 +7,8 @@
 # where they disagree: two shared-axis #8-32 holes at the KP08 stations,
 # drilled #29 through and tapped plug-then-bottoming from both faces to the
 # drawing's tip marks (v47: four #8-32 from the bar side, two #6-32 from the
-# KP08 side, plug tap to about 5/8 in).
+# KP08 side, plug tap to about 5/8 in). The v49 sheet names the faces FRONT
+# FACE (the KP08's, KP08 SIDE here) and BACK FACE (the base bar's, BAR SIDE).
 title = "Oblique trammel end bracket — {{process.quantity:d}} identical"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -131,7 +132,7 @@ inspection = "Length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Each part: mark ROW EDGE on one 1 in side, BAR SIDE and KP08 SIDE on the 1/2 in faces; record its W (ROW EDGE to opposite side) mid-length."
+instruction = "Each part: mark ROW EDGE on one 1 in side, BAR SIDE (drawing BACK FACE) and KP08 SIDE (drawing FRONT FACE) on the 1/2 in faces; record its W (ROW EDGE to opposite side) mid-length."
 
 [[setups]]
 machine_kind = "other"
@@ -234,6 +235,6 @@ envelope = "other"
 vise_hold = "other"
 
 [[setups.operations]]
-instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. Turn a #8-32 × 3/4 socket screw into each thread from both faces."
+instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. From each face run a #8-32 socket screw in by hand to its own full-thread depth only (BAR SIDE {{cad.bar_thread_min_in:.3f}}, KP08 SIDE {{cad.kp08_thread_min_in:.3f}}), never on into the other face's thread."
 inspection = "Section {{cad.thickness_min_in:.3f}}–{{cad.thickness_max_in:.3f}} × {{cad.width_min_in:.3f}}–{{cad.width_max_in:.3f}} as bought; screws turn in by hand."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]

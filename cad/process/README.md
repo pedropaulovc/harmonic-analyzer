@@ -138,16 +138,18 @@ Owner rulings (Pedro), recorded for the cutover:
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: the oblique-trammel base bar and end bracket. `build`
-and `release` do not run it, and releases carry no travelers while prechips
-stabilises. Each run renders two travelers from the same plan: `traveler.html`
-(`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
-`<stem>/diagrams/`). Under prechips 0.10.1 the base bar and end bracket pass both
-on the v48 manifests. The base-bar and feed-lever plans need 0.10.1: they read
-its adapter bindings `cad.vise_centred_overhang_mm` (centred overhang from the
-CAD length and `vise_jaw_width_mm`) and `cad.overhang_mm` (from the lever's one
-`overhang_in`), and the base-bar adapter refuses a Setup 5 jack centre off the
-bar or inside a rail-hole, counterbore or slot outline.
+`prechips:<stem>` task: the oblique-trammel base bar, end bracket and feed
+lever. `build` and `release` do not run it, and releases carry no travelers while
+prechips stabilises. Each run renders two travelers from the same plan:
+`traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
+setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
+end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
+need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
+(centred overhang from the CAD length and `vise_jaw_width_mm`) and
+`cad.overhang_mm` (from the lever's one `overhang_in`), and the base-bar adapter
+refuses a Setup 5 jack centre off the bar or inside a rail-hole, counterbore or
+slot outline. The feed-lever plan needs 0.11.0, which binds the lever's
+grip-corner fillet (`cad.corner_radius_in` and its limits).
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
@@ -156,7 +158,7 @@ hold is checked against `workholding.vise-pm-6` and the three vise limits
 balance, and a rod against an unmachined moving-jaw face). Overhang rigidity
 is not judged. All three plans pass it with HA's 5 3/4 in opening.
 
-What the 0.10 port changed on the sheets:
+What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
 
 - Base bar: bar 2 is the opposite hand of bar 1 (rail and table faces
   swapped), so Setup 4 marks bar 1 C'BORE SIDE and bar 2 RAIL SIDE, and Setup
@@ -181,14 +183,16 @@ What the 0.10 port changed on the sheets:
   both before the next tool; X0 is the left part's INNER END and XR the right
   part's. The two blanks are sawn adjacent from the same bar so their as-bought
   widths match in the jaws. This route differs from the 2026-11-02 hand sheet
-  (`hand-travelers/`), which holds and re-zeroes one bracket at a time.
-
-The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
-in the repository but not enrolled. It declares its vise holds and passes
-`vise_holding`; prechips refuses it only on `tool_sizing`: the plan's 11/32
-drill (8.73125 mm) is below the drawing's hole band (8.7376–8.8392 mm). That is
-a finding for the owner (a different drill, or a drawing change), not a check
-to opt out of; enroll the part once its plan passes.
+  (`hand-travelers/`), which holds and re-zeroes one bracket at a time. The
+  sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE;
+  the final screw check runs each screw only to its own face's full-thread
+  depth, never on into the opposite face's thread.
+- Feed lever: the 2X bolt holes are the 11/32 drill, Ø.3438 +.004/0 (owner
+  ruling 2026-11-13; the former 5/16 normal-fit clearance, Ø.344, put the
+  plan's 11/32 drill under its minimum), inspected with pin gauges. The grip
+  corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
+  fillet, not an authored radius; the saw is the Evolution miter saw, as for
+  the end brackets cut from the same bar.
 
 ```text
 uv run --frozen python -m doit prechips:<stem>

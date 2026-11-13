@@ -1,9 +1,9 @@
 # Source: cad/process/hand-travelers/
 # ch-rocker-arm-tl-oblique-feed-lever-traveler-2026-11-02.html (drawing v47):
 # route, cut list, tools, speeds, workholding, datums and the filed grip-end
-# corners. Dimensions and limits follow the feature manifest, which agrees
-# with the hand sheet except that it prints the as-bought section bands and
-# carries no corner-radius record.
+# corners. Dimensions and limits follow the feature manifest. The 2X bolt
+# holes are the 11/32 drill, Ø.3438 +.004/0 (owner ruling 2026-11-13, Pedro;
+# the hand sheet's Ø.344 5/16 clearance put the drill under its minimum).
 title = "Oblique trammel feed lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -24,9 +24,6 @@ kerf_in = 0.125                  # Hand sheet: about 1/8 in per cut.
 blank_thickness_in = 0.5
 blank_width_in = 1.0
 quantity = 1
-# Hand sheet (v47 drawing 2X R.2, lines scribed .20 from end and sides); no
-# v48 record. The scribed lines sit one corner radius back.
-corner_radius_in = 0.2
 # Hand sheet: ZERO END, then grip end, ~.4 past the jaw side. The adapter
 # binds cad.overhang_mm from it for vise_hold.
 overhang_in = 0.4
@@ -51,8 +48,8 @@ drill_projection_max_mm = 112.8
 
 [[tools]]
 id = "saw"
-name = "Saw"
-ref = "jig-saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
 [[tools]]
 id = "em-half"
 name = "1/2 in end mill"
@@ -127,8 +124,8 @@ sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
 instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.1 past breakthrough; peck .1. H1 leaves a ~.11 web to the end."
 rpm = 2000
 feed = "hand"
-inspection = "Stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+inspection = "Ø{{cad.hole_dia_min_in:.4dot}}–{{cad.hole_dia_max_in:.4dot}}; stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
@@ -165,10 +162,10 @@ diagram = { file = "diagrams/feed-lever/corners.svg", alt = "Finished lever and 
 speed_kind = "other"
 tool = "files"
 sizing = "other"
-instruction = "Scribe lines {{process.corner_radius_in:.2dot}} from the grip end and from each side on the top face. Lever upright, grip end just above the jaws: file both vertical grip-end corners to R{{process.corner_radius_in:.1dot}}, inside the lines, blended."
-instruction_detailed = "Dykem the grip end; scribe lines {{process.corner_radius_in:.2dot}} from the grip end and from each side on the top face, ~1/2 in back. Lever upright, grip end just above the jaws: file each vertical grip-end corner flat at 45° until the flat just reaches both lines, then roll the file round until it blends into an arc touching both lines (R{{process.corner_radius_in:.1dot}})."
+instruction = "Scribe lines {{cad.corner_radius_in:.2dot}} from the grip end and from each side on the top face. Lever upright, grip end just above the jaws: file both vertical grip-end corners to R{{cad.corner_radius_in:.1dot}}, inside the lines, blended."
+instruction_detailed = "Dykem the grip end; scribe lines {{cad.corner_radius_in:.2dot}} from the grip end and from each side on the top face, ~1/2 in back. Lever upright, grip end just above the jaws: file each vertical grip-end corner flat at 45° until the flat just reaches both lines, then roll the file round until it blends into an arc touching both lines (R{{cad.corner_radius_in:.1dot}})."
 feed = "hand"
-inspection = "2X R{{process.corner_radius_in:.1dot}} ±{{cad.linear_1pl_in:.1dot}}, visual against the scribed lines."
+inspection = "2X R{{cad.corner_radius_min_in:.1dot}}–R{{cad.corner_radius_max_in:.1dot}}, visual against the scribed lines."
 gauge_checks = "other"
 
 [[setups.operations]]

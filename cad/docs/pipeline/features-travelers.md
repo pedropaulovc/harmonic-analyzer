@@ -253,9 +253,9 @@ disjoint fields; no field is duplicated. See
 ## Travelers
 
 `_process_plans.TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar` and
-`ch_rocker_arm_tl_oblique_end_bracket`. The feed lever's plan is held,
-unenrolled (see [`cad/process/README.md`](../../process/README.md)).
+`prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
+`ch_rocker_arm_tl_oblique_end_bracket` and
+`ch_rocker_arm_tl_oblique_feed_lever`.
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
@@ -342,11 +342,11 @@ A missing plan, an unresolved version or a nonzero exit marks the pipeline span
 as failed.
 
 Current state: under prechips 0.10.1 the base bar and end bracket pass both
-profiles on the v48 manifests, including the new `vise_holding` check against
-`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever's plan passes
-`vise_holding` but refuses on `tool_sizing` (its 11/32 drill is below the
-drawing's hole band) and is held out of
-`TRAVELER_STEMS` until that is resolved. prechips adapters are tied to the
+profiles on the v49 manifests, including the new `vise_holding` check against
+`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever's 2X bolt holes
+are the 11/32 drill (Ø.3438 +.004/0, owner ruling 2026-11-13), so its plan's
+drill passes `tool_sizing`; its plan reads the grip-corner fillet the manifest
+now exports and so needs prechips 0.11.0. prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.
 
