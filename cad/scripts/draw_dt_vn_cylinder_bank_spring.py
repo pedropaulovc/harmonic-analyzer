@@ -463,13 +463,15 @@ async def build(adapter: Any) -> dict[str, str]:
         prepare_views=prepare_diagrams,
         supplier_reference_features=SHEET_FEATURES,
         include_right=False,
-        stock_caption="SUPPLIER NOMINAL DIMENSION DIAGRAM — NOT PART SHAPE",
+        # Rules 9 and 26: the projected principal views take no prose name;
+        # the footer note already says the views are reference only.
+        stock_caption="",
         supplier_margins={
             "free_front": (0.035, 0.0, 0.035, 0.0),
             "free_top": (0.040, 0.0, 0.040, 0.0),
         },
         supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
-        installed_caption="INSTALLED ENVELOPE",
+        installed_caption="ISOMETRIC",
         settled_checks=settled_checks,
         unit=part_drawing_unit("dt-vn-cylinder-bank-spring"),
     )

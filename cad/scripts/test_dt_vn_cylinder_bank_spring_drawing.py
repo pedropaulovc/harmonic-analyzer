@@ -16,6 +16,7 @@ import dt_vn_cylinder_bank_spring_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
+from _supplier_spring_drawing import state_captions
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9714K392 as recipe
 
@@ -282,6 +283,15 @@ def test_build_shows_and_dimensions_only_the_sheet_diagrams(monkeypatch) -> None
     supplier_dimensions = seen["supplier_dimensions"]
     assert supplier_dimensions.func is drawing.supplier_dimensions
     assert supplier_dimensions.keywords["settled_checks"] is seen["settled_checks"]
+    # Rules 9 and 26: no prose name on the principal views, a standard name
+    # on the pictorial.
+    captions = state_captions(
+        stock_caption=seen["stock_caption"],
+        installed_caption=seen["installed_caption"],
+        right_caption="",
+    )
+    assert captions["free_front"] == captions["free_top"] == ""
+    assert captions["installed_iso"] == "ISOMETRIC"
 
 
 def test_diagrams_show_only_the_sheet_sketches_in_solid_construction_font(
