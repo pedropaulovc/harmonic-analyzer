@@ -664,27 +664,29 @@ MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 # --- Sheet words -----------------------------------------------------------------------
-# One numbered note states the seat's matched fit with its mates and
-# acceptance, and the keyseat's key (rule 4: one flag note linked to every
-# dimension of the one feature; every mate by its drawing number). The key's
-# clock and its setting are the kit's fitting steps (MHA-DT-03-TL-05), not
-# this sheet's.
+# One numbered note states the seat's matched fit and acceptance and the
+# keyseat's bonded key (rule 4: one flag note linked to every dimension of
+# the one feature; every mate by its drawing number). The seat's mates are
+# the kit sheet's setup table rows, every blank by drawing number, so the
+# note points there rather than print a range (machinist review of farm
+# 20261113T171903293Z). The key's clock and its setting are the kit's
+# fitting steps, not this sheet's.
 KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
+# The kit sheet's number: a part never reads an assembly contract
+# (test_assembly_contract), so the kit's test holds it to the contract's.
+KIT_NUMBER = "MHA-DT-03-TL-05"
+KEY_BOND = "LOCTITE 638"
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
 SEAT_CLEARANCE_TEXT = "-".join(
     inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
 )
-_CONE_SPAN = (KEYED_GEARS[0].number, KEYED_GEARS[-2].number)
-if not all(n.startswith(f"{_CONE_NUMBER}-T") for n in _CONE_SPAN):
-    raise AssertionError("the note's cone span no longer runs over MHA-DT-03's members")
 SHEET_NOTES = "\n".join(
     (
-        f"{SEAT_NOTE_NUMBER}. SEAT: SLIDING FIT, MATCHED TO THE KEYED BORES OF "
-        f"{_CONE_SPAN[0]}",
-        f"   TO {_CONE_SPAN[1]} AND {_CRANK_NUMBER}, CLEARANCE {SEAT_CLEARANCE_TEXT} "
-        "IN EACH BORE;",
-        f"   KEYSEAT FOR KEY {KEY_NUMBER}.",
+        f"{SEAT_NOTE_NUMBER}. SEAT: SLIDING FIT, MATCHED TO THE KEYED BORES LISTED ON "
+        f"{KIT_NUMBER},",
+        f"   CLEARANCE {SEAT_CLEARANCE_TEXT} IN EACH BORE;",
+        f"   KEYSEAT: KEY {KEY_NUMBER} BONDED WITH {KEY_BOND}.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
