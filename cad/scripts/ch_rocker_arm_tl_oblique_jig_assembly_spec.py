@@ -2301,8 +2301,9 @@ if (
 # The strap cut's depth (TL-00 machinist review of afe1018: the retired
 # MHA-CH-06 plan carried it): the cutter's end goes past the strap's
 # underside by more than the breakthrough budget and stays well clear of the
-# step 18 groove floor (checked against RISER_GROOVE_DEPTH below).
-STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.10 * trammel.INCH)
+# step 18 groove floor (checked against RISER_GROOVE_DEPTHS below). Owner
+# ruling 2026-11-13 (#2447): .02-.07, half the shallowest loose groove.
+STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.07 * trammel.INCH)
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
@@ -2549,21 +2550,21 @@ HOLD_DOWN_REFERENCE = (
 # from the seated riser's top and never through to the carrier under it. The
 # deepest accepted groove leaves a skin under the thinnest printed riser
 # (riser.THICKNESS - riser.THICKNESS_BAND, .23); the shallowest still takes
-# the flat 3/8 cutter's overtravel past the strap's underside many times over.
-RISER_GROOVE_DEPTH = 0.215 * trammel.INCH
-RISER_GROOVE_BAND = 0.010 * trammel.INCH
-_GROOVE_MIN = RISER_GROOVE_DEPTH - RISER_GROOVE_BAND
-_GROOVE_MAX = RISER_GROOVE_DEPTH + RISER_GROOVE_BAND
-if _GROOVE_MAX >= riser.THICKNESS - riser.THICKNESS_BAND:
+# the flat 3/8 cutter's overtravel past the strap's underside twice over.
+# Owner ruling 2026-11-13 (#2447): a loose band, any depth .15-.20 read with
+# the caliper depth rod (was .215 +/-.010 on a depth micrometer); only a
+# groove past .20 scraps the riser. The skin is then .030 MIN. The HUB
+# relief notching both groove walls is accepted as it is (#2447).
+RISER_GROOVE_DEPTHS = (0.15 * trammel.INCH, 0.20 * trammel.INCH)
+_GROOVE_MIN, _GROOVE_MAX = RISER_GROOVE_DEPTHS
+RISER_GROOVE_SKIN_MIN = riser.THICKNESS - riser.THICKNESS_BAND - _GROOVE_MAX
+if RISER_GROOVE_SKIN_MIN <= 0.0:
     raise AssertionError("the riser groove can cut through to the carrier")
 if _GROOVE_MIN <= holding.TOOL_OVERTRAVEL_BUDGET:
     raise AssertionError("the riser groove leaves no breakthrough room")
 if not holding.TOOL_OVERTRAVEL_BUDGET < STRAP_CUT_OVERTRAVEL[0] < STRAP_CUT_OVERTRAVEL[1] <= _GROOVE_MIN / 2:
     raise AssertionError("the strap cut misses breakthrough or nears the groove floor")
-_GROOVE = (
-    f"{_length(RISER_GROOVE_DEPTH, 3)} DEEP",
-    f"{_length(_GROOVE_MIN, 3)}-{_length(_GROOVE_MAX, 3)}",
-)
+_GROOVE = f"{_length(_GROOVE_MIN, 2)}-{_length(_GROOVE_MAX, 2)}"
 
 
 # Strap blank preparation and drilling on the jig (#2443): the retired
@@ -2657,17 +2658,19 @@ OPERATION_STEPS = (
     "PINS AT FULL HEIGHT: CLEARANCE SEEN OR MEASURED AT EACH.",
     "17B. REPEAT STEPS 17-17A AFTER ANY TOOL, DEPTH OR SETUP CHANGE.",
     "17C. REDO STEP 6 AFTER ANY CHANGE TO THE TABLE SETUP.",
-    f"18. CUT A GROOVE {_GROOVE[0]} FROM THE RISER TOP WITH THE "
+    f"18. CUT A GROOVE {_GROOVE} DEEP FROM THE RISER TOP WITH THE "
     f"{trammel.RISER_CUTTER_IN} CUTTER OVER THE INNER PASS, "
     "MARK TO MARK, BEFORE THE FIRST STRAP: WASHER AND CLAMP SCREWS OUT, RISER "
     "SCREWS AND STOP PINS IN.",
     "18A. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
     "18B. CUT THE OUTER PASS'S GROOVE AS IN STEP 18.",
     "18C. MOVE THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
-    "18D. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP WITH A DEPTH MICROMETER "
-    f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
-    "18E. IF A GROOVE IS SHALLOW, DEEPEN IT AS IN STEPS 18-18C.",
-    "18F. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18-18C, NEW RISER.",
+    "18D. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP AT BOTH PASS ENDS: "
+    f"{_GROOVE} (CALIPER DEPTH ROD).",
+    f"18E. IF A GROOVE IS SHALLOWER THAN {_length(_GROOVE_MIN, 2)}, DEEPEN IT AS IN "
+    "STEPS 18-18C.",
+    f"18F. IF A GROOVE IS DEEPER THAN {_length(_GROOVE_MAX, 2)}, REDO STEPS 11-11E "
+    "AND 18-18C, NEW RISER.",
     "19. MARK X 0 ON EACH STEP 1N BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 "
     "ALONG ITS LOWER RAW EDGE.",
     "19A. MARK THE INNER CHAIN'S POINTS FROM THE STRAP BLANK LAYOUT TABLE (SHEET "
