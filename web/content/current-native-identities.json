@@ -1027,6 +1027,13 @@
       "role": "FeedNut",
       "priorStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
       "priorNumber": "MHA-CH-06-TL-VN-82"
+    },
+    {
+      "sourceStem": "dt-cone-gear-tl-vn-arbor-nut",
+      "sourceNumber": null,
+      "parent": "dt-cone-gear-tl-arbor",
+      "stem": "dt-cone-gear-tl-vn-arbor-nut",
+      "number": "MHA-DT-03-TL-VN-50"
     }
   ],
   "archivedAliases": [
@@ -1105,7 +1112,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "ad4d89f067d1dbc6ba18a964aee829af7adba0ae4a8615de3f2c011ab5ddd570",
+  "currentRegistryMapSha256": "db26f845a9e64671862f0161e1c7b4ccaf092d09532451dabc6253354c4545f6",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2278,12 +2285,84 @@
       ]
     },
     {
+      "sourceStem": "dt-cone-gear-tl-keyed-arbor",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-keyed-arbor",
+          "number": "MHA-DT-03-TL-03"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-gear-tl-arbor-collar",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor-collar",
+          "number": "MHA-DT-03-TL-04"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-gear-tl-arbor-key",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor-key",
+          "number": "MHA-DT-03-TL-06"
+        }
+      ]
+    },
+    {
       "sourceStem": "dt-cone-gear-tl-indexing",
       "sourceNumber": null,
       "identities": [
         {
           "stem": "dt-cone-gear-tl-indexing",
           "number": "MHA-DT-03-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear-tl-form-cutter",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-form-cutter",
+          "number": "MHA-DT-37-TL-01"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear-tl-cutter-bar",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter-bar",
+          "number": "MHA-DT-37-TL-02"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-tip-gear-tl-cutter",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-tip-gear-tl-cutter",
+          "number": "MHA-DT-37-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "sourceStem": "dt-cone-gear-tl-arbor",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-arbor",
+          "number": "MHA-DT-03-TL-05"
         }
       ],
       "kind": "assembly"

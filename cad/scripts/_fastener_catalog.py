@@ -498,6 +498,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "SHIM-0375-008",
         supplier="Huyett",
     ),
+    # Issue #2465: the keyed cutting arbor's nut clamps its backing collar and
+    # the blank to the arbor's shoulder (MHA-DT-03-TL-05).
+    "dt-cone-gear-tl-vn-arbor-nut": _stock(
+        "dt-cone-gear-tl-vn-arbor-nut",
+        "Medium-Strength Zinc-Plated Steel Hex Nut",
+        "95462A505",
+    ),
 }
 
 

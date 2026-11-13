@@ -540,6 +540,12 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-005-TL-04 | — | MHA-DT-05-TL-04 (retired 2026-10-21; never reissued) |
 | new tooling part (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 |
 | new tooling part (2026-11-09) | — | — | — | — | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-form-cutter` | MHA-DT-37-TL-01 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-cutter-bar` | MHA-DT-37-TL-02 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-keyed-arbor` | MHA-DT-03-TL-03 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor-collar` | MHA-DT-03-TL-04 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor-key` | MHA-DT-03-TL-06 |
+| new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-vn-arbor-nut` | MHA-DT-03-TL-VN-50 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -551,6 +557,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | assembly | `harmonic-analyzer` | MHA-A08 | `ha-harmonic-analyzer` | MHA-HA-000 | `ha-harmonic-analyzer` | MHA-HA-00 |
 | tooling assembly | — | — | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-006-TL-000 | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-06-TL-00 |
 | new tooling assembly (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 |
+| new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-cutter` | MHA-DT-37-TL-00 |
+| new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 |
 
 ### Shared vendor families
 
@@ -744,6 +752,14 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 | 2026-11-02 BS-0 dividing-head index plate with 57-, 51- and 24-hole circles for the 114T, 102T and 96T cone gears the stock plates cannot index; best-guess sizes pending measurement (#2157) |
 | added | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 | 2026-11-02 one-part tooling assembly holding the index plate on the BS-0 head, so the plate belongs to a registered fixture kit; never in a machine assembly or BOM |
 | added | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 | Owner ruling 2026-11-09 (C1 keyed, [PR #1992](https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), tip phasing option b1): flat steel comb with one blade per cone gear T030, T024, T018, T012 and T006 in the tooth space beside its phase-0 tooth at shop-row bands (single blade, owner ruling 2026-11-10), clocking the LOCTITE 638-bonded tip gears to the keyed T030 at MHA-DT-00 step 1; enrolled in the `dt-cone-gear-tl-indexing` kit (MHA-DT-03-TL-00 was already that kit's assembly Number); never in a machine assembly or BOM |
+| added | `dt-cone-tip-gear-tl-form-cutter` | MHA-DT-37-TL-01 | 2026-11-12 (#2358): DT6-FORM1 single-point form bit, 1/8 O1 drill rod with the T006 tooth-space form on a zero-rake face, 10° front and 3° side clearance; enrolled in the `dt-cone-tip-gear-tl-cutter` kit; never in a machine assembly or BOM |
+| added | `dt-cone-tip-gear-tl-cutter-bar` | MHA-DT-37-TL-02 | 2026-11-12 (#2358): 3/8 cold-finished fly-cutter bar, reamed cross hole for the TL-01 bit and #4-40 tap for the shared MHA-SH-VN-54 set screw; enrolled in the `dt-cone-tip-gear-tl-cutter` kit; never in a machine assembly or BOM |
+| added | `dt-cone-tip-gear-tl-cutter` | MHA-DT-37-TL-00 | 2026-11-12 (#2358): fly-cutter kit, the TL-01 bit in the TL-02 bar held by one MHA-SH-VN-54 set screw at the stick-out the fitter sheet states; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-keyed-arbor` | MHA-DT-03-TL-03 | Issue #2465: keyed tooth-cutting arbor for T030..T120 (MHA-DT-03) and the 64T (MHA-DT-07), cut on their finished bore and keyway so the teeth are clocked to the keyway; between centres, or gripped in the BS-0 3-jaw for the 64T; enrolled in `dt-cone-gear-tl-arbor`; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-arbor-collar` | MHA-DT-03-TL-04 | Issue #2465: the arbor's backing collar, members C175, C100 and C050 (Ø1.75, Ø1.00, Ø.50), one per setup, the largest under each blank's root; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 | Issue #2465: tooling assembly holding the keyed arbor, its key, the three collars and the nut, so they belong to a registered fixture kit; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-arbor-key` | MHA-DT-03-TL-06 | Issue #2465: 1/16 square undersized key stock cut to .15 and bonded in the arbor's keyseat; a made part because McMaster's only undersized 1/16 stock, 98830A511, is already MHA-DT-VN-71's SKU; never in a machine assembly or BOM |
+| added | `dt-cone-gear-tl-vn-arbor-nut` | MHA-DT-03-TL-VN-50 | Issue #2465: McMaster 95462A505 grade 5 zinc-plated 1/4-28 hex nut clamping the arbor's collar and blank; never in a machine assembly or BOM |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |
 | added | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | 2026-11-03 Main ruling on Codjiflo P1: McMaster 98381A438 3/32 x 1/2 alloy-steel dowel x1 (ASME B18.8.2, +.0001/+.0003), the TL-27 feed nut's positive anti-rotation key, slip in the nut and pressed into the TL-32 lug; bought fixture hardware modelled for the jig assembly |

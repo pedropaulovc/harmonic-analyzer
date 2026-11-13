@@ -1,0 +1,14 @@
+dt-cone-tip-gear-tl-form-cutter:
+  title: Cone Tip Gear Fly Cutter Bit
+  # Shop tooling: the parent MHA-DT-37 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2358: the DT6-FORM1 single-point form tool that cuts the T006 tooth
+  # spaces, drawn as a tool and held in the MHA-DT-37-TL-02 bar
+  # (fixture MHA-DT-37-TL-00). Never in a machine assembly or BOM.
+  number: MHA-DT-37-TL-01
+  material: O1 TOOL STEEL DRILL ROD, 1/8 IN
+  material_specification: AISI O1 oil-hardening tool steel drill rod, 1/8 in, ASTM A681
+  finish: cutting end hardened and tempered, file-hard
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "cut 1/8 O1 drill rod to length; file the flat to centre and the tooth-space form on the face with its front and side clearance while soft; harden and temper the cutting end; hone the face"
