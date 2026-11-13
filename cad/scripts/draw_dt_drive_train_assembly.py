@@ -1206,9 +1206,10 @@ PEDESTAL_RECHECK_ROWS = (
     # cone-line seats on the swing platform (DtFeel2365, check 4's author;
     # the stack past them is #2587's).  The row is the X rows' remedy carried
     # on, so it records nothing: its label is its trigger (machinist review
-    # r7/r8 of PR #2640: "X, ALL IN PRINT" read as a row with no trigger).
+    # r7/r8 of PR #2640: "X, ALL IN PRINT" read as a row with no trigger;
+    # #2672 review: "X, PARTS IN PRINT" still named no condition).
     (
-        "X, PARTS IN PRINT",
+        "X OUT AFTER REMEDY",
         "-", "-", "-", "-", "-",
         "MIC MHA-DT-05 + MHA-DT-21 SEATS ON MHA-DT-20; REMAKE ANY OUT",
     ),
