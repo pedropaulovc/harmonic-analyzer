@@ -142,21 +142,25 @@ def test_every_dimension_prints_at_the_title_block() -> None:
 
 
 def test_each_gear_is_named_once_and_every_depth_flags_note_one() -> None:
-    """Rule 4: each bonded blade's depth names its gear; note 1, flagged at
-    each depth (rule 7), says what the depth is for and names T030's blade,
-    the depths' datum."""
+    """Rule 4: each bonded blade's depth names its gear and flags note 1,
+    the depth's reason; note 2 names T030, whose blade is the depths'
+    datum. Rule 7: each note one line, a reason of at most six words plus
+    the mate's number."""
     for teeth in spec.BONDED_TEETH:
         assert spec.CALLOUTS_BELOW[spec.blade_depth_name(teeth)].splitlines() == [
             spec.gear_number(teeth),
             "SEE NOTE 1",
         ]
     notes = spec.SHEET_NOTES.splitlines()
-    assert 1 <= len(notes) <= 4 and notes[0].startswith("1. ")
+    assert [line[:3] for line in notes] == ["1. ", "2. "]
+    for line in notes:
+        words = [w for w in line[3:].split() if not w.startswith("MHA-")]
+        assert len(words) <= 6, line
     named = "\n".join((spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values()))
     for teeth in spec.GEARS:
         assert named.count(spec.gear_number(teeth)) == 1, teeth
-    assert spec.gear_number(spec.REFERENCE_TEETH) in spec.SHEET_NOTES
-    assert "CLEAR OF THAT GEAR'S ROOT" in " ".join(notes)
+    assert spec.gear_number(spec.REFERENCE_TEETH) in notes[1]
+    assert "ROOT" in notes[0]
     # No method (rule 7).
     for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE"):
         assert word not in spec.SHEET_NOTES
