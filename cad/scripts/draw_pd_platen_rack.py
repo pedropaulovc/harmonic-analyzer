@@ -42,11 +42,11 @@ from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from pd_platen_rack_callouts import DIMENSION_CALLOUTS
 from pd_platen_rack_spec import (
     BACKER_HEIGHT,
     BAR_HEIGHT,
     BAR_LENGTH,
-    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
