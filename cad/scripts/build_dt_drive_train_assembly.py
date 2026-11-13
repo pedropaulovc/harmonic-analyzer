@@ -1330,7 +1330,8 @@ from dt_cone_tip_block_spec import (  # noqa: E402
     DOWEL_FROM_TAP as TIP_DOWEL_FROM_TAP,
     DOWEL_HOLE_DEPTH as TIP_DOWEL_HOLE_DEPTH,
     FOOT_BORE_SPEC as TIP_FOOT_BORE_SPEC,
-    FOOT_TAP_STATION_TOL_MM as TIP_FOOT_TAP_STATION_TOL_MM,
+    FOOT_TAP_X_TOL_MM as TIP_FOOT_TAP_X_TOL_MM,
+    FOOT_TAP_Z_TOL_MM as TIP_FOOT_TAP_Z_TOL_MM,
     HOLDDOWN_LEDGE_RANGE_MM as TIP_HOLDDOWN_LEDGE_RANGE,
     HOLDDOWN_SCREW_LENGTH as TIP_HOLDDOWN_SCREW_LENGTH,
     HOLDDOWN_THREAD as TIP_HOLDDOWN_THREAD,
@@ -1633,11 +1634,11 @@ HOLDDOWN_SCREW_FLOAT_MM = (
 # Block north face along the cone axis, about its nominal station off the
 # pivot bore.
 TIP_NORTH_FACE_BAND_MM = (
-    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_STATION_TOL_MM
+    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_Z_TOL_MM
 )
 # The tap's lateral station about its nominal PLAT_HOLDDOWN_LOCAL_X.
 TIP_TAP_LATERAL_BAND_MM = (
-    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_STATION_TOL_MM
+    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_X_TOL_MM
 )
 # Each side face's worst distance from the plate centreline: the tap stands
 # at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X
@@ -2715,24 +2716,39 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # rule-18 exception accepts (ruling 2026-11-09 via PR #1992: keep 91794A558
 # at this block station; dt-drive-train.yaml DT-07).  Any stack change that
 # cuts deeper fails here and needs a new ruling.
+#
+# The post's screw clearance is one-sided (#2697): MHA-DT-00 holds MHA-DT-05
+# pushed toward MHA-DT-21 along the shaft while it is turned and tightened
+# (steps 2S-2U, user decision 2026-10-12; dt_cone_tip_air books the same), so
+# the clearance can only carry the shaft north of its centred station, by
+# anything from none (the post turned to the end of its clearance) to all of
+# it.  It makes the embed shallower, never deeper.
 END_SCREW_EMBED_BAND_MM = (
     POST_BOSS_FACE_AXIAL_BAND_MM
+    - POST_SCREW_FLOAT_MM
     + shaft_printed_band("CollarWidth")
     + dt_cone_gear_stack.face_band(dt_cone_gear_stack.COUNT - 1, "north")[0]
     + _printed_band_mm(tip_cluster.BUSHING_PLACES, unit=SHAFT_UNIT)
     + TIP_NORTH_FACE_BAND_MM
 )
+END_SCREW_POST_PUSH_MM = POST_SCREW_FLOAT_MM
 END_SCREW_ENGAGEMENT_FLOOR_D = 1.39
 _END_SCREW_MAJOR_MM = THREAD_MAJOR_MM[tip_cluster.ADJUSTER_THREAD]
 
 
-def end_screw_embed_worst_mm(band_mm: float) -> tuple[float, float]:
+def end_screw_embed_worst_mm(
+    band_mm: float, post_push_mm: float = END_SCREW_POST_PUSH_MM
+) -> tuple[float, float]:
     """The end screw's embed (MHA-DT-21's north face to the screw's end) at
-    both extremes of band_mm and the set end play; raise if the head can
-    bottom on the block before the screw reaches the bushing, or if the full
-    thread engaged falls under END_SCREW_ENGAGEMENT_FLOOR_D."""
+    both extremes of band_mm and the set end play, the shallow one with the
+    pushed post's whole screw clearance; raise if the head can bottom on the
+    block before the screw reaches the bushing, or if the full thread engaged
+    falls under END_SCREW_ENGAGEMENT_FLOOR_D."""
     worst = (
-        TIP_END_SCREW_EMBED - band_mm - (SHAFT_END_PLAY[1] - END_SCREW_MODEL_END_PLAY_MM),
+        TIP_END_SCREW_EMBED
+        - band_mm
+        - post_push_mm
+        - (SHAFT_END_PLAY[1] - END_SCREW_MODEL_END_PLAY_MM),
         TIP_END_SCREW_EMBED + band_mm + (END_SCREW_MODEL_END_PLAY_MM - SHAFT_END_PLAY[0]),
     )
     if worst[1] > TIP_END_SCREW_REACH_MAX_EMBED_MM + 1e-9:

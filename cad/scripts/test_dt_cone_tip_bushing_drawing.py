@@ -66,15 +66,48 @@ def test_bore_callout_names_process_fit_mate_and_interference() -> None:
 
 
 def test_every_marked_dimension_has_places() -> None:
-    assert spec.DRAWING_PRECISION_BY_NAME == {"OuterDia": 3, "BoreDia": 4, "Length": 3}
+    assert spec.DRAWING_PRECISION_BY_NAME == {
+        "OuterDia": 3,
+        "BoreDia": 4,
+        "Length": 3,
+        "EndChamferSize": 2,
+    }
 
 
-def test_builder_volume_is_the_annulus() -> None:
+def test_builder_volume_is_the_annulus_less_both_corner_breaks() -> None:
     import build_dt_cone_tip_bushing as build
 
-    assert build.V_BUSHING == pytest.approx(
-        math.pi / 4.0 * (spec.OUTER_DIA**2 - spec.BORE_DIA**2) * spec.LENGTH
-    )
+    ring = math.pi / 4.0 * (spec.OUTER_DIA**2 - spec.BORE_DIA**2) * spec.LENGTH
+    assert build.V_RING == pytest.approx(ring)
+    # Pappus: each 45 deg triangle of leg c, centroid c/3 inside the O.D.
+    c = spec.END_CHAMFER
+    one_break = c * c / 2.0 * 2.0 * math.pi * (spec.OUTER_DIA / 2.0 - c / 3.0)
+    assert build.V_BUSHING == pytest.approx(ring - 2.0 * one_break)
+
+
+def test_corner_breaks_leave_a_flat_seat_and_give_the_tip_its_air() -> None:
+    """#2697: the .04 x 45 deg break on both O.D. corners prints .XX; at its
+    largest each face keeps a flat round the bore, and at its smallest the
+    cone tip's air to G19 books it (a square corner stands nearer the bank)."""
+    import dataclasses
+
+    import dt_cone_tip_air as air
+
+    assert spec.END_CHAMFER == pytest.approx(0.04 * IN)
+    assert spec.END_CHAMFER_MIN == pytest.approx(0.03 * IN)
+    assert spec.FACE_FLAT_MIN >= 0.5
+    bushing = next(tier for tier in air.TIERS if tier.name == "bushing")
+    assert bushing.south_chamfer_mm == spec.END_CHAMFER_MIN
+    fixed = air.DRUM_TIERS[0]
+    chamfered = air.projection_nominal_mm("bushing", fixed)
+    square = dataclasses.replace(bushing, south_chamfer_mm=0.0)
+    tiers = tuple(square if tier is bushing else tier for tier in air.TIERS)
+    original = air.TIERS
+    air.TIERS = tiers
+    try:
+        assert chamfered > air.projection_nominal_mm("bushing", fixed) + 0.1
+    finally:
+        air.TIERS = original
 
 
 def test_sheet_is_registered_and_enforced() -> None:
@@ -117,7 +150,14 @@ def test_bore_block_stands_clear_of_its_extension_lines() -> None:
         "BoreDia": spec.BORE_CALLOUT,
         "OuterDia": spec.OUTER_DIA_CALLOUT,
         "Length": spec.LENGTH_CALLOUT,
+        "EndChamferSize": spec.END_CHAMFER_CALLOUT,
     }
+    # #2697: the chamfer's text stands right of both its extension lines and
+    # its rows above the bore's block.
+    chamfer_x, chamfer_y = drawing.SECTION_KEEP["EndChamferSize"]
+    south_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    assert chamfer_x > south_x + spec.END_CHAMFER * drawing._S
+    assert chamfer_y - 2.0 * drawing._ROW > y
     length_x, length_y = drawing.SECTION_KEEP["Length"]
     assert length_x > drawing.NORTH_FACE_X + 0.03
     assert length_y < drawing.SECTION_CENTER[1] - drawing.OUTER_R
