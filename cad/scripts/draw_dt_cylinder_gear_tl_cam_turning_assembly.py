@@ -126,7 +126,26 @@ BOM_DESCRIPTIONS = {
 BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     stem: (stem, None) for stem in BOM_COMPONENTS
 }
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# The right view sees every bought item's rims edge-on, each drawn as one
+# line. A leader asked onto such a line near either end reads back at that
+# end: run 20261112T203156536Z walked item 2 to a top-rim point 1.42 mm
+# (sheet) in from the line's left end and the leader landed on the end
+# (_assert_leader_lands, limit 0.2 mm). So items 2-5 each take the front
+# point of one rim (part frame: +X toward the right view's viewer, +Y the
+# item's axis, z = 0), which draws at the line's middle, on the item's axis,
+# nowhere near an end; nothing stands in front of it. Item 1's walked point
+# lands 18 mm from any end and held.
+BALLOON_RIMS_MM: dict[str, tuple[float, float]] = {
+    # (rim radius, rim height along the item's axis)
+    STUB: (fixture.DOWEL_DIA / 2.0, fixture.DOWEL_LENGTH),  # tapped top end
+    CLOCK_PIN: (fixture.PIN_DIA / 2.0, fixture.PIN_LENGTH),  # top end
+    WASHER: (fixture.WASHER_OD / 2.0, 0.0),  # outer rim, gear side
+    SCREW_STEM: (SCREW.head_dia / 2.0, SCREW.head_h),  # head top
+}
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
+    stem: BalloonAnchor(point_mm=(radius, height, 0.0))
+    for stem, (radius, height) in BALLOON_RIMS_MM.items()
+}
 BALLOON_MARGIN = 0.012
 
 

@@ -76,5 +76,7 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierHeadDiameter": (4, "diameter", None, None),
     "SupplierHeadHeight": (2, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "10-32"),
-    "SupplierDriveWidth": (0, "length", 32, None),
+    # Decimal, one line: the stacked 5/32 fraction ran its own dimension line
+    # through its text (run 20261112T203156536Z layout audit).
+    "SupplierDriveWidth": (3, "length", None, None),
 }

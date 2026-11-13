@@ -70,6 +70,31 @@ def test_the_kit_places_each_bought_part_on_its_hole() -> None:
     assert 0.0 < fixture.SCREW_ENGAGEMENT < fixture.DOWEL_THREAD_DEPTH_MIN
 
 
+def test_bought_items_balloon_mid_line_where_their_rims_draw_edge_on() -> None:
+    # The right view draws each bought item's rims as lines across its axis;
+    # a leader asked near a line's end lands on the end. Each anchor is the
+    # front point of a real rim: on the item's axis on the sheet (z = 0),
+    # a full radius from both ends, toward the viewer (+X).
+    bought = set(sheet.BOM_COMPONENTS) - {sheet.BODY}
+    assert set(sheet.BALLOON_RIMS_MM) == bought
+    assert sheet.BALLOON_ANCHORS[sheet.BODY].point_mm is None
+    ends = {
+        sheet.STUB: (0.0, fixture.DOWEL_LENGTH),
+        sheet.CLOCK_PIN: (0.0, fixture.PIN_LENGTH),
+        sheet.WASHER: (0.0, fixture.WASHER_MODEL_THICKNESS),
+        sheet.SCREW_STEM: (0.0, fixture.SCREW.head_h),
+    }
+    for stem in bought:
+        radius, height = sheet.BALLOON_RIMS_MM[stem]
+        assert height in ends[stem], stem
+        assert sheet.BALLOON_ANCHORS[stem].point_mm == (radius, height, 0.0)
+        assert radius > 0.0
+    assert sheet.BALLOON_RIMS_MM[sheet.STUB][0] == fixture.DOWEL_DIA / 2.0
+    assert sheet.BALLOON_RIMS_MM[sheet.CLOCK_PIN][0] == fixture.PIN_DIA / 2.0
+    assert sheet.BALLOON_RIMS_MM[sheet.WASHER][0] == fixture.WASHER_OD / 2.0
+    assert sheet.BALLOON_RIMS_MM[sheet.SCREW_STEM][0] == fixture.SCREW.head_dia / 2.0
+
+
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
     pairs = {
         frozenset(name.rsplit("-", 1)[0] for name in pair)
