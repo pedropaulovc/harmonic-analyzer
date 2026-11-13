@@ -2,8 +2,9 @@
 # ch-rocker-arm-tl-oblique-feed-lever-traveler-2026-11-02.html (drawing v47):
 # route, cut list, tools, speeds, workholding, datums and the filed grip-end
 # corners. Dimensions and limits follow the feature manifest. The 2X bolt
-# holes are the 11/32 drill, Ø.3438 +.004/0 (owner ruling 2026-11-13, Pedro;
-# the hand sheet's Ø.344 5/16 clearance put the drill under its minimum).
+# holes are the 11/32 drill, 2X Ø.3438 11/32 DRILL THRU ALL, +.004/0 (owner
+# ruling 2026-11-13, Pedro, post-v49; the hand sheet's Ø.344 5/16 clearance
+# put the drill under its minimum).
 title = "Oblique trammel feed lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -48,8 +49,8 @@ drill_projection_max_mm = 112.8
 
 [[tools]]
 id = "saw"
-name = "Evolution miter saw"
-ref = "saw-evolution-14"
+name = "Saw"
+ref = "jig-saw"
 [[tools]]
 id = "em-half"
 name = "1/2 in end mill"

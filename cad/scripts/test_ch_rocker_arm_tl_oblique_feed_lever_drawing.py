@@ -125,7 +125,8 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     checked = 0
     stock = {("carrier_seat", "thickness"), ("carrier_seat", "width")}
-    # The drilled band qualifies the exact 11/32 drill, which prints .3438.
+    # The drilled band qualifies the exact size of the drill the callout
+    # names (11/32, printed .3438): rule 3's named-drill decimal.
     drilled = {("bolt_hole_1", "dia"), ("bolt_hole_2", "dia")}
     for name, feature in _features().items():
         for requirement in feature["requirements"]:
@@ -185,13 +186,14 @@ class _Callout:
 
 @pytest.mark.parametrize("token", ("<hw-diam>", "<hw-thruholedia>"))
 def test_drill_follows_the_size_in_the_native_callout(token: str) -> None:
-    # Rule 26: size, then process: 2X Ø.3438 DRILL THRU ALL.
+    # Rule 26: size, then process; rule 3: the named drill's exact decimal.
+    # 2X Ø.3438 11/32 DRILL THRU ALL.
     native = {5: "", 6: "", 7: f"<NUM_INST>X <MOD-DIAM>{token} THRU ALL", 8: ""}
     callout = _Callout(native)
     drawing._write_drill_after_size(callout)
     assert callout.definitions == {
         **native,
-        7: f"<NUM_INST>X <MOD-DIAM>{token} DRILL THRU ALL",
+        7: f"<NUM_INST>X <MOD-DIAM>{token} 11/32 DRILL THRU ALL",
     }
     # A refused write is caught on read-back.
     with pytest.raises(RuntimeError, match="did not persist"):

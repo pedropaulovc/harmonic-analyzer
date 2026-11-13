@@ -187,12 +187,12 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE;
   the final screw check runs each screw only to its own face's full-thread
   depth, never on into the opposite face's thread.
-- Feed lever: the 2X bolt holes are the 11/32 drill, Ø.3438 +.004/0 (owner
-  ruling 2026-11-13; the former 5/16 normal-fit clearance, Ø.344, put the
+- Feed lever: the 2X bolt holes are the 11/32 drill, `2X Ø.3438 11/32 DRILL
+  THRU ALL`, +.004/0 (owner ruling 2026-11-13, so the traveler follows the
+  post-v49 drawing; the former 5/16 normal-fit clearance, Ø.344, put the
   plan's 11/32 drill under its minimum), inspected with pin gauges. The grip
   corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
-  fillet, not an authored radius; the saw is the Evolution miter saw, as for
-  the end brackets cut from the same bar.
+  fillet, not an authored radius.
 
 ```text
 uv run --frozen python -m doit prechips:<stem>

@@ -343,10 +343,11 @@ as failed.
 
 Current state: under prechips 0.10.1 the base bar and end bracket pass both
 profiles on the v49 manifests, including the new `vise_holding` check against
-`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever's 2X bolt holes
-are the 11/32 drill (Ø.3438 +.004/0, owner ruling 2026-11-13), so its plan's
-drill passes `tool_sizing`; its plan reads the grip-corner fillet the manifest
-now exports and so needs prechips 0.11.0. prechips adapters are tied to the
+`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever follows the
+post-v49 drawing: its 2X bolt holes are the 11/32 drill (`2X Ø.3438 11/32 DRILL
+THRU ALL`, +.004/0, owner ruling 2026-11-13), so its plan's drill passes
+`tool_sizing`; its plan reads the grip-corner fillet the manifest now exports
+and so needs prechips 0.11.0. prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.
 
