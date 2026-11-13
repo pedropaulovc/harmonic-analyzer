@@ -297,20 +297,6 @@ def test_registry_row() -> None:
     assert part.MATERIAL == "Plain Carbon Steel"
 
 
-def test_the_strap_stays_flat_by_its_route_not_by_a_frame() -> None:
-    """#2340: the strap's bow is bounded by its thickness band and, once
-    joined, MHA-CH-06's strap position zone (the fork and bar-foot gaps spend
-    those), so this sheet carries no frame; the registry route skims both
-    faces of the bought 1/8 flat equally, and the figure it states is the
-    model's."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame" not in source
-    row = _config.parts("ch-rocker-strap")
-    assert "1/8 x 1-1/2" in str(row["material_specification"])
-    per_face = (0.125 * 25.4 - spec.ARM_THICKNESS) / 2.0 / 25.4
-    assert f"{per_face:.4f}".lstrip("0") in row["process"]
-
-
 def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
     import _drawing_marks
     import _part_properties

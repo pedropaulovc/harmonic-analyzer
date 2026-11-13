@@ -19,11 +19,4 @@ ch-rocker-strap:
   quantity: 20
   tolerance_class: machined_block
   drawing_unit: in
-  # #2340: the strap needs no flatness control of its own. Its .098 +/-.001
-  # thickness (whose MMC envelope bounds its bow) sets the fork's side
-  # clearance, and once joined MHA-CH-06's owner-accepted strap position zone
-  # (.004 to its hub face, RV-05) holds the mid-plane the bar-foot and
-  # neighbouring-fork gaps spend (ch_channel_assembly_spec bar_gap_budget,
-  # sh_vn_pivot_pin_rod_spec joint_budget). The route keeps the bought flat
-  # (#2173) and skims both faces equally instead of one.
-  process: "1018 cold-finish flat 1/8 x 1-1/2 in (OnlineMetals 4807, #2173), both faces skimmed equally to the finished thickness, about .0135 off each, on the full-width blank before the outline is cut: rough the two faces in turns, release the blank and reseat it, then take the finish passes on both faces; hub hole reamed; outline milled; MHA-CH-12 pressed in, then finished on MHA-CH-06. A strap that leaves its thickness band, or after joining MHA-CH-06's strap position zone, is set straight by hand on the surface plate and rechecked, or exchanged"
+  process: "1018 cold-finish flat 1/8 x 1-1/2 in (OnlineMetals 4807) milled to the finished thickness; hub hole reamed; outline milled; MHA-CH-12 pressed in, then finished on MHA-CH-06"
