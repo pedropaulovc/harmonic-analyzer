@@ -43,10 +43,12 @@ UNIT = drawing_unit("parts/dt-cone-tip-block", _config.parts("dt-cone-tip-block"
 # the bands exported here).
 # U24b (2026-09-23): the adjuster thread's side walls keep the wall target at
 # the printed width and passage-centre bands.
-# r3 (user ruling, Main option (a), 2026-09-25): the narrowest width whose
-# lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
-# PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
-BLOCK_X = 17.018  # .67 plan width across the shaft
+# r3 (user ruling, Main option (a), 2026-09-25): a width whose lower limit
+# keeps the 5/8 pinch screw (McMaster 91794A112) PINCH_SCREW_RECESS_MM short
+# of the -X face (asserted with the screw below).  #2697: .68, .01 over the
+# narrowest such width, so its half (PassageCenter .34) and the tap's .30
+# stand on the .01 grid and print .XX.
+BLOCK_X = 17.272  # .68 plan width across the shaft
 # Plan depth along the shaft: cone_tip_cluster's BLOCK_DEPTH_MM, deep enough
 # for the 1/4-28 end screw's full thread past both mouth countersinks at the
 # printed limits: 1.5 D, or 1.48 D (END_SCREW_ENGAGEMENT_MIN_MM) at the .XX
@@ -69,15 +71,20 @@ BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 # head clear at every limit of the tip's axial stack
 # (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM); the shallow
 # side's 1.39D engagement there is an owner exception (ruling 2026-11-09,
-# dt-drive-train DT-07).  The realized
-# south face stands TIP_BLOCK_GAP_MM (.26747) north of the layout T006 north
+# dt-drive-train DT-07).  #2697: .730, .008 north of that ruling's station,
+# by the same two criteria.  The post's 19/64 mounting holes give its turn
+# room to line the tip up, and the same clearance lets the pushed post carry
+# the shaft further north (build_dt_drive_train_assembly books it one-sided);
+# the block follows so the shallow side keeps the ruling's 1.39D and the deep
+# side gains reach (0.27 mm to the head, 0.03 before).  The realized
+# south face stands TIP_BLOCK_GAP_MM (.27547) north of the layout T006 north
 # face.  Every consumer reads the block's stations from here.
-TIP_BLOCK_PIVOT_OFFSET = 18.7452  # .738
+TIP_BLOCK_PIVOT_OFFSET = 18.542  # .730
 TIP_BLOCK_STATION = PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET
 TIP_BLOCK_NORTH_FACE = TIP_BLOCK_STATION + BLOCK_Z / 2.0
 TIP_BLOCK_SOUTH_FACE = TIP_BLOCK_STATION - BLOCK_Z / 2.0
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_NORTH_FACE  # .523
-TIP_BLOCK_GAP_MM = TIP_BLOCK_SOUTH_FACE - T006_NORTH_FACE  # .26747
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_NORTH_FACE  # .515
+TIP_BLOCK_GAP_MM = TIP_BLOCK_SOUTH_FACE - T006_NORTH_FACE  # .27547
 
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
@@ -116,7 +123,10 @@ BLOCK_HEIGHT_PLACES = 2
 # (build_dt_drive_train_assembly's vertical take-up) reads this band.
 AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
-PASSAGE_CENTER_PLACES = 3
+# .XX (#2697): turning the post on its 19/64 holes takes up the tip's whole
+# lateral error with room to spare (build_dt_drive_train_assembly's
+# TIP_LATERAL_CAPACITY_MM).
+PASSAGE_CENTER_PLACES = 2
 # The pinch hole stands .22 from the north face, on the .01 grid at .XX
 # (machinist review of PR 2's farm proof, rule 3: no function needs the
 # .XXX its old half-depth station .215 printed), .005 south of the block's
@@ -599,12 +609,13 @@ FOOT_BORE_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": FOOT_THREAD_DEPTH},
 )
 FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
-# The tap's two stations, each .XXX on the title block's band: across the
-# block from the -X face (the PassageCenter datum), and along the axis from
-# the NORTH face, the face the pivot screw's head gap is measured to
-# (build_dt_drive_train_assembly's embed and lateral stacks read this band:
-# at .XX the across station fails the post's lateral take-up and the along
-# station the end screw's reach and 1.39 D engagement).  The tap sits
+# The tap's two stations: across the block from the -X face (the
+# PassageCenter datum), .XX, and along the axis from the NORTH face, the
+# face the pivot screw's head gap is measured to, .XXX
+# (build_dt_drive_train_assembly's embed stack reads the along band: at .XX
+# it passes the 5/8 end screw's reach and drops its engagement under the
+# owner's 1.39 D; the across band rides the post's lateral take-up, which has
+# room at .XX, #2697).  The tap sits
 # FOOT_TAP_OFFSET_X off the adjuster axis, the
 # same offset as the platform's hold-down hole off the cone line
 # (dt_cone_swing_platform_spec.HOLDDOWN_LOCAL_X, which says why), so the block
@@ -613,11 +624,10 @@ FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 FOOT_TAP_OFFSET_X = -1.016  # -.04
 FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
 FOOT_TAP_Z = BLOCK_Z / 2.0
-FOOT_TAP_X_PLACES = 3
+FOOT_TAP_X_PLACES = 2
 FOOT_TAP_Z_PLACES = 3
-if FOOT_TAP_X_PLACES != FOOT_TAP_Z_PLACES:
-    raise AssertionError("the stacks read one band for both foot tap stations")
-FOOT_TAP_STATION_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)
+FOOT_TAP_X_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)
+FOOT_TAP_Z_TOL_MM = printed_band_mm(FOOT_TAP_Z_PLACES)
 _tap_r = _HOLDDOWN_MAJOR_MM / 2.0
 _tap_drill_top_max = (
     FOOT_DEPTH
@@ -625,10 +635,10 @@ _tap_drill_top_max = (
     + (FOOT_BORE_DIA / 2.0) / math.tan(math.radians(DRILL_POINT_ANGLE_DEG / 2.0))
 )
 WORST_FOOT_TAP_WEBS_MM = {
-    "-X side": FOOT_TAP_X - FOOT_TAP_STATION_TOL_MM - _tap_r,
-    "+X side": _width_limits[0] - (FOOT_TAP_X + FOOT_TAP_STATION_TOL_MM) - _tap_r,
-    "north face": FOOT_TAP_Z - FOOT_TAP_STATION_TOL_MM - _tap_r,
-    "south face": _depth_limits[0] - (FOOT_TAP_Z + FOOT_TAP_STATION_TOL_MM) - _tap_r,
+    "-X side": FOOT_TAP_X - FOOT_TAP_X_TOL_MM - _tap_r,
+    "+X side": _width_limits[0] - (FOOT_TAP_X + FOOT_TAP_X_TOL_MM) - _tap_r,
+    "north face": FOOT_TAP_Z - FOOT_TAP_Z_TOL_MM - _tap_r,
+    "south face": _depth_limits[0] - (FOOT_TAP_Z + FOOT_TAP_Z_TOL_MM) - _tap_r,
     "adjuster thread": (
         _axis_limits[0] - ADJUSTER_ROOT_REF_DIA / 2.0 - _tap_drill_top_max
     ),
@@ -741,13 +751,13 @@ _dowel_top_max = DOWEL_HOLE_DEPTH_LIMITS[1] + _dowel_r / math.tan(
 )
 WORST_DOWEL_WEBS_MM = {
     "+X face": _width_limits[0]
-    - (FOOT_TAP_X + FOOT_TAP_STATION_TOL_MM)
+    - (FOOT_TAP_X + FOOT_TAP_X_TOL_MM)
     - (DOWEL_FROM_TAP + DOWEL_X_TOL_MM)
     - _dowel_r,
     "foot tap": DOWEL_FROM_TAP - DOWEL_X_TOL_MM - _tap_r - _dowel_r,
-    "north face": DOWEL_Z - FOOT_TAP_STATION_TOL_MM - DOWEL_Z_TOL_MM - _dowel_r,
+    "north face": DOWEL_Z - FOOT_TAP_Z_TOL_MM - DOWEL_Z_TOL_MM - _dowel_r,
     "south face": _depth_limits[0]
-    - (DOWEL_Z + FOOT_TAP_STATION_TOL_MM + DOWEL_Z_TOL_MM)
+    - (DOWEL_Z + FOOT_TAP_Z_TOL_MM + DOWEL_Z_TOL_MM)
     - _dowel_r,
     "adjuster thread": _axis_limits[0] - ADJUSTER_ROOT_REF_DIA / 2.0 - _dowel_top_max,
 }
@@ -795,13 +805,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # note 2), the slit width (the drill-to-slot point reaches past the far jaw's
 # tap drill at .X), the pinch-hole height (the top ligament closes at 1.92 at
 # .X if 46.95 prints 47.0) and the pinch hole's .22 station from the north
-# face.  .XXX, each with its function at its callout: the passage centre
-# .335 (ON MHA-DT-05 AXIS: the post's turn takes up the tip's lateral error
-# only at .XXX) and the tap's stations (SETS MHA-DT-39 REACH): .215 along
-# the axis, where .XX passes the end screw's reach and drops its engagement
-# under the owner's 1.39 D, and .295 across it, where .XX fails the same
-# lateral take-up.  build_dt_drive_train_assembly proves each looser grade
-# fails.  The dowel's station is a reference.
+# face, the passage centre .34 and the tap's .30 across the block (#2697:
+# the post's turn on its screws takes up the tip's lateral error with room).
+# .XXX, with its function at its callout: the tap's .215 along the axis
+# (SETS MHA-DT-39 REACH), where .XX passes the 5/8 end screw's reach and
+# drops its engagement under the owner's 1.39 D
+# (build_dt_drive_train_assembly proves the looser grade fails).  The
+# dowel's station is a reference.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},

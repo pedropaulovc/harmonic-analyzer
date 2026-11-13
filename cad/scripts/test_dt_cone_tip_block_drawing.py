@@ -777,7 +777,8 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     assert grades["BlockHt"] == 2
     assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
-    # Nothing prints .X: on the inch sheet its +/-.1 fails every web.
+    # Nothing prints .X: on the inch sheet its +/-.1 fails every web.  #2697:
+    # the bore's and the tap's stations across the block print .XX too.
     assert {name for name, places in grades.items() if places == 2} == {
         "Width",
         "Depth",
@@ -786,6 +787,8 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
         "PinchDepthCenter",
         "SlitW",
         "AxisHeight",
+        "PassageCenter",
+        "FootTapX",
     }
     # The pinch hole's station sits on the .01 grid (round-2 review of PR 2:
     # .215 printed a third place no function needed).
@@ -795,24 +798,17 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
     function is a tight band, and its dimension names the mate it serves.
-    The tap's two stations locate one hole, named on that hole's callout;
-    the bore's location names its mate on the bore's callout (rule 4: a
-    location carries its value only).  The locating dowel's station
-    (rule-23 retention, owner ruling 2026-11-07) prints as a reference with
-    no band (round 6, #9), so it holds nothing and names nothing."""
+    The tap's along-axis station is named on that hole's callout.  The
+    locating dowel's station (rule-23 retention, owner ruling 2026-11-07)
+    prints as a reference with no band (round 6, #9), so it holds nothing and
+    names nothing.  #2697: the bore's location and the tap's station across
+    the block print .XX."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
     assert "PassageCenter" not in texts
-    for name in ("FootTapX", "FootTapZ"):
-        texts[name] = drawing.FOOT_TAP_QUALIFIER
-    texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
+    texts["FootTapZ"] = drawing.FOOT_TAP_QUALIFIER
     three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {
-        "PassageCenter",
-        "FootTapX",
-        "FootTapZ",
-        "DowelX",
-    }
+    assert three_place == {"FootTapZ", "DowelX"}
     three_place.discard("DowelX")
     assert "DowelX" not in texts
     # The width's band is its own, one-sided; its reason still names the edge.
@@ -912,24 +908,24 @@ def _worst_far_wall_from_head() -> float:
 def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
     """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
     1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    2.25D at the printed worst case: the width's one-sided band tops out at
-    its nominal on the head's side under the -X datum, PassageCenter .XXX."""
+    over 2D at the printed worst case: the width's one-sided band tops out at
+    its nominal on the head's side under the -X datum, PassageCenter .XX."""
     spec = dt_cone_tip_block_spec
     engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
     assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(6.477)
+    assert engagement == pytest.approx(6.223)
 
 
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     """Regression pin (the 1/2 screw passed it too): at the width's lower
     limit the 5/8 screw's tip stays 0.25 inside the far face; the one-sided
-    band's lower limit leaves 0.635."""
+    band's lower limit leaves 0.889."""
     spec = dt_cone_tip_block_spec
     recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
-    assert recess == pytest.approx(0.635)
+    assert recess == pytest.approx(0.889)
 
 
 def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
@@ -1032,8 +1028,8 @@ _FOOT_TAP_MUTATIONS = {
         "FOOT_DEPTH = 8.6",
     ),
     "tap station band eats a web": (
-        "FOOT_TAP_STATION_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)",
-        "FOOT_TAP_STATION_TOL_MM = 4.0",
+        "FOOT_TAP_X_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)",
+        "FOOT_TAP_X_TOL_MM = 4.0",
     ),
 }
 
@@ -1262,7 +1258,7 @@ def test_build_models_the_dowel_ream_on_a_named_axis() -> None:
     assert 'drive_expression=\'"FootTapX" + "DowelFromTap"\'' in reference
     assert spec.DOWEL_X == pytest.approx(spec.FOOT_TAP_X + spec.DOWEL_FROM_TAP)
     assert spec.DOWEL_Z == spec.FOOT_TAP_Z
-    assert spec.DOWEL_X_PRINTED_TEXT == "(.523)"
+    assert spec.DOWEL_X_PRINTED_TEXT == "(.528)"
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "dimension_name(adapter, item) == \"DowelX\"" in drawing_source
     assert "set_reference_dimension(\n        adapter, dowel_station[0]" in drawing_source

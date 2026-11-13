@@ -322,7 +322,8 @@ SECTION_KEEP = {
 # pivot bore is too small to dimension at 1:2 beside the relief, so
 # DETAIL B enlarges the pivot-to-hole region of the hole-location plan and
 # carries HoldDownZ and HoldDownX.  C1 keyed (owner decision 2026-11-09, PR
-# #1992) moved the hole .329 south with MHA-DT-21, to .738 from the pivot:
+# #1992) moved the hole .329 south with MHA-DT-21, to .738 from the pivot
+# (.730 since #2697, 0.2 mm north: 0.3 mm on this detail's sheet):
 # the circle grew from 12 to 16 mm and the detail went from 2:1 to 3:2, so
 # its sheet circle stays the 48 mm one the layout below was measured around,
 # and its centre moved so the hole stands where it did on the sheet (8.77 mm

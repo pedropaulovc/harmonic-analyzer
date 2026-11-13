@@ -265,17 +265,18 @@ ROUND_OUT = 0.0001
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
 # The bore's function, named at its callout (screen review dt-fab-4: the
-# location carries its value only, rule 4).  Its .XXX location from the -X
-# face holds the end screw, and with it T006's pivot, in line with the line
-# MHA-DT-05's journal points the shaft along: the post's turn on its screws
-# takes up the tip's lateral error (build_dt_drive_train_assembly
-# TIP_LATERAL_ERROR_MM 6.50 against TIP_LATERAL_CAPACITY_MM 6.63) only with
-# PassageCenter at .XXX, since .335 is off the .01 grid and the nearest .XX
-# nominal's band reaches 6.75.  Its height is made to the same axis (note 2).
+# location carries its value only, rule 4).  Its location from the -X face
+# holds the end screw, and with it T006's pivot, in line with the line
+# MHA-DT-05's journal points the shaft along; the post's turn on its screws
+# takes up the rest.  #2697: the location prints .34 at .XX (the post's
+# 19/64 holes leave that turn 2.8 mm past the tip's print-worst lateral
+# error, build_dt_drive_train_assembly TIP_LATERAL_ERROR_MM 6.76 against
+# TIP_LATERAL_CAPACITY_MM 9.59), so the flag states the bore's function, no
+# longer a tight band's reason.  Its height is made to the same axis (note 2).
 # Machinist review of PR 2's farm proof (rounds 1 and 2) read "LOCATES
 # MHA-DT-37 PIVOT" as a mate with no function; the v49 release review
-# (3 of 3 runs) read "ON MHA-DT-05 AXIS" as the height alone and the .335 as
-# a bare centring, so the reason names the side-to-side alignment it holds.
+# (3 of 3 runs) read "ON MHA-DT-05 AXIS" as the height alone, so the flag
+# names the side-to-side alignment.
 BORE_FLAG_TEXT = f"IN LINE WITH {POST_NUMBER}"
 # The flag's ink from its upper-left corner: run 20261110T001845485Z printed
 # "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; BORE_FLAG_TEXT's
@@ -659,17 +660,14 @@ PINCH_THREAD_CALLOUT_XY = (
 # point, 7.8 mm over it to the shoulder 8.35 under it, and the last line's
 # twenty glyphs print 57.6 mm wide.  The tap's .215 from the north face sets
 # where that face, and so the end screw's head, stands over MHA-DT-20's
-# hold-down hole: at .XX the end screw's embed (build_dt_drive_train_assembly
-# END_SCREW_EMBED_WORST_MM) reaches 14.961 past its 14.863 reach, so the
-# station stays .XXX (rule 4; machinist review of PR 2's farm proof, round 2,
-# found no function on it).  Its .295 across the block sets the same screw's
-# line with PassageCenter (the post's lateral take-up, BORE_FLAG_TEXT).  The
-# v49 release review (3 of 3 runs) read "SETS MHA-DT-39 REACH" as the .295's
-# reason alone, so the one reason names both: the screw's reach (along) and
-# line (across).  The longer line grows the block; the point slides right half
-# the growth so the shoulder's left end, where the leader leaves, keeps its
-# place (the pinch thread callout's round-8 rule).
-FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH AND LINE"
+# hold-down hole: at .XX the 5/8 end screw's shallow engagement
+# (build_dt_drive_train_assembly END_SCREW_EMBED_WORST_MM) drops under the
+# owner's 1.39 D, so the station stays .XXX with its reason (rule 4; machinist
+# review of PR 2's farm proof, round 2, found no function on it).  #2697: its
+# station across the block prints .30 at .XX and needs no reason, so the one
+# reason is the .XXX station's alone (the v49 release review, 3 of 3 runs,
+# read it as the across station's when both were .XXX).
+FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
 _FOOT_TAP_GLYPH = 0.0576 / 20.0
 _FOOT_TAP_GROWTH = (len(FOOT_TAP_QUALIFIER) - 20) * _FOOT_TAP_GLYPH
 FOOT_TAP_CALLOUT_EXTENT = (

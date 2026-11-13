@@ -124,7 +124,13 @@ CONE_BOSS_LENGTH = 42.011
 # purchased-stock spec owns the actual head envelope, stock-length,
 # cut-to-fit and engagement guards.  Raising the casting also raises that
 # floor, so the former 3-1/2-inch stock is no longer long enough.
-ATTACHMENT_THRU_DIA = 7.14248
+# #2697: 19/64, 3/64 over the 1/4 screw.  MHA-DT-00 turns the post on these
+# screws until the MHA-DT-37 pivot runs free in MHA-DT-39; at 9/32 that turn
+# covered the tip's print-worst lateral error with 0.13 mm to spare
+# (build_dt_drive_train_assembly's TIP_LATERAL_CAPACITY_MM), which held three
+# MHA-DT-21 stations at .XXX.  The fillister head still seats all round the
+# hole ("counterbore floor annulus" below).
+ATTACHMENT_THRU_DIA = 7.540625  # 19/64
 ATTACHMENT_CBORE_DIA = 11.5062  # .453
 ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 # The mounting counterbores' Hole Wizard callout prints its diameters at
@@ -196,8 +202,9 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
-# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011).
-HARVESTED_VOLUME_MM3 = 111_752.8114 + math.pi * (
+# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011), with the 19/64
+# through drills of #2697 (111 752.8114 at 9/32).
+HARVESTED_VOLUME_MM3 = 111_018.3626 + math.pi * (
     (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
