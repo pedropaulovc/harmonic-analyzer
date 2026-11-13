@@ -127,21 +127,42 @@ for _value, _places in (
         raise AssertionError(f"{_value} mm is off its printed grid")
 
 # Sheet words: the bore is a plain drilled hole (the title block's DRILLED
-# HOLES row), through; each member's sheet names the gears it backs.
+# HOLES row), through. One Number, three members (the base bar's form, no
+# new part numbers): each member's sheet names its member as the kit's parts
+# list calls it up (its Description of the one Number) with its quantity,
+# then the gears it backs, each by its own drawing number (rule 4).
 BORE_CALLOUT = "THRU"
 STOCK_CALLOUT = "STOCK OK"
 SHEET_NAMES: tuple[str, ...] = tuple(f"COLLAR {name}" for name in CONFIGURATIONS)
+QUANTITY_BY_CONFIGURATION: dict[str, int] = {
+    name: int(quantity) for name, quantity in _ROW["configuration_quantities"].items()
+}
+_GEAR_NUMBERS = {blank.tag: blank.number for blank in arbor.KEYED_GEARS}
+# The arbor shares this part's MHA-DT-03 parent: its short form (rule 4).
+ARBOR_SHORT = arbor.PART_NUMBER.removeprefix(
+    PART_NUMBER[: PART_NUMBER.index("-TL-") + 1]
+)
+if ARBOR_SHORT == arbor.PART_NUMBER or not ARBOR_SHORT.startswith("TL-"):
+    raise AssertionError("the arbor no longer shares the collar's parent number")
+
+
+def member_label(configuration: str) -> str:
+    """The member this sheet draws, as the kit's parts list names it."""
+    return (
+        f"{CONFIGURATION_DESCRIPTIONS[configuration]} OF {PART_NUMBER}, "
+        f"QTY {QUANTITY_BY_CONFIGURATION[configuration]}"
+    )
 
 
 def member_note(configuration: str) -> str:
-    """The member's one note line: which blanks it backs."""
+    """The member's label over its one note: which blanks it backs."""
     tags = GEARS_BY_CONFIGURATION[configuration]
-    cones = [int(t[1:]) for t in tags if t.startswith("T")]
-    crank = [t for t in tags if not t.startswith("T")]
-    parts = [f"MHA-DT-03 {cones[0]}T-{cones[-1]}T"]
+    cones = [_GEAR_NUMBERS[t] for t in tags if t.startswith("T")]
+    crank = [_GEAR_NUMBERS[t] for t in tags if not t.startswith("T")]
+    backed = f"{cones[0]} TO {cones[-1]}" if len(cones) > 1 else cones[0]
     if crank:
-        parts.append(f"MHA-DT-07 ({crank[0]})")
-    return f"1. BACKS {' AND '.join(parts)} ON MHA-DT-03-TL-03."
+        backed += f" AND {crank[0]}"
+    return f"{member_label(configuration)}\n1. BACKS {backed} ON {ARBOR_SHORT}."
 
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

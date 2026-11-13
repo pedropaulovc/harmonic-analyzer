@@ -82,9 +82,11 @@ BALLOON_MARGIN = 0.012
 SETTING_DROP = {spec.STANDOFF_DIMENSION: 0.022, spec.SEAT_DIMENSION: 0.034}
 
 BOM_COMPONENTS = spec.BOM_ORDER
+# Each collar member's family (``<stem>--<member>``) is itself a leaf
+# identity of its one occurrence (``_drawing_balloons._component_leaf``), so
+# the default anchor finds it; an ``@<member>:1`` pin is a semantic reference
+# selector, which only roles registered in ``_component_references`` resolve.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
-for _family, (_stem, _member) in spec.MEMBER_IDENTITIES.items():
-    BALLOON_ANCHORS[_family] = BalloonAnchor(instance=f"@{_member}:1")
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 

@@ -63,8 +63,6 @@ if PART_NAME != spec.PART_NAME:
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 UNIT = spec.UNIT
 
-KEYSEAT_LENGTH_EXPRESSION = '"SeatLength" - "KeyseatEndSet"'
-
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters
@@ -191,8 +189,10 @@ async def _add_section(
     end: float,
 ) -> float:
     """One turned section: the grip on the Front Plane extruded +Z; every
-    other on its own end plane extruded back to its origin (the standoff's
-    end plane is the shoulder). Returns the running volume."""
+    other on its own end plane extruded back toward the grip's end face (the
+    standoff's end plane is the shoulder; the thread stops at the relief), so
+    each length on the sheet is a depth from that one face. Returns the
+    running volume."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     dia_name, length_name = spec.SECTION_DIMENSIONS[section]
@@ -205,25 +205,17 @@ async def _add_section(
         reverse = True
     else:
         plane = spec.end_plane(section)
-        offset = end - spec.SHOULDER_Z
         check(
             f"create_plane {plane}",
             await adapter.create_plane(
                 CreatePlaneParameters(
-                    mode="offset", base_plane=spec.SHOULDER_PLANE, offset=offset
+                    mode="offset", base_plane="Front Plane", offset=end
                 )
             ),
         )
         name_last_feature(adapter, plane)
         (station,) = name_dimensions(adapter, plane, [f"{section}Station"])
-        drive_jobs.append(
-            (
-                station,
-                spec.ARBOR_END_EXPRESSION
-                if section == "Thread"
-                else f'"{length_name}"',
-            )
-        )
+        drive_jobs.append((station, spec.END_STATION_DRIVES[section]))
         reverse = True
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane))
@@ -250,7 +242,7 @@ async def _add_section(
     )
     name_last_feature(adapter, section)
     (depth,) = name_dimensions(adapter, section, [length_name])
-    drive_jobs.append((depth, f'"{length_name}"'))
+    drive_jobs.append((depth, spec.LENGTH_DRIVES[length_name]))
     # Each section runs from its end back over the larger sections before it,
     # so the running volume is the union of those built; an extrude the wrong
     # way lands off the arbor and fails it.
@@ -523,7 +515,7 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     )
     name_last_feature(adapter, spec.KEYSEAT_FEATURE)
     (length,) = name_dimensions(adapter, spec.KEYSEAT_FEATURE, ["KeyseatLength"])
-    drive_jobs.append((length, KEYSEAT_LENGTH_EXPRESSION))
+    drive_jobs.append((length, spec.KEYSEAT_LENGTH_EXPRESSION))
     return spec.KEYSEAT_VOLUME
 
 
@@ -537,7 +529,7 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     floor. The sketch locates the centre FROM THE SHOULDER, as the sheet
     does: a construction line standing on the shoulder face from the axis to
     the seat's round on -Y (``KeyseatShoulderFace`` from the origin, driven by
-    the grip and standoff knobs; ``KeyseatShoulderRise`` = ``SeatDia``/2), and
+    the shoulder's station; ``KeyseatShoulderRise`` = ``SeatDia``/2), and
     the centre ``KeyseatEndSet`` along the arbor from the line's outer end.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters

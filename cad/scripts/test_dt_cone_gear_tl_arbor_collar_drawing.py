@@ -86,13 +86,25 @@ def test_member_volumes_and_dimensions_are_the_disc_and_bore() -> None:
     assert len(features) == len(set(features))
 
 
-def test_each_member_sheet_names_only_its_own_gears() -> None:
+def test_each_member_sheet_names_its_member_and_only_its_own_gears() -> None:
     assert tuple(drawing.MEMBER_SHEETS.values()) == spec.CONFIGURATIONS
     assert len(set(spec.SHEET_NAMES)) == len(spec.SHEET_NAMES)
     notes = {name: spec.member_note(name) for name in spec.CONFIGURATIONS}
+    labels = set()
     for name, note in notes.items():
-        assert len(note.splitlines()) == 1
-        assert arbor.PART_NUMBER in note
+        label, note_1 = note.splitlines()
+        assert label == (
+            f"{spec.CONFIGURATION_DESCRIPTIONS[name]} OF {spec.PART_NUMBER}, "
+            f"QTY {spec.QUANTITY_BY_CONFIGURATION[name]}"
+        )
+        labels.add(label)
+        assert note_1.startswith("1. BACKS MHA-DT-03-T")
+        assert note_1.endswith(f" ON {spec.ARBOR_SHORT}.")
+        assert arbor.PART_NUMBER.endswith(spec.ARBOR_SHORT)
+        numbers = {blank.tag: blank.number for blank in arbor.KEYED_GEARS}
+        backed = [t for t in spec.GEARS_BY_CONFIGURATION[name] if t.startswith("T")]
+        assert numbers[backed[0]] in note_1 and numbers[backed[-1]] in note_1
+    assert len(labels) == len(spec.CONFIGURATIONS)
     crank_tag = arbor.KEYED_GEARS[-1].tag
     holders = [
         n for n, tags in spec.GEARS_BY_CONFIGURATION.items() if crank_tag in tags
@@ -108,6 +120,17 @@ def test_the_largest_member_fits_the_sheet_at_its_scale() -> None:
     assert drawing.END_CENTER[0] + half + drawing.BORE_RUN < drawing.SIDE_CENTER[0]
     assert drawing.END_CENTER[1] + half + drawing.OD_RISE < 0.2667
     assert drawing.END_CENTER[0] - half > 0.0127
+
+
+def test_the_isometric_and_its_label_stand_clear_of_the_title_block() -> None:
+    """Title block top 0.066 m; the 1:1 isometric of the largest disc stands
+    above its label, which stands above the title block."""
+    title_top = 0.066
+    largest = max(spec.OD_BY_CONFIGURATION.values()) / 1000.0
+    assert drawing.ISO_NOTE_XY[1] - 0.005 > title_top
+    assert drawing.ISO_CENTER[1] - largest / 2.0 * 1.25 > drawing.ISO_NOTE_XY[1]
+    side_right = drawing.SIDE_CENTER[0] + spec.LENGTH * drawing.VIEW_SCALE[0] / 2000.0
+    assert drawing.ISO_CENTER[0] - largest / 2.0 * 1.25 > side_right
 
 
 def test_each_disc_is_authored_alone_in_its_own_member(monkeypatch) -> None:
