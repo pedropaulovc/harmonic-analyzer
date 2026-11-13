@@ -666,8 +666,10 @@ PINCH_THREAD_CALLOUT_XY = (
 # review of PR 2's farm proof, round 2, found no function on it).  #2697: its
 # station across the block prints .30 at .XX and needs no reason, so the one
 # reason is the .XXX station's alone (the v49 release review, 3 of 3 runs,
-# read it as the across station's when both were .XXX).
-FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
+# read it as the across station's when both were .XXX).  Machinist review of
+# 017b38ec2 (3 of 3 runs) read "SETS MHA-DT-39 REACH" as no rule-3 function
+# for the .215, so the reason takes rule 3's form: what the station holds.
+FOOT_TAP_QUALIFIER = "HOLDS MHA-DT-39 ENGAGEMENT"
 _FOOT_TAP_GLYPH = 0.0576 / 20.0
 _FOOT_TAP_GROWTH = (len(FOOT_TAP_QUALIFIER) - 20) * _FOOT_TAP_GLYPH
 FOOT_TAP_CALLOUT_EXTENT = (
