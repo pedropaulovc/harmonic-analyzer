@@ -47,7 +47,6 @@ from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import (
     add_native_hole_callout,
-    compose_hole_callout_prefix,
     set_hole_callout_precision,
 )
 from _drawing_leaders import set_near_side_diameter
@@ -132,15 +131,19 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # y 238) laid the leader across the plan at y ~229 and through the tap's
 # end-on circle, where it crossed the tap callout's leader at (99.7, 229.3)
 # mm (leader-crosses-leader, farm run r8, HEAD c126e34b). Native hangs the
-# leader's shoulder under the LAST row, so the rows widen downward: DRILL
-# alone on top (MR-fleet r7), the two sizes, then the two mate rows
-# (FOOT_HOLE_MATE, widest last). The leader then climbs left of every row
-# above the bottom one: with the 21-character bottom row (~54 mm at 2.57 mm a
-# character) centred at x 131 the shoulder ends at x ~104, ~12 mm short of
-# the rim, which clears each upper row's left end by ~2 mm or more. Five
-# rows (~5.5 mm pitch) centred at y 199 put the top row under the plan's
-# bottom edge (y 214) and the shoulder (y ~187) over the crown radius's rows.
-FOOT_HOLE_CALLOUT_XY = (0.131, 0.199)
+# leader's shoulder under the LAST row. Rule 26 (machinist review, #2338
+# farm run 20261113T004704480Z): size first, then process, then extent, so
+# the through row reads "Ø .094 DRILL THRU" (FOOT_HOLE_THRU_ROW), then the
+# counterbore, then the two mate rows (FOOT_HOLE_MATE, widest last); four
+# rows, inside the 4-row block limit. The 17-character top row is wider than
+# the counterbore row under it, so the block stands right of where the
+# 5-row DRILL-on-top block stood: centred at x 138 the shoulder ends at x
+# ~108, ~9 mm short of the rim, and the leader clears the top row's left end
+# by ~2 mm (~4 mm at the printed 2.57 mm a character); the right end (x
+# ~165) stands ~4 mm over the crown radius's rows and ~11 mm left of the
+# .275 station's line. Centred at y 199 the top row stays under the plan's
+# bottom edge (y 214).
+FOOT_HOLE_CALLOUT_XY = (0.138, 0.199)
 # The crown tap stops at the bore (MR-fleet r2, 0eca37c). The native sizes
 # lead and say where they stop (both "<hw-thru>" extents read TO BORE; the
 # thread class is the title block's), and the mate closes the thread's own
@@ -158,8 +161,10 @@ FOOT_HOLE_CALLOUT_XY = (0.131, 0.199)
 SET_SCREW_EXTENT = "TO BORE"
 SET_SCREW_CALLOUT_XY = (0.069, 0.196)
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
-# The foot hole's process, on its own row above the native through row.
-FOOT_HOLE_PROCESS = "DRILL\n"
+# The foot hole's process, after its size in the through row (rules 12 and
+# 26): the native "<hw-thru>" extent becomes FOOT_HOLE_THRU.
+FOOT_HOLE_PROCESS = "DRILL"
+FOOT_HOLE_THRU = f"{FOOT_HOLE_PROCESS} THRU"
 # The crown tap's native drill size prints .XXX.
 SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 # The bore names the process and the shaft it slides on, the crown its full
@@ -441,17 +446,15 @@ def _set_tap_callout_text(display: Any) -> None:
 
 
 def foot_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Put FOOT_HOLE_PROCESS on its own row above the native THRU row and
-    FOOT_HOLE_MATE under the counterbore row.
+    """Write the native THRU row's extent as FOOT_HOLE_THRU (size, DRILL,
+    THRU) and put FOOT_HOLE_MATE under the counterbore row.
 
     A counterbored callout prints its through row from the CalloutAbove
     part (7), the counterbore row from the Prefix part (5) and closes with
     the CalloutBelow part (8), so ``add_native_hole_callout(process=...)``,
     which writes the Prefix, put DRILL ahead of the counterbore (MR-fleet r7,
-    cc1a81a: "DRILL ⌴Ø3.80", and a leader-through-own-text on the widened
-    row). On its own row the word stays narrower than the rows under it,
-    which the leader climbs past (FOOT_HOLE_CALLOUT_XY). The mate rows follow
-    the sizes (rule 7).
+    cc1a81a: "DRILL ⌴Ø3.80"); the process belongs in the through row, after
+    its size (rule 26). The mate rows follow the sizes (rule 7).
     """
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected foot-hole callout parts: {definitions!r}")
@@ -459,10 +462,12 @@ def foot_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]
     if len(thru_parts) != 1 or thru_parts[0] == 8:
         raise RuntimeError(f"foot-hole THRU row is not in one part: {definitions!r}")
     part = thru_parts[0]
+    if definitions[part].count("<hw-thru>") != 1:
+        raise RuntimeError(f"foot-hole THRU row has no single native extent: {definitions!r}")
     below = definitions[8].rstrip()
     return {
         **definitions,
-        part: compose_hole_callout_prefix(FOOT_HOLE_PROCESS, definitions[part]),
+        part: definitions[part].replace("<hw-thru>", FOOT_HOLE_THRU),
         8: f"{below}\n{FOOT_HOLE_MATE}" if below else FOOT_HOLE_MATE,
     }
 
@@ -481,7 +486,7 @@ def _set_foot_hole_process(display: Any) -> None:
     first = resolved[3] or resolved[1]
     if (
         persisted != updated
-        or not first.startswith(FOOT_HOLE_PROCESS)
+        or FOOT_HOLE_THRU not in first
         or not resolved[4].rstrip().endswith(FOOT_HOLE_MATE)
     ):
         raise RuntimeError(

@@ -451,9 +451,9 @@ def test_foot_hole_leader_routes_clear_of_the_crown_tap() -> None:
     # Farm run r8 (HEAD c126e34b): with its text left of the plan, the
     # foot-hole callout's leader ran across the plan at y ~229 mm and through
     # the crown tap's end-on circle, crossing the tap callout's leader at
-    # (99.7, 229.3) mm (leader-crosses-leader).  The leaders are r8's printed
-    # ones; r8 printed the text end 5.6 mm under its position (238 -> 232.4)
-    # and the tip on the counterbore rim toward it.
+    # (99.7, 229.3) mm (leader-crosses-leader).  The tap leader is r8's
+    # printed one; the foot-hole leader runs from the shoulder under its last
+    # row to the counterbore rim facing it (_foot_hole_leader).
     from _layout_audit import _segment_crossing
     from _layout_geometry import (
         Segment,
@@ -464,15 +464,10 @@ def test_foot_hole_leader_routes_clear_of_the_crown_tap() -> None:
     spec = ch_fulcrum_keeper_spec
     tap_leader = Segment(0.0997, 0.2295, 0.0993, 0.2265)
     assert _segment_crossing(Segment(0.1122, 0.2283, 0.0624, 0.2324), tap_leader)
-    x, y = drawing.FOOT_HOLE_CALLOUT_XY
-    end = (x, y - 0.0056)
-    cx, cy = drawing.HOLE_X_SHEET, drawing.TOP_CENTER[1]
-    reach = math.dist(end, (cx, cy))
-    tip = (
-        cx + drawing.CBORE_R_SHEET * (end[0] - cx) / reach,
-        cy + drawing.CBORE_R_SHEET * (end[1] - cy) / reach,
-    )
-    leader = Segment(*tip, *end)
+    x, _ = drawing.FOOT_HOLE_CALLOUT_XY
+    cy = drawing.TOP_CENTER[1]
+    leader = _foot_hole_leader()
+    tip = (leader.x1, leader.y1)
     assert _segment_crossing(leader, tap_leader) is None
     tap = (drawing.TAP_X_SHEET, cy, drawing.TAP_R_SHEET)
     assert segment_circle_distance(leader, tap) >= 0.003
@@ -648,11 +643,10 @@ def _tap_rows() -> list[str]:
 
 
 def _foot_hole_rows() -> list[str]:
-    """The foot-hole callout as printed: DRILL on its own row, the through
-    and counterbore rows, then the mate rows."""
+    """The foot-hole callout as printed: the through row (size, DRILL,
+    THRU), the counterbore row, then the mate rows."""
     return [
-        drawing.FOOT_HOLE_PROCESS.strip(),
-        "Ø .094 THRU ALL",
+        f"Ø .094 {drawing.FOOT_HOLE_THRU}",
         "⌴ Ø .150 ↧ .083",
         *ch_fulcrum_keeper_notes.FOOT_HOLE_MATE.splitlines(),
     ]
@@ -798,12 +792,14 @@ def _foot_hole_leader():
 
 
 def test_foot_hole_leader_climbs_left_of_its_own_upper_rows() -> None:
-    # The mate rows widen the block downward, so the shoulder under the last
-    # row stands left of every row above it and the leader clears them.
+    # Native hangs the shoulder under the last (widest) row; the leader from
+    # there to the counterbore rim clears every row above it. Rule 7 block
+    # limit: four rows.
     from _layout_geometry import Box, segment_box_distance
 
     rows = _foot_hole_rows()
-    assert [len(row) for row in rows] == sorted(len(row) for row in rows)
+    assert len(rows) <= 4
+    assert len(rows[-1]) == max(map(len, rows))
     block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, rows)
     leader = _foot_hole_leader()
     for index, row in enumerate(rows[:-1]):
@@ -824,11 +820,12 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     assert "tapped hole" not in ch_fulcrum_keeper_notes.DRAWING_NOTES.lower()
 
 
-def test_foot_hole_callout_says_drill_above_and_its_mates_below() -> None:
+def test_foot_hole_callout_says_size_drill_thru_and_its_mates_below() -> None:
     # MR-fleet r6 (rule 12): "Ø2.39 THRU ALL" left drill against ream unsaid.
     # r7 (cc1a81a): the Prefix part is the counterbore row, so DRILL printed
-    # ahead of the counterbore; it belongs on its own row over the THRU part.
-    # The mates close the callout from its CalloutBelow part.
+    # ahead of the counterbore. #2338 review (rule 26): size first, then
+    # process, then extent, in the THRU part. The mates close the callout from
+    # its CalloutBelow part.
     native = {
         5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
         6: "",
@@ -838,7 +835,7 @@ def test_foot_hole_callout_says_drill_above_and_its_mates_below() -> None:
     updated = drawing.foot_hole_callout_definitions(native)
     assert updated == {
         **native,
-        7: "DRILL\n<MOD-DIAM><hw-diam> <hw-thru>",
+        7: "<MOD-DIAM><hw-diam> DRILL THRU",
         8: ch_fulcrum_keeper_notes.FOOT_HOLE_MATE,
     }
     with pytest.raises(RuntimeError, match="THRU row"):
