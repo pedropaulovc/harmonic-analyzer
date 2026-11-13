@@ -7,7 +7,7 @@ export behavior lives in ``_drawing_common``.  Dimension import and curation
 live in ``_drawing_dimension_import``; places and bands are authored on the
 part.
 
-The pen hanger is a black tapered steel strap (11 gauge, .63 -> .48 wide,
+The pen hanger is a black tapered steel strap (1/8 flat, .63 -> .48 wide,
 6.69 tall; decimal-inch sheet) with two open U guide plates brazed across its
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
@@ -269,9 +269,9 @@ FRONT_KEEP = {
 # slot width's 10 mm span cannot hold its banded value and fit callout, so
 # its text is offset onto a leader, right of the section beyond every
 # extension line (SLOT_WIDTH_TEXT_XY).  On the left, the slot depth and,
-# outside it, the plate reach, both from the plate's free end (the plate is
-# cut as its own blank before brazing): shortest nearest, so the slot
-# bottom's extension line stops short of the reach's dimension line.  The
+# outside it, the plate reach, both from the plate's free end: shortest
+# nearest, so the slot bottom's extension line stops short of the reach's
+# dimension line.  The
 # strap stock thickness right of the strap end; the corner radius's text
 # up-right of the -x corner it is attached to, so its leader leaves the arc
 # outward through the arm and crosses no other ink.
@@ -324,7 +324,7 @@ SLOT_WIDTH_TEXT_XY = (
     _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
     SECTION_ROW_Y["SlotWidth"] - 0.004,
 )
-# The strap stock's offset text block ("(.1196)" over 11 GA SHEET, about
+# The strap stock's offset text block ("(.125)" over 1/8 CF FLAT, about
 # 30 x 8 mm, positioned by its centre): its two rows cannot sit in the 6 mm
 # span, so the block stands level with the strap, its left end 4 mm right of
 # the dimension line (8 mm right of the strap end), and the leader runs level

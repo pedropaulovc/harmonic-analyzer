@@ -34,9 +34,9 @@ def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
     assert spec.HANGER_POS[1] == pytest.approx(
         magnifier.WHEEL_BAR_Y + bar.BAR_TOP_ABOVE_ROW
     )
-    # The 11 gauge strap carries no thread: the screw passes its #8 clearance hole
+    # The 1/8 flat strap carries no thread: the screw passes its #8 clearance hole
     # into the nut and jam nut, which leave at least two full pitches beyond.
-    assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(0.1196 * 25.4)
+    assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(0.125 * 25.4)
     assert spec.SCREW_HOLE_SPEC.kind == "clearance"
     assert spec.SCREW_HOLE_DIA > spec.HANGER_SCREW_DIA
     assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pen.HANGER_THREAD_PITCH
@@ -85,19 +85,19 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     # Worst lean between the two slots' outer faces stays under 0.25 deg.
     span = spec.GUIDE_PITCH + spec.GUIDE_PLATE_T
     assert math.degrees(math.atan((wide - rod_min) / span)) < 0.25
-    # The plate is cut as its own blank before brazing: the sheet prints its
-    # reach and slot depth both .XX from its free end, its root seating on the
-    # strap front face a stock (reference) thickness off the bar seat that
-    # sets the rod line.  With both .XX bands and the thickest strap stock the
-    # slot bottom still stands behind the largest rod's back face, and the
-    # corner fillets' wall tangency behind it too with the radius at its
-    # printed MAX (drawing-guidelines.md rule 16, no tight band).
+    # The sheet prints the plate's reach and slot depth both .XX from its
+    # free end, its root seating on the strap front face a stock (reference)
+    # thickness off the bar seat that sets the rod line.  With both .XX bands
+    # and the thickest strap stock the slot bottom still stands behind the
+    # largest rod's back face, and the corner fillets' wall tangency behind it
+    # too with the radius at its printed MAX (drawing-guidelines.md rule 16,
+    # no tight band).
     back_face = spec.ROD_AXIS_Z + rod_max / 2.0
     assert spec.SLOT_DEPTH == pytest.approx(
         spec.PLATE_REACH + spec.STRAP_T - spec.SLOT_BOTTOM
     )
-    # 11 gauge sheet, .1130-.1256 in, about its .1196 decimal.
-    assert spec.STRAP_T_STOCK_BAND == pytest.approx((0.1524, -0.16764))
+    # 1/8 x 3/4 1018 cold-finish flat, +/-.003 in about its .125 decimal.
+    assert spec.STRAP_T_STOCK_BAND == pytest.approx((0.0762, -0.0762))
     thickest = spec.STRAP_T + spec.STRAP_T_STOCK_BAND[0]
     root_z = -thickest
     two = printed_band_mm(2, unit=spec.UNIT)
@@ -147,6 +147,21 @@ def test_both_slot_walls_keep_the_floor_at_the_printed_worst_case() -> None:
         -spec.GUIDE_PLATE_WIDTH / 2.0,
         spec.GUIDE_PLATE_WIDTH / 2.0,
     )
+
+
+def test_strap_and_plates_come_from_the_one_bought_flat_bar() -> None:
+    import _config
+
+    # #2436: the shop bought 1/8 x 3/4 1018 cold-finish flat for this part,
+    # so the strap and both plates are that bar's thickness, every blank lies
+    # across its width, and the sheet's stock references print its decimal.
+    assert spec.STRAP_T == spec.GUIDE_PLATE_T == pytest.approx(0.125 * 25.4)
+    widest = max(spec.STRAP_TOP_X[1] - spec.STRAP_TOP_X[0], spec.GUIDE_PLATE_WIDTH)
+    assert widest <= 0.75 * 25.4
+    assert spec.GUIDE_PLATE_T_STOCK_RANGE[0] >= WALL_TARGET_MM
+    places = spec.DRAWING_PRECISION_BY_NAME
+    assert places["StrapThick"] == places["PlateThick"] == 3
+    assert "1/8 x 3/4" in _config.parts("pn-pen-hanger")["material_specification"]
 
 
 def test_strap_foot_stays_above_the_platen() -> None:

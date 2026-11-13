@@ -1,7 +1,10 @@
 pn-pen-hanger:
   number: MHA-PN-02
-  material: 1008/1010/1018 steel sheet
-  material_specification: "1008/1010/1018 steel sheet"
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: AISI 1018 CF flat, 1/8 x 3/4 REF
+  # Stock: OnlineMetals 4804, 1/8 x 3/4 in 1018 cold-finish flat, 24 in,
+  # bought for this part in the 2026-11-03 machine stock order (#2436); the
+  # strap and both guide plates come from it.
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block

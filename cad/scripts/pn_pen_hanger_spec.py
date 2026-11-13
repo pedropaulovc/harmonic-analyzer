@@ -15,7 +15,7 @@ restated here.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each the exact decimal of the inch value it prints.
-Exempt from the grid: the strap and plate sheet-stock gauges (as supplied,
+Exempt from the grid: the strap and plate bar-stock thickness (as supplied,
 REF), the #8 hole (Hole Wizard), and the hole's station, which is the wheel
 bar's screw axis (``mg_wheel_bar_geom``) relative to the rod line: it keeps
 its value and prints rounded at the title block's .XX (.27, .20), the model
@@ -55,21 +55,27 @@ ROD_AXIS_Z = round(PEN_Z_MID - BAR_FRONT_Z, 6)  # local z of the rod line
 # as wide as the guide plates below (not the photo's narrower foot), so the
 # lower plate sits flush with both foot corners (note 1) and needs no lateral
 # dimension.
-# The strap is 11 gauge A366/1008 low-carbon sheet (.1196) as supplied: the
-# sheet prints its thickness as a reference over its gauge, so the stacks below
-# carry the gauge's commercial band instead of a title-block one (Online
-# Metals, Cold Roll Steel Tolerances,
-# https://www.onlinemetals.com/en/cold-roll-steel-tolerances, read 2026-10-31:
-# 11 gauge .1196, tolerance range .1130 to .1256).
-STRAP_T = 3.03784  # .1196, 11 GA
+# The strap and both guide plates come from one bar of 1/8 x 3/4 1018
+# cold-finish flat, the stock bought for this part (OnlineMetals 4804, the
+# 2026-11-03 machine stock order; #2436): the strap's .63 top and the plates'
+# .48 width lie across the bar's .75.  The sheet prints the bar's thickness as
+# a reference over its stock name, so the stacks below carry the bar's
+# commercial band instead of a title-block one (Online Metals, Cold Roll Steel
+# Tolerances, https://www.onlinemetals.com/en/cold-roll-steel-tolerances, read
+# 2026-11-13: 1018 cold-finish rectangle bar up to .75 wide, +/-.003, the
+# width's band governing the thickness too).
+FLAT_BAR_T = 3.175  # .125, 1/8
+FLAT_BAR_WIDTH = 19.05  # .75, 3/4
+FLAT_BAR_T_RANGE = (round((0.125 - 0.003) * 25.4, 6), round((0.125 + 0.003) * 25.4, 6))
+STRAP_T = FLAT_BAR_T
 STRAP_Z = (-STRAP_T, 0.0)
-STRAP_T_STOCK_RANGE = (round(0.1130 * 25.4, 6), round(0.1256 * 25.4, 6))
+STRAP_T_STOCK_RANGE = FLAT_BAR_T_RANGE
 STRAP_T_STOCK_BAND = (
     round(STRAP_T_STOCK_RANGE[1] - STRAP_T, 6),
     round(STRAP_T_STOCK_RANGE[0] - STRAP_T, 6),
-)  # (upper, lower) about the .1196 nominal: +.0060/-.0066
+)  # (upper, lower) about the .125 nominal: +/-.003
 if not (STRAP_T_STOCK_BAND[1] < 0.0 < STRAP_T_STOCK_BAND[0]):
-    raise AssertionError("the strap stock band no longer brackets its gauge")
+    raise AssertionError("the strap stock band no longer brackets its bar")
 STRAP_TOP_X = (-16.002, 0.0)  # .63 wide at the bar (low)
 STRAP_BOT_X = (-6.096, 6.096)  # .48 wide at the foot, centred on the rod (low)
 # 6.69 below the bar top: the strap stays flat on the bar plane, which the
@@ -92,15 +98,13 @@ if PLATEN_TOP_CLEARANCE < PLATEN_TOP_CLEARANCE_MIN:
         f"(< {PLATEN_TOP_CLEARANCE_MIN})"
     )
 
-# --- Two open U guide plates (12 gauge sheet), brazed across the strap front.
-# The plates are 12 gauge A366/1008 sheet (.1046, tolerance range .0986 to
-# .1106, the Online Metals page above) as supplied, printed as a reference.
-# Each plate is a web: its thinnest supplied sheet keeps rule 17's .080 target
-# (16 gauge's .0548 fell under the .060 floor; 14 gauge's .0697 under the target).
-GUIDE_PLATE_T = 2.65684  # .1046, 12 GA
-GUIDE_PLATE_T_STOCK_RANGE = (round(0.0986 * 25.4, 6), round(0.1106 * 25.4, 6))
+# --- Two open U guide plates, brazed across the strap front: plain blanks of
+# the strap's 1/8 flat (printed as a reference), slotted after brazing.
+# Each plate is a web: its thinnest supplied bar keeps rule 17's .080 target.
+GUIDE_PLATE_T = FLAT_BAR_T
+GUIDE_PLATE_T_STOCK_RANGE = FLAT_BAR_T_RANGE
 if not GUIDE_PLATE_T_STOCK_RANGE[0] < GUIDE_PLATE_T < GUIDE_PLATE_T_STOCK_RANGE[1]:
-    raise AssertionError("the guide plate stock band no longer brackets its gauge")
+    raise AssertionError("the guide plate stock band no longer brackets its bar")
 if GUIDE_PLATE_T_STOCK_RANGE[0] < WALL_TARGET_MM:
     raise AssertionError("the thinnest supplied guide plate is under the rule 17 target")
 # The upper plate's top face below the strap top (printed): the plates'
@@ -117,6 +121,8 @@ if not math.isclose(STRAP_BOT_X[1] - STRAP_BOT_X[0], GUIDE_PLATE_WIDTH):
     raise AssertionError(
         "the lower guide plate is no longer flush with both foot corners"
     )
+if max(STRAP_TOP_X[1] - STRAP_TOP_X[0], GUIDE_PLATE_WIDTH) > FLAT_BAR_WIDTH:
+    raise AssertionError("the strap or a guide plate no longer fits across the 3/4 bar")
 GUIDE_SPAN_Y = (
     round(HANGER_POS[1] + GUIDE_PLATE_YS[0], 6),
     round(HANGER_POS[1] + GUIDE_PLATE_YS[1] + GUIDE_PLATE_T, 6),
@@ -135,10 +141,14 @@ SLOT_WIDTH = 5.08  # .200
 # (GUIDE_TILT_MAX).
 SLOT_WIDTH_BAND = (0.0508, 0.0)
 # The plate's reach (strap front to plate front) and its slot depth, both
-# printed from the plate's free end, so the plate is cut as its own blank
-# before brazing.  Deep enough that the printed reach and slot depth and the
-# strap's stock band, with the corner radius at its printed MAX below, still
-# keep the rod's back corners off the slot-corner fillets (guarded below).
+# printed from the plate's free end.  The slots are cut after brazing, both in
+# one setup (note 2): with the strap's back face on the mill table the cutter
+# stands square to the strap and one feed along it slots both plates, so the
+# two slots are in line however the braze left the plates, and the .002 slot
+# band rides the mill's travel, not the joint.  Deep enough that the printed
+# reach and slot depth and the strap's stock band, with the corner radius at
+# its printed MAX below, still keep the rod's back corners off the
+# slot-corner fillets (guarded below).
 PLATE_REACH = 24.638  # .97
 SLOT_DEPTH = 10.668  # .42
 PLATE_FRONT_Z = round(STRAP_Z[0] - PLATE_REACH, 6)
@@ -203,7 +213,7 @@ if GUIDE_ARM_COVER_MIN <= 0.0:
 # Hole Wizard hole near the strap top, on the bar's screw axis, into the
 # MHA-PN-VN-54 hex nut on the strap front, the MHA-PN-VN-55 jam nut jammed against
 # it (rule 23: the jam nut locks the joint the pen rod's reversing friction
-# loads; rule 18: the nuts, not the .1196 strap, carry the thread).  The
+# loads; rule 18: the nuts, not the .125 strap, carry the thread).  The
 # Hole Wizard's ANSI-inch #8 close row is the #15 drill (.180) of
 # cad/config/tolerances/fastener_clearance.yaml. ---
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
@@ -264,7 +274,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # block's .XX, except the banded slot (+.002/0).  The hole station keeps the
 # bar's screw axis and prints it rounded at .XX, the model inside the band
 # (the wall below is judged about the printed value).  The stock references
-# print their gauge's four-place decimal.
+# print the bar's three-place decimal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "StrapTopRun": 2,
@@ -272,10 +282,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "StrapRise": 2,
         "StrapBotWidth": 2,
     },
-    "Strap": {"StrapThick": 4},
+    "Strap": {"StrapThick": 3},
     "ScrewHole": {"ScrewX": 2, "ScrewY": 2},
     "UpperGuide": {"UpperPlateDrop": 2},
-    "LowerGuide": {"PlateThick": 4},
+    "LowerGuide": {"PlateThick": 3},
     "UpperGuideProfile": {
         "SlotWidth": 3,
         "SlotDepth": 2,
@@ -359,11 +369,11 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
-    # The strap's and the plates' thickness is the sheet's as supplied, not a
-    # machined size: printed as a reference (parenthesised) with the gauge
+    # The strap's and the plates' thickness is the bar's as supplied, not a
+    # machined size: printed as a reference (parenthesised) with the stock
     # named under it.
-    "StrapThick": "11 GA SHEET",
-    "PlateThick": f"12 GA SHEET\nSEE NOTE {BRAZE_NOTE}",
+    "StrapThick": "1/8 CF FLAT",
+    "PlateThick": f"1/8 CF FLAT\nSEE NOTE {BRAZE_NOTE}",
 }
 # Model dimensions the sheet parenthesises as reference (the stock governs).
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
@@ -373,12 +383,16 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("UpperSlotCorner", "SlotCornerR"): "2X R",
 }
 
+# Note 2 is the slots' fit route (drawing-guidelines.md "What the shop
+# holds": two .002-band slots in line across a brazed joint are reached by
+# cutting both in one setup after brazing, not by placing pre-cut plates),
+# with the rod's free fall as its acceptance.
 DRAWING_NOTES = "\n".join(
     (
-        f"{BRAZE_NOTE}. TWO GUIDE PLATES ALIKE, BRAZED (BAg-7) TO STRAP FRONT;",
+        f"{BRAZE_NOTE}. TWO GUIDE PLATES BRAZED (BAg-7) TO STRAP FRONT;",
         "   LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS.",
-        f"{SLOTS_NOTE}. SLOTS IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES FREELY",
-        "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
+        f"{SLOTS_NOTE}. BOTH SLOTS CUT IN ONE SETUP AFTER BRAZING; PEN ROD",
+        f"   {PEN_ROD_NUMBER} SLIDES FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
 # The upper plate's lateral station is the lower plate's: both slots sit on
