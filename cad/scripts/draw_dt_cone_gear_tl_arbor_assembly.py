@@ -62,7 +62,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -166,7 +166,6 @@ EXPLODED_ORIGIN = (0.175, 0.200)  # item 1's grip end-face centre, sheet m
 EXPLODE_GAP = 25.0
 SPARE_DROP = 30.0
 SPARE_SPREAD = 42.0
-AXIS_OVERRUN = 3.0
 _EXPLODED_ITEM2_Z = arbor.ARBOR_END_Z + EXPLODE_GAP  # its near face
 _ITEM2_MID_Z = _EXPLODED_ITEM2_Z + collar.LENGTH / 2.0
 _EXPLODED_NUT_Z = _EXPLODED_ITEM2_Z + collar.LENGTH + EXPLODE_GAP
@@ -196,19 +195,13 @@ EXPLODED_VIEWS: dict[str, frozenset[str]] = {
 }
 if set().union(*EXPLODED_VIEWS.values()) != set(BOM_COMPONENTS):
     raise AssertionError("the exploded view shows every kit part once")
-# The arbor's axis through the stack, an owned centreline in item 1's view.
-EXPLODED_AXIS_MM = (
-    (0.0, 0.0, -AXIS_OVERRUN),
-    (0.0, 0.0, _EXPLODED_NUT_Z + nut.THICKNESS + AXIS_OVERRUN),
-)
 # Items 3 and 4 carry BOM balloons here, the one view each shows in; the
 # stack's items are ballooned on sheet 1 and labelled here by leader.
 EXPLODED_BALLOONED = SPARES
 EXPLODED_LABELS: dict[str, str] = {
     spec.ARBOR: f"ITEM {spec.BOM_ITEMS[spec.ARBOR]}",
     spec.KEY: (
-        f"ITEM {spec.BOM_ITEMS[spec.KEY]}, BONDED IN ITEM "
-        f"{spec.BOM_ITEMS[spec.ARBOR]}'S KEYSEAT"
+        f"ITEM {spec.BOM_ITEMS[spec.KEY]}, BONDED IN ITEM {spec.BOM_ITEMS[spec.ARBOR]}"
     ),
     KIT_COLLAR: f"ITEM {spec.BOM_ITEMS[KIT_COLLAR]}",
     spec.NUT: f"ITEM {spec.BOM_ITEMS[spec.NUT]}",
@@ -220,13 +213,21 @@ LABEL_TIPS_MM: dict[str, tuple[float, float, float]] = {
     KIT_COLLAR: (0.0, 0.6 * _R[KIT_COLLAR], spec.BLANK_FACE_Z + collar.LENGTH / 2.0),
     spec.NUT: (0.0, nut.ACROSS_FLATS / 4.0, spec.COLLAR_FAR_Z + nut.THICKNESS / 2.0),
 }
-# Each label's upper-left corner from its tip, sheet m: all above the stack,
-# item 5's highest, clear of the others' rows.
-LABEL_OFFSETS: dict[str, tuple[float, float]] = {
-    spec.ARBOR: (-0.008, 0.024),
-    spec.KEY: (-0.065, 0.044),
-    KIT_COLLAR: (-0.008, 0.022),
-    spec.NUT: (-0.008, 0.022),
+# Each label stands wholly to one side of its tip, LABEL_RUN clear, so its
+# leader leaves the text's near end and never starts on the text; (side, the
+# label's top over its tip, sheet m). All stand above the stack: item 5's
+# highest, over item 2's by more than the layout audit's row pitch, so the
+# two never read as one block (farm 20261113T090619426Z: 4.79 mm apart).
+# No owned centreline runs through the stack: one in item 1's view grew its
+# outline over items 2 and 6 and their labels' leaders.
+LABEL_RUN = 0.004
+TOWARD_HEAD = 1.0
+TOWARD_THREAD = -1.0
+LABEL_PLACES: dict[str, tuple[float, float]] = {
+    spec.ARBOR: (TOWARD_HEAD, 0.022),
+    spec.KEY: (TOWARD_THREAD, 0.050),
+    KIT_COLLAR: (TOWARD_HEAD, 0.0227),
+    spec.NUT: (TOWARD_THREAD, 0.023),
 }
 EXPLODED_CAPTION = "\n".join(
     (
@@ -256,7 +257,11 @@ def label_box(text: str, upper_left: tuple[float, float]) -> Box:
 
 
 def label_position(stem: str, tip: tuple[float, float]) -> tuple[float, float]:
-    return (tip[0] + LABEL_OFFSETS[stem][0], tip[1] + LABEL_OFFSETS[stem][1])
+    """Label ``stem``'s upper-left corner, sheet m, wholly beside its tip."""
+    side, rise = LABEL_PLACES[stem]
+    x0, _y0, x1, _y1 = label_box(EXPLODED_LABELS[stem], (0.0, 0.0))
+    x = tip[0] + LABEL_RUN if side > 0 else tip[0] - LABEL_RUN - (x1 - x0)
+    return (x, tip[1] + rise)
 
 
 def _view_stem(stem: str) -> str:
@@ -356,53 +361,6 @@ def _assert_at(
         raise RuntimeError(f"settled {label} sits at {here!r}, not {target!r}")
 
 
-def _centreline(
-    adapter: Any,
-    view: Any,
-    ends_mm: tuple[tuple[float, float, float], ...],
-    *,
-    label: str,
-) -> Any:
-    """One owned centreline in the view's sketch between two assembly points
-    (draw_dt_cone_tip_gear_tl_cutter_assembly's), returned as its segment."""
-    draw = adapter.currentModel
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate the arbor-kit view for the {label}")
-    draw.ClearSelection2(True)
-    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    ends = []
-    for x, y in model_points_in_view(
-        adapter,
-        view,
-        [tuple(value / 1000.0 for value in end) for end in ends_mm],
-        label=f"{label} endpoints",
-    ):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        ends.append(
-            tuple(
-                _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData
-            )
-        )
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        segment = manager.CreateCenterLine(*ends[0], *ends[1])
-    finally:
-        manager.AddToDB = previous
-    if segment is None:
-        raise RuntimeError(f"failed to create the {label} centreline")
-    segment = _early_bound(segment, "ISketchSegment")
-    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label=f"{label} centreline")
-    return segment
-
-
 def _activate_sheet(adapter: Any, name: str) -> None:
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not ddoc.ActivateSheet(name):
@@ -496,7 +454,7 @@ def _place_exploded_sheet(
 ) -> tuple[Callable[[], None], list[BalloonLanding]]:
     """Sheet 2: item 1 (with item 5) at EXPLODED_ORIGIN, every other item
     where its explode offset lands in item 1's view; items 3 and 4
-    ballooned, the stack labelled; the axis, the caption and the steps."""
+    ballooned, the stack labelled; the caption and the steps."""
     label = "arbor-kit exploded view"
     _activate_sheet(adapter, SHEET_NAMES[1])
     targets = {spec.ARBOR: EXPLODED_ORIGIN}
@@ -532,9 +490,6 @@ def _place_exploded_sheet(
             margin=BALLOON_MARGIN,
             explode_offsets={},
         )
-    _centreline(
-        adapter, views[spec.ARBOR], EXPLODED_AXIS_MM, label="exploded arbor axis"
-    )
     for stem, text in EXPLODED_LABELS.items():
         owner = _view_stem(stem)
         (tip,) = model_points_in_view(
