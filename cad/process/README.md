@@ -201,9 +201,10 @@ for it under `@latest`. The 20.5 in plate is made flat on the table, vise off,
 on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
 2026-11-05/06), placed between hole columns; the registry note's "mill to
 width on edge in the vise" grips at most the 1.77 in jaw height of a 6 in-tall
-bar, under the one-third rule. Holes run from the lower-left corner as sheet 2
-prints them; note 2's relations to A1 are read on the DRO over the GO pin
-before unclamping. The .3760-.3765 bores need class X GO/NO-GO pins
+bar, under the one-third rule. Strap toes land on the blocks. Holes run from
+the lower-left corner as sheet 2 prints them, from one DRO zero; note 2's
+relations (B1, A2, B2, CL, CR, R1-R4 from A1 and the A1-B1 line) are inspected
+before tapping by centring the DTI on a pin in each hole. The .3760-.3765 bores need class X GO/NO-GO pins
 (`gauges.pin-0376-go-nogo`, to buy, `shop-equipment.toml`); section A-A's
 underside chamfer is not in the manifest, so its .012 leg is authored in the
 plan until the drawing exports it.

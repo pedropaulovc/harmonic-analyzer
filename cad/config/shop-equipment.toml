@@ -162,10 +162,10 @@ kind = "protractor"
 present = false
 
 [tools.edge-finder]
-name = "Mechanical edge finder"
+name = "Mechanical edge finder, .200 in"
 kind = "edge_finder"
-present = false
-note = "The archived inventory gave only an illustrative example identity (Starrett 827A), with no possession evidence."
+present = true
+note = "Possession: logbook 2026-11-04 (\"switched to the edge finder (0.200 in, at 900 rpm)\"; its inventory entry is #2288). Make and SKU unrecorded; the archived inventory's Starrett 827A was only an illustrative identity."
 
 [tools.setting-mandrel-375]
 name = "3/8 in ground setting mandrel, long enough to pass both MHA-DT-02 pedestals"
