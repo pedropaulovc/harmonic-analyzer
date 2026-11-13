@@ -68,10 +68,10 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _limit_tolerance import SW_TOL_LIMIT as LIMIT_TOL_TYPE
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
     HEAD_CHAMFER_LIMITS,
-    LIMIT_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     UNDER_HEAD_RADIUS_BAND,
@@ -465,6 +465,7 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
             not math.isclose(actual, expected, abs_tol=1e-6)
             for actual, expected in zip(limits, HEAD_CHAMFER_LIMITS, strict=True)
         )
+        or bool(dimension.IsReference())
     ):
         raise RuntimeError(f"MHA-DT-32 HeadChamfer lost its model limits: {limits}")
 

@@ -14,7 +14,7 @@ import _config
 import build_dt_crank_handle_butt_cup as part
 import dt_crank_handle_butt_cup_notes as notes
 import dt_crank_handle_butt_cup_spec as spec
-import dt_crank_handle_head_seat_spec as seat
+import dt_crank_handle_butt_cup_seat_spec as seat
 import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions

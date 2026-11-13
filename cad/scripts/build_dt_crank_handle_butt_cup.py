@@ -64,7 +64,7 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
     UNIT,
 )
-from dt_crank_handle_head_seat_spec import (
+from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     CUP_DRAWING_PRECISION as DRAWING_PRECISION,
     FLOOR_HOLE_CHAMFER,
