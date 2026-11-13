@@ -204,7 +204,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert len(set(steps.SEQUENCE)) == len(steps.SEQUENCE)
     assert tuple(drawing.FITUP_TEXT) == steps.SEQUENCE
     # The lever bank's steps all follow the rocker bank's.
-    assert steps.LEVER_SEQUENCE[0] == "keepers-clamped"
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     assert steps.SEQUENCE[-1] == "spring-bottom-loops-left"
 
 
@@ -215,6 +215,7 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         assert len(drawing._wrapped_step(key, drawing.FITUP_TEXT[key])) <= 6
     for key, target in (
         ("rocker-stack-refaced", "rocker-stack-measured"),
+        ("rocker-stack-short", "rocker-stack-measured"),
         ("rod-pin-remade", steps.RODS_PINNED_KEY),
         ("bank-spring-replaced", "bank-spring-checked"),
         ("south-bracket-reset", "south-bracket-spring-set"),
@@ -1188,28 +1189,28 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     assert explode.FULCRUM_SHAFT in explode.EXPLODED_STEMS
 
 
-def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
-    """GPT review F5/F6 and round 3 (PR #1311): the two keeper bores share one
-    axis only if they are made in one setup at their installed spacing, feet
-    on one flat; the shaft gauges that line. The pair is then set on the top
-    frame by DRO, screwed down, and each set screw's tap mouth staked over it
-    (drawing-guidelines.md rule 23). The keeper print says AT ASSEMBLY,
-    citing no step."""
+def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
+    """#2338: each keeper comes finished to its own print (no pair ream at
+    assembly, no made-to-order reamer). The pair is set on the top frame by
+    DRO with the shaft through both, screwed down, the shaft checked to slide
+    through both bores, and each set screw's tap mouth staked over it later
+    (drawing-guidelines.md rule 23)."""
     import ch_fulcrum_keeper_spec as keeper
     from channel_frame_geom import LEVER_FULCRUM_XY
     from frame_column_stations import COLUMN_X
 
+    assert not hasattr(steps, "KEEPERS_PAIR_REAMED_KEY")
+    for retired in ("keepers-clamped", "keeper-tops-finished", "keeper-taps-made"):
+        assert retired not in steps.SEQUENCE
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     order = [
-        "keepers-clamped",
-        steps.KEEPERS_PAIR_REAMED_KEY,
-        "keeper-bores-checked",
-        "keeper-tops-finished",
         "keepers-on-frame",
         steps.KEEPERS_SET_KEY,
         "keepers-clamped-on-frame",
         "keeper-feet-transferred",
         steps.KEEPERS_SCREWED_KEY,
         "keepers-held",
+        "keeper-bores-checked",
         steps.BARS_PINNED_KEY,
         steps.LEVER_BANK_THREADED_KEY,
         "lever-bank-slides",
@@ -1222,23 +1223,21 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     numbers = [steps.step_number(key) for key in order]
     assert numbers == sorted(numbers)
     front, rear = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
-    # The pair is made at the installed spacing: view E's lug span.
+    # The pair is set at view E's lug span.
     assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front)
     assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(
         drawing.asm.LUG_INNER_FACE_Z[1] - drawing.asm.LUG_INNER_FACE_Z[0]
     )
-    reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
-    # Machinist gate 2026-10-17 (rule 7) and 5d5245a48 review (rule 24): the
-    # bore limits and the reamer are the keeper print's, never this sheet's.
-    assert "6.388" not in reamed and "6.400" not in reamed
-    for method in ("0.2515", " IN LONG", " PASS"):
-        assert method not in reamed
-    assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
-    # #1660 r2 (rules 22 and 24): the top and its tap are finished on the
-    # bore made here, to the keeper print, which this sheet restates none of.
-    tops = _step_body("keeper-tops-finished")
-    for part_data in ("R7.0", "#1-72", "9.8", "10.6"):
-        assert part_data not in tops
+    # The slide check carries no keeper part data (rule 24) and names the
+    # shaft; the bore band covers it (ch_fulcrum_shaft_spec).
+    checked = _step_body("keeper-bores-checked")
+    assert drawing.item("ch-fulcrum-shaft") in checked
+    assert drawing.item("ch-fulcrum-keeper") in checked
+    for part_data in (".2550", "6.4", "REAM"):
+        assert part_data not in checked
+    import ch_fulcrum_shaft_spec as shaft
+
+    assert shaft.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM
     # #1660 r2 (rule 19): the lever bank has no stack fit-up because it
     # needs none: twenty hubs at the top of their band leave end play at the
     # shortest lug span, which the slide check gauges.
@@ -1304,6 +1303,7 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         "rocker-stack-accepted",
         "rocker-stack-measured",
         "rocker-stack-refaced",
+        "rocker-stack-short",
         "rockers-kept-in-order",
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
@@ -1390,7 +1390,7 @@ def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
         "set-screws-driven",
         steps.PIVOT_SET_SCREWS_STAKED_KEY,
         "pivot-shaft-held",
-        steps.KEEPERS_PAIR_REAMED_KEY,
+        "keepers-on-frame",
     ]
     numbers = [steps.step_number(key) for key in order]
     assert numbers == sorted(numbers)

@@ -1434,14 +1434,22 @@ JOINTS: tuple[Joint, ...] = (
         installed_at=ch_channel_assembly_steps.step_ref(
             ch_channel_assembly_steps.KEEPERS_SCREWED_KEY
         ),
-        exposure=Exposure.OSCILLATING,
+        # #1180, delegated ruling (Main's #2338 assignment; logged on #2144 for
+        # owner review): the pivot brackets' reasoning (north/
+        # south-pivot-bracket-hold-down rows above) holds here: the shaft is
+        # set-screwed in both keepers and joins them into one frame located
+        # by the two screws.
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "the only fastener of each fulcrum_keeper, which carries the end of the "
-            "fulcrum_shaft that the 20 oscillating channel_levers rock on (shaft held "
-            "in the keeper's reamed bore by the MHA-CH-VN-55 set screw); the shaft-end "
-            "reaction is 8.25 off the screw along the shaft, so the reversing horizontal "
-            "lever/bar loads apply a reversing torque about the single screw's vertical "
-            "axis, and no dowel or second screw reacts it"
+            "clamps each fulcrum_keeper foot to the stationary top_frame rail (neither "
+            "moves in operation); one screw per foot, but the keeper cannot turn about "
+            "it: the fulcrum_shaft runs through both keepers' bores, each set screw "
+            "(MHA-CH-VN-55 on its flat) clamping it to its bore, so the two keepers and "
+            "the shaft are one frame held by two screws 177.3 apart on the shaft line, "
+            "and either keeper's yaw about its own screw would have to drag the other "
+            "keeper's clamped foot sideways; the channel_levers' oscillating "
+            "drag acts about the shaft axis (Z), perpendicular to the vertical screw axis, "
+            "and their spring and bar loads press the foot on its seat"
         ),
         axial_capture="slotted fillister head seated flush in the keeper foot counterbore (CBORE_DEPTH 2.1082); thread in top_frame KeeperTaps #2-56 x 7.6 thread / 11.5 drill blind, transferred from the foot hole at fit-up",
         lock=Lock.NONE,
@@ -1453,7 +1461,8 @@ JOINTS: tuple[Joint, ...] = (
             "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
             "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + ch_fulcrum_keeper_notes.FOOT_HOLE_MATE; build_fr_top_frame.py step 'KeeperTaps' "
             "consumes KEEPER_TAP_SPEC; config parts/ch-vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
-            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-tapped taps the rail"
+            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-tapped taps the rail; "
+            "keeper-bores-checked ('CHECK ITEM 2 SLIDES FREELY THROUGH BOTH ITEM 8 BORES') after the screws"
         ),
     ),
     Joint(
@@ -1478,7 +1487,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (ch-vn-fulcrum-set-screw on each keeper's crown tap axis); "
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next); "
-            "ch_fulcrum_keeper_notes.SET_SCREW_QUALIFIER ('FOR MHA-CH-VN-55 SET SCREW, AT ASSEMBLY'); "
+            "ch_fulcrum_keeper_notes.SET_SCREW_QUALIFIER ('FOR MHA-CH-VN-55 SET SCREW'); "
             "draw_ch_channel_assembly.py steps fulcrum-set-screws-driven ('TIGHTEN ONE ITEM 10 SET SCREW ONTO EACH "
             "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS, "
             "ONE EACH SIDE ALONG ITEM 2 (VIEW E).'); "

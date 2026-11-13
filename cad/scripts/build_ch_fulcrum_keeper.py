@@ -55,7 +55,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -97,8 +97,6 @@ from ch_fulcrum_keeper_spec import (
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
     SHAFT_AXIS_H,
-    SUPPLY_HEIGHT_MIN,
-    SUPPLY_HEIGHT_TOL_TYPE,
     UNIT,
 )
 
@@ -141,12 +139,11 @@ V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R**2 * KEEPER_WIDTH
 # side corner along the side face to the screw station and down the tip
 # face to the screw axis, so their extension lines leave the plan's outline
 # without crossing; the bore's runs on the Right plane
-# (the end view's frame) from a side face to the bore axis; the finished and
-# supplied heights' run up the lug's inner face from the seat to the crown
-# top and to the blank's least top; the overall length's along the seat
-# from the inner lug face to the foot tip. ``drives`` binds the value
-# dimension, then the start point's
-# origin anchors, to the part's globals.
+# (the end view's frame) from a side face to the bore axis; the finished
+# height's runs up the lug's inner face from the seat to the crown top; the
+# overall length's along the seat from the inner lug face to the foot tip.
+# ``drives`` binds the value dimension, then the start point's origin
+# anchors, to the part's globals.
 REFERENCE_LINES = (
     (
         "SetScrewReference",
@@ -199,16 +196,6 @@ REFERENCE_LINES = (
         ('"ShaftAxisH" + "CrownR"', '"LugT" / 2'),
     ),
     (
-        "SupplyHeightReference",
-        "Front",
-        "SupplyHeight",
-        (-LUG_HALF_T, 0.0),
-        (-LUG_HALF_T, SUPPLY_HEIGHT_MIN),
-        "vertical",
-        SUPPLY_HEIGHT_MIN,
-        ('"SupplyH"', '"LugT" / 2'),
-    ),
-    (
         "OverallLengthReference",
         "Front",
         "OverallLength",
@@ -221,14 +208,6 @@ REFERENCE_LINES = (
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
     raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
-# The supplied blank's square top (MR-fleet r8, 7b21790: the supply height's
-# extension line ended in air above the crown): a second construction line in
-# the supply height's sketch, across the lug thickness from the height line's
-# top, so the dimension lands on drawn geometry, the blank's phantom outline.
-SUPPLY_TOP_SKETCH = "SupplyHeightReference"
-SUPPLY_TOP_DIMENSION = "SupplyTopWidth"
-if SUPPLY_TOP_SKETCH not in REFERENCE_SKETCHES:
-    raise AssertionError("the supply top's sketch is not a reference sketch")
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -238,31 +217,6 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
-
-
-async def _supply_square_top(adapter, sketch: str, height_line: str, corner) -> None:
-    """The blank's square top: a horizontal construction line LUG_T long from
-    the supply height line's top corner, sized by its own dimension."""
-    set_sketch_direct_db(adapter, True)
-    top = check(
-        f"{sketch} square top",
-        await adapter.add_line(*corner, corner[0] + LUG_T, corner[1]),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, top)
-    check(
-        f"{sketch} square top horizontal",
-        await adapter.add_sketch_constraint(top, None, "horizontal"),
-    )
-    check(
-        f"{sketch} square top starts on the height line",
-        await adapter.add_sketch_constraint(
-            f"{height_line}.end", f"{top}.start", "coincident"
-        ),
-    )
-    await dimension_between(
-        adapter, f"{top}.start", f"{top}.end", "horizontal_distance", LUG_T, sketch
-    )
 
 
 async def _reference_line(
@@ -291,10 +245,6 @@ async def _reference_line(
     )
     await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
     names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
-    if sketch == SUPPLY_TOP_SKETCH:
-        await _supply_square_top(adapter, sketch, line, end)
-        names.append(SUPPLY_TOP_DIMENSION)
-        drives = (*drives, '"LugT"')
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
@@ -328,43 +278,6 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
-def _single_limit(
-    adapter,
-    feature: str,
-    name: str,
-    limit: float,
-    tol_type: int,
-    lower: float,
-    upper: float,
-) -> None:
-    """``name@feature`` as a single limit: its nominal IS the printed limit
-    (swTolMAX / swTolMIN print the nominal plus MAX / MIN), carrying the
-    deviations ``lower`` / ``upper`` mm (build_ch_pivot_bracket.
-    _corner_radius_max_limit's recipe)."""
-    _, dimension = _named_dimension(adapter, feature, name)
-    label = f"{name}@{feature}"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != tol_type
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {limit:g} (type {tol_type})")
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -382,7 +295,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CrownR", f"{CROWN_R}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R}mm")
-    await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
     await set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -512,7 +424,7 @@ async def build(adapter) -> dict[str, str]:
     v_crown = 0.5 * math.pi * r_c * r_c * LUG_T
     volume = await volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
 
-    # --- Shaft bore: plain reamed Ø6.35 through the lug on the axis -------
+    # --- Shaft bore: plain reamed Ø.2550 through the lug on the axis ------
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Right"))
     await define_circle(
@@ -603,18 +515,8 @@ async def build(adapter) -> dict[str, str]:
     )
     _hide_reference_sketches(adapter)
     # Decimal places are the tolerance statement, so the PART carries them;
-    # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
+    # the reamed bore's band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # Any taller blank rounds down to the crown: no deviation either way.
-    _single_limit(
-        adapter,
-        "SupplyHeightReference",
-        "SupplyHeight",
-        SUPPLY_HEIGHT_MIN,
-        SUPPLY_HEIGHT_TOL_TYPE,
-        0.0,
-        0.0,
-    )
     # The crown is a full round tangent to both sides: no band of its own
     # (the width's governs it); the sheet prints it as a radial reference.
     # The bands are millimetres; UNIT prints them in inches.

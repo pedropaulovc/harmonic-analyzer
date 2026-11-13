@@ -25,10 +25,10 @@ from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
+    BORE_ALIGNMENT_ALLOWANCE_MM,
     BORE_DIA,
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
-    BORE_SEAT_ALLOWANCE_MM,
     CROWN_R,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
@@ -50,8 +50,6 @@ UNIT = drawing_unit("parts/ch-fulcrum-shaft", _config.parts("ch-fulcrum-shaft"))
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
-if SHAFT_DIA != BORE_DIA:
-    raise AssertionError("fulcrum shaft and keeper bore nominals differ")
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
@@ -295,24 +293,21 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
         f"({FLAT_STATION_WINDOW_MM:.3f})"
     )
 
-# --- The keepers' bores, drilled and reamed through in one pass at their
-# installed spacing (ch_fulcrum_keeper_notes.BORE_CALLOUT, assembly step
-# fulcrum-keepers-pair-reamed): bored apart, the .XX LugRise could put the bores
-# BORE_OFFSET_UNPAIRED_MM out of line, past the fit's largest diametral
-# clearance; reamed together they are one straight line, gauged by this
-# shaft in the clamped setup. What remains is the rail under the two feet:
-# within the keeper spec's seat-flatness budget each lug spends
-# BORE_SEAT_ALLOWANCE_MM of its clearance on the straight shaft, and the rest
-# must still be the running minimum.
-BORE_OFFSET_UNPAIRED_MM = 2.0 * _band(KEEPER_PRECISION, "LugProfile", "LugRise")
-PAIRED_MIN_CLEARANCE_MM = (
-    BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0] - BORE_SEAT_ALLOWANCE_MM
-)  # 0.0109
-if BORE_OFFSET_UNPAIRED_MM <= BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1]:
-    raise AssertionError("the keeper bores line up unpaired: drop the pair reaming")
-if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
+# --- The keepers' bores, each reamed alone on its own keeper
+# (ch_fulcrum_keeper_spec): the straight shaft through both spends
+# BORE_ALIGNMENT_ALLOWANCE_MM of each bore's clearance on the two bore
+# heights' bands, each bore's tilt and the rail seats under the feet, and
+# the rest must still be the slip minimum. The one guard on the keeper fit.
+ALIGNED_MIN_CLEARANCE_MM = (
+    BORE_DIA
+    + BORE_DIA_BAND[1]
+    - SHAFT_DIA
+    - SHAFT_DIA_BAND[0]
+    - BORE_ALIGNMENT_ALLOWANCE_MM
+)  # 0.0344
+if ALIGNED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
     raise AssertionError(
-        f"the paired keeper bores keep {PAIRED_MIN_CLEARANCE_MM:.4f} on the shaft "
-        f"after the rail-seat allowance {BORE_SEAT_ALLOWANCE_MM:.4f} "
+        f"the keeper bores keep {ALIGNED_MIN_CLEARANCE_MM:.4f} on the shaft "
+        f"after the alignment allowance {BORE_ALIGNMENT_ALLOWANCE_MM:.4f} "
         f"(< {BORE_RUNNING_MIN_CLEARANCE_MM})"
     )

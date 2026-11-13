@@ -1092,7 +1092,6 @@ def _fitup_text() -> dict[str, str]:
     """Every step's text, keyed as ``ch_channel_assembly_steps.SEQUENCE``."""
     # Literal stems, so the config-dependency analysis reads exactly these rows.
     arm_number = _config.parts("ch-rocker-arm")["number"]
-    keeper_number = _config.parts("ch-fulcrum-keeper")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
     shaft, fulcrum_shaft = item("ch-pivot-shaft"), item("ch-fulcrum-shaft")
@@ -1160,10 +1159,10 @@ def _fitup_text() -> dict[str, str]:
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
-    # The pair is reamed at the spacing KEEPERS_SET_KEY sets it to (Main's
-    # ruling): view E's reference lug span.
+    # The lug span the fit-up sets (KEEPERS_SET_KEY) is view E's reference
+    # lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
-        raise AssertionError("the pair-ream span is not the fit-up span")
+        raise AssertionError("the view E lug span is not the fit-up span")
     # The lever bank is never fitted like the rocker stack: the bars on the
     # arms locate it, and twenty hubs at the top of their band still leave end
     # play between the lugs at the extremes of both inner-face bands (#1660
@@ -1196,8 +1195,7 @@ def _fitup_text() -> dict[str, str]:
         # loose; each rod + arm pair is then pinned at the bench, before the
         # drive-train cylinder stack captures the rod rings in their cams.
         "rocker-stack-accepted": (
-            f"STACK THE {COUNT} {arm} ROCKERS ON {shaft} AS {rocker_view} SHOWS, "
-            "HUBS IN CONTACT."
+            f"STACK {COUNT} {arm} ON {shaft} AS {rocker_view} SHOWS, HUBS TOUCHING."
         ),
         "rocker-stack-measured": (
             "MEASURE THE STACK OVER ITS END HUB FACES WITH A CALIPER: IT MUST "
@@ -1207,6 +1205,13 @@ def _fitup_text() -> dict[str, str]:
             "IF IT IS LONG, FACE THE LONGEST HUBS ON THEIR ENDS AWAY FROM DATUM "
             f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH, AND "
             f"RETURN TO STEP {n('rocker-stack-measured')}."
+        ),
+        # A short stack has a hub under its printed length: the band is
+        # upper-only, so twenty conforming hubs meet the low limit (#2338
+        # review: the short case had no procedure).
+        "rocker-stack-short": (
+            f"IF IT IS SHORT, REPLACE EACH {arm} WHOSE HUB IS UNDER ITS PRINTED "
+            f"LENGTH AND RETURN TO STEP {n('rocker-stack-measured')}."
         ),
         "rockers-kept-in-order": (
             f"SLIDE THE ROCKERS OFF {shaft} IN ORDER AND KEEP THAT ORDER."
@@ -1219,7 +1224,7 @@ def _fitup_text() -> dict[str, str]:
         "rod-pins-dressed": f"DRESS BOTH ENDS OF EACH {pin} FLUSH WITH THE TINES.",
         "rod-pins-held": f"CHECK EACH {pin} DOES NOT SLIDE IN ITS FORK BY HAND.",
         "rod-arms-swing": (
-            f"CHECK EACH {arm} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
+            f"CHECK EACH {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
         # A press whose part slides in by hand is a slip fit (rule 23). The pin
         # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
@@ -1247,7 +1252,7 @@ def _fitup_text() -> dict[str, str]:
             f"KEPT AT STEP {n('rockers-kept-in-order')}."
         ),
         "south-washer-fitted": (
-            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT-HAND HUB."
+            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT HUB."
         ),
         # #2337: the right bracket is zeroed on its foot end with the ear on
         # the washer before the spring covers it, on the mill the left ear was
@@ -1328,30 +1333,6 @@ def _fitup_text() -> dict[str, str]:
             f"{stake_points('ch-pivot-shaft')} ({ROCKER_BANK.title})."
         ),
         "pivot-shaft-held": f"CHECK {shaft} DOES NOT TURN OR SLIDE BY HAND.",
-        # The keepers are reamed as a pair at the bench, then each is finished
-        # to its own print on the bore this makes: MHA-CH-07 sizes the
-        # full-radius top and places the set-screw tap on the bore axis. The
-        # steps carry none of that part data (rule 24; #1660 r2).
-        "keepers-clamped": (
-            f"CLAMP BOTH {keeper} KEEPERS ON A SURFACE PLATE, FEET OUTWARD, "
-            f"INNER LUG FACES AT THE {lever_view} LUG SPAN, BORE AXES PARALLEL "
-            "TO THE PLATE."
-        ),
-        steps.KEEPERS_PAIR_REAMED_KEY: (
-            f"STILL CLAMPED, MAKE BOTH {keeper} BORES TO THEIR DRAWING IN ONE "
-            "SETUP, IN LINE."
-        ),
-        "keeper-bores-checked": (
-            f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH BORES."
-        ),
-        "keeper-tops-finished": (
-            f"FINISH EACH {keeper}'S FULL-RADIUS TOP ON ITS BORE AXIS, TO THE "
-            f"{keeper_number} DRAWING."
-        ),
-        "keeper-taps-made": (
-            f"MAKE EACH {keeper}'S {fulcrum_set_screw} TAP ON ITS BORE AXIS, TO "
-            f"THE {keeper_number} DRAWING."
-        ),
         "keepers-on-frame": (
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
             f"{plan_view} SHOWS, FEET OUTWARD, {fulcrum_shaft} THROUGH BOTH BORES."
@@ -1373,6 +1354,12 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-unclamped": "REMOVE THE CLAMPS.",
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
+        # #2338: each keeper is reamed alone to its print; the bore's band
+        # covers both bore heights and the rail seats, so the shaft slides
+        # with both screwed down (ch_fulcrum_shaft_spec ALIGNED_MIN_CLEARANCE_MM).
+        "keeper-bores-checked": (
+            f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH {keeper} BORES."
+        ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
             f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT."

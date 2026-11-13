@@ -37,7 +37,8 @@ def test_shaft_carries_no_frames_or_datums() -> None:
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
-    assert spec.SHAFT_DIA == keeper.BORE_DIA
+    # #2338: the keeper bore is a .2550 reamer's size over the .2500 shaft.
+    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0050
     assert math.isclose(
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
@@ -233,65 +234,38 @@ def test_every_orthographic_view_is_at_sheet_scale() -> None:
     assert drawing.ISO_SCALE == (1, 1)
 
 
-def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
-    # Bored apart, the two keepers' .XX LugRise bands could put the bores
-    # .020 out of line, far past the fit; reamed through in one pass at their
-    # installed spacing they are one straight line, so a setup tilt of that
-    # line costs nothing. GPT round 3 (PR #1311): the residual is the rail
-    # under the two feet, MHA-FR-02's faced rail top, flat to one 0.04 zone: a
-    # step, opposite rolls across the .55 width (each lug centre 25.2 high)
-    # and a pitch over the .65 seat; the shaft runs through both lug centres
-    # 6.360 apart and each .32 lug spends its thickness x (pitch + slope).
+def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
+    # #2338: each keeper is reamed alone, so the two bores stand up to both
+    # .XX LugRise bands (.020) plus the rail seats' 0.04 zone apart in height
+    # (a roll across the width only moves a lug sideways, which the fit-up
+    # takes with the shaft through both); each seat may also pitch its zone
+    # over its .65 length. The shaft runs through both lug centres 6.360
+    # apart and each lug, at its thickest printed .33, spends its thickness x
+    # (pitch + slope); each bore, reamed in its own setup, may run off 0.3 deg
+    # from its seat (the drill it follows). The .2550 bore keeps the slip
+    # minimum after all of that.
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
-    assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 0.508)
-    assert spec.BORE_OFFSET_UNPAIRED_MM > (
-        keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1]
-    )
     flatness = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
     assert flatness == 0.04
     assert math.isclose(keeper.KEEPER_SEAT_LENGTH_MM, 16.51)
-    lug_t = 2.0 * keeper.LUG_HALF_T
+    lug_t = 2.0 * keeper.LUG_HALF_T + 0.254
     span = 2.0 * keeper.KEEPER_Z_OFF
     assert math.isclose(span, 161.544)
-    sideways = 2.0 * keeper.SHAFT_AXIS_H * flatness / keeper.KEEPER_WIDTH
-    slope = math.hypot(flatness, sideways) / span
+    slope = (2.0 * 0.254 + flatness) / span
     pitch = flatness / keeper.KEEPER_SEAT_LENGTH_MM
-    allowance = lug_t * (pitch + slope)
-    assert math.isclose(keeper.BORE_SEAT_ALLOWANCE_MM, allowance)
-    assert round(allowance, 4) == 0.0272
-    least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
-    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.0381 >= 0.0372
-    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0109
-    assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
-
-
-def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
-    # One pass through both lugs: a 12 in long-series 0.2515 chucking reamer,
-    # made to order (Super Tool catalogue 2026 p.59, 9458EL: .2211-.2530,
-    # 12 OAL, 1-1/2 flute, .2193 shank, NAS 897 Type C; p.42: +.0002/-.0000
-    # in), gripped 1 in, carries its whole flute past the far lug's outer
-    # face, 169.672 from the near one; the toleranced reamer lies in the band.
-    keeper = ch_fulcrum_keeper_spec
-    assert math.isclose(keeper.KEEPER_OUTER_FACE_SPAN_MM, 169.672)
-    assert keeper.PAIR_REAMER_OAL_IN == 12.0
-    reach = (12.0 - 1.0 - 1.5) * 25.4
-    assert math.isclose(
-        keeper.PAIR_REAMER_REACH_MARGIN_MM, reach - keeper.KEEPER_OUTER_FACE_SPAN_MM
-    )
-    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 71.6
-    # An 8 in OAL reamer would not carry the flute through.
-    assert (8.0 - 1.0 - 1.5) * 25.4 < keeper.KEEPER_OUTER_FACE_SPAN_MM
-    assert keeper.PAIR_REAMER_DIA_IN == 0.2515
-    low, high = (
-        (keeper.PAIR_REAMER_DIA_IN + plus) * 25.4 - keeper.BORE_DIA
-        for plus in (0.0, 0.0002)
-    )
-    assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[0], low)
-    assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[1], high)
-    assert (round(low, 5), round(high, 5)) == (0.0381, 0.04318)
-    assert keeper.BORE_DIA_BAND[1] <= low < high <= keeper.BORE_DIA_BAND[0]
+    allowance = lug_t * (pitch + slope + math.tan(math.radians(0.3)))
+    assert math.isclose(keeper.BORE_ALIGNMENT_ALLOWANCE_MM, allowance)
+    assert round(allowance, 4) == 0.0926
+    least = keeper.BORE_DIA + keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA - spec.SHAFT_DIA_BAND[0]
+    assert round(least / 25.4, 4) == 0.0050
+    assert math.isclose(spec.ALIGNED_MIN_CLEARANCE_MM, least - allowance)
+    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0344
+    assert spec.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
+    # Neither the owned .2510 reamer nor a .2540 one would do it: each one's
+    # least clearance is under the slip minimum plus the allowance.
+    for reamer_in in (0.2510, 0.2540):
+        assert (reamer_in - 0.2500) * 25.4 < keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance
 
 
 def test_installed_set_screw_meets_rule_12() -> None:
