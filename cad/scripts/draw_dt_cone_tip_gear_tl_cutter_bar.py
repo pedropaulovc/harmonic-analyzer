@@ -20,6 +20,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
     place_view,
+    remove_notes_matching,
 )
 
 import _telemetry
@@ -34,6 +35,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -200,13 +202,17 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(
         adapter, str(SOURCE), "*Bottom", *BOTTOM_ORIGIN, scale=VIEW_SCALE
     )
-    # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     origin = (0.0, 0.0, 0.0)
     _place_point(adapter, front, origin, FRONT_ORIGIN, label="front view")
     _place_point(adapter, right, origin, RIGHT_ORIGIN, label="right view")
     _place_point(adapter, bottom, origin, BOTTOM_ORIGIN, label="bottom view")
-    for view in (front, right, bottom):
+    # The iso too (draw_pn_pen_rod): a new view already reads Shaded With
+    # Edges, so finalize_drawing's SetDisplayMode4 is a no-op that leaves the
+    # tap's cosmetic thread at draft quality (farm run 20261112T203021325Z:
+    # readback cosmetic_threads=False). From HLR the shading call really
+    # changes the mode and takes precision.
+    for view in (front, right, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations: list[Any] = []
@@ -252,12 +258,24 @@ async def build(adapter: Any) -> dict[str, str]:
     _early_bound(drawing, "IDrawingDoc").EditSheet()
     if add_note(adapter, ISO_NOTE, *ISO_NOTE_XY) is None:
         raise RuntimeError("failed to add the fly-cutter bar's isometric scale note")
+    # Materialize the iso's cosmetic thread before the strict final note
+    # cleanup (draw_fr_rocker_arm_support), so any "#4-40 Tapped Hole" label
+    # SolidWorks pins to it exists when it is counted rather than first
+    # appearing during the native save. The tap is stated once, on its native
+    # callout, so any such label goes and the count is logged.
+    import_cosmetic_threads(adapter, iso)
+    removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Gear Fly Cutter Bar Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # The sweep stays, so a label that appears after the removal above
+        # fails the count instead of printing.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=0,
     )
 
 

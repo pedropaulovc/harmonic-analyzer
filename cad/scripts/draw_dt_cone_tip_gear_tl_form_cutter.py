@@ -90,21 +90,26 @@ def top_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 
 
 # --- Front view: the rod's length under it, its Ø left of the shank end, the
-# flat's length over the face line, the front clearance under the tip.
+# flat's length over the face line, the front clearance under the tip, its
+# text clear right of the plumb line (farm run 20261112T203021325Z printed
+# FRONT CLEARANCE across it at 1.2 mm).
 FRONT_KEEP = {
     "BitLength": front_xy(-part.BIT_LENGTH / 2.0, -_R - 1.2),
     "BitDia": front_xy(-part.BIT_LENGTH - 2.0, 0.0),
     "FlatLength": front_xy(-part.FLAT_LENGTH / 2.0, _R + 1.0),
-    "FrontClearance": front_xy(1.2, -_R - 0.4),
+    "FrontClearance": front_xy(3.5, -_R - 0.6),
 }
-# --- Face view: the three widths right of the tip, one column each, the two
-# stations from P1 over the rod's far edge, one row each.
+# --- Face view: the three widths right of the tip, one column each a
+# reference's text width apart (at 1 mm pitch the same run printed them over
+# one another), the two stations from P1 above the view, one row each, clear
+# of the front view's flat length below it.
+WIDTH_PITCH_MM = 2.5
 TOP_KEEP = {
-    "TipWidth": top_xy(1.0, 0.0),
-    "JunctionWidth": top_xy(2.0, 0.0),
-    "FormWidth": top_xy(3.0, 0.0),
-    "JunctionDepth": top_xy(-abs(part.JUNCTION_DEPTH) / 2.0, _R + 0.9),
-    "FormDepth": top_xy(-abs(part.FORM_DEPTH) / 2.0, _R + 1.8),
+    "TipWidth": top_xy(WIDTH_PITCH_MM, 0.0),
+    "JunctionWidth": top_xy(2.0 * WIDTH_PITCH_MM, 0.0),
+    "FormWidth": top_xy(3.0 * WIDTH_PITCH_MM, 0.0),
+    "JunctionDepth": top_xy(-abs(part.JUNCTION_DEPTH) / 2.0, -_R - 0.9),
+    "FormDepth": top_xy(-abs(part.FORM_DEPTH) / 2.0, -_R - 1.8),
 }
 # --- End view: the side clearance right of the rod.
 RIGHT_KEEP = {
