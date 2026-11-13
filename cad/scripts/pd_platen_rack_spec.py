@@ -58,6 +58,22 @@ PURCHASED_RACK_LENGTH_MM = PURCHASED_RACK_LENGTH_IN * MM_PER_IN
 PURCHASED_RACK_FACE_WIDTH_IN = 3.0 / 16.0
 PURCHASED_RACK_HEIGHT_IN = 3.0 / 16.0
 PURCHASED_RACK_QUALITY_CLASS = "Commercial"
+# SDP/SI publishes no face-width or height tolerance for the strip (product
+# page and catalogue p. 1-193 checked 2026-11-13, #2694); its only published
+# accuracy is pitch. Drawn 3/16 square brass bar is held to .003 (Alro Metals
+# Guide p. 7-3, CDA 360 / ASTM B16 square rod). The receiving geometry gives
+# the strip twice that over its 3/16 REF in both height and face width: the
+# bottom guide rail's air over the backer (build_pd_paper_drive_assembly
+# RACK_BACKER_RAIL_AIR_WORST), the cut-end section reserve and the feed's
+# lateral terms are paid at these maxima, so any ordinary strip is accepted
+# as supplied, with no receiving gauge and no limit on the sheet.
+PURCHASED_RACK_SECTION_ROOM_IN = 2.0 * 0.003
+PURCHASED_RACK_HEIGHT_MAX_MM = (
+    PURCHASED_RACK_HEIGHT_IN + PURCHASED_RACK_SECTION_ROOM_IN
+) * MM_PER_IN
+PURCHASED_RACK_FACE_WIDTH_MAX_MM = (
+    PURCHASED_RACK_FACE_WIDTH_IN + PURCHASED_RACK_SECTION_ROOM_IN
+) * MM_PER_IN
 if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
     raise AssertionError("purchased rack pitch/PA no longer match the feed sleeve")
 
@@ -183,11 +199,11 @@ def require_rack_stock_section_measurements_mm(
     return (
         _require_stock_dimension_maximum_mm(
             "stock height", measured_stock_height_max_mm,
-            stock_height_measurement_uncertainty_mm, quality.rack_stock_height_max_mm(),
+            stock_height_measurement_uncertainty_mm, PURCHASED_RACK_HEIGHT_MAX_MM,
         ),
         _require_stock_dimension_maximum_mm(
             "face width", measured_face_width_max_mm,
-            face_width_measurement_uncertainty_mm, quality.rack_face_width_max_mm(),
+            face_width_measurement_uncertainty_mm, PURCHASED_RACK_FACE_WIDTH_MAX_MM,
         ),
     )
 
@@ -672,44 +688,10 @@ GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # running mesh at assembly. The joint names its solder family (machinist
 # review round 6), no alloy ratio: notes carry no numbers.
 
-
-def _receiving_ceiling_text(limit_mm: float, purpose: str) -> str:
-    """An incoming maximum at the stock REF's places, rounded down so the
-    print never admits a section the cut-end envelope refuses, followed by
-    the mate it protects."""
-    scale = 10**_PLACES["RackHeight"]
-    value = math.floor(round(limit_mm / MM_PER_IN * scale, 9)) / scale
-    return f"{value:.{_PLACES['RackHeight']}f} MAX{purpose}".removeprefix("0")
-
-
-# The two stock sizes carry their receiving maxima as callout text on the
-# native REF dimensions: delegated ruling 2026-11-02, following the owner's
-# precedents that a supplier size prints as untoleranced REF (#2147) and that
-# a functional acceptance rides its native callout (rule 4's DIAMETRAL
-# CLEARANCE callouts); owner review on #2144.  The rack-travel cut-end
-# reserve (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at
-# these ceilings, so a larger section must be rejected on receipt.  Each
-# limit names the mate it protects (novice-rubric fan-out round 5: a limit on
-# a supplier size with no mate read as invented): the height keeps air under
-# the bottom guide rail (build_pd_paper_drive_assembly
-# RACK_BACKER_RAIL_AIR_WORST), the face width bounds the feed pinion's mesh
-# offset across the face (paper_drive_geom.feed_lateral_deviation_mm).  The
-# sheet parenthesizes only the REF value, so the plain limit reads outside
-# the parentheses (round 1: a limit inside a reference's parentheses, and
-# RECEIVE, read as neither REF nor limit).  The height's limit stacks on two
-# lines under its value, right of the rack (round 2: one line ran from the
-# rack's outline to the border); an above-callout holding a line break never
-# prints, so it goes below.
-GUIDE_RAIL_NUMBER = _config.parts("pd-platen-guide")["number"]
-FEED_PINION_NUMBER = _config.parts("pd-transgear-feed-pinion")["number"]
-DIMENSION_CALLOUTS = {
-    "RackHeight": _receiving_ceiling_text(
-        quality.rack_stock_height_max_mm(), f"\nCLEARS {GUIDE_RAIL_NUMBER}"
-    ),
-    "RackDepth": _receiving_ceiling_text(
-        quality.rack_face_width_max_mm(), f" FOR {FEED_PINION_NUMBER} MESH"
-    ),
-}
+# The two stock sizes print as plain (.1875) REF with no receiving limit
+# (#2694): a supplier size prints as untoleranced REF (#2147), and the
+# receiving geometry has room for any ordinary strip
+# (PURCHASED_RACK_SECTION_ROOM_IN), so the shop has nothing to gauge.
 DRAWING_NOTES = "\n".join(
     (
         "SOFT-SOLDERED (TIN-LEAD OR LEAD-FREE) RACK/BACKER JOINT; ENDS FLUSH",
