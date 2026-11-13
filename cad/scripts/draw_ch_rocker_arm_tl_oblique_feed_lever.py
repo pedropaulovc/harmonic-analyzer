@@ -243,6 +243,31 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
         },
     )
 
+# The two grip-end plan corners (2X R.2 on the top view): vertical fillets
+# through the thickness at the grip end, one at each long side, under the
+# title block's one-place band.
+requirement(
+    "grip_corners",
+    kind="fillet",
+    faces=tuple(
+        CylinderFace(2.0 * part_spec.CORNER_R, contains_z_mm=z)
+        for z in (
+            -part_spec.CORNER_R / 2.0,
+            -(part_spec.LEVER_WIDTH - part_spec.CORNER_R / 2.0),
+        )
+    ),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            _limits(part_spec.CORNER_R, part_spec.CORNER_PLACES),
+            ("CORNER_R", "CORNER_PLACES"),
+        ),
+        "radius_nominal": (part_spec.CORNER_R, ("CORNER_R",)),
+        "count": (2, ("DIMENSION_PREFIXES",)),
+    },
+    precision={"radius": part_spec.CORNER_PLACES},
+)
+
 
 def _view_mapper(adapter: Any, view: Any):
     """Return model point (mm) -> sheet xy (m) through the view's transform."""

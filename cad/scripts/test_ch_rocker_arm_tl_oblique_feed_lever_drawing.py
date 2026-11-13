@@ -95,6 +95,12 @@ def test_grip_corners_are_broken_clear_of_the_holes() -> None:
     assert spec.CORNER_R > 0.0
     assert spec.LEVER_LENGTH - spec.CORNER_R > spec.HOLE_X[-1] + spec.HOLE_DIA
     assert spec.DIMENSION_PREFIXES["GripCornerR"] == "2X R"
+    # Both printed corners export as one fillet under the .X band (R.1-R.3).
+    corners = _features()["grip_corners"]
+    assert corners["count"] == 2
+    assert corners["radius"] == pytest.approx(
+        [spec.CORNER_R - 0.1 * INCH, spec.CORNER_R + 0.1 * INCH]
+    )
 
 
 def test_holes_carry_the_title_block_band_only() -> None:
