@@ -60,8 +60,8 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A Ø3.25 disc: 2:1 keeps the pin's .0332 offset from the vertical
-# centreline readable (1.7 mm on the sheet).
+# A Ø3.25 disc: 2:1 keeps the pin's .0373 offset from the vertical
+# centreline readable (1.9 mm on the sheet).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
@@ -77,7 +77,7 @@ ISO_NOTE_XY = (0.350, 0.160)
 # outside the disc (rule 14; run 20261113T012650242Z's review read all three
 # stations inside it): the two vertical stations in one chain from the
 # centre, right of the disc and left of the edge view (x .275); the pin's
-# .0332 over the disc's top; each ream size on a leader outside the disc.
+# .0373 over the disc's top; each ream size on a leader outside the disc.
 _FX, _FY = FACE_CENTER
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 _DISC_RIGHT = _FX + part.BODY_DIA / 2.0 * _S

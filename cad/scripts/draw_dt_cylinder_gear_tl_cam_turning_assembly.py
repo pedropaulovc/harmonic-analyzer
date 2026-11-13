@@ -8,10 +8,11 @@ in phantom on the exploded sheet only.
 
 Sheet 1: the top view (from the tailstock, items 4 and 5 off) with the cam
 throw and the clock pin's station from the register axis as native
-reference dimensions, the right view with every item ballooned, the shaded
-isometric, the BOM, the kit's one-time presses, the three fitting steps
-(the gear is turned CLOCKWISE in the top view onto item 3 before item 5 is
-tightened: the cut then pushes it harder onto the pin) and the checks.
+reference dimensions, the right view with item 1 ballooned, the shaded
+isometric with items 2-5 ballooned, the BOM, the kit's one-time presses, the
+three fitting steps (the gear is turned CLOCKWISE in the top view onto item 3
+before item 5 is tightened: the cut then pushes it harder onto the pin) and
+the checks.
 Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
 off the stub's axis in fitting order. Numbers come from
 ``dt_cylinder_gear_tl_cam_fixture_spec``; this recipe never edits the source
@@ -126,43 +127,24 @@ BOM_DESCRIPTIONS = {
 BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     stem: (stem, None) for stem in BOM_COMPONENTS
 }
-# The right view sees every bought item's rims edge-on, each drawn as one
-# line across the item's axis. A leader asked on such a line near its end
-# lands ON the end: run 20261112T203156536Z walked item 2 to its top rim
-# 1.42 mm (sheet) in from the line's end and the leader read back on the
-# end (_assert_leader_lands, limit 0.2 mm); item 1's walked rim point, 39 mm
-# from either end, landed where asked. Mid-line is not safe either: the
-# clock pin's rim line is 1.9 mm long, so its middle is under 1 mm from both
-# ends, and run 20261113T012650242Z found no edge under the clamp screw's
-# head-top front point (3.96875, 4.826, 0) though run 20261112T203156536Z's
-# walk had hit that rim at 58 deg from it. So items 2-5 each take a point of
-# a real rim of their builder's revolve or extrude RIM_END_GAP_MM short of
-# the line's end on ``side`` (part frame: +X toward the right view's viewer,
-# +Y the item's axis, z across the sheet): a leader that lands on the end
-# is RIM_END_GAP_MM * 2 (the 2:1 scale) off, a quarter of the limit, and one
-# that lands as asked is exact. Each point lies on the viewer's half of its
-# rim, off the screw's hex socket (corner radius 2.29 mm < 3.94).
-RIM_END_GAP_MM = 0.025
-BALLOON_RIMS_MM: dict[str, tuple[float, float, float]] = {
-    # (rim radius, rim height along the item's axis, side of the sheet's axis)
-    STUB: (fixture.DOWEL_DIA / 2.0, fixture.DOWEL_LENGTH, 1.0),  # tapped top end
-    CLOCK_PIN: (fixture.PIN_DIA / 2.0, fixture.PIN_LENGTH, -1.0),  # top end
-    WASHER: (fixture.WASHER_OD / 2.0, 0.0, -1.0),  # outer rim, gear side
-    SCREW_STEM: (SCREW.head_dia / 2.0, SCREW.head_h, 1.0),  # head top
-}
-
-
-def rim_end_point(radius: float, height: float, side: float) -> tuple[float, float, float]:
-    """The rim point RIM_END_GAP_MM short of its edge-on line's ``side`` end,
-    on the viewer's (+X) half of the rim, part millimetres."""
-    z = side * (radius - RIM_END_GAP_MM)
-    return (math.sqrt(radius * radius - z * z), height, z)
-
-
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
-    stem: BalloonAnchor(point_mm=rim_end_point(*rim))
-    for stem, rim in BALLOON_RIMS_MM.items()
-}
+# Item 1 balloons in the right view, items 2-5 in the shaded isometric. The
+# right view sees every round item's rims edge-on, each drawn as one line
+# across the item's axis, and on a short line no anchor holds: run
+# 20261112T203156536Z walked item 2 to its top rim 1.42 mm (sheet) in from
+# the line's end and the leader read back on the end (_assert_leader_lands,
+# limit 0.2 mm); frozen points on those rims then probed as no edge at all
+# (run 20261113T012650242Z, item 5's head top; run 20261113T042822797Z,
+# item 2's top rim .025 short of the line's end). Item 1's walked rim point,
+# 39 mm from either end of its line, landed where asked (run
+# 20261112T203156536Z proved it before item 2 failed). The isometric draws
+# every bought item's rims as ellipses, so each walks its own body there, as
+# the fly cutter's set screw does on its end-on bottom view
+# (draw_dt_cone_tip_gear_tl_cutter_assembly).
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+RIGHT_ITEMS = (BODY,)
+ISO_ITEMS = (STUB, CLOCK_PIN, WASHER, SCREW_STEM)
+if RIGHT_ITEMS + ISO_ITEMS != BOM_COMPONENTS:
+    raise AssertionError("every BOM row is ballooned once")
 BALLOON_MARGIN = 0.012
 
 
@@ -529,15 +511,20 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
         label="cam turning kit",
     )
     items = _bom_items(adapter, table)
-    landings = add_component_bom_balloons(
-        adapter,
-        right,
-        items=tuple((stem, items[stem]) for stem in BOM_COMPONENTS),
-        anchors=BALLOON_ANCHORS,
-        label="cam turning kit BOM coverage",
-        margin=BALLOON_MARGIN,
-        explode_offsets={},
-    )
+    landings = []
+    for view, stems, label in (
+        (right, RIGHT_ITEMS, "cam turning kit right balloons"),
+        (iso, ISO_ITEMS, "cam turning kit isometric balloons"),
+    ):
+        landings += add_component_bom_balloons(
+            adapter,
+            view,
+            items=tuple((stem, items[stem]) for stem in stems),
+            anchors=BALLOON_ANCHORS,
+            label=label,
+            margin=BALLOON_MARGIN,
+            explode_offsets={},
+        )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
             f"cam turning kit carries {len(landings)} balloons, "

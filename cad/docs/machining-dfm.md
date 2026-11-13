@@ -1265,7 +1265,7 @@ own errors, which every gear inherits alike, can be larger than what varies from
 
 Gear-to-gear scatter is inside the print. The fixed part is not guaranteed to be: a common
 throw error scales the whole drawn curve (.7% at .0023 in) and a common phase error mixes each
-harmonic's sine into its cosine (.8% of the summed amplitudes at .47°), the same for all 20
+harmonic's sine into its cosine (.7% of the summed amplitudes at .39°), the same for all 20
 channels. Measure the first cam's throw: it shows the fixture's throw error directly, and a
 fixture outside the print is corrected before the other 19 are cut. Whether the print's phase
 band applies to the common part is open with the owner

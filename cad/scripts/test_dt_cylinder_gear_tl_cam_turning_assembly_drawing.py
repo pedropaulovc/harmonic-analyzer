@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import re
 
 import pytest
@@ -71,37 +70,18 @@ def test_the_kit_places_each_bought_part_on_its_hole() -> None:
     assert 0.0 < fixture.SCREW_ENGAGEMENT < fixture.DOWEL_THREAD_DEPTH_MIN
 
 
-def test_bought_items_balloon_on_a_real_rim_just_short_of_its_lines_end() -> None:
-    # The right view draws each bought item's rims as lines across its axis;
-    # a leader asked near a line's end lands on the end. Each anchor is a
-    # point of a real rim of its builder (radius, end face), on the viewer's
-    # half (+X), RIM_END_GAP_MM short of the line's end: landing on the end
-    # costs at most a quarter of the leader landing limit.
-    from _drawing_balloons import _BALLOON_LANDING_TOLERANCE_M
-
-    bought = set(sheet.BOM_COMPONENTS) - {sheet.BODY}
-    assert set(sheet.BALLOON_RIMS_MM) == bought
-    assert sheet.BALLOON_ANCHORS[sheet.BODY].point_mm is None
-    rims = {
-        sheet.STUB: (fixture.DOWEL_DIA / 2.0, (0.0, fixture.DOWEL_LENGTH)),
-        sheet.CLOCK_PIN: (fixture.PIN_DIA / 2.0, (0.0, fixture.PIN_LENGTH)),
-        sheet.WASHER: (fixture.WASHER_OD / 2.0, (0.0, fixture.WASHER_MODEL_THICKNESS)),
-        sheet.SCREW_STEM: (fixture.SCREW.head_dia / 2.0, (fixture.SCREW.head_h,)),
-    }
-    scale = sheet.DETAIL_SCALE[0] / sheet.DETAIL_SCALE[1]
-    end_miss_m = sheet.RIM_END_GAP_MM * scale / 1000.0
-    assert 0.0 < end_miss_m <= _BALLOON_LANDING_TOLERANCE_M / 4.0
-    for stem in bought:
-        radius, heights = rims[stem]
-        x, y, z = sheet.BALLOON_ANCHORS[stem].point_mm
-        assert sheet.BALLOON_RIMS_MM[stem][:2] == (radius, y), stem
-        assert y in heights, stem
-        assert math.hypot(x, z) == pytest.approx(radius, abs=1e-9), stem
-        assert x > 0.0, stem
-        assert radius - abs(z) == pytest.approx(sheet.RIM_END_GAP_MM), stem
-    # Clear of the screw's hex socket mouth in the head top.
-    screw_z = sheet.BALLOON_ANCHORS[sheet.SCREW_STEM].point_mm[2]
-    assert abs(screw_z) > fixture.SCREW.socket_corner_r
+def test_bought_items_balloon_in_the_isometric_by_walking_their_own_body() -> None:
+    # The right view draws each bought item's rims edge-on, as short lines a
+    # leader does not land on as asked (runs 20261112T203156536Z,
+    # 20261113T012650242Z, 20261113T042822797Z); the isometric draws them as
+    # ellipses. No anchor is computed: every item walks its own body.
+    assert sheet.RIGHT_ITEMS == (sheet.BODY,)
+    assert set(sheet.ISO_ITEMS) == set(sheet.BOM_COMPONENTS) - {sheet.BODY}
+    assert sheet.RIGHT_ITEMS + sheet.ISO_ITEMS == sheet.BOM_COMPONENTS
+    assert set(sheet.BALLOON_ANCHORS) == set(sheet.BOM_COMPONENTS)
+    for stem, anchor in sheet.BALLOON_ANCHORS.items():
+        assert anchor.point_mm is None, stem
+        assert anchor.instance is None, stem
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
