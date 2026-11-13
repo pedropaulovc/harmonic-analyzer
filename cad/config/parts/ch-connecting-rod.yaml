@@ -1,12 +1,20 @@
 ch-connecting-rod:
   number: MHA-CH-03
   material: Plain Carbon Steel
-  material_specification: AISI 1018 low-carbon steel plate
+  material_specification: AISI 1018 CF flat, 1/4 x 2 REF
   finish: BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; OIL BARE SURFACES
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact
-  process: "machined from 1018 steel plate"
+  # #2340: the ring and shank need no flatness control of their own. The
+  # ring's near face from the fork's datum face and its thickness, both
+  # +/-.002 (the thickness's MMC envelope bounds the plate's bow), are what the
+  # flat rod's cam-to-arm window spends (test_channel_axial_budget), the ring
+  # floats about .045 a side in its .179 MIN cam slot, and neighbouring
+  # shanks stand .21 apart. The route keeps the bought bar (#2173) and cuts
+  # the plate so it stays flat: equal stock off both faces, a release before
+  # the finish passes, and hand setting (no furnace for stress relief).
+  process: "machined from the bought 1/4 x 2 in 1018 cold-finish flat (OnlineMetals 7469, #2173): the fork faces skimmed to .240, about .005 off each face; the ring and shank come off both faces equally, about .082 each, cut as a pocket inside the blank's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and bore, slot and ream after it. A rod whose ring face or thickness leaves its band once free is set straight by hand on the surface plate and rechecked, or exchanged"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

@@ -9,7 +9,14 @@ ch-channel-lever:
   finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
   quantity: 20
   tolerance_class: machined_block
-  process: "machined from 5/16 x 1 in 1018 cold-finish flat: hub and plate faces, the reamed fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces"
+  # #2340: the plate's form needs no flatness control of its own. Its thickness
+  # band (whose MMC envelope bounds the plate's bow) and its offset from the hub
+  # face, both +/-.002, are what the bar-to-bar gap at the bar pin spends
+  # (sh_vn_pivot_pin_bar_spec joint_budget), and the levers' plates stand .18
+  # apart, so nothing else rubs. The route keeps the bought bar (#2173) and
+  # cuts the plate so it stays flat: equal stock off both faces, a release
+  # before the finish passes, and hand setting (no furnace for stress relief).
+  process: "machined from the bought 5/16 x 1 in 1018 cold-finish flat (#2173): hub and plate faces, the reamed fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces. The plate comes off both faces equally, about .097 each, cut as a pocket inside the bar's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and drill and ream after it. A plate that leaves its thickness or plate-offset band once free is set straight by hand on the surface plate and rechecked, or exchanged"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
