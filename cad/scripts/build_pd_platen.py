@@ -8,8 +8,8 @@ build_pd_platen_guide.py). Fastener holes:
 
 * four clip-screw #2-56 through receivers at the plate's extreme left/right
   edges (.170 in from each), matching the clips' .283-inset end holes, each
-  tapped on through a Ø.30 boss on the back face for >= 1.5D engagement,
-  each boss rounded into the face inside the title block's inside-corner limit;
+  tapped through the plate alone for >= 1.5D engagement (#2411: no back-face
+  boss; the stock screw's tip stands proud of the back face);
 * ten #4 loose (Ø.144) counterbored guide-screw through-holes in two rows
   of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
   top row y 47 (machine 318 / 352 with the plate at y 305).
@@ -45,7 +45,6 @@ from _drawing_marks import (
 )
 from _document_units import apply_package_model_units
 from _drawing_precision import apply_drawing_precision
-from _extrude import extrude_at_offset
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -62,7 +61,6 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
 from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
 from _visibility import blank_reference_geometry
 from pd_platen_spec import (
@@ -84,11 +82,7 @@ from pd_platen_spec import (
     PLATE_THICKNESS,
     PLATE_WIDTH,
     RIGHT_VIEW_NOTE,
-    SOCKET_BOSS_DIA,
-    SOCKET_BOSS_FILLET_R,
-    SOCKET_BOSS_H,
     SOCKET_SPEC,
-    SOCKET_THREAD_ENGAGEMENT,
     SOCKET_XY,
 )
 
@@ -206,9 +200,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
     await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
-    await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
-    await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
-    await set_global(adapter, "SocketBossFilletR", f"{SOCKET_BOSS_FILLET_R}mm")
     # The counterbore depth the guide Hole Wizard override cuts; only the
     # drawing's floor reference reads it.
     await set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
@@ -262,68 +253,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
-    # Clip-screw receiver bosses: four Ø.30 integral bosses on the back face
-    # (z = PlateThickness), sketched on the front plane and extruded from that
-    # offset, so the through taps below gain the boss height of thread.
-    bosses = SketchDims()
-    check("create_sketch socket bosses", await adapter.create_sketch("Front"))
-    for index, (x, y) in enumerate(SOCKET_XY, start=1):
-        await define_circle(
-            adapter,
-            x,
-            y,
-            SOCKET_BOSS_DIA / 2.0,
-            f"socket boss {index}",
-            dims=bosses,
-            names=(f"Boss{index}X", f"Boss{index}Y", f"Boss{index}Dia"),
-            drives=(None, None, '"SocketBossDia"'),
-        )
-    await ensure_fully_defined(adapter, "socket boss sketch")
-    check("exit_sketch socket bosses", await adapter.exit_sketch())
-    name_last_feature(adapter, "SocketBossProfile")
-    drive_jobs += bosses.apply(adapter, "SocketBossProfile")
-    extrude_at_offset(adapter, SOCKET_BOSS_H, PLATE_THICKNESS)
-    name_last_feature(adapter, "SocketBosses")
-    # Offset bosses expose depth first and start offset second.
-    boss_dims = name_dimensions(adapter, "SocketBosses", ["BossH", "BossOffset"])
-    drive_jobs += [(boss_dims[0], '"SocketBossH"'), (boss_dims[1], '"PlateThickness"')]
-    v_bosses = len(SOCKET_XY) * math.pi * (SOCKET_BOSS_DIA / 2.0) ** 2 * SOCKET_BOSS_H
-    await volume_check(
-        adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
-    )
-
-    # Boss roots: each boss rounds into the back face inside the title
-    # block's inside-corner limit (unprinted; pd_platen_spec), picked on its
-    # root circle at +X (the only edge through that point).
-    check(
-        "fillet SocketBossFillets",
-        await adapter.add_fillet(
-            SOCKET_BOSS_FILLET_R,
-            [[x + SOCKET_BOSS_DIA / 2.0, y, PLATE_THICKNESS] for x, y in SOCKET_XY],
-        ),
-    )
-    name_last_feature(adapter, "SocketBossFillets")
-    fillet_dim = name_dimensions(adapter, "SocketBossFillets", ["BossFilletsR"])
-    drive_jobs += [(fillet_dim[0], '"SocketBossFilletR"')]
-    # Pappus: the corner spandrel r^2 (1 - pi/4), its centroid r (10 - 3 pi) /
-    # (3 (4 - pi)) out from the boss surface, revolved about each boss axis.
-    spandrel = SOCKET_BOSS_FILLET_R**2 * (1.0 - math.pi / 4.0)
-    spandrel_r = SOCKET_BOSS_DIA / 2.0 + SOCKET_BOSS_FILLET_R * (
-        10.0 - 3.0 * math.pi
-    ) / (3.0 * (4.0 - math.pi))
-    v_fillets = len(SOCKET_XY) * 2.0 * math.pi * spandrel_r * spandrel
-    await volume_check(
-        adapter,
-        "socket boss root fillets",
-        v_plate + v_bosses + v_fillets,
-        0.25 * v_fillets,
-    )
-
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
     # feature (4 points) from the front face. The heads sit on the clip's flat
-    # .032 sheet, so the plate plus the rear boss take the rest of the
-    # stock shank as thread and its tip finishes flush at the boss's rear face
-    # rather than bottoming in a blind socket.
+    # .032 sheet, so the plate takes the stock shank as thread and its tip
+    # stands proud of the back face (#2411) rather than bottoming in a blind
+    # socket.
     pre = await adapter.get_mass_properties()
     sockets = wizard_holes(
         adapter, SOCKET_SPEC,
@@ -338,7 +272,7 @@ async def build(adapter) -> dict[str, str]:
         len(SOCKET_XY)
         * math.pi
         * (blind_cut_dia_mm(SOCKET_SPEC) / 2.0) ** 2
-        * SOCKET_THREAD_ENGAGEMENT
+        * PLATE_THICKNESS
     )
     removed = pre.data.volume - post.data.volume
     _telemetry.info(f"sockets removed {removed:.1f} mm^3 (analytic {v_sockets:.1f})")
@@ -434,7 +368,7 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate + v_bosses + v_fillets - v_sockets - v_guide
+    v_final = v_plate - v_sockets - v_guide
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)

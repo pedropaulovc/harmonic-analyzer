@@ -4,7 +4,7 @@ The large thin brass reducer disc carries 150 physical teeth (#2034: 15:150
 replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
 48DP stock #1/reference-135 master. It does not touch the rack: the finite
 stock #7/reference-14 knob pinion drives it 15:150.
-Its Ø.504 bore clears the brass hub's Ø.501 spigot (the disc is set central
+Its Ø.501 bore clears the brass hub's Ø.498 spigot (the disc is set central
 at assembly), and three #0-80 fillister screws (MHA-PD-VN-55) clamp it to
 that hub's flange (MHA-PD-17).
 

@@ -650,14 +650,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 8.5124,
             ),
-            # MHA-PD-VN-65 #2-56 clip screws, 5.55 in the platen's through tap.
+            # MHA-PD-VN-65 #2-56 clip screws, through the 3.85 platen's tap,
+            # their tips proud of its back (#2411).
             **_expected_numbered_pairs(
                 "pd-vn-platen-clip-screw",
                 range(1, 5),
                 "pd-platen",
                 2.184,
                 1.778,
-                5.55,
+                3.85,
             ),
             **_expected_numbered_pairs(
                 "sh-vn-brass-fillister-screw",

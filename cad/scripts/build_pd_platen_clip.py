@@ -14,9 +14,9 @@ line/arc path, so every bend is a smooth cylindrical band.  In plan, the
 spring ends are full half-rounds, the screw rail's corners are rounded
 (large on the outer edge, small at the slit), and each slit ends in a full
 half-round at the bridge, as img03 shows.  The two slotted pan heads sit
-directly on the flat .032 sheet (img03: no raised seats); the platen's rear
-socket bosses take the rest of the stock shank as thread
-(pd_platen_spec.SOCKET_BOSS_H).
+directly on the flat .032 sheet (img03: no raised seats); the platen's
+through taps take the shank as thread and its tip stands proud of the
+platen's back face (#2411, CLIP_SCREW_TIP_PROUD).
 
 Used twice in pd-paper-drive.SLDASM.  Length is local +X, total width is local +Y,
 and the flat rail's outward face is local z = 0.  The assembly turns the holder
@@ -65,7 +65,6 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _document_units import apply_package_model_units
@@ -86,7 +85,11 @@ from pd_vn_platen_clip_screw_spec import (
     SHANK_LEN,
     THREAD,
 )
-from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
+from pd_platen_spec import (
+    PLATE_THICKNESS,
+    PLATE_THICKNESS_MAX,
+    PLATE_THICKNESS_MIN,
+)
 
 PART_NAME = "pd-platen-clip"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
@@ -222,16 +225,29 @@ HOLE_FLOAT_MIN = HOLE_DIA - SHANK_DIA
 # The least catalogue head (ASME B18.6.3) over the largest drilled hole,
 # concentric: the least bearing land (an offset head only uncovers less hole).
 HEAD_BEARING_LAND_MIN = (HEAD_DIA_MIN - HOLE_DIA_MAX) / 2.0
-# Clip-joint thread engagement at the worst case (drawing-guidelines.md rule
-# 18): the shortest catalogue screw (ASME B18.6.3, to 1 in: +0/-0.03 in) under
-# the thickest stock sheet reaches the least into the platen's through tap,
-# less one pitch of incomplete lead and the tap mouth's title-block edge break.
+# Clip-joint stack (#2411): the head seats on the sheet and the shank runs
+# through the platen's through tap, its tip proud of the plate's back face:
+# least for the shortest catalogue screw (ASME B18.6.3, to 1 in: +0/-0.03 in)
+# through the thickest sheet and plate, most for the longest through the
+# thinnest.
 SCREW_LENGTH_MINUS = 0.03 * 25.4
-TAP_MOUTH_BREAK = 0.254  # .010
 SHEET_T_MAX = (STOCK_THICKNESS_IN + STOCK_THICKNESS_TOL_IN) * 25.4
-CLIP_SCREW_ENGAGEMENT_MIN = (
-    SHANK_LEN - SCREW_LENGTH_MINUS - SHEET_T_MAX - PITCH - TAP_MOUTH_BREAK
+SHEET_T_MIN = (STOCK_THICKNESS_IN - STOCK_THICKNESS_TOL_IN) * 25.4
+CLIP_SCREW_TIP_PROUD = SHANK_LEN - SHEET_T - PLATE_THICKNESS
+CLIP_SCREW_TIP_PROUD_MIN = (
+    SHANK_LEN - SCREW_LENGTH_MINUS - SHEET_T_MAX - PLATE_THICKNESS_MAX
 )
+CLIP_SCREW_TIP_PROUD_MAX = SHANK_LEN - SHEET_T_MIN - PLATE_THICKNESS_MIN
+# Engagement (drawing-guidelines.md rule 18): the screw's incomplete thread
+# at its tip (up to 1.5 pitches, rule 18) stands beyond the back face even at
+# the least protrusion, and the one under its head (B18.6.3: within one pitch
+# of the head for No. 5 and smaller up to 3D long) stays inside the thinnest
+# sheet, so the screw is full thread through the whole plate and the
+# platen's receiver sets the engagement: its thinnest printed plate less both
+# tap mouths' title-block breaks (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT_MIN,
+# 1.47D, pd-platen RV-03).
+TIP_INCOMPLETE_THREAD_MAX = 1.5 * PITCH
+HEAD_INCOMPLETE_THREAD_MAX = PITCH
 # The overall width prints .XX from the outer edge, as the slit (SLIT_PLACES)
 # does: the spring rail is what they leave beside the screw rail (a reference).
 WIDTH_PLACES = 2
@@ -465,14 +481,18 @@ if TIP_FLAT_LENGTH < SPRING_END_RADIUS or BOW_RUN <= 0.0 or ARCH_RISE <= 0.0:
     )
 if BEND_RADIUS <= SHEET_T / 2.0:
     raise AssertionError("platen clip bend radius must exceed half the sheet")
-# Heads seat directly on the sheet: the shank's remainder is all thread.
-if abs(CLIP_THICKNESS + SOCKET_THREAD_ENGAGEMENT - SHANK_LEN) > 1e-9:
-    raise AssertionError("clip/platen stack no longer finishes at the screw tip")
-if abs(SOCKET_THREAD_ENGAGEMENT - (PLATE_THICKNESS + SOCKET_BOSS_H)) > 1e-9:
-    raise AssertionError("clip screw receiver no longer runs through plate and boss")
-if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
+# Heads seat directly on the sheet; the tip's incomplete thread clears the
+# platen's back face and the head's stays in the sheet, so the platen's
+# receiver holds the whole engagement (pd_platen_spec checks its floor).
+if CLIP_SCREW_TIP_PROUD_MIN < TIP_INCOMPLETE_THREAD_MAX:
     raise AssertionError(
-        f"clip {THREAD} engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (drawing-guidelines.md rule 18 (thread engagement))"
+        f"clip screw tip stands only {CLIP_SCREW_TIP_PROUD_MIN:.3f} proud at the "
+        f"worst case: its incomplete lead ({TIP_INCOMPLETE_THREAD_MAX:.3f}) "
+        "reaches into the platen's tap"
+    )
+if SHANK_LEN > 3.0 * SHANK_DIA or HEAD_INCOMPLETE_THREAD_MAX > SHEET_T_MIN:
+    raise AssertionError(
+        "the clip screw's under-head incomplete thread reaches into the platen's tap"
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock clip-screw shank does not clear the clip")
@@ -508,11 +528,6 @@ if SLIT_WIDTH_MIN < SLIT_GAP_FLOOR - 1e-9:
     raise AssertionError(
         f"platen clip slit narrows to {SLIT_WIDTH_MIN:.3f} at the printed worst "
         f"case, under the photographed {SLIT_GAP_FLOOR:.3f} it must keep open"
-    )
-if CLIP_SCREW_ENGAGEMENT_MIN < 1.5 * THREAD_MAJOR_MM[THREAD]:
-    raise AssertionError(
-        f"clip {THREAD} worst-case engagement {CLIP_SCREW_ENGAGEMENT_MIN:.3f} < 1.5D "
-        "(drawing-guidelines.md rule 18 (thread engagement))"
     )
 if HOLE_FLOAT_MIN < 2.0 * PATTERN_POSITION_ZONE:
     raise AssertionError(

@@ -411,11 +411,11 @@ if FRONT_RELIEF_WIDTH_MIN <= 2.0 * FRONT_CORNER_RADIUS_MAX:
 # #8-32 UNC-2A thread on the lathe, not with a die. Full thread ends at
 # PLAIN_CORE in front of F, on the relief's front shoulder, printed from the
 # tip face (THREAD_END_FROM_TIP, .XXX) and so at the .XX row's band from F
-# (PLAIN_CORE_PLACES). The existing
-# relief provides a tool-exit space below the conservative thread-root estimate;
-# the thumbnut at the collar's rearward stop runs on full thread or over that
-# relief. Single-pointing removes the die's assumed 1.5-pitch lead requirement,
-# not the functional relief, its floor diameter or either shoulder station.
+# (PLAIN_CORE_PLACES). The relief provides a tool-exit space below the
+# conservative thread-root estimate; the thumbnut at the collar's rearward
+# stop runs on full thread or over that relief. Single-pointing removes the
+# die's assumed 1.5-pitch lead requirement, not the functional relief or
+# either shoulder station.
 PLAIN_CORE = 7.62  # .30
 PLAIN_CORE_PLACES = 2
 THREAD_END_FROM_TIP = TIP_STATION - PLAIN_CORE  # .640
@@ -430,16 +430,19 @@ if 2.0 * _STUD_STATION_BAND > min(
         "MHA-PD-08 core front or thread end from F, two .XXX stations from "
         "the tip, is looser than the band its stacks charge"
     )
-# Ø.10 at the .XX row (.09-.11): the relief clears the thumbnut and lets the
-# tool exit below the thread root, so it takes the loosest row whose maximum
-# stays under the root estimate (machinist review of cf6e32b19: .110 at .XXX
-# named no function; .11 at .XX would reach .120, over the .1196 root).
-RELIEF_DIA = 2.54  # .10
-RELIEF_DIA_PLACES = 2
-_CORE_FRONT_TOL = printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=UNIT)
-_PLAIN_CORE_TOL = printed_band_mm(PLAIN_CORE_PLACES, unit=UNIT)
+# Ø.113 at the title block's .XXX row (.108-.118, #2419): the relief clears
+# the thumbnut and lets the tool exit below the thread root, so its maximum
+# stays under the root estimate (.11 at the .XX row would reach .120, over
+# the .1196 root).  Its least is the stud's smallest section, where the
+# threading load and the clamp both pass: the earlier Ø.10 at the .XX row
+# (.090 at its least) sat .026 under the minor for no function.  Ø.108
+# carries 1.7x the bending strength and 2.1x the stiffness of Ø.090.
+RELIEF_DIA = 2.8702  # .113
+RELIEF_DIA_PLACES = 3
 RELIEF_DIA_MAX = RELIEF_DIA + printed_band_mm(RELIEF_DIA_PLACES, unit=UNIT)
 RELIEF_DIA_MIN = RELIEF_DIA - printed_band_mm(RELIEF_DIA_PLACES, unit=UNIT)
+_CORE_FRONT_TOL = printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=UNIT)
+_PLAIN_CORE_TOL = printed_band_mm(PLAIN_CORE_PLACES, unit=UNIT)
 RELIEF_WIDTH_MIN = (PLAIN_CORE - _PLAIN_CORE_TOL) - (
     CORE_FRONT_FROM_F + _CORE_FRONT_TOL
 )  # .29 - .22 = .07

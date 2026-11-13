@@ -131,7 +131,7 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 4
     assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia"}
     assert spec.HUB_DIA == pytest.approx(0.540 * IN) and _places("HubDia") == 3
-    assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN) and _places("SpigotDia") == 4
+    assert spec.SPIGOT_DIA == pytest.approx(0.498 * IN) and _places("SpigotDia") == 4
     assert spec.FLANGE_DIA == pytest.approx(1.05 * IN) and _places("FlangeDia") == 2
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     assert joint.BOLT_CIRCLE_PLACES == 2
@@ -774,10 +774,10 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
     assert finished["hub wall over the bore"] == pytest.approx(0.0905 * IN, abs=1e-3)
     assert finished["hub wall over the bore"] >= WALL_FLOOR
     spigot = finished["spigot wall over the bore"]
-    assert spigot == pytest.approx(0.0730 * IN, abs=1e-3)
+    assert spigot == pytest.approx(0.0715 * IN, abs=1e-3)
     assert 0.060 * IN - 1e-9 <= spigot < WALL_FLOOR
     assert not hasattr(spec, "FLAT_WALL_FINISHED")
-    assert spec.BORE_WALL_TEXT == "WALL .073 MIN"
+    assert spec.BORE_WALL_TEXT == "WALL .071 MIN"
     assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
         spec.BORE_WALL_TEXT
     )
@@ -822,7 +822,7 @@ def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> No
     for hub_dia, holds in ((spec.HUB_DIA, True), (spec.HUB_DIA - 0.01 * IN, False)):
         chord_wall = (hub_dia - _row(_places("HubDia"))) / 2.0 - ream_out
         assert (chord_wall >= 0.060 * IN - 1e-9) is holds, hub_dia
-    assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN)
+    assert spec.SPIGOT_DIA == pytest.approx(0.498 * IN)
     assert spec.FLANGE_DIA == pytest.approx(1.05 * IN)
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     round_wall = spec.body_wall_worst(spec.HUB_DIA)

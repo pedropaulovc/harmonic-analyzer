@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import math
 import re
+from pathlib import Path
 
 import pytest
 
 import _config
 import build_pd_platen as build
 import draw_pd_platen as draw
+import pd_platen_callouts as callouts
 import pd_platen_spec as spec
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import SharedCoordinate
-from _inch_wall_limits import WALL_TARGET_MM
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
+from machinist_exceptions import load_exceptions
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
+CONFIG_ROOT = Path(__file__).resolve().parents[1] / "config"
 # ASME B landscape field and title block (sheet metres).
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
@@ -36,7 +45,7 @@ def _inside(xy, box) -> bool:
 
 def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
     w, h = spec.PLATE_WIDTH * draw._S / 2.0, spec.PLATE_HEIGHT * draw._S / 2.0
-    depth = (spec.PLATE_THICKNESS + spec.SOCKET_BOSS_H) * draw._RIGHT_S / 2.0
+    depth = spec.PLATE_THICKNESS * draw._RIGHT_S / 2.0
     right_h = spec.PLATE_HEIGHT * draw._RIGHT_S / 2.0
     return {
         "front": (
@@ -73,30 +82,60 @@ def test_printed_guide_and_screw_numbers_resolve_to_the_registered_parts() -> No
         assert _config.parts(mate)["number"] in printed
 
 
-def test_boss_walls_survive_the_printed_band():
-    assert spec.UNIT == "in"
-    smallest_boss = _limits(spec.SOCKET_BOSS_DIA, spec.DRAWING_PRECISION_BY_NAME["Boss2Dia"])[0]
+def test_no_socket_boss_feature_or_dimension_remains():
+    # #2411: the back face is one flat skim. The builder extrudes the plate
+    # once and adds no offset boss or root round; nothing boss-shaped is
+    # marked, printed or prefixed, and VIEW B spans the plate alone.
+    calls = [
+        node.func.attr
+        for node in ast.walk(ast.parse(inspect.getsource(build.build)))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    ]
+    assert calls.count("create_extrusion") == 1
+    assert "add_fillet" not in calls
+    names = {
+        node.id
+        for node in ast.walk(ast.parse(inspect.getsource(build.build)))
+        if isinstance(node, ast.Name)
+    }
+    assert "extrude_at_offset" not in names and "define_circle" not in names
+    marked = set(spec.DRAWING_DIMENSIONS) | {
+        name for names in spec.DRAWING_DIMENSIONS.values() for name in names
+    }
+    assert not any("boss" in name.lower() for name in marked)
+    assert not any("boss" in name.lower() for name in vars(spec))
+    assert draw.PRINTED_DIMENSIONS <= marked
+    assert draw._DEPTH_SPAN == spec.PLATE_THICKNESS
+
+
+def test_socket_engagement_shortfall_is_stated_floored_and_accepted():
+    # Rule 18: the clip screw's tip stands out of the back face, so the full
+    # thread is the thinnest printed plate less both tap mouths' title-block
+    # breaks; it falls under 1.5D (no band is tightened to rescue it, rule 4).
+    thinnest = _limits(spec.PLATE_THICKNESS, spec.DRAWING_PRECISION_BY_NAME["Depth"])[0]
     major = THREAD_MAJOR_MM[spec.SOCKET_SPEC.size]
-    # Finished: the boss rim's and the tap mouth's .010 breaks (Codjiflo, #2124).
-    breaks = 2.0 * 0.010 * 25.4
-    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(
-        smallest_boss / 2.0 - major / 2.0 - breaks
+    assert spec.PLATE_THICKNESS_MIN == pytest.approx(thinnest)
+    title_block = max(
+        edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT)
     )
-    assert spec.SOCKET_BOSS_DIA == pytest.approx(0.30 * 25.4)
-    assert spec.SOCKET_BOSS_WALL_MIN >= WALL_TARGET_MM
-
-
-def test_boss_roots_stay_inside_the_title_block_inside_corner_limit():
-    # Machinist review round 2: nothing seats on the boss roots, so the title
-    # block's inside-corner limit governs them unprinted; the modelled round
-    # lies inside it and the assembly sweep grows each boss by the limit.
-    from _printed_tolerance import inside_corner_radius_mm
-
-    limit = inside_corner_radius_mm(unit=spec.UNIT)
-    assert spec.SOCKET_BOSS_ROOT_R_MAX == limit == pytest.approx(0.040 * 25.4)
-    assert 0.0 < spec.SOCKET_BOSS_FILLET_R <= limit
-    printed = {n for names in spec.DRAWING_DIMENSIONS.values() for n in names}
-    assert not any("Fillet" in name for name in printed)
+    engaged = thinnest - 2.0 * title_block
+    assert spec.SOCKET_THREAD_ENGAGEMENT_MIN == pytest.approx(engaged)
+    assert spec.SOCKET_ENGAGEMENT_MIN_D == pytest.approx(engaged / major)
+    assert engaged < 1.5 * major
+    # It stays above the owner-accepted fleet floor (fr-nameplate RV-03).
+    assert engaged / major >= spec.ENGAGEMENT_ACCEPTED_FLOOR_D
+    # Rule 20: the socket callout states it, between the mate and the tap,
+    # never overstating the worst case.
+    lines = draw.SOCKET_CALLOUT_PROCESS.split("\n")
+    assert lines[0].startswith("PATTERN MATCHES ") and lines[-1] == "TAP"
+    assert callouts.SOCKET_ENGAGEMENT_LINE in lines
+    (printed,) = re.findall(r"(\d+\.\d+)D MIN", callouts.SOCKET_ENGAGEMENT_LINE)
+    assert engaged / major - 0.01 < float(printed) <= engaged / major
+    # pd-platen RV-03 accepts the shortfall as minor, citing that line.
+    rows = {row.id: row for row in load_exceptions(CONFIG_ROOT, "pd_platen", "part")}
+    assert rows["RV-03"].kind == "minor"
+    assert callouts.SOCKET_ENGAGEMENT_LINE in rows["RV-03"].where
+    assert "PATTERN MATCHES" in rows["RV-01"].where
 
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():
@@ -124,16 +163,10 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
         (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN),
         (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN),
     }
-    # Its crop keeps the whole counterbore inside the cut and stops short of
-    # the clip-screw boss's fillet root seen beyond (v47: the cut's upper end
-    # printed it); a break line stands on each cropped end, across both faces.
+    # Its crop keeps the whole counterbore inside the cut (v47: the uncropped
+    # cut's ends printed as plate edges); a break line stands on each cropped
+    # end, across both faces.
     assert spec.CBORE_DIA / 2.0 < draw.SECTION_CROP_HALF < draw.SECTION_SPAN
-    boss_root = (
-        min(y for _, y in spec.SOCKET_XY)
-        - spec.SOCKET_BOSS_DIA / 2.0
-        - spec.SOCKET_BOSS_FILLET_R
-    )
-    assert spec.CBORE_SECTION_HOLE_Y + draw.SECTION_CROP_HALF < boss_root - 1.0
     ends = (
         spec.CBORE_SECTION_HOLE_Y - draw.SECTION_CROP_HALF,
         spec.CBORE_SECTION_HOLE_Y + draw.SECTION_CROP_HALF,
@@ -344,7 +377,6 @@ def test_hole_table_replaces_every_hole_location_dimension():
     assert not draw.PRINTED_DIMENSIONS & draw.HOLE_TABLE_LOCATED
     assert draw.PRINTED_DIMENSIONS | draw.HOLE_TABLE_LOCATED == marked
     assert set(draw.FRONT_KEEP) >= {"Width", "Height"}
-    assert set(draw.DIMENSION_PREFIXES) <= draw.PRINTED_DIMENSIONS
     assert set(draw.PRINTED_PRECISION) == draw.PRINTED_DIMENSIONS
     stations = set(spec.GUIDE_HOLE_XY) | set(spec.SOCKET_XY)
     assert set(draw.HOLE_TABLE_MATES) == stations
@@ -427,7 +459,10 @@ def test_hole_tags_stand_clear_inside_the_plate():
     plate = (draw.LEFT_EDGE_X, draw.BOTTOM_EDGE_Y, draw.RIGHT_EDGE_X, draw.TOP_EDGE_Y)
     rims = {
         **{s: spec.GUIDE_HOLE_DIA / 2.0 * draw._S for s in spec.GUIDE_HOLE_XY},
-        **{s: spec.SOCKET_BOSS_DIA / 2.0 * draw._S for s in spec.SOCKET_XY},
+        **{
+            s: THREAD_MAJOR_MM[spec.SOCKET_SPEC.size] / 2.0 * draw._S
+            for s in spec.SOCKET_XY
+        },
     }
     holes = {
         s: (
@@ -464,8 +499,8 @@ def test_view_b_is_lettered_with_its_scale_and_arrow():
     tip_x, tip_y = draw.VIEW_ARROW_TIP
     assert tip_x == pytest.approx(draw.RIGHT_EDGE_X)
     low, high = sorted({y for _, y in spec.SOCKET_XY})
-    boss_r = spec.SOCKET_BOSS_DIA / 2.0 * draw._S
-    assert draw._front_y(low) + boss_r < tip_y < draw._front_y(high) - boss_r
+    socket_r = THREAD_MAJOR_MM[spec.SOCKET_SPEC.size] / 2.0 * draw._S
+    assert draw._front_y(low) + socket_r < tip_y < draw._front_y(high) - socket_r
     text_x, text_y = draw.VIEW_ARROW_TEXT_XY
     assert tip_x < text_x < draw.FRONT_KEEP["Height"][0] - 0.010
     assert text_y - draw.VIEW_LETTER_HEIGHT < tip_y < text_y

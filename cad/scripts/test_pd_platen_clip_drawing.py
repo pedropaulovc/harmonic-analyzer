@@ -12,7 +12,6 @@ import draw_pd_platen_clip as draw
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
-from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from machinist_exceptions import load_exceptions
 
@@ -95,11 +94,16 @@ def test_slit_keeps_the_photographed_gap_at_the_printed_worst_case():
     assert clip.SPRING_RAIL_WIDTH == pytest.approx(0.130 * 25.4)
 
 
-def test_clip_screw_engages_one_and_a_half_diameters_worst_case():
+def test_clip_screw_full_thread_spans_the_whole_platen_tap():
+    # #2411: the shortest screw through the thickest sheet and plate still
+    # carries its incomplete lead (1.5 pitches) out of the platen's back face,
+    # and the one under the head (a pitch) stays in the thinnest sheet, so
+    # the platen's tap holds the whole engagement (pd_platen_spec, RV-03).
     shortest = clip.SHANK_LEN - 0.03 * 25.4
-    engaged = shortest - clip.SHEET_T_MAX - clip.PITCH - 0.010 * 25.4
-    assert clip.CLIP_SCREW_ENGAGEMENT_MIN == pytest.approx(engaged)
-    assert engaged / THREAD_MAJOR_MM[clip.THREAD] >= 1.5
+    proud = shortest - clip.SHEET_T_MAX - clip.PLATE_THICKNESS_MAX
+    assert clip.CLIP_SCREW_TIP_PROUD_MIN == pytest.approx(proud)
+    assert proud >= 1.5 * clip.PITCH
+    assert clip.PITCH <= clip.SHEET_T_MIN
 
 
 def test_annotations_stay_in_the_field():

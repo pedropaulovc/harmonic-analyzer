@@ -6,8 +6,8 @@ authority for what two parts cut and must agree on: the brass hub's flange
 (MHA-PD-17, ``transgear_disc_hub_spec``) carries the #51 (.067) clearance
 holes and the reducer disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps;
 the three 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø.75
-circle, which keeps the disc's taps .080 clear of its Ø.501 bore at the worst
-case (``rack_pinion_spec`` checks it; the heads stand clear of the Ø.52 hub
+circle, which keeps the disc's taps clear of its Ø.501 bore at the worst
+case (``rack_pinion_spec`` checks the web; the heads stand clear of the hub
 body).  The hub's rear spigot passes the disc's bore and seats on
 the MHA-PD-10 sleeve's step face (R9-68): its diameter clears the disc's
 bore (the disc is centred at assembly) and its length is the disc front
@@ -57,16 +57,19 @@ BOLT_CIRCLE_POSITION_TOL = printed_band_mm(BOLT_CIRCLE_PLACES, unit=UNIT) / 2.0
 if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
     raise AssertionError("one pattern angle per disc screw")
 
-# The retained hub spigot (R9-68): Ø.501 in the disc's bore, which it only
+# The retained hub spigot (R9-68): Ø.498 in the disc's bore, which it only
 # clears (the disc is centred at assembly), so it prints the turned
 # diameter's row as a plain inch step, +.000/-.001 (delegated ruling
 # 2026-11-07 L2, pending owner confirmation; it was the fleet's SHAFT_H
-# 0/-.0008 while it located the disc).  Its length runs from the flange's
+# 0/-.0008 while it located the disc).  It is turned .003 under the owned
+# .501 chucking reamer that cuts the disc's bore, which keeps the disc's
+# .0030-.0045 centring clearance without a special .504 reamer (#2412).
+# Its length runs from the flange's
 # rear face to its end on the sleeve's step: a term of the disc cluster's
 # stack (transgear_cluster_fit) that sets the collar-to-disc air, so it
 # prints +/-.001 (the shims set the end float: owner ruling 2026-11-01,
 # #2124).
-SPIGOT_DIA = 12.7254  # .501
+SPIGOT_DIA = 12.6492  # .498
 SPIGOT_DIA_BAND = (0.0, -0.0254)  # (upper, lower) deviations: +.000/-.001
 SPIGOT_DIA_PLACES = 4
 SPIGOT_LENGTH = 3.6576  # .144

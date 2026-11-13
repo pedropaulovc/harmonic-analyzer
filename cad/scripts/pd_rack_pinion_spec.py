@@ -5,8 +5,8 @@ driven 15:150 by the knob shaft's finite #7/reference-14 PA20 48DP form (#2034:
 15:150 replaced 12:120 at the same 1:10 feed) and
 screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
-``pd_transgear_disc_hub_geometry``'s).  Its Ø.504 REAM_H7 bore clears the
-hub's Ø.501 SHAFT_H spigot, which passes it and seats on the pinion sleeve's
+``pd_transgear_disc_hub_geometry``'s).  Its Ø.501 REAM_H7 bore clears the
+hub's Ø.498 spigot, which passes it and seats on the pinion sleeve's
 (MHA-PD-10) step face; the clearance lets MHA-PD-00 set the disc central to
 the running axis before its taps are transferred.  Its front face, clamped by
 the hub's flange, stands the spigot's length ahead of that step, and its rear
@@ -290,11 +290,13 @@ FACE_WIDTH = 2.9972  # .118
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
 # Clears the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): the
-# bore reamed .504 REAM_H7 (a .5040 decimal chucking reamer) over the
-# spigot's SHAFT_H.  The clearance is the set-at-assembly route of the tooth
-# space runout (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Owner ruling
-# 2026-11-08 (Pedro), #2144 item 3.1 (Q-PD06-1 option B).
-BORE_DIA = 12.8016  # .504
+# bore reamed .501 REAM_H7 (the owned .5010 chucking reamer) over the
+# spigot turned .003 under it.  The clearance is the set-at-assembly route
+# of the tooth space runout (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Owner
+# ruling 2026-11-08 (Pedro), #2144 item 3.1 (Q-PD06-1 option B: a clearance
+# bore, disc set central at assembly); the bore moved from .504 to the owned
+# reamer and the spigot from .501 to .498 at the same clearance (#2412).
+BORE_DIA = 12.7254  # .501
 BORE_BAND = REAM_H7  # (upper, lower) deviations: +.0005/0
 BORE_DEVIATIONS = deviations(BORE_BAND)
 BORE_PLACES = 4
@@ -311,7 +313,7 @@ BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 # taps are spotted through the flange.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
-# (least, greatest) diametral clearance: .0030 .. .0043.
+# (least, greatest) diametral clearance: .0030 .. .0045.
 SPIGOT_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 6),
     round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 6),

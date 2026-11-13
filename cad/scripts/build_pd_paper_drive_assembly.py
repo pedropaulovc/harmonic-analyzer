@@ -225,11 +225,8 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
-    SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
-    SOCKET_BOSS_ROOT_R_MAX as PLATEN_BOSS_ROOT_R_MAX,
-    SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
-    SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
+    SOCKET_THREAD_ENGAGEMENT_MIN as PLATEN_SOCKET_ENGAGEMENT_MIN,
     SOCKET_XY as PLATEN_SOCKET_XY,
     UNIT as PLATEN_UNIT,
 )
@@ -275,6 +272,9 @@ from pd_platen_guide_spec import (  # noqa: E402
 )
 from build_pd_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
+    CLIP_SCREW_TIP_PROUD,
+    CLIP_SCREW_TIP_PROUD_MAX,
+    CLIP_SCREW_TIP_PROUD_MIN,
     CLIP_THICKNESS,
     HOLE_INSET as CLIP_HOLE_INSET,
     HOLE_Y as CLIP_HOLE_Y,
@@ -1376,8 +1376,10 @@ def _assert_fastener_stacks() -> None:
     nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
     # Clip heads sit directly on the flat 0.8 brass sheet (no seat boss); the
-    # platen and its rear socket bosses are through-tapped for the remaining
-    # 5.55 mm of shank, and the tip is flush with the boss.
+    # platen's through tap holds the whole engagement (its full-thread
+    # minimum, pd_platen_spec) and the tip stands proud of the platen's back
+    # face (#2411), its whole range swept past the bar and the hanger by
+    # _assert_lock_station_sweep.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
         CLIP_SCREW_THREAD,
@@ -1389,15 +1391,15 @@ def _assert_fastener_stacks() -> None:
     )
     valid_engagement(
         f"clip {CLIP_SCREW_THREAD} engagement",
-        PLATEN_SOCKET_ENGAGEMENT,
+        PLATEN_SOCKET_ENGAGEMENT_MIN,
         CLIP_SCREW_SHANK_DIA,
     )
-    clip_tip_clearance = (
-        CLIP_THICKNESS + PLATEN_SOCKET_ENGAGEMENT - CLIP_SCREW_SHANK_LEN
-    )
-    nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
-    if abs(clip_tip_clearance) > 1e-9:
-        raise AssertionError("clip screw tip is not flush with the socket boss")
+    clip_stack = CLIP_THICKNESS + PLATE_THICKNESS + CLIP_SCREW_TIP_PROUD
+    if abs(clip_stack - CLIP_SCREW_SHANK_LEN) > 1e-9:
+        raise AssertionError("clip screw stack does not consume the stock shank")
+    nonnegative("clip screw tip proud of the platen back", CLIP_SCREW_TIP_PROUD_MIN)
+    if not CLIP_SCREW_TIP_PROUD_MIN <= CLIP_SCREW_TIP_PROUD <= CLIP_SCREW_TIP_PROUD_MAX:
+        raise AssertionError("clip screw nominal tip lies outside its swept range")
 
     # The raised heads remain wholly outside the recording-paper side margins
     # (the sheet sits off centre: _recording_geometry.RECORDING_PAPER_LEFT_INSET_MM).
@@ -1658,11 +1660,11 @@ def _grown(
 
 
 def _assert_lock_station_sweep() -> None:
-    """Conservatively sweep each guide-lock section and clip-screw boss
+    """Conservatively sweep each guide-lock section and clip-screw tip
     unbounded in x; this is stricter than the separately enforced finite
     engaged-feed domain. Its (y, z) section must clear every fixed part
     behind the bar at every platen position, the plates the bar's back face
-    and the bosses its top edge, by LOCK_SWEEP_FLOOR at the printed worst case
+    and the tips its top edge, by LOCK_SWEEP_FLOOR at the printed worst case
     (contract lock sweep; R9-31 fits the low guide-lock screw heads so they
     pass the hanger arm)."""
     # How far the lock stack's faces can stand from the model: forward (the
@@ -1724,38 +1726,32 @@ def _assert_lock_station_sweep() -> None:
                 ),
             ),
         ]
-    # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
-    # proud of it, their screw tips flush in them; the thinnest bar carries
-    # the back rearward. Each boss takes its printed Ø (on the radius), the
-    # root round's foot on the back face beyond it at the title block's
-    # inside-corner limit, and its station sideways,
-    # and rearward the tallest boss, or the tip left proud of the shortest one
-    # by a thin plate.
-    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_ROOT_R_MAX
-    boss_dy = printed_deviations(
-        PLATEN_SOCKET_BOSS_DIA, PLATEN_PRECISION["Boss2Dia"], unit=PLATEN_UNIT
-    )[1] / 2.0 + max(
+    # The clip-screw tips stand proud of the platen back (#2411), from the
+    # back face to CLIP_SCREW_TIP_PROUD; the thinnest bar carries the back
+    # rearward. Each tip takes the #2-56 major (on the radius) and its tap's
+    # printed station sideways, and rearward the longest screw through the
+    # thinnest sheet and plate (CLIP_SCREW_TIP_PROUD_MAX).
+    tip_r = CLIP_SCREW_SHANK_DIA / 2.0
+    tip_dy = max(
         abs(deviation)
         for _, y in PLATEN_SOCKET_XY
-        for deviation in printed_deviations(y, PLATEN_PRECISION["Socket2Y"], unit=PLATEN_UNIT)
+        for deviation in printed_deviations(
+            y, PLATEN_PRECISION["Socket2Y"], unit=PLATEN_UNIT
+        )
     )
-    boss_rear = (
-        printed_deviations(PLATEN_BOSS_H, PLATEN_PRECISION["BossH"], unit=PLATEN_UNIT)[1]
-        + _PLATEN_THICKNESS_BAND
-    )
-    bosses = [
+    clip_tips = [
         (
-            f"clip-screw boss y{y:.1f}",
+            f"clip-screw tip y{y:.1f}",
             _grown(
-                (y - boss_r, y + boss_r, BAR_FRONT_Z, BAR_FRONT_Z + PLATEN_BOSS_H),
-                boss_dy,
+                (y - tip_r, y + tip_r, BAR_FRONT_Z, BAR_FRONT_Z + CLIP_SCREW_TIP_PROUD),
+                tip_dy,
                 0.0,
-                -_BAR_DEPTH_DEV[0] + boss_rear,
+                -_BAR_DEPTH_DEV[0] + CLIP_SCREW_TIP_PROUD_MAX - CLIP_SCREW_TIP_PROUD,
             ),
         )
         for y in sorted({y for _, y in CLIP_SCREW_XY})
     ]
-    moving += bosses
+    moving += clip_tips
     tip_y = _on_arm(ARM.TIP_STATION)[1]
     plate_corner_y = max(
         _on_arm(ARM_PLATE.BORE_STATION + u, ARM_PLATE.BORE_OFFSET + v)[1]
@@ -1882,9 +1878,9 @@ def _assert_lock_station_sweep() -> None:
                     f" < {LOCK_SWEEP_FLOOR})"
                 )
             minima[fixed_label] = min(minima.get(fixed_label, math.inf), gap)
-            if moving_label.startswith("clip-screw boss"):
-                minima["clip-screw bosses"] = min(
-                    minima.get("clip-screw bosses", math.inf), gap
+            if moving_label.startswith("clip-screw tip"):
+                minima["clip-screw tips"] = min(
+                    minima.get("clip-screw tips", math.inf), gap
                 )
     # The plates bridge behind the bar: the thickest bar and the shallowest
     # rail bring their front faces closest to its back face.
@@ -1910,7 +1906,7 @@ def _assert_lock_station_sweep() -> None:
             f" (worst-case gap {rack_gap:.3f} < {LOCK_SWEEP_FLOOR})"
         )
     minima["platen rack"] = rack_gap
-    # The bosses stand inside the bar's depth, so they must pass above its top
+    # The tips stand inside the bar's depth, so they must pass above its top
     # edge; a top rail printed short drops the hung platen toward it.
     bar = _grown(
         (BAR_TOP_Y - BAR_HEIGHT, BAR_TOP_Y, BAR_FRONT_Z, BAR_BACK_Z),
@@ -1918,13 +1914,13 @@ def _assert_lock_station_sweep() -> None:
         0.0,
         0.0,
     )
-    boss_bar_gap = min(_section_gap(section, bar) for _, section in bosses)
-    if boss_bar_gap < LOCK_SWEEP_FLOOR:
+    tip_bar_gap = min(_section_gap(section, bar) for _, section in clip_tips)
+    if tip_bar_gap < LOCK_SWEEP_FLOOR:
         raise AssertionError(
-            "the platen's clip-screw bosses would sweep into the bar"
-            f" (worst-case gap {boss_bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+            "the platen's clip-screw tips would sweep into the bar"
+            f" (worst-case gap {tip_bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
         )
-    minima["clip-screw bosses on the bar"] = boss_bar_gap
+    minima["clip-screw tips on the bar"] = tip_bar_gap
     log(
         "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())

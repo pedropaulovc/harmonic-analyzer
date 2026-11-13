@@ -3,7 +3,7 @@ r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reduc
 The turned Ø.540 hub has a plain round .313 +.0010/+.0005 bore,
 reamed through (the shop's .3135 over reamer), a sliding fit on the pinion
 sleeve's (MHA-PD-10) .313 +.0005/.0000 boss, with a Ø1.05 × .094 flange and
-a Ø.501 +.000/-.001 rear spigot.  The spigot passes the reducer disc's
+a Ø.498 +.000/-.001 rear spigot.  The spigot passes the reducer disc's
 (MHA-PD-06) bore, which it clears (the disc is centred at assembly), and its
 end seats on the sleeve's step face (the 12T's tooth ends); the flange's rear
 face clamps the disc's front face, the spigot's length ahead of the step.

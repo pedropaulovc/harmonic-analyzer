@@ -583,9 +583,11 @@ Live catalog verification on October 11, 2026:
   min, and `_mcmaster_92446a077.py` holds the least head. Over the clip's
   largest drilled hole the least head leaves 0.44 mm of land (0.25 mm on a
   bearing circle of 90 % of it); the Ø4.24 head stays 1.18 mm inside the
-  6.6 mm screw rail. Length and thread are 90114A124's, so the engagement
-  (5.55 mm nominal, 4.02 mm worst case, at least 1.5D) and the flush tip are
-  unchanged. The drawing shows a domed pan crown but sizes no crown, slot or
+  6.6 mm screw rail. Length and thread are 90114A124's. The platen has no
+  rear bosses (#2411), so the plate alone engages 3.22 mm at the worst case
+  (1.47D, both tap mouths at the title block's .010 break; pd-platen RV-03
+  accepts it) and the tip stands .029 to .073 in proud of its back face.
+  The drawing shows a domed pan crown but sizes no crown, slot or
   tip, so `diag_build_92446A077.py` builds it on the shared slotted-head laws
   of `diag_mcmaster_fillister.py`, as 91792A108 does [INFERENCE]. It is
   catalogue-only: the SLDPRT download is not harvested, so it has no replica
