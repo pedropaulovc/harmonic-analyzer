@@ -17,6 +17,7 @@ import ast
 import asyncio
 import dataclasses
 import gzip
+import hashlib
 import importlib.util
 import json
 import math
@@ -25,6 +26,8 @@ import socket
 import subprocess
 import struct
 import sys
+import time
+import types
 from pathlib import Path
 from typing import Any
 
@@ -2678,3 +2681,503 @@ def test_an_unmasked_property_that_differs_still_diverges(tmp_path, monkeypatch)
     assert "2027" in divergence["actual"]["args"]
     # The Generator before it was rebound and its readback served rebound.
     assert replayer.substitution_report()["count"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Assemblies and drawings: a script's own argument, PDFs and sidecars
+# --------------------------------------------------------------------------- #
+def minimal_pdf(line_end: float, stamp: str) -> bytes:
+    """A one-page vector PDF as SolidWorks exports a sheet: one text run and
+    one black stroked line from (20, 20) to (``line_end``, 20) points;
+    ``stamp`` is its Info dictionary's creation date (bytes, never ink)."""
+    content = (
+        f"BT /F1 12 Tf 20 60 Td (DRAWING) Tj ET 0 0 0 RG 1 w 20 20 m "
+        f"{line_end:g} 20 l S"
+    ).encode()
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 100] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /CreationDate (" + stamp.encode() + b") >>",
+    ]
+    data = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(data))
+        data += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(data)
+    data += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    data += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    data += b"trailer\n<< /Size %d /Root 1 0 R /Info 6 0 R >>\n" % (len(objects) + 1)
+    data += b"startxref\n%d\n%%%%EOF\n" % xref
+    return bytes(data)
+
+
+class DrawingServer(FakeServer):
+    """FakeServer whose SaveTo writes a real vector PDF to a ``.pdf`` path:
+    its line as long as the application's Name says (a request), stamped
+    with the export's time as SolidWorks stamps its date."""
+
+    def invoke(self, target: FakeDispatch, dispid: int, flags: int, args: tuple) -> Any:
+        if dispid != 7 or not str(args[0]).lower().endswith(".pdf"):
+            return super().invoke(target, dispid, flags, args)
+        self.calls += 1
+        path = Path(args[0])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line_end = float(self.names.get("app", "100"))
+        path.write_bytes(minimal_pdf(line_end, f"D:{time.time_ns()}"))
+        return True
+
+
+def fake_run_drawing(build: Any) -> int:
+    """:func:`fake_run_build` on a :class:`DrawingServer`."""
+    adapter = FakeAdapter(DrawingServer())
+    try:
+        asyncio.run(build(adapter))
+    except Exception:  # noqa: BLE001 - run_build's contract
+        return 1
+    return 0
+
+
+# The record driver of an assembly or drawing build on the fake seat: the real
+# CLI, recorder and exit-code mapping, SaveTo writing real PDFs.
+DEPENDENT_DRIVER = """
+import sys
+import _session
+import test_com_conversation as fixture
+_session.run_build = fixture.fake_run_drawing
+import com_replay
+sys.exit(com_replay.main(sys.argv[1:]))
+"""
+# A drawing script as dodo runs one: its artifact stem is its one argument. It
+# opens the model it draws, reads that model's STL itself, sets the line from
+# its own settings (a request) and saves the drawing and its PDF.
+DRAWING_SCRIPT = (
+    "import json, sys\n"
+    "from pathlib import Path\n"
+    "import _paths\n"
+    "from _session import run_build\n"
+    "import test_com_conversation  # noqa: F401 -- the fake seat's interfaces\n"
+    "async def build(adapter):\n"
+    "    stem, out = sys.argv[1], _paths.OUT_SLDPRT.parent\n"
+    "    settings = json.loads((Path(__file__).parent / 'drawing.json').read_text())\n"
+    "    app = adapter.swApp\n"
+    "    if not app.Open(str(out / 'sldprt' / 'sh-widget.SLDPRT')):\n"
+    "        raise RuntimeError('the model is missing')\n"
+    "    (out / 'stl' / 'sh-widget.STL').read_bytes()\n"
+    "    app.Name = str(settings['line'])\n"
+    "    app.SaveTo(str(out / 'slddrw' / f'{stem}.SLDDRW'))\n"
+    "    app.SaveTo(str(out / 'pdf' / f'{stem}.PDF'))\n"
+    "    return {}\n"
+    "if __name__ == '__main__':\n"
+    "    if len(sys.argv) != 2:\n"
+    "        sys.exit(2)\n"
+    "    sys.exit(run_build(build))\n"
+)
+
+
+def drawing_outputs(out: Path) -> None:
+    """The model a :data:`DRAWING_SCRIPT` build draws, under output root ``out``."""
+    (out / "sldprt").mkdir(parents=True, exist_ok=True)
+    (out / "sldprt" / "sh-widget.SLDPRT").write_bytes(b"the model")
+    (out / "stl").mkdir(exist_ok=True)
+    (out / "stl" / "sh-widget.STL").write_bytes(b"its STL")
+
+
+def test_cli_record_keeps_a_scripts_argument_and_measures_what_replay_lacks(tmp_path):
+    script = tmp_path / "draw_sh_widget.py"
+    script.write_text(DRAWING_SCRIPT, encoding="utf-8")
+    (tmp_path / "drawing.json").write_text('{"line": 100}', encoding="utf-8")
+    procs = {}
+    for case, argv in {"argument": ["--", "sh_widget"], "none": []}.items():
+        drawing_outputs(tmp_path / case / "out")
+        procs[case] = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                DEPENDENT_DRIVER,
+                "record",
+                str(script),
+                "--log",
+                str(tmp_path / case / "L.jsonl.gz"),
+                "--summary",
+                str(tmp_path / case / "summary.json"),
+                "--out-root",
+                str(tmp_path / case / "out"),
+                *argv,
+            ],
+            cwd=SCRIPTS,
+            env=dict(os.environ, OTEL_EXPORTER_OTLP_ENDPOINT=""),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    runs = {}
+    for case, proc in procs.items():
+        output, _ = proc.communicate(timeout=120)
+        summary = json.loads((tmp_path / case / "summary.json").read_text("utf-8"))
+        runs[case] = (proc.returncode, summary, output)
+    rc, summary, output = runs["argument"]
+    assert rc == 0 and summary["complete"], output
+    assert summary["argv"] == ["sh_widget"]
+    gaps = summary["replay_gaps"]
+    # The engine's replay passes no argument, redirects only sldprt/, sldasm/,
+    # png/ and stl/, and stages none of the models a build opens.
+    assert {name: gaps[name] for name in gaps if name != "python_out_reads"} == {
+        "argv": 1,
+        "out_paths": {
+            "count": 3,
+            "first": [
+                "pdf/sh_widget.PDF",
+                "slddrw/sh_widget.SLDDRW",
+                "sldprt/sh-widget.SLDPRT",
+            ],
+        },
+        "out_paths_unredirected": {
+            "count": 2,
+            "first": ["pdf/sh_widget.PDF", "slddrw/sh_widget.SLDDRW"],
+        },
+        "out_inputs": {"count": 1, "first": ["sldprt/sh-widget.SLDPRT"]},
+        "out_inputs_unredirected": {"count": 0, "first": []},
+    }
+    assert "stl/sh-widget.STL" in gaps["python_out_reads"]["first"]
+    # Without its argument the script refuses, exactly as unrecorded: the
+    # argument reaches it only through the driver.
+    rc, summary, output = runs["none"]
+    assert rc == 2 == summary["exit_code"], output
+    assert summary["argv"] == [] and summary["replay_gaps"]["argv"] == 0
+
+
+def test_the_replays_redirected_outputs_are_the_engines(tmp_path, monkeypatch):
+    import com_replay
+
+    monkeypatch.delitem(sys.modules, "_part_save", raising=False)
+    before = {name: v for name, v in vars(_paths).items() if isinstance(v, Path)}
+    for name, value in before.items():
+        monkeypatch.setattr(_paths, name, value)  # restored after the test
+    conv.redirect_outputs(tmp_path)
+    moved = {
+        value.relative_to(tmp_path).as_posix()
+        for name, value in vars(_paths).items()
+        if isinstance(value, Path) and value != before.get(name)
+    }
+    assert moved == set(com_replay._REDIRECTED)
+
+
+def _captured_pdfs(root: Path, *pdfs: tuple[str, bytes]) -> tuple[Any, Path]:
+    """A conversation whose build had SolidWorks write ``pdfs`` (path, bytes)
+    and the capture directory holding them."""
+    root.mkdir()
+    captured: dict[str, dict[str, Any]] = {}
+    for index, (rel, data) in enumerate(pdfs):
+        name = conv.capture_name(index)
+        (root / name).write_bytes(gzip.compress(data))
+        digest = hashlib.sha256(data).hexdigest()
+        captured[str(index + 3)] = {
+            rel: {"file": name, "sha256": digest, "size": len(data)}
+        }
+    return types.SimpleNamespace(trailer={"captured": captured}), root
+
+
+def test_a_drawings_pdf_is_judged_on_its_ink_not_its_bytes(tmp_path):
+    def signal(a: tuple[Any, Path], b: tuple[Any, Path]) -> tuple[str, Any]:
+        found, detail = _com_outcome._pdf_signal(a[0], b[0], a[1], b[1])
+        return found.value, detail
+
+    sheet = "pdf/sh_widget.PDF"
+    base = _captured_pdfs(tmp_path / "base", (sheet, minimal_pdf(100.0, "D:1")))
+    again = minimal_pdf(100.0, "D:2")
+    assert again != minimal_pdf(100.0, "D:1")
+    assert signal(base, _captured_pdfs(tmp_path / "again", (sheet, again))) == (
+        "same",
+        None,
+    )
+    longer = _captured_pdfs(tmp_path / "longer", (sheet, minimal_pdf(120.0, "D:1")))
+    assert signal(base, longer) == (
+        "different",
+        {sheet: "page 1: 1 path pieces base only, 1 new only"},
+    )
+    other = _captured_pdfs(tmp_path / "other", ("pdf/other.PDF", again))
+    assert signal(base, other) == (
+        "different",
+        {"pdf/other.PDF": "new only", sheet: "base only"},
+    )
+    broken = _captured_pdfs(tmp_path / "broken", (sheet, b"%PDF-1.4 no objects"))
+    assert signal(base, broken) == ("different", {sheet: "bytes"})
+    none = _captured_pdfs(tmp_path / "none")
+    assert signal(none, none) == ("absent", None)
+
+
+def test_an_assemblys_sidecars_are_compared_byte_for_byte(tmp_path):
+    proof, dof = ".sh-widget.massprops.sha", ".sh-widget.dof.json"
+
+    def directory(name: str, **files: str) -> Path:
+        root = tmp_path / name
+        root.mkdir()
+        for file, text in files.items():
+            (root / file).write_text(text, encoding="utf-8")
+        return root
+
+    def signal(a: Path | None, b: Path | None) -> tuple[str, Any]:
+        found, detail = _com_outcome._sidecar_signal(a, b)
+        return found.value, detail
+
+    base = directory("base", **{proof: "ab\n"})
+    assert signal(base, directory("same", **{proof: "ab\n"})) == ("same", None)
+    moved = directory("moved", **{proof: "cd\n"})
+    assert signal(base, moved) == ("different", {proof: "bytes"})
+    freed = directory("freed", **{proof: "ab\n", dof: "{}"})
+    assert signal(base, freed) == ("different", {dof: "new only"})
+    assert signal(None, tmp_path / "missing") == ("absent", None)
+
+
+def test_each_kind_is_judged_on_its_own_signals(tmp_path, monkeypatch):
+    empty = types.SimpleNamespace(calls=[], trailer={})
+    assert _com_outcome.SIGNALS == {
+        "part": ("mass", "requests", "answers", "stl"),
+        "assembly": ("mass", "requests", "answers", "sidecars"),
+        "drawing": ("requests", "answers", "pdf"),
+    }
+    streams = _com_outcome._streams(empty, empty)
+    for kind, names in _com_outcome.SIGNALS.items():
+        found = _com_outcome.outcome(empty, empty, tmp_path, tmp_path, streams, kind)
+        assert tuple(found["outcome_signals"]) == names
+
+    def broken(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("injected")
+
+    monkeypatch.setattr(_com_outcome, "outcome", broken)
+    judged = _com_outcome.judge(empty, empty, None, tmp_path, tmp_path, kind="drawing")
+    assert judged["outcome_signals"] == dict.fromkeys(
+        ("requests", "answers", "pdf"), "absent"
+    )
+
+
+def test_a_dependents_seat_path_needs_its_own_geometry(monkeypatch):
+    assert _com_outcome.GEOMETRY == {
+        "part": ("mass", "stl"),
+        "assembly": ("mass", "sidecars"),
+        "drawing": ("pdf",),
+    }
+
+    def judged(kind: str, **geometry: str) -> dict[str, Any]:
+        found = {
+            "outcome": "different",
+            "outcome_signals": {
+                "requests": "different",
+                "answers": "different",
+                **geometry,
+            },
+            "outcome_details": {},
+            "judge_faults": [],
+        }
+        monkeypatch.setattr(_com_outcome, "outcome", lambda *args: found)
+        base = types.SimpleNamespace(calls=_picked(True))
+        new = types.SimpleNamespace(calls=_picked(False))
+        return _com_outcome.judge(base, new, {"index": 4}, Path(), Path(), kind=kind)
+
+    # The same vendored selection fallback steers assemblies and drawings, so
+    # their detours are judged once their own geometry is the base's.
+    assert judged("drawing", pdf="same")["seat_path"]["path"] == "detour"
+    assert judged("drawing", pdf="different")["seat_path"] is None
+    found = judged("assembly", mass="same", sidecars="same")
+    assert found["seat_path"]["path"] == "detour"
+    assert judged("assembly", mass="same", sidecars="different")["seat_path"] is None
+    # A part's geometry is mass and STL: a sheet's ink is no evidence of it.
+    assert judged("part", pdf="same")["seat_path"] is None
+
+
+def test_a_stream_that_differs_only_by_echoed_titles_is_a_title_echo(monkeypatch):
+    echo = _com_outcome.title_echo
+    base = _echoing("Part13")
+    assert echo(base, _echoing("Part24"))
+    # Anything else differing is no echo: a request, a missing request...
+    assert not echo(base, _echoing("Part24", "ScaleEndMargin"))
+    assert not echo(base, _echoing("Part24", handle=5))
+    assert not echo(base, _echoing("Part24")[:3])
+    # ... or an answer beyond noise, however late after the echo.
+    count = conv.Call(4, 3, "InvokeTypes", ["Count"], "IApp.Get", result=0)
+    later = [*base, count]
+    answered = [*_echoing("Part24"), dataclasses.replace(count, result=1)]
+    assert echo(later, [*_echoing("Part24"), count]) and not echo(later, answered)
+
+    def judged(a: list[conv.Call], b: list[conv.Call]) -> dict[str, Any]:
+        return _com_outcome.judge(
+            types.SimpleNamespace(calls=a, trailer={}),
+            types.SimpleNamespace(calls=b, trailer={}),
+            {"index": 3, "field": "args"},
+            Path(),
+            Path(),
+            kind="drawing",
+        )
+
+    found = judged(base, _echoing("Part24"))
+    assert found["truth_cause"] == _com_outcome.TITLE_COUNTER_CAUSE
+    assert found["title_echo"] is True and found["judge_faults"] == []
+    assert judged(later, answered)["title_echo"] is False
+    # Judged only after an echo was the first difference.
+    assert judged(base, _echoing("Part24", "ScaleEndMargin"))["title_echo"] is None
+
+    def broken(*_args: Any) -> bool:
+        raise RuntimeError("injected")
+
+    monkeypatch.setattr(_com_outcome, "title_echo", broken)
+    found = judged(base, _echoing("Part24"))
+    assert found["title_echo"] is None
+    assert found["judge_faults"] == [
+        {"step": "title_echo", "error": "RuntimeError: injected"}
+    ]
+
+
+def _display_probe(site: str, *values: Any, result: Any) -> conv.Call:
+    """An inert IModelView read of ``_seat_forensics.display_geometry``, as
+    the 2026-11-12 ms_stop_plate recording logged it."""
+    header = [54, 0, 1, {"t": [24, 0]}, {"t": [{"t": [5, 1]}, {"t": [16389, 2]}]}]
+    return conv.Call(
+        0, -5, "InvokeTypes", [*header, *values], site, result, origin=conv.Origin.INERT
+    )
+
+
+def _projected(point: tuple[float, ...], x: str, y: str) -> conv.Call:
+    return _display_probe(
+        "IModelView.ProjectModelPoint",
+        *map(_f, point),
+        *[{"s": "Missing"}] * 3,
+        result={"t": [{"f": x}, {"f": y}, _f(0.0)]},
+    )
+
+
+# ms_stop_plate's pass-1 answers: the origin's projection, and 1 mm along x.
+_LEFT, _BOTTOM = "0x1.f414141414143p+7", "0x1.4be629edb1754p+9"
+_X_AXIS = "0x1.f8ba7666bfeadp+7"
+
+
+def _probes(box: list[Any], x_axis: str = _X_AXIS) -> list[conv.Call]:
+    """One ``display_geometry`` probe: the window, then four projections."""
+    return [
+        _display_probe("IModelView.GetVisibleBox", result={"t": box}),
+        _projected((0.0, 0.0, 0.0), _LEFT, _BOTTOM),
+        _projected((1e-3, 0.0, 0.0), x_axis, _BOTTOM),
+        _projected((0.0, 1e-3, 0.0), _LEFT, "0x1.4abc9159067f9p+9"),
+        _projected((0.0, 0.0, 1e-3), _LEFT, _BOTTOM),
+    ]
+
+
+def test_the_seats_drawing_display_is_read_from_the_logs_own_answers():
+    import com_replay
+
+    def display(*calls: conv.Call) -> Any:
+        return com_replay._display(types.SimpleNamespace(calls=list(calls)))
+
+    # ms_stop_plate's pass 1 (its seat logged view_window=1010x678 px/mm=2.325).
+    first = _probes([253, 36, 1263, 714])
+    assert display(*first) == {"view_window": [1010, 678], "px_per_mm": 2.325}
+    # The last probe is the display the build ended on.
+    narrower = _probes([253, 36, 1263, 634])
+    assert display(*first, *narrower)["view_window"] == [1010, 598]
+    # An answer that cannot be read leaves its key out; no probe, no display.
+    assert display(*_probes([253.0, 36, 1263, 714], _LEFT)) == {"px_per_mm": 2.325}
+    assert display(*_echoing("Part24")) is None
+
+
+def test_a_drawings_display_is_streamed_from_the_lines_the_engine_wrote(
+    tmp_path, monkeypatch
+):
+    import com_replay
+
+    recorded, _, _, _ = _record(tmp_path / "header", monkeypatch)
+    log = tmp_path / "probed.jsonl.gz"
+    calls = [*_echoing("Part24"), *_probes([253, 36, 1263, 714])]
+    writer = conv.LogWriter(log)
+    writer.header(conv.read_header(recorded))
+    for seq, call in enumerate(calls):
+        writer.emit(dataclasses.replace(call, seq=seq))
+    writer.close({"status": "complete"})
+    # The writer interned each probe's dispatch header; the stream never sees it.
+    assert conv.load(log).calls[-1].args == calls[-1].args
+    assert com_replay._logged_display(log) == com_replay._display(conv.load(log))
+    assert com_replay._logged_display(log) == {
+        "view_window": [1010, 678],
+        "px_per_mm": 2.325,
+    }
+    assert com_replay._logged_display(recorded) is None
+
+
+def test_only_a_drawings_recording_reads_its_display_on_the_seat(tmp_path, monkeypatch):
+    import com_replay
+
+    timing = {"rc": 0, "trailer": {"status": "complete", "calls": 2, "inert_calls": 0}}
+    monkeypatch.setattr(conv, "record_build", lambda *_a, **_k: timing)
+    monkeypatch.setattr(conv, "record_faults", lambda: [])
+    monkeypatch.setattr(conv, "rerun_required", lambda: False)
+    read: list[Path] = []
+
+    def logged(log: Path) -> dict[str, Any]:
+        read.append(log)
+        return {"px_per_mm": 2.098}
+
+    monkeypatch.setattr(com_replay, "_logged_display", logged)
+    log = tmp_path / "L.jsonl.gz"
+
+    def display(kind: str) -> Any:
+        summary = tmp_path / f"{kind}.json"
+        argv = ["record", "s.py", "--log", str(log), "--summary", str(summary)]
+        assert com_replay.main([*argv, "--kind", kind]) == 0
+        return json.loads(summary.read_text("utf-8"))["display"]
+
+    # A part or an assembly never probes the display: its log is not re-read.
+    assert display("part") is None and display("assembly") is None and read == []
+    assert display("drawing") == {"px_per_mm": 2.098} and read == [log.resolve()]
+
+
+def test_a_scripts_arguments_are_everything_after_the_first_double_dash():
+    import com_replay
+
+    parse = com_replay._arguments
+    record = ["record", "draw_x.py", "--log", "L", "--summary", "S"]
+    # dodo's two shapes (Recording.command): a part's, and a drawing's stem.
+    assert parse([*record, "--kind", "part"]).argv == []
+    drawing = parse([*record, "--kind", "drawing", "--", "sh_widget"])
+    assert (drawing.script, drawing.kind, drawing.argv) == (
+        Path("draw_x.py"),
+        "drawing",
+        ["sh_widget"],
+    )
+    # Options before it are the driver's; whatever follows, the script's.
+    found = parse([*record, "--out-root", "O", "--", "--flag", "--", "x"])
+    assert (found.out_root, found.argv) == (Path("O"), ["--flag", "--", "x"])
+    # argparse never sees a script argument, so no patch release of it binds
+    # one: a bare one is the driver's error, and only record passes any.
+    with pytest.raises(SystemExit):
+        parse([*record, "sh_widget"])
+    assert parse(["diff", "a", "b", "--"]).argv == []
+    with pytest.raises(SystemExit):
+        parse(["diff", "a", "b", "--", "sh_widget"])
+
+
+def test_a_diff_reports_each_logs_own_display(tmp_path, monkeypatch):
+    import com_replay
+
+    base = _shaped(tmp_path / "a", monkeypatch)
+    new = _shaped(tmp_path / "b", monkeypatch, _REORDERED)
+    # A shaped part probes no display.
+    assert _diff(base, new, tmp_path / "none.json")["display"] == {
+        "base": None,
+        "new": None,
+    }
+    counted = {"base": {"calls": len(conv.load(base).calls)}}
+    counted["new"] = {"calls": len(conv.load(new).calls)}
+    monkeypatch.setattr(com_replay, "_display", lambda log: {"calls": len(log.calls)})
+    assert _diff(base, new, tmp_path / "counted.json")["display"] == counted
+
+    def broken(_log: Any) -> None:
+        raise ValueError("injected")
+
+    # A display that cannot be read costs the display, never the diff.
+    monkeypatch.setattr(com_replay, "_display", broken)
+    diff = _diff(base, new, tmp_path / "broken.json")
+    assert diff["display"] == {"error": "ValueError: injected"}
+    assert diff["truth_cause"] == "response:IFace2.Normal"

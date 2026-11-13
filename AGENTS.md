@@ -1077,8 +1077,40 @@ the seat as before; no cache key moves.
 Decisions are `replay_reuse` records, `replay.reuse` spans and
 `[com-replay] part:<stem>: reuse=<decision>` lines. Environment variables are not
 forwarded to farm workers: to turn reuse off fleet-wide, set
-`_replay_shadow.DEFAULT_MODE = ReplayMode.SHADOW` and launch from that commit;
-locally `HARMONIC_COM_REPLAY=shadow`. See DEVELOPING.md "Reuse".
+`_replay_shadow.DEFAULT_MODES[BuildKind.PART] = ReplayMode.SHADOW` and launch
+from that commit; locally `HARMONIC_COM_REPLAY=part=shadow`. See DEVELOPING.md
+"Reuse".
+
+**Assembly and drawing recording (shadow only).** FULL assembly builds and
+drawing builds that run under `rw` are recorded through the same driver and
+engine (`_replay_shadow.plan_dependent`; a drawing keeps its artifact-stem
+argument, also in the exit-92 unrecorded re-run); REFRESH tiers and gates are
+not. Nothing is replayed or reused (`shadow` is their highest mode; per kind:
+`HARMONIC_COM_REPLAY=drawing=off`). After the store, off the seat, the fresh
+recording is diffed against the nearest earlier recording of the stem under
+the same cache salt made on the same children (every opened model's
+`.execution` token, transitively): `split=noop | diverged | children_changed`,
+with `truth_cause` (`request` against `response:<member>`) separating source
+change from seat nondeterminism (`seat_path_divergence` when the requests
+differ only by the seat's detours on the same geometry: assemblies' mass and
+sidecars, drawings' PDF ink), the outcome judged per kind (assemblies: mass,
+requests, answers, sidecar bytes; drawings: requests, answers, PDF ink). A
+`noop` is also the base's requests but for echoed title counters
+(`title_echo`, ground truth kept), and is never an alarm: another output reads
+WARN `output_nondeterminism` (`output_cause=seat_display` when the two logs'
+own answers report different drawing windows, else `answers`) or
+WARN `unexplained_output_divergence` (answers alike); `SOUNDNESS ALARM` is
+parts-only. A recording left unpublished because another writer's bytes stand
+under its key (`publish=exists|lost`) and that is no confirmed `noop` is kept
+create-only outside `manifest/` as evidence (`evidence=`); a bundle whose files
+pass 512 MiB on disk is never built. The comparison runs before the leaf's
+process reports, so it is capped at 60 s (`timeout`); a child token that holds
+no digest is named with its reason (WARN, `children_unreadable`). Manifests
+carry `replay_gaps` (what the engine's replay lacks for these kinds) and a
+drawing's `display`, streamed from its log's probe lines (never re-read for a
+part or an assembly). The record driver splits the script's arguments at the
+first `--` itself (argparse before 3.12.7 rejects them). No output, exit code
+or cache key changes. See DEVELOPING.md "Assemblies and drawings".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

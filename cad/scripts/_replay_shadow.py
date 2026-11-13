@@ -1,7 +1,11 @@
-"""COM-conversation recording of part builds and reuse from it (dodo's side).
+"""COM-conversation recording of part, assembly and drawing builds, and reuse of
+parts from it (dodo's side).
 
 One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
-= ``off`` | ``record`` | ``shadow`` | ``reuse`` (unset: ``reuse``).
+= ``off`` | ``record`` | ``shadow`` | ``reuse``, for every kind or per kind
+(``drawing=off``); unset, :data:`DEFAULT_MODES` (parts ``reuse``, assemblies
+and drawings ``shadow``, the highest they have). The bullets below are parts';
+the last one is what differs for assemblies and drawings.
 
 * ``off``: a part build runs exactly as it did before recording existed: the
   same command line, and the engine (``_com_conversation``) is never imported.
@@ -31,6 +35,19 @@ One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
   one after the build). A soundness alarm against a base, or a forced refresh
   of a base or of a key reused from one, revokes the base
   (``.../revoked/<key>.json``).
+
+* Assemblies (FULL builds) and drawings: ``record`` as for a part
+  (:func:`plan_dependent`; a drawing script keeps its own argument). Nothing of
+  theirs is ever reused, and ``shadow`` replays nothing: the engine's replay
+  cannot stage the models they open or redirect the output paths drawings
+  build, so the fresh recording itself is compared with the nearest earlier
+  recording of the stem under the same cache salt made on the same children
+  (every model opened, by its ``.execution`` token): :class:`Split`
+  ``children_changed`` | ``noop`` | ``diverged``, ``truth_cause`` saying what
+  preceded a divergence, and the outcome judged per kind (span
+  ``replay.split <label>``). A no-op whose outcome differs is never an alarm:
+  an :class:`OutputJudgement` logged at WARN. A recording whose key already
+  existed is kept as evidence unless confirmed (:func:`_keep_evidence`).
 
 A driver exit of :data:`EXIT_RECORD_FAULT` (the recorder failed where the
 build's results cannot be trusted, not the script or SolidWorks) re-runs the
@@ -110,6 +127,9 @@ SUMMARY_NAME = "summary.json"
 SHADOW_NAME = "shadow.json"
 REPLAY_LOG_NAME = "shadow-replay.log"
 DIFF_LOG_NAME = "shadow-diff.log"
+# An assembly's or drawing's recording directory and bundle: copies of the
+# small files its build wrote beside the model (Recording.sidecars).
+SIDECAR_NAME = "outputs"
 # Windows without long-path support (farm workers, and SolidWorks itself):
 # a file path is at most 259 characters, a directory 247 (CreateDirectory
 # keeps room for an 8.3 name).
@@ -135,6 +155,33 @@ REUSE_LOG_CHARS = 200_000
 # Bound on any evidence string carried by a span, log or cache.jsonl record.
 EVIDENCE_CHARS = 4000
 DIFFERING_LISTED = 40
+# Assemblies and drawings, mode ``shadow`` (:func:`_judge_dependent`). Their
+# lookup reads this many manifests, newest first, within LOOKUP_SECONDS: a
+# base must also have been made on the same children, which the newest
+# recordings (other branches' builds) often were not.
+DEPENDENT_MANIFESTS = 16
+# The comparison with the base (bundle download and diff): a hard wall budget
+# off the seat. The step runs inside the leaf's doit action, after the store
+# but before the leaf's process exits and its result is reported, so on a farm
+# worker it holds the leaf's slot with the seat idle: the budget is kept to a
+# minute. Measured basis, 2026-11-12 (788 recorded part builds): 101 recipe
+# requests per window second (p95 156) and a diff of about 3 s plus 0.5 ms per
+# request, so a build of up to about 1e5 requests (a window of 15 to 18
+# minutes) is judged, the slowest assemblies (1565 s, 2.4e5 requests) read
+# ``timeout``.
+DEPENDENT_SECONDS = 60.0
+# Above this many logged calls in either recording the diff is skipped
+# (``oversize``): it holds both logs in memory.
+DIFF_CALLS_LIMIT = 500_000
+# An assembly's or drawing's recording bundle above this many bytes (its
+# files' bytes on disk, :func:`bundle_size`) is never built, published or kept
+# (``oversize``): part bundles were 176 bytes per request (p95 680, largest
+# 22 MB).
+BUNDLE_LIMIT = 512 * 1024 * 1024
+# The ``publish`` outcomes of an assembly's or drawing's recording left
+# unpublished because another writer's bytes stand under its key, which
+# _keep_evidence keeps unless the split is a confirmed NOOP.
+EVIDENCE_OF = ("exists", "lost")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -153,30 +200,59 @@ class ReplayMode(StrEnum):
     REUSE = "reuse"
 
 
-# The fleet switch: farm workers get no submitter environment, so a fleet-wide
-# change of mode is a change of this default.
-DEFAULT_MODE = ReplayMode.REUSE
+class BuildKind(StrEnum):
+    """The COM leaf a recording is of: its label's prefix."""
+
+    PART = "part"
+    ASSEMBLY = "assembly"
+    DRAWING = "drawing"
+
+
+# The fleet switch, per kind: farm workers get no submitter environment, so a
+# fleet-wide change of mode is a change of these defaults. Nothing of an
+# assembly's or a drawing's recording is ever reused: ``shadow`` is the
+# highest mode they have (_HIGHEST_MODES).
+DEFAULT_MODES: dict[BuildKind, ReplayMode] = {
+    BuildKind.PART: ReplayMode.REUSE,
+    BuildKind.ASSEMBLY: ReplayMode.SHADOW,
+    BuildKind.DRAWING: ReplayMode.SHADOW,
+}
+_HIGHEST_MODES: dict[BuildKind, ReplayMode] = {
+    BuildKind.PART: ReplayMode.REUSE,
+    BuildKind.ASSEMBLY: ReplayMode.SHADOW,
+    BuildKind.DRAWING: ReplayMode.SHADOW,
+}
 _UNKNOWN_MODES: set[str] = set()
 
 
-def mode() -> ReplayMode:
-    """The one reading of ``HARMONIC_COM_REPLAY``. Unset or empty is the
-    default (``reuse``). Anything else unknown is a typo, not a request:
-    recording is off, and WARN says so once per value."""
+def mode(kind: BuildKind = BuildKind.PART) -> ReplayMode:
+    """The one reading of ``HARMONIC_COM_REPLAY``: comma-separated items, each
+    a mode for every kind (``shadow``) or for one kind (``drawing=off``), a
+    later item winning over an earlier one. Unset or empty is
+    :data:`DEFAULT_MODES`. A kind never runs above its highest mode, so
+    ``reuse`` reuses parts and shadows assemblies and drawings. Anything else
+    is a typo, not a request: recording is off for every kind, and WARN says
+    so once per value."""
     raw = os.environ.get(MODE_ENV, "").strip().lower()
-    if not raw:
-        return DEFAULT_MODE
+    modes = dict(DEFAULT_MODES)
     try:
-        return ReplayMode(raw)
+        for item in (part.strip() for part in raw.split(",") if part.strip()):
+            name, assigned, value = item.rpartition("=")
+            chosen = ReplayMode(value.strip())
+            for target in [BuildKind(name.strip())] if assigned else list(BuildKind):
+                modes[target] = chosen
     except ValueError:
         if raw not in _UNKNOWN_MODES:
             _UNKNOWN_MODES.add(raw)
             _telemetry.warn(
                 f"[com-replay] {MODE_ENV}={raw!r} is not one of "
-                f"{', '.join(m.value for m in ReplayMode)}: recording is off",
+                f"{', '.join(m.value for m in ReplayMode)}, for every kind or "
+                f"as <kind>=<mode> ({', '.join(k.value for k in BuildKind)}): "
+                "recording is off",
                 value=raw,
             )
         return ReplayMode.OFF
+    return min(modes[kind], _HIGHEST_MODES[kind], key=list(ReplayMode).index)
 
 
 class InputClass(StrEnum):
@@ -188,6 +264,9 @@ class InputClass(StrEnum):
     RELEASE = "release"
     TEMPLATE = "template"
     ADAPTER = "adapter"
+    # A model an assembly or drawing opens: its recipe digest or its
+    # ``.execution`` token (the identity of its bytes).
+    CHILD = "child"
     SALT = "salt"
     OTHER = "other"
 
@@ -205,9 +284,11 @@ def input_class(tag: str) -> InputClass:
         return InputClass.SALT
     name = tag.rsplit("/", 1)[-1]
     if tag.startswith("cad/scripts/"):
-        if name.startswith("build_") and name.endswith(".py"):
+        if name.startswith(("build_", "draw_")) and name.endswith(".py"):
             return InputClass.SCRIPT
         return InputClass.HELPER
+    if name.lower().endswith((".sldprt", ".sldasm", ".execution")):
+        return InputClass.CHILD
     if tag == "cad/config/release.yaml":
         return InputClass.RELEASE
     if tag.startswith("cad/config/"):
@@ -224,9 +305,17 @@ def input_class(tag: str) -> InputClass:
 # ---------------------------------------------------------------------------
 
 
+def recording_name(kind: BuildKind, stem: str) -> str:
+    """What a recording of ``kind:stem`` is filed under, locally (under
+    :data:`RECORDINGS`) and in its blob names: the stem for a part, as ever,
+    ``<kind>-<stem>`` otherwise. Stems hold no ``-``, so a drawing named like
+    its part never shares the part's recordings (pinned by test)."""
+    return stem if kind is BuildKind.PART else f"{kind.value}-{stem}"
+
+
 @dataclass
 class Recording:
-    """One part build run through the recording driver."""
+    """One part, assembly or drawing build run through the recording driver."""
 
     mode: ReplayMode
     stem: str
@@ -240,14 +329,28 @@ class Recording:
     # Mode ``reuse``: the attempt this build follows (not reused); its replay,
     # when it ran, is the shadow's (:func:`after_build`).
     reuse: Reuse | None = None
+    # An assembly or drawing (:func:`plan_dependent`, :class:`Dependent`).
+    kind: BuildKind = BuildKind.PART
+    argv: tuple[str, ...] = ()
+    children: dict[str, str] = field(default_factory=dict)
+    sidecars: tuple[Path, ...] = ()
 
     @property
     def faulted(self) -> bool:
         return self.recovery is not None
 
     @property
+    def name(self) -> str:
+        return recording_name(self.kind, self.stem)
+
+    @property
     def label(self) -> str:
-        return f"part:{self.stem}"
+        return f"{self.kind.value}:{self.stem}"
+
+    @property
+    def sidecar_copies(self) -> Path:
+        """Where the bundle carries copies of :attr:`sidecars`."""
+        return self.directory / SIDECAR_NAME
 
     @property
     def log(self) -> Path:
@@ -273,12 +376,15 @@ class Recording:
             str(self.log),
             "--summary",
             str(self.summary_path),
+            "--kind",
+            self.kind.value,
+            *(("--", *self.argv) if self.argv else ()),
         ]
 
     @property
     def unrecorded(self) -> list[str]:
         """The build's own command, exactly as with recording off."""
-        return [sys.executable, str(self.script)]
+        return [sys.executable, str(self.script), *self.argv]
 
     def exited(self, exit_code: int) -> bool:
         """Read the driver's exit; True when the caller must re-run the build
@@ -290,7 +396,9 @@ class Recording:
         (recording stopped, the build finished on its real results) or none.
         A fault of either class is said here (WARN, a ``replay.record_fault``
         event on the task span, a ``replay_record_fault`` cache.jsonl record,
-        each with its ``recovery``) and nothing of this recording is used."""
+        each with its ``recovery``) and nothing of this recording is used.
+        A clean exit 0 keeps copies of the build's :attr:`sidecars` as it
+        wrote them, before a lost store adopts the winner's."""
         summary = _read_json(self.summary_path) or {}
         faults = [f for f in summary.get("faults") or [] if isinstance(f, dict)]
         if exit_code == EXIT_RECORD_FAULT:
@@ -298,6 +406,8 @@ class Recording:
         elif faults:
             recovery = Recovery.DEGRADED
         else:
+            if exit_code == 0 and self.sidecars:
+                _keep_sidecars(self)
             return False
         first = faults[0] if faults else {}
         self.recovery = recovery
@@ -363,12 +473,15 @@ def path_needs(
     recordings: PurePath,
     scratch: PurePath,
     outputs: Iterable[str] = (),
+    sidecars: Iterable[str] = (),
 ) -> list[PathNeed]:
-    """Every path recording ``stem`` creates, at its longest: the recording's
-    own files under ``recordings`` (:data:`RECORDINGS`), the shadow work
-    directory under ``scratch`` (:data:`SCRATCH`; random names at full width)
-    and, for each output path the build writes (relative to the output root),
-    its copy under the replay's scratch output root."""
+    """Every path recording ``stem`` (:func:`recording_name`) creates, at its
+    longest: the recording's own files under ``recordings``
+    (:data:`RECORDINGS`), the shadow work directory under ``scratch``
+    (:data:`SCRATCH`; random names at full width), for each output path the
+    build writes (relative to the output root) its copy under the replay's
+    scratch output root, and for each sidecar file name its copy in the
+    recording and in a base's bundle."""
     recording = recordings / stem
     captures = recording / CAPTURE_NAME
     work = scratch / ("x" * SCRATCH_NAME_CHARS)
@@ -404,6 +517,9 @@ def path_needs(
         needs.append(
             PathNeed(f"replay directory {output}", str(target.parent), directory=True)
         )
+    for name in sidecars:
+        needs.append(PathNeed(f"sidecar {name}", str(recording / SIDECAR_NAME / name)))
+        needs.append(PathNeed(f"base sidecar {name}", str(base / SIDECAR_NAME / name)))
     return needs
 
 
@@ -420,7 +536,7 @@ def plan(
     current = mode()
     if current is ReplayMode.OFF or not _cache.writable():
         return None
-    directory = _fresh_directory(stem, "building unrecorded")
+    directory = _fresh_directory(stem, f"part:{stem}", "building unrecorded")
     if directory is None:
         return None
     if reuse is not None and reuse.replay_log:
@@ -429,31 +545,102 @@ def plan(
     return Recording(current, stem, script, key, directory, reuse=reuse)
 
 
-def _fresh_directory(stem: str, otherwise: str) -> Path | None:
-    """``RECORDINGS/<stem>``, emptied, or None (WARN, ``otherwise`` says what
+@dataclass(frozen=True)
+class Dependent:
+    """What dodo knows of an assembly or drawing build before it runs
+    (:func:`plan_dependent`)."""
+
+    kind: BuildKind
+    stem: str
+    script: Path
+    # The script's own arguments (a drawing's artifact stem).
+    argv: tuple[str, ...]
+    # Every model the build opens, transitively, by key-input tag of its
+    # ``.execution`` token: the SHA-256 of its native bytes, or why the token
+    # held none (``missing``, ``unreadable: <error>``, ``malformed:
+    # <content>``). A recording is judged only against a base made on the
+    # same (:func:`_judge_dependent`).
+    children: dict[str, str]
+    # Small files the build writes beside its model that the outcome compares
+    # byte for byte (an assembly's geometry proof and DOF manifest).
+    sidecars: tuple[Path, ...] = ()
+
+    @property
+    def label(self) -> str:
+        return f"{self.kind.value}:{self.stem}"
+
+
+def plan_dependent(
+    kind: BuildKind, describe: Callable[[], Dependent], key: str
+) -> Recording | None:
+    """The recording of this assembly or drawing build, or None for the
+    reasons :func:`plan` gives for a part (mode ``off`` for ``kind``, a cache
+    role that cannot publish, a checkout too deep, a directory that cannot be
+    prepared). ``describe`` is asked only past the mode and role checks, so an
+    unrecorded build pays nothing for it; one that raises builds unrecorded
+    (WARN). Nothing of a recording is ever reused: the build runs on the seat
+    whatever it says."""
+    current = mode(kind)
+    if current is ReplayMode.OFF or not _cache.writable():
+        return None
+    try:
+        dependent = describe()
+    except Exception as exc:  # noqa: BLE001 - recording never costs a build
+        _telemetry.warn(
+            f"[com-replay] {kind.value}: describing the build for its recording "
+            f"failed ({exc!r}); building unrecorded",
+            label=kind.value,
+        )
+        return None
+    directory = _fresh_directory(
+        recording_name(dependent.kind, dependent.stem),
+        dependent.label,
+        "building unrecorded",
+        sidecars=[path.name for path in dependent.sidecars],
+    )
+    if directory is None:
+        return None
+    return Recording(
+        current,
+        dependent.stem,
+        dependent.script,
+        key,
+        directory,
+        kind=dependent.kind,
+        argv=dependent.argv,
+        children=dict(dependent.children),
+        sidecars=dependent.sidecars,
+    )
+
+
+def _fresh_directory(
+    name: str, label: str, otherwise: str, *, sidecars: Iterable[str] = ()
+) -> Path | None:
+    """``RECORDINGS/<name>``, emptied, or None (WARN, ``otherwise`` says what
     happens instead): a checkout too deep for the recording's own paths, or a
     directory that cannot be prepared."""
     too_long = [
-        need for need in path_needs(stem, RECORDINGS, SCRATCH) if need.headroom < 0
+        need
+        for need in path_needs(name, RECORDINGS, SCRATCH, sidecars=sidecars)
+        if need.headroom < 0
     ]
     if too_long:
         _telemetry.warn(
-            f"[com-replay] part:{stem}: {too_long[0].purpose} path "
+            f"[com-replay] {label}: {too_long[0].purpose} path "
             f"{too_long[0].path} is {len(too_long[0].path)} characters, past the "
             f"Windows limit; {otherwise}",
-            label=f"part:{stem}",
+            label=label,
         )
         return None
-    directory = RECORDINGS / stem
+    directory = RECORDINGS / name
     try:
         if directory.exists():
             shutil.rmtree(directory)
         directory.mkdir(parents=True)
     except OSError as exc:
         _telemetry.warn(
-            f"[com-replay] part:{stem}: recording directory unusable ({exc}); "
-            f"{otherwise}",
-            label=f"part:{stem}",
+            f"[com-replay] {label}: recording directory unusable ({exc}); {otherwise}",
+            label=label,
         )
         return None
     return directory
@@ -479,15 +666,41 @@ def blob_names(engine: str, stem: str, key: str) -> tuple[str, str]:
     return f"{root}/bundle/{key}.tar", f"{blob_prefix(engine, stem)}{key}.json"
 
 
-def bundle(recording: Recording) -> bytes:
-    """The log and its captures as one uncompressed tar (both are gzip
-    already): sorted members, no timestamps or owners."""
+def evidence_names(
+    engine: str, stem: str, key: str, recording_id: str
+) -> tuple[str, str]:
+    """``(bundle, manifest)`` names of an assembly's or drawing's evidence
+    copy: a recording of ``key`` left unpublished because another writer's
+    bytes stand under the key (:func:`_keep_evidence`). Outside ``manifest/``,
+    so no base lookup lists it; one per recording, so a second never collides."""
+    root = f"{BLOB_ROOT}/{engine[:16]}/{stem}/evidence/{key}/{recording_id}"
+    return f"{root}.tar", f"{root}.json"
+
+
+def _bundle_files(recording: Recording) -> list[Path]:
+    """The files :func:`bundle` packs: the log, then its captures and sidecar
+    copies, sorted."""
     files = [recording.log]
-    if recording.captures.is_dir():
-        files += sorted(p for p in recording.captures.rglob("*") if p.is_file())
+    for directory in (recording.captures, recording.sidecar_copies):
+        if directory.is_dir():
+            files += sorted(p for p in directory.rglob("*") if p.is_file())
+    return files
+
+
+def bundle_size(recording: Recording) -> int:
+    """The bytes of the files :func:`bundle` would pack, read from disk without
+    packing them (the tar adds a header and padding per member): what
+    BUNDLE_LIMIT is checked against before a bundle is built in memory."""
+    return sum(path.stat().st_size for path in _bundle_files(recording))
+
+
+def bundle(recording: Recording) -> bytes:
+    """The log, its captures and (an assembly's or drawing's) sidecar copies
+    as one uncompressed tar (log and captures are gzip already): sorted
+    members, no timestamps or owners."""
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
-        for path in files:
+        for path in _bundle_files(recording):
             info = tarfile.TarInfo(path.relative_to(recording.directory).as_posix())
             info.size = path.stat().st_size
             info.mode = 0o644
@@ -507,7 +720,7 @@ def manifest(
     summary: dict[str, Any],
     inputs: dict[str, str],
     bundle_name: str,
-    bundle_bytes: bytes,
+    bundle_bytes: bytes | None,
     *,
     archive: tuple[str, int] | None = None,
     sw_build: str | None = None,
@@ -517,7 +730,9 @@ def manifest(
     the two key inputs that are not files. ``archive`` binds the recording to
     the archive its build stored under the key (``(sha256, size)``,
     :func:`_artifact_cache.publication`; None: unbound, never a reuse base);
-    ``sw_build`` is the recording machine's SolidWorks (:func:`seat_build`)."""
+    ``sw_build`` is the recording machine's SolidWorks (:func:`seat_build`).
+    ``bundle_bytes`` None: an assembly's or drawing's bundle past
+    BUNDLE_LIMIT, never built, whose manifest is never published."""
     settings = _cache.config_summary()
     return {
         "schema": MANIFEST_SCHEMA,
@@ -536,7 +751,9 @@ def manifest(
         "sw_revision": summary.get("sw_revision"),
         "sw_build": sw_build,
         "environment": summary.get("environment"),
-        "bundle": {
+        "bundle": None
+        if bundle_bytes is None
+        else {
             "name": bundle_name,
             "sha256": hashlib.sha256(bundle_bytes).hexdigest(),
             "size": len(bundle_bytes),
@@ -625,7 +842,7 @@ def publish(recording: Recording, record: dict[str, Any], data: bytes) -> str:
     bundle_outcome = _cache.publish_sidecar(record["bundle"]["name"], data)
     if bundle_outcome != "stored":
         return bundle_outcome
-    _, manifest_name = blob_names(record["engine"], recording.stem, recording.key)
+    _, manifest_name = blob_names(record["engine"], recording.name, recording.key)
     return _cache.publish_sidecar(
         manifest_name, json.dumps(record, sort_keys=True).encode("utf-8")
     )
@@ -849,6 +1066,13 @@ class NoopJudgement(StrEnum):
 
 # _com_outcome.SeatPath.DETOUR (dodo never imports the engine); pinned by test.
 SEAT_PATH_DETOUR = "detour"
+# _com_outcome.GEOMETRY: per kind, the signals that say a build made the base's
+# geometry, without which a seat path is not judged; pinned by test.
+GEOMETRY_SIGNALS: dict[BuildKind, tuple[str, ...]] = {
+    BuildKind.PART: ("mass", "stl"),
+    BuildKind.ASSEMBLY: ("mass", "sidecars"),
+    BuildKind.DRAWING: ("pdf",),
+}
 
 
 @dataclass
@@ -866,9 +1090,10 @@ class Shadow:
     pinned inputs a live request divergence after a no-op comes from
     SolidWorks: request equality is telemetry about the seat, the outcome is
     the oracle. ``seat_path``: for an outcome ``different`` only in the
-    requests and answers (mass and STL the same) after a response cause,
-    whether the requests differ only by detours (``_com_outcome.seat_path``:
-    ``path`` and ``detail`` or the blocks; ``None`` when not judged)."""
+    requests and answers (the ``kind``'s :data:`GEOMETRY_SIGNALS` the same)
+    after a response cause, whether the requests differ only by detours
+    (``_com_outcome.seat_path``: ``path`` and ``detail`` or the blocks;
+    ``None`` when not judged)."""
 
     verdict: str
     recorded: int | None = None
@@ -887,6 +1112,10 @@ class Shadow:
     # ``step``, ``error``).
     judge_faults: list[dict[str, Any]] = field(default_factory=list)
     seat_path: dict[str, Any] | None = None
+    kind: BuildKind = BuildKind.PART
+    # An assembly's or drawing's comparison: each recording's drawing display
+    # (``com_replay.py diff`` ``display``: ``base``, ``new``).
+    display: dict[str, Any] | None = None
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -922,14 +1151,16 @@ class Shadow:
     def seat_path_detour(self) -> bool:
         """This build's requests diverged from the base after SolidWorks
         answered differently (a ``response:`` cause), only by detours of reads
-        and selections (``seat_path`` ``detour``), with the base's mass
-        properties and STL geometry. Every condition is the judge's own,
-        checked again here."""
+        and selections (``seat_path`` ``detour``), with the base's geometry
+        (mass properties and STL for a part, :data:`GEOMETRY_SIGNALS`). Every
+        condition is the judge's own, checked again here."""
         return (
             self.ground_truth == "diverged"
             and (self.truth_cause or "").startswith("response:")
-            and self.outcome_signals.get("mass") == "same"
-            and self.outcome_signals.get("stl") == "same"
+            and all(
+                self.outcome_signals.get(name) == "same"
+                for name in GEOMETRY_SIGNALS[self.kind]
+            )
             and (self.seat_path or {}).get("path") == SEAT_PATH_DETOUR
         )
 
@@ -1097,22 +1328,29 @@ def _replay_command(
 def _diff(
     work: Path, recording: Recording, env: dict[str, str], deadline: float
 ) -> tuple[int | None, dict[str, Any] | None]:
-    """This build's recording compared with the base's in ``work``."""
+    """This build's recording compared with the base's in ``work``; an
+    assembly or drawing is judged on its own kind's signals, with the
+    sidecar copies of both."""
     diff_result = work / "diff.json"
-    diff_rc = _run(
-        [
-            sys.executable,
-            str(DRIVER),
-            "diff",
-            str(work / WORK_BASE / LOG_NAME),
-            str(recording.log),
-            "--result",
-            str(diff_result),
-        ],
-        env,
-        deadline,
-        recording.directory / DIFF_LOG_NAME,
-    )
+    command = [
+        sys.executable,
+        str(DRIVER),
+        "diff",
+        str(work / WORK_BASE / LOG_NAME),
+        str(recording.log),
+        "--result",
+        str(diff_result),
+    ]
+    if recording.kind is not BuildKind.PART:
+        command += [
+            "--kind",
+            recording.kind.value,
+            "--base-sidecars",
+            str(work / WORK_BASE / SIDECAR_NAME),
+            "--new-sidecars",
+            str(recording.sidecar_copies),
+        ]
+    diff_rc = _run(command, env, deadline, recording.directory / DIFF_LOG_NAME)
     return diff_rc, _read_json(diff_result)
 
 
@@ -1624,7 +1862,9 @@ class Reuse:
         try:
             if self.part is None:
                 return
-            directory = _fresh_directory(self.part.stem, "keeping no local record")
+            directory = _fresh_directory(
+                self.part.stem, self.label, "keeping no local record"
+            )
             if directory is None:
                 return
             (directory / REUSE_NAME).write_text(
@@ -2083,12 +2323,14 @@ def after_build(
     digest: Callable[[str], str],
 ) -> None:
     """Publish this build's recording and (``shadow``, ``reuse``) evaluate a
-    replay of it. Runs after the seat is released; never raises, never touches
-    an output. ``recording`` None (no recording: :func:`plan`) is a no-op; a
-    faulted recording (:meth:`Recording.exited`) publishes nothing. Every
-    recorded build ends with one ``replay_shadow`` cache.jsonl record and one
-    INFO line (:func:`report_line`), all inside one ``replay.after_build``
-    span: the wall time this step adds to the task, every part of it."""
+    replay of it (an assembly or drawing: judge it against its base,
+    :func:`_judge_dependent`). Runs after the seat is released; never raises,
+    never touches an output. ``recording`` None (no recording: :func:`plan`,
+    :func:`plan_dependent`) is a no-op; a faulted recording
+    (:meth:`Recording.exited`) publishes nothing. Every recorded build ends
+    with one ``replay_shadow`` cache.jsonl record and one INFO line
+    (:func:`report_line`), all inside one ``replay.after_build`` span: the
+    wall time this step adds to the task, every part of it."""
     if recording is None:
         return
     label = recording.label
@@ -2128,12 +2370,17 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     """One line (never a newline) of what a recorded build's shadow step did:
     publication outcome and bundle bytes; the base lookup (base key or none,
     manifests listed and read, seconds); the shadow replay's verdict, requests
-    served of recorded, seconds; the ground truth from this build's own
-    requests; the outcome against the base's and the truth's cause; then the
-    markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
-    ``seat_path_divergence``, ``noop_unexplained_divergence``,
-    ``noop_outcome_unknown``, ``judge_fault``). ``-`` marks a step the build
-    never reached."""
+    served of recorded, seconds (an assembly or drawing: its :class:`Split`,
+    how many of the candidates read had its children, seconds); the ground
+    truth from this build's own requests; the outcome against the base's and
+    the truth's cause; an assembly's or drawing's recording cost on the seat;
+    then the markers (``SOUNDNESS ALARM``, ``seat_nondeterminism``,
+    ``seat_path_divergence``, ``noop_unexplained_divergence``, an assembly's
+    or drawing's ``output_nondeterminism cause=<cause>``,
+    ``unexplained_output_divergence`` and ``title_echo``,
+    ``noop_outcome_unknown``, ``judge_fault``, ``children_unreadable``). An
+    assembly's or drawing's evidence copy reads ``evidence=<outcome>`` after
+    its bundle bytes. ``-`` marks a step the build never reached."""
 
     def shown(name: str, unit: str = "") -> str:
         value = record.get(name)
@@ -2148,6 +2395,22 @@ def report_line(label: str, record: dict[str, Any]) -> str:
     base = str(record.get("base_key") or "")[:12]
     if not base:
         base = "none" if "lookup" in record else "-"
+    dependent = not label.startswith(f"{BuildKind.PART.value}:")
+    if dependent:
+        judged = [
+            f"lookup={shown('lookup')} base={base} differing={shown('differing_count')} "
+            f"own={shown('own_differing')} listed={shown('listed')} "
+            f"read={shown('read')} {shown('lookup_s', 's')}",
+            f"split={shown('split')} same_children={shown('same_children')}/"
+            f"{shown('candidates')} {shown('wall_s', 's')}",
+        ]
+    else:
+        judged = [
+            f"lookup={shown('lookup')} base={base} differing={shown('differing_count')} "
+            f"listed={shown('listed')} read={shown('read')} {shown('lookup_s', 's')}",
+            f"shadow={shown('verdict')} served={shown('served')}/{shown('recorded')} "
+            f"{shown('wall_s', 's')}",
+        ]
     segments = [
         head,
         *(
@@ -2155,13 +2418,12 @@ def report_line(label: str, record: dict[str, Any]) -> str:
             if record.get("reuse_decision")
             else []
         ),
-        f"publish={shown('publish')} bytes={shown('bundle_bytes')}",
-        f"lookup={shown('lookup')} base={base} differing={shown('differing_count')} "
-        f"listed={shown('listed')} read={shown('read')} {shown('lookup_s', 's')}",
-        f"shadow={shown('verdict')} served={shown('served')}/{shown('recorded')} "
-        f"{shown('wall_s', 's')}",
+        f"publish={shown('publish')} bytes={shown('bundle_bytes')}"
+        + (f" evidence={record['evidence']}" if record.get("evidence") else ""),
+        *judged,
         f"truth={shown('ground_truth')}",
         f"outcome={shown('artefact_outcome')} cause={shown('truth_cause')}",
+        *([_record_cost(record.get("overhead"))] if dependent else []),
     ]
     if record.get("soundness_alarm"):
         segments.append("SOUNDNESS ALARM")
@@ -2171,11 +2433,34 @@ def report_line(label: str, record: dict[str, Any]) -> str:
         segments.append("seat_path_divergence")
     if record.get("noop_unexplained_divergence"):
         segments.append("noop_unexplained_divergence")
+    if record.get("output_nondeterminism"):
+        segments.append(f"output_nondeterminism cause={shown('output_cause')}")
+    if record.get("unexplained_output_divergence"):
+        segments.append("unexplained_output_divergence")
+    if record.get("title_echo"):
+        segments.append("title_echo")
     if record.get("noop_outcome_unknown"):
         segments.append("noop_outcome_unknown")
     if record.get("judge_fault"):
         segments.append("judge_fault")
+    if record.get("children_unreadable"):
+        segments.append("children_unreadable")
     return " | ".join(segments)
+
+
+def _record_cost(overhead: Any) -> str:
+    """``record=+<engine and audit seconds>s/<window seconds>s <percent>%``:
+    what recording added to the build on the seat (:func:`_overhead`)."""
+    if not isinstance(overhead, dict) or overhead.get("window_s") is None:
+        return "record=-"
+    added = float(overhead.get("engine_s") or 0.0) + float(
+        overhead.get("escape_audit_s") or 0.0
+    )
+    pct = overhead.get("overhead_pct")
+    return (
+        f"record=+{added:.2f}s/{float(overhead['window_s']):.1f}s "
+        f"{'-' if pct is None else pct}%"
+    )
 
 
 # The fields of a request divergence that place it (the rest is context).
@@ -2272,13 +2557,16 @@ def _after_build(
         pass
     key, pairs = _cache.key_inputs(file_deps, digest)
     if key != recording.key:
-        # An input changed while the part built: the manifest would misstate
+        # An input changed while the build ran: the manifest would misstate
         # what the key was built from, so nothing is published or evaluated.
         record["outcome"] = "inputs_moved"
         return
     inputs = dict(pairs)
-    data = bundle(recording)
-    bundle_name, _ = blob_names(summary["engine"], recording.stem, recording.key)
+    # An assembly's or drawing's bundle past BUNDLE_LIMIT, by its files' bytes
+    # on disk, is never built in memory: neither published nor kept.
+    size = None if recording.kind is BuildKind.PART else bundle_size(recording)
+    data = None if size is not None and size > BUNDLE_LIMIT else bundle(recording)
+    bundle_name, _ = blob_names(summary["engine"], recording.name, recording.key)
     stored = _cache.publication(recording.key)
     outcome = None if stored is None else stored[0]
     published = manifest(
@@ -2290,24 +2578,41 @@ def _after_build(
         archive=stored[1] if stored is not None and outcome == "stored" else None,
         sw_build=seat_build(),
     )
-    record["bundle_bytes"] = len(data)
+    if recording.kind is not BuildKind.PART:
+        published.update(
+            kind=recording.kind.value,
+            argv=list(recording.argv),
+            children=recording.children,
+            # What a replay of this recording would need that the engine's
+            # replay lacks (com_replay._replay_gaps), to size that change.
+            replay_gaps=summary.get("replay_gaps"),
+            # The window a drawing's sheet picks hit-tested in (com_replay
+            # _display), to count seat windows without opening a bundle.
+            display=summary.get("display"),
+        )
+    record["bundle_bytes"] = size if data is None else len(data)
     record["bound"] = bound_archive(published) is not None
     with _telemetry.span(f"replay.publish {label}", service=infra, label=label) as sp:
         # Only a build that stored the key's archive publishes its recording:
         # one whose store lost the race made none of it (its recording
         # describes another build's part), and one that stored nothing, or
         # failed to, would leave an unbound manifest holding the key's
-        # create-only names. ``publish`` is then the store's outcome.
-        record["publish"] = (
-            publish(recording, published, data)
-            if outcome == "stored"
-            else outcome or "unstored"
-        )
+        # create-only names. ``publish`` is then the store's outcome. An
+        # assembly's or drawing's bundle past BUNDLE_LIMIT is not published.
+        if outcome != "stored":
+            record["publish"] = outcome or "unstored"
+        elif data is None:
+            record["publish"] = "oversize"
+        else:
+            record["publish"] = publish(recording, published, data)
         sp.set_attribute("replay.publish", record["publish"])
-        sp.set_attribute("replay.bundle_bytes", len(data))
+        sp.set_attribute("replay.bundle_bytes", record["bundle_bytes"])
         sp.set_attribute("replay.bound", bound_archive(published) is not None)
     if recording.mode not in (ReplayMode.SHADOW, ReplayMode.REUSE):
         record["outcome"] = "recorded"
+        return
+    if recording.kind is not BuildKind.PART:
+        _judge_dependent(recording, summary, inputs, published, record, data)
         return
     reuse = recording.reuse
     replayed = reuse is not None and reuse.replayed and reuse.lookup is not None
@@ -2321,7 +2626,7 @@ def _after_build(
             f"replay.base_lookup {label}", service=infra, label=label
         ) as sp:
             found = find_base(
-                blob_prefix(summary["engine"], recording.stem),
+                blob_prefix(summary["engine"], recording.name),
                 inputs,
                 published["recording_id"],
                 published["salt"],
@@ -2442,6 +2747,442 @@ def _after_build(
         )
     record["outcome"] = "evaluated"
     _write_shadow(recording, record)
+
+
+# ---------------------------------------------------------------------------
+# Assemblies and drawings: the fresh recording against its base
+# ---------------------------------------------------------------------------
+
+
+class Split(StrEnum):
+    """What an assembly's or drawing's fresh recording says against the
+    earlier recordings of its stem (:func:`_judge_dependent`). The first three
+    are the judgement the shadow exists for; the others are none."""
+
+    # No candidate read was made on this build's children: not comparable.
+    CHILDREN_CHANGED = "children_changed"
+    # The nearest base made on the same children issued exactly these
+    # requests, or the same requests but for the title counters the script
+    # echoed (``title_echo``: _com_outcome.title_echo; the ground truth stays
+    # ``diverged``, the cause ``response:title_counter``): the own-source
+    # change was a no-op for SolidWorks.
+    NOOP = "noop"
+    # It issued others. ``truth_cause`` says what preceded the first
+    # difference: ``request`` (the source asked something else) or
+    # ``response:<member>`` (SolidWorks answered differently first).
+    DIVERGED = "diverged"
+    # This build's own children are unknown (a token could not be read).
+    CHILDREN_UNKNOWN = "children_unknown"
+    # A recording of more than DIFF_CALLS_LIMIT calls: not compared.
+    OVERSIZE = "oversize"
+    TIMEOUT = "timeout"
+    UNAVAILABLE = "unavailable"
+    ERROR = "error"
+
+
+class OutputJudgement(StrEnum):
+    """What an assembly's or drawing's NOOP split says about its output:
+    exactly one per no-op. Nothing of an assembly's or drawing's recording is
+    reused, so none is an alarm: an output that differs after the base's
+    requests is evidence of what a reuse would have to pin or tolerate."""
+
+    # The base's requests and the base's assembly or drawing.
+    CONFIRMED = "confirmed"
+    # The base's requests and another output, with the seat seen to differ
+    # (:class:`OutputCause`). 2026-11-12, ms_stop_plate: one seat's 1010x678
+    # pixel drawing window against another's 1010x598 moved two leader tips
+    # 0.45 and 0.17 mm, with every request the same.
+    OUTPUT_NONDETERMINISM = "output_nondeterminism"
+    # The base's requests, SolidWorks' answers the same but for noise, and
+    # another output: nothing recorded explains it.
+    UNEXPLAINED_OUTPUT_DIVERGENCE = "unexplained_output_divergence"
+    # Nothing to judge the output by (a signal absent, no comparison).
+    OUTCOME_UNKNOWN = "noop_outcome_unknown"
+
+
+class OutputCause(StrEnum):
+    """How the seat differed for an :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`."""
+
+    # The drawing display the sheet picks hit-tested in (com_replay._display:
+    # view window or px/mm), as the two recordings' answers report it.
+    SEAT_DISPLAY = "seat_display"
+    # Otherwise, SolidWorks answered some request differently.
+    ANSWERS = "answers"
+
+
+def _output_judgement(
+    shadow: Shadow, display: Any, base_display: Any
+) -> tuple[OutputJudgement | None, OutputCause | None]:
+    """The judgement of a NOOP split (``None`` for any other) and, for an
+    output nondeterminism, its cause: the display first, which explains
+    answers that differ with it."""
+    if shadow.verdict != Split.NOOP:
+        return None, None
+    if shadow.outcome == "same":
+        return OutputJudgement.CONFIRMED, None
+    if shadow.outcome != "different":
+        return OutputJudgement.OUTCOME_UNKNOWN, None
+    if display is not None and base_display is not None and display != base_display:
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.SEAT_DISPLAY
+    if shadow.outcome_signals.get("answers") == "different":
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.ANSWERS
+    return OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE, None
+
+
+def _display_text(display: Any) -> str | None:
+    """``<width>x<height> px/mm=<p>`` of a :func:`com_replay._display`, as
+    the seat's own ``drawing display`` line reads (``?`` for a value missing)."""
+    if not isinstance(display, dict):
+        return None
+    window = display.get("view_window")
+    size = "x".join(map(str, window)) if isinstance(window, list) else "?"
+    return f"{size} px/mm={display.get('px_per_mm', '?')}"
+
+
+def _keep_sidecars(recording: Recording) -> None:
+    """Copy the sidecar files the build wrote into the recording directory,
+    for the bundle (one the build did not write is left out: the outcome
+    compares the files present). Never raises: a copy that fails is said at
+    WARN, and the outcome then finds that sidecar missing."""
+    copies = recording.sidecar_copies
+    try:
+        shutil.rmtree(copies, ignore_errors=True)
+        for path in recording.sidecars:
+            if path.is_file():
+                copies.mkdir(exist_ok=True)
+                shutil.copyfile(path, copies / path.name)
+    except OSError as exc:
+        _telemetry.warn(
+            f"[com-replay] {recording.label}: sidecar copy failed ({exc}); the "
+            "outcome will find it missing",
+            label=recording.label,
+        )
+
+
+def _unreadable(children: dict[str, str]) -> dict[str, str]:
+    """The children whose token held no SHA-256: tag -> why (dodo's
+    ``_execution_identity``: ``missing``, ``unreadable: <error>`` or
+    ``malformed: <content>``)."""
+    return {
+        tag: str(value)
+        for tag, value in children.items()
+        if not (isinstance(value, str) and _SHA256.fullmatch(value))
+    }
+
+
+def _comparable(children: dict[str, str]) -> bool:
+    """Whether these children identify the models a build opened: at least
+    one, each by the SHA-256 its token holds."""
+    return bool(children) and not _unreadable(children)
+
+
+def _judge_dependent(
+    recording: Recording,
+    summary: dict[str, Any],
+    inputs: dict[str, str],
+    published: dict[str, Any],
+    record: dict[str, Any],
+    data: bytes | None,
+) -> None:
+    """Mode ``shadow``, an assembly or drawing: find the nearest earlier
+    recording of the stem under this cache salt made on the same children
+    and compare this build's recording with it (:class:`Split`; a NOOP's
+    :class:`OutputJudgement`). No replay stands in: the fresh recording is
+    the ground truth of what the current source asked. ``data``: this
+    recording's bundle (None past BUNDLE_LIMIT), for :func:`_keep_evidence`.
+    Fills ``record`` (``outcome`` last)."""
+    label, infra = recording.label, _telemetry.BUILD_INFRA_SERVICE
+    children = recording.children
+    tally: Counter[str] = Counter()
+    unreadable = _unreadable(children)
+    if unreadable:
+        # No base can match: name each child and why, for the first native
+        # pass to tell a worker that lacks tokens from one that cannot read
+        # them.
+        listed = "; ".join(
+            f"{tag}: {why}" for tag, why in list(unreadable.items())[:DIFFERING_LISTED]
+        )[:EVIDENCE_CHARS]
+        record["children_unreadable"] = listed
+        _telemetry.warn(
+            f"[com-replay] {label}: {len(unreadable)} of {len(children)} children "
+            f"have no readable token, so no base can match: {listed}",
+            label=label,
+        )
+
+    def usable(candidate: dict[str, Any]) -> bool:
+        if (
+            candidate.get("schema") != MANIFEST_SCHEMA
+            or candidate.get("salt") != published["salt"]
+            or candidate.get("kind") != recording.kind.value
+            or candidate.get("recording_id") == published["recording_id"]
+        ):
+            return False
+        tally["candidates"] += 1
+        same = _comparable(children) and candidate.get("children") == children
+        tally["same_children"] += same
+        return same
+
+    started = time.monotonic()
+    with _telemetry.span(
+        f"replay.base_lookup {label}", service=infra, label=label
+    ) as sp:
+        found = find_base(
+            blob_prefix(summary["engine"], recording.name),
+            inputs,
+            published["recording_id"],
+            published["salt"],
+            limit=DEPENDENT_MANIFESTS,
+            usable=usable,
+        )
+        sp.set_attribute("replay.lookup", found.outcome.value)
+        sp.set_attribute("replay.listed", found.listed)
+        sp.set_attribute("replay.read", found.read)
+        sp.set_attribute("replay.candidates", tally["candidates"])
+        sp.set_attribute("replay.same_children", tally["same_children"])
+    record.update(
+        lookup=found.outcome.value,
+        lookup_s=round(time.monotonic() - started, 3),
+        listed=found.listed,
+        read=found.read,
+        candidates=tally["candidates"],
+        same_children=tally["same_children"],
+    )
+    base = found.base
+    if base is None and (found.outcome is Lookup.BUDGET or not tally["candidates"]):
+        _keep_evidence(recording, published, data, record)
+        record["outcome"] = "no_base"
+        return
+    started = time.monotonic()
+    with _telemetry.span(f"replay.split {label}", service=infra, label=label) as sp:
+        if base is None:
+            split = (
+                Split.CHILDREN_CHANGED
+                if _comparable(children)
+                else Split.CHILDREN_UNKNOWN
+            )
+            shadow = Shadow(split.value)
+        else:
+            record.update(
+                base_key=base.manifest.get("key"),
+                base_recorded_utc=base.manifest.get("recorded_utc"),
+                differing_count=len(base.differing),
+                differing_classes=base.classes,
+                differing=list(base.differing[:DIFFERING_LISTED]),
+                own_differing=sum(
+                    input_class(tag) is not InputClass.CHILD for tag in base.differing
+                ),
+            )
+            try:
+                shadow = _compare_dependent(recording, base, summary)
+            except Exception as exc:  # noqa: BLE001 - a failed comparison is a split
+                shadow = Shadow(Split.ERROR.value, reason=repr(exc)[:EVIDENCE_CHARS])
+        # Both from the two logs when they were compared (a base's manifest
+        # may predate ``display``), else this build's summary alone.
+        compared = shadow.display or {}
+        display = compared.get("new", summary.get("display"))
+        base_display = compared.get("base")
+        judgement, cause = _output_judgement(shadow, display, base_display)
+        fields = {
+            "split": shadow.verdict,
+            "candidates": tally["candidates"],
+            "same_children": tally["same_children"],
+            "children_unreadable": record.get("children_unreadable"),
+            "base_key": str(record.get("base_key") or "")[:12] or None,
+            "differing_count": record.get("differing_count"),
+            "differing_classes": ",".join(
+                f"{k}:{v}" for k, v in (record.get("differing_classes") or {}).items()
+            )
+            or None,
+            "own_differing": record.get("own_differing"),
+            "recipe_requests": summary.get("recipe_requests"),
+            "base_recipe_requests": base.manifest.get("recipe_requests")
+            if base is not None
+            else None,
+            "ground_truth": shadow.ground_truth,
+            "truth_cause": shadow.truth_cause,
+            "artefact_outcome": shadow.outcome,
+            "outcome_signals": ",".join(
+                f"{name}:{signal}"
+                for name, signal in sorted(shadow.outcome_signals.items())
+            )
+            or None,
+            "noop_judgement": judgement,
+            # The base's requests but for the title counters the script echoed
+            # (_compare_dependent).
+            "title_echo": shadow.verdict == Split.NOOP
+            and shadow.ground_truth == "diverged",
+            "output_nondeterminism": judgement is OutputJudgement.OUTPUT_NONDETERMINISM,
+            "output_cause": cause,
+            "unexplained_output_divergence": judgement
+            is OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE,
+            "display": _display_text(display),
+            "base_display": _display_text(base_display),
+            # SolidWorks answered differently first, and made the same model.
+            "seat_nondeterminism": shadow.verdict == Split.DIVERGED
+            and (shadow.truth_cause or "").startswith("response:")
+            and shadow.outcome == "same",
+            # SolidWorks answered differently first and the requests differ only
+            # by its detours of reads and selections, on the same geometry
+            # (Shadow.seat_path_detour): the vendored selection fallback.
+            "seat_path_divergence": shadow.verdict == Split.DIVERGED
+            and shadow.seat_path_detour,
+            "seat_path": (shadow.seat_path or {}).get("path"),
+            "noop_outcome_unknown": judgement is OutputJudgement.OUTCOME_UNKNOWN,
+            "judge_fault": shadow.judge_fault,
+            "judge_faults": ",".join(
+                str(fault.get("step")) for fault in shadow.judge_faults
+            )
+            or None,
+            "wall_s": round(time.monotonic() - started, 3),
+        }
+        for name, value in _attributes("replay", fields).items():
+            sp.set_attribute(name, value)
+    record.update(
+        **{
+            k: v
+            for k, v in fields.items()
+            if k not in ("base_key", "differing_count", "differing_classes")
+        },
+        reason=shadow.reason,
+    )
+    key = str(record.get("base_key") or "")
+    kind = recording.kind.value
+    if base is not None and judgement is OutputJudgement.OUTPUT_NONDETERMINISM:
+        evidence = _evidence(base, shadow)
+        record["output_evidence"] = evidence
+        seat = (
+            f"the base's display {fields['base_display']}, this build's "
+            f"{fields['display']}"
+            if cause is OutputCause.SEAT_DISPLAY
+            else "SolidWorks answered some request otherwise"
+        )
+        # Nothing of an assembly's or drawing's recording is reused, so no
+        # base is revoked: what a reuse would have to pin or tolerate.
+        _telemetry.warn(
+            f"[com-replay] output_nondeterminism {label}: this build issued base "
+            f"{key[:12]}'s requests on the same children but made another {kind} "
+            f"({cause}: {seat}): {evidence}",
+            label=label,
+            base_key=key,
+        )
+    if base is not None and judgement is OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE:
+        evidence = _evidence(base, shadow)
+        record["output_evidence"] = evidence
+        _telemetry.warn(
+            f"[com-replay] unexplained_output_divergence {label}: this build "
+            f"issued base {key[:12]}'s requests on the same children and "
+            f"SolidWorks answered alike, but it made another {kind}: {evidence}",
+            label=label,
+            base_key=key,
+        )
+    if base is not None and shadow.judge_fault:
+        _telemetry.warn(
+            f"[com-replay] judge_fault {label}: judging this build's recording "
+            f"against base {key[:12]} raised, so what it judged is unknown (the "
+            f"request divergence is kept): {_evidence(base, shadow)}",
+            label=label,
+            base_key=key,
+        )
+    _keep_evidence(recording, published, data, record)
+    record["outcome"] = "evaluated"
+    _write_shadow(recording, record)
+
+
+def _compare_dependent(
+    recording: Recording,
+    base: Base,
+    summary: dict[str, Any],
+    *,
+    seconds: float = DEPENDENT_SECONDS,
+) -> Shadow:
+    """This build's recording against ``base``'s (``com_replay.py diff`` of
+    the recording's kind), within ``seconds`` of wall time, as a Shadow
+    whose verdict is the :class:`Split`: NOOP for no request divergence or
+    one that is only the title counters the script echoed (``title_echo``),
+    whose ground truth stays ``diverged``. Everything lives in a fresh work
+    directory under :data:`SCRATCH`, removed afterwards."""
+    calls = [summary.get("calls"), base.manifest.get("calls")]
+    if any(isinstance(count, int) and count > DIFF_CALLS_LIMIT for count in calls):
+        return Shadow(
+            Split.OVERSIZE.value,
+            reason=f"calls {calls[0]} (base {calls[1]}) past {DIFF_CALLS_LIMIT}",
+        )
+    deadline = time.monotonic() + seconds
+    with _work_directory() as work:
+        data, failure = _bundle_of(base, deadline)
+        if data is None:
+            return Shadow(str(failure), reason=_BUNDLE_REASONS.get(str(failure)))
+        unbundle(data, work / WORK_BASE)
+        diff_rc, diff = _diff(
+            work, recording, _child_env(summary, work / WORK_TMP), deadline
+        )
+    if diff_rc is None:
+        return Shadow(Split.TIMEOUT.value, reason="diff exceeded the budget")
+    if diff is None or "request_divergence" not in diff:
+        return Shadow(Split.ERROR.value, reason=f"diff exited {diff_rc} with no result")
+    divergence = diff["request_divergence"]
+    noop = divergence is None or diff.get("title_echo") is True
+    return Shadow(
+        (Split.NOOP if noop else Split.DIVERGED).value,
+        ground_truth="same" if divergence is None else "diverged",
+        request_divergence=divergence,
+        truth_cause=diff.get("truth_cause"),
+        outcome=str(diff.get("outcome") or "unknown"),
+        outcome_signals=dict(diff.get("outcome_signals") or {}),
+        outcome_details=diff.get("outcome_details"),
+        judge_faults=list(diff.get("judge_faults") or []),
+        seat_path=diff.get("seat_path"),
+        kind=recording.kind,
+        display=diff.get("display"),
+    )
+
+
+def _keep_evidence(
+    recording: Recording,
+    published: dict[str, Any],
+    data: bytes | None,
+    record: dict[str, Any],
+) -> None:
+    """An assembly's or drawing's recording that is not published because
+    another writer's bytes already stand under the key (:data:`EVIDENCE_OF`:
+    ``publish`` ``exists``, the key's recording names held another's, as on a
+    forced refresh; ``lost``, the key's archive committed by another build
+    first, as when two seats build one key) is the only copy of what this
+    build asked and answered: unless its split is a confirmed NOOP, keep it
+    create-only under :func:`evidence_names` (bundle first, then the manifest
+    naming it), for a judgement only the pair can settle.
+    ``record["evidence"]``: the outcome (``stored``, ``exists``, ``error``,
+    the cache's ``skip``/``off``, or ``oversize`` for a bundle past
+    BUNDLE_LIMIT, ``data`` None, never built)."""
+    if record.get("publish") not in EVIDENCE_OF:
+        return
+    if record.get("noop_judgement") == OutputJudgement.CONFIRMED:
+        return
+    if data is None:
+        record["evidence"] = "oversize"
+        return
+    label = recording.label
+    bundle_name, manifest_name = evidence_names(
+        published["engine"], recording.name, recording.key, published["recording_id"]
+    )
+    kept = {
+        **published,
+        "bundle": {**published["bundle"], "name": bundle_name},
+        "evidence_of": {
+            name: record.get(name)
+            for name in ("split", "noop_judgement", "output_cause", "base_key")
+        },
+    }
+    with _telemetry.span(
+        f"replay.evidence {label}", service=_telemetry.BUILD_INFRA_SERVICE, label=label
+    ) as sp:
+        outcome = _cache.publish_sidecar(bundle_name, data)
+        if outcome == "stored":
+            outcome = _cache.publish_sidecar(
+                manifest_name, json.dumps(kept, sort_keys=True).encode("utf-8")
+            )
+        sp.set_attribute("replay.evidence", outcome)
+    record["evidence"] = outcome
 
 
 def _revoke_alarmed(engine: str, stem: str, base: dict[str, Any]) -> str:
