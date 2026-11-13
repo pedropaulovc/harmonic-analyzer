@@ -40,6 +40,7 @@ the driver only; in no recipe closure.
 
 from __future__ import annotations
 
+import functools
 import gzip
 import hashlib
 import itertools
@@ -50,7 +51,7 @@ import struct
 import sys
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -129,6 +130,24 @@ _PDF_SUFFIX = ".pdf"
 # Sheet coordinates of a drawing PDF's ink are compared rounded to this many
 # decimals of a metre (1 um: a PDF point is 353 um, written to a few decimals).
 _PDF_ROUND = 6
+# A drawing's PDF difference that is only a jagged crop outline drawn again
+# (:func:`jagged_outline`): the judgement's ``pdf_cause``.
+JAGGED_OUTLINE_CAUSE = "jagged_outline"
+# Slack of a jagged view's box against the PDF's rounded ends (metres).
+_BOX_SLACK = 2 * 10.0**-_PDF_ROUND
+# Requests (not reads) that move or resize a drawing view after its outline
+# was read: its box no longer bounds what it draws.
+_VIEW_MOVES = frozenset(
+    {
+        "IView.Angle",
+        "IView.Crop2",
+        "IView.Position",
+        "IView.ScaleDecimal",
+        "IView.ScaleRatio",
+        "IView.SetViewPosition",
+        "IView.UseSheetScale",
+    }
+)
 # The signals of :func:`outcome` per kind of build: a drawing holds no mass
 # property and writes no STL; an assembly writes no STL, and the outputs Python
 # writes beside it (its geometry proof, DOF manifest, BOM) are compared as
@@ -146,6 +165,23 @@ GEOMETRY: dict[str, tuple[str, ...]] = {
     "assembly": ("mass", "sidecars"),
     "drawing": ("pdf",),
 }
+# The kinds judged as dependents of other models (assemblies and drawings):
+# only telemetry, nothing of their recordings is reused, so these judgements
+# name causes more finely than a part's (:func:`truth_cause`,
+# :func:`_distance_only`, :func:`jagged_outline`, :func:`name_bound`).
+DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
+# Members whose answer a dependent's ``answers`` signal compares by its first
+# element only: ``IModelDoc2.ClosestDistance`` answers the distance, then a
+# witness point on each entity, and between two parallel faces any pair of
+# points is a witness. 2026-11-13, dt_drive_train built twice under one key:
+# 6.882839 mm both times, the witnesses 17.47 mm apart along the faces.
+_DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
+# The reads that identify a component in a dependent's array pre-pass
+# (:func:`name_bound`): a component's instance name, a drawing component's
+# name (the keys #2686's name-order sort reads).
+_IDENTITY_READ = re.compile(r"\.Name2$|^IDrawingComponent\.Name$")
+# ``_com._early_bound``'s QueryInterface, as the recorder logs it.
+_EARLY_BOUND = ("QueryInterface", "early_bound")
 
 
 class Outcome(StrEnum):
@@ -244,16 +280,20 @@ def judge(
     ``outcome_details`` (the seat path's in its own ``detail``). The diff's
     result, whose request divergence is the ground truth, is kept.
     ``judge_faults`` lists every fault (``step``: ``truth_cause``, a signal,
-    ``outcome`` for all of them, ``seat_path`` or ``title_echo``; ``error``),
-    so a signal absent because its judgement raised is told from one absent
-    from both logs. ``title_echo`` (:func:`title_echo`, ``None`` when not
-    judged) is judged only for a :data:`TITLE_COUNTER_CAUSE`."""
+    ``outcome`` for all of them, ``seat_path``, ``title_echo`` or
+    ``pdf_cause``; ``error``), so a signal absent because its judgement
+    raised is told from one absent from both logs. ``title_echo``
+    (:func:`title_echo`, ``None`` when not judged) is judged only for a
+    :data:`TITLE_COUNTER_CAUSE`; ``pdf_cause`` (:data:`JAGGED_OUTLINE_CAUSE`
+    when :func:`jagged_outline`, else ``None``) only for a ``different``
+    ``pdf`` signal."""
     streams, streams_error = _attempt(lambda: _streams(base, new))
+    inks = _read_once(base, new, base_captures, new_captures)
     cause, cause_error = (None, streams_error)
     found, error = (None, streams_error)
     if streams is not None:
         cause, cause_error = _attempt(
-            lambda: truth_cause(streams.a, streams.b, divergence)
+            lambda: truth_cause(streams.a, streams.b, divergence, kind)
         )
         found, error = _attempt(
             lambda: outcome(
@@ -265,6 +305,7 @@ def judge(
                 kind,
                 base_sidecars,
                 new_sidecars,
+                inks,
             )
         )
     if error is not None:
@@ -296,28 +337,293 @@ def judge(
         echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b))
         if echo_error is not None:
             found["judge_faults"].append({"step": "title_echo", "error": echo_error})
-    return {"truth_cause": cause, **found, "seat_path": path, "title_echo": echo}
+    ink = None
+    if signals.get("pdf") == Signal.DIFFERENT.value:
+        jagged, ink_error = _attempt(lambda: jagged_outline(base, new, *inks()))
+        if ink_error is not None:
+            found["judge_faults"].append({"step": "pdf_cause", "error": ink_error})
+        if jagged:
+            ink = JAGGED_OUTLINE_CAUSE
+    return {
+        "truth_cause": cause,
+        **found,
+        "seat_path": path,
+        "title_echo": echo,
+        "pdf_cause": ink,
+    }
 
 
 def truth_cause(
-    a: Sequence[conv.Call], b: Sequence[conv.Call], divergence: dict[str, Any] | None
+    a: Sequence[conv.Call],
+    b: Sequence[conv.Call],
+    divergence: dict[str, Any] | None,
+    kind: str = "part",
 ) -> str | None:
-    """``response:<member>`` for the nearest response before the request
-    divergence that differs beyond noise (SolidWorks answered differently
-    first), :data:`TITLE_COUNTER_CAUSE` when every earlier answer agrees but
-    for noise and the diverging request echoes a title counter
-    (:func:`_echoes_title`), ``request`` when the script asked something else
-    of the same answers, ``None`` without a divergence."""
+    """``response:<member>`` for a response before the request divergence
+    that differs beyond noise (SolidWorks answered differently first),
+    :data:`TITLE_COUNTER_CAUSE` when every earlier answer agrees but for noise
+    and the diverging request echoes a title counter (:func:`_echoes_title`),
+    ``request`` when the script asked something else of the same answers,
+    ``None`` without a divergence.
+
+    A part names the nearest such response. An assembly or drawing
+    (:data:`DEPENDENT_KINDS`) names the earliest (:func:`_earliest_response`),
+    and files a request that differs from the base's only by float noise
+    after an answer that did (:func:`_noise_carried`) as that answer's
+    response cause."""
     if divergence is None:
         return None
     end = min(int(divergence["index"]), len(a), len(b))
-    for index in range(end - 1, -1, -1):
-        x, y = a[index], b[index]
-        if not _close([x.result, x.raised, x.outs], [y.result, y.raised, y.outs]):
-            return f"response:{x.site}"
+    if kind not in DEPENDENT_KINDS:
+        for index in range(end - 1, -1, -1):
+            if not _close(_answer(a[index]), _answer(b[index])):
+                return f"response:{a[index].site}"
+    else:
+        found = _earliest_response(a, b, end)
+        if found is not None:
+            return f"response:{a[found].site}"
     if _echoes_title(a, b, end):
         return TITLE_COUNTER_CAUSE
+    if kind in DEPENDENT_KINDS:
+        carried = _noise_carried(a, b, end, divergence)
+        if carried is not None:
+            return f"response:{a[carried].site}"
     return "request"
+
+
+def _earliest_response(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], end: int
+) -> int | None:
+    """The index of the earliest answer before ``end`` that differs beyond
+    noise and is no renumbering (:func:`_renumbered`); else of the earliest
+    renumbering, which is still SolidWorks answering otherwise first; else
+    ``None``. 2026-11-13, pd_transgear_knob_shaft: the nearest difference was
+    a QueryInterface answering h1327 against h1319, a renumbering behind the
+    first one that matters, one build listing 8 fewer visible edges."""
+    newest = [0, 0]  # the largest handle number each build had used
+    renumbered = None
+    for index in range(end):
+        x, y = _answer(a[index]), _answer(b[index])
+        if not _close(x, y):
+            if not _renumbered(x, y, newest):
+                return index
+            if renumbered is None:
+                renumbered = index
+        for side, (call, answer) in enumerate(((a[index], x), (b[index], y))):
+            used = _handles([call.args, answer])
+            newest[side] = max(newest[side], call.handle, *used)
+    return renumbered
+
+
+def _renumbered(x: Any, y: Any, newest: list[int]) -> bool:
+    """Two answers that differ only by handles each build numbered with this
+    answer: the same new objects, numbered apart (an object's number is its
+    allocation order, so a build that allocated another count of objects
+    earlier numbers every later one apart). A handle either build had
+    already used (``newest``: the largest number each had) is another
+    object than the base's, so a real difference."""
+    if not _close(_erased(x), _erased(y)):
+        return False
+    return all(
+        p == q or (p > newest[0] and q > newest[1])
+        for p, q in zip(_handles(x), _handles(y), strict=True)
+    )
+
+
+def _noise_carried(
+    a: Sequence[conv.Call],
+    b: Sequence[conv.Call],
+    index: int,
+    divergence: dict[str, Any],
+) -> int | None:
+    """The index of the nearest answer before ``index`` that differed only by
+    float noise, when the diverging request is the base's member on the same
+    object with arguments the same but for float noise (:func:`_close`): the
+    script carried SolidWorks' noise into a request. 2026-11-13,
+    dt_cone_tip_gear: an ``IAnnotation.GetPosition`` 1 ulp apart, then
+    ``SetPosition2`` 1 ulp apart. Otherwise ``None``: any other difference in
+    the request is the script's own."""
+    if divergence.get("field") != "args" or index >= min(len(a), len(b)):
+        return None
+    x, y = a[index], b[index]
+    if (x.handle, x.op, x.site) != (y.handle, y.op, y.site) or not _close(
+        x.args, y.args
+    ):
+        return None
+    for earlier in range(index - 1, -1, -1):
+        p, q = _answer(a[earlier]), _answer(b[earlier])
+        if _exact(_mapped(_erased(p), _text)) != _exact(_mapped(_erased(q), _text)):
+            return earlier
+    return None
+
+
+def name_bound(
+    base: conv.Conversation, new: conv.Conversation
+) -> tuple[conv.Conversation, int]:
+    """``new`` with each component array SolidWorks enumerated in another
+    order bound to the base's by name, and how many arrays were bound (0:
+    ``new`` itself). For a dependent's split only (:data:`DEPENDENT_KINDS`).
+
+    The recorder numbers handles in allocation order, so an array answer's
+    elements are numbered in the seat's enumeration order: two seats number
+    the same components apart, and a script that reads every component's name
+    and then visits the components in name order (the sort #2686 brings) asks
+    the same of each component under another number. An array is bound only
+    when, at a request both builds issued alike (``request_field``) whose
+    answers are the same handle numbers, both builds then :func:`_identify`
+    every element, each by one distinct name, the same names in both. The new
+    build is then read as if SolidWorks had enumerated in the base's order:
+    the array's answer stays as recorded (the same numbers as the base's),
+    the pre-pass is put in the base's element order, and every handle of an
+    element (the element and what its pre-pass calls allocated) is renamed,
+    in the pre-pass and in every later call, to the base's handle of the
+    component of the same name. Anything else stays positional: components
+    visited in enumeration order (as the explode authors' ``by_name`` dicts
+    are, in insertion order) still differ, a request on another component
+    than the base's still diverges, and a component that is not the base's
+    by name binds nothing."""
+    a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
+    bound = 0
+    index = 0
+    while index < min(len(a), len(b)):
+        x, y = a[index], b[index]
+        if conv.request_field(x, y.handle, y.op, y.args) is not None:
+            break
+        found = _bind(a, b, index)
+        if found is None:
+            index += 1
+            continue
+        b, index = found
+        bound += 1
+    if not bound:
+        return new, 0
+    inert = [call for call in new.calls if call.origin is not conv.Origin.RECIPE]
+    return replace(new, calls=[*b, *inert]), bound
+
+
+@dataclass(frozen=True)
+class _Identified:
+    """An array's pre-pass (:func:`_identify`): where it ends, per pre-pass
+    call its element and that element's call count before it, per element
+    its calls, its name and the handles its calls allocated, in order."""
+
+    end: int
+    owners: list[tuple[int, int]]
+    calls: list[list[conv.Call]]
+    names: list[str]
+    allocated: list[list[int]]
+
+
+def _bind(
+    a: list[conv.Call], b: list[conv.Call], index: int
+) -> tuple[list[conv.Call], int] | None:
+    """``b`` with the array answered at ``index`` bound to ``a``'s by name
+    (:func:`name_bound`), and where its pre-pass ends; ``None`` when it is
+    no such array, or in the same order."""
+    elements = _handle_array(a[index].result)
+    if elements is None or elements != _handle_array(b[index].result):
+        return None
+    left, right = _identify(a, index, elements), _identify(b, index, elements)
+    if left is None or right is None or left.end != right.end:
+        return None
+    if len(set(left.names)) != len(elements) or set(left.names) != set(right.names):
+        return None
+    at = {name: element for element, name in enumerate(left.names)}
+    order = [at[name] for name in right.names]  # new element -> base element
+    if order == list(range(len(order))):
+        return None
+    rename: dict[int, int] = {}
+    of = [0] * len(order)
+    for element, mine in enumerate(order):
+        of[mine] = element
+        if len(right.calls[element]) != len(left.calls[mine]):
+            return None
+        if len(right.allocated[element]) != len(left.allocated[mine]):
+            return None
+        rename[elements[element]] = elements[mine]
+        rename.update(zip(right.allocated[element], left.allocated[mine], strict=True))
+    if set(rename) != set(rename.values()):
+        return None
+    prepass = [right.calls[of[element]][count] for element, count in left.owners]
+    renamed = [_renamed(call, rename) for call in prepass]
+    rest = [_renamed(call, rename) for call in b[left.end :]]
+    return [*b[: index + 1], *renamed, *rest], left.end
+
+
+def _handle_array(answer: Any) -> list[int] | None:
+    """The handles of an answer that is an array of two or more of them."""
+    if not isinstance(answer, dict) or not isinstance(answer.get("t"), list):
+        return None
+    items = answer["t"]
+    if len(items) < 2 or not all(_is_handle(item) for item in items):
+        return None
+    return [item["h"] for item in items]
+
+
+def _is_handle(value: Any) -> bool:
+    return isinstance(value, dict) and isinstance(value.get("h"), int)
+
+
+def _identify(
+    calls: list[conv.Call], index: int, elements: list[int]
+) -> _Identified | None:
+    """The calls right after the array answered at ``index`` when they
+    identify every element by name and do nothing else: each addressed to
+    an element or a handle an earlier one of its calls allocated, each a
+    pywin32 wrap (``GetTypeInfo``), a QueryInterface (``early_bound``) or a
+    :data:`_IDENTITY_READ` answering a string, one per element. ``None``
+    for anything else before every element was named."""
+    owner = {handle: element for element, handle in enumerate(elements)}
+    newest = max(elements)
+    owners: list[tuple[int, int]] = []
+    mine: list[list[conv.Call]] = [[] for _ in elements]
+    names: list[str | None] = [None] * len(elements)
+    allocated: list[list[int]] = [[] for _ in elements]
+    unnamed = len(elements)
+    at = index + 1
+    while unnamed:
+        if at >= len(calls) or calls[at].handle not in owner:
+            return None
+        call = calls[at]
+        element = owner[call.handle]
+        if _IDENTITY_READ.search(call.site) and call.kind is conv.Kind.GET:
+            if names[element] is not None or not isinstance(call.result, str):
+                return None
+            names[element] = call.result
+            unnamed -= 1
+        elif call.op != "GetTypeInfo" and (call.op, call.site) != _EARLY_BOUND:
+            return None
+        for handle in _handles([call.result, call.outs]):
+            if handle > newest:
+                newest = handle
+                owner[handle] = element
+                allocated[element].append(handle)
+        owners.append((element, len(mine[element])))
+        mine[element].append(call)
+        at += 1
+    return _Identified(at, owners, mine, [str(name) for name in names], allocated)
+
+
+def _renamed(call: conv.Call, rename: dict[int, int]) -> conv.Call:
+    """``call`` with every handle in ``rename`` renamed: its object, its
+    arguments and its answer."""
+    return replace(
+        call,
+        handle=rename.get(call.handle, call.handle),
+        args=_rehandled(call.args, rename),
+        result=_rehandled(call.result, rename),
+        outs=_rehandled(call.outs, rename),
+    )
+
+
+def _rehandled(value: Any, rename: dict[int, int]) -> Any:
+    if isinstance(value, list):
+        return [_rehandled(item, rename) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if _is_handle(value):
+        return {**value, "h": rename.get(value["h"], value["h"])}
+    return {name: _rehandled(item, rename) for name, item in value.items()}
 
 
 def carries_title_counter(value: Any) -> bool:
@@ -409,6 +715,7 @@ def outcome(
     kind: str = "part",
     base_sidecars: Path | None = None,
     new_sidecars: Path | None = None,
+    inks: Callable[[], tuple[Any, Any]] | None = None,
 ) -> dict[str, Any]:
     """``outcome`` (an :class:`Outcome` value), each signal's
     :class:`Signal` (``outcome_signals``), what differed
@@ -435,7 +742,11 @@ def outcome(
     BMP captures are no signal: a model file's bytes differ on every save, a
     screenshot's with the seat's window. A signal whose judgement raises is
     ``absent``, its message its detail. ``streams``: both builds' recipe calls
-    and keys, which :func:`judge` made once for every judgement of the pair."""
+    and keys, which :func:`judge` made once for every judgement of the pair;
+    ``inks``: both builds' :func:`pdf_inks`, read once when first asked for
+    (by default here)."""
+    if inks is None:
+        inks = _read_once(base, new, base_captures, new_captures)
     a, b = streams.a, streams.b
     keyed, keyed_error = streams.keyed, streams.keyed_error
     computed: dict[str, Callable[[], tuple[Signal, Any]]] = {
@@ -444,9 +755,9 @@ def outcome(
             [(site, request) for site, request, _ in keyed[0]],
             [(site, request) for site, request, _ in keyed[1]],
         ),
-        "answers": lambda: _answers_signal(keyed[0], keyed[1], a, b),
+        "answers": lambda: _answers_signal(*_distance_only(keyed, a, b, kind)),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
-        "pdf": lambda: _pdf_signal(base, new, base_captures, new_captures),
+        "pdf": lambda: _pdf_signal(*inks()),
         "sidecars": lambda: _sidecar_signal(base_sidecars, new_sidecars),
     }
     attempts = {name: computed[name] for name in SIGNALS[kind]}
@@ -1075,6 +1386,40 @@ def _keyed_calls(calls: Sequence[conv.Call]) -> list[tuple[str, str, str | None]
     return keyed
 
 
+def _distance_only(
+    keyed: tuple[list[tuple[str, str, str | None]], ...],
+    a: Sequence[conv.Call],
+    b: Sequence[conv.Call],
+    kind: str,
+) -> tuple[Sequence[Any], ...]:
+    """:func:`_answers_signal`'s arguments: for a dependent
+    (:data:`DEPENDENT_KINDS`), each :data:`_DISTANCE_ONLY` answer cut to its
+    first element, the distance, and keyed again; a part's as recorded."""
+    if kind not in DEPENDENT_KINDS:
+        return keyed[0], keyed[1], a, b
+    (keys_a, cut_a), (keys_b, cut_b) = _cut(keyed[0], a), _cut(keyed[1], b)
+    return keys_a, keys_b, cut_a, cut_b
+
+
+def _cut(
+    keyed: list[tuple[str, str, str | None]], calls: Sequence[conv.Call]
+) -> tuple[list[tuple[str, str, str | None]], list[conv.Call]]:
+    kept_keys, kept_calls = list(keyed), list(calls)
+    for index, call in enumerate(calls):
+        answer = call.result
+        if call.site not in _DISTANCE_ONLY or keyed[index][2] is None:
+            continue
+        if not isinstance(answer, dict) or not isinstance(answer.get("t"), list):
+            continue
+        if not answer["t"]:
+            continue
+        call = replace(call, result=answer["t"][0])
+        kept_calls[index] = call
+        key = json.dumps(_keyed(_answer(call)), separators=(",", ":"))
+        kept_keys[index] = (call.site, keyed[index][1], key)
+    return kept_keys, kept_calls
+
+
 def _multiset_signal(
     a: Sequence[tuple[str, ...]], b: Sequence[tuple[str, ...]]
 ) -> tuple[Signal, dict[str, list[int]] | None]:
@@ -1271,17 +1616,37 @@ def _last_writes(
     return found
 
 
-def _pdf_signal(
+def pdf_inks(
+    conversation: conv.Conversation, captures: Path
+) -> dict[str, list[tuple[Any, ...]] | str] | None:
+    """Per PDF path the build had SolidWorks write, its last write's
+    :func:`_pdf_ink`; ``None`` when a capture is missing or not the bytes
+    the log describes. Read once per judgement: :func:`judge` hands both
+    builds' to the ``pdf`` signal and to :func:`jagged_outline`."""
+    found = _last_writes(conversation, captures, _PDF_SUFFIX)
+    if found is None:
+        return None
+    return {rel: _pdf_ink(data) for rel, data in found.items()}
+
+
+def _read_once(
     base: conv.Conversation,
     new: conv.Conversation,
     base_captures: Path,
     new_captures: Path,
+) -> Callable[[], tuple[Any, Any]]:
+    """Both builds' :func:`pdf_inks`, read on the first call and kept."""
+    return functools.cache(
+        lambda: (pdf_inks(base, base_captures), pdf_inks(new, new_captures))
+    )
+
+
+def _pdf_signal(
+    a: dict[str, Any] | None, b: dict[str, Any] | None
 ) -> tuple[Signal, dict[str, str] | None]:
-    """Per PDF path either build had SolidWorks write, whether the two last
-    writes print the same ink (:func:`_pdf_ink`). A PDF's bytes are no
+    """Per PDF path either build had SolidWorks write (:func:`pdf_inks`),
+    whether the two last writes print the same ink. A PDF's bytes are no
     signal: SolidWorks writes the export's date into them."""
-    a = _last_writes(base, base_captures, _PDF_SUFFIX)
-    b = _last_writes(new, new_captures, _PDF_SUFFIX)
     if a is None or b is None or (not a and not b):
         return Signal.ABSENT, None
     differing: dict[str, str] = {}
@@ -1289,7 +1654,7 @@ def _pdf_signal(
         if rel not in b or rel not in a:
             differing[rel] = "base only" if rel in a else "new only"
             continue
-        found = _ink_difference(_pdf_ink(a[rel]), _pdf_ink(b[rel]))
+        found = _ink_difference(a[rel], b[rel])
         if found is not None:
             differing[rel] = found
     if differing:
@@ -1360,6 +1725,136 @@ def _ink_difference(
                     f"{new_only.total()} new only"
                 )
     return None
+
+
+def jagged_outline(
+    base: conv.Conversation,
+    new: conv.Conversation,
+    a: dict[str, Any] | None,
+    b: dict[str, Any] | None,
+) -> bool:
+    """Whether two drawings' PDFs (``a``, ``b``: :func:`pdf_inks`) differ
+    only by a jagged crop outline drawn again: SolidWorks breaks a cropped
+    view's outline along a random wiggle each time it draws it (2026-11-13,
+    dt_pinion_arbor's detail A: three builds of the same requests, three
+    wiggles). True only when both builds read the same jagged views
+    (:func:`_jagged_boxes`), wrote the same PDFs with the same pages and text
+    runs, and on every page that differs the differing path pieces are
+    :func:`_rewiggled`. Any doubt is False."""
+    boxes = _jagged_boxes(conv.recipe_calls(base.calls))
+    if not boxes or boxes != _jagged_boxes(conv.recipe_calls(new.calls)):
+        return False
+    if not a or not b or a.keys() != b.keys():
+        return False
+    rewiggled = False
+    for rel in sorted(a):
+        x, y = a[rel], b[rel]
+        if isinstance(x, str) or isinstance(y, str) or len(x) != len(y):
+            return False
+        for page_a, page_b in zip(x, y, strict=True):
+            if page_a[:2] != page_b[:2]:  # size, text runs
+                return False
+            left, right = Counter(page_a[2]), Counter(page_b[2])
+            if left == right:
+                continue
+            if not _rewiggled(left - right, right - left, left & right, boxes):
+                return False
+            rewiggled = True
+    return rewiggled
+
+
+def _jagged_boxes(calls: Sequence[conv.Call]) -> list[tuple[float, ...]]:
+    """The sheet box (xmin, ymin, xmax, ymax, metres) of each view whose
+    ``IView.CropViewJaggedOutline`` last read True: the last
+    ``IView.GetOutline`` answer on that view's handle, unless a
+    :data:`_VIEW_MOVES` request on the handle followed it."""
+    outline: dict[int, tuple[float, ...] | None] = {}
+    jagged: dict[int, bool] = {}
+    for call in calls:
+        if call.site == "IView.GetOutline":
+            outline[call.handle] = _box(call.result)
+        elif call.site in _VIEW_MOVES and call.kind is not conv.Kind.GET:
+            outline[call.handle] = None
+        elif call.site == "IView.CropViewJaggedOutline":
+            if call.kind is conv.Kind.GET:
+                jagged[call.handle] = call.result is True
+    return sorted(
+        box
+        for handle, on in jagged.items()
+        if on and (box := outline.get(handle)) is not None
+    )
+
+
+def _box(answer: Any) -> tuple[float, ...] | None:
+    if not isinstance(answer, dict) or not isinstance(answer.get("t"), list):
+        return None
+    values = answer["t"]
+    if len(values) != 4 or not all(_is_float(value) for value in values):
+        return None
+    return tuple(float.fromhex(value["f"]) for value in values)
+
+
+def _rewiggled(
+    base_only: Counter[Any],
+    new_only: Counter[Any],
+    unchanged: Counter[Any],
+    boxes: list[tuple[float, ...]],
+) -> bool:
+    """Whether one page's differing path pieces (:func:`_pdf_ink`'s) are a
+    jagged outline drawn again: all of one solid stroke (one width and
+    colour, not dashed, not filled), all inside one jagged view's box, and
+    on each side open chains (:func:`_open_ends`) whose ends are the same
+    points and each the end of an unchanged piece: the wiggle is the stretch
+    of the outline between the same two points of the unbroken outline."""
+    pieces = [*base_only.elements(), *new_only.elements()]
+    if len({(piece[0][4], *piece[1:]) for piece in pieces}) != 1:
+        return False
+    _, _, dashed, filled, stroked = pieces[0]
+    if dashed or filled or not stroked:
+        return False
+    if not any(all(_inside(piece[0], box) for piece in pieces) for box in boxes):
+        return False
+    ends = _open_ends(base_only)
+    attached = {end for piece in unchanged for end in _piece_ends(piece)}
+    return ends is not None and ends == _open_ends(new_only) and ends <= attached
+
+
+def _inside(ends: tuple[float, ...], box: tuple[float, ...]) -> bool:
+    x0, y0, x1, y1, _ = ends
+    xmin, ymin, xmax, ymax = box
+    return all(
+        xmin - _BOX_SLACK <= x <= xmax + _BOX_SLACK
+        and ymin - _BOX_SLACK <= y <= ymax + _BOX_SLACK
+        for x, y in ((x0, y0), (x1, y1))
+    )
+
+
+def _piece_ends(piece: tuple[Any, ...]) -> tuple[tuple[float, float], ...]:
+    x0, y0, x1, y1, _ = piece[0]
+    return (x0, y0), (x1, y1)
+
+
+def _open_ends(pieces: Counter[Any]) -> frozenset[tuple[float, float]] | None:
+    """The points where ``pieces`` (path pieces, ends as rounded) end: those
+    an odd number of pieces end at. ``None`` for no pieces or when a
+    connected run of them ends nowhere (a closed loop)."""
+    degree: Counter[tuple[float, float]] = Counter()
+    parent: dict[tuple[float, float], tuple[float, float]] = {}
+
+    def root(point: tuple[float, float]) -> tuple[float, float]:
+        while parent.setdefault(point, point) != point:
+            point = parent[point]
+        return point
+
+    for piece in pieces.elements():
+        start, end = _piece_ends(piece)
+        degree[start] += 1
+        degree[end] += 1
+        parent[root(start)] = root(end)
+    ends = frozenset(point for point, count in degree.items() if count % 2)
+    if not degree or {root(p) for p in degree} != {root(p) for p in ends}:
+        return None
+    return ends
 
 
 def _sidecar_signal(

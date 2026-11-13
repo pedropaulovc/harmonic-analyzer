@@ -19,6 +19,7 @@ import dataclasses
 import gzip
 import hashlib
 import importlib.util
+import itertools
 import json
 import math
 import os
@@ -1412,6 +1413,76 @@ def test_a_request_echoing_a_title_counter_is_caused_by_the_seat():
     assert not _com_outcome.carries_title_counter(["Partial11", 11, {"f": "0x1p0"}])
 
 
+def _answered(site: str, result: Any, args: list[Any] | None = None) -> conv.Call:
+    return conv.Call(0, 3, "InvokeTypes", args or [], site, result=result)
+
+
+def test_a_dependents_cause_is_its_earliest_answer_beyond_handle_numbers():
+    cause = _com_outcome.truth_cause
+    at = {"index": 3, "field": "args"}
+    added = _answered("IEquationMgr.Add2", 0, ["D1 = 2"])
+    base = [
+        _answered("early_bound", {"h": 20, "p": "PyIDispatch"}),
+        _answered("IComponent2.GetPathName", "C:/parts/a.SLDPRT"),
+        _answered("IApp.Get", 1),
+        added,
+    ]
+    new = [
+        _answered("early_bound", {"h": 21, "p": "PyIDispatch"}),
+        _answered("IComponent2.GetPathName", "C:/parts/b.SLDPRT"),
+        _answered("IApp.Get", 2),
+        dataclasses.replace(added, args=["D1 = 3"]),
+    ]
+    # A part names the nearest answer that differs; an assembly or drawing
+    # the earliest, past a new object numbered apart (a renumbering).
+    assert cause(base, new, at) == "response:IApp.Get"
+    for kind in ("assembly", "drawing"):
+        assert cause(base, new, at, kind) == "response:IComponent2.GetPathName"
+    # A renumbering alone is still SolidWorks answering otherwise first.
+    renumbered = [new[0], *base[1:3], new[3]]
+    assert cause(base, renumbered, at) == "response:early_bound"
+    assert cause(base, renumbered, at, "drawing") == "response:early_bound"
+    # An object either build had numbered already is another object: named
+    # first, whatever differs after it.
+    known = [_answered("early_bound", {"h": h, "p": "PyIDispatch"}) for h in (20, 21)]
+    picked = _answered(
+        "ISelectionMgr.GetSelectedObject6", {"h": 20, "p": "PyIDispatch"}
+    )
+    other = dataclasses.replace(picked, result={"h": 21, "p": "PyIDispatch"})
+    at = {"index": 4, "field": "args"}
+    assert cause(
+        [*known, picked, base[1], added], [*known, other, new[1], new[3]], at, "drawing"
+    ) == ("response:ISelectionMgr.GetSelectedObject6")
+
+
+def test_a_dependents_request_carrying_float_noise_is_the_noises():
+    cause = _com_outcome.truth_cause
+    at = {"index": 2, "field": "args"}
+    x = 0.14036  # dt_cone_tip_gear's note, 2026-11-13
+    noisy = math.nextafter(x, 1.0)
+
+    def placed(read: float, put: float, site: str = "IAnnotation.SetPosition2"):
+        return [
+            _answered("IAnnotation.GetPosition", {"t": [_f(read), _f(0.2), _f(0.0)]}),
+            _answered("IView.GetName2", "Drawing View1"),
+            _answered(site, True, [_f(put), _f(0.2), _f(0.0)]),
+        ]
+
+    base = placed(x, x)
+    # The answer 1 ulp apart, carried into the request: the noise's.
+    assert cause(base, placed(noisy, noisy), at, "drawing") == (
+        "response:IAnnotation.GetPosition"
+    )
+    # A part's request is its script's, whatever preceded it.
+    assert cause(base, placed(noisy, noisy), at) == "request"
+    # Arguments beyond noise, or noise no answer carried, are the script's.
+    assert cause(base, placed(noisy, x + 0.012), at, "drawing") == "request"
+    assert cause(base, placed(x, noisy), at, "drawing") == "request"
+    # As is another member, however close its arguments.
+    moved = placed(noisy, noisy, "IAnnotation.SetPosition")
+    assert cause(base, moved, {"index": 2, "field": "member"}, "drawing") == "request"
+
+
 def _sw(
     site: str, *values: Any, flags: int = 1, result: Any = True, on: int = 3
 ) -> conv.Call:
@@ -2690,10 +2761,13 @@ def minimal_pdf(line_end: float, stamp: str) -> bytes:
     """A one-page vector PDF as SolidWorks exports a sheet: one text run and
     one black stroked line from (20, 20) to (``line_end``, 20) points;
     ``stamp`` is its Info dictionary's creation date (bytes, never ink)."""
-    content = (
-        f"BT /F1 12 Tf 20 60 Td (DRAWING) Tj ET 0 0 0 RG 1 w 20 20 m "
-        f"{line_end:g} 20 l S"
-    ).encode()
+    return _sheet_pdf(f"20 20 m {line_end:g} 20 l S", stamp)
+
+
+def _sheet_pdf(paths: str, stamp: str = "D:1", text: str = "DRAWING") -> bytes:
+    """A one-page 300 x 100 point vector PDF: the text run ``text`` and the
+    black 1 pt strokes of the path operators ``paths``."""
+    content = f"BT /F1 12 Tf 20 60 Td ({text}) Tj ET 0 0 0 RG 1 w {paths}".encode()
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -2884,7 +2958,9 @@ def _captured_pdfs(root: Path, *pdfs: tuple[str, bytes]) -> tuple[Any, Path]:
 
 def test_a_drawings_pdf_is_judged_on_its_ink_not_its_bytes(tmp_path):
     def signal(a: tuple[Any, Path], b: tuple[Any, Path]) -> tuple[str, Any]:
-        found, detail = _com_outcome._pdf_signal(a[0], b[0], a[1], b[1])
+        found, detail = _com_outcome._pdf_signal(
+            _com_outcome.pdf_inks(*a), _com_outcome.pdf_inks(*b)
+        )
         return found.value, detail
 
     sheet = "pdf/sh_widget.PDF"
@@ -2909,6 +2985,237 @@ def test_a_drawings_pdf_is_judged_on_its_ink_not_its_bytes(tmp_path):
     assert signal(base, broken) == ("different", {sheet: "bytes"})
     none = _captured_pdfs(tmp_path / "none")
     assert signal(none, none) == ("absent", None)
+
+
+# A PDF point in sheet metres (_pdf_ink.POINT_M).
+_PT = 0.0254 / 72.0
+
+
+def _cropped(
+    jagged: bool = True, box: tuple[float, ...] = (50, 10, 150, 90), moved=False
+) -> list[conv.Call]:
+    """dt_pinion_arbor's detail view (2026-11-13): cropped with a jagged
+    outline, its sheet outline read (``box``, points), the flag read back;
+    ``moved``: then positioned elsewhere."""
+    outline = {"t": [_f(value * _PT) for value in box]}
+    calls = [
+        _sw("IView.Crop2", True, False, 3, result=1, on=85),
+        _sw("IView.GetOutline", result=outline, on=85),
+        _sw("IView.CropViewJaggedOutline", flags=2, result=jagged, on=85),
+    ]
+    if moved:
+        calls.append(_sw("IView.SetViewPosition", {"t": [_f(0.1), _f(0.2)]}, on=85))
+    return calls
+
+
+def test_a_drawings_jagged_outline_drawn_again_is_its_own_cause(tmp_path, monkeypatch):
+    # The outline's unchanged stretches, and two wiggles between their ends.
+    neck = "60 20 m 100 20 l 100 40 l S 100 60 m 100 80 l 60 80 l S "
+    wiggle = "100 40 m 103 45 l 98 50 l 102 55 l 100 60 l S "
+    again = "100 40 m 97 44 l 103 52 l 100 60 l S "
+    sheet = "pdf/dt-pinion-arbor.PDF"
+    built = itertools.count()
+
+    def drawn(paths: str, calls: list[conv.Call], text: str = "DRAWING"):
+        pdf = _sheet_pdf(neck + paths, text=text)
+        found, root = _captured_pdfs(tmp_path / str(next(built)), (sheet, pdf))
+        found.calls = calls
+        return found, root
+
+    def jagged(a: tuple[Any, Path], b: tuple[Any, Path]) -> bool:
+        inks = _com_outcome.pdf_inks(*a), _com_outcome.pdf_inks(*b)
+        return _com_outcome.jagged_outline(a[0], b[0], *inks)
+
+    view = _cropped()
+    base = drawn(wiggle, view)
+    read: list[bytes] = []
+    ink = _com_outcome._pdf_ink
+    monkeypatch.setattr(
+        _com_outcome, "_pdf_ink", lambda data: read.append(data) or ink(data)
+    )
+    found = _com_outcome.judge(*_pair(base, drawn(again, view)), kind="drawing")
+    assert found["outcome_signals"]["pdf"] == "different"
+    assert found["pdf_cause"] == _com_outcome.JAGGED_OUTLINE_CAUSE
+    assert found["judge_faults"] == []
+    # Each build's PDF is read once, for the signal and the cause alike.
+    assert len(read) == 2
+    # Nothing else may differ: a line moved inside the view's box...
+    line = drawn(wiggle + "120 30 m 130 30 l S ", view)
+    assert not jagged(line, drawn(wiggle + "120 35 m 130 35 l S ", view))
+    # ... or swung about an unchanged end, or a closed shape moved...
+    swung = drawn(wiggle + "100 20 m 110 30 l S ", view)
+    assert not jagged(swung, drawn(wiggle + "100 20 m 112 30 l S ", view))
+    loop = drawn(wiggle + "120 30 m 130 30 l 125 35 l 120 30 l S ", view)
+    shifted = "121 30 m 131 30 l 126 35 l 121 30 l S "
+    assert not jagged(loop, drawn(wiggle + shifted, view))
+    # ... or any text, however the outline wiggles.
+    assert not jagged(base, drawn(again, view, text="DRAWN"))
+    # The wiggle must lie in a view read back as jagged, where it was read.
+    for other in (
+        _cropped(jagged=False),
+        _cropped(box=(110, 10, 150, 90)),
+        _cropped(moved=True),
+    ):
+        assert not jagged(drawn(wiggle, other), drawn(again, other))
+    # A part or an assembly has no PDF to explain.
+    assert _com_outcome.judge(*_pair(base, drawn(again, view)))["pdf_cause"] is None
+
+
+def _pair(a: tuple[Any, Path], b: tuple[Any, Path]) -> tuple[Any, ...]:
+    """:func:`_com_outcome.judge`'s positional arguments for two drawn
+    sheets, with no request divergence."""
+    return a[0], b[0], None, a[1], b[1]
+
+
+def test_a_dependents_closest_distance_is_judged_by_its_distance(tmp_path):
+    def measured(witness: float, distance: float = 0.006882839) -> list[conv.Call]:
+        """dt_drive_train's ClosestDistance between two parallel faces,
+        2026-11-13: the distance, then a witness point on each face."""
+        points = [{"t": [_f(0.01), _f(y), _f(0.0)]} for y in (witness, witness + 0.007)]
+        faces = [{"h": 5, "p": "PyIDispatch"}, {"h": 6, "p": "PyIDispatch"}]
+        result = {"t": [_f(distance), *points]}
+        return [_sw("IModelDoc2.ClosestDistance", *faces, result=result)]
+
+    def answers(a: list[conv.Call], b: list[conv.Call], kind: str) -> str:
+        base = types.SimpleNamespace(calls=a, trailer={})
+        new = types.SimpleNamespace(calls=b, trailer={})
+        streams = _com_outcome._streams(base, new)
+        found = _com_outcome.outcome(base, new, tmp_path, tmp_path, streams, kind)
+        return found["outcome_signals"]["answers"]
+
+    base = measured(0.0)
+    for kind in ("assembly", "drawing"):
+        assert answers(base, measured(0.01747), kind) == "same"
+        assert answers(base, measured(0.0, 0.0069), kind) == "different"
+    # A part's answers are compared whole.
+    assert answers(base, measured(0.01747), "part") == "different"
+
+
+_HEADER = types.SimpleNamespace(
+    engine="e", sw_revision="r", environment={}, provenance_mask=[], adapter_state={}
+)
+
+
+def _assembled(
+    names: tuple[str, ...],
+    visit: tuple[str, ...] | None = None,
+    mate: str = "arbor",
+    named: str = "IComponent2.Name2",
+    title: str | None = None,
+) -> conv.Conversation:
+    """An assembly script that reads every component's name, then visits the
+    components in name order (the sort #2686 brings), 2026-11-13: the
+    components SolidWorks enumerated as ``names``, each wrapped by pywin32,
+    early-bound and named (``named``), then each selected in ``visit`` order
+    (sorted by default), then a mate on ``mate``; then, with ``title``, the
+    document's title echoed into an equation (:func:`_echoing`). Handles are
+    numbered in allocation order."""
+    raw = list(range(10, 10 + len(names)))
+    bound = [handle + len(names) for handle in raw]
+    listed = {"t": [{"h": handle, "p": "PyIDispatch"} for handle in raw]}
+    calls = [_sw("IAssemblyDoc.GetComponents", False, result=listed, on=4)]
+    calls += [
+        conv.Call(0, handle, "GetTypeInfo", [], "__WrapDispatch") for handle in raw
+    ]
+    for handle, early, name in zip(raw, bound, names, strict=True):
+        calls += [
+            _qi(handle, "IComponent2", early),
+            _sw(named, flags=2, result=name, on=early),
+        ]
+    of = dict(zip(names, bound, strict=True))
+    for name in sorted(names) if visit is None else visit:
+        calls.append(_sw("IComponent2.Select4", False, on=of[name]))
+    calls.append(
+        _sw("IAssemblyDoc.AddMate5", {"h": of[mate], "p": "PyIDispatch"}, on=4)
+    )
+    if title is not None:
+        calls += _echoing(title)
+    return conv.Conversation(_HEADER, calls, {})
+
+
+def test_a_dependents_components_are_compared_by_name_not_enumeration_order():
+    def split(base: conv.Conversation, new: conv.Conversation) -> tuple[Any, int]:
+        named, arrays = _com_outcome.name_bound(base, new)
+        return conv.compare_conversations(base, named)["request_divergence"], arrays
+
+    base = _assembled(("brace", "arbor", "collar"))
+    permuted = _assembled(("collar", "brace", "arbor"))
+    # By position, the sorted visit's first request is on another handle: the
+    # seat numbered the same components in its own enumeration order.
+    positional = conv.compare_conversations(base, permuted)["request_divergence"]
+    assert positional["field"] == "handle"
+    assert split(base, permuted) == (None, 1)
+    # Read as if enumerated in the base's order: every answer the base's.
+    named, _ = _com_outcome.name_bound(base, permuted)
+    assert conv.compare_conversations(base, named)["response_differences"] == {}
+    # A mate on another component still diverges...
+    divergence, arrays = split(
+        base, _assembled(("collar", "brace", "arbor"), mate="brace")
+    )
+    assert arrays == 1 and divergence["field"] == "args"
+    assert divergence["member_expected"] == "IAssemblyDoc.AddMate5"
+    # ... as does a visit in each seat's enumeration order.
+    listed = _assembled(("brace", "arbor", "collar"), ("brace", "arbor", "collar"))
+    visited = _assembled(("collar", "brace", "arbor"), ("collar", "brace", "arbor"))
+    divergence, arrays = split(listed, visited)
+    assert arrays == 1 and divergence["field"] == "handle"
+    # Nothing binds without the same distinct names, or for another read.
+    for other in (
+        _assembled(("collar", "brace", "axle"), mate="brace"),
+        _assembled(("collar", "brace", "arbor"), named="IComponent2.GetPathName"),
+    ):
+        assert split(_assembled(("brace", "arbor", "collar")), other)[1] == 0
+    twice = _assembled(("arbor", "brace", "arbor"))
+    assert split(twice, _assembled(("brace", "arbor", "arbor")))[1] == 0
+    # A drawing view's components are visited by their own name.
+    drawn = "IDrawingComponent.Name"
+    listed = _assembled(("brace", "arbor", "collar"), named=drawn)
+    assert split(listed, _assembled(("collar", "brace", "arbor"), named=drawn)) == (
+        None,
+        1,
+    )
+
+
+def test_only_a_dependents_diff_binds_components_by_name(tmp_path, monkeypatch):
+    import com_replay
+
+    logs = {
+        "base": _assembled(("brace", "arbor", "collar")),
+        "new": _assembled(("collar", "brace", "arbor")),
+        "titled": _assembled(("brace", "arbor", "collar"), title="Part13"),
+        "retitled": _assembled(("collar", "brace", "arbor"), title="Part24"),
+    }
+    monkeypatch.setattr(conv, "load", lambda path: logs[Path(path).name])
+
+    def diff(kind: str, base: str = "base", new: str = "new"):
+        result = tmp_path / f"{kind}.json"
+        argv = ["diff", base, new, "--kind", kind, "--result", str(result)]
+        rc = com_replay.main(argv)
+        return rc, json.loads(result.read_text("utf-8"))
+
+    rc, found = diff("assembly")
+    assert rc == 0 and found["request_divergence"] is None
+    assert found["name_bound"]["arrays"] == 1
+    assert found["name_bound"]["positional_divergence"]["field"] == "handle"
+    # Bound, a script that also echoes a title counter is still a title echo.
+    rc, found = diff("assembly", "titled", "retitled")
+    assert found["truth_cause"] == _com_outcome.TITLE_COUNTER_CAUSE
+    assert found["title_echo"] is True and found["name_bound"]["arrays"] == 1
+    rc, found = diff("part")
+    assert rc == 91 and found["request_divergence"]["field"] == "handle"
+    assert "name_bound" not in found
+
+    def broken(*_args: Any) -> None:
+        raise RuntimeError("injected")
+
+    # A binding that raises is a judge fault; the comparison stays positional.
+    monkeypatch.setattr(_com_outcome, "name_bound", broken)
+    rc, found = diff("assembly")
+    assert rc == 91 and found["request_divergence"]["field"] == "handle"
+    assert found["judge_faults"][0] == {
+        "step": "name_bound",
+        "error": "RuntimeError: injected",
+    }
 
 
 def test_an_assemblys_sidecars_are_compared_byte_for_byte(tmp_path):

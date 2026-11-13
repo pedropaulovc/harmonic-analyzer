@@ -3023,7 +3023,7 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read`; an assembly or drawing also `replay.candidates` and `replay.same_children` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
-| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.output_nondeterminism`, `replay.output_cause` (`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
+| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.name_bound` (arrays bound by name, when any), `replay.output_nondeterminism`, `replay.output_cause` (`jagged_outline`/`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
 | `replay.evidence <label>` | an assembly's or drawing's evidence copy ("Evidence copies"): `replay.evidence` (`stored`/`exists`/`skip`/`off`/`error`) |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
@@ -3226,7 +3226,7 @@ against the base's (`com_replay.py diff --kind <kind>`):
 
 | `split` | meaning |
 | --- | --- |
-| `noop` | same children, the base's exact requests, or the same requests but for the title counters the script echoed (`title_echo`): the own-closure change was a no-op for SolidWorks |
+| `noop` | same children, the base's exact requests (with component arrays bound by name, `name_bound`), or the same requests but for the title counters the script echoed (`title_echo`): the own-closure change was a no-op for SolidWorks |
 | `diverged` | same children, other requests; `truth_cause` says what preceded the first difference: `request` (the source asked something else) or `response:<member>` (SolidWorks answered differently first; `seat_nondeterminism` when it also made the same model, `seat_path_divergence` when the requests differ only by detours of reads and selections on the same geometry) |
 | `children_changed` | candidates were read, none made on these children: not comparable |
 | `children_unknown` | a child's token held no SHA-256 (`children_unreadable` names which and why) |
@@ -3243,7 +3243,7 @@ bytes, which carry the export's date. Nothing of these kinds is reused, so a
 | `noop_judgement` | meaning |
 | --- | --- |
 | `confirmed` | the base's assembly or drawing |
-| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
+| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
 | `unexplained_output_divergence` | another output, though SolidWorks answered alike: nothing recorded explains it; WARN |
 | `noop_outcome_unknown` | a signal absent, or no comparison |
 
@@ -3271,6 +3271,72 @@ counter the script echoed (`truth_cause=response:title_counter`), and the
 whole streams are the same requests once title counters are masked, every
 answer the same but for noise. The split is `noop`; `ground_truth=diverged`
 and the cause are kept, and the INFO line ends with `title_echo`.
+
+The judge names a dependent's causes more finely than a part's (only for
+`_com_outcome.DEPENDENT_KINDS`; a part's reuse and audit judgement is
+unchanged). `truth_cause` names the earliest answer before the divergence
+that differs beyond noise, where a part's names the nearest. It passes over a
+renumbering, an answer that differs only by handles both builds numbered with
+that very answer (an object's number is its allocation order, so one more
+object listed earlier renumbers every later one), and names it only when
+nothing else differed; a handle either build had numbered before is another
+object, a real difference. A diverging request that is the base's
+member on the same object, with arguments the same but for float noise
+(`REL_TOL`), after an answer that differed only by float noise, is that
+answer's `response:<member>`: the script carried SolidWorks' noise into a
+request (2026-11-13, `dt_cone_tip_gear` and `fr_top_frame`: an annotation
+position 1 ulp apart, then `SetPosition2` 1 ulp apart). Any other request
+difference stays `request`. The `answers` signal compares
+`IModelDoc2.ClosestDistance` by its distance only: between parallel faces any
+pair of points witnesses it (`dt_drive_train` built twice under one key: the
+same 6.882839 mm, witnesses 17.47 mm apart). A drawing whose `pdf` signal
+differs gets `pdf_cause=jagged_outline` (`_com_outcome.jagged_outline`) only
+when every condition holds:
+
+- both recordings read the same jagged views, meaning each view's last
+  `IView.GetOutline` box on a handle whose `IView.CropViewJaggedOutline` read
+  True, with no later move of that view;
+- the PDFs have the same pages, sizes and text runs;
+- on each page that differs, the differing path pieces are one solid stroke
+  inside one such box and form open chains;
+- those chains end at the same points on both sides, and each of those points
+  is an end of an unchanged piece.
+
+SolidWorks breaks such an outline along a random wiggle each time it draws it.
+On 2026-11-13, three builds of `dt_pinion_arbor` with the same requests drew
+three wiggles in detail A. The box is not tied to a sheet, so a multi-sheet
+drawing's other sheets are bounded by it too. What remains possible is a real
+edit that re-routes a line of the same stroke, inside such a view, between the
+same two unchanged points.
+
+The recorder numbers handles in allocation order, so the elements of an array
+answer such as `IAssemblyDoc.GetComponents` are numbered in the seat's
+enumeration order. A script that reads every component's name and then visits
+the components in name order (the sort #2686 brings) therefore asks the same
+thing of each component under a seat-dependent number. Before a dependent's
+split, `_com_outcome.name_bound` binds such an array to the base's by name. It
+does so only when all of these hold:
+
+- both builds issued the request alike and were answered with the same handle
+  numbers;
+- the calls right after it identify every element and do nothing else: pywin32
+  wraps (`GetTypeInfo`), `early_bound` QueryInterfaces, and one identity read
+  per element (`*.Name2`, or `IDrawingComponent.Name` for a drawing view's
+  components);
+- each build's names are distinct and are the same set in both builds.
+
+When the array is bound, the new build is read as if SolidWorks had enumerated
+in the base's order. The array's answer stays as recorded (the same numbers as
+the base's), and the pre-pass is put in the base's element order. Each element
+handle, including those the pre-pass allocated, is renamed to the base's handle
+of the same-named component, in the pre-pass and in every later call. The
+engine's comparison then runs on that stream. The diff keeps how many arrays
+were bound and the positional divergence they replaced (`name_bound`; the
+record and span carry `name_bound`, the count). A binding that raises is a
+judge fault (`judge_faults` step `name_bound`), and the comparison stays
+positional. Anything else stays positional too: a visit in enumeration order
+(the explode authors' `by_name` dicts iterate in insertion order) or a request
+on another component than the base's still diverges.
 
 **Evidence copies.** A recording left unpublished because another writer's
 bytes already stand under its key (`_replay_shadow.EVIDENCE_OF`:
@@ -3347,6 +3413,7 @@ dependencies
                                             "children_unknown")),
             title_echo=countif(echo),
             seat_display=countif(nondeterminism == "seat_display"),
+            jagged_outline=countif(nondeterminism == "jagged_outline"),
             answers=countif(nondeterminism == "answers"),
             unexplained_output=countif(unexplained)
             by kind, label
