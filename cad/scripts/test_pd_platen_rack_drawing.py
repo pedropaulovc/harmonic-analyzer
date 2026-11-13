@@ -15,7 +15,6 @@ import _gear_quality as quality
 
 import build_pd_platen_rack as builder
 import draw_pd_platen_rack as drawing
-import pd_platen_rack_callouts as callouts
 import pd_platen_rack_spec as spec
 import pd_transgear_feed_pinion_spec as feed
 from _drawing_contract import (
@@ -371,21 +370,21 @@ def test_incoming_stock_height_and_width_are_separately_paid(synthetic_stock_sec
     )
     assert height > synthetic_stock_section_record["measured_stock_height_max_mm"]
     assert width > synthetic_stock_section_record["measured_face_width_max_mm"]
-    assert height <= quality.rack_stock_height_max_mm()
-    assert width <= quality.rack_face_width_max_mm()
+    assert height <= spec.PURCHASED_RACK_HEIGHT_MAX_MM
+    assert width <= spec.PURCHASED_RACK_FACE_WIDTH_MAX_MM
 
 
 @pytest.mark.parametrize(
-    ("field", "limit_reader", "label"),
+    ("field", "limit_mm", "label"),
     (
-        ("measured_stock_height_max_mm", quality.rack_stock_height_max_mm, "stock height"),
-        ("measured_face_width_max_mm", quality.rack_face_width_max_mm, "face width"),
+        ("measured_stock_height_max_mm", spec.PURCHASED_RACK_HEIGHT_MAX_MM, "stock height"),
+        ("measured_face_width_max_mm", spec.PURCHASED_RACK_FACE_WIDTH_MAX_MM, "face width"),
     ),
 )
-def test_measured_at_source_ceiling_still_rejects_uncertainty(
-    synthetic_stock_section_record, field, limit_reader, label
+def test_measured_at_the_room_still_rejects_uncertainty(
+    synthetic_stock_section_record, field, limit_mm, label
 ):
-    record = {**synthetic_stock_section_record, field: limit_reader()}
+    record = {**synthetic_stock_section_record, field: limit_mm}
     with pytest.raises(ValueError, match=f"REJECT incoming rack {label}"):
         spec.require_rack_stock_section_measurements_mm(**record)
 
@@ -827,30 +826,25 @@ def test_short_or_wrong_side_secant_is_not_a_direction_or_calibration_fallback(
         )
 
 
-def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() -> None:
-    ceilings = {
-        "RackHeight": quality.rack_stock_height_max_mm(),
-        "RackDepth": quality.rack_face_width_max_mm(),
-    }
-    assert set(callouts.DIMENSION_CALLOUTS) == set(ceilings)
-    assert drawing.DIMENSION_CALLOUTS is callouts.DIMENSION_CALLOUTS
-    assert set(ceilings) <= spec.DRAWING_REFERENCE_DIMENSIONS
-    # Rule 4: a plain inch step, not a converted millimetre (v49 review).
-    step = 10.0 ** -callouts.RECEIVING_LIMIT_PLACES
-    for name, ceiling_mm in ceilings.items():
-        value = callouts.DIMENSION_CALLOUTS[name].split()[0]
-        assert len(value.partition(".")[2]) == callouts.RECEIVING_LIMIT_PLACES
-        printed = float(value)
-        # Rounded down: never admits a section above the ceiling, never
-        # rejects one more than a print step below it.
-        assert printed * 25.4 <= ceiling_mm
-        assert printed + step > ceiling_mm / 25.4
-        assert printed > spec.RACK_HEIGHT / 25.4
-    # Each limit names the mate it protects (round 5: a supplier size's limit
-    # with no mate read as invented).
-    assert callouts.DIMENSION_CALLOUTS["RackHeight"].splitlines()[1] == (
-        f"CLEARS {_config.parts('pd-platen-guide')['number']}"
+def test_an_ordinary_drawn_strip_fits_as_supplied_and_prints_plain_refs() -> None:
+    # #2694: SDP/SI publishes no section tolerance; drawn 3/16 square brass
+    # is held to .003. A strip that far over its REF in both sizes, read with
+    # the shop micrometer, is inside the room the assembly is paid at.
+    import paper_drive_geom
+
+    drawn = 0.003 * 25.4
+    micrometer = quality.wire_measurement_uncertainty_mm()
+    height, width = spec.require_rack_stock_section_measurements_mm(
+        measured_stock_height_max_mm=spec.RACK_HEIGHT + drawn,
+        stock_height_measurement_uncertainty_mm=micrometer,
+        measured_face_width_max_mm=spec.RACK_THICKNESS + drawn,
+        face_width_measurement_uncertainty_mm=micrometer,
     )
-    assert callouts.DIMENSION_CALLOUTS["RackDepth"].endswith(
-        f" FOR {_config.parts('pd-transgear-feed-pinion')['number']} MESH"
-    )
+    seam_upper = spec.BACKER_HEIGHT + printed_deviations(
+        spec.BACKER_HEIGHT, spec.DRAWING_PRECISION_BY_NAME["SeamHeight"], unit=spec.UNIT
+    )[1]
+    section_height, _ = paper_drive_geom.feed_rack_cut_end_section_maxima_mm()
+    assert section_height >= seam_upper + height
+    # The stock sizes print as plain references: nothing for the shop to gauge.
+    assert {"RackHeight", "RackDepth"} <= spec.DRAWING_REFERENCE_DIMENSIONS
+    assert not hasattr(drawing, "DIMENSION_CALLOUTS")
