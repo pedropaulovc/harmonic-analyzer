@@ -38,7 +38,11 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -94,8 +98,8 @@ SHEET_BOX = (*front_xy(_SOUTH_X, _LOW_Y), *front_xy(_NORTH_X, _TOP_Y))
 # on one side of its dimension line, with the line at the text's edge: the
 # depths and the thickness to the right of the line. Widths (sheet m): a
 # three-place value 10 mm, a two-place value 7.6 mm; a capital 2.7 mm. A line
-# of dimension text stands 5 mm in a block, which is centred on its keep
-# point.
+# of dimension text stands 5 mm in a block (value, then each callout line),
+# which is centred on its keep point.
 TEXT_GAP = 0.004
 DEPTH_TEXT_WIDTH = 0.010
 TWO_PLACE_TEXT_WIDTH = 0.0076
@@ -129,8 +133,14 @@ def front_keep() -> dict[str, tuple[float, float]]:
     x = BASELINE_X0 + TEXT_GAP
     for teeth in part.BONDED_TEETH:
         keep[part.blade_depth_name(teeth)] = (x, DEPTH_TEXT_Y)
-        x += DEPTH_TEXT_WIDTH + TEXT_GAP
+        x += depth_block_width(teeth) + TEXT_GAP
     return keep
+
+
+def depth_block_width(teeth: int) -> float:
+    """A depth's text block: its value, its gear and its note flag."""
+    lines = part.CALLOUTS_BELOW[part.blade_depth_name(teeth)].splitlines()
+    return max([DEPTH_TEXT_WIDTH, *(len(line) * CHAR_WIDTH for line in lines)])
 
 
 FRONT_KEEP = front_keep()
@@ -258,6 +268,18 @@ async def build(adapter: Any) -> dict[str, str]:
             f"sheet prints {sorted(printed)}, the part marks {sorted(sheet_dimension_names())}"
         )
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_BELOW)
+    # The sheet's thickness is the stock's, a reference over SHEET STOCK.
+    references = [
+        (dimension_name(adapter, item), item)
+        for item in annotations
+        if dimension_name(adapter, item) in part.REFERENCE_DIMENSIONS
+    ]
+    if sorted(name for name, _ in references) != sorted(part.REFERENCE_DIMENSIONS):
+        raise RuntimeError(
+            f"expected one native stock thickness: {sorted(part.REFERENCE_DIMENSIONS)}"
+        )
+    for name, item in references:
+        set_reference_dimension(adapter, item, label=f"{name} stock thickness")
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
