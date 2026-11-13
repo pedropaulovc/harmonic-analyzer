@@ -1115,10 +1115,15 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     assert draw.SPIGOT_NOTE.replace("\n", " ") == "SPIGOT FACED FLUSH WITH FLANGE SEAT FACE"
     assert nut.LENGTH == nut.FLANGE_THICK + nut.BODY_LENGTH  # no spigot left
     # The faced length's MAX is the near KP08's feed gap: it names that KP08.
+    # Its MIN sets RV-03's full thread, printed as a plain fact (#2207).
     lane, faced = draw.REWORK_CALLOUTS["FacedLength"]
     kp08 = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
     assert lane == "below" and draw.KP08_NUMBER == kp08
-    assert faced.splitlines()[-1] == kp08
+    assert faced.splitlines() == [
+        f"CLEARS {draw.short_number(kp08)} AT TRAVEL END",
+        "FULL THREAD 10.2 MIN",
+    ]
+    assert nut.FULL_THREAD_MIN == pytest.approx(10.2)
     # The receipt limits print once, natively; each size callout below them
     # names its mate, with no number of its own but the body's RV-02 wall
     # row, the spec's. The PCD, a location, carries its identifier only
@@ -3253,7 +3258,10 @@ def test_feed_nut_full_thread_shortfall_is_the_owner_ruled_rv03() -> None:
     printed = f"{nut.LENGTH_MAX:.1f}/{nut.LENGTH_MIN:.1f}"
     assert faced.where == (
         f"sheet {nut.REWORK_SHEET}, Section {label}-{label}, the faced length {printed}"
+        f" callout: {nut.FULL_THREAD_TEXT}"
     )
+    assert nut.FULL_THREAD_TEXT == "FULL THREAD 10.2 MIN"
+    assert draw.REWORK_CALLOUTS["FacedLength"][1].splitlines()[-1] == nut.FULL_THREAD_TEXT
     assert f"holds {nut.FULL_THREAD_MIN:.1f} mm of full Tr8x2 thread" in faced.finding
     assert f"1.5D ({1.5 * spec.MAJOR_DIA:.1f})" in faced.finding
     assert faced.reason.startswith(

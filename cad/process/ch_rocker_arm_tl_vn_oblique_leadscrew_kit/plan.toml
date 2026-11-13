@@ -1,0 +1,257 @@
+# Source: MHA-CH-06-TL-VN-84 v49 (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit.py
+# and its feature manifest: the LeadScrew features and the FeedNut member's).
+# No hand traveler exists: the route, holding, allowances and speeds are
+# authored here. The kit is bought (ReliaBot Tr8x2 600 mm SUS304 screw and
+# brass flange nut); the rework cuts the screw to length from the NEAR END,
+# mills its five set-screw flats on the BS-0 dividing head, faces the nut's
+# spigot flush and countersinks its four holes. Sheet note 1: the angle
+# between flat stations is free; the two flats at each KP08 station are
+# clocked 120° apart. Sheet 3 prints the nut's FULL THREAD 10.2 MIN (RV-03,
+# #2207) on the faced length; the facing step repeats it.
+title = "Oblique trammel leadscrew kit rework"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "SUS304 screw; brass flange nut (as supplied)"
+stock = "ReliaBot Tr8x2 lead screw kit (Amazon B085DDHJTW): {{cad.stock_length_mm:g}} mm SUS304 screw with brass flange nut."
+note = "Millimetres. NEAR END = the factory end kept; flat stations run from it."
+shop = "../shop.toml"
+material_key = "sus304"
+
+[cad]
+file = "../../out/features/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/features.toml"
+adapter = "harmonic_leadscrew_kit"
+
+[parameters]
+screw_stock_length_mm = 600.0
+saw_allowance_mm = 3.0           # Sawn long, milled to length.
+kerf_mm = 1.0                    # Hacksaw kerf.
+cutter_dia_mm = 12.7             # 1/2 in end mill.
+flat_cutter_dia_mm = 7.9375      # 5/16 in end mill: flat length = one crossing.
+cut_overhang_mm = 10.0           # Cut end past the right jaw side.
+near_stickout_mm = 20.0          # Out of the BS-0 jaws, NEAR END flats.
+far_stickout_mm = 42.0           # Out of the BS-0 jaws, cut-end flats.
+# Machine-capacity inputs (mm), as the feed-lever plan: heights above the
+# mill table; tool lengths from spindle nose to tip.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_height_mm = 25.4        # 1 in parallels (archive parallels-lms-6745 1in).
+end_cut_tip_z_mm = -1.0          # Cutter 1 mm below the screw.
+bs0_centre_height_mm = 100.0125  # Archive machines.BS-0 height_mm (table to centre).
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+# Archive LMS 6784 R8-collet projections: 1/4 in 25, 3/8 in 38, 7/16 in 41,
+# 11/16 in 50; the 1/2 and 5/16 in mills lie between their neighbours.
+half_mill_projection_min_mm = 41.0
+half_mill_projection_max_mm = 50.0
+small_mill_projection_min_mm = 25.0
+small_mill_projection_max_mm = 38.0
+
+[[tools]]
+id = "saw"
+name = "Hacksaw"
+ref = "kit-hacksaw"
+[[tools]]
+id = "em-half"
+name = "1/2 in end mill"
+ref = "jig-em-half"
+[[tools]]
+id = "em-flat"
+name = "5/16 in end mill"
+ref = "basebar-counterbore"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "ar"
+name = "AR carbide"
+ref = "lathe-ar"
+[[tools]]
+id = "csk"
+name = "82° countersink"
+ref = "kit-countersink-82"
+
+[[setups]]
+machine_kind = "other"
+title = "Receive the kit"
+machine = "Bench"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+diagram = { file = "diagrams/leadscrew-kit/receipt.svg", alt = "The feed nut as supplied: spigot, flange and body" }
+
+[[setups.operations]]
+instruction = "Check the nut as supplied; mark one screw end NEAR END (its factory chamfer stays)."
+inspection = "Nut flange Ø{{cad.nut_flange_dia_min_mm:.1f}}–{{cad.nut_flange_dia_max_mm:.1f}} × {{cad.nut_flange_thickness_min_mm:.1f}}–{{cad.nut_flange_thickness_max_mm:.1f}}; body Ø{{cad.nut_body_dia_min_mm:.1f}}–{{cad.nut_body_dia_max_mm:.1f}}; {{cad.csk_count:d}} holes Ø{{cad.nut_hole_dia_min_mm:.2f}}–{{cad.nut_hole_dia_max_mm:.2f}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.nut_flange_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.nut_flange_thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.nut_body_dia_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.nut_hole_dia_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Saw the screw"
+machine = "Bench vise"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+diagram = { file = "diagrams/leadscrew-kit/saw.svg", alt = "The screw from the NEAR END with the saw mark near the far end" }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+sizing = "other"
+instruction = "Mark {{cad.saw_mark_from_far_mm:.1f}} from the far end; saw on the offcut side. Piece ≈{{cad.saw_piece_mm:.1f}}."
+instruction_detailed = "Measure {{cad.saw_mark_from_far_mm:.1f}} from the far factory end with the 12 in rule of the combination square and mark round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes. The kept piece is about {{cad.saw_piece_mm:.1f}} long; the mill brings it to length."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Cut end to length"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Screw along X on 1 in parallels, wrapped in paper; cut end ~{{process.cut_overhang_mm:g}} past the right jaw side."
+datum = "X0 NEAR END (cutter-side touch)."
+diagram = { file = "diagrams/leadscrew-kit/length.svg", alt = "Top view: the screw in the vise, cut end just past the right jaw, milled to length from the NEAR END" }
+envelope = { x_span_mm = ["{{cad.saw_piece_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.major_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.major_dia_mm}}", along_jaws_mm = "{{cad.saw_piece_mm}}", part_height_mm = "{{cad.major_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{process.cut_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Cut the sawn end feeding away, 0.2 mm X steps; last X = {{cad.length_mm:.1f}} + D/2."
+instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw. Feed away across the sawn end, stepping X 0.2 mm a pass, up to X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
+settings = "kit-em-half-sus304"
+cut_diameter_mm = "{{process.cutter_dia_mm}}"
+inspection = "Length {{cad.length_min_mm:.1f}}–{{cad.length_max_mm:.1f}} on the DRO from the NEAR END."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+sizing = "other"
+instruction = "Break the cut end ≤{{cad.end_chamfer_mm:g}}; run the nut over it."
+instruction_detailed = "File a light chamfer, no more than {{cad.end_chamfer_mm:g}}, round the cut end until the first thread is clean, then run the nut on and off the cut end by hand. {{cad.thread}}."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "NEAR END flats"
+machine = "PM-30MV / BS-0 dividing head"
+indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
+machine_ref = "pm-30mv"
+holding = "Screw through the BS-0 spindle, NEAR END {{process.near_stickout_mm:g}} out of the 3-jaw, threads wrapped in paper; support the tail past the head."
+datum = "X0 NEAR END; Z0 the thread crest on top."
+diagram = { file = "diagrams/leadscrew-kit/near-flats.svg", alt = "NEAR END out of the dividing-head chuck: the two KP08 flats, 0° then 120°" }
+envelope = { x_span_mm = ["{{cad.near_kp08_centre_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
+vise_hold = "other"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-flat"
+sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
+instruction = "Cutter centre {{cad.near_kp08_centre_mm:.2f}} in from the NEAR END; touch the crest, Z0; cross in Y to Z −{{cad.flat_depth_mm:.2f}} in two passes."
+instruction_detailed = "Touch the NEAR END face with the cutter's side on a paper strip: the cutter centre is then D/2 off the end. Set X0 there on the end face, then move the cutter centre {{cad.near_kp08_centre_mm:.2f}} in from the end: its edge sits on the flat's start, {{cad.near_kp08_station_mm:g}} from the end. Touch the thread crest on top with paper and set Z0. Cross the screw in Y at Z −0.40, then Z −{{cad.flat_depth_mm:.2f}}."
+settings = "kit-flat-sus304"
+cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
+inspection = "Starts {{cad.near_kp08_station_min_mm:.1f}}–{{cad.near_kp08_station_max_mm:.1f}} from the NEAR END; {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat to the crest."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.near_kp08_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_length_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-flat"
+sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
+instruction = "Index {{cad.clock_deg:g}}°; same X and depth for the second flat."
+instruction_detailed = "Index the head {{cad.clock_deg:g}}° (8 holes on the 24-hole direct plate) and lock it. Re-touch the crest, set Z0 and cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
+settings = "kit-flat-sus304"
+cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
+inspection = "{{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat; {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Cut-end flats"
+machine = "PM-30MV / BS-0 dividing head"
+indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
+machine_ref = "pm-30mv"
+holding = "Screw reversed: cut end {{process.far_stickout_mm:g}} out of the 3-jaw, threads wrapped; support the tail."
+datum = "X0 cut end; Z0 the thread crest. L = the length written in the length setup."
+diagram = { file = "diagrams/leadscrew-kit/far-flats.svg", alt = "Cut end out of the dividing-head chuck: the KP08 flats and the open handwheel flat" }
+envelope = { x_span_mm = ["{{cad.far_kp08_from_cut_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
+vise_hold = "other"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-flat"
+sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
+instruction = "KP08 flat: cutter centre (L − {{cad.far_kp08_centre_mm:.2f}}) in from the cut end; Z −{{cad.flat_depth_mm:.2f}} in two passes."
+instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X0 on the end face (the cutter centre D/2 off it). Move the cutter centre L − {{cad.far_kp08_centre_mm:.2f}} in from the end (L as written on the screw): its edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. Touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
+settings = "kit-flat-sus304"
+cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
+inspection = "Starts {{cad.far_kp08_station_min_mm:.1f}}–{{cad.far_kp08_station_max_mm:.1f}} from the NEAR END (L less its DRO distance in from the cut end); {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.far_kp08_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-flat"
+sizing = "other"
+instruction = "Handwheel flat, same index: cutter centre (L − {{cad.handwheel_centre_mm:.2f}}) in from the cut end, then centred on the end; Z −{{cad.flat_depth_mm:.2f}}."
+instruction_detailed = "Without indexing, cross with the cutter centre L − {{cad.handwheel_centre_mm:.2f}} in from the cut end (its edge on the flat's start, {{cad.handwheel_station_mm:.1f}} from the NEAR END), then with the cutter centred on the end face, so the flat runs out through the end. Z −0.40 then Z −{{cad.flat_depth_mm:.2f}} at each."
+settings = "kit-flat-sus304"
+cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
+inspection = "Starts {{cad.handwheel_station_min_mm:.1f}}–{{cad.handwheel_station_max_mm:.1f}} from the NEAR END, open to the end; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.handwheel_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-flat"
+sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
+instruction = "Index {{cad.clock_deg:g}}°; second KP08 flat at L − {{cad.far_kp08_centre_mm:.2f}}, Z −{{cad.flat_depth_mm:.2f}}. Deburr all flats."
+instruction_detailed = "Index the head {{cad.clock_deg:g}}° (8 holes on the 24-hole direct plate) and lock it. Re-touch the crest, set Z0, cross at L − {{cad.far_kp08_centre_mm:.2f}}, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
+settings = "kit-flat-sus304"
+cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
+inspection = "{{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat; {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "lathe"
+title = "Face the nut spigot"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "Nut body in the 3-jaw, light grip; flange back face on the jaw fronts; spigot out."
+datum = "Z0 the flange seat face."
+diagram = { file = "diagrams/leadscrew-kit/nut-face.svg", alt = "The nut body in the lathe chuck, flange on the jaws, spigot faced off" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.nut_body_dia_mm}}", stock_diameter_mm = "{{cad.nut_flange_dia_mm}}", stickout_mm = "{{cad.nut_stickout_mm}}", minimum_diameter_mm = "{{cad.nut_spigot_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+sizing = "other"
+instruction = "Face the spigot off flush with the seat face, light cuts. Full thread {{cad.nut_full_thread_min_mm:g}} min remains."
+instruction_detailed = "Touch the spigot end and face it off in light cuts until the cut just reaches the flange seat face: {{cad.nut_note}}. Lift the bore-mouth burr with a file corner; the nut keeps at least {{cad.nut_full_thread_min_mm:g}} of full thread."
+# Brass, LittleMachineShop carbide turning 1170 ft/min: above the PM-1127's
+# 2000 rpm top speed at Ø10.2, so the top speed. The plan's material_key is
+# the screw's, so the nut's speed is written here, not from a shop setting.
+rpm = 2000
+feed = "0.05 mm/rev"
+inspection = "Nut length {{cad.nut_length_min_mm:.1f}}–{{cad.nut_length_max_mm:.1f}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.nut_length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Countersink the nut"
+machine = "Bench vise, soft jaws"
+indexing = "none"
+envelope = "other"
+vise_hold = "other"
+diagram = { file = "diagrams/leadscrew-kit/nut-csk.svg", alt = "The flange's body side: four countersinks beside the body" }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "csk"
+sizing = { kind = "band", band_mm = "{{cad.csk_cutter_band_mm}}" }
+instruction = "{{cad.csk_count:d}}× countersink on the flange's body side by hand to Ø{{cad.csk_dia_mm:.2f}}; keep off the body."
+instruction_detailed = "Hold the nut by its flange O.D. in soft jaws, body up. Turn the {{cad.csk_angle_deg:g}}° countersink by hand in each hole, checking the mouth with calipers every few turns, to Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}}: {{cad.csk_wall_note}}."
+feed = "hand"
+inspection = "Mouths Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}} × {{cad.csk_angle_deg:g}}°; flat-head screws sit at or below the face."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.csk_dia_band_mm}}" }]

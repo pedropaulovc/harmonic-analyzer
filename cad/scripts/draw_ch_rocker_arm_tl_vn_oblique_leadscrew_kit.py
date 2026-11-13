@@ -557,9 +557,11 @@ CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 3.5, feed_nut.LENGTH + 2.0)
 # 20261105T023247678Z: point (0.313, 0.106) printed 0.280 .. 0.345 by
 # 0.098 .. 0.114, its own line and far witness through it), so the point
 # stands right of the far witness and under the line: the block clears both
-# and the caption, over the title block.
+# and the caption, over the title block. Its widest row ("CLEARS TL-VN-56 AT
+# TRAVEL END", #2207) is four characters wider than the run's, so the point
+# stands 11.5 past the far end, not 10.5.
 FACED_LENGTH_LINE_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 2.5), feed_nut.LENGTH_MAX / 2.0)
-FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 10.5)
+FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 11.5)
 # Section F-F's native caption (SECTION F-F over SCALE 4 : 1): its box's top
 # centre. Where SolidWorks hung it (run 20261105T054045952Z: printed 0.2586 ..
 # 0.3014 by 0.0833 .. 0.0975), the faced length's leader, from its dimension
@@ -641,11 +643,17 @@ CSK_SCREW_CALLOUT = (
     f"FOR {short_number(NUT_SCREW_NUMBER)} ({feed_nut.SCREW_SKU})\n"
     f"{feed_nut.CSK_WALL_TEXT}"
 )
+# Rule 20: the faced nut's full thread, RV-03's stated shortfall, as the
+# spec's plain fact on the faced length that sets it (#2207). Rule 7: two word
+# lines, so the KP08 is named by its short number on the reason's line.
 # name -> (callout lane, text); swDimensionTextCalloutAbove 3, Below 4.
 REWORK_CALLOUTS = {
     "FlangeThick": ("above", FLANGE_THICK_CALLOUT),
     "CskDia": ("below", CSK_SCREW_CALLOUT),
-    "FacedLength": ("below", f"CLEARS KP08 AT TRAVEL END\n{KP08_NUMBER}"),
+    "FacedLength": (
+        "below",
+        f"CLEARS {short_number(KP08_NUMBER)} AT TRAVEL END\n{feed_nut.FULL_THREAD_TEXT}",
+    ),
 }
 RECEIPT_CALLOUTS = {
     "ReceiptFlangeDia": ("below", f"WITHIN {FEED_BLOCK_NUMBER}\nLUG FACE"),

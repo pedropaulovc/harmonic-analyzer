@@ -161,6 +161,9 @@ LENGTH_MIN = 13.2
 FULL_THREAD_MIN = LENGTH_MIN - 1.5 * LEAD  # 10.2
 if FULL_THREAD_MIN < 5.0 * LEAD:
     raise AssertionError("the shortest faced nut holds under five full Tr8 turns")
+# Rule 20: RV-03's shortfall as the plain fact sheet 3 prints on the faced
+# length (#2207), at one place, rounded down: a MIN never overstates.
+FULL_THREAD_TEXT = f"FULL THREAD {math.floor(FULL_THREAD_MIN * 10.0 + 1e-9) / 10.0:.1f} MIN"
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
 # The listing gives the holes no angular stations (HOLE_ANGLES_DEG is the

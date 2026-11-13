@@ -28,6 +28,12 @@ spindle_to_table_mm = [62.484, 431.8]
 [machines.pm-1127vf-lb]
 kind = "lathe"
 rpm_ranges = [[70, 380], [380, 2000]]
+# HA: envelope swing_over_bed_in 11, swing_over_cross_slide_in 6.66 and
+# between_centres_in 27.55 (45952b66bc inventory machines.PM-1127VF-LB), × 25.4;
+# read by the TL-VN-84 lathe setup's machine_capacity screen.
+swing_over_bed_mm = 279.4
+swing_over_cross_slide_mm = 169.164
+between_centres_mm = 699.77
 
 # HA: fixtures.vise-pm-6 (Precision Matthews VISE-6in-HIGHPREC; make, SKU and
 # source stay in cad/config/shop-equipment.toml), from the deleted inventory
@@ -290,3 +296,52 @@ tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800
 feed = "8 in/min"
+
+# --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
+# Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
+
+# HA: machines.BS-0 (45952b66bc inventory; installed and commissioned on the
+# PM-30MV, #465): 40:1 worm, 24-position direct index, plates A, B and C.
+[machines.bs-0]
+kind = "dividing_head"
+worm_ratio = 40
+direct_index_positions = 24
+plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = [37, 39, 41, 43, 47, 49] }
+
+# HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
+# inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
+# examples/shop.toml workholding.chuck-3jaw-6.
+[workholding.chuck-3jaw-6]
+kind = "chuck"
+grip_range_mm = [3.0, 140.0]
+body_diameter_mm = 158.0
+body_length_mm = 72.0
+
+# The AR holder is the A R Warner LMS 4132 set's (TCMT insert, R0.4 nose;
+# owned, by photo in the 45952b66bc inventory); it faces the kit nut.
+[tools.lathe-ar]
+description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
+
+# Kit tools: a hand hacksaw (not owned, cad/config/shop-equipment.toml
+# tools.hacksaw), the 1/2 in end mill (jig-em-half) for the cut end, the 5/16 in
+# end mill (basebar-counterbore) for the flats, and an 82° countersink no
+# larger than the 3/16 in cutter the sheet allows (not owned,
+# tools.countersink-82-3-16).
+[tools.kit-hacksaw]
+description = "Hacksaw, 12 in 32 TPI bi-metal blade"
+[tools.kit-countersink-82]
+description = "82° countersink, 3/16 in body, in a T-handle"
+diameter_mm = 4.7625
+
+# SUS304 screw, LittleMachineShop "Cutting Speeds" table (read live
+# 2026-11-13), row Stainless steel 304: milling 70 ft/min (low end). Hand feed.
+[settings.kit-em-half-sus304]
+tool = "jig-em-half"
+material = "sus304"
+sfm = 70
+feed = "Hand, light: .2 mm a pass"
+[settings.kit-flat-sus304]
+tool = "basebar-counterbore"
+material = "sus304"
+sfm = 70
+feed = "Hand, light"

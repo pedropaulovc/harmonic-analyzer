@@ -254,6 +254,17 @@ and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
+The leadscrew kit's plan (`ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml`,
+MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.0: its
+`harmonic_leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
+cut end and five flats, the FeedNut member's faced seat, countersinks and
+receipt limits), and its `kit-*` setup pictures are prechips layouts. The route
+is authored (no hand traveler): receive and check the kit, hacksaw the screw
+long, mill the cut end to length from the NEAR END, mill the five set-screw
+flats on the BS-0 dividing head, face the nut's spigot in the lathe and
+countersink its four holes by hand. The hacksaw and the 3/16 in-body 82°
+countersink are not owned (`shop-equipment.toml`, `present = false`).
+
 ```text
 uv run --frozen python -m doit prechips:<stem>
 uv run --frozen python cad/scripts/prechips_traveler.py <stem>
