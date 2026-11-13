@@ -66,6 +66,7 @@ from _drawing_dimensions import (
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
@@ -170,7 +171,6 @@ LETTERED_LEFT = frozenset(("stirrup",))
 # (draw_sm_summing_lever's VIEW F arrow): the letter's top stands this far over
 # the tip, the leader leaving the letter's side squared over the tip.
 VIEW_ARROW_RISE = 0.010
-VIEW_ARROW_SQUARE_TOL = 0.0003
 # The arrow's tip stands at least this far off D's circle, so it reads as
 # pointing at the block, not at the circle.
 VIEW_ARROW_CIRCLE_CLEARANCE = 0.002
@@ -1076,34 +1076,21 @@ def _add_carriage_arrow(
     centre, radius = stirrup_circle
     if math.dist(tip, centre) - radius < VIEW_ARROW_CIRCLE_CLEARANCE:
         raise RuntimeError(f"{label}: tip {tip!r} crowds D's circle at {centre!r}")
+    text_xy = (tip[0] - DETAIL_LETTER_WIDTH, tip[1] + VIEW_ARROW_RISE)
     note = add_leader_note(
         adapter,
         letter,
-        text_xy=(tip[0] - DETAIL_LETTER_WIDTH, tip[1] + VIEW_ARROW_RISE),
+        text_xy=text_xy,
         attach_xy=tip,
         view=front,
         label=label,
     )
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) >= 6 and abs(tip[0] - points[0]) > VIEW_ARROW_SQUARE_TOL:
-        x, y, z = (float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(x + tip[0] - points[0], y, z):
-            raise RuntimeError(f"failed to square the {label}")
-        adapter.currentModel.EditRebuild3()
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if (
-        len(points) < 6
-        or math.dist((points[-3], points[-2]), tip) > 0.001
-        or abs(tip[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
-        or points[1] <= tip[1]
-    ):
-        raise RuntimeError(f"{label} does not stand square over its tip: {points!r}")
-    _assert_on_sheet(_note_box(_early_bound(note, "INote"), label=label), label=label)
-    _telemetry.info(
-        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
-        f"{points[-3]:.5f},{points[-2]:.5f}"
+    points = square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip, axis=0, label=label
     )
+    if points[1] <= tip[1]:
+        raise RuntimeError(f"{label} does not stand over its tip: {points!r}")
+    _assert_on_sheet(_note_box(_early_bound(note, "INote"), label=label), label=label)
 
 
 def _crop(adapter: Any, view: Any, detail: Detail) -> None:

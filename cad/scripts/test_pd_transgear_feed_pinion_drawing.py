@@ -1220,6 +1220,23 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
 
+def test_nose_caption_hangs_below_its_views_outline() -> None:
+    """#2708, leaf 20261113T084309Z on a 1010x678 px window: hung 2.5 mm
+    under the tips, VIEW E's caption stood inside its view's outline (the
+    tips plus 6.25 mm) and passed the layout gate only as a tag under 15 mm
+    wide, 14.8 mm read on a 598 px window, 15.5 mm on 678 px.  Hung under the
+    outline it needs no exemption: the settle and the gate read the same box,
+    so it clears by the gap less the settle slack on any window."""
+    assert drawing.REAR_CAPTION_GAP_M > drawing.CAPTION_SETTLE_M
+    outline_bottom = (
+        drawing.NOSE_CENTER[1] - drawing.HALF_OD - drawing.NOSE_OUTLINE_MARGIN
+    )
+    caption = _note_box(drawing.NOSE_CAPTION, drawing.NOSE_CAPTION_XY)
+    assert caption.ymax < outline_bottom
+    # Beside section B-B, whose outline ends the same margin past its nose.
+    assert drawing._NOSE_X + drawing.NOSE_OUTLINE_MARGIN + ARROW_TEXT_CLEARANCE_M < caption.xmin
+
+
 def test_end_view_is_the_sections_third_angle_left_view(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1311,96 +1328,6 @@ def test_viewing_arrows_point_along_their_views_sight() -> None:
     # D's tip lands on the rear face's extent, clear of the axis.
     tip_y = drawing.VIEW_D_ARROW[1][1]
     assert drawing.LEFT_CENTER[1] - drawing.HALF_OD < tip_y < drawing.LEFT_CENTER[1]
-
-
-class _PixelWindow:
-    """A drawing window whose annotation readbacks floor to its pixels: the
-    release v49 r2 seat, 1010x678 px, fitted to the sheet at 2.325 px/mm."""
-
-    WINDOW_PX = (1010, 678)
-    FIT_PX_PER_M = 2325.0
-
-    def __init__(self) -> None:
-        self.px_per_m = self.FIT_PX_PER_M
-
-    def ViewZoomTo2(self, x0, y0, _z0, x1, y1, _z1):  # noqa: N802
-        self.px_per_m = min(self.WINDOW_PX[0] / (x1 - x0), self.WINDOW_PX[1] / (y1 - y0))
-
-    def ViewZoomtofit2(self):  # noqa: N802
-        self.px_per_m = self.FIT_PX_PER_M
-
-    def GraphicsRedraw2(self):  # noqa: N802
-        return None
-
-
-class _ArrowNote:
-    """A letter note whose leader leaves ``start_offset`` from its anchor."""
-
-    def __init__(self, window: _PixelWindow, anchor, tip, start_offset: float) -> None:
-        self.window, self.anchor, self.tip = window, list(anchor), tip
-        self.start_offset = start_offset
-
-    def true_start_y(self) -> float:
-        return self.anchor[1] + self.start_offset
-
-    def GetAnnotation(self):  # noqa: N802
-        return self
-
-    def GetTextFormat(self, _index):  # noqa: N802
-        return type("Format", (), {})()
-
-    def SetTextFormat(self, _index, _use_document, _text_format):  # noqa: N802
-        return True
-
-    def GetLeaderPointsAtIndex(self, _index):  # noqa: N802
-        px = self.window.px_per_m
-        read_y = math.floor(self.true_start_y() * px) / px
-        return (self.anchor[0], read_y, 0.0, *self.tip, 0.0)
-
-    def GetPosition(self):  # noqa: N802
-        return (*self.anchor, 0.0)
-
-    def SetPosition2(self, x, y, _z):  # noqa: N802
-        self.anchor = [x, y]
-        return True
-
-
-@pytest.mark.parametrize("zoomed", (True, False))
-def test_viewing_arrow_is_squared_on_a_zoomed_readback(
-    monkeypatch: pytest.MonkeyPatch, zoomed: bool
-) -> None:
-    """Release v49 r2 (leaf 20261113T013309Z): fitted, a pixel of the seat's
-    window is 0.43 mm, over the 0.3 mm squaring tolerance, so VIEW E's leader
-    could read square while it stood most of a pixel off, or read off after
-    its correction.  Zoomed onto the arrow the readback resolves the miss and
-    the letter's move squares the leader itself; the fit is restored.  The
-    control keeps the fitted readback and leaves the leader 0.4 mm off."""
-    from contextlib import nullcontext
-    from types import SimpleNamespace
-
-    text_xy, tip = drawing.VIEW_E_ARROW
-    window = _PixelWindow()
-    # The leader leaves 0.4 mm over the letter's mid-height: under a fitted
-    # pixel, so the fitted window reads it level with the tip.
-    note = _ArrowNote(window, text_xy, tip, -drawing.VIEW_LETTER_HEIGHT / 2.0 + 0.0004)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "add_leader_note", lambda *_args, **_kwargs: note)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "_assert_note_inside_border", lambda *_args: None)
-    if not zoomed:
-        monkeypatch.setattr(drawing, "_zoomed_on", lambda *_args: nullcontext())
-
-    drawing._add_view_arrow(
-        SimpleNamespace(currentModel=window), object(), drawing.NOSE_VIEW_LETTER,
-        drawing.VIEW_E_ARROW,
-    )
-
-    off_square = abs(note.true_start_y() - tip[1])
-    assert window.px_per_m == window.FIT_PX_PER_M
-    if zoomed:
-        assert off_square < 0.00005
-    else:
-        assert off_square > drawing.VIEW_ARROW_SQUARE_TOL
 
 
 def test_outside_view_crops_past_the_run_out_limit() -> None:

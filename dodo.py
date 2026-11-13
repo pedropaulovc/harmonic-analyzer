@@ -3968,6 +3968,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_drawing_visibility.py",
+        # Viewing arrows square on a zoomed readback, alike on every seat
+        # window (#2708).
+        SCRIPTS_DIR / "test_drawing_view_arrow.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         # The two cone tip screws' supplier reference lines lie under their
         # own extension lines (one file for both sheets' shared builders).
