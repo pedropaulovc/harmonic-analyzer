@@ -162,9 +162,6 @@ _INSERTED_SOURCES = {
     "sh_vn_arbor_set_screw",
     "dt_cone_gear_tl_arbor": "dt_cone_gear_tl_keyed_arbor dt_cone_gear_tl_arbor_collar "
     "dt_cone_gear_tl_arbor_key dt_cone_gear_tl_vn_arbor_nut",
-    "dt_cylinder_gear_tl_cam_turning": "dt_cylinder_gear_tl_cam_fixture "
-    "dt_cylinder_gear_tl_vn_cam_stub dt_cylinder_gear_tl_vn_cam_clock_pin "
-    "dt_cylinder_gear_tl_vn_cam_clamp_screw dt_cylinder_gear_tl_vn_cam_clamp_washer",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
