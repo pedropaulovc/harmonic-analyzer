@@ -4,11 +4,12 @@ Issue #2358: the bar (item 1, MHA-DT-37-TL-02), the DT6-FORM1 bit (item 2,
 MHA-DT-37-TL-01) and the bought set screw (item 3, MHA-SH-VN-54) as set up.
 One sheet: the front view (the bit's face toward the viewer, so the face leads
 with the spindle in forward) with items 1 and 2 ballooned and the stick-out
-and swing radius as references measured off the model; the bottom view (the
-cutting end, end-on) with item 3 ballooned; the shaded isometric; the BOM; the
-three fitting steps.  Poses, the stick-out window and the step text come from
-``dt_cone_tip_gear_tl_cutter_spec``; this recipe only lays the sheet out and
-never edits the source assembly.
+and swing radius as references, the assembly's own settings dimensions
+(its hidden CutterSettingsReference sketch); the bottom view (the cutting
+end, end-on) with item 3 ballooned; the shaded isometric; the BOM; the three
+fitting steps.  Poses, the settings, the stick-out window and the step text
+come from ``dt_cone_tip_gear_tl_cutter_spec``; this recipe only lays the
+sheet out and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from pathlib import Path
 from typing import Any
 
 import _config
@@ -37,8 +37,13 @@ from _drawing_common import (
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_dimensions import set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_tables import insert_bom_table
@@ -54,9 +59,9 @@ from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
+    dimension_name,
     place_view,
     view_name,
-    visible_component_entities,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -114,31 +119,32 @@ BOTTOM_ITEMS = (SET_SCREW,)
 if set(FRONT_ITEMS) | set(BOTTOM_ITEMS) != set(BOM_COMPONENTS):
     raise AssertionError("every BOM row is ballooned once")
 
-# --- The references, measured off the model in the front view -------------------
-_BAR_R = fixture.bar.BAR_RADIUS
+# --- The settings, imported off the assembly's settings sketch ---------------
 _STATION = fixture.bar.CROSS_HOLE_STATION
-# The bar's right silhouette, picked well above the cross hole.
-SILHOUETTE_PICK = (
-    FRONT_ORIGIN[0] + _BAR_R * _S,
-    FRONT_ORIGIN[1] + (_STATION + 12.0) * _S,
-)
 # The bar's axis as an owned centreline, end to end with a short overrun.
 AXIS_ENDS_MM = ((0.0, -2.0, 0.0), (0.0, fixture.bar.BAR_LENGTH + 2.0, 0.0))
-STICK_OUT_TEXT_XY = (
-    FRONT_ORIGIN[0] + (_BAR_R + fixture.STICK_OUT / 2.0) * _S,
-    FRONT_ORIGIN[1] + (_STATION + 6.0) * _S,
-)
-SWING_TEXT_XY = (
-    FRONT_ORIGIN[0] + fixture.SWING_RADIUS / 2.0 * _S,
-    FRONT_ORIGIN[1] + (_STATION + 11.0) * _S,
-)
-CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
-# The bit's tip corner in its own frame (mm): the root arc's end on the face
-# (y = 0) where the upper relief starts, .0004 ahead of P1 -- below the
-# references' three places, so they print the spec's stick-out and radius.
-_FORM = {segment.name: segment for segment in fixture.bit.form_segments(1.0)}
-_CORNER_X, _CORNER_Z = fixture.bit.face_point(*_FORM["RootArc"].point(0.0))
-TIP_CORNER_MM = (_CORNER_X, 0.0, _CORNER_Z)
+# Both texts right of P1 (about 0.11-0.14 m), outside their extension lines,
+# so no extension line strikes a text and no text sits on the bar: the
+# stick-out 18 mm over the bit, the swing radius 18 mm above it (its
+# extension line up from P1 passes left of the stick-out's text), both left
+# of the isometric.
+_SETTINGS_TEXT_X = FRONT_ORIGIN[0] + (fixture.SWING_RADIUS + 7.0) * _S
+SETTINGS_TEXT_XY = {
+    fixture.STICK_OUT_DIMENSION: (
+        _SETTINGS_TEXT_X,
+        FRONT_ORIGIN[1] + (_STATION + 6.0) * _S,
+    ),
+    fixture.SWING_RADIUS_DIMENSION: (
+        _SETTINGS_TEXT_X,
+        FRONT_ORIGIN[1] + (_STATION + 12.0) * _S,
+    ),
+}
+SETTINGS_EXPECTED_MM = {
+    fixture.STICK_OUT_DIMENSION: fixture.STICK_OUT,
+    fixture.SWING_RADIUS_DIMENSION: fixture.SWING_RADIUS,
+}
+if set(SETTINGS_TEXT_XY) != fixture.DRAWING_DIMENSIONS[fixture.SETTINGS_SKETCH]:
+    raise AssertionError("the sheet prints exactly the assembly's marked settings")
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
@@ -209,39 +215,6 @@ def _move_model_point(
         raise RuntimeError(f"{label}: origin sits at {here!r}, not {target!r}")
 
 
-def _tip_corner(view: Any) -> Any:
-    """The bit's tip corner on its face: the vertex where the root arc meets
-    the upper relief, which the references end on.
-
-    The root arc is not a circular edge: the bit's form is cut from native
-    equation curves (``_gear.equation_curve``, an equation-driven spline), so
-    every form edge on the face is a B-spline and ``ICurve.IsCircle`` is false
-    for all of them (farm run 20261112T203021325Z). A linear dimension cannot
-    end on a spline at P1; the corner is a true vertex of the face loop.
-    Vertices read in the bit's own frame, so the bit's are matched by stem."""
-    view = _early_bound(view, "IView")
-    target = TIP_CORNER_MM
-    matches = []
-    for raw_component in view.GetVisibleComponents() or ():
-        component = _early_bound(raw_component, "IComponent2")
-        if Path(str(component.GetPathName() or "")).stem.casefold() != BIT:
-            continue
-        for raw in visible_component_entities(view, component, 1):
-            edge = _early_bound(raw, "IEdge")
-            for raw_vertex in (edge.GetStartVertex(), edge.GetEndVertex()):
-                if raw_vertex is None:
-                    continue
-                vertex = _early_bound(raw_vertex, "IVertex")
-                point = tuple(float(value) * 1000.0 for value in vertex.GetPoint())
-                if math.dist(point, target) < 1e-4:
-                    matches.append(vertex)
-    if not matches:
-        raise RuntimeError(
-            f"fly-cutter front view shows no bit vertex at the tip corner {target!r} mm"
-        )
-    return matches[0]
-
-
 def _axis_centreline(adapter: Any, view: Any) -> Any:
     """The bar's axis, one owned centreline in the view's sketch
     (draw_fr_top_frame._add_view_centerlines), returned as its segment."""
@@ -283,47 +256,49 @@ def _axis_centreline(adapter: Any, view: Any) -> Any:
     return segment
 
 
-def _reference(
-    adapter: Any,
-    view: Any,
-    *,
-    label: str,
-    expected_mm: float,
-    callout: str,
-    text_xy: tuple[float, float],
-    entity_types: tuple[str, str],
-    entities: tuple[Any | None, Any | None],
-    p0: tuple[float, float],
-) -> Any:
-    """One horizontal reference to the tip, proved against the spec's value,
-    parenthesized, at the spec's places, its name above it."""
-    display = add_edge_dimension(
+def _settings(adapter: Any, view: Any) -> None:
+    """The stick-out and swing radius: the assembly's own settings dimensions
+    (``CutterSettingsReference``, build_dt_cone_tip_gear_tl_cutter_assembly),
+    shown in ``view``, imported at their text points, proved against the
+    spec at the assembly-authored places, parenthesized, named above.
+
+    Two drawing-authored dimensions to the bit's tip failed on the farm
+    because the tip is equation-curve topology (no circular root arc, run
+    20261112T203021325Z; no vertex at the computed corner, run
+    20261113T012650242Z). The settings sketch owns both ends of each
+    reference, so nothing here depends on the bit's form edges."""
+    label = "fly-cutter settings"
+    _show_base_view_sketches(adapter, view, (fixture.SETTINGS_SKETCH,), label=label)
+    annotations = curate_view_dimensions(
         adapter,
         view,
-        p0=p0,
-        p1=(0.0, 0.0),
-        text_xy=text_xy,
-        label=label,
-        orientation="horizontal",
-        entity_types=entity_types,
-        entities=entities,
+        keep=SETTINGS_TEXT_XY,
+        view_label=label,
+        dimensions_by_feature=fixture.DRAWING_DIMENSIONS,
     )
-    display = _early_bound(display, "IDisplayDimension")
-    measured = abs(
-        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    printed = {dimension_name(adapter, annotation) for annotation in annotations}
+    if printed != set(SETTINGS_TEXT_XY):
+        raise RuntimeError(f"{label} imported {sorted(printed)}")
+    assert_imported_precision(
+        adapter, annotations, dict(fixture.DRAWING_PRECISION[fixture.SETTINGS_SKETCH])
     )
-    if abs(measured * 1000.0 - expected_mm) > 1e-3:
-        raise RuntimeError(
-            f"{label} measured {measured * 1000.0:.4f} mm, expected {expected_mm:.4f}"
+    set_dimension_callouts(
+        adapter, annotations, dict(fixture.DIMENSION_CALLOUTS), location="above"
+    )
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        display = _early_bound(
+            set_reference_dimension(adapter, annotation, label=f"{label} {name}"),
+            "IDisplayDimension",
         )
-    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-    display.SetPrecision3(fixture.DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != fixture.DRAWING_REFERENCE_PRECISION:
-        raise RuntimeError(f"{label} precision did not persist")
-    display.SetText(CALLOUT_ABOVE, callout)
-    if str(display.GetText(CALLOUT_ABOVE) or "") != callout:
-        raise RuntimeError(f"{label} callout did not persist")
-    return display
+        measured = 1000.0 * abs(
+            float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+        )
+        if abs(measured - SETTINGS_EXPECTED_MM[name]) > 1e-4:
+            raise RuntimeError(
+                f"{label} {name} reads {measured:.4f} mm, "
+                f"expected {SETTINGS_EXPECTED_MM[name]:.4f}"
+            )
 
 
 def _place_sheet(adapter: Any) -> Any:
@@ -378,32 +353,10 @@ def _place_sheet(adapter: Any) -> Any:
             f"fly cutter carries {len(landings)} balloons, expected {len(BOM_COMPONENTS)}"
         )
 
-    # The setting the fitter makes and the radius it gives, both off the bit's
-    # tip corner on its face (a vertex; see _tip_corner).
-    tip = _tip_corner(front)
-    _reference(
-        adapter,
-        front,
-        label="stick-out",
-        expected_mm=fixture.STICK_OUT + TIP_CORNER_MM[0],
-        callout=fixture.STICK_OUT_CALLOUT,
-        text_xy=STICK_OUT_TEXT_XY,
-        entity_types=("SILHOUETTE", "VERTEX"),
-        entities=(None, tip),
-        p0=SILHOUETTE_PICK,
-    )
-    axis = _axis_centreline(adapter, front)
-    _reference(
-        adapter,
-        front,
-        label="swing radius",
-        expected_mm=fixture.SWING_RADIUS + TIP_CORNER_MM[0],
-        callout=fixture.SWING_RADIUS_CALLOUT,
-        text_xy=SWING_TEXT_XY,
-        entity_types=("SKETCHSEGMENT", "VERTEX"),
-        entities=(axis, tip),
-        p0=(0.0, 0.0),
-    )
+    # The bar's axis the swing radius is read from, then the setting the
+    # fitter makes and the radius it gives.
+    _axis_centreline(adapter, front)
+    _settings(adapter, front)
     for text, xy, label in (
         (fixture.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
         (fixture.ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),

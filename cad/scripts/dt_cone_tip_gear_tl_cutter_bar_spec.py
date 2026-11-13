@@ -59,10 +59,12 @@ SLIP_CLEARANCE = (
 )
 if SLIP_CLEARANCE[0] <= 0.0:
     raise AssertionError("the largest bit must slide into the smallest reamed hole")
-# From the cutting end face to the hole's axis, .XXX: the set screw then
-# seats on the bit flush with that face.
-CROSS_HOLE_STATION = 7.9248  # .312
-CROSS_HOLE_STATION_PLACES = 3
+# From the cutting end face to the hole's axis, .XX: the set screw seats on
+# the bit near flush with that face (the 1/4 screw over the bit's radius).
+CROSS_HOLE_STATION = 7.874  # .31
+CROSS_HOLE_STATION_PLACES = 2
+# The title block's .XX row the station is held to.
+CROSS_HOLE_STATION_TOL = 0.254  # +/-.01
 
 # --- The set-screw tap: #4-40 up the axis from the cutting end to the hole ---
 SET_SCREW_THREAD = set_screw.THREAD
@@ -77,10 +79,14 @@ SET_SCREW_MIN_ENGAGEMENT = 1.5 * THREAD_MAJOR_MM[SET_SCREW_THREAD]
 if TAP_LENGTH < SET_SCREW_MIN_ENGAGEMENT:
     raise AssertionError("the set-screw tap must give the screw 1.5D of thread")
 # Seated on the bit's top the screw's socket face stands this far proud of the
-# end face (negative: below it).
+# end face (negative: below it).  On the bar's axis it sweeps nothing, so the
+# station's band only moves it; what it must keep is its thread: at the
+# shortest station the screw stands proudest and still holds 1.5D in the tap.
 SET_SCREW_PROUD = set_screw.LENGTH - (CROSS_HOLE_STATION - BIT_RADIUS)
-if abs(SET_SCREW_PROUD) > 0.0254:
-    raise AssertionError("the seated set screw must finish flush with the end face")
+SET_SCREW_PROUD_MAX = SET_SCREW_PROUD + CROSS_HOLE_STATION_TOL
+SET_SCREW_ENGAGED_MIN = set_screw.LENGTH - max(SET_SCREW_PROUD_MAX, 0.0)
+if SET_SCREW_ENGAGED_MIN < SET_SCREW_MIN_ENGAGEMENT:
+    raise AssertionError("the seated set screw must keep 1.5D of thread")
 # Walls: from the cross hole to the bar's surface, and to the cutting end.
 CROSS_HOLE_SIDE_WALL = (BAR_DIA - CROSS_HOLE_LIMITS[1]) / 2.0
 CROSS_HOLE_END_WALL = CROSS_HOLE_STATION - CROSS_HOLE_LIMITS[1] / 2.0
@@ -124,9 +130,9 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 HOLE_CALLOUT_PRECISION = 3
 SET_SCREW_EXTENT = "TO CROSS HOLE"
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "BarDia": "COLD-FINISHED ROUND,\nAS SUPPLIED",
+    "BarDia": "AS SUPPLIED",
     "CrossHoleDia": (
-        f"REAM THRU, SQUARE TO AXIS\nSLIP FIT ON BIT {BIT_NUMBER}\n"
+        f"REAM THRU\nSLIDING FIT ON {BIT_NUMBER}\n"
         f"(CLEARANCE {inch_range(SLIP_CLEARANCE)} REF)"
     ),
 }
