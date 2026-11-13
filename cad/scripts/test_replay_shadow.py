@@ -3718,6 +3718,16 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| output_nondeterminism cause=seat_display",
         ),
         (
+            # Named before the display: the ink difference is only the wiggle.
+            dataclasses.replace(
+                _noop("different", pdf="different"),
+                pdf_cause=_com_outcome.JAGGED_OUTLINE_CAUSE,
+            ),
+            (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["new"]),
+            "output_nondeterminism",
+            "| output_nondeterminism cause=jagged_outline",
+        ),
+        (
             _noop("different", answers="different", pdf="different"),
             (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
             "output_nondeterminism",
@@ -3736,7 +3746,7 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| title_echo",
         ),
     ],
-    ids=["seat_display", "answers", "unexplained", "title_echo"],
+    ids=["seat_display", "jagged_outline", "answers", "unexplained", "title_echo"],
 )
 def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
     blob, tmp_path, monkeypatch, spans, logged, found, displays, judgement, line_end
@@ -3763,6 +3773,54 @@ def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
     if record["output_cause"] == "seat_display":
         assert record["base_display"] == "1010x678 px/mm=2.325"
         assert "this build's 1010x598 px/mm=2.098" in warned
+    if record["output_cause"] == "jagged_outline":
+        assert "(jagged_outline: SolidWorks broke a jagged crop outline" in warned
+
+
+def test_a_dependents_diff_judgements_reach_its_split(blob, tmp_path, monkeypatch):
+    assert shadow.OutputCause.JAGGED_OUTLINE.value == _com_outcome.JAGGED_OUTLINE_CAUSE
+    monkeypatch.setenv(shadow.MODE_ENV, "shadow")
+    recording = _planned(_drawing(tmp_path / "draw.py"), "k" * 64)
+    recording.log.write_bytes(b"log")
+    monkeypatch.setattr(
+        shadow, "_bundle_of", lambda *_a: (shadow.bundle(recording), None)
+    )
+
+    def diff(pdf_cause: str | None, **bound: Any):
+        result = {
+            "request_divergence": None,
+            "outcome": "different",
+            "outcome_signals": {
+                "requests": "same",
+                "answers": "same",
+                "pdf": "different",
+            },
+            "judge_faults": [],
+            "pdf_cause": pdf_cause,
+            **bound,
+        }
+        return lambda *_a: (0, result)
+
+    base = shadow.Base({"calls": 10}, (), 0.0)
+    named = {"arrays": 1, "positional_divergence": {"index": 4, "field": "handle"}}
+    jagged = diff(_com_outcome.JAGGED_OUTLINE_CAUSE, name_bound=named)
+    monkeypatch.setattr(shadow, "_diff", jagged)
+    found = shadow._compare_dependent(recording, base, {"calls": 10})
+    assert (found.verdict, found.ground_truth, found.name_bound) == ("noop", "same", 1)
+    # The jagged outline is named before the display.
+    assert shadow._output_judgement(
+        found, _SEAT_WINDOWS["new"], _SEAT_WINDOWS["base"]
+    ) == (
+        shadow.OutputJudgement.OUTPUT_NONDETERMINISM,
+        shadow.OutputCause.JAGGED_OUTLINE,
+    )
+    monkeypatch.setattr(shadow, "_diff", diff(None))
+    found = shadow._compare_dependent(recording, base, {"calls": 10})
+    assert found.name_bound is None
+    assert shadow._output_judgement(found, None, None) == (
+        shadow.OutputJudgement.UNEXPLAINED_OUTPUT_DIVERGENCE,
+        None,
+    )
 
 
 @pytest.mark.parametrize("publish", shadow.EVIDENCE_OF)

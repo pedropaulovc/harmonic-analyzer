@@ -1126,6 +1126,12 @@ class Shadow:
     # An assembly's or drawing's comparison: each recording's drawing display
     # (``com_replay.py diff`` ``display``: ``base``, ``new``).
     display: dict[str, Any] | None = None
+    # A drawing's PDF difference explained by the judge (_com_outcome.judge
+    # ``pdf_cause``: ``jagged_outline`` or ``None``).
+    pdf_cause: str | None = None
+    # How many component arrays the comparison bound to the base's by name
+    # (``com_replay.py diff`` ``name_bound`` ``arrays``; ``None``: none).
+    name_bound: int | None = None
 
     @property
     def verdict_class(self) -> VerdictClass:
@@ -2876,6 +2882,10 @@ class OutputJudgement(StrEnum):
 class OutputCause(StrEnum):
     """How the seat differed for an :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`."""
 
+    # The drawing's PDFs differ only by a jagged crop outline drawn again
+    # (_com_outcome.JAGGED_OUTLINE_CAUSE, the judge's ``pdf_cause``; pinned by
+    # test): SolidWorks breaks such an outline along a random wiggle each time.
+    JAGGED_OUTLINE = "jagged_outline"
     # The drawing display the sheet picks hit-tested in (com_replay._display:
     # view window or px/mm), as the two recordings' answers report it.
     SEAT_DISPLAY = "seat_display"
@@ -2887,14 +2897,17 @@ def _output_judgement(
     shadow: Shadow, display: Any, base_display: Any
 ) -> tuple[OutputJudgement | None, OutputCause | None]:
     """The judgement of a NOOP split (``None`` for any other) and, for an
-    output nondeterminism, its cause: the display first, which explains
-    answers that differ with it."""
+    output nondeterminism, its cause: a PDF that differs only by a jagged
+    outline first, then the display, which explains answers that differ
+    with it."""
     if shadow.verdict != Split.NOOP:
         return None, None
     if shadow.outcome == "same":
         return OutputJudgement.CONFIRMED, None
     if shadow.outcome != "different":
         return OutputJudgement.OUTCOME_UNKNOWN, None
+    if shadow.pdf_cause == OutputCause.JAGGED_OUTLINE:
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.JAGGED_OUTLINE
     if display is not None and base_display is not None and display != base_display:
         return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.SEAT_DISPLAY
     if shadow.outcome_signals.get("answers") == "different":
@@ -3084,6 +3097,9 @@ def _judge_dependent(
             # (_compare_dependent).
             "title_echo": shadow.verdict == Split.NOOP
             and shadow.ground_truth == "diverged",
+            # Component arrays SolidWorks enumerated in another order, bound
+            # to the base's by name before the split (_com_outcome.name_bound).
+            "name_bound": shadow.name_bound,
             "output_nondeterminism": judgement is OutputJudgement.OUTPUT_NONDETERMINISM,
             "output_cause": cause,
             "unexplained_output_divergence": judgement
@@ -3123,12 +3139,14 @@ def _judge_dependent(
     if base is not None and judgement is OutputJudgement.OUTPUT_NONDETERMINISM:
         evidence = _evidence(base, shadow)
         record["output_evidence"] = evidence
-        seat = (
-            f"the base's display {fields['base_display']}, this build's "
-            f"{fields['display']}"
-            if cause is OutputCause.SEAT_DISPLAY
-            else "SolidWorks answered some request otherwise"
-        )
+        seat = "SolidWorks answered some request otherwise"
+        if cause is OutputCause.JAGGED_OUTLINE:
+            seat = "SolidWorks broke a jagged crop outline along another wiggle"
+        if cause is OutputCause.SEAT_DISPLAY:
+            seat = (
+                f"the base's display {fields['base_display']}, this build's "
+                f"{fields['display']}"
+            )
         # Nothing of an assembly's or drawing's recording is reused, so no
         # base is revoked: what a reuse would have to pin or tolerate.
         _telemetry.warn(
@@ -3207,6 +3225,8 @@ def _compare_dependent(
         seat_path=diff.get("seat_path"),
         kind=recording.kind,
         display=diff.get("display"),
+        pdf_cause=diff.get("pdf_cause"),
+        name_bound=(diff.get("name_bound") or {}).get("arrays"),
     )
 
 
