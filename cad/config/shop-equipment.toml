@@ -550,12 +550,13 @@ use = "guides the 1/16-A broach in the Ø.375 bores"
 bore_in = 0.375
 
 # Shaft keyseat on MHA-DT-04 (#2467): 1/16 wide, .0395 deep, 4.53 in long.
-# The sheet prints the width .0625 +.0020/-.0010. Catalogue 1/16 end mills
-# are ground to one side of size: this one 0/+.002 (.0625-.0645), the HSS
-# stub 2802A14 -.0015/0 and the carbide 8876A11 -.002/0 (McMaster, read live
-# 2026-11-12). Measure the cutter before the cut: one at .0640 or under
-# leaves runout room below the .0645 limit; with an undersize cutter, take a
-# second pass a few tenths to one side by the DRO until the key enters.
+# The sheet prints the width .0625 +.0020/-.0000, and the key must slide in,
+# so the cutter is chosen for the band, not the band for the cutter (#2467):
+# catalogue 1/16 end mills are ground to one side of size, this one 0/+.002
+# (.0625-.0645), the HSS stub 2802A14 -.0015/0 and the carbide 8876A11
+# -.002/0 (McMaster, read live 2026-11-12), and only the first cuts inside
+# the band in one pass. Measure the cutter before the cut: one at .0640 or
+# under leaves runout room below the .0645 limit.
 # Double-ended, so two pieces are four cutting ends.
 [tools.keyseat-endmill-1-16]
 name = "HSS 2-flute end mill, 1/16 in, double-end, 3/16 shank, 7/32 length of cut, diameter 0/+.002"

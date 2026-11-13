@@ -56,7 +56,7 @@ they rotate together". The design's 1/16 key (owner decision C1 keyed,
 | | route | purchases | what changes |
 |---|---|--:|---|
 | A | Make every gear, as designed | **$2,417** | nothing |
-| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,532** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
+| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,766** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
 | C | Route A, plus one Boston Y48120 as a 120T master to roll cut gears against | **$2,588** | nothing in the machine; one more shop gauge |
 
 All three exclude the C67500 rod for T006 to T024 (5/8 in, about 6 in),
@@ -96,9 +96,9 @@ press reamers the cam fixture's pins need (.3745 and .0365) are not priced.
 
 Route A adds the eleven cutters, $1,379.13, and brass bar, $521.58 (six
 C360 bars for the drive train, $439.04, and the 3-1/4 in bar for the
-paper-drive disc, $82.54). Route B drops four cutters (48DP #3, #5, #6, #8;
-#6 and #8 come back because the 12T and 18T cannot be bought) and adds the
-gears. Route C is route A plus the $171.00 master.
+paper-drive disc, $82.54). Route B drops two cutters (48DP #3 and #5; #6 and
+#8 stay because the 12T and 18T cannot be bought), nine cutters for
+$1,130.04, and adds the gears. Route C is route A plus the $171.00 master.
 
 The records are in `cad/config/shop-equipment.toml` ("gear cutting kit"),
 each `present = false`.

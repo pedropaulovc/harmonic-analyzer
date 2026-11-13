@@ -10,7 +10,6 @@ import tomllib
 
 import pytest
 
-import build_dt_cone_gear_shaft as shaft
 import cone_land_key
 import dt_alignment_pinion_spec
 import dt_cone_gear_spec
@@ -121,7 +120,7 @@ def test_the_broach_cuts_the_printed_keyway_at_every_keyed_face() -> None:
 def test_the_keyseat_end_mill_cuts_inside_the_printed_width() -> None:
     cutter = TOOLS["keyseat-endmill-1-16"]
     width_min, width_max = cone_land_key.limits(
-        cone_land_key.KEYSEAT_WIDTH_MM, shaft.KEYSEAT_WIDTH_PRINT_BAND
+        cone_land_key.KEYSEAT_WIDTH_MM, cone_land_key.KEYSEAT_WIDTH_BAND
     )
     low, high = (value * MM_PER_IN for value in cutter["dia_in"])
     assert width_min <= low <= high <= width_max + 1e-9
