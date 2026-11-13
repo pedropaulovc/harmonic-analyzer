@@ -4,8 +4,8 @@ Issue #2358: one sheet at 2:1, laid as the bar sits in the lathe (rule 11):
 the front view with its axis horizontal, the faced, tapped cutting end on the
 right, carrying the bar's Ø and length; the top view above it with the reamed
 cross hole end-on and its station from that end; the end view of the cutting
-end projected right of the front view with the #4-40 tap's native blind
-callout (size, DRILL, drill depth; thread, full-thread depth); and the
+end projected right of the front view with the #4-40 tap's native callout,
+both rows running INTO CROSS HOLE (no depth: the tap breaks into it); and the
 isometric.  Every number is the part's own
 (``dt_cone_tip_gear_tl_cutter_bar_spec``), imported from the model.
 """
@@ -112,17 +112,18 @@ TOP_KEEP = {
 }
 _TAP_R = part.TAP_DRILL_DIA / 2.0 * _S
 TAP_EDGE_XY = (END_ORIGIN[0] + _TAP_R, END_ORIGIN[1])
-# The callout's two lines (about 50 mm wide) centre here, below and right of
-# the end view's circle and above the title block, so only the leader
-# crosses the outline (farm run 20261113T012650242Z printed TAP 4-40 across
-# the circle).
+# The callout's two lines (at most 27 characters, "Ø.089 DRILL INTO CROSS
+# HOLE", about 70 mm wide) centre here, below and right of the end view's
+# circle and above the title block, so only the leader crosses the outline
+# (farm run 20261113T012650242Z printed TAP 4-40 across the circle).
 TAP_CALLOUT_XY = (END_ORIGIN[0] + (_R + 22.0) * _S, END_ORIGIN[1] - (_R + 6.0) * _S)
-TAP_PRECISION = dict.fromkeys(
-    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION
-)
+TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 DRILL_PROCESS = "DRILL"
+# Both native ``<hw-thru>`` extents name where the hole ends, the cross hole
+# it breaks into (draw_pn_pen_v_block's set-screw tap INTO PIVOT BORE).
+TAP_END = "INTO CROSS HOLE"
+_THRU_TOKEN = "<hw-thru>"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
-_DEPTH_TOKENS = ("<hw-tapdrldepth>", "<hw-threaddepth>")
 
 
 def sheet_dimension_names() -> set[str]:
@@ -134,22 +135,21 @@ if {*FRONT_KEEP, *TOP_KEEP} != sheet_dimension_names():
 
 
 def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Rewrite the native blind tap callout's definition parts (5..8) to the
-    standard form, size then process then depth (draw_ch_rocker_arm_tl_
-    oblique_end_bracket's DRILL after the drill's size): DRILL after the tap
-    drill's Ø; the thread class goes (the title block states it).  Both ↧
-    depths stay native variables."""
+    """Rewrite the native up-to-next tap callout's definition parts (5..8) to
+    the standard form, size then process then extent (draw_pn_pen_v_block):
+    DRILL after the tap drill's Ø, both ``<hw-thru>`` extents become INTO
+    CROSS HOLE, and the thread class goes (the title block states it)."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
     joined = "\n".join(definitions.values())
-    if joined.count("<hw-tapdrldia>") != 1 or any(
-        joined.count(token) != 1 for token in _DEPTH_TOKENS
-    ):
-        raise RuntimeError(f"tap callout is not one blind tap: {definitions!r}")
-    if DRILL_PROCESS in joined or "<hw-thru>" in joined:
+    if joined.count(_THRU_TOKEN) != 2 or joined.count("<hw-tapdrldia>") != 1:
+        raise RuntimeError(f"tap callout is not one up-to-next tap: {definitions!r}")
+    if DRILL_PROCESS in joined or "depth>" in joined.lower():
         raise RuntimeError(f"tap callout already carries its rows: {definitions!r}")
     updated = {
-        key: text.replace("<hw-tapdrldia>", f"<hw-tapdrldia> {DRILL_PROCESS}", 1)
+        key: text.replace(
+            "<hw-tapdrldia>", f"<hw-tapdrldia> {DRILL_PROCESS}", 1
+        ).replace(_THRU_TOKEN, TAP_END)
         for key, text in definitions.items()
     }
     thread_parts = [
@@ -306,8 +306,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part.DIMENSION_CALLOUTS)
 
-    # The set-screw tap, end-on in the end view: the native blind callout in
-    # standard form, Ø DRILL ↧ depth over thread ↧ full-thread depth.
+    # The set-screw tap, end-on in the end view: the native up-to-next
+    # callout in standard form, Ø DRILL INTO CROSS HOLE over the thread INTO
+    # CROSS HOLE.
     adapter.currentModel.GraphicsRedraw2()
     tap_callout = add_native_hole_callout(
         adapter,
@@ -318,7 +319,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     resolved = _rewrite_callout_definitions(tap_callout, tap_callout_definitions)
     joined = "\n".join(resolved.values())
-    if joined.count(DRILL_PROCESS) != 1 or "2B" in joined or "THRU" in joined:
+    if (
+        joined.count(DRILL_PROCESS) != 1
+        or joined.count(TAP_END) != 2
+        or "2B" in joined
+        or "THRU" in joined
+    ):
         raise RuntimeError(f"set-screw tap callout text did not resolve: {resolved!r}")
     set_hole_callout_precision(tap_callout, TAP_PRECISION, label="set-screw tap")
     for view in (front, top, end):

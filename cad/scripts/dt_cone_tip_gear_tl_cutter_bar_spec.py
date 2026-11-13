@@ -9,12 +9,10 @@ bought set screw MHA-SH-VN-54 (fixture MHA-DT-37-TL-00, issue #2358).
 Part frame: bar axis +Y through the origin; the cutting end face on the Top
 Plane (y = 0), the collet end at y = BAR_LENGTH.  The cross hole runs along
 model X through the axis at y = CROSS_HOLE_STATION; the tap runs up the axis
-from the cutting end, its drill to the cross hole's axis.
+from the cutting end into the cross hole.
 """
 
 from __future__ import annotations
-
-import math
 
 import _config
 import sh_vn_arbor_set_screw_spec as set_screw
@@ -69,50 +67,32 @@ CROSS_HOLE_STATION_PLACES = 2
 CROSS_HOLE_STATION_TOL = 0.254  # +/-.01
 
 # --- The set-screw tap: #4-40 up the axis from the cutting end --------------
-# A blind native tap (mg_output_fixture_geom's thumb tap): the drill runs to
-# the cross hole's axis, so its full Ø breaks into the hole and its point
-# stops inside it; the full thread stops short of the hole at the station's
-# shortest, so every printed depth is a plain .XXX from the faced end.
+# The tap breaks into the cross hole by design (its screw clamps the bit
+# there): a native up-to-next tap (pn_pen_v_block's set-screw tap INTO PIVOT
+# BORE), drill and full thread both run into the hole, so no web is left
+# between the thread and the bore and the callout states no depth.
 SET_SCREW_THREAD = set_screw.THREAD
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_THREAD]
-TAP_DRILL_DEPTH = CROSS_HOLE_STATION  # .310
-SET_SCREW_THREAD_DEPTH = 5.842  # .230 full thread
-SET_SCREW_HOLE_SPEC = HoleSpec(
-    "tapped",
-    SET_SCREW_THREAD,
-    end="blind",
-    depth_mm=TAP_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": SET_SCREW_THREAD_DEPTH},
-)
+SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 _STATION_RANGE = (
     CROSS_HOLE_STATION - CROSS_HOLE_STATION_TOL,
     CROSS_HOLE_STATION + CROSS_HOLE_STATION_TOL,
 )
-# Where the hole's wall stands over the drill: lowest on the axis, highest at
-# the drill's edge (the tap's full length to the hole at the nominal station).
-_HOLE_WALL_AT_DRILL_EDGE = (
-    (CROSS_HOLE_DIA / 2.0) ** 2 - (TAP_DRILL_DIA / 2.0) ** 2
-) ** 0.5
-TAP_LENGTH = CROSS_HOLE_STATION - _HOLE_WALL_AT_DRILL_EDGE
-if TAP_DRILL_DEPTH <= _STATION_RANGE[1] - _HOLE_WALL_AT_DRILL_EDGE:
-    raise AssertionError("the tap drill must break wholly into the cross hole")
-_DRILL_POINT = (
-    TAP_DRILL_DIA
-    / 2.0
-    / math.tan(math.radians(SET_SCREW_HOLE_SPEC.drill_angle_deg / 2.0))
+# The tap's full length, end face to where the tap drill breaks wholly into
+# the hole (the hole's wall over the drill's edge) at the nominal station.
+TAP_LENGTH = (
+    CROSS_HOLE_STATION
+    - ((CROSS_HOLE_DIA / 2.0) ** 2 - (TAP_DRILL_DIA / 2.0) ** 2) ** 0.5
 )
-if TAP_DRILL_DEPTH + _DRILL_POINT >= _STATION_RANGE[0] + CROSS_HOLE_LIMITS[0] / 2.0:
-    raise AssertionError("the tap drill's point must stop inside the cross hole")
-if SET_SCREW_THREAD_DEPTH >= _STATION_RANGE[0] - CROSS_HOLE_LIMITS[1] / 2.0:
-    raise AssertionError("the full thread must stop short of the cross hole")
 SET_SCREW_MIN_ENGAGEMENT = 1.5 * THREAD_MAJOR_MM[SET_SCREW_THREAD]
-if SET_SCREW_THREAD_DEPTH < SET_SCREW_MIN_ENGAGEMENT:
+if TAP_LENGTH < SET_SCREW_MIN_ENGAGEMENT:
     raise AssertionError("the set-screw tap must give the screw 1.5D of thread")
 # Seated on the bit's top the screw's socket face stands this far proud of the
 # end face (negative: below it).  On the bar's axis it sweeps nothing, so the
 # station's band only moves it; what it must keep is its full thread at both
-# ends of the band: the shortest station stands it proudest, the longest
-# carries its cup past the full thread.
+# ends of the band, the thread counted only up to the hole's lowest wall (on
+# the axis, at the largest reamed size): the shortest station stands it
+# proudest, the longest carries its socket face inside the bar.
 SET_SCREW_PROUD = set_screw.LENGTH - (CROSS_HOLE_STATION - BIT_RADIUS)
 SET_SCREW_PROUD_MAX = SET_SCREW_PROUD + CROSS_HOLE_STATION_TOL
 
@@ -120,7 +100,8 @@ SET_SCREW_PROUD_MAX = SET_SCREW_PROUD + CROSS_HOLE_STATION_TOL
 def set_screw_engaged(station: float) -> float:
     """Full thread the seated screw holds at a cross-hole ``station``."""
     cup = station - BIT_RADIUS
-    return min(cup, SET_SCREW_THREAD_DEPTH) - max(cup - set_screw.LENGTH, 0.0)
+    thread_end = station - CROSS_HOLE_LIMITS[1] / 2.0
+    return min(cup, thread_end) - max(cup - set_screw.LENGTH, 0.0)
 
 
 SET_SCREW_ENGAGED_MIN = min(set_screw_engaged(s) for s in _STATION_RANGE)
@@ -165,11 +146,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-# The tap callout's drill, its depth and the full thread's print at the title
-# block's three places.
+# The tap callout's drill prints at the title block's three places.
 HOLE_CALLOUT_PRECISION = 3
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "BarDia": "AS SUPPLIED",
+    "BarDia": "STOCK OK",
     "CrossHoleDia": (
         f"REAM THRU\nSLIDING FIT ON {BIT_NUMBER}\n"
         f"(CLEARANCE {inch_range(SLIP_CLEARANCE)} REF)"
