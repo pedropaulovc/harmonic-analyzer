@@ -11,6 +11,7 @@ import pytest
 import _config
 import build_dt_crank_handle_pivot_screw as part
 import dt_crank_handle_butt_cup_spec as cup
+import dt_crank_handle_butt_cup_seat_spec as cup_seat
 import dt_crank_handle_head_seat_spec as seat
 import dt_crank_handle_pivot_screw_notes as notes
 import dt_crank_handle_pivot_screw_spec as spec
@@ -753,7 +754,7 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     # the smallest break clear the largest round on both corners.
     assert seat.UNDER_HEAD_RADIUS_BAND == (0.0, -seat.UNDER_HEAD_RADIUS_MAX)
     under_head = _round_to_break_air(
-        seat.UNDER_HEAD_RADIUS_MAX, seat.FLOOR_HOLE_CHAMFER_LIMITS[0]
+        seat.UNDER_HEAD_RADIUS_MAX, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[0]
     )
     head_edge = _round_to_break_air(
         cup.POCKET_FLOOR_CORNER_R_MAX, seat.HEAD_CHAMFER_LIMITS[0]
@@ -766,22 +767,28 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     # block's edge break, so the specs' existing annulus budgets still hold.
     for nominal, (low, high) in (
         (seat.HEAD_CHAMFER, seat.HEAD_CHAMFER_LIMITS),
-        (seat.FLOOR_HOLE_CHAMFER, seat.FLOOR_HOLE_CHAMFER_LIMITS),
+        (cup_seat.FLOOR_HOLE_CHAMFER, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS),
     ):
         assert low < nominal < high <= edge_break_chamfer_mm(unit=spec.UNIT)
-    # The flat annulus left on the narrow side: smallest head less its
-    # largest break, over the largest drilled hole plus its largest break,
-    # the head pushed over by its running play.
+    # The flat annulus left on the narrow side, from the printed limits:
+    # smallest head less its largest break, over the largest drilled hole
+    # plus its largest break, the head pushed over by its running play.  The
+    # screw spec's one annulus figure, which budgets the edge break on both
+    # edges, still holds it.
     hole_max = cup.FLOOR_HOLE_DIA + drilled_oversize_mm(unit=cup.UNIT)
     flat = (
         (spec.HEAD_DIA - spec.HEAD_DIA_TOL) / 2.0
         - seat.HEAD_CHAMFER_LIMITS[1]
         - hole_max / 2.0
-        - seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
+        - cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
         - spec.HEAD_RUNNING_OFFSET_MAX
     )
-    assert seat.HEAD_BEARING_FLAT_MIN == pytest.approx(flat, abs=1e-6)
-    assert flat >= seat.HEAD_BEARING_FLAT_FLOOR_MM
+    assert flat >= spec.HEAD_BEARING_RADIAL_MIN - 1e-9
+    assert flat >= 0.1  # the ruling's flat bearing floor (#1757)
+    # The cup's recipes stay out of the screw spec's closure (Codjiflo r2).
+    assert "dt_crank_handle_pivot_screw_spec" not in Path(
+        cup_seat.__file__
+    ).read_text(encoding="utf-8")
 
 
 def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:

@@ -22,6 +22,7 @@ from _drawing_tolerances import _set_tolerance_precision
 SW_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
+@_telemetry.traced("dim.limits", label_param="dimension_name")
 def set_limits(
     adapter: Any,
     feature_name: str,

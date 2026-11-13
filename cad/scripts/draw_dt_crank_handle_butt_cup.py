@@ -86,7 +86,7 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
     REFERENCE_DIMENSIONS,
 )
-from dt_crank_handle_head_seat_spec import (
+from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     CUP_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     FLOOR_HOLE_CHAMFER,
@@ -292,6 +292,7 @@ def _dress_floor_hole_chamfer(annotation: Any) -> None:
         raise RuntimeError(f"{label}: imported break lost its model limits: {limits}")
 
 
+@_telemetry.traced("crank_handle_butt_cup.mouth_break_detail")
 def _mouth_break_detail(adapter: Any, section: Any) -> Any:
     """Native 20:1 detail B of the floor hole's mouth in section A-A
     (draw_dt_crank_handle._ferrule_seat_detail): fence, scale, outline, label
