@@ -157,6 +157,120 @@ def test_the_tight_bands_live_on_the_model_dimensions() -> None:
     assert len(spec.SHEET_NOTES.splitlines()) <= 4
 
 
+class _CentreRecorder:
+    """A fake SolidWorks for the centre-hole sketch: every call it gets."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+        self.currentModel = None
+
+    async def create_sketch(self, plane):
+        self.calls.append(("create_sketch", plane))
+        return "ok"
+
+    async def add_centerline(self, *xy):
+        self.calls.append(("centerline", xy))
+        return "Axis"
+
+    async def add_sketch_constraint(self, first, second, relation):
+        self.calls.append(("constraint", first, second, relation))
+        return "ok"
+
+    async def add_sketch_dimension(self, first, second, kind, value):
+        self.calls.append(("dimension", first, second, kind, value))
+        return "ok"
+
+    async def exit_sketch(self):
+        self.calls.append(("exit_sketch",))
+        return "ok"
+
+    async def create_revolve(self, params):
+        self.calls.append(("revolve", params))
+        return "ok"
+
+
+def test_centre_holes_are_sized_by_axial_depth_never_an_angle(monkeypatch) -> None:
+    """Both cones are fixed by their mouth diameter and an axial depth driven
+    as mouth/2 / tan(30), so the solver keeps each apex inside its end face;
+    no angular dimension can flip a cone across its face into air."""
+    import asyncio
+
+    adapter = _CentreRecorder()
+    recorded: list[tuple[str | None, str | None]] = []
+
+    class _Dims:
+        def record(self, name, drive=None):
+            recorded.append((name, drive))
+
+        def apply(self, _adapter, _feature):
+            return [(name, drive) for name, drive in recorded if drive]
+
+    lines = iter(f"L{i}" for i in range(6))
+
+    async def chain(_adapter, points, close=True):
+        adapter.calls.append(("chain", tuple(points)))
+        return [next(lines) for _ in points]
+
+    async def diametric(_adapter, axis, point, **kwargs):
+        adapter.calls.append(("diametric", axis, point))
+
+    async def anchor(_adapter, ref, x, y, label):
+        adapter.calls.append(("anchor", ref, x, y))
+
+    async def between(_adapter, first, second, kind, value, label):
+        adapter.calls.append(("dimension", first, second, kind, value))
+        return "ok"
+
+    async def defined(_adapter, _label):
+        return None
+
+    # The Right Plane's sketch: u = -Z, v = Y (model mm).
+    monkeypatch.setattr(part, "_sketch_xy_mm", lambda _a, p: (-p[2], p[1]))
+    monkeypatch.setattr(part, "check", lambda _label, result: result)
+    monkeypatch.setattr(part, "SketchDims", _Dims)
+    monkeypatch.setattr(part, "add_line_chain", chain)
+    monkeypatch.setattr(part, "add_diametric_linear_dimension", diametric)
+    monkeypatch.setattr(part, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(part, "dimension_between", between)
+    monkeypatch.setattr(part, "ensure_fully_defined", defined)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda *_a: None)
+    monkeypatch.setattr(part, "name_last_feature", lambda *_a: None)
+    jobs: list[tuple[str, str]] = []
+    removed = asyncio.run(part._cut_centres(adapter, jobs))
+    assert removed == pytest.approx(spec.CENTRE_VOLUME)
+    dims = [c for c in adapter.calls if c[0] == "dimension"]
+    assert not [c for c in dims if c[3] == "angular"]
+    depths = [c for c in dims if c[1].startswith("L") and c[2].startswith("L")]
+    assert [c[3] for c in depths] == ["horizontal_distance"] * 2
+    assert [c[4] for c in depths] == pytest.approx(
+        [
+            spec.centre_depth_mm(spec.HEAD_CENTRE_DIA),
+            spec.centre_depth_mm(spec.TAIL_CENTRE_DIA),
+        ]
+    )
+    # Each depth runs along its own triangle's axis line, apex inside the part.
+    chains = [c[1] for c in adapter.calls if c[0] == "chain"]
+    for (apex, mouth, face), end_z in zip(chains, (0.0, spec.OVERALL_LENGTH)):
+        assert apex[1] == face[1] == 0.0
+        assert mouth[0] == face[0] == -end_z
+        assert 0.0 < -apex[0] < spec.OVERALL_LENGTH
+    # The drives keep the 60 degree cone whatever the mouth.
+    drives = dict(recorded)
+    for name, dia in (
+        ("HeadCentreDepth", spec.HEAD_CENTRE_DIA),
+        ("TailCentreDepth", spec.TAIL_CENTRE_DIA),
+    ):
+        expression = drives[name]
+        assert expression.startswith(f'"{name.replace("Depth", "Dia")}" / 2')
+        half = float(expression.rsplit("tan(", 1)[1].rstrip(")"))
+        assert dia / 2.0 / math.tan(math.radians(half)) == pytest.approx(
+            spec.centre_depth_mm(dia)
+        )
+        assert 2.0 * half == spec.CENTRE_INCLUDED_ANGLE_DEG
+    (revolve,) = [c[1] for c in adapter.calls if c[0] == "revolve"]
+    assert revolve.is_cut and revolve.angle == 360.0
+
+
 def _fake_projection(_adapter, _view, points_m, label, names):
     """The side view at 3:1, the axis horizontal, head right, model +Y up."""
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]

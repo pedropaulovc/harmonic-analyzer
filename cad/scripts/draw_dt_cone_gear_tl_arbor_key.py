@@ -60,12 +60,14 @@ PNG = OUTPUTS.png
 
 # Every view at the sheet's 8:1: the .0625 section spans 12.7 mm and the .15
 # length 30.5 mm; the end view stands left of the side view in line, the
-# isometric under the side view, clear of the title block.
+# isometric right of the note row, clear of its text and of the title block
+# (farm run 20261112T203156536Z: under the side view it sat on the note's
+# end).
 SHEET_SCALE = (8.0, 1.0)
 VIEW_SCALE = (8, 1)
 FRONT_CENTER = (0.080, 0.190)
 RIGHT_CENTER = (0.200, 0.190)
-ISO_CENTER = (0.200, 0.110)
+ISO_CENTER = (0.300, 0.120)
 HALF_SIZE = SIZE * VIEW_SCALE[0] / 2000.0
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0
 # The end view's height (model X, horizontal) above it, its width (model Y,
