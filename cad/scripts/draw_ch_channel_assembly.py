@@ -122,6 +122,11 @@ from ch_fulcrum_keeper_spec import (
     LUG_HALF_T as KEEPER_LUG_HALF_T,
     SHAFT_AXIS_H as KEEPER_SHAFT_AXIS_H,
 )
+from ch_fulcrum_shaft_spec import (
+    FLAT_HEIGHT as FULCRUM_FLAT_Y,
+    FLAT_PITCH as FULCRUM_FLAT_PITCH,
+    SHAFT_R as FULCRUM_SHAFT_R,
+)
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
     APEX_ABOVE_BORE as BRACKET_APEX_ABOVE_BORE,
@@ -279,6 +284,20 @@ PIVOT_SHAFT_BALLOON_POINT_MM = (
 # corner and clear of the washer ring beside the stub's tip (measured on the
 # sheet of run 20261023T234951749Z).
 PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
+# Balloon 2 (the lever fulcrum shaft) walked to a body extreme among the
+# stacked lever hubs, where the shaft shows only as slivers, and read as
+# naming the levers (machinist review on PR #2702, three runs of three). Its
+# landing is the south flat's eye-side edge at the flat's middle, as balloon
+# 1's: withdrawn south (ch_channel_explode_spec), that flat stands on the bare
+# run past the exploded south keeper, the shaft's only clear length. Part
+# frame (ch_fulcrum_shaft_spec): axis along z centred on 0, flats on +y,
+# unturned in the assembly.
+FULCRUM_SHAFT_STEM = "ch-fulcrum-shaft"
+FULCRUM_SHAFT_BALLOON_POINT_MM = (
+    math.sqrt(FULCRUM_SHAFT_R**2 - FULCRUM_FLAT_Y**2),
+    FULCRUM_FLAT_Y,
+    -FULCRUM_FLAT_PITCH / 2.0,
+)
 # The rendered circle's read-back may sit a viewport pixel off the request
 # at fit zoom (position_bom_balloon's pixel bound); a millimetre still proves
 # the circle left its ring slot for the strip.
@@ -858,6 +877,7 @@ KEEPER_DETAIL_BALLOON_MARGIN = 0.010
 KEEPER_BALLOON_POINT_MM = (-KEEPER_LUG_HALF_T, KEEPER_CROWN_TOP_Y, 0.0)
 BALLOON_POINTS_MM = {
     PIVOT_SHAFT_STEM: PIVOT_SHAFT_BALLOON_POINT_MM,
+    FULCRUM_SHAFT_STEM: FULCRUM_SHAFT_BALLOON_POINT_MM,
     explode.BRACKET: BRACKET_BALLOON_POINT_MM,
     explode.KEEPER: KEEPER_BALLOON_POINT_MM,
 }

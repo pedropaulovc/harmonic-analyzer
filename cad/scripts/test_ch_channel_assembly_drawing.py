@@ -1046,6 +1046,26 @@ def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
     assert dy > 0.04 and 0.0 < dx < dy / 3.0
 
 
+def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper() -> None:
+    """PR #2702 machinist review: leader 2 ended among the stacked lever hubs,
+    where the shaft shows only as slivers. It lands on the south flat's
+    eye-side edge, which the shaft's withdrawal carries past the exploded
+    south keeper onto the shaft's bare run."""
+    import ch_fulcrum_shaft_spec as shaft
+
+    x, y, z = drawing.BALLOON_POINTS_MM[drawing.FULCRUM_SHAFT_STEM]
+    assert y == pytest.approx(shaft.FLAT_HEIGHT)
+    assert x > 0.0 and math.hypot(x, y) == pytest.approx(shaft.SHAFT_R)
+    assert z == pytest.approx(-shaft.FLAT_PITCH / 2.0)
+    shaft_dz = drawing.exploded_offset(drawing.explode.FULCRUM_SHAFT, "south")[2]
+    keeper_dz = drawing.exploded_offset(drawing.explode.KEEPER, "south")[2]
+    point_z = z + shaft_dz
+    tip_z = -shaft.SHAFT_LENGTH / 2.0 + shaft_dz
+    keeper_outer_z = -drawing.KEEPER_Z_OFF + keeper_dz - drawing.KEEPER_LUG_HALF_T
+    assert tip_z < point_z - shaft.FLAT_LENGTH / 2.0
+    assert point_z + shaft.FLAT_LENGTH / 2.0 + 20.0 < keeper_outer_z
+
+
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 18
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
