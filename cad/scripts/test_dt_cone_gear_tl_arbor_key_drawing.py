@@ -80,6 +80,27 @@ def test_the_sheet_marks_every_dimension_once() -> None:
     assert len(spec.DRAWING_NOTES.splitlines()) <= 4
 
 
+def test_the_isometric_stands_clear_of_the_note_and_the_title_block() -> None:
+    """The note's text (one line, about .0026 m a character at the sheet's
+    note height) ends short of the isometric's widest reach, and the view
+    stays above the title block and inside the border."""
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    # Half the view's widest extent: its length plus two section sides.
+    reach = (spec.LENGTH + 2.0 * spec.SIZE) * scale / 2000.0
+    iso_x, iso_y = drawing.ISO_CENTER
+    (line,) = spec.DRAWING_NOTES.splitlines()
+    note_right = drawing.NOTES_XY[0] + len(line) * 0.0026
+    assert note_right < iso_x - reach
+    title_top, title_left, border_right = 0.069, 0.216, 0.4191
+    assert iso_y - reach > title_top or iso_x + reach < title_left
+    assert iso_x + reach < border_right
+    # The isometric clears the side view above it.
+    side_bottom = drawing.RIGHT_CENTER[1] - drawing.HALF_SIZE - 0.012
+    assert iso_y + reach < side_bottom or iso_x - reach > (
+        drawing.RIGHT_CENTER[0] + drawing.HALF_LENGTH
+    )
+
+
 def test_the_cli_takes_its_own_stem(monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["draw", spec.PART_NAME])
     assert drawing._parse_args().part == spec.PART_NAME
