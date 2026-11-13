@@ -26,8 +26,8 @@ TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-BAR = "MHA-MG-08"  # wheel bar
-WHEEL = "MHA-MG-05"  # magnifying wheel
+BAR = "MHA-MG-08 WHEEL BAR"
+WHEEL = "MHA-MG-05 MAGNIFYING WHEEL"
 
 
 def _limits(low_mm: float, high_mm: float) -> str:
@@ -40,8 +40,9 @@ def _limits(low_mm: float, high_mm: float) -> str:
 
 # The shank's stock Ø is an untoleranced REF (the drill rod's supplier limits
 # govern; purchased precision stock is its fit route). Its callout names both
-# fits by their standard names with each range as REF (drawing-guidelines.md
-# rule 4), one line each (rule 7): the press in the bar's reamed bore, whose
+# fits by their standard names with each range as REF, each mate by number
+# and name (drawing-guidelines.md rule 4; v49 machinist review), one line each
+# (rule 7): the press in the bar's reamed bore, whose
 # limits print on the bar's own sheet, and the wheel that runs on it, which is
 # what the journal's Ra 63 uin marks (rule 6). The press follows from the
 # stock and the bore limits; the running clearance is mg_wheel_group.HUB_RUNNING,
