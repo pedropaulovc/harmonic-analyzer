@@ -1255,10 +1255,20 @@ turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 
 by the screw in the stub's end. One screw and a Ø.0375 pin hold it, and the cut is interrupted
 until the cam cleans up, so rough each cam close to size before it goes on the fixture and take
 light finishing cuts there. Check the throw with a micrometer over the cam and a Ø.376 pin in the
-bore: 1.1307 in nominal, ±.002. The fixture's own errors are the same for every gear; from gear
-to gear the cam's phase to the notch scatters by up to .24° (bore clearance on the stub, pin play
-in the tooth space), inside the printed ±.25°. Adding the fixture's fixed error gives .37° worst
-case against the same band, which is open with the owner
+bore: 1.1307 in nominal, ±.002. The fixture's holes are located at the shop's ±.002 row, so its
+own errors, which every gear inherits alike, can be larger than what varies from gear to gear:
+
+| | gear to gear | fixed in the fixture | worst total | MHA-DT-12 print |
+|---|--:|--:|--:|--:|
+| cam phase to the notch | .13° | .39° | .60° | ±.25° |
+| throw | .0007 in | .0023 in | .0030 in | ±.0020 in |
+
+Gear-to-gear scatter is inside the print. The fixed part is not guaranteed to be: a common
+throw error scales the whole drawn curve (.7% at .0023 in) and a common phase error mixes each
+harmonic's sine into its cosine (.8% of the summed amplitudes at .47°), the same for all 20
+channels. Measure the first cam's throw: it shows the fixture's throw error directly, and a
+fixture outside the print is corrected before the other 19 are cut. Whether the print's phase
+band applies to the common part is open with the owner
 ([#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)).
 
 ### T006 special cutter
