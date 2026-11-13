@@ -58,9 +58,13 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, blank_sketch, ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import (
+    _set_tolerance_precision,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _gear import volume_check
@@ -87,6 +91,8 @@ from dt_crank_drive_gear_spec import (
     TOOTH_SPACE_FORM,
     UNIT,
 )
+
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
 def _slot_in_disc_area(rho: float, half_width: float, top_x: float) -> float:
@@ -133,6 +139,38 @@ def _bore_south_chamfer_volume(
         weight = 1 if index in (0, steps) else 4 if index % 2 else 2
         total += weight * area_added(leg - index * dz)
     return dz * total / 3.0
+
+
+def _set_keyway_t_limits(adapter) -> None:
+    """Print KeywayT as stacked limits, .4065 over .3995: the envelope of
+    cone_land_key.KEYWAY_T_BAND (#2519; T MAX and the web unchanged).  As
+    +/-.0035 the band read as a converted value, not an inch step (v49
+    machinist review, 2 of 2 runs); the cone gear's _set_keyway_t_limits
+    answered the same finding on MHA-DT-03."""
+    lower, upper = deviations(KEYWAY_T_BAND)
+    display, dimension = _named_dimension(adapter, "BoreProfile", "KeywayT")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"KeywayT: SetValues rejected the limits {lower}/{upper} mm")
+    if int(tolerance.Type) != _TOL_LIMIT:
+        raise RuntimeError("KeywayT: LIMIT tolerance type did not persist")
+    observed = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if any(abs(o - e) > 1e-6 for o, e in zip(observed, (lower, upper))):
+        raise RuntimeError(
+            f"KeywayT: limits read back {observed} mm, expected {(lower, upper)}"
+        )
+    _set_tolerance_precision(
+        display,
+        (lower, upper),
+        display_unit=UNIT,
+        label="KeywayT",
+        places=DRAWING_PRECISION["BoreProfile"]["KeywayT"],
+    )
+    _telemetry.success(f"KeywayT: LIMIT {lower:+g}/{upper:+g} mm")
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -353,13 +391,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BoreProfile", "KeywayWidth", *deviations(KEYWAY_WIDTH_BAND),
         display_unit=UNIT,
     )
-    t_lower, t_upper = deviations(KEYWAY_T_BAND)
-    if t_lower != -t_upper:
-        raise AssertionError("the keyway T band must be symmetric")
-    set_dimension_symmetric_tolerance(
-        adapter, "BoreProfile", "KeywayT", t_upper,
-        places=DRAWING_PRECISION["BoreProfile"]["KeywayT"], display_unit=UNIT,
-    )
+    _set_keyway_t_limits(adapter)
     await volume_check(
         adapter, "driven crank-drive gear (equations neutral)",
         expected, 0.03 * v_chamfer + 0.15,
