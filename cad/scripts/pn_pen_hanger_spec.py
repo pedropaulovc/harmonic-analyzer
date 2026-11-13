@@ -361,15 +361,14 @@ if SCREW_HOLE_WALL_MIN < WALL_TARGET_MM:
     )
 # Every tight band names its mate on the dimension it governs.  The two
 # numbered notes are flagged from the features they govern (rule 7: SEE NOTE
-# n puts the note at the callout): note 1, the plates' braze to the strap
-# front, from each plate's place in the front view (the upper plate's drop,
-# the lower plate's stock); note 2, the slots cut together, from the slot
-# width.  Rule 7: at most two lines of words under the slot's limits.
+# n puts the note at the callout; a location dimension carries only its
+# value and band): note 1, the plates' braze to the strap front, from the
+# plates' stock callout in the front view; note 2, the slots cut together,
+# from the slot width.  Rule 7: at most two lines of words under a value.
 BRAZE_NOTE = 1
 SLOTS_NOTE = 2
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
-    "UpperPlateDrop": f"SEE NOTE {BRAZE_NOTE}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
     # The strap's and the plates' thickness is the bar's as supplied, not a

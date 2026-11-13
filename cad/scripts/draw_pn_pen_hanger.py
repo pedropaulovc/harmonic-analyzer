@@ -12,8 +12,8 @@ The pen hanger is a black tapered steel strap (1/8 flat, .63 -> .48 wide,
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
-the strap outline, the screw-hole station, the upper plate's drop (SEE NOTE
-1), the plates' sheet-stock thickness (a reference, SEE NOTE 1) and the
+the strap outline, the screw-hole station, the upper plate's drop, the
+plates' sheet-stock thickness (a reference, SEE NOTE 1) and the
 centreline both slots share; section A-A (2:1) cuts the strap just above the
 upper plate and looks down onto its U, carrying the slot (its depth and the
 plate's reach both from the plate's free end), its corner radius, the strap's
@@ -239,11 +239,7 @@ FRONT_KEEP = {
     "ScrewX": (_fx(0.0) - 0.006, _fy(0.0) + 0.010),
     "StrapTopRun": (_fx(STRAP_TOP_X[0] / 2.0), _fy(0.0) + 0.020),
     "ScrewY": (_fx(_X[1]) - 0.008, _fy(SCREW_HOLE_XY[1] / 2.0)),
-    # "5.00" over SEE NOTE 1 (~24 mm wide): between the StrapRise line
-    # (x 0.033) and the strap's tapered edge (x ~0.068 at this height), its
-    # top arrow 2 mm+ left of ScrewY's ".20" (x >= 0.0531; run
-    # 20261113T100251177Z's audit: 1.8 mm with the line at x 0.051).
-    "UpperPlateDrop": (_fx(_X[1]) - 0.0145, _fy(_UPPER_TOP_Y / 2.0)),
+    "UpperPlateDrop": (_fx(_X[1]) - 0.018, _fy(_UPPER_TOP_Y / 2.0)),
     "StrapRise": (_fx(_X[1]) - 0.030, _fy(_CY)),
     # The 1.5 span holds no text, so SolidWorks shelves the two-row block
     # just left of the dimension line, centred on the keep's height

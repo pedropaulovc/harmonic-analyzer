@@ -1031,24 +1031,22 @@ def _mark_detail_boundary(
         )
     radius = drawn
     letter = notes.DETAIL_LETTERS[detail.key]
-    if detail.key not in LETTERED_LEFT:
-        reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
-        _label_view(
-            adapter, parent, letter, (centre[0] + reach, centre[1] + reach), label=label
-        )
-        return centre, radius
-    # Upper left, the letter's measured box is moved so its lower-right corner
-    # sits on the circle's upper-left 45 degree ray, DETAIL_LETTER_GAP outside
-    # the rim; the whole box then lies up and left of that corner, clear of the
-    # circle. Placing it by an assumed glyph size left the corner 0.4 mm inside
-    # the gap once the glyph read 3.4 x 4.7 mm (rolling main 6d7f35476).
+    # The letter's measured box is moved so its near corner (lower left at
+    # the upper right, lower right at the upper left) sits on the circle's
+    # 45 degree ray, DETAIL_LETTER_GAP outside the rim; the whole box then
+    # lies beyond that corner, clear of the circle. Placing it by an assumed
+    # glyph size left the corner 0.4 mm inside the gap once the glyph read
+    # 3.4 x 4.7 mm (rolling main 6d7f35476); anchoring the note itself on the
+    # ray left A and B struck by their circles (farm run 20261113T172037696Z).
+    left = detail.key in LETTERED_LEFT
     clear = (radius + DETAIL_LETTER_GAP) * math.sqrt(0.5)
-    corner = (centre[0] - clear, centre[1] + clear)
+    corner = (centre[0] - clear if left else centre[0] + clear, centre[1] + clear)
     note, box = _view_note(adapter, parent, letter, corner, label=label)
+    near_x = 2 if left else 0
     box = _move_note(
-        adapter, note, (corner[0] - box[2], corner[1] - box[1]), label=label
+        adapter, note, (corner[0] - box[near_x], corner[1] - box[1]), label=label
     )
-    if math.dist((box[2], box[1]), corner) > DETAIL_POSITION_TOL_M:
+    if math.dist((box[near_x], box[1]), corner) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(f"{label}: letter {box!r} did not land at {corner!r}")
     _telemetry.info(f"{label}: circle {centre!r} r {radius!r}, letter {box!r}")
     return centre, radius

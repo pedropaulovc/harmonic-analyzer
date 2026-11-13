@@ -445,8 +445,8 @@ def test_each_numbered_note_is_flagged_from_its_feature() -> None:
     }
     assert flagged == set(numbers)
     assert spec.DIMENSION_CALLOUTS["SlotWidth"].endswith(f"SEE NOTE {spec.SLOTS_NOTE}")
-    # Note 1 (the braze) on the lower plate's stock callout; a location
-    # dimension (the upper plate's drop) carries only its value and band.
+    # Note 1 (the braze) at the plates' stock in the front view; a location
+    # dimension (the upper plate's drop) carries only its value (rule 7).
     braze = {
         name
         for name, callout in spec.DIMENSION_CALLOUTS.items()
