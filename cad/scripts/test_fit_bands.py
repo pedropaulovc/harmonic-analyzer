@@ -70,7 +70,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
-    ("build_dt_cone_gear_tl_phasing_comb", "deviations"): ("MODEL_BANDS_MM", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
