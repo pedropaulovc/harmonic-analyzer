@@ -75,7 +75,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_dt_cone_gear_tl_phasing_comb", "deviations"): ("MODEL_BANDS_MM", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
-    ("build_dt_cylinder_gear_tl_cam_fixture", "deviations"): ("MODEL_BANDS_MM", "values"),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
