@@ -46,19 +46,26 @@ bar_bottom = rail_top + A.BOTTOM_RAIL_CLEARANCE
 rail_depth = A.GUIDE_DEPTH
 screw_row_y = p.GUIDE_HOLE_Y[0]
 
-# Proposed purchased rack: SDP/SI S1811Y-RB-2P, 32 DP 20 deg, 416 stainless,
-# face .230 +-.005, height .480 +.000/-.002, pitch line .4487 above the base.
-NEW_FACE = 0.230 * IN
-NEW_FACE_BAND = 0.005 * IN
-NEW_HEIGHT = 0.480 * IN
-NEW_PITCH_HEIGHT = 0.4487 * IN
-NEW_ROOT_FROM_BASE = NEW_PITCH_HEIGHT - F.DEDENDUM_FACTOR * F.MODULE_MM
-new_base_y = crest_y + NEW_HEIGHT
-new_rail_height = rail_top - new_base_y
-new_tap_y_local = screw_row_y - new_base_y
-# Rack front set back from the rail's (platen's) front face: keeps the 12T
-# pinion's full depth over the rack's front (today's margin 0.163 at the
-# worst case with the strip's .62 inset) and air to the rear bushing.
+# Owner 2026-11-13: keep the 3/16 brass A 1B12-Y324 strip, smaller screws.
+# The bottom rail grows down to the strip's top and seats it on its underside.
+STRIP_H = rack.RACK_HEIGHT
+STRIP_W = rack.RACK_THICKNESS
+STRIP_H_ROOM = 0.003 * IN  # drawn-bar proxy (#2694)
+strip_top_y = crest_y + STRIP_H
+new_rail_height = rail_top - strip_top_y
+new_tap_y_local = screw_row_y - strip_top_y
+root_from_top = STRIP_H - rack.ADDENDUM - rack.DEDENDUM
+root_from_top_worst = root_from_top - STRIP_H_ROOM
+TAN20 = math.tan(math.radians(20.0))
+tooth_at_root = rack.PITCH / 2.0 + 2.0 * rack.DEDENDUM * TAN20
+
+
+def tooth_width_below_root(d: float) -> float:
+    return tooth_at_root - 2.0 * d * TAN20
+
+
+# Rack front set back from the rail's (platen's) front face so the 12T's full
+# depth still covers the strip's front (today: .62 inset, margin 0.163).
 SETBACK = 1.0
 SETBACK_BAND = 0.25
 front_margin_today = A.FEED.FULL_DEPTH_MIN - A.RACK_FRONT_FROM_SLEEVE_REAR_WORST
@@ -66,37 +73,46 @@ front_margin_new = front_margin_today + (SETBACK - SETBACK_BAND) - A.RACK_TEETH_
 bushing_other_terms = (
     A.BUSHING_RACK_AIR_NOMINAL - A._RACK_THICKNESS_BAND - A.BUSHING_RACK_AIR_WORST
 )
-new_rack_back = zc(A.BAR_FRONT_Z) + SETBACK + NEW_FACE
 bushing_front = zc(A.REAR_BUSHING_Z0) - RB.LENGTH
-bushing_air_nominal_new = bushing_front - new_rack_back
-bushing_air_worst_new = (
-    bushing_air_nominal_new - NEW_FACE_BAND - SETBACK_BAND - bushing_other_terms
-)
+strip_back_worst = t + SETBACK + SETBACK_BAND + STRIP_W + STRIP_H_ROOM
+bushing_air_worst_new = bushing_front - strip_back_worst - bushing_other_terms
+pinion_axis_y = pitch_y - F.PITCH_DIA / 2.0
+bushing_top_y = pinion_axis_y + RB.OD / 2.0
+rail_bushing_y_gap = strip_top_y - bushing_top_y
 
-# Rack screws: McMaster 91792A108 #4-40 x 3/8 pan head (the MHA-PD-VN-60 lock
-# screw), down through the rail's top into blind taps in the rack's base.
-SCREW_LEN = 0.375 * IN
-SCREW_MAJOR = 0.112 * IN
-PAN_HEAD_DIA = 0.219 * IN
-PAN_HEAD_H = 0.080 * IN
-CB_DIA = 0.250 * IN
-CB_DEPTH = 0.145 * IN
-CLEAR_DIA = 0.120 * IN  # close fit: the rack is transfer-drilled through it
-under_head = new_rail_height - CB_DEPTH
-reach_into_rack = SCREW_LEN - under_head
-FIRST_THREAD_LOSS = IN / 40.0
-engagement = reach_into_rack - FIRST_THREAD_LOSS
-TAP_FULL = 0.25 * IN
-TAP_DRILL = 0.30 * IN
-solid_under_drill = NEW_ROOT_FROM_BASE - TAP_DRILL
-rack_screw_x = tuple(
-    (G.SCREW_STATION_X[i] + G.SCREW_STATION_X[i + 1]) / 2.0 for i in range(4)
-)
+# Screws: the existing #0-80 x 1/4 slotted fillister, McMaster 91794A055
+# (MHA-PD-VN-55), cut to length at assembly like the disc screws.
+import _mcmaster_91794a055 as SCR
+
+SCREW_MAJOR = SCR.SHANK_DIA
+HEAD_DIA = SCR.HEAD_DIA
+HEAD_H = SCR.HEAD_H
+THREAD_PITCH = SCR.PITCH
+UNDER_HEAD_FLOOR = 0.118 * IN  # rail left under the head
+CB_DIA = 0.110 * IN  # #35 drill, from the rail top
+CLEAR_DIA = 0.067 * IN  # #51 close clearance through the floor
+TAP_DRILL = 0.0465 * IN  # #56
+CUT_LEN = 0.226 * IN
+CUT_BAND = 0.005 * IN
+reach = (CUT_LEN - CUT_BAND - UNDER_HEAD_FLOOR, CUT_LEN + CUT_BAND - UNDER_HEAD_FLOOR)
+engagement = tuple(r - THREAD_PITCH for r in reach)
+FULL_THREAD = 0.118 * IN
+DRILL_DEPTH = 0.126 * IN  # full diameter
+point = TAP_DRILL / 2.0 / math.tan(math.radians(59.0))
+cb_depth = new_rail_height - UNDER_HEAD_FLOOR
+below_root_drill = DRILL_DEPTH - root_from_top_worst
+below_root_thread = FULL_THREAD - root_from_top_worst
+below_root_point = DRILL_DEPTH + point - root_from_top_worst
+# Stations: a whole number of circular pitches apart, centred on the platen,
+# so once one hole sits over a tooth all of them do.
+N_PITCH = 22
+centre = G.SCREW_STATION_X[2]
+rack_screw_x = tuple(centre + k * N_PITCH * rack.PITCH / 2.0 for k in (-3, -1, 1, 3))
 nearest_tap = min(
     abs(x - s) for x in rack_screw_x for s in (*G.SCREW_STATION_X, *G.HOLE_X)
 )
-rack_z_centre = zc(A.BAR_FRONT_Z) + SETBACK + NEW_FACE / 2.0
-pinion_axis_y = pitch_y - F.PITCH_DIA / 2.0
+strip_front = t + SETBACK
+screw_z = strip_front + STRIP_W / 2.0
 pinion_rear = zc(A.FEED_Z0)
 pinion_front = pinion_rear - F.FACE_WIDTH
 
@@ -169,69 +185,93 @@ ax.set_title("Today: rack soldered to the PD-05 backer, backer soldered\n"
 
 ax = fig.add_subplot(grid[0, 2])
 platen_and_bar(ax)
-rack_front = t + SETBACK
-ax.add_patch(Rectangle((t, new_base_y), rail_depth, new_rail_height, fc="0.45", ec="k"))
-ax.text(t + rail_depth + 0.5, new_base_y + 4.5, "bottom rail\n(PD-11 section,\n0.84 taller)",
-        ha="left", fontsize=6.5)
-ax.add_patch(Rectangle((rack_front, crest_y), NEW_FACE, NEW_HEIGHT, fc="#bfc5cc", ec="k"))
-for k in range(3):
-    ax.plot([rack_front, rack_front + NEW_FACE], [crest_y + k * 0.0, crest_y], color="k", lw=0.3)
-ax.axhline(crest_y + (NEW_HEIGHT - NEW_ROOT_FROM_BASE), xmin=0, xmax=0, color="k")
-ax.plot([rack_front, rack_front + NEW_FACE], [new_base_y - NEW_ROOT_FROM_BASE] * 2, "k:", lw=0.7)
-ax.text(rack_front + NEW_FACE / 2, crest_y + 3.0, "rack\n.230 x .480\n416 SS", ha="center", fontsize=6.5)
-# rack screw (section at a rack-screw station, between the platen screws)
-cb_floor = rail_top - CB_DEPTH
-ax.add_patch(Rectangle((rack_z_centre - CB_DIA / 2, cb_floor), CB_DIA, CB_DEPTH, fc="w", ec="k", lw=0.6))
-ax.add_patch(Rectangle((rack_z_centre - PAN_HEAD_DIA / 2, cb_floor), PAN_HEAD_DIA, PAN_HEAD_H,
-                       fc="#e06666", ec="k"))
-ax.add_patch(Rectangle((rack_z_centre - SCREW_MAJOR / 2, cb_floor - SCREW_LEN), SCREW_MAJOR, SCREW_LEN,
-                       fc="#e06666", ec="k", alpha=0.75))
-ax.plot([rack_z_centre - 1.4, rack_z_centre + 1.4], [new_base_y - TAP_DRILL] * 2, color="r", lw=0.6)
-ax.text(t + rail_depth + 0.5, 2.0, "4x #4-40 x 3/8\npan head (VN-60)\ninto blind taps\nin the rack",
+ax.add_patch(Rectangle((t, strip_top_y), rail_depth, new_rail_height, fc="0.45", ec="k"))
+ax.text(t + rail_depth + 0.5, strip_top_y + 6.0, "bottom rail,\nown part:\nPD-11 section\n+8.27 taller", fontsize=6.5)
+ax.add_patch(Rectangle((strip_front, crest_y), STRIP_W, STRIP_H, fc="#c9a227", ec="k"))
+ax.plot([strip_front, strip_front + STRIP_W], [strip_top_y - root_from_top] * 2, "k:", lw=0.7)
+ax.text(t + rail_depth + 0.5, -10.5, "3/16 brass rack\nA 1B12-Y324\n(unchanged)", fontsize=6.5)
+cb_floor = strip_top_y + UNDER_HEAD_FLOOR
+ax.add_patch(Rectangle((screw_z - CB_DIA / 2, cb_floor), CB_DIA, rail_top - cb_floor, fc="w", ec="k", lw=0.5))
+ax.add_patch(Rectangle((screw_z - HEAD_DIA / 2, cb_floor), HEAD_DIA, HEAD_H, fc="#e06666", ec="k", lw=0.5))
+ax.add_patch(Rectangle((screw_z - SCREW_MAJOR / 2, cb_floor - CUT_LEN), SCREW_MAJOR, CUT_LEN,
+                       fc="#e06666", ec="k", lw=0.5))
+ax.text(t + rail_depth + 0.5, strip_top_y + 0.3, "4x #0-80 fillister\n(VN-55 SKU), cut\nto .226, into taps\nin the strip top",
         fontsize=6.5, color="#a00000")
 ax.text(t - 0.3, crest_y + 2.0, "no solder", fontsize=7, color="g", ha="right")
-ax.set_title("Proposed: rack screwed to the bottom rail on the bench;\n"
-             "rail to the platen by the existing lower row (front unchanged)", fontsize=9)
+ax.set_title("Proposed: 3/16 brass rack screwed up under the bottom rail on\n"
+             "the bench; rail to the platen by the existing lower row", fontsize=9)
 
 # Rear elevation of the proposed rail + rack (looking forward from behind).
-ax = fig.add_subplot(grid[1, :])
+bottom = grid[1, :].subgridspec(1, 2, width_ratios=(3.2, 1.0))
+ax = fig.add_subplot(bottom[0, 0])
 L = A.GUIDE_LENGTH
-ax.add_patch(Rectangle((0, new_base_y), L, new_rail_height, fc="0.55", ec="k"))
-ax.add_patch(Rectangle((0, crest_y), L, NEW_HEIGHT, fc="#bfc5cc", ec="k"))
+ax.add_patch(Rectangle((0, strip_top_y), L, new_rail_height, fc="0.55", ec="k"))
+ax.add_patch(Rectangle((0, crest_y), L, STRIP_H, fc="#c9a227", ec="k"))
 for x in G.SCREW_STATION_X:
     ax.add_patch(Circle((x, screw_row_y), 1.42, fc="#c9a227", ec="k"))
 for x in G.HOLE_X:
     ax.add_patch(Circle((x, screw_row_y), 1.42, fc="#7aa6d6", ec="k"))
 for x in rack_screw_x:
-    ax.plot([x, x], [rail_top, new_base_y - TAP_FULL], color="#e06666", lw=2.2)
-    ax.add_patch(Rectangle((x - CB_DIA / 2, rail_top - CB_DEPTH), CB_DIA, CB_DEPTH, fc="none", ec="#a00000"))
+    ax.add_patch(Rectangle((x - CB_DIA / 2, cb_floor), CB_DIA, rail_top - cb_floor, fc="none", ec="#a00000"))
+    ax.plot([x, x], [cb_floor, strip_top_y - FULL_THREAD], color="#e06666", lw=1.6)
 ax.axhline(0, color="k", lw=0.5, ls=":")
 ax.set_xlim(-5, L + 5)
 ax.set_ylim(-5, rail_top + 3)
 ax.set_aspect("equal")
 ax.set_title(
     "Proposed rail + rack, rear elevation: 5 platen-screw taps (gold, existing lower row), 4 lock taps "
-    "(blue, unchanged), 4 rack screws (red) midway between the platen screws",
+    f"(blue, unchanged), 4 rack screws (red) {N_PITCH} rack pitches apart, each over a tooth",
     fontsize=9,
 )
 ax.set_xlabel("mm from the platen's left edge")
 
+ax = fig.add_subplot(bottom[0, 1])
+# Strip end-on along its length (x), crest down, 10:1-ish: one tooth under a tap.
+top = 0.0
+root = -root_from_top_worst
+pitch_line = root - rack.DEDENDUM
+crest = pitch_line - rack.ADDENDUM
+half_p = rack.PITCH / 2.0
+xs, ys = [-1.6 * rack.PITCH, -1.6 * rack.PITCH], [top, root]
+for k in (-1, 0, 1):
+    c = k * rack.PITCH
+    w_root = tooth_at_root / 2.0
+    w_crest = (rack.PITCH / 2.0 - 2.0 * rack.ADDENDUM * TAN20) / 2.0
+    xs += [c - w_root, c - w_crest, c + w_crest, c + w_root]
+    ys += [root, crest, crest, root]
+xs += [1.6 * rack.PITCH, 1.6 * rack.PITCH]
+ys += [root, top]
+ax.fill(xs, ys, fc="#c9a227", ec="k", lw=0.7)
+for cx, ok in ((0.0, True), (half_p, False)):
+    colour = "g" if ok else "r"
+    ax.add_patch(Rectangle((cx - TAP_DRILL / 2, top - DRILL_DEPTH), TAP_DRILL, DRILL_DEPTH, fc="none", ec=colour, lw=1.0))
+    ax.plot([cx - TAP_DRILL / 2, cx, cx + TAP_DRILL / 2], [top - DRILL_DEPTH, top - DRILL_DEPTH - point, top - DRILL_DEPTH], color=colour, lw=1.0)
+    ax.plot([cx - SCREW_MAJOR / 2] * 2, [top, top - FULL_THREAD], color=colour, lw=0.5, ls="--")
+    ax.plot([cx + SCREW_MAJOR / 2] * 2, [top, top - FULL_THREAD], color=colour, lw=0.5, ls="--")
+ax.text(0.0, top + 0.25, "over a tooth:\nstays in metal", ha="center", fontsize=6.5, color="g")
+ax.text(half_p + 0.3, crest - 0.3, "over a space:\nbreaks through", ha="left", fontsize=6.5, color="r")
+ax.set_aspect("equal")
+ax.set_xlim(-1.7 * rack.PITCH, 2.6 * rack.PITCH)
+ax.set_ylim(crest - 1.0, top + 1.2)
+ax.set_title("#0-80 tap in the strip top, shortest strip\n(drill solid, thread dashed)", fontsize=9)
+ax.set_xlabel("mm along the rack")
+
 fig.suptitle(
-    "#2410 owner ruling 2026-11-13: no backer, no solder; rack screwed to the rail, rail to the platen",
+    "#2410 owner rulings 2026-11-13: no backer, no solder; the 3/16 brass rack screwed to the rail, rail to the platen",
     fontsize=12,
 )
 fig.tight_layout()
 fig.savefig(sys.argv[1], dpi=110)
 
-print(f"crest {crest_y:.3f}  new rack base {new_base_y:.3f}  today rail bottom {rail_bottom_today:.3f}")
-print(f"bottom rail height {new_rail_height:.3f} ({new_rail_height / IN:.4f} in), grows "
-      f"{rail_bottom_today - new_base_y:.3f}; tap row local {new_tap_y_local:.3f} "
-      f"({new_tap_y_local / IN:.4f} in), wall above tap major {new_rail_height - new_tap_y_local - SCREW_MAJOR / 2:.3f}")
-print(f"rack root from base {NEW_ROOT_FROM_BASE:.3f}; under-head {under_head:.3f}; reach {reach_into_rack:.3f}; "
-      f"engagement {engagement:.3f} = {engagement / SCREW_MAJOR:.2f} D; solid under drill {solid_under_drill:.3f}")
+print(f"strip top {strip_top_y:.3f}; rail bottom today {rail_bottom_today:.3f}; rail height {new_rail_height:.3f} "
+      f"({new_rail_height / IN:.4f} in), grows {rail_bottom_today - strip_top_y:.3f}; tap row local {new_tap_y_local:.3f} ({new_tap_y_local / IN:.4f})")
+print(f"root from strip top {root_from_top:.3f} (worst {root_from_top_worst:.3f}); tooth at root {tooth_at_root:.3f}")
+print(f"reach {reach[0]:.3f}..{reach[1]:.3f}; engagement {engagement[0]:.3f}..{engagement[1]:.3f} = "
+      f"{engagement[0] / SCREW_MAJOR:.2f}..{engagement[1] / SCREW_MAJOR:.2f} D; full thread {FULL_THREAD:.3f}; drill {DRILL_DEPTH:.3f} + point {point:.3f}")
+print(f"over a tooth (worst strip): drill {below_root_drill:.3f} below root, tooth width there {tooth_width_below_root(below_root_drill):.3f} vs drill {TAP_DRILL:.3f}; "
+      f"thread {below_root_thread:.3f} below root, width {tooth_width_below_root(below_root_thread):.3f} vs major {SCREW_MAJOR:.3f}; point tip {below_root_point:.3f} below root")
+print(f"over a space: drill breaks {below_root_drill:.3f} into the gap")
+print(f"counterbore depth from rail top {cb_depth:.3f} ({cb_depth / IN:.3f}); head top below rail top {cb_depth - HEAD_H:.3f}")
 print(f"rack screw x {[round(x, 2) for x in rack_screw_x]}; nearest Z tap {nearest_tap:.2f}")
 print(f"front full-depth margin today {front_margin_today:.3f}, proposed worst {front_margin_new:.3f}")
-print(f"bushing air today worst {A.BUSHING_RACK_AIR_WORST:.3f}; proposed nominal "
-      f"{bushing_air_nominal_new:.3f} worst {bushing_air_worst_new:.3f}")
-print(f"head top below rail top {CB_DEPTH - PAN_HEAD_H:.3f}; rack z band {rack_front:.3f}..{rack_front + NEW_FACE:.3f}")
-print(f"pinion axis y {pinion_axis_y:.3f}; pinion z {pinion_front:.3f}..{pinion_rear:.3f}")
+print(f"bushing air today worst {A.BUSHING_RACK_AIR_WORST:.3f}; proposed worst {bushing_air_worst_new:.3f}; rail bottom over bushing top {rail_bushing_y_gap:.3f}")
