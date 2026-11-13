@@ -40,6 +40,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -146,24 +147,27 @@ def depth_block_width(teeth: int) -> float:
 FRONT_KEEP = front_keep()
 
 # --- Bottom view ---------------------------------------------------------------
-# The stock's thickness across the edge view, right of the sheet's north end,
-# its value and SHEET STOCK under it.
-SHEET_THICK_X = SHEET_BOX[2] + 0.020
+# The stock's thickness across the edge view, just right of the sheet's
+# north end. Its arrows stand 2.5 mm apart, too close to hold the text, so
+# the text (value, SHEET STOCK under it) stands off below and right on a
+# leader, clear of both extension lines (pd-platen-clip's SheetDepth).
+SHEET_THICK_X = SHEET_BOX[2] + 0.008
 BOTTOM_KEEP = {"SheetThick": (SHEET_THICK_X, BOTTOM_CENTER_Y)}
+OFFSET_TEXT = {"SheetThick": (SHEET_BOX[2] + 0.030, BOTTOM_CENTER_Y - 0.014)}
 
 
 def text_blocks() -> dict[str, tuple[float, float, float, float]]:
     """(left, bottom, right, top) of each dimension's text: its value's line
-    and its callout's lines, a depth's or the thickness's run right of its
-    line, the rest centred on it."""
+    and its callout's lines, a depth's run right of its line, an offset
+    text centred on its offset point, the rest centred on its line."""
     blocks = {}
     for name, (x, y) in (FRONT_KEEP | BOTTOM_KEEP).items():
         callout = part.CALLOUTS_BELOW.get(name, "").splitlines()
         places = part.DRAWING_PRECISION_BY_NAME[name]
         value = DEPTH_TEXT_WIDTH if places == 3 else TWO_PLACE_TEXT_WIDTH
         width = max([value, *(len(line) * CHAR_WIDTH for line in callout)])
-        right_of_line = name in BOTTOM_KEEP or name.startswith("BladeDepth")
-        left = x if right_of_line else x - width / 2.0
+        x, y = OFFSET_TEXT.get(name, (x, y))
+        left = x if name.startswith("BladeDepth") else x - width / 2.0
         half = (1 + len(callout)) * LINE_HEIGHT / 2.0
         blocks[name] = (left, y - half, left + width, y + half)
     return blocks
@@ -280,6 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     for name, item in references:
         set_reference_dimension(adapter, item, label=f"{name} stock thickness")
+    offset_dimension_text(adapter, annotations, OFFSET_TEXT)
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
