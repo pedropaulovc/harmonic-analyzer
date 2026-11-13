@@ -73,21 +73,25 @@ ISO_NOTE_XY = (0.345, 0.112)
 # Side view, above the arbor: each diameter's text stands off its own step's
 # dimension line (TEXT_GAP) on one side, at a rise over the grip's top. A
 # text that reaches over a neighbouring step's dimension line stands above
-# that line's own text, so no line strikes it: the relief's goes toward the
-# tail, low; the tail centre's above it, alone on the tail face's line (the
-# thread's, there too, stands on the end view: machinist review of farm
-# 20261113T090619426Z); the seat's and the pilot's toward the head in a
-# staircase over the keyseat end's set (KEYSEAT_END_SET_RISE), the pilot's
-# highest. The standoff's stands at its step's middle: at the shoulder its
-# dimension line crossed the keyseat end set's outside arrow (machinist
-# review of farm 20261113T071241685Z).
+# that line's own text, so no line strikes it. At the tail face the thread's
+# line stands on the threaded step itself, its designation toward the head,
+# low, and the tail centre's line outside the face, its callout toward the
+# tail and above: the two never share a line (machinist reviews of farms
+# 20261113T090619426Z and 20261113T171903293Z), and the end view's
+# concentric circles carry no designation. The relief's, toward the tail,
+# stands over the thread's text; the seat's and the pilot's toward the head
+# in a staircase over the keyseat end's set (KEYSEAT_END_SET_RISE), the
+# pilot's highest. The standoff's stands at its step's middle: at the
+# shoulder its dimension line crossed the keyseat end set's outside arrow
+# (machinist review of farm 20261113T071241685Z).
 TOWARD_HEAD = 1.0
 TOWARD_TAIL = -1.0
 TEXT_GAP = 0.003
 DIA_TEXT: dict[str, tuple[float, float, float]] = {
     # name: (model station z mm, side, rise over the grip's top, m)
+    "ThreadDia": (spec.ARBOR_END_Z, TOWARD_HEAD, 0.011),
     "TailCentreDia": (spec.ARBOR_END_Z, TOWARD_TAIL, 0.028),
-    "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.011),
+    "ReliefDia": (spec.RELIEF_END_Z, TOWARD_TAIL, 0.021),
     "PilotDia": (spec.PILOT_END_Z, TOWARD_HEAD, 0.036),
     "SeatDia": (spec.SEAT_END_Z, TOWARD_HEAD, 0.023),
     "StandoffDia": ((spec.GRIP_LENGTH + spec.SHOULDER_Z) / 2.0, TOWARD_HEAD, 0.014),
@@ -123,17 +127,12 @@ SHOULDER_R_DROP = 0.006
 # (.3355 +.0000/-.0040) prints END_S_TEXT wide, about the span between its
 # extension lines, so centred there the floor's extension line struck its
 # limits (machinist review of farm 20261113T071241685Z, rule 14): it stands
-# outside, right of the floor's. The thread's circle sketch faces this view,
-# so its designation leads to the circle from up and left, the one quarter
-# free of S's extension lines, the width's and the side view's callouts
-# (its diameter line runs through the centre).
+# outside, right of the floor's.
 END_S_DROP = 0.014
 END_S_TEXT = 0.026
 END_WIDTH_RUN = 0.015
 END_WIDTH_RISE = 0.012
 END_WIDTH_TEXT = 0.027
-END_THREAD_RUN = 0.012
-END_THREAD_RISE = 0.032
 
 
 def _sheet_points(
@@ -195,8 +194,7 @@ def _side_keep(adapter: Any, side: Any) -> dict[str, tuple[float, float]]:
 
 
 def _end_keep(adapter: Any, end: Any) -> dict[str, tuple[float, float]]:
-    """The keyseat's S under the end view, its width toward the side view and
-    the thread's designation up and away from it."""
+    """The keyseat's S under the end view and its width toward the side view."""
     radius = spec.SEAT_DIA / 2.0
     z = spec.SEAT_END_Z
     sheet = _sheet_points(
@@ -224,10 +222,6 @@ def _end_keep(adapter: Any, end: Any) -> dict[str, tuple[float, float]]:
         "KeyseatWidth": (
             sheet["keyseat"][0] + END_WIDTH_RUN,
             sheet["centre"][1] + END_WIDTH_RISE,
-        ),
-        "ThreadDia": (
-            sheet["centre"][0] - END_THREAD_RUN,
-            sheet["centre"][1] + END_THREAD_RISE,
         ),
     }
 

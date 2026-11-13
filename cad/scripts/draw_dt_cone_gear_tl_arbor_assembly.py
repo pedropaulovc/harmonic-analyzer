@@ -3,16 +3,17 @@ r"""Create the fitting sheets for the keyed cutting arbor kit (MHA-DT-03-TL-05).
 Shop fixture (issue #2465; ``dt_cone_gear_tl_arbor_assembly_spec``).
 Sheet 1: the kit's side view in its working pose, the 64T setup (item 1 with
 item 5 bonded in its keyseat, item 2 and item 6 seated on its pilot), its
-parts ballooned against the parts list; the shaded isometric in the same
-pose; the parts list; the setup table (each blank's collar and first index).
-Sheet 2: the exploded side view (rule 22), one view per item
+parts ballooned against the parts list, the 64T blank (not in the kit) in
+phantom where it seats; the shaded isometric in the same pose; the parts
+list; the setup table (each blank's collar and first index). Sheet 2: the
+exploded side view (rule 22), one view per item
 (draw_dt_cone_tip_gear_tl_cutter_assembly's ``_item_view``): items 1 and 5
-seated together, item 2 and item 6 drawn off the thread end in fitting
-order on the arbor's axis, items 3 and 4 under item 2, whose place either
-takes; the fitting steps. The spare collars stand off the arbor's end in the
-model, so every sheet-1 view shows only the working pose's parts. Poses,
-items and the sheet words come from the spec; this recipe only lays the
-sheets out and never edits the source assembly.
+seated together, the blank's phantom, item 2 and item 6 drawn off the thread
+end in fitting order on the arbor's axis, items 3 and 4 under item 2, whose
+place either takes; the fitting steps. The spare collars stand off the
+arbor's end in the model, so every sheet-1 view shows only the working
+pose's parts. Poses, items and the sheet words come from the spec; this
+recipe only lays the sheets out and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -61,6 +62,7 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
+from _transgear_zone_line import require_placed, sketch_lines
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
@@ -102,14 +104,15 @@ if set(WORKING) | set(SPARES) != set(BOM_COMPONENTS):
 
 # --- Sheet 1 (sheet metres) ----------------------------------------------------
 # The side view's model origin (the grip's end-face centre) top left, the
-# 2.58 arbor running 131 mm left of it, the Ø1.75 collar 89 mm tall; the
-# isometric under it; the parts list and the setup table in the right half,
-# above the title block (x >= 0.216 m, y <= 0.066 m). The parts list's
-# template columns print 196.6 mm wide, so from x 0.219 it ends inside the
-# right border (draw_dt_cone_gear_tl_indexing_assembly); its six rows end by
-# about y 0.189 (farm 20261113T071241685Z), the table's 19 lines (4.6 mm a
-# line) below it end over the title block.
-SIDE_ORIGIN = (0.180, 0.200)
+# 2.58 arbor running 131 mm left of it, the Ø1.75 collar 89 mm tall and the
+# 64T blank's phantom 142 mm; the isometric under it; the parts list and the
+# setup table in the right half, above the title block (x >= 0.216 m,
+# y <= 0.066 m). The parts list's template columns print 196.6 mm wide, so
+# from x 0.219 it ends inside the right border
+# (draw_dt_cone_gear_tl_indexing_assembly); its six rows end by about y 0.189
+# (farm 20261113T071241685Z), the table's 20 lines (4.6 mm a line) below it
+# end over the title block.
+SIDE_ORIGIN = (0.180, 0.190)
 ISO_CENTER = (0.105, 0.085)
 ISO_POINT_MM = (0.0, 0.0, arbor.ARBOR_END_Z / 2.0)
 ISO_NOTE_XY = (0.060, 0.045)
@@ -119,6 +122,41 @@ BALLOON_MARGIN = 0.012
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
+
+# --- The 64T blank in phantom (spec.SHOWN_BLANK) ----------------------------------
+# Drawn in the views' own sketches as MHA-DT-03-TL-00's sheets draw the
+# dividing head (thin phantom, swLineStyles_e 2 / swLineWeights_e 0): its
+# edge-view outline, faces and rim, where it seats (sheet 1) and where it
+# stands exploded (sheet 2). Its label names it and its facing; the label's
+# tip on the face nearer the grip, BLANK_TIP_SHARE of its radius out, clear
+# of item 2's and item 1's own ink.
+PHANTOM_STYLE, PHANTOM_WIDTH = 2, 0
+_BLANK_R = spec.SHOWN_BLANK_OD / 2.0
+BLANK_TIP_SHARE = {"sheet 1": 0.85, "sheet 2": -0.6}
+Point3 = tuple[float, float, float]
+
+
+def blank_outline(near_z: float) -> dict[str, tuple[Point3, Point3]]:
+    """The blank's edge-view outline, its near face (toward the grip) at
+    ``near_z``, assembly mm."""
+    far_z = near_z + spec.SHOWN_BLANK_FACE
+    r = _BLANK_R
+    return {
+        "near face": ((0.0, -r, near_z), (0.0, r, near_z)),
+        "far face": ((0.0, -r, far_z), (0.0, r, far_z)),
+        "top": ((0.0, r, near_z), (0.0, r, far_z)),
+        "bottom": ((0.0, -r, near_z), (0.0, -r, far_z)),
+    }
+
+
+def blank_tip_mm(sheet: str, near_z: float) -> Point3:
+    """The blank label's tip on its near face, assembly mm."""
+    return (0.0, BLANK_TIP_SHARE[sheet] * _BLANK_R, near_z)
+
+
+# The label beside its tip (side, top over the tip, sheet m): over the blank
+# on sheet 1, under the arbor on sheet 2.
+BLANK_LABEL_PLACES = {"sheet 1": (1.0, 0.0128), "sheet 2": (1.0, -0.016)}
 
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 # The side view sees every turned edge edge-on, one line across the axis. A
@@ -156,17 +194,18 @@ BALLOON_ANCHORS[_C100] = BalloonAnchor(
 # --- Sheet 2: the exploded side view (rule 22) ---------------------------------
 # One side view per item at 1:1, each isolated to its item, placed where its
 # explode offset lands in item 1's view (the side view prints model z to the
-# left, y up). Item 5 stays seated in item 1 (bonded first, steps 1-6). Item
-# 2 is drawn off the thread end until its near face clears the arbor's end by
-# EXPLODE_GAP, item 6 the same beyond item 2: the order they go on. Items 3
-# and 4, which take item 2's place per the setup table, stand under item 2,
-# item 3 centred under it, item 4 SPARE_SPREAD toward the thread end, each
-# SPARE_DROP clear. Assembly mm.
-EXPLODED_ORIGIN = (0.175, 0.200)  # item 1's grip end-face centre, sheet m
-EXPLODE_GAP = 25.0
+# left, y up). Item 5 stays seated in item 1 (bonded first, steps 1-6). The
+# 64T blank's phantom (item 1's view) stands off the thread end by
+# EXPLODE_GAP, item 2 the same beyond it, item 6 beyond item 2: the order
+# they go on. Items 3 and 4, which take item 2's place per the setup table,
+# stand under item 2, item 3 centred under it, item 4 SPARE_SPREAD toward the
+# thread end, each SPARE_DROP clear. Assembly mm.
+EXPLODED_ORIGIN = (0.193, 0.200)  # item 1's grip end-face centre, sheet m
+EXPLODE_GAP = 20.0
 SPARE_DROP = 30.0
 SPARE_SPREAD = 42.0
-_EXPLODED_ITEM2_Z = arbor.ARBOR_END_Z + EXPLODE_GAP  # its near face
+EXPLODED_BLANK_Z = arbor.ARBOR_END_Z + EXPLODE_GAP  # its near face
+_EXPLODED_ITEM2_Z = EXPLODED_BLANK_Z + spec.SHOWN_BLANK_FACE + EXPLODE_GAP
 _ITEM2_MID_Z = _EXPLODED_ITEM2_Z + collar.LENGTH / 2.0
 _EXPLODED_NUT_Z = _EXPLODED_ITEM2_Z + collar.LENGTH + EXPLODE_GAP
 _R = {
@@ -215,18 +254,19 @@ LABEL_TIPS_MM: dict[str, tuple[float, float, float]] = {
 }
 # Each label stands wholly to one side of its tip, LABEL_RUN clear, so its
 # leader leaves the text's near end and never starts on the text; (side, the
-# label's top over its tip, sheet m). All stand above the stack: item 5's
-# highest, over item 2's by more than the layout audit's row pitch, so the
-# two never read as one block (farm 20261113T090619426Z: 4.79 mm apart).
-# No owned centreline runs through the stack: one in item 1's view grew its
-# outline over items 2 and 6 and their labels' leaders.
+# label's top over its tip, sheet m). All stand above the stack, items 1 and
+# 5 toward the head (item 5's over item 1's by more than the layout audit's
+# row pitch, farm 20261113T090619426Z: 4.79 mm read as one block), items 2
+# and 6 toward the thread, off the blank's phantom. No owned centreline runs
+# through the stack: one in item 1's view grew its outline over items 2 and
+# 6 and their labels' leaders.
 LABEL_RUN = 0.004
 TOWARD_HEAD = 1.0
 TOWARD_THREAD = -1.0
 LABEL_PLACES: dict[str, tuple[float, float]] = {
     spec.ARBOR: (TOWARD_HEAD, 0.022),
-    spec.KEY: (TOWARD_THREAD, 0.050),
-    KIT_COLLAR: (TOWARD_HEAD, 0.0227),
+    spec.KEY: (TOWARD_HEAD, 0.050),
+    KIT_COLLAR: (TOWARD_THREAD, 0.0227),
     spec.NUT: (TOWARD_THREAD, 0.023),
 }
 EXPLODED_CAPTION = "\n".join(
@@ -256,12 +296,24 @@ def label_box(text: str, upper_left: tuple[float, float]) -> Box:
     return (x, y - len(lines) * LINE_PITCH, x + max(map(len, lines)) * CHAR_WIDTH, y)
 
 
-def label_position(stem: str, tip: tuple[float, float]) -> tuple[float, float]:
-    """Label ``stem``'s upper-left corner, sheet m, wholly beside its tip."""
-    side, rise = LABEL_PLACES[stem]
-    x0, _y0, x1, _y1 = label_box(EXPLODED_LABELS[stem], (0.0, 0.0))
+def beside(
+    text: str, tip: tuple[float, float], side: float, rise: float
+) -> tuple[float, float]:
+    """A label's upper-left corner, sheet m, wholly to ``side`` of its tip,
+    LABEL_RUN clear, its top ``rise`` over the tip."""
+    x0, _y0, x1, _y1 = label_box(text, (0.0, 0.0))
     x = tip[0] + LABEL_RUN if side > 0 else tip[0] - LABEL_RUN - (x1 - x0)
     return (x, tip[1] + rise)
+
+
+def label_position(stem: str, tip: tuple[float, float]) -> tuple[float, float]:
+    """Label ``stem``'s upper-left corner, sheet m, wholly beside its tip."""
+    return beside(EXPLODED_LABELS[stem], tip, *LABEL_PLACES[stem])
+
+
+def blank_label_position(sheet: str, tip: tuple[float, float]) -> tuple[float, float]:
+    """The blank label's upper-left corner on ``sheet``, sheet m."""
+    return beside(spec.SHOWN_BLANK_LABEL, tip, *BLANK_LABEL_PLACES[sheet])
 
 
 def _view_stem(stem: str) -> str:
@@ -370,6 +422,61 @@ def _activate_sheet(adapter: Any, name: str) -> None:
         raise RuntimeError(f"arbor-kit sheet is {actual!r}, expected {name!r}")
 
 
+def _draw_blank(
+    adapter: Any, view: Any, sheet: str, near_z: float
+) -> Callable[[], None]:
+    """The 64T blank's phantom outline in ``view``'s sketch, its near face at
+    ``near_z`` (assembly mm), and its label; returns the settled check."""
+    label = f"arbor-kit {sheet} 64T blank"
+    lines = blank_outline(near_z)
+    keys = list(lines)
+    sheet_points = model_points_in_view(
+        adapter,
+        view,
+        [
+            tuple(value / 1000.0 for value in point)
+            for key in keys
+            for point in lines[key]
+        ]
+        + [tuple(value / 1000.0 for value in blank_tip_mm(sheet, near_z))],
+        label=f"{label} outline",
+    )
+    sketched = sketch_lines(
+        adapter,
+        view,
+        {
+            key: (sheet_points[2 * i], sheet_points[2 * i + 1])
+            for i, key in enumerate(keys)
+        },
+        style=PHANTOM_STYLE,
+        width=PHANTOM_WIDTH,
+        label=label,
+    )
+    rebuild_drawing(adapter, label=label)
+
+    def placed(stage: str) -> None:
+        require_placed(
+            adapter,
+            sketched,
+            style=PHANTOM_STYLE,
+            width=PHANTOM_WIDTH,
+            label=label,
+            stage=stage,
+        )
+
+    placed("drawn")
+    tip = sheet_points[-1]
+    add_leader_note(
+        adapter,
+        spec.SHOWN_BLANK_LABEL,
+        text_xy=blank_label_position(sheet, tip),
+        attach_xy=tip,
+        label=f"{label} label",
+        view=view,
+    )
+    return lambda: placed("settled")
+
+
 def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding], str]:
     """Sheet 1: the working pose's side view and isometric, the parts list,
     the balloons and the setup table. Returns its settled check, its
@@ -427,10 +534,12 @@ def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding]
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)
+    blank_settled = _draw_blank(adapter, side, "sheet 1", arbor.SHOULDER_Z)
 
     def settled() -> None:
         _assert_at(adapter, side, (0.0, 0.0, 0.0), SIDE_ORIGIN, label="side view")
         _assert_at(adapter, iso, ISO_POINT_MM, ISO_CENTER, label="isometric")
+        blank_settled()
 
     return settled, landings, _bom_feature_name(table)
 
@@ -490,6 +599,7 @@ def _place_exploded_sheet(
             margin=BALLOON_MARGIN,
             explode_offsets={},
         )
+    blank_settled = _draw_blank(adapter, views[spec.ARBOR], "sheet 2", EXPLODED_BLANK_Z)
     for stem, text in EXPLODED_LABELS.items():
         owner = _view_stem(stem)
         (tip,) = model_points_in_view(
@@ -518,6 +628,7 @@ def _place_exploded_sheet(
             _assert_at(
                 adapter, view, (0.0, 0.0, 0.0), targets[stem], label=f"{label} {stem}"
             )
+        blank_settled()
 
     return settled, landings
 

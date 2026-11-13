@@ -74,11 +74,17 @@ def test_one_seat_fits_every_blank_inside_the_tir_share() -> None:
 
 
 def test_the_note_names_every_mate_by_its_drawing_number() -> None:
-    numbers = [blank.number for blank in spec.KEYED_GEARS]
+    """The seat's mates are the kit sheet's setup table rows, every blank by
+    drawing number; the note points there, and names the key's bond."""
+    import dt_cone_gear_tl_arbor_assembly_spec as kit
+
     note = " ".join(spec.SHEET_NOTES.split())
-    assert f"{numbers[0]} TO {numbers[-2]} AND {numbers[-1]}" in note
-    assert numbers[0] == "MHA-DT-03-T030" and numbers[-2] == "MHA-DT-03-T120"
-    assert f"KEY {spec.KEY_NUMBER}" in note
+    assert f"KEYED BORES LISTED ON {spec.KIT_NUMBER}" in note
+    for blank in spec.KEYED_GEARS:
+        assert blank.number in kit.SETUP_TABLE, blank.tag
+    assert f"KEY {spec.KEY_NUMBER} BONDED WITH {spec.KEY_BOND}" in note
+    assert f"COAT ITEM 5 WITH {spec.KEY_BOND}." in kit.ASSEMBLY_STEPS
+    assert len(spec.SHEET_NOTES.splitlines()) <= 4
     # The pilot only carries the loose collars: a clearance size at the title
     # block's .XXX band, never a fit name.
     pilot = spec.CALLOUTS_BELOW["PilotDia"]
@@ -366,7 +372,7 @@ def test_the_side_view_places_every_marked_dimension_off_the_part(
     monkeypatch.setattr(drawing, "model_points_in_view", _fake_projection)
     keep = drawing._side_keep(None, None)
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    in_end_view = spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH] | {"ThreadDia"}
+    in_end_view = spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH]
     assert set(keep) == marked - in_end_view
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
     top = drawing.SIDE_CENTER[1] + spec.GRIP_DIA / 1000.0 / 2.0 * scale
@@ -375,12 +381,20 @@ def test_the_side_view_places_every_marked_dimension_off_the_part(
         assert not bottom < y < top, name
     positions = list(keep.values())
     assert len(set(positions)) == len(positions)
-    # The tail centre's callout is alone on the tail face's dimension line:
-    # the thread's designation stands on the end view.
-    tail_names = [
-        name for name, (z, _s, _r) in drawing.DIA_TEXT.items() if z == spec.ARBOR_END_Z
-    ]
-    assert tail_names == ["TailCentreDia"]
+    # At the tail face the thread's line stands on the threaded step and the
+    # tail centre's outside it: never one line (rule 14).
+    tail = {
+        name: side
+        for name, (z, side, _r) in drawing.DIA_TEXT.items()
+        if z == spec.ARBOR_END_Z
+    }
+    assert tail == {
+        "ThreadDia": drawing.TOWARD_HEAD,
+        "TailCentreDia": drawing.TOWARD_TAIL,
+    }
+    assert keep["ThreadDia"][0] - keep["TailCentreDia"][0] >= 2.0 * drawing.TEXT_GAP
+    # The relief's text, toward the tail, stands over the thread's.
+    assert keep["ReliefDia"][1] - keep["ThreadDia"][1] >= 0.009
     # Baselines: each tier's span holds every nearer tier's span.
     spans = sorted(drawing.LENGTH_SPANS_Z.values(), key=lambda span: span[2])
     assert [tier for _a, _b, tier in spans] == list(range(1, len(spans) + 1))
@@ -396,7 +410,7 @@ def test_the_side_view_places_every_marked_dimension_off_the_part(
 def test_the_end_view_puts_the_keyseat_toward_the_side_view(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "model_points_in_view", _fake_projection)
     keep = drawing._end_keep(None, None)
-    assert set(keep) == spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH] | {"ThreadDia"}
+    assert set(keep) == spec.DRAWING_DIMENSIONS[spec.KEYSEAT_SKETCH]
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
     grip = spec.GRIP_DIA / 2000.0 * scale
     end_right = drawing.END_CENTER[0] + grip
@@ -414,16 +428,6 @@ def test_the_end_view_puts_the_keyseat_toward_the_side_view(monkeypatch) -> None
     s_x = keep["KeyseatS"][0]
     assert s_x - drawing.END_S_TEXT / 2.0 > floor_x
     assert s_x + drawing.END_S_TEXT / 2.0 < side_left - 0.002
-    # The thread's designation leads in from up and left: off the arbor,
-    # inside the border (its ten characters about 25 mm wide), away from the
-    # width's quarter and under the side view's tail centre callout, which
-    # starts 28 mm over the grip's top.
-    thread_x, thread_y = keep["ThreadDia"]
-    assert thread_x < drawing.END_CENTER[0]
-    assert thread_y > drawing.END_CENTER[1] + grip + 0.004
-    assert thread_x - 0.0125 > 0.0127
-    assert thread_x + 0.0125 < width_x
-    assert thread_y + 0.004 < drawing.SIDE_CENTER[1] + grip + 0.020
 
 
 def test_the_standoff_diameter_line_clears_the_keyseat_end_set(monkeypatch) -> None:

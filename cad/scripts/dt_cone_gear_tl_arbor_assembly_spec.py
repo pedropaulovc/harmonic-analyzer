@@ -25,6 +25,7 @@ import dt_cone_gear_tl_arbor_key_spec as key
 import dt_cone_gear_tl_keyed_arbor_spec as arbor
 import dt_cone_gear_tl_vn_arbor_nut_spec as nut
 import dt_crank_drive_gear_spec as crank
+from _printed_tolerance import printed_band_mm
 
 ASM_NAME = "dt-cone-gear-tl-arbor"
 INCH = arbor.INCH
@@ -167,6 +168,35 @@ KEY_CLOCK_FROM_READING_DEG = math.degrees(KEY_SIDE_READING / (2.0 * KEY_SIDE_LEV
 if KEY_CLOCK_FROM_READING_DEG >= arbor.KEY_SETTING_ALLOWANCE_DEG / 2.0:
     raise AssertionError("the key's side-face reading spends half the clock allowance")
 
+# --- The blank the views show -------------------------------------------------------
+# No blank is in the kit, but the views show the 64T's (this sheet's setup) in
+# phantom where it goes (rule 22: order and facing): seated on item 1's
+# shoulder under item 2, as MHA-DT-03-TL-00's sheets show the dividing head
+# they fit. Its chamfered bore face goes toward item 2: that chamfer's mouth
+# can reach past the Ø.50 shoulder at their limits, leaving that face nothing
+# to bear on there; the plain face bears flat on the shoulder, and item 2's
+# face covers the mouth.
+SHOWN_BLANK = arbor.KEYED_GEARS[-1]
+SHOWN_BLANK_OD = crank.OUTSIDE_DIA
+SHOWN_BLANK_FACE = arbor.KIT_BLANK_FACE
+CHAMFER_MOUTH_MAX_DIA = (
+    crank.BORE_DIA + max(crank.BORE_DIA_BAND) + 2.0 * crank.BORE_SOUTH_CHAMFER_MAX
+)
+SHOULDER_MIN_DIA = arbor.STANDOFF_DIA - printed_band_mm(2, unit=arbor.UNIT)
+if CHAMFER_MOUTH_MAX_DIA <= SHOULDER_MIN_DIA:
+    raise AssertionError("the 64T's chamfered face always bears on the shoulder")
+if CHAMFER_MOUTH_MAX_DIA >= collar.OD_BY_CONFIGURATION[KIT_COLLAR]:
+    raise AssertionError("item 2 no longer covers the 64T's chamfer mouth")
+CHAMFERED_FACE_TOWARD = (
+    f"CHAMFERED BORE FACE TOWARD ITEM {BOM_ITEMS[member(KIT_COLLAR)]}"
+)
+SHOWN_BLANK_LABEL = "\n".join(
+    (f"{SHOWN_BLANK.number} {crank.TEETH}T BLANK, NOT IN KIT", CHAMFERED_FACE_TOWARD)
+)
+_SEAT_TEXT = "Ø" + arbor.inch_text(
+    arbor.SEAT_DIA, arbor.DRAWING_PRECISION_BY_NAME["SeatDia"]
+)
+
 # --- Sheet words ------------------------------------------------------------------
 # The setup table (sheet 1, under the parts list): each blank by drawing
 # number and tooth count, the collar item that backs it and its first index.
@@ -183,7 +213,8 @@ for _blank in arbor.KEYED_GEARS:
         _TABLE_ROWS += [
             f"{_blank.number} ({_teeth}T): ITEM {_item}, "
             f"{CRANK_FIRST_INDEX_DEG:.2f}° COUNTER-CLOCKWISE",
-            f"   {CRANK_FIRST_INDEX_SENSE.removeprefix('COUNTER-CLOCKWISE ')}",
+            f"   {CRANK_FIRST_INDEX_SENSE.removeprefix('COUNTER-CLOCKWISE ')}, "
+            f"WHICH GOES TOWARD ITEM {_item}",
         ]
 SETUP_TABLE = "\n".join(
     (
@@ -196,13 +227,17 @@ SETUP_TABLE = "\n".join(
 # Fitting steps (sheet 2, beside the exploded view): one action each, each
 # retention or setting followed by its check (rules 22, 23). LOCTITE 638 is
 # a consumable: degrease, coat the key (never the keyseat), keep it off the
-# seat the blanks slide on, cure before the first cut.
+# seat the blanks slide on, cure before the first cut. Ends and surfaces are
+# named by the features the views show, not by a view the package does not
+# label (machinist review of farm 20261113T171903293Z).
 _K, _A, _N = (BOM_ITEMS[s] for s in (KEY, ARBOR, NUT))
 _STEPS: tuple[str, ...] = (
     f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
-    f"COAT ITEM {_K} WITH LOCTITE 638.",
-    f"PUSH ITEM {_K} INTO ITEM {_A}'S KEYSEAT AGAINST ITS RIGHT END IN THE SIDE VIEW.",
-    f"WIPE ALL 638 OFF ITEM {_A}'S SEAT.",
+    f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
+    f"PUSH ITEM {_K} INTO ITEM {_A}'S KEYSEAT AGAINST THE KEYSEAT'S END NEAREST "
+    f"ITEM {_A}'S SHOULDER.",
+    f"WIPE ALL {arbor.KEY_BOND} OFF ITEM {_A}'S {_SEAT_TEXT} SEAT, LEAVING THE "
+    "KEYSEAT FILLED.",
     "LET THE BOND CURE 24 H.",
     f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
     f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",

@@ -34,6 +34,8 @@ KIT = "dt_cone_gear_tl_arbor"
 def test_the_kit_sheet_is_a_reviewed_shop_fixture() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert assembly_contract(spec.ASM_NAME).number == "MHA-DT-03-TL-05"
+    # The arbor's note 1 points at this sheet's setup table by its number.
+    assert arbor.KIT_NUMBER == assembly_contract(spec.ASM_NAME).number
     assert KIT in bg.ASSEMBLY_ORDER
     assert KIT not in bg.MACHINE_ASSEMBLIES
     assert bg.is_shop_fixture(KIT)
@@ -154,8 +156,9 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
     order = [
         f"DEGREASE ITEM {k}",
         f"COAT ITEM {k} WITH LOCTITE 638",
-        f"PUSH ITEM {k} INTO ITEM {a}'S KEYSEAT",
-        f"OFF ITEM {a}'S SEAT",
+        f"PUSH ITEM {k} INTO ITEM {a}'S KEYSEAT AGAINST THE KEYSEAT'S END NEAREST "
+        f"ITEM {a}'S SHOULDER",
+        f"OFF ITEM {a}'S Ø.376 SEAT, LEAVING THE KEYSEAT FILLED",
         "CURE 24 H",
         f"CHECK: ITEM {k} DOES NOT MOVE BY HAND",
         "SLIDE THE BLANK ONTO",
@@ -303,6 +306,12 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     assert "FROM CHAMFERED BORE FACE" in GEAR_DATA
     printed, words = _printed_index_deg(crank.TEETH)
     assert printed == spec.CRANK_FIRST_INDEX_DEG
+    # The row also says which way the chamfered face goes: toward item 2,
+    # the collar that covers its mouth, as the phantoms' labels show.
+    words, _, facing = words.partition(", WHICH GOES TOWARD ")
+    assert facing == f"ITEM {spec.BOM_ITEMS[spec.member(spec.KIT_COLLAR)]}"
+    assert spec.CHAMFERED_FACE_TOWARD.endswith(facing)
+    assert spec.CHAMFERED_FACE_TOWARD in spec.SHOWN_BLANK_LABEL
     # Turning the blank by a about its +z carries a cutter fixed in space to
     # gear azimuth -a; counter-clockwise seen from the z = 0 face (looking
     # along +z) is a negative turn about +z.
@@ -394,6 +403,49 @@ def test_sheet_one_shows_only_the_working_pose() -> None:
     }
 
 
+def _side_point(point_mm):
+    s = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1] / 1000.0
+    x, y = drawing.SIDE_ORIGIN
+    return (x - point_mm[2] * s, y + point_mm[1] * s)
+
+
+def test_sheet_one_shows_the_64t_blank_in_phantom_where_it_seats() -> None:
+    """Rule 22's working pose: the blank the steps fit, not in the kit, in
+    phantom from item 1's shoulder to item 2, its label naming it and the
+    face its chamfer goes toward; all inside the border, left of the parts
+    list and over the isometric."""
+    lines = drawing.blank_outline(arbor.SHOULDER_Z)
+    points = [_side_point(p) for ends in lines.values() for p in ends]
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    outline = (min(xs), min(ys), max(xs), max(ys))
+    assert _inside(outline) and outline[2] < drawing.BOM_ANCHOR[0]
+    assert lines["far face"][0][2] == pytest.approx(spec.BLANK_FACE_Z)
+    iso_top = drawing.ISO_CENTER[1] + 0.025
+    assert outline[1] > iso_top
+    assert drawing.PHANTOM_STYLE == 2
+    tip = _side_point(drawing.blank_tip_mm("sheet 1", arbor.SHOULDER_Z))
+    assert outline[1] < tip[1] < outline[3]
+    label = drawing.label_box(
+        spec.SHOWN_BLANK_LABEL, drawing.blank_label_position("sheet 1", tip)
+    )
+    assert _inside(label) and label[2] < drawing.BOM_ANCHOR[0]
+    assert label[0] >= tip[0] + drawing.LABEL_RUN - 1e-9
+    radius = collar.OD_BY_CONFIGURATION[spec.KIT_COLLAR] / 2.0
+    assert label[1] > _side_point((0.0, radius, 0.0))[1]  # over item 2
+    assert spec.SHOWN_BLANK.number in spec.SHOWN_BLANK_LABEL
+    assert spec.CHAMFERED_FACE_TOWARD in spec.SHOWN_BLANK_LABEL
+
+
+def test_the_64t_blank_seats_its_plain_face_on_the_shoulder() -> None:
+    """The chamfer's mouth can pass the Ø.50 shoulder at the limits, so the
+    chamfered face goes toward item 2, whose face covers the mouth."""
+    assert spec.CHAMFER_MOUTH_MAX_DIA > arbor.STANDOFF_DIA - 0.01 * arbor.INCH
+    assert spec.CHAMFER_MOUTH_MAX_DIA < collar.OD_BY_CONFIGURATION[spec.KIT_COLLAR]
+    assert spec.CHAMFERED_FACE_TOWARD == (
+        f"CHAMFERED BORE FACE TOWARD ITEM {spec.BOM_ITEMS[spec.member(spec.KIT_COLLAR)]}"
+    )
+
+
 def _box(a, b):
     (x0, y0), (x1, y1) = drawing.nominal_sheet_point(a), drawing.nominal_sheet_point(b)
     return (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
@@ -418,20 +470,26 @@ def _exploded_part_boxes() -> dict[str, tuple[float, float, float, float]]:
                 collar.LENGTH
             )
         boxes[stem] = _box((0.0, dy - half, z), (0.0, dy + half, z + length))
+    near = drawing.EXPLODED_BLANK_Z
+    r = spec.SHOWN_BLANK_OD / 2.0
+    boxes["blank"] = _box((0.0, -r, near), (0.0, r, near + spec.SHOWN_BLANK_FACE))
     return boxes
 
 
 def test_the_exploded_view_draws_one_setup_in_fitting_order() -> None:
-    """Rule 22: items 1 and 5 seated (bonded first), item 2 then item 6 off
-    the thread end on the axis, each EXPLODE_GAP clear; items 3 and 4 under
-    item 2, whose place either takes; every item shown once."""
+    """Rule 22: items 1 and 5 seated (bonded first), the 64T blank's phantom,
+    item 2 then item 6 off the thread end on the axis, each EXPLODE_GAP
+    clear; items 3 and 4 under item 2, whose place either takes; every item
+    shown once."""
     offsets = drawing.EXPLODE_OFFSETS_MM
     gap = drawing.EXPLODE_GAP
     item2 = spec.member(spec.KIT_COLLAR)
     assert offsets[spec.ARBOR] == (0.0, 0.0, 0.0)
     assert drawing.EXPLODED_VIEWS[spec.ARBOR] == {spec.ARBOR, spec.KEY}
+    assert drawing.EXPLODED_BLANK_Z - arbor.ARBOR_END_Z == pytest.approx(gap)
     near2 = spec.POSITIONS[item2][2] + offsets[item2][2]
-    assert near2 - arbor.ARBOR_END_Z == pytest.approx(gap)
+    blank_far = drawing.EXPLODED_BLANK_Z + spec.SHOWN_BLANK_FACE
+    assert near2 - blank_far == pytest.approx(gap)
     near6 = spec.POSITIONS[spec.NUT][2] + offsets[spec.NUT][2]
     assert near6 - (near2 + collar.LENGTH) == pytest.approx(gap)
     for stem in (item2, spec.NUT):
@@ -448,7 +506,7 @@ def test_the_exploded_view_draws_one_setup_in_fitting_order() -> None:
         assert boxes[stem][3] < boxes[item2][1] - drawing.SPARE_DROP / 1000.0 + 1e-9
     # The stack stands on one axis height; no owned centreline joins the
     # views (one in item 1's view grew its outline over items 2 and 6).
-    for stem in (item2, spec.NUT):
+    for stem in (item2, spec.NUT, "blank"):
         assert (boxes[stem][1] + boxes[stem][3]) / 2.0 == pytest.approx(
             (boxes[spec.ARBOR][1] + boxes[spec.ARBOR][3]) / 2.0
         ), stem
@@ -490,6 +548,15 @@ def test_the_exploded_labels_and_balloons_stand_clear_of_the_ink() -> None:
         for stem, text in drawing.EXPLODED_LABELS.items()
     }
     boxes["caption"] = drawing.label_box(drawing.EXPLODED_CAPTION, drawing.CAPTION_XY)
+    blank_tip = drawing.nominal_sheet_point(
+        drawing.blank_tip_mm("sheet 2", drawing.EXPLODED_BLANK_Z)
+    )
+    x0, y0, x1, y1 = parts["blank"]
+    assert x0 <= blank_tip[0] <= x1 and y0 < blank_tip[1] < y1
+    boxes["blank label"] = drawing.label_box(
+        spec.SHOWN_BLANK_LABEL, drawing.blank_label_position("sheet 2", blank_tip)
+    )
+    assert boxes["blank label"][0] >= blank_tip[0] + drawing.LABEL_RUN - 1e-9
     boxes["steps"] = drawing.label_box(spec.ASSEMBLY_STEPS, drawing.STEPS_XY)
     for stem in drawing.SPARES:
         boxes[f"ring {stem}"] = _grown(parts[stem], BALLOON_REACH)
