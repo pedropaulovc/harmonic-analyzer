@@ -81,7 +81,7 @@ def test_the_note_names_every_mate_by_its_drawing_number() -> None:
     note = " ".join(spec.SHEET_NOTES.split())
     assert f"KEYED BORES LISTED ON {spec.KIT_NUMBER}" in note
     for blank in spec.KEYED_GEARS:
-        assert blank.number in kit.SETUP_TABLE, blank.tag
+        assert blank.number in (row[0] for row in kit.SETUP_TABLE_ROWS), blank.tag
     assert f"KEY {spec.KEY_NUMBER} BONDED WITH {spec.KEY_BOND}" in note
     assert f"COAT ITEM 5 WITH {spec.KEY_BOND}." in kit.ASSEMBLY_STEPS
     assert len(spec.SHEET_NOTES.splitlines()) <= 4

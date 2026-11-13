@@ -138,8 +138,10 @@ def _after(steps: list[str], words: str) -> list[str]:
 def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None:
     """Rule 22: numbered, at most six printed lines, one action each; rule
     23: the bond's degrease, coat, cure and bench check, the nut's clamp and
-    its check; the key's clock set, then checked with its instrument and
-    band; the index last."""
+    its check; the key's clock set on its own two side faces (an indicator
+    zeroed on one, the head turned half a turn), checked with its band, its
+    remedy a separate step; then the quarter turn to the cutter and the
+    index last."""
     steps = _steps()
     assert [step.split(".", 1)[0] for step in steps] == [
         str(number) for number in range(1, len(steps) + 1)
@@ -167,8 +169,13 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         "COLLAR (SETUP TABLE)",
         f"TIGHTEN ITEM {n}",
         "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND",
-        f"UNTIL ITEM {k} FACES THE CUTTER",
-        "CHECK WITH A TEST INDICATOR",
+        f"UNTIL ITEM {k}'S SIDE FACES ARE LEVEL",
+        f"ZERO A TEST INDICATOR ON ITEM {k}'S UPPER SIDE FACE",
+        "TURN THE HEAD 180°",
+        f"CHECK: THE INDICATOR, AT THE SAME HEIGHT, READS ZERO WITHIN "
+        f"{arbor.inch_text(spec.KEY_SIDE_READING, 3)} ON ITEM {k}'S OTHER SIDE FACE",
+        f"IF STEP {spec.CHECK_STEP} FAILS",
+        f"TURN THE HEAD 90° UNTIL ITEM {k} FACES THE CUTTER",
         "FIRST INDEX (SETUP TABLE)",
     ]
     positions = [
@@ -176,8 +183,12 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
     ]
     assert positions == sorted(positions)
     assert flat[-1].endswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
-    (check,) = _after(steps, "FACES THE CUTTER")[:1]
-    assert f"WITHIN {arbor.inch_text(spec.KEY_SIDE_READING, 3)}." in check
+    assert len(steps) == spec.INDEX_STEP
+    # The step numbers the remedy cites are the zeroing and the check.
+    assert "ZERO A TEST INDICATOR" in flat[spec.ZERO_STEP - 1]
+    assert flat[spec.CHECK_STEP - 1].startswith(f"{spec.CHECK_STEP}. CHECK:")
+    assert flat[spec.CHECK_STEP].endswith(f"REPEAT FROM STEP {spec.ZERO_STEP}.")
+    assert "CENTRE PLANE" not in spec.ASSEMBLY_STEPS
 
 
 def test_the_side_face_reading_holds_the_keys_clock() -> None:
@@ -193,42 +204,46 @@ def test_the_side_face_reading_holds_the_keys_clock() -> None:
     assert spec.KEY_CLOCK_FROM_READING_DEG < arbor.KEY_SETTING_ALLOWANCE_DEG / 2.0
 
 
-def _table_rows() -> dict[str, str]:
-    """The setup table's rows by blank number, continuation lines joined."""
-    rows: dict[str, str] = {}
-    last = ""
-    for line in spec.SETUP_TABLE.splitlines()[2:]:
-        if line.startswith("MHA-"):
-            last = line.split(" ", 1)[0]
-            rows[last] = line
-        else:
-            assert line.startswith("   "), line
-            rows[last] += " " + line.strip()
-    return rows
-
-
 def test_the_setup_table_names_every_blank_its_collar_and_index() -> None:
-    """Each keyed blank by drawing number and tooth count, the collar the
-    arbor's backing rule gives it, and its first index."""
-    rows = _table_rows()
-    assert list(rows) == [blank.number for blank in arbor.KEYED_GEARS]
+    """A ruled table, a row per keyed blank by drawing number and tooth
+    count, the collar the arbor's backing rule gives it, and its first index;
+    every cell inside its column, the table inside the right half over the
+    title block."""
+    rows = spec.SETUP_TABLE_ROWS
+    assert spec.SETUP_TABLE_HEADER == (
+        "BLANK",
+        "TEETH",
+        "COLLAR",
+        "FIRST INDEX",
+        "DIRECTION",
+    )
+    assert [row[0] for row in rows] == [blank.number for blank in arbor.KEYED_GEARS]
     by_dia = {
         spec.member(name): collar.OD_BY_CONFIGURATION[name]
         for name in collar.CONFIGURATIONS
     }
-    for blank in arbor.KEYED_GEARS:
-        row = rows[blank.number]
-        teeth = spec.blank_teeth(blank.tag)
-        assert row.startswith(f"{blank.number} ({teeth}T): ITEM "), row
-        item = re.search(r"ITEM (\d+),", row).group(1)
+    for blank, row in zip(arbor.KEYED_GEARS, rows, strict=True):
+        assert row[1] == str(spec.blank_teeth(blank.tag)), row
+        item = row[2].removeprefix("ITEM ")
         (stem,) = (s for s, i in spec.BOM_ITEMS.items() if i == item)
         assert by_dia[stem] == pytest.approx(
             arbor.COLLAR_DIAS[arbor.COLLAR_BY_GEAR[blank.tag]]
         ), blank.tag
-    assert "ITEM 5" in spec.SETUP_TABLE.splitlines()[1]
-    for line in spec.SETUP_TABLE.splitlines():
-        assert len(line) * drawing.CHAR_WIDTH < 0.4191 - drawing.TABLE_XY[0], line
-    assert "HALF A PITCH" not in spec.SETUP_TABLE
+    assert "ITEM 5" in spec.SETUP_TABLE_TITLE.splitlines()[1]
+    widths = drawing.table_column_widths(spec.SETUP_TABLE_HEADER, rows)
+    for row in (spec.SETUP_TABLE_HEADER, *rows):
+        for text, width in zip(row, widths, strict=True):
+            assert len(text) * drawing.TABLE_CHAR_WIDTH < width, text
+    x0, y0, x1, y1 = drawing.setup_table_box()
+    assert x0 >= TITLE_BLOCK[0] and x1 < 0.4191 - drawing.SHEET_CLEARANCE
+    assert y0 > TITLE_BLOCK[3] + drawing.SHEET_CLEARANCE
+    title = drawing.label_box(spec.SETUP_TABLE_TITLE, drawing.TABLE_XY)
+    assert title[2] < 0.4191 and title[1] > y1
+    # Under the parts list (its six rows end by about y 0.189, farm
+    # 20261113T071241685Z) and clear of the isometric's column.
+    assert drawing.TABLE_XY[1] < 0.189 - 0.004
+    assert x0 > drawing.ISO_CENTER[0] + 0.05
+    assert "HALF A PITCH" not in spec.SETUP_TABLE_TITLE
 
 
 def _cone_gap_span_rad(teeth: int) -> tuple[float, float]:
@@ -254,10 +269,11 @@ def _off_pitches(angle: float, target: float, pitch: float) -> float:
 
 
 def _printed_index_deg(teeth: int) -> tuple[float, str]:
-    """A blank's printed first index (degrees) and the words after it."""
-    (row,) = (row for row in _table_rows().values() if f"({teeth}T)" in row)
-    match = re.search(r", (\d+\.\d\d)° (.+)$", row)
-    return float(match.group(1)), match.group(2)
+    """A blank's printed first index (degrees) and its direction cell."""
+    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(teeth))
+    angle, direction = row[3], row[4]
+    assert re.fullmatch(r"\d+\.\d\d°", angle), angle
+    return float(angle.removesuffix("°")), direction
 
 
 def test_the_table_indexes_each_cone_blank_so_a_tooth_centres_on_the_key() -> None:
@@ -308,26 +324,23 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     assert "FROM CHAMFERED BORE FACE" in GEAR_DATA
     printed, words = _printed_index_deg(crank.TEETH)
     assert printed == spec.CRANK_FIRST_INDEX_DEG
-    # The row also says which way the chamfered face goes: toward item 2,
-    # the collar that covers its mouth, as the phantoms' labels show.
-    words, _, facing = words.partition(", WHICH GOES TOWARD ")
-    assert facing == f"ITEM {spec.BOM_ITEMS[spec.member(spec.KIT_COLLAR)]}"
-    assert spec.CHAMFERED_FACE_TOWARD.endswith(facing)
+    # The phantoms' labels say which way the chamfered face goes: toward
+    # item 2, the collar that covers its mouth.
     assert spec.CHAMFERED_FACE_TOWARD in spec.SHOWN_BLANK_LABEL
     # Turning the blank by a about its +z carries a cutter fixed in space to
     # gear azimuth -a; counter-clockwise seen from the z = 0 face (looking
     # along +z) is a negative turn about +z.
     sense = {
-        "COUNTER-CLOCKWISE SEEN FROM ITS CHAMFERED BORE FACE": 1.0,
-        "CLOCKWISE SEEN FROM ITS CHAMFERED BORE FACE": -1.0,
+        "CCW FROM CHAMFERED BORE FACE": 1.0,
+        "CW FROM CHAMFERED BORE FACE": -1.0,
     }[words]
     assert words == spec.CRANK_FIRST_INDEX_SENSE
     cut = replace(crank.TOOTH_SPACE, azimuth_rad=sense * math.radians(printed))
     assert _off_pitches(_midface_gap_rad(cut), model, pitch) < allowance
     half = replace(crank.TOOTH_SPACE, azimuth_rad=pitch / 2.0)
     assert _off_pitches(_midface_gap_rad(half), model, pitch) > allowance
-    (row,) = (row for row in _table_rows().values() if f"({crank.TEETH}T)" in row)
-    assert row.startswith(f"{arbor.KEYED_GEARS[-1].number} ({crank.TEETH}T)")
+    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(crank.TEETH))
+    assert row[0] == arbor.KEYED_GEARS[-1].number
 
 
 def test_the_frozen_rims_stand_mid_line_on_their_own_edges() -> None:
@@ -396,7 +409,7 @@ def test_sheet_one_shows_only_the_working_pose() -> None:
     ring = _grown(side, BALLOON_REACH)
     assert _inside(ring)
     assert ring[2] < drawing.BOM_ANCHOR[0]
-    table = drawing.label_box(spec.SETUP_TABLE, drawing.TABLE_XY)
+    table = drawing.setup_table_box()
     assert table[1] > TITLE_BLOCK[3]
     assert _inside(table)
     assert drawing.SHEET_SCALES == {
