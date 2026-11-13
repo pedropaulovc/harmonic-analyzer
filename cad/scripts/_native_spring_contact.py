@@ -357,10 +357,10 @@ def _assembly_spring_instances(
     if components is None:
         raise RuntimeError("native spring contact: top-level components unavailable")
     found = {family: [] for family in families}
-    # A None element fails loud in by_name's own name read.
+    # by_name raises on a None element or a component without a Name2.
     for name, component in by_name(components):
         source = _read_member(component, "GetPathName")
-        if not name or not isinstance(source, str) or not source:
+        if not isinstance(source, str) or not source:
             raise RuntimeError(
                 "native spring contact: component identity unavailable "
                 f"(name={name!r}, source={source!r})"

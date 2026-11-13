@@ -119,8 +119,6 @@ def component_reference_names(
                 f"component reference {selector!r} on {name!r} selects "
                 f"{actual!r}, expected {normalized[selector]!r}"
             )
-        if not name:
-            raise RuntimeError(f"component reference {selector!r} has no native name")
         found[selector] = name
     missing = sorted(set(normalized) - found.keys())
     if missing:

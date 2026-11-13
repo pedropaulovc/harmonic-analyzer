@@ -777,7 +777,7 @@ def _validate_source(source_model: Any) -> None:
         source_model, {"@PenWire:1": (spec.WIRE, wire.CONFIGURATION)}
     )
     counts: dict[str, int] = {}
-    for _, component in by_name(assembly.GetComponents(True)):
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         if stem == spec.WIRE:
             selected = component_identity(component)
@@ -792,9 +792,7 @@ def _validate_source(source_model: Any) -> None:
             abs(float(actual) - float(expected)) > 1e-9
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
-            raise RuntimeError(
-                f"pen source must open collapsed: {component.Name2!r} is displaced"
-            )
+            raise RuntimeError(f"pen source must open collapsed: {name!r} is displaced")
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"pen families {counts!r} != contract {BOM_QUANTITIES!r}")
 

@@ -504,16 +504,20 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
         for index in range(quantity):
             selector = spec.instance_name(family, index)
             component = types.SimpleNamespace(Name2=member_names.get(selector, selector))
-            groups[family].append(component)
+            groups[family].append((component.Name2, component))
             by_name[component.Name2] = component
     assert {member_names.get(name, name) for name in spec.INSTANCE_NAMES} == set(by_name)
+
+    def moved_names(label: str, selectors: tuple[str, ...]) -> list[str]:
+        moved = builder.explode_step_components(
+            label, selectors, groups, by_name, member_names
+        )
+        # Each moved occurrence keeps the name it was enumerated with.
+        assert all(component.Name2 == name for name, component in moved), label
+        return [name for name, _component in moved]
+
     for label, selectors, _axis, _distance in spec.EXPLODE_STEPS:
-        moved = [
-            component.Name2
-            for component in builder.explode_step_components(
-                label, selectors, groups, by_name, member_names
-            )
-        ]
+        moved = moved_names(label, selectors)
         expected = {
             member_names.get(occurrence, occurrence)
             for selector in selectors
@@ -523,19 +527,14 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
     steps = {label: selectors for label, selectors, _axis, _distance in spec.EXPLODE_STEPS}
 
     def names(label: str) -> list[str]:
-        return [
-            component.Name2
-            for component in builder.explode_step_components(
-                label, steps[label], groups, by_name, member_names
-            )
-        ]
+        return moved_names(label, steps[label])
 
     assert names("riser screws lift out") == [f"{spec.RISER_SCREW}-{n}" for n in range(1, 5)]
     nut_screws = [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
     for key in "xy":
         assert names(f"nut screws back out along {key}") == nut_screws
         assert names(f"feed nut backs off along {key}") == [
-            *(component.Name2 for component in groups[spec.FEED_NUT]),
+            *(name for name, _component in groups[spec.FEED_NUT]),
             *nut_screws,
         ]
     # Rail screws lift; the bracket family's lower TL-28 screws drop.

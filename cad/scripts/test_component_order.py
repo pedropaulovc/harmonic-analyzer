@@ -8,7 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 import _assembly
-from _component_order import by_name, natural_key
+from _component_order import by_name, drawing_components_by_name, natural_key
+from _component_references import component_reference_names
 
 
 def test_instance_numbers_order_as_numbers_and_a_parent_precedes_its_children():
@@ -187,3 +188,37 @@ def test_following_the_enumeration_order_would_not(monkeypatch):
 @pytest.mark.parametrize("given", [(), None])
 def test_an_empty_or_failed_enumeration_names_nothing(given):
     assert by_name(given) == []
+
+
+@pytest.mark.parametrize("name", [None, ""])
+def test_an_unnamed_component_fails_closed(name):
+    components = [SimpleNamespace(Name2="gear-1"), SimpleNamespace(Name2=name)]
+    with pytest.raises(
+        RuntimeError, match="IComponent2 enumeration: element 1 of 2 has no Name2"
+    ):
+        by_name(components)
+
+
+def test_a_missing_component_fails_closed():
+    with pytest.raises(
+        RuntimeError, match="IComponent2 enumeration: element 0 of 1 is None"
+    ):
+        by_name([None])
+
+
+def test_an_unnamed_drawing_component_fails_closed():
+    with pytest.raises(
+        RuntimeError, match="IDrawingComponent enumeration: element 0 of 1 has no Name"
+    ):
+        drawing_components_by_name([SimpleNamespace(Name=None)])
+
+
+def test_an_unnamed_member_never_binds_the_top_level_selector():
+    # A name read answering None once became the name "None", so the nested
+    # member bound the top-level selector @LeverWire:1.
+    member = SimpleNamespace(Name2=None, ComponentReference="LeverWire:1")
+    model = SimpleNamespace(GetComponents=lambda _top_level_only: (member,))
+    with pytest.raises(RuntimeError, match="has no Name2"):
+        component_reference_names(
+            model, {"@LeverWire:1": ("sh-vn-music-wire", "LeverWire")}
+        )

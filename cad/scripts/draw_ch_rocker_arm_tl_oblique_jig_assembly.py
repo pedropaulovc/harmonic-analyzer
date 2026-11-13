@@ -1459,7 +1459,7 @@ def _validate_source(source_model: Any) -> None:
         if names != (wanted,):
             raise RuntimeError(f"jig {owner} exploded views {names!r} != {(wanted,)!r}")
     counts: dict[str, int] = {}
-    for _, component in by_name(assembly.GetComponents(True)):
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -1468,9 +1468,7 @@ def _validate_source(source_model: Any) -> None:
             abs(float(actual) - float(expected)) > 1e-9
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
-            raise RuntimeError(
-                f"jig source must open collapsed: {component.Name2!r} is displaced"
-            )
+            raise RuntimeError(f"jig source must open collapsed: {name!r} is displaced")
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"jig families {counts!r} != contract {BOM_QUANTITIES!r}")
     component_reference_names(source_model, spec.MEMBER_COMPONENT_REFERENCES)

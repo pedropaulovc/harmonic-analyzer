@@ -2394,14 +2394,17 @@ every assembly-, drawing- and verify-tier loop over one iterates
 enumeration's result: each element is bound and its name read in the order
 given, one bind and one read each and nothing else, then visited in natural
 name order (`part-2` before `part-10`, a pattern seed before its instances).
-Only those name reads' answers follow the seat, and two seats' recordings pair
-their elements by name; the recorder still numbers the elements' handles in
-the seat's order. A loop that only collects names into a set is left as it
-is (its requests are the same name reads), and a part drawing view's one
+Callers use the name it returns instead of reading it again, and an element
+that is `None` or answers no name raises there: an unnamed component is never
+skipped, labelled or ordered under a placeholder. Only those name reads'
+answers follow the seat, and two seats' recordings pair their elements by
+name; the recorder still numbers the elements' handles in the seat's order. A
+loop that only collects names into a set is left as it is (its requests are
+the same name reads), and a part drawing view's one
 visible component needs no order (`_drawing_edges.visible_view_entities`
 sorts only an assembly view's). `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the
-same requests.
+same requests, and requires an unnamed component to fail closed.
 
 Gates are not recorded; FULL assembly builds and drawings are, and nothing of
 theirs is reused ("Assemblies and drawings" below). Nothing under

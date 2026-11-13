@@ -4019,8 +4019,8 @@ def _validate_source(source_model: Any) -> SourceFacts:
     numbers: dict[str, set[str]] = {}
     reference_names = component_reference_names(source_model, COMPONENT_IDENTITIES)
     roles = {name: selector[1:] for selector, name in reference_names.items()}
-    for _, component in by_name(assembly.GetComponents(True)):
-        name = _component_name(component)
+    for native_name, component in by_name(assembly.GetComponents(True)):
+        name = native_name.rsplit("/", 1)[-1]
         stem = _component_stem(component)
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform").ArrayData
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform").ArrayData

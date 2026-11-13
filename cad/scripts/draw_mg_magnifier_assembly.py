@@ -2252,9 +2252,9 @@ def _validate_source(
     )
     counts: dict[str, int] = {}
     instances = []
-    for _, component in by_name(assembly.GetComponents(True)):
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
-        instances.append(explode.Instance(str(component.Name2), stem))
+        instances.append(explode.Instance(name, stem))
         if stem == notes.WIRE:
             selected = component_identity(component)
             expected = (notes.WIRE, sh_vn_music_wire_lever_geom.CONFIGURATION)
@@ -2269,8 +2269,7 @@ def _validate_source(
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"magnifier source must open collapsed: {component.Name2!r} "
-                "is displaced"
+                f"magnifier source must open collapsed: {name!r} is displaced"
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(

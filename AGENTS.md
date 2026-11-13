@@ -1028,7 +1028,8 @@ call's result is in hand stops recording and the build finishes as its own
 with `PYTHONHASHSEED=0` (`dodo._COM_ENV_PINS`; why: DEVELOPING.md, "What is
 recorded"); never order COM requests by iterating a set of str, nor by a
 component enumeration's own order (`GetComponents`, `GetChildren`,
-`GetVisibleComponents`, ...): iterate `_component_order.by_name` on it (#2686).
+`GetVisibleComponents`, ...): iterate `_component_order.by_name` on it (#2686)
+and use the names it returns; it raises on a component without a name.
 The soundness alarm is a replay `noop` whose build made another part than the
 base (`outcome=different`: mass-property measurements in any order, request
 and answer multisets, STL geometry whatever its triangulation, vertices within

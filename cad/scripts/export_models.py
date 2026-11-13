@@ -343,6 +343,9 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
     millimetre STL meshes it is rendered against."""
     model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
     # Name order, never the seat's (issue #2686): the scene lists the same order.
+    # Every Name2 is read here, before the scan, and a component whose name is
+    # unreadable or empty aborts the export instead of being skipped: like every
+    # other enumeration (_component_order), an unnamed component fails closed.
     comps = by_name(model.GetComponents(False))
     boxes, scene, stems = [], [], set()
     for i, (name, comp) in enumerate(comps, 1):

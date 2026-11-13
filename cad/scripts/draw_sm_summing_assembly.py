@@ -447,7 +447,7 @@ def _validate_source(source_model: Any) -> None:
                 f"summing {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
-    for _, component in by_name(assembly.GetComponents(True)):
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -457,7 +457,7 @@ def _validate_source(source_model: Any) -> None:
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"summing source must open collapsed: {component.Name2!r} is displaced"
+                f"summing source must open collapsed: {name!r} is displaced"
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(

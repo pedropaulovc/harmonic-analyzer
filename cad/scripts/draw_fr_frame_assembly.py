@@ -984,12 +984,12 @@ def _visible_circle_at_height(
         full_components[name] = component
 
     candidates: list[tuple[tuple[float, ...], Any]] = []
-    for _, visible_component in by_name(
+    for native_name, visible_component in by_name(
         _as_tuple(view.GetVisibleComponents(), label=f"{label} visible components")
     ):
         if _component_stem(visible_component) != component_stem:
             continue
-        name = str(visible_component.Name2 or "").rsplit("/", 1)[-1]
+        name = native_name.rsplit("/", 1)[-1]
         full_component = full_components.get(name)
         if full_component is None:
             raise RuntimeError(f"{label}: component {name!r} has no full peer")
@@ -1633,7 +1633,7 @@ def _validate_persisted_explode(source_model: Any) -> None:
     components = by_name(assembly.GetComponents(True))
     if len(components) != sum(BOM_QUANTITIES.values()):
         raise RuntimeError("frame source must contain exactly 29 components")
-    for _, component in components:
+    for name, component in components:
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
         if any(
@@ -1641,7 +1641,7 @@ def _validate_persisted_explode(source_model: Any) -> None:
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"frame source must open collapsed: {component.Name2!r} is displaced"
+                f"frame source must open collapsed: {name!r} is displaced"
             )
 
 

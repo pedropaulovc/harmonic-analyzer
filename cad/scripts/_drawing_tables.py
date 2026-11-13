@@ -1077,16 +1077,12 @@ def validate_bom_number_property(
     visible_cell(0, quantity_column, "quantity header")
     snapshot: list[tuple[int, tuple[tuple[str, str, int], ...], str, str]] = []
     for row in data_rows:
-        components = tuple(
-            component
-            for _, component in by_name(annotation.GetComponents2(row, configuration))
-        )
+        components = by_name(annotation.GetComponents2(row, configuration))
         if not components:
             raise RuntimeError(f"{label} BOM row {row} has no native components")
         numbers: set[str] = set()
         identities: dict[tuple[str, str], int] = {}
-        for raw_component in components:
-            component = _early_bound(raw_component, "IComponent2")
+        for name, component in components:
             identity = component_identity(component)
             identities[identity] = identities.get(identity, 0) + 1
             native = component.GetModelDoc2()
@@ -1105,7 +1101,7 @@ def validate_bom_number_property(
             ).strip()
             if not number:
                 raise RuntimeError(
-                    f"{label} BOM row {row}: {component.Name2!r} "
+                    f"{label} BOM row {row}: {name!r} "
                     f"configuration {member!r} has no Number property"
                 )
             numbers.add(number)

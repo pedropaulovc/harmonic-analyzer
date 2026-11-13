@@ -24,6 +24,11 @@ only those reads' answers follow the seat and a recording comparison can pair
 the two seats' elements by name. Call these directly on the enumeration's
 result.
 
+An element that is ``None``, or whose name reads ``None`` or empty, raises
+:class:`RuntimeError` here, naming the enumeration's interface and the
+element's position: a component without a name can be neither ordered nor
+identified, so no caller substitutes a placeholder name or skips it.
+
 Not part of any part recipe: only assembly- and drawing-tier modules import
 this.
 """
@@ -49,10 +54,22 @@ def natural_key(name: str) -> tuple[tuple[str | int, ...], str]:
 def _named(
     elements: Iterable[Any] | None, interface: str, member: str
 ) -> list[tuple[str, Any]]:
+    raws = tuple(elements or ())
     named = []
-    for raw in elements or ():
+    for index, raw in enumerate(raws):
+        if raw is None:
+            raise RuntimeError(
+                f"{interface} enumeration: element {index} of {len(raws)} is None"
+            )
         element = _early_bound(raw, interface)
-        named.append((str(getattr(element, member)), element))
+        value = getattr(element, member)
+        name = "" if value is None else str(value)
+        if not name:
+            raise RuntimeError(
+                f"{interface} enumeration: element {index} of {len(raws)} "
+                f"has no {member} ({value!r})"
+            )
+        named.append((name, element))
     return sorted(named, key=lambda pair: natural_key(pair[0]))
 
 
