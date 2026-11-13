@@ -110,6 +110,92 @@ def test_the_largest_member_fits_the_sheet_at_its_scale() -> None:
     assert drawing.END_CENTER[0] - half > 0.0127
 
 
+def test_each_disc_is_authored_alone_in_its_own_member(monkeypatch) -> None:
+    """A disc extruded into another member's solid merges with it and makes
+    that disc its parent, so unsuppressing it brings the foreign disc back
+    (farm run 20261112T203156536Z). Each disc is authored with its member
+    active and every disc before it suppressed there, and its volume checked
+    alone."""
+    import asyncio
+
+    state = {"active": None, "suppressed": set(), "existing": []}
+    authored: list[tuple[str, str, tuple[str, ...]]] = []
+    volumes: list[tuple[str, float]] = []
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    def sync_noop(*_args, **_kwargs):
+        return None
+
+    async def activate(_adapter, configuration):
+        state["active"] = configuration
+
+    def suppress(_adapter, names, *, suppressed):
+        for name in names:
+            key = (state["active"], name)
+            if suppressed:
+                state["suppressed"].add(key)
+            else:
+                state["suppressed"].discard(key)
+
+    async def add_disc(_adapter, jobs, configuration):
+        present = tuple(
+            name
+            for name in state["existing"]
+            if (state["active"], name) not in state["suppressed"]
+        )
+        authored.append((state["active"], configuration, present))
+        state["existing"].append(spec.disc_feature(configuration))
+        jobs.append((spec.length_name(configuration), '"CollarLength"'))
+
+    async def volume(_adapter, label, expected, _tol):
+        volumes.append((label, expected))
+        return expected
+
+    async def save(*_args, **_kwargs):
+        return {}
+
+    class _Adapter:
+        async def create_part(self):
+            from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
+            return AdapterResult(status=AdapterResultStatus.SUCCESS, data="ok")
+
+    for name, value in {
+        "apply_package_model_units": sync_noop,
+        "part_drawing_unit": lambda _stem: "in",
+        "create_member_configurations": noop,
+        "set_global": noop,
+        "activate_member": activate,
+        "set_member_suppression": suppress,
+        "_add_disc": add_disc,
+        "volume_check": volume,
+        "force_rebuild": noop,
+        "drive_dimension": noop,
+        "apply_drawing_precision": sync_noop,
+        "clear_dimensions_for_drawing": sync_noop,
+        "mark_dimensions_for_drawing": sync_noop,
+        "apply_drawing_properties": sync_noop,
+        "select_member_features": noop,
+        "apply_material": noop,
+        "apply_member_properties": sync_noop,
+        "report_mass_properties": noop,
+        "save_member_part": save,
+    }.items():
+        monkeypatch.setattr(part, name, value)
+    asyncio.run(part.build(_Adapter()))
+    assert [(active, disc) for active, disc, _ in authored] == [
+        (name, name) for name in spec.CONFIGURATIONS
+    ]
+    assert all(present == () for _active, _disc, present in authored)
+    for name in spec.CONFIGURATIONS:
+        checked = [v for label, v in volumes if name in label]
+        assert checked and all(
+            v == pytest.approx(spec.V_BY_CONFIGURATION[name]) for v in checked
+        )
+
+
 def test_the_cli_takes_its_own_stem(monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["draw", spec.PART_NAME])
     assert drawing._parse_args().part == spec.PART_NAME
