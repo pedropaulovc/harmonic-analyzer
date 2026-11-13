@@ -12,7 +12,8 @@ the form across Z.
 Features, each volume-gated against the spec's sliced form:
 
 1. ``BitProfile`` (Front): the rod's half section, revolved to ``Bit``.
-2. ``FlatProfile`` (Front): the flat to centre, cut both ways across Z.
+2. ``FlatProfile`` (Front): the flat to centre, its depth (``FlatDepth``)
+   from a construction line on the rod's far side, cut both ways across Z.
 3. ``FormReliefPlus`` / ``FormReliefMinus``: the face form (the tooth space's
    root arc, reliefs and finite flanks, closed by its shoulders and a box ahead
    of the tip) projected along each clearance direction onto the plane normal
@@ -76,6 +77,9 @@ from dt_cone_tip_gear_tl_form_cutter_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FLANK_END_Z,
+    FLAT_DEPTH,
+    FLAT_DEPTH_PLACES,
+    FLAT_DEPTH_TOL,
     FLAT_LENGTH,
     FORM_CUT_DEPTH,
     FORM_DEPTH,
@@ -119,7 +123,9 @@ PROFILE_POINTS = [
     (0.0, 0.0),
 ]
 # The flat: a Front-plane box over the face from the flat's start to past the
-# tip, cut through the rod both ways along Z.
+# tip, cut through the rod both ways along Z.  Its floor (the face) stands
+# FLAT_DEPTH above a construction line on the rod's far side, so the depth the
+# sheet prints is the thickness a micrometer reads across the flat.
 _FLAT_FAR_X = TIP_STOCK + 1.0
 _FLAT_TOP = BIT_RADIUS + 1.0
 FLAT_POINTS = [
@@ -128,6 +134,8 @@ FLAT_POINTS = [
     (_FLAT_FAR_X, _FLAT_TOP),
     (_FLAT_FAR_X, 0.0),
 ]
+# The rod's far side at the flat's start, run to under P1.
+FAR_SIDE_ENDS = ((-FLAT_LENGTH, -BIT_RADIUS), (0.0, -BIT_RADIUS))
 
 
 def _unit(vector: Vector) -> Vector:
@@ -520,10 +528,48 @@ async def build(adapter: Any) -> dict[str, str]:
             f"flat {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    await anchor_point_to_origin(
-        adapter, f"{flat_lines[0]}.start", -FLAT_LENGTH, 0.0, "flat start"
+    set_sketch_direct_db(adapter, True)
+    far_side = check(
+        "flat far-side centerline",
+        await adapter.add_centerline(*FAR_SIDE_ENDS[0], *FAR_SIDE_ENDS[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for ref1, ref2, relation in (
+        (far_side, None, "horizontal"),
+        (f"{far_side}.end", "origin", "vertical_points"),
+        (f"{far_side}.start", f"{flat_lines[0]}.start", "vertical_points"),
+    ):
+        check(
+            f"flat far side {relation}",
+            await adapter.add_sketch_constraint(ref1, ref2, relation),
+        )
+    await dimension_between(
+        adapter,
+        f"{flat_lines[0]}.start",
+        "origin",
+        "horizontal_distance",
+        FLAT_LENGTH,
+        "flat start",
     )
     flat.record("FlatLength", '"FlatLength"')
+    await dimension_between(
+        adapter,
+        f"{far_side}.end",
+        "origin",
+        "vertical_distance",
+        BIT_RADIUS,
+        "rod far side",
+    )
+    flat.record("RodFarSide", '"BitDia"/2')
+    await dimension_between(
+        adapter,
+        f"{far_side}.start",
+        f"{flat_lines[0]}.start",
+        "vertical_distance",
+        FLAT_DEPTH,
+        "flat depth",
+    )
+    flat.record("FlatDepth", '"BitDia"/2')
     await dimension_between(
         adapter,
         f"{flat_lines[0]}.start",
@@ -629,6 +675,15 @@ async def build(adapter: Any) -> dict[str, str]:
         "BitDia",
         BIT_DIA_TOL,
         places=BIT_DIA_PLACES,
+        display_unit=UNIT,
+    )
+    # The flat's depth carries the title block's .XXX band at four places.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "FlatProfile",
+        "FlatDepth",
+        FLAT_DEPTH_TOL,
+        places=FLAT_DEPTH_PLACES,
         display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)

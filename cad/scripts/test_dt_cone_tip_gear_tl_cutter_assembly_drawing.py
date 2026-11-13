@@ -299,6 +299,13 @@ def test_the_exploded_labels_name_every_item_clear_of_the_ink() -> None:
     # ahead of the flat's end.
     back = fixture.BIT_POSITION[0] - drawing.LABEL_TIPS_MM[fixture.BIT][0]
     assert -fixture.bit.SHOULDER_X < back < fixture.bit.FLAT_LENGTH
+    # Every label stands wholly to one side of its tip, so its leader leaves
+    # the text's end and strikes no letter.
+    for stem, text in labels.items():
+        x0, _y0, x1, _y1 = drawing.label_box(
+            text, drawing.label_position(stem, tips[stem])
+        )
+        assert tips[stem][0] < x0 or x1 < tips[stem][0], stem
     boxes = {
         stem: drawing.label_box(text, drawing.label_position(stem, tips[stem]))
         for stem, text in labels.items()
@@ -317,3 +324,41 @@ def test_the_exploded_labels_name_every_item_clear_of_the_ink() -> None:
             assert not _overlap(boxes[name], part), name
         for axis in axes:
             assert not _overlap(boxes[name], axis), name
+
+
+def test_the_exploded_group_is_centred_on_its_sheet_off_the_title_block() -> None:
+    """Rule 15: the group's extent (axes, which span every item, and the
+    labels) centres on the sheet inside its border; no part enters the
+    title block."""
+    tips = {
+        stem: drawing.nominal_sheet_point(drawing._exploded_tip_mm(stem))
+        for stem in drawing.EXPLODED_LABELS
+    }
+    boxes = [
+        drawing.label_box(text, drawing.label_position(stem, tips[stem]))
+        for stem, text in drawing.EXPLODED_LABELS.items()
+    ]
+    boxes += [_box(*ends) for ends in drawing.EXPLODED_AXES_MM.values()]
+    x0 = min(box[0] for box in boxes)
+    y0 = min(box[1] for box in boxes)
+    x1 = max(box[2] for box in boxes)
+    y1 = max(box[3] for box in boxes)
+    left, bottom, right, top = SHEET_INNER
+    assert drawing.SHEET_INNER_BORDER == pytest.approx(SHEET_INNER)
+    assert (x0 + x1) / 2.0 == pytest.approx((left + right) / 2.0, abs=0.001)
+    assert (y0 + y1) / 2.0 == pytest.approx((bottom + top) / 2.0, abs=0.001)
+    for stem, part in _exploded_part_boxes().items():
+        assert not _overlap(part, TITLE_BLOCK), stem
+
+
+def test_the_steps_name_ends_by_view_and_no_private_phrase() -> None:
+    """Rules 22 and 26: item 1's cutting end is its bottom end in the front
+    view; the bit's orientation is stated in view terms only."""
+    steps = fixture.ASSEMBLY_STEPS
+    assert "CUTTING END" not in steps and "SPINDLE" not in steps
+    assert "FORWARD" not in steps and "LEADS" not in steps
+    for step in _steps():
+        if "ITEM 1'S BOTTOM END" in step:
+            assert "ITEM 1'S BOTTOM END (FRONT VIEW)" in step.replace("\n   ", " ")
+    assert sum("BOTTOM END" in step for step in _steps()) == 2
+    assert "FACE TOWARD THE VIEWER (FRONT VIEW)" in _steps()[0].replace("\n   ", " ")

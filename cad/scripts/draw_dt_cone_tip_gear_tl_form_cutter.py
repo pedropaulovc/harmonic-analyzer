@@ -92,13 +92,16 @@ def top_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 # --- Front view: the rod's length under it; its Ø far enough left of the
 # shank end that the three-line callout stays clear of the outline; the flat's
 # length with its text left of both extension lines (between them the lines
-# ran up through FLAT TO CENTER LINE, farm run 20261113T012650242Z); the front
-# clearance low and right of the plumb line, under the end view's side
-# clearance arc, whose extension line crossed it at 3.5 mm.
+# ran up through its old callout, farm run 20261113T012650242Z); the flat's
+# depth right of the tip, between the flat and the rod's far side, left of the
+# end view; the front clearance low and right of the plumb line, under the
+# end view's side clearance arc, whose extension line crossed it at 3.5 mm.
+FLAT_DEPTH_TEXT_X_MM = 2.0
 FRONT_KEEP = {
     "BitLength": front_xy(-part.BIT_LENGTH / 2.0, -_R - 1.2),
     "BitDia": front_xy(-part.BIT_LENGTH - 4.5, 0.0),
     "FlatLength": front_xy(-part.FLAT_LENGTH - 2.8, _R + 1.2),
+    "FlatDepth": front_xy(FLAT_DEPTH_TEXT_X_MM, -part.FLAT_DEPTH / 2.0),
     "FrontClearance": front_xy(3.0, -_R - 4.5),
 }
 # --- Face view: the three widths right of the tip, one column each a

@@ -131,6 +131,38 @@ def test_the_sheet_prints_each_marked_dimension_once_inside_the_border() -> None
     assert set(part.DIMENSION_CALLOUTS) <= set(keeps)
 
 
+def test_the_flat_prints_its_length_and_its_micrometer_depth_bare() -> None:
+    """The flat's depth is a native model dimension, the thickness from the
+    face to the rod's far side, nominal half the rod (zero rake), at four
+    places under the title block's .XXX band; neither flat dimension
+    carries words."""
+    assert part.DRAWING_DIMENSIONS["FlatProfile"] == {"FlatLength", "FlatDepth"}
+    assert part.FLAT_DEPTH == pytest.approx(part.BIT_DIA / 2.0)
+    assert part.FLAT_DEPTH / 25.4 == pytest.approx(0.0625)
+    assert part.DRAWING_PRECISION_BY_NAME["FlatDepth"] == 4
+    assert part.FLAT_DEPTH_TOL == pytest.approx(0.005 * 25.4)
+    assert "FlatLength" not in part.DIMENSION_CALLOUTS
+    assert "FlatDepth" not in part.DIMENSION_CALLOUTS
+    assert "CENTER" not in " ".join(part.DIMENSION_CALLOUTS.values())
+    # The depth's text sits right of the tip, between the face and the far
+    # side, left of the end view's rod.
+    x, y = drawing.FRONT_KEEP["FlatDepth"]
+    assert (
+        drawing.FRONT_P1[0] < x < drawing.RIGHT_AXIS[0] - part.BIT_RADIUS * drawing._S
+    )
+    assert drawing.FRONT_P1[1] - part.FLAT_DEPTH * drawing._S < y < drawing.FRONT_P1[1]
+
+
+def test_the_flat_band_holds_zero_rake_and_the_tooth_space() -> None:
+    import dt_cone_tip_gear_tl_cutter_spec as fixture
+
+    assert part.FLAT_FACE_OFFSET_MAX == pytest.approx(
+        part.FLAT_DEPTH_TOL + part.BIT_DIA_TOL / 2.0
+    )
+    assert 0.0 < fixture.RAKE_ERROR_DEG_MAX <= fixture.RAKE_ERROR_DEG_LIMIT
+    assert 0.0 < fixture.FORM_DISTORTION_MAX < fixture.FORM_DISTORTION_LIMIT
+
+
 def test_the_notes_state_facts_in_at_most_four_lines() -> None:
     lines = part.SHEET_NOTES.splitlines()
     assert len(lines) <= 4

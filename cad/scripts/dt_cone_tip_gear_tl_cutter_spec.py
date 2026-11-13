@@ -125,6 +125,32 @@ if not -bar.BAR_RADIUS < TAIL_X_RANGE[0] < TAIL_X_RANGE[1] < -set_screw.MAJOR_DI
 #     cross-hole station (its socket face then stands proudest).
 if bar.SET_SCREW_ENGAGED_MIN < bar.SET_SCREW_MIN_ENGAGEMENT:
     raise AssertionError("the seated set screw must keep 1.5D of thread")
+# (g) The flat's band (bit.FLAT_DEPTH_TOL, the title block's .XXX, plus the
+#     rod's half-band) sets the face at most bit.FLAT_FACE_OFFSET_MAX off the
+#     bar axis.  At the shortest swing, on the form's deepest point, that
+#     turns the rake by RAKE_ERROR_DEG_MAX (1.28 deg) and moves each face
+#     point outward by sqrt(r^2 + e^2) - r: under .002 mm, near-uniform
+#     across the form, which the plunge to over-pins absorbs.  What changes
+#     the tooth space's shape is that shift's spread across the form's depth
+#     (.0002 mm), held under half the MHA-DT-37 sheet 2 table's last place.
+_SWING_MIN = bar.BAR_RADIUS + STICK_OUT_WINDOW[0]
+_FORM_R_MIN = _SWING_MIN - bit.FORM_DEPTH
+_FORM_R_MAX = _SWING_MIN + bit.FORM_X_MAX
+
+
+def _face_shift(radius: float) -> float:
+    offset = bit.FLAT_FACE_OFFSET_MAX
+    return math.hypot(radius, offset) - radius
+
+
+RAKE_ERROR_DEG_MAX = math.degrees(math.asin(bit.FLAT_FACE_OFFSET_MAX / _FORM_R_MIN))
+RAKE_ERROR_DEG_LIMIT = 1.5
+FORM_DISTORTION_MAX = _face_shift(_FORM_R_MIN) - _face_shift(_FORM_R_MAX)
+FORM_DISTORTION_LIMIT = 0.5 * INCH * 10.0**-bit.FORM_PLACES
+if RAKE_ERROR_DEG_MAX > RAKE_ERROR_DEG_LIMIT:
+    raise AssertionError("the flat's band lets the rake drift past its limit")
+if FORM_DISTORTION_MAX >= FORM_DISTORTION_LIMIT:
+    raise AssertionError("the flat's band would distort the tooth space")
 
 # --- Sheet words ---------------------------------------------------------------
 BOM_COMPONENTS = (BAR, BIT, SET_SCREW)
@@ -138,19 +164,19 @@ def _window_text() -> str:
 
 # Item 3's cup bears on item 2's plain round: the stick-out is an adjustable
 # clamp setting (drawing-guidelines rule 23), so the steps set it, then prove
-# the clamp holds it.
+# the clamp holds it.  Ends and faces go by view names (rule 22): item 1's
+# cutting end is its bottom end in the front view.
 ASSEMBLY_STEPS = "\n".join(
     (
         "FITTING",
         "1. SLIDE ITEM 2 INTO ITEM 1'S CROSS HOLE, FORM END RIGHT, FACE",
-        "   TOWARD THE VIEWER (FRONT VIEW): THE FACE LEADS WITH THE",
-        "   SPINDLE IN FORWARD.",
+        "   TOWARD THE VIEWER (FRONT VIEW).",
         f"2. SET THE STICK-OUT {_window_text()} (CALIPER).",
         "3. TURN ITEM 2 UNTIL ITS FACE IS PARALLEL TO ITEM 1'S AXIS: A",
-        "   SQUARE ON ITEM 1'S CUTTING END SHOWS NO LIGHT BETWEEN ITS",
-        "   BLADE AND THE FACE.",
-        "4. TIGHTEN ITEM 3, CUP END FIRST, THROUGH ITEM 1'S CUTTING END",
-        "   ONTO ITEM 2'S ROUND SHANK.",
+        "   SQUARE ON ITEM 1'S BOTTOM END (FRONT VIEW) SHOWS NO LIGHT",
+        "   BETWEEN ITS BLADE AND THE FACE.",
+        "4. TIGHTEN ITEM 3, CUP END FIRST, UP THROUGH ITEM 1'S BOTTOM END",
+        "   (FRONT VIEW) ONTO ITEM 2'S ROUND SHANK.",
         "5. CHECK: ITEM 2 DOES NOT TURN OR SLIDE BY HAND.",
         f"6. CHECK: THE STICK-OUT STILL READS {_window_text()} (CALIPER).",
         "7. IF STEP 5 OR 6 FAILS, LOOSEN ITEM 3 AND REPEAT FROM STEP 2.",

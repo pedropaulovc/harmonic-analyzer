@@ -143,6 +143,16 @@ TIP_STOCK = 0.254
 # Flat to centre: from P1 back past the gear blank's reach, .XX.
 FLAT_LENGTH = 1.524  # .06
 FLAT_LENGTH_PLACES = 2
+# The flat's depth, printed as what stays: the flat to the rod's far side,
+# read with a micrometer, nominal half the rod (the face on the axis, zero
+# rake).  A face FLAT_FACE_OFFSET_MAX off the axis turns the rake by at most
+# dt_cone_tip_gear_tl_cutter_spec.RAKE_ERROR_DEG_MAX and moves the form
+# outward under .002 mm, so the title block's .XXX band holds it, printed
+# explicitly because four places give the half-rod nominal exactly.
+FLAT_DEPTH = BIT_RADIUS  # .0625
+FLAT_DEPTH_PLACES = 4
+FLAT_DEPTH_TOL = 0.127  # +/-.005, the title block's .XXX row
+FLAT_FACE_OFFSET_MAX = FLAT_DEPTH_TOL + BIT_DIA_TOL / 2.0
 FRONT_CLEARANCE_DEG = 10.0
 SIDE_CLEARANCE_DEG = 3.0
 CLEARANCE_PLACES = 0
@@ -379,14 +389,14 @@ REFERENCE_DIMENSIONS = frozenset(
 )
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BitProfile": {"BitDia", "BitLength"},
-    "FlatProfile": {"FlatLength"},
+    "FlatProfile": {"FlatLength", "FlatDepth"},
     FRONT_CLEARANCE_SKETCH: {"FrontClearance"},
     SIDE_CLEARANCE_SKETCH: {"SideClearance"},
     FORM_REFERENCE_SKETCH: set(REFERENCE_DIMENSIONS),
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BitProfile": {"BitDia": BIT_DIA_PLACES, "BitLength": BIT_LENGTH_PLACES},
-    "FlatProfile": {"FlatLength": FLAT_LENGTH_PLACES},
+    "FlatProfile": {"FlatLength": FLAT_LENGTH_PLACES, "FlatDepth": FLAT_DEPTH_PLACES},
     FRONT_CLEARANCE_SKETCH: {"FrontClearance": CLEARANCE_PLACES},
     SIDE_CLEARANCE_SKETCH: {"SideClearance": CLEARANCE_PLACES},
     FORM_REFERENCE_SKETCH: {name: FORM_PLACES for name in REFERENCE_DIMENSIONS},
@@ -404,14 +414,12 @@ if set(DRAWING_PRECISION) != set(DRAWING_DIMENSIONS) or any(
 
 # Rule 4: the band names its mate; rule 7: words, no method.  The material
 # block names the drill rod, so the Ø says only that it stays as supplied.
+# The flat's length and depth print bare: the depth dimension is the flat.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "BitDia": f"AS SUPPLIED\nSLIDING FIT IN {BAR_NUMBER}",
-    "FlatLength": "FLAT TO CENTER LINE",
     "FrontClearance": "FRONT CLEARANCE",
     "SideClearance": "SIDE CLEARANCE,\nBOTH FLANKS",
 }
-# The flat's callout states the face on the centre line; note 2 does not
-# repeat it.
 SHEET_NOTES = "\n".join(
     (
         f"1. FACE FORM: TOOTH SPACE OF {GEAR_NUMBER}, SHEET 2 (P1-P17), CENTERED ON BIT AXIS.",
