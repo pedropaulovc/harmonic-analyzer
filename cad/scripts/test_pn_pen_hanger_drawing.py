@@ -201,18 +201,20 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
 
 
 def test_plate_stock_callout_row_clears_the_bottom_width_row() -> None:
-    # PlateThick's line stands left of the plate edge; its two-row block,
-    # shelved left of that line and centred on the keep's height, sits under
-    # the foot's extension line (and the 170.0 arrowhead on it) and ends
-    # left of the bottom width's row, whose value is right.
+    # PlateThick's line stands left of the plate edge; its three-row block
+    # (value, stock, SEE NOTE 1), shelved left of that line and centred on
+    # the keep's height, sits under the foot's extension line (and the 170.0
+    # arrowhead on it) and ends left of the bottom width's row, whose value
+    # is right: the two share heights but not columns.
     foot = draw._fy(spec.STRAP_BOT_Y)
     thick_x, thick_y = draw.FRONT_KEEP["PlateThick"]
     width_x, width_y = draw.FRONT_KEEP["StrapBotWidth"]
-    assert width_y < thick_y < foot
+    assert width_y < foot and thick_y < foot
     assert thick_x < draw._fx(draw._X[1])
-    # The block is ~10.7 mm tall (20261014T024823419Z sheet): its top stays
-    # at least 3 mm under the foot line that struck "(1.5)" at keep 4 under.
-    assert foot - (thick_y + 0.0107 / 2.0) >= 0.003
+    # Two rows measured ~10.7 mm tall (20261014T024823419Z sheet), three
+    # ~15.7: its top stays at least 3 mm under the foot line that struck
+    # "(1.5)" at keep 4 under.
+    assert foot - (thick_y + 0.0157 / 2.0) >= 0.003
     # The ~27 mm block ends at its dimension line, left of the bottom
     # width's ~8 mm value.
     assert thick_x < width_x - 0.004
@@ -406,3 +408,34 @@ def test_notes_carry_no_dimensions() -> None:
     assert len(lines) <= 4  # rule 7: at most four short lines
     for line in lines:
         assert not re.search(r"\d\.\d|\+/-|±", line), line
+
+
+def test_each_numbered_note_is_flagged_from_its_feature() -> None:
+    # Rule 7: a numbered note is linked to its feature by SEE NOTE n.
+    numbers = [
+        int(line.split(".", 1)[0])
+        for line in spec.DRAWING_NOTES.splitlines()
+        if line[:1].isdigit()
+    ]
+    assert numbers == [spec.BRAZE_NOTE, spec.SLOTS_NOTE]
+    flagged = {
+        int(row.removeprefix("SEE NOTE "))
+        for callout in spec.DIMENSION_CALLOUTS.values()
+        for row in callout.splitlines()
+        if row.startswith("SEE NOTE ")
+    }
+    assert flagged == set(numbers)
+    assert spec.DIMENSION_CALLOUTS["SlotWidth"].endswith(f"SEE NOTE {spec.SLOTS_NOTE}")
+    # Note 1 (the braze) on the lower plate's stock callout; a location
+    # dimension (the upper plate's drop) carries only its value and band.
+    braze = {
+        name
+        for name, callout in spec.DIMENSION_CALLOUTS.items()
+        if f"SEE NOTE {spec.BRAZE_NOTE}" in callout.splitlines()
+    }
+    assert braze == {"PlateThick"}
+    assert "UpperPlateDrop" not in spec.DIMENSION_CALLOUTS
+    for name in spec.DIMENSION_CALLOUTS:
+        assert name in draw.FRONT_KEEP or name in draw.SECTION_KEEP, name
+    # Rule 7: at most two lines of words under a size.
+    assert all(len(c.splitlines()) <= 2 for c in spec.DIMENSION_CALLOUTS.values())
