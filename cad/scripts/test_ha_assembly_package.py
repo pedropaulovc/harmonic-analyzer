@@ -50,3 +50,13 @@ def test_release_ships_the_sequence_and_tool_list(tmp_path, monkeypatch):
             assert run.text in text
     for use in package.tool_uses():
         assert use.tool.name in text
+
+
+def test_summing_lever_step_stops_before_its_final_assembly_step():
+    import ha_harmonic_analyzer_assembly_sheet as ha_sheet
+    import sm_summing_assembly_sheet as sm_sheet
+
+    numbers = [step.split(". ", 1)[0] for step in sm_sheet.ASSEMBLY_STEPS]
+    last = numbers.index(ha_sheet.SM_LAST_BENCH_STEP)
+    assert "AT FINAL ASSEMBLY" in sm_sheet.ASSEMBLY_STEPS[last + 1]
+    assert not any("FINAL ASSEMBLY" in step for step in sm_sheet.ASSEMBLY_STEPS[: last + 1])
