@@ -13,8 +13,9 @@ the reference arm straight (the bend's exit tangent to the faced arm end) on
 the tube's axes, from the part's hidden ``StationReference``; the bend's
 centreline radius; the tube's reference stock Ø with its wall; the overall
 reach (faced arm end to the leg's outer side) and the reference overall
-height, from the part's hidden ``OverallReference``.  The isometric is at
-1:4.  The sheet prints decimal inch (#290, the registry row's drawing_unit).
+height, from the part's hidden ``OverallReference``.  The bend's acceptance
+stands at its own leader on the bend.  The isometric is at 1:4.  The sheet
+prints decimal inch (#290, the registry row's drawing_unit).
 
 Run with SolidWorks open::
 
@@ -24,6 +25,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -43,6 +45,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -53,6 +56,7 @@ from _session import run_build
 import _telemetry
 from sm_gooseneck_geom import (
     ARM_Y,
+    BEND_R,
     LEG_BOTTOM,
     LEG_TOP,
     TUBE_DIA,
@@ -150,11 +154,30 @@ if set(FRONT_KEEP) != {
 }:
     raise AssertionError("the gooseneck sheet does not place every marked dimension")
 
-# The note sits in the bottom left, under the elevation's foot (y ~0.067) and
-# left of the title block (x 0.216); the isometric's note sits under it.  The
-# elevation is a projected principal view at the sheet's scale, so it carries
-# no label (drawing-guidelines.md rule 9).
-NOTES_XY = (0.016, 0.062)
+# The bend's acceptance is short, so it prints at its own leader on the bend,
+# not as a numbered note in the corner (drawing-guidelines.md rule 7, "flag
+# it where it applies"; machinist review of the v49 release, acd9e8f84d: note
+# 1 stood alone with no flag at the R3.0 callout).  Two rows, ~39 mm wide at
+# ~2.62 mm a glyph (farm run 20261112T194827228Z), left of the faced arm end
+# and just under the arm: the block ends 4.7 mm left of the arm end and its
+# top 5.5 mm under the arm's inner edge, far over the tube Ø's text.  Its
+# leader runs right, under the arm, to the bend's inner arc 55° up from the
+# leg, so it stays well above the bend's centre: the R3.0 dimension's line
+# runs in from the leg's tangent toward that centre, and the leader of the
+# first placement (block under the centre, tip 35° up) crossed it (machinist
+# review of that run, r1-r3).  The text is the part's Manufacturing Notes
+# property (spec DRAWING_NOTES) without its number and "BEND:", which the
+# leader now says.  The elevation is a projected principal view at the
+# sheet's scale, so it carries no label (drawing-guidelines.md rule 9).  The
+# isometric's note sits under it, over the title block.
+BEND_ACCEPTANCE = "OVALITY 5% MAX,\nNO KINKS"
+_BEND_INNER_R = BEND_R - _TUBE_R
+_BEND_TIP_ANGLE = math.radians(55.0)
+BEND_NOTE_TIP = (
+    _front_x(-BEND_R + _BEND_INNER_R * math.cos(_BEND_TIP_ANGLE)),
+    _front_y(LEG_TOP + _BEND_INNER_R * math.sin(_BEND_TIP_ANGLE)),
+)
+BEND_NOTE_XY = (ARM_END_X - 0.044, _front_y(ARM_Y - _TUBE_R) - 0.0055)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.085)
 
 
@@ -185,7 +208,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open gooseneck source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -206,6 +229,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
+    acceptance = " ".join(BEND_ACCEPTANCE.split())
+    if properties["Manufacturing Notes"] != f"1. BEND: {acceptance}":
+        raise RuntimeError(
+            "gooseneck bend acceptance does not match the part's notes: "
+            f"{properties['Manufacturing Notes']!r}"
+        )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         property_view=PART_STEM,
@@ -239,7 +268,14 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_part_callouts(adapter, annotations)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_leader_note(
+        adapter,
+        BEND_ACCEPTANCE,
+        text_xy=BEND_NOTE_XY,
+        attach_xy=BEND_NOTE_TIP,
+        label="bend acceptance",
+        view=front,
+    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
