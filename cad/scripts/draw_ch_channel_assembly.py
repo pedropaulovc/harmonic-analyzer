@@ -1202,10 +1202,14 @@ def _fitup_text() -> dict[str, str]:
             "MEASURE THE STACK OVER ITS END HUB FACES WITH A CALIPER: IT MUST "
             f"MEET THE {rocker_view} STACK DIMENSION."
         ),
+        # A short stack has a hub under its printed length (the band is
+        # upper-only, so twenty conforming hubs meet the low limit); the same
+        # step brings the stack into its band either way (#2338 review).
         "rocker-stack-refaced": (
             "IF IT IS LONG, FACE THE LONGEST HUBS ON THEIR ENDS AWAY FROM DATUM "
-            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH, AND "
-            f"RETURN TO STEP {n('rocker-stack-measured')}."
+            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH; IF IT IS "
+            f"SHORT, REPLACE EACH {arm} WHOSE HUB IS UNDER THAT LENGTH. RETURN "
+            f"TO STEP {n('rocker-stack-measured')}."
         ),
         "rockers-kept-in-order": (
             f"SLIDE THE ROCKERS OFF {shaft} IN ORDER AND KEEP THAT ORDER."
