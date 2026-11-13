@@ -204,7 +204,6 @@ def test_tooth_space_sheet_defines_the_space_point_by_point() -> None:
     assert title == "MHA-DT-37 TOOTH SPACE, INCH (CONTINUED FROM SHEET 1)"
     assert drawing.SHEET_NAMES == ("T006", "DT6-FORM1")
     assert "TOLERANCE" not in notes_text
-    assert family.CUSTOM_SIX_FORM_TOLERANCE_NOTE not in notes_text
     assert notes_text.splitlines()[-1].endswith(
         f"SEE SHEET 1 NOTE {notes.TEETH_NOTE_NUMBER}."
     )
