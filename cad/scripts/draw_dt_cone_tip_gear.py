@@ -490,9 +490,10 @@ def form_sheet_notes() -> str:
     own, #2358)."""
     return "\n".join(
         (
-            # The R column and the plot's station radii derive from X and Y
-            # (REF); Y is a BASIC station (machinist review of PR #2557).
-            "R (REF) FROM GEAR AXIS; Y BASIC, ALONG CL FROM P1; X FROM CL, EACH SIDE.",
+            # With no form band and no frame, every column is reference: the
+            # gear's over-pins and backlash (sheet 1 note 2) accept the form
+            # (machinist review of #2358's head).
+            "R, X, Y (REF): R FROM GEAR AXIS; Y ALONG CL FROM P1; X EACH SIDE OF CL.",
             "ACCEPT THE FORM BY THE GEAR IT CUTS, SEE SHEET "
             f"{SHEET_NAMES.index(GEAR_SHEET) + 1} NOTE {TEETH_NOTE_NUMBER}.",
         )

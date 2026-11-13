@@ -131,3 +131,14 @@ def test_the_references_are_the_spec_values_at_the_spec_places() -> None:
         assert not (TITLE_BLOCK[0] < x and y < TITLE_BLOCK[3]), name
     # The front view's bar stays inside the border.
     assert drawing.FRONT_ORIGIN[1] + fixture.bar.BAR_LENGTH * drawing._S < top
+
+
+def test_the_references_end_on_a_true_vertex_that_prints_as_the_tip() -> None:
+    """The form's edges are equation-driven splines, so the references end on
+    the face's root-arc/relief corner, a real vertex, not on the arc at P1."""
+    segments = {s.name: s for s in fixture.bit.form_segments(1.0)}
+    corner = fixture.bit.face_point(*segments["UpperRelief"].point(1.0))
+    assert drawing.TIP_CORNER_MM == pytest.approx((corner[0], 0.0, corner[1]))
+    # Ahead of P1, but by less than half the references' last place.
+    half_place = 0.5 * 25.4 * 10.0**-fixture.DRAWING_REFERENCE_PRECISION
+    assert 0.0 < drawing.TIP_CORNER_MM[0] < half_place
