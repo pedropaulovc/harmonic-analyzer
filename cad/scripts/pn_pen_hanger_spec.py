@@ -385,16 +385,17 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("UpperSlotCorner", "SlotCornerR"): "2X R",
 }
 
-# Note 2 is the slots' fit route (drawing-guidelines.md "What the shop
-# holds": two .002-band slots in line across a brazed joint are reached by
-# cutting both in one setup after brazing, not by placing pre-cut plates),
-# with the rod's free fall as its acceptance.
+# Note 1 makes the lower plate the upper one's twin (section A-A draws only
+# the upper).  Note 2 is the slots' requirement after the braze, with the
+# rod's free fall as its acceptance (rule 7: geometry, not method; the shop
+# reaches two .002-band slots in line across a brazed joint by cutting both
+# after brazing, drawing-guidelines.md "What the shop holds", #2435).
 DRAWING_NOTES = "\n".join(
     (
-        f"{BRAZE_NOTE}. TWO GUIDE PLATES BRAZED (BAg-7) TO STRAP FRONT;",
+        f"{BRAZE_NOTE}. TWO GUIDE PLATES ALIKE, BRAZED (BAg-7) TO STRAP FRONT;",
         "   LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS.",
-        f"{SLOTS_NOTE}. BOTH SLOTS CUT IN ONE SETUP AFTER BRAZING; PEN ROD",
-        f"   {PEN_ROD_NUMBER} SLIDES FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
+        f"{SLOTS_NOTE}. SLOTS IN LINE AFTER BRAZING: PEN ROD {PEN_ROD_NUMBER} SLIDES",
+        "   FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
 # The upper plate's braze station across the strap (rule 10: a location is a

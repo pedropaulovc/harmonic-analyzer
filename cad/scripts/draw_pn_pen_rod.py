@@ -192,7 +192,7 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 #     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
 #   row 3 (y 0.2045): the (4.82) reference, end face to end face, its line
 #     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
-# Ø.1260 -.0002/-.0005 between the pivot flanks: its line stands 5.75 mm
+# Ø.1260 -.0005/-.0020 between the pivot flanks: its line stands 5.75 mm
 #   left of the pivot end (x 0.07675), the flanks' extension lines reaching
 #   it, so it rises past every row clear of their lines (all start at the
 #   pivot end or right of it) to the four-row ~56 x 20 mm block centred at

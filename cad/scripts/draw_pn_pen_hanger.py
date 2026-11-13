@@ -13,11 +13,11 @@ front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
 the strap outline, the screw-hole station, the upper plate's drop, the
-plates' sheet-stock thickness (a reference, SEE NOTE 1) and the
+plates' bar-stock thickness (a reference, SEE NOTE 1) and the
 centreline both slots share; section A-A (2:1) cuts the strap just above the
 upper plate and looks down onto its U, carrying the slot (its depth and the
 plate's reach both from the plate's free end), its corner radius, the strap's
-sheet-stock thickness (a reference) and the plate's overhang past the strap's
+bar-stock thickness (a reference) and the plate's overhang past the strap's
 edge (its braze station across the strap); the shaded isometric (1:1) fills
 the right of the sheet.
 
@@ -185,7 +185,7 @@ SECTION_CENTER = (0.230, 0.195)
 # The 1:1 iso is about 42 wide x 158 tall on the sheet (twice the 1:2 view's
 # 21 x 76 on the 20261014T010321468Z sheet): centred at y 0.166 it spans
 # y 0.087..0.245, under the top border (0.267) and above its note; its left
-# edge (x 0.341) stands 40 mm right of the slot width's text block (x 0.298).
+# edge (x 0.341) stands ~17 mm right of the slot width's text block (x ~0.324).
 ISO_CENTER = (0.362, 0.166)
 # The note's top-left: its line (~2.5 mm a character) centres under the iso
 # and stands 12 mm above the title block's top edge (y 0.065 for x >= 0.216).
@@ -709,8 +709,8 @@ async def build(adapter: Any) -> dict[str, str]:
         {"SlotWidth": SLOT_WIDTH_TEXT_XY, "StrapThick": STRAP_THICK_TEXT_XY},
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # The strap's and the guide plates' thickness is the sheet stock's, each
-    # printed as a reference (no band) over its SHEET STOCK callout row.
+    # The strap's and the guide plates' thickness is the bar stock's, each
+    # printed as a reference (no band) over its 1/8 CF FLAT callout row.
     references = [
         (dimension_name(adapter, item), item)
         for item in annotations
