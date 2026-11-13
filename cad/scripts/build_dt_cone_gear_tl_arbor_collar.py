@@ -4,8 +4,11 @@ One native part, three named members (``dt_cone_gear_tl_arbor_collar_spec``):
 each member owns one disc, an annulus on the Front Plane extruded +Z by the
 collar's length, and the other members' discs are suppressed in it
 (``_purchased_part_variants``: ``create_member_configurations``,
-``select_member_features``, ``apply_member_properties``, ``save_member_part``,
-the base bar's recipe).
+``select_member_features``, ``apply_member_properties``, ``save_member_part``).
+Each disc is authored with its own member active and the discs authored
+before it suppressed there (the rail kit's recipe): a disc extruded into
+another member's solid merges with it and makes that disc its parent, so
+unsuppressing it in its own member brings the foreign disc back.
 
 Frame: axis +Z; the face on the blank at z = 0, the face under the nut at
 z = LENGTH.
@@ -33,6 +36,7 @@ from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _purchased_part_variants import (
+    activate_member,
     apply_member_properties,
     assert_member_properties,
     assert_member_suppression,
@@ -40,6 +44,7 @@ from _purchased_part_variants import (
     require_member_configurations,
     save_member_part,
     select_member_features,
+    set_member_suppression,
 )
 from _rebuild import force_rebuild
 from _session import run_build
@@ -124,26 +129,37 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    # The first member (the largest disc) is active while every disc is
-    # authored; each smaller disc lies inside it, so the solid stays its.
     await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
     for name, value in spec.GLOBALS.items():
         await set_global(adapter, name, f"{value}mm")
 
-    drive_jobs: list[tuple[str, str]] = []
-    largest = spec.V_BY_CONFIGURATION[CONFIGURATIONS[0]]
+    # Each disc with its own member active and every disc authored before it
+    # suppressed there, so no disc merges into another member's solid; its
+    # equations are driven while its member is active.
+    authored: list[str] = []
     for configuration in CONFIGURATIONS:
+        await activate_member(adapter, configuration)
+        for previous in reversed(authored):
+            set_member_suppression(
+                adapter, spec.CONFIGURATION_FEATURES[previous], suppressed=True
+            )
+        drive_jobs: list[tuple[str, str]] = []
         await _add_disc(adapter, drive_jobs, configuration)
+        expected = spec.V_BY_CONFIGURATION[configuration]
         await volume_check(
-            adapter, f"collar disc {configuration}", largest, _V_TOL * largest
+            adapter, f"collar disc {configuration}", expected, _V_TOL * expected
         )
-    await force_rebuild(adapter)
-    for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
-        adapter, "driven collars (equations neutral)", largest, _V_TOL * largest
-    )
+        await force_rebuild(adapter)
+        for dimension_name, expression in drive_jobs:
+            await drive_dimension(adapter, dimension_name, expression)
+        await force_rebuild(adapter)
+        await volume_check(
+            adapter,
+            f"driven collar {configuration} (equations neutral)",
+            expected,
+            _V_TOL * expected,
+        )
+        authored.append(configuration)
 
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

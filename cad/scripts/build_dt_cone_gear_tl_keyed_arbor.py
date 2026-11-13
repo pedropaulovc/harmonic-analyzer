@@ -275,14 +275,26 @@ def _union_volume(sections) -> float:
 async def _cut_centres(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
     """Both 60° centre holes in one revolve cut and return the volume removed.
 
-    ``build_pd_transgear_thumbnut``'s countersink recipe on the Right Plane
+    ``build_pd_transgear_thumbnut``'s countersink layout on the Right Plane
     (model Y, Z): a centreline on the axis from the grip end to the thread end,
     and per end a triangle -- the cone line, the end-face line from the mouth to
     the axis, the axis line back to the apex -- sized by its mouth diameter
-    (diametric from the centreline) and its 30° half angle. The grip end's
-    axis point is the origin; the thread end's stands the arbor's length along
-    the axis. Model points map to the sketch through ModelToSketchTransform,
-    which also says which sketch axis runs along the arbor.
+    (diametric from the centreline) and its cone depth along the axis, driven
+    as mouth/2 / tan(30°). The grip end's axis point is the origin; the thread
+    end's stands the arbor's length along the axis. Model points map to the
+    sketch through ModelToSketchTransform, which also says which sketch axis
+    runs along the arbor.
+
+    No angular dimension: ``add_sketch_dimension(..., "angular")`` hands
+    ``AddDimension`` a text point in SKETCH coordinates, and SolidWorks picks
+    the measured angle region from that point read in model space (the index
+    plate's ``_add_flank_reference`` note). On the Front Plane the two agree;
+    on this Right Plane (sketch u = -Z) the point lands outside the 30° wedge,
+    so the dimension can take the 150° side and, driven to 30°, solve each
+    apex across its end face into air, leaving the revolve no material to cut
+    (farm run 20261112T203156536Z: "Failed to create revolve feature" with a
+    fully defined sketch). An axial distance keeps the side the apex was
+    drawn on.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -312,7 +324,7 @@ async def _cut_centres(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
             ],
             0.0,
             "HeadCentreDia",
-            "HeadCentreHalfAngle",
+            "HeadCentreDepth",
             head_dia,
         ),
         (
@@ -324,7 +336,7 @@ async def _cut_centres(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
             ],
             length,
             "TailCentreDia",
-            "TailCentreHalfAngle",
+            "TailCentreDepth",
             tail_dia,
         ),
     )
@@ -348,8 +360,8 @@ async def _cut_centres(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
         check(
             relation_label, await adapter.add_sketch_constraint(first, second, relation)
         )
-    for (end_label, _points, z, dia_name, angle_name, dia), lines in chains:
-        cone, face, centre = lines
+    for (end_label, _points, z, dia_name, depth_name, dia), lines in chains:
+        _cone, face, centre = lines
         for i in range(3):
             check(
                 f"{end_label} centre junction {i}",
@@ -386,13 +398,19 @@ async def _cut_centres(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
             label=f"{end_label} centre diameter",
         )
         dims.record(dia_name, f'"{dia_name}"')
-        check(
-            f"{end_label} centre half angle",
-            await adapter.add_sketch_dimension(
-                cone, centre, "angular", spec.CENTRE_HALF_ANGLE_DEG
-            ),
+        depth_kind = "horizontal_distance" if along_x else "vertical_distance"
+        await dimension_between(
+            adapter,
+            f"{centre}.start",
+            f"{centre}.end",
+            depth_kind,
+            spec.centre_depth_mm(dia),
+            f"{end_label} centre depth",
         )
-        dims.record(angle_name)
+        dims.record(
+            depth_name,
+            f'"{dia_name}" / 2 / tan({spec.CENTRE_HALF_ANGLE_DEG:g})',
+        )
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, spec.CENTRE_SKETCH)
