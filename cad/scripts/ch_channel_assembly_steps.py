@@ -70,6 +70,7 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",
     "rocker-stack-measured",
     "rocker-stack-refaced",
+    "rocker-stack-short",
     "rockers-kept-in-order",
     RODS_PINNED_KEY,
     "rod-pins-dressed",

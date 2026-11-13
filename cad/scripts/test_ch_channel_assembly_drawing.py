@@ -215,6 +215,7 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         assert len(drawing._wrapped_step(key, drawing.FITUP_TEXT[key])) <= 6
     for key, target in (
         ("rocker-stack-refaced", "rocker-stack-measured"),
+        ("rocker-stack-short", "rocker-stack-measured"),
         ("rod-pin-remade", steps.RODS_PINNED_KEY),
         ("bank-spring-replaced", "bank-spring-checked"),
         ("south-bracket-reset", "south-bracket-spring-set"),
@@ -1302,6 +1303,7 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         "rocker-stack-accepted",
         "rocker-stack-measured",
         "rocker-stack-refaced",
+        "rocker-stack-short",
         "rockers-kept-in-order",
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",

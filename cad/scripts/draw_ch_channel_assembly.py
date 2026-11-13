@@ -1195,21 +1195,23 @@ def _fitup_text() -> dict[str, str]:
         # loose; each rod + arm pair is then pinned at the bench, before the
         # drive-train cylinder stack captures the rod rings in their cams.
         "rocker-stack-accepted": (
-            f"STACK THE {COUNT} {arm} ROCKERS ON {shaft} AS {rocker_view} SHOWS, "
-            "HUBS IN CONTACT."
+            f"STACK {COUNT} {arm} ON {shaft} AS {rocker_view} SHOWS, HUBS TOUCHING."
         ),
         "rocker-stack-measured": (
             "MEASURE THE STACK OVER ITS END HUB FACES WITH A CALIPER: IT MUST "
             f"MEET THE {rocker_view} STACK DIMENSION."
         ),
-        # A short stack has a hub under its printed length (the band is
-        # upper-only, so twenty conforming hubs meet the low limit); the same
-        # step brings the stack into its band either way (#2338 review).
         "rocker-stack-refaced": (
             "IF IT IS LONG, FACE THE LONGEST HUBS ON THEIR ENDS AWAY FROM DATUM "
-            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH; IF IT IS "
-            f"SHORT, REPLACE EACH {arm} WHOSE HUB IS UNDER THAT LENGTH. RETURN "
-            f"TO STEP {n('rocker-stack-measured')}."
+            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH, AND "
+            f"RETURN TO STEP {n('rocker-stack-measured')}."
+        ),
+        # A short stack has a hub under its printed length: the band is
+        # upper-only, so twenty conforming hubs meet the low limit (#2338
+        # review: the short case had no procedure).
+        "rocker-stack-short": (
+            f"IF IT IS SHORT, REPLACE EACH {arm} WHOSE HUB IS UNDER ITS PRINTED "
+            f"LENGTH AND RETURN TO STEP {n('rocker-stack-measured')}."
         ),
         "rockers-kept-in-order": (
             f"SLIDE THE ROCKERS OFF {shaft} IN ORDER AND KEEP THAT ORDER."
@@ -1222,7 +1224,7 @@ def _fitup_text() -> dict[str, str]:
         "rod-pins-dressed": f"DRESS BOTH ENDS OF EACH {pin} FLUSH WITH THE TINES.",
         "rod-pins-held": f"CHECK EACH {pin} DOES NOT SLIDE IN ITS FORK BY HAND.",
         "rod-arms-swing": (
-            f"CHECK EACH {arm} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
+            f"CHECK EACH {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
         # A press whose part slides in by hand is a slip fit (rule 23). The pin
         # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
@@ -1250,7 +1252,7 @@ def _fitup_text() -> dict[str, str]:
             f"KEPT AT STEP {n('rockers-kept-in-order')}."
         ),
         "south-washer-fitted": (
-            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT-HAND HUB."
+            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT HUB."
         ),
         # #2337: the right bracket is zeroed on its foot end with the ear on
         # the washer before the spring covers it, on the mill the left ear was
