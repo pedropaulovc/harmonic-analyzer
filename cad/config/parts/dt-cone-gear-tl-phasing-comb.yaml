@@ -10,7 +10,7 @@ dt-cone-gear-tl-phasing-comb:
   # brass or other metal. Never in the drive-train BOM.
   number: MHA-DT-03-TL-02
   material: C26000 BRASS, HALF-HARD
-  material_specification: C26000 half-hard brass shim stock, .020 in, ASTM B36
+  material_specification: C26000 half-hard brass shim stock, .020 in +/-.002 in, ASTM B36
   finish: as cut
   quantity: 1
   tolerance_class: machined_block

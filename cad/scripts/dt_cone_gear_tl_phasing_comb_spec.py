@@ -27,7 +27,8 @@ sheet's south end on its T030 blade's edge: the SEAT line.
 The seat: T030's blade drops into T030's space until it bottoms on T030's
 root; on the thickest sheet over the narrowest root space it binds between
 the flanks just above it instead. Where it bottoms, the sheet may slide
-across the space as far as the space lets it (``SEAT_POSITIONS``). Every other
+across the space as far as the space lets it (``SEAT_CONDITIONS``,
+``COMB_SLIDE_MM``). Every other
 blade stands at its printed depth under the seat line, at the title block's
 .XXX band; each bonded gear turns until its space holds its blade, anywhere
 in that space's play. The depths are the deepest on the .001 grid at which no
@@ -211,7 +212,7 @@ def _placement_window_min_mm() -> float:
 # The fitter centres the comb on the stack by eye; at the worst stack and
 # print it still has this much axial freedom.
 AXIAL_PLACEMENT_WINDOW_MM = _placement_window_min_mm()
-if AXIAL_PLACEMENT_WINDOW_MM <= 0.0:
+if AXIAL_PLACEMENT_WINDOW_MM < 0.1:
     raise AssertionError(
         f"comb placement window {AXIAL_PLACEMENT_WINDOW_MM:.3f} mm: a step overhangs"
     )
@@ -564,8 +565,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     SHEET_FEATURE: {"SheetThick"},
 }
 # Every length and height no fit depends on is .XX (rule 3); each blade's
-# depth (it decides where the blade meets its space) and the stock's
-# thickness are .XXX, at the title block's band.
+# depth (it decides where the blade meets its space) is .XXX at the title
+# block's band, and the stock's thickness .XXX as a reference.
 _THREE_PLACE = frozenset({"SheetThick", *(blade_depth_name(t) for t in BONDED_TEETH)})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: DEPTH_PLACES if name in _THREE_PLACE else 2 for name in names}
@@ -584,18 +585,24 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
         raise AssertionError(f"{_name} {_value} mm is off its .{'X' * _places} grid")
 
 # --- Sheet words ----------------------------------------------------------------
-# Note 1 names the gear each blade serves, south (left) to north, once
-# (rule 4). The thickness is the stock's. Words only, no narration (rule 7).
-_NAMES = [gear_number(t) for t in GEARS]
+# Each blade's depth names its gear (rule 4) and flags note 1, which says
+# what the depth is for (rule 7); the left blade, T030's, is the depths'
+# datum. The thickness is the stock's, printed as a reference over SHEET
+# STOCK (pn-pen-hanger, pd-platen-clip): the stock's own tolerance governs.
+NOTE_FLAG = "SEE NOTE 1"
 SHEET_NOTES = "\n".join(
     (
-        "1. LEFT TO RIGHT IN THE FRONT VIEW, THE BLADES DROP INTO ONE",
-        f"   TOOTH SPACE EACH OF {_NAMES[0]}, {_NAMES[1]},",
-        f"   {_NAMES[2]}, {_NAMES[3]} AND {_NAMES[4]}.",
+        "1. EACH BLADE DROPS INTO ONE TOOTH SPACE OF THE GEAR NAMED AT ITS",
+        "   DEPTH, CLEAR OF THAT GEAR'S ROOT. THE LEFT BLADE, FROM WHICH THE",
+        f"   DEPTHS ARE TAKEN, SEATS IN A TOOTH SPACE OF {gear_number(REFERENCE_TEETH)}.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
     raise AssertionError("at most four note lines")
 STOCK_TEXT = "SHEET STOCK"
-CALLOUTS_BELOW: dict[str, str] = {"SheetThick": STOCK_TEXT}
+REFERENCE_DIMENSIONS = frozenset({"SheetThick"})
+CALLOUTS_BELOW: dict[str, str] = {
+    **{blade_depth_name(t): f"{gear_number(t)}\n{NOTE_FLAG}" for t in BONDED_TEETH},
+    "SheetThick": STOCK_TEXT,
+}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

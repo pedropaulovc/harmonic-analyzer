@@ -102,7 +102,7 @@ def test_every_level_clears_the_smaller_gear_beyond_it() -> None:
 
 
 def test_every_step_fits_the_stack_axially() -> None:
-    assert spec.AXIAL_PLACEMENT_WINDOW_MM > 0.0
+    assert spec.AXIAL_PLACEMENT_WINDOW_MM >= 0.1
     assert spec.SHEET_LENGTH == spec.BLADE_START_MM[6] + spec.BLADE_LENGTH
 
 
@@ -123,7 +123,8 @@ def test_the_profile_is_a_rectilinear_staircase_on_the_seat_origin() -> None:
 
 def test_every_dimension_prints_at_the_title_block() -> None:
     """No band tighter than the title block, none set on the model; the
-    depths and the stock's thickness .XXX, every length .XX (rule 3)."""
+    depths .XXX, every length .XX (rule 3); the stock's thickness a
+    reference over SHEET STOCK, whose ±.002 the registry row states."""
     assert model_toleranced_dimensions(part) == {}
     marked = drawing.sheet_dimension_names()
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -132,18 +133,31 @@ def test_every_dimension_prints_at_the_title_block() -> None:
         assert name in spec.GLOBALS, name
         places = 3 if name == "SheetThick" or name.startswith("BladeDepth") else 2
         assert spec.DRAWING_PRECISION_BY_NAME[name] == places, name
-    assert spec.CALLOUTS_BELOW == {"SheetThick": "SHEET STOCK"}
+    assert spec.REFERENCE_DIMENSIONS == {"SheetThick"}
+    assert spec.CALLOUTS_BELOW["SheetThick"] == "SHEET STOCK"
+    assert "set_reference_dimension" in inspect.getsource(drawing.build)
+    assert (
+        ".020 in +/-.002 in" in _config.parts(spec.PART_NAME)["material_specification"]
+    )
 
 
-def test_note_one_names_every_gear_once_with_words_only() -> None:
+def test_each_gear_is_named_once_and_every_depth_flags_note_one() -> None:
+    """Rule 4: each bonded blade's depth names its gear; note 1, flagged at
+    each depth (rule 7), says what the depth is for and names T030's blade,
+    the depths' datum."""
+    for teeth in spec.BONDED_TEETH:
+        assert spec.CALLOUTS_BELOW[spec.blade_depth_name(teeth)].splitlines() == [
+            spec.gear_number(teeth),
+            "SEE NOTE 1",
+        ]
     notes = spec.SHEET_NOTES.splitlines()
-    assert 1 <= len(notes) <= 4
-    text = " ".join(notes)
+    assert 1 <= len(notes) <= 4 and notes[0].startswith("1. ")
+    named = "\n".join((spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values()))
     for teeth in spec.GEARS:
-        assert text.count(spec.gear_number(teeth)) == 1, teeth
-    positions = [text.index(spec.gear_number(t)) for t in spec.GEARS]
-    assert positions == sorted(positions)
-    # No method, no dimension (rule 7).
+        assert named.count(spec.gear_number(teeth)) == 1, teeth
+    assert spec.gear_number(spec.REFERENCE_TEETH) in spec.SHEET_NOTES
+    assert "CLEAR OF THAT GEAR'S ROOT" in " ".join(notes)
+    # No method (rule 7).
     for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE"):
         assert word not in spec.SHEET_NOTES
 
@@ -173,12 +187,13 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
             assert _apart(box, blocks[b]), (a, b)
     # Each depth's text runs right of its line, the next line clear of it.
     row = sorted(
-        x
-        for name, (x, y) in drawing.FRONT_KEEP.items()
-        if name.startswith("BladeDepth")
+        (x, teeth)
+        for teeth in spec.BONDED_TEETH
+        for name, (x, _y) in drawing.FRONT_KEEP.items()
+        if name == spec.blade_depth_name(teeth)
     )
-    for x0, x1 in zip(row, row[1:], strict=False):
-        assert x1 - (x0 + drawing.DEPTH_TEXT_WIDTH) >= drawing.TEXT_GAP - 1e-9
+    for (x0, t0), (x1, _t1) in zip(row, row[1:], strict=False):
+        assert x1 - (x0 + drawing.depth_block_width(t0)) >= drawing.TEXT_GAP - 1e-9
     # The bottom view's text stands clear of the front view's start rows.
     lowest_start = min(
         y for name, (_x, y) in drawing.FRONT_KEEP.items() if name.startswith("Start")
