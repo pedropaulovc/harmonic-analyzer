@@ -2768,7 +2768,12 @@ declines with its reason:
 8. The replay's outputs (`com_outputs` and `py_outputs`) are exactly the
    archive's members, all within the task's declared outputs, with the
    native part among them (`output_set_differs`); every output Python wrote
-   is its member byte for byte (`python_output_differs`).
+   is its member byte for byte (`python_output_differs`), but for one field:
+   a member-export certificate (`reports/part-neutral/<stem>.json`) names
+   the SHA-256 of the native part (`execution_identity`), and a recording
+   keeps that part as SaveAs3 wrote it, before the build's in-place Save3,
+   so the replay's certificate may differ from the archive's in that field
+   alone, each side naming its own native part's digest.
 9. The inputs still make the key (`inputs_moved`).
 
 The template's identity is its key input: every build pins the default part
