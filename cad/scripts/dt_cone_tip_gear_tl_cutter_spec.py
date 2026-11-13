@@ -136,18 +136,27 @@ def _window_text() -> str:
     return f"{low}-{high}"
 
 
+# Item 3's cup bears on item 2's plain round: the stick-out is an adjustable
+# clamp setting (drawing-guidelines rule 23), so the steps set it, then prove
+# the clamp holds it.
 ASSEMBLY_STEPS = "\n".join(
     (
         "FITTING",
         "1. SLIDE ITEM 2 INTO ITEM 1'S CROSS HOLE, FORM END RIGHT, FACE",
         "   TOWARD THE VIEWER (FRONT VIEW): THE FACE LEADS WITH THE",
         "   SPINDLE IN FORWARD.",
-        f"2. SET THE STICK-OUT {_window_text()} (CALIPER), THE FACE PARALLEL TO",
-        "   ITEM 1'S AXIS (SQUARE ON ITEM 1'S CUTTING END).",
-        "3. TIGHTEN ITEM 3 THROUGH ITEM 1'S CUTTING END ONTO ITEM 2.",
+        f"2. SET THE STICK-OUT {_window_text()} (CALIPER).",
+        "3. TURN ITEM 2 UNTIL ITS FACE IS PARALLEL TO ITEM 1'S AXIS: A",
+        "   SQUARE ON ITEM 1'S CUTTING END SHOWS NO LIGHT BETWEEN ITS",
+        "   BLADE AND THE FACE.",
+        "4. TIGHTEN ITEM 3, CUP END FIRST, THROUGH ITEM 1'S CUTTING END",
+        "   ONTO ITEM 2'S ROUND SHANK.",
+        "5. CHECK: ITEM 2 DOES NOT TURN OR SLIDE BY HAND.",
+        f"6. CHECK: THE STICK-OUT STILL READS {_window_text()} (CALIPER).",
+        "7. IF STEP 5 OR 6 FAILS, LOOSEN ITEM 3 AND REPEAT FROM STEP 2.",
     )
 )
-# Named above each value; step 2 names the stick-out's window.
+# Named above each value; steps 2 and 6 name the stick-out's window.
 DIMENSION_CALLOUTS: dict[str, str] = {
     STICK_OUT_DIMENSION: "STICK-OUT",
     SWING_RADIUS_DIMENSION: "SWING RADIUS",

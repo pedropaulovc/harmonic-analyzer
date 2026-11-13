@@ -97,7 +97,19 @@ def test_the_only_allowed_overlap_is_the_set_screw_thread_in_its_tap() -> None:
     )
 
 
-def test_the_sheet_is_bom_balloons_and_at_most_three_steps() -> None:
+def _steps() -> list[str]:
+    """Each numbered step with its continuation lines, as printed."""
+    steps: list[str] = []
+    for line in fixture.ASSEMBLY_STEPS.splitlines()[1:]:
+        if line[:1].isdigit():
+            steps.append(line)
+        else:
+            assert line.startswith("   "), line
+            steps[-1] += "\n" + line
+    return steps
+
+
+def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert set(drawing.FRONT_ITEMS) | set(drawing.BOTTOM_ITEMS) == set(
         fixture.BOM_COMPONENTS
@@ -106,10 +118,28 @@ def test_the_sheet_is_bom_balloons_and_at_most_three_steps() -> None:
     for stem in fixture.BOM_COMPONENTS:
         assert fixture.QUANTITIES[stem] == 1
         assert _config.parts(stem)["number"]
-    steps = [line for line in fixture.ASSEMBLY_STEPS.splitlines() if line[:1].isdigit()]
-    assert 1 <= len(steps) <= 3
-    # The fitter's setting names the window it is read against.
-    assert "STICK-OUT" in fixture.ASSEMBLY_STEPS.upper()
+    steps = _steps()
+    assert [step.split(".", 1)[0] for step in steps] == [
+        str(number) for number in range(1, len(steps) + 1)
+    ]
+    # Rule 22: at most six printed lines a step.
+    assert all(len(step.splitlines()) <= 6 for step in steps)
+    window = fixture._window_text()
+    # Setting the stick-out and squaring the face are separate steps; each
+    # names the tool it is read with and its acceptance.
+    (setting,) = (step for step in steps if "SET THE STICK-OUT" in step)
+    assert window in setting and "(CALIPER)" in setting and "FACE" not in setting
+    (squaring,) = (step for step in steps if "PARALLEL" in step)
+    assert "SQUARE" in squaring and "NO LIGHT" in squaring
+    assert "STICK-OUT" not in squaring
+    # Item 3 clamps item 2's plain round at an adjustable setting (rule 23's
+    # adjustable-clamp row): the step names what it bears on, and later steps
+    # check the clamp holds and the setting survived it, each on its own.
+    (clamp,) = (step for step in steps if "TIGHTEN ITEM 3" in step)
+    assert "ITEM 2'S ROUND" in clamp
+    after = steps[steps.index(clamp) + 1 :]
+    assert any("DOES NOT TURN OR SLIDE BY HAND" in step for step in after)
+    assert any(window in step and "(CALIPER)" in step for step in after)
 
 
 def test_the_references_are_the_spec_values_at_the_spec_places() -> None:
@@ -177,3 +207,113 @@ def test_the_settings_texts_clear_every_extension_line_and_the_bar() -> None:
         + (fixture.bar.CROSS_HOLE_STATION + fixture.bit.BIT_RADIUS) * drawing._S
     )
     assert stick[1] - bit_top > 0.008
+
+
+def _box(
+    a: tuple[float, float, float], b: tuple[float, float, float]
+) -> tuple[float, float, float, float]:
+    (x0, y0), (x1, y1) = drawing.nominal_sheet_point(a), drawing.nominal_sheet_point(b)
+    return (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+
+
+def _overlap(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _exploded_part_boxes() -> dict[str, tuple[float, float, float, float]]:
+    """Each item's front-view outline on sheet 2, nominal, as exploded."""
+    radius, length = fixture.bar.BAR_RADIUS, fixture.bar.BAR_LENGTH
+    bit_dx = drawing.EXPLODE_OFFSETS_MM[fixture.BIT][0]
+    screw_dy = drawing.EXPLODE_OFFSETS_MM[fixture.SET_SCREW][1]
+    station, bit_r = fixture.bar.CROSS_HOLE_STATION, fixture.bit.BIT_RADIUS
+    tip_x = fixture.BIT_POSITION[0]
+    cup_y = fixture.SET_SCREW_POSITION[1]
+    screw_r = set_screw.MAJOR_DIA / 2.0
+    return {
+        fixture.BAR: _box((-radius, 0.0, 0.0), (radius, length, 0.0)),
+        fixture.BIT: _box(
+            (tip_x - fixture.bit.BIT_LENGTH + bit_dx, station - bit_r, 0.0),
+            (tip_x + bit_dx, station + bit_r, 0.0),
+        ),
+        fixture.SET_SCREW: _box(
+            (-screw_r, cup_y - set_screw.LENGTH + screw_dy, 0.0),
+            (screw_r, cup_y + screw_dy, 0.0),
+        ),
+    }
+
+
+def test_the_exploded_view_pulls_each_loose_item_clear_along_its_way_in() -> None:
+    """Rule 22: item 2 out along the cross-hole axis, its tail clear of item
+    1's surface; item 3 down the bar's axis, its cup clear of the cutting
+    end; item 1 stays put."""
+    gap = drawing.EXPLODE_GAP
+    assert gap > 0.0
+    assert drawing.SHEET_NAMES == ("ASSEMBLY", "EXPLODED VIEW")
+    assert drawing.SHEET_SCALES == {
+        name: drawing.SHEET_SCALE for name in drawing.SHEET_NAMES
+    }
+    offsets = drawing.EXPLODE_OFFSETS_MM
+    assert offsets[fixture.BAR] == (0.0, 0.0, 0.0)
+    bit_dx, bit_dy, bit_dz = offsets[fixture.BIT]
+    assert (bit_dy, bit_dz) == (0.0, 0.0)
+    tail_x = fixture.BIT_POSITION[0] - fixture.bit.BIT_LENGTH + bit_dx
+    assert tail_x - fixture.bar.BAR_RADIUS == pytest.approx(gap)
+    screw_dx, screw_dy, screw_dz = offsets[fixture.SET_SCREW]
+    assert (screw_dx, screw_dz) == (0.0, 0.0)
+    assert fixture.SET_SCREW_POSITION[1] + screw_dy == pytest.approx(-gap)
+    # Each axis runs the full length of the items it guides, through them.
+    boxes = _exploded_part_boxes()
+    bar_axis, cross_axis = (
+        _box(*drawing.EXPLODED_AXES_MM[name])
+        for name in ("bar axis", "cross-hole axis")
+    )
+    assert bar_axis[0] == bar_axis[2] and cross_axis[1] == cross_axis[3]
+    for stem in (fixture.BAR, fixture.SET_SCREW):
+        box = boxes[stem]
+        assert box[0] < bar_axis[0] < box[2], stem
+        assert bar_axis[1] < box[1] and box[3] < bar_axis[3], stem
+    for stem in (fixture.BAR, fixture.BIT):
+        box = boxes[stem]
+        assert box[1] < cross_axis[1] < box[3], stem
+        assert cross_axis[0] < box[0] and box[2] < cross_axis[2], stem
+
+
+def test_the_exploded_labels_name_every_item_clear_of_the_ink() -> None:
+    labels = drawing.EXPLODED_LABELS
+    assert set(labels) == set(fixture.BOM_COMPONENTS)
+    for stem, text in labels.items():
+        assert text.startswith(f"ITEM {fixture.BOM_ITEMS[stem]}")
+    assert "FACE TOWARD THE VIEWER" in labels[fixture.BIT]
+    assert "CUP END UP" in labels[fixture.SET_SCREW]
+    parts = _exploded_part_boxes()
+    # Each tip lies on its own item's outline, seated + explode offset.
+    tips = {}
+    for stem, point in drawing.LABEL_TIPS_MM.items():
+        offset = drawing.EXPLODE_OFFSETS_MM[stem]
+        tips[stem] = drawing.nominal_sheet_point(
+            tuple(p + o for p, o in zip(point, offset, strict=True))
+        )
+        x0, y0, x1, y1 = parts[stem]
+        assert x0 < tips[stem][0] < x1 and y0 < tips[stem][1] < y1, stem
+    # Item 2's tip is on its face, full width: behind the form's shoulders,
+    # ahead of the flat's end.
+    back = fixture.BIT_POSITION[0] - drawing.LABEL_TIPS_MM[fixture.BIT][0]
+    assert -fixture.bit.SHOULDER_X < back < fixture.bit.FLAT_LENGTH
+    boxes = {
+        stem: drawing.label_box(text, drawing.label_position(stem, tips[stem]))
+        for stem, text in labels.items()
+    }
+    boxes["caption"] = drawing.label_box(drawing.EXPLODED_CAPTION, drawing.CAPTION_XY)
+    axes = [_box(*ends) for ends in drawing.EXPLODED_AXES_MM.values()]
+    left, bottom, right, top = SHEET_INNER
+    names = list(boxes)
+    for i, name in enumerate(names):
+        x0, y0, x1, y1 = boxes[name]
+        assert left < x0 and x1 < right and bottom < y0 and y1 < top, name
+        assert not _overlap(boxes[name], TITLE_BLOCK), name
+        for other in names[i + 1 :]:
+            assert not _overlap(boxes[name], boxes[other]), (name, other)
+        for part in parts.values():
+            assert not _overlap(boxes[name], part), name
+        for axis in axes:
+            assert not _overlap(boxes[name], axis), name
