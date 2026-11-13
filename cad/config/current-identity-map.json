@@ -2160,6 +2160,7 @@
       "introduced": "2026-11-12",
       "new_identities": [
         {
+          "parent": "dt-cone-gear-tl-arbor",
           "stem": "dt-cone-gear-tl-vn-arbor-nut",
           "number": "MHA-DT-03-TL-VN-50"
         }
