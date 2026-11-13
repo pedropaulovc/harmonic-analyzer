@@ -445,14 +445,20 @@ def _reference_dimensions(adapter: Any, view: Any) -> Callable[[], None]:
     for name, second in zip(names, picks[1:], strict=True):
         _pick, orientation, expected_mm, offset = REFERENCE_DIMENSIONS[name]
         label = f"cam turning kit {name}"
-        display = add_edge_dimension(
-            adapter,
-            view,
-            p0=register,
-            p1=second,
-            text_xy=(TOP_CENTER[0] + offset[0], TOP_CENTER[1] + offset[1]),
-            label=label,
-            orientation=orientation,
+        # add_edge_dimension returns the raw dispatch: GetAnnotation on it
+        # is "Member not found" natively (run 6f63c0c9), so bind it as the
+        # passing sheets do (draw_dt_cone_tip_gear._add_overall_reference).
+        display = _early_bound(
+            add_edge_dimension(
+                adapter,
+                view,
+                p0=register,
+                p1=second,
+                text_xy=(TOP_CENTER[0] + offset[0], TOP_CENTER[1] + offset[1]),
+                label=label,
+                orientation=orientation,
+            ),
+            "IDisplayDimension",
         )
         # Value-only: the picks are circle rims at exact projected model
         # points; the register, stub and pin are the only circles there.
