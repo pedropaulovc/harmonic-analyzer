@@ -3639,7 +3639,7 @@ def _machinist_review_profile() -> ReviewProfile:
     return _MACHINIST_REVIEW_PROFILE
 
 
-def _machinist_review_digest(profile: ReviewProfile):
+def _machinist_review_digest(profile: ReviewProfile, *, pdf_ink: bool = True):
     # The config module is a real review input. Its contextual digest records
     # both its actual source and the frozen effective profile, keeping normal
     # cache-key provenance instead of adding a virtual file or a post-hoc salt.
@@ -3647,6 +3647,17 @@ def _machinist_review_digest(profile: ReviewProfile):
     effective = json.dumps(profile._asdict(), sort_keys=True, separators=(",", ":"))
 
     def digest(path: str) -> str:
+        if pdf_ink and Path(path).suffix.casefold() == ".pdf":
+            # The reviewed sheet is keyed by the ink it prints: a rebuild that
+            # prints the same sheet differs in export time, document ID and
+            # font-subset tags, and must reuse its verdict (#2714). A file
+            # PDFium cannot render keeps its byte digest.
+            from _pdf_ink_digest import PdfInkError, pdf_ink_digest
+
+            try:
+                return pdf_ink_digest(path)
+            except PdfInkError:
+                pass
         source = ContentChecker._digest(path)
         if Path(path).resolve() == config_path:
             return hashlib.sha256(f"{source}\0{effective}".encode()).hexdigest()
@@ -3661,6 +3672,30 @@ def _machinist_review_cache_key(
     return _cache.cache_key(
         _machinist_review_file_deps(stem), _machinist_review_digest(profile), label
     )
+
+
+def _machinist_review_byte_key(stem: str, profile: ReviewProfile) -> str:
+    """The key this review had while the PDF was hashed by its bytes."""
+    return _cache.cache_key(
+        _machinist_review_file_deps(stem),
+        _machinist_review_digest(profile, pdf_ink=False),
+    )
+
+
+def _adopt_byte_keyed_review(
+    stem: str, profile: ReviewProfile, key: str, directory: Path, label: str
+) -> bool:
+    """Republish under ``key`` the verdict these exact PDF bytes already have.
+
+    Every review published before the ink key is stored under its byte key.
+    Without this, the first build after the change would review every sheet
+    again on ink that has a verdict. Remove once main's sheets are re-published.
+    """
+    legacy = _machinist_review_byte_key(stem, profile)
+    if legacy == key or not _cache.restore(legacy, [directory], label):
+        return False
+    _cache.store(key, [directory], label)
+    return True
 
 
 def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
@@ -3750,6 +3785,9 @@ def _cached_machinist_review_action(
             )
             return
     try:
+        if probed == "miss" and _cache.forced_refresh(label) is None:
+            if _adopt_byte_keyed_review(stem, profile, key, directory, label):
+                probed = "hit"
         if probed != "hit":
             if probed == "locked":
                 raise OSError(f"{label}: report outputs are locked")

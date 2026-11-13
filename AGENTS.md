@@ -1184,7 +1184,7 @@ a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl
 
 `check:machinist_review:<stem>` also uses the shared cache probe/store path, but
 executes entirely on the submitter under either executor. Its key includes the
-drawing PDF, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
+drawing PDF's ink, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
 contract with the `-assembly` suffix removed), the review/exception/sheet-server
 code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
@@ -1198,6 +1198,13 @@ are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw
 script and learn/enforce declaration are not review inputs. The complete leaf
 report directory, including individual run JSON, source snapshots and attempt
 evidence, is cached without pruning.
+The PDF enters the key as `_pdf_ink_digest.pdf_ink_digest`: each page's size,
+printed characters and 144 dpi grayscale raster, with no tolerance. A rebuild
+that prints the same sheet differs only in export time, document `/ID` and
+font-subset tags, and reuses its verdict, `SHIP` or `FIX`; one changed pixel or
+character reviews the sheet again. A verdict published under the earlier
+byte-digest key is adopted under the ink key for the same PDF bytes instead of
+being rolled again.
 For Claude this key describes the hashed SDK-first/API-pool, OMP-fallback routing
 policy, not a transport preselected from mutable quota state. The canonical
 cached report preserves each attempt's actual transport and routes; adopters
