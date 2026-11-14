@@ -21,8 +21,9 @@
 # Blind review 2026-11-14: TOP alone is faced, and only when the sawn bar is
 # over .480 (X1: neither flatness nor parallelism is toleranced); the ends
 # rough at .100 (X2); the edges keep .080 roughing, since .150 bends the
-# two-strap blank 0.15 mm (milling_deflection, X3 refused); the reamer runs
-# at 1400 rpm after a test hole and a runout check (S1).
+# two-strap blank 0.15 mm (milling_deflection, X3 refused); the reamer keeps
+# the owner-ruled 3000 rpm (#2748) and gains a test hole and a runout check
+# (S1's safeguards; its lower speed is not taken).
 #
 # The pin holes' underside edges carry the title block's edge break only, no
 # chamfer (owner ruling 2026-11-13): the TL-VN-78 spacers seat on them.
@@ -326,18 +327,14 @@ milling_cuts = [
   { name = "L1, L2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.lever_x_mm}}" },
 ]
 
-# Drill speeds: LittleMachineShop "Cutting Speeds", Drilling & Reaming
-# table, row wrought aluminum 6061-T6: drilling 350-400 ft/min
-# (https://littlemachineshop.com/pages/cutting-speeds, read 2026-11-14).
-# Every drill here computes above the PM-30MV's 3000 rpm top speed, so the
-# drills run at 3000 (#2748). The reamer does not: that table's reaming row
-# (350-400) is a general figure for machine-fed reaming and says nothing about
-# a hand-fed reamer in a drill chuck holding a .001 oversize window (blind
-# review S1). Red Line Tools "Reamers" technical information
-# (https://www.redlinetools.com/customer/docs/RedLineToolsReamersTechInfo.pdf,
-# read 2026-11-14), aluminum, HSS: 125-325 ft/min, feed .006 in/rev at 1/4 in
-# to .010 at 1/2 in. 1400 rpm is 138 ft/min at .376, the low end, and the
-# bottom of the high belt range the drills already use: no belt change.
+# Drill and ream speeds: LittleMachineShop "Cutting Speeds", Drilling &
+# Reaming table, row wrought aluminum 6061-T6: drilling 350-400 ft/min,
+# reaming 350-400 ft/min (https://littlemachineshop.com/pages/cutting-speeds,
+# read 2026-11-13). Every size here computes above the PM-30MV's 3000 rpm top
+# speed, so drills and the reamer run at 3000 (owner ruling 2026-11-13, #2748).
+# The blind review (S1) cited lower HSS reaming speeds; the owner ruling
+# stands, and its safeguards are taken instead: reamer runout checked and a
+# test hole gauged in the offcut before the plate.
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-43"
@@ -380,14 +377,14 @@ milling_cuts = [{ name = "A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase 
 speed_kind = "spindle"
 tool = "reamer"
 sizing = { kind = "band", band_mm = "{{cad.pin_dia_band_mm}}" }
-instruction = "Indicate the reamer's runout in the chuck, ≤.0005. Ream a test hole in the bar's offcut first (same 23/64 drill, same reamer) and gauge it. Then ream A1, B1, A2, B2 through, steady .006/rev."
-instruction_detailed = "Reamer in the drill chuck: indicate it just above the flutes and turn the chuck by hand; re-seat it until the runout reads .0005 or less. Clamp the bar's offcut from Setup 1 beside the plate, drill it 23/64 and ream it exactly as below, then gauge it: the .376 GO pin enters and the .377 NO-GO does not start. If it fails, stop and sort out the reamer before touching the plate: these four holes cannot be reworked. Then, at the same X/Y as each 23/64 hole, brush on cutting fluid (WD-40 or kerosene for aluminium) and feed down in one steady pass, about .006 per revolution (8 in/min, about 4 s through), until the full-diameter flutes are through the underside; do not dwell or stop in the bore. Withdraw with the spindle still running, then wipe the chips off the flutes before the next hole."
-rpm = 1400
+instruction = "Indicate the reamer's runout in the chuck, ≤.0005. Ream a test hole in the bar's offcut first (same 23/64 drill, same reamer) and gauge it. Then ream A1, B1, A2, B2 through, one steady pass."
+instruction_detailed = "Reamer in the drill chuck: indicate it just above the flutes and turn the chuck by hand; re-seat it until the runout reads .0005 or less. Clamp the bar's offcut from Setup 1 beside the plate, drill it 23/64 and ream it exactly as below, then gauge it: the .376 GO pin enters and the .377 NO-GO does not start. If it fails, stop and sort out the reamer before touching the plate: these four holes cannot be reworked. Then, at the same X/Y as each 23/64 hole, brush on cutting fluid (WD-40 or kerosene for aluminium) and feed down in one steady pass, about .004 per revolution (12 in/min, about 2-3 s through), until the full-diameter flutes are through the underside; do not dwell or stop in the bore. Withdraw with the spindle still running, then wipe the chips off the flutes before the next hole."
+rpm = 3000
 feed = "hand"
 # No reamer kind: its thrust is declared as a twist drill's at the reamer Ø
-# (the larger, chisel-edge figure), .006 in/rev.
+# (the larger, chisel-edge figure), .004 in/rev.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-milling_cuts = [{ name = "ream A1, A2, B1, B2 at .006 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 9.5504, flutes = 2, feed_per_tooth_mm = 0.0762, stations_mm = "{{cad.pin_x_mm}}" }]
+milling_cuts = [{ name = "ream A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 9.5504, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 inspection = "Ø{{cad.pin_dia_min_in:.4dot}}–{{cad.pin_dia_max_in:.4dot}}: the .376 GO pin enters full depth, the .377 NO-GO does not start, each hole."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_dia_band_mm}}" }]
 
