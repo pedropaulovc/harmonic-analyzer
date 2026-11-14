@@ -226,9 +226,7 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # carries only a flag to the numbered note that names the mate (rule 7;
 # dfm-2340 r12: 2/3 runs).
 PLATE_OFFSET_NOTE_NUMBER = 1
-PLATE_OFFSET_NOTE = (
-    f"{PLATE_OFFSET_NOTE_NUMBER}. PLATE OFFSET SPACES {BAR_NUMBER} BARS IN THE STACK."
-)
+PLATE_OFFSET_NOTE = f"{PLATE_OFFSET_NOTE_NUMBER}. SPACES {BAR_NUMBER} BARS IN STACK."
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
     "PlateOffset": f"SEE NOTE {PLATE_OFFSET_NOTE_NUMBER}",
