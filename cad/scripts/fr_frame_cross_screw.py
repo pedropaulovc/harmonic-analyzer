@@ -33,7 +33,10 @@ IN = 25.4
 # with a 13/64 transfer punch (lower-/upper-holes-marked; the punch-entry check
 # is draw_fr_frame_assembly.TRANSFER_PUNCH_IN), then drills the tube's .197
 # match hole on the mill, out of the casting, so no drill runs through this
-# hole; being no smaller than that .197 hole is no longer a process need.
+# hole. The guard below still holds it no smaller than that .197 hole; the
+# relation is kept, with the .197 tube hole itself, pending the next casting
+# change (#2561; see the note on draw_fr_frame_assembly's lower-holes-drilled
+# step).
 NEAR_WALL_CLEARANCE_SIZE = "#10"
 NEAR_WALL_CLEARANCE_FIT = "close"
 NEAR_WALL_CLEARANCE_DIAMETER = CLEARANCE_MM[
