@@ -40,7 +40,6 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert not hasattr(drawing, "SECTION_NOTE")
-    assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert sorted(tag for tags, _note in table.NOTE_GROUPS for tag in tags) == sorted(TABLED)
     assert "HUB: 8-32 AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
@@ -1107,7 +1106,7 @@ def _imported(monkeypatch, places_by_name):
 def test_imported_precision_contract_is_exactly_what_the_sheet_imports():
     imported = set().union(*spec.DRAWING_DIMENSIONS.values()) - drawing.TABLE_ROW_DIMENSIONS
     assert set(drawing.IMPORTED_PRECISION) == imported
-    assert imported == set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM)
+    assert imported == set(drawing.TOP_KEEP) | set(drawing.EDGE_KEEP_MODEL_MM)
     assert all(drawing.IMPORTED_PRECISION[name] == spec.DRAWING_PRECISION_BY_NAME[name] for name in imported)
     source = inspect.getsource(drawing.build)
     assert "assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)" in source

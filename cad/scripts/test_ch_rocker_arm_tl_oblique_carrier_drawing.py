@@ -204,11 +204,11 @@ def test_no_skid_sag_is_negligible() -> None:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    printed = set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM)
+    printed = set(drawing.TOP_KEEP) | set(drawing.EDGE_KEEP_MODEL_MM)
     # A1's corner row carries the left end's and the -Y edge's values.
     assert printed | drawing.TABLE_ROW_DIMENSIONS == marked
     assert not printed & drawing.TABLE_ROW_DIMENSIONS
-    assert not set(drawing.TOP_KEEP) & set(drawing.SECTION_KEEP_MODEL_MM)
+    assert not set(drawing.TOP_KEEP) & set(drawing.EDGE_KEEP_MODEL_MM)
     assert marked <= set(spec.DRAWING_PRECISION_BY_NAME)
     assert set(spec.CALLOUT_PREFIXES) <= printed
     assert set(drawing.CALLOUTS_BELOW) <= printed
@@ -427,10 +427,11 @@ def test_pin_edge_break_retains_the_spacer_thrust_seat() -> None:
     assert "add_chamfer" not in source and "PinChamfer" not in source
 
 
-def test_section_reference_is_on_its_own_hidden_cutting_plane() -> None:
-    """jig-r6: on the bare Front plane the section's import came back empty;
-    every fleet section that imports a sketch has it on a dedicated named
-    plane in the cut (pd_platen, the pivot block, fr_nameplate)."""
+def test_section_reference_is_on_its_own_hidden_plane() -> None:
+    """The thickness's hidden sketch keeps its own named plane, coincident
+    with the Front plane (jig-r6: section A-A imported nothing from the bare
+    Front plane). Section A-A is gone; the edge view, parallel to that plane,
+    imports from it, and the part is unchanged."""
     assert spec.SECTION_PLANE == "SectionAPlane"
     source = inspect.getsource(part._section_reference)
     assert "create_sketch(SECTION_PLANE)" in source
@@ -443,16 +444,14 @@ def test_section_reference_is_on_its_own_hidden_cutting_plane() -> None:
 
 
 
-def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
-    """jig-r4/r5: asked for Plate's depth and the reference sketch's leg, the
-    section imported nothing at all; the finished thickness is a
-    SectionReference dimension driven from Plate's depth, so the section's
-    import stays one hidden sketch in its plane (pd_platen A-A, pivot block
-    B-B)."""
+def test_edge_view_imports_one_hidden_sketch_and_no_body_feature() -> None:
+    """The finished thickness is a SectionReference dimension driven from
+    Plate's depth (jig-r4/r5: Plate's own depth did not import into the
+    section); the edge view imports that one hidden sketch, parallel to it."""
     owners = {
         feature
         for feature, names in spec.DRAWING_DIMENSIONS.items()
-        if names & set(drawing.SECTION_KEEP_MODEL_MM)
+        if names & set(drawing.EDGE_KEEP_MODEL_MM)
     }
     assert owners == {spec.SECTION_REFERENCE}
     assert "Plate" not in spec.DRAWING_DIMENSIONS
@@ -463,80 +462,132 @@ def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
     source = inspect.getsource(part)
     assert '"StockThick", \'"PlateThick@Plate"\'' in source
     assert "PIN_CHAMFER_REFERENCE" not in source
-    # The stock line stands in A1's +X wall, inside the cut, near its end.
+    # The stock line stands in A1's +X wall, inside the plate; the text
+    # stands left of the plate's -X end and its extension lines are capped to
+    # stop 1.5 sheet mm short of it, never running along the view's outline.
     wall = spec.PIN_HOLE_DIA / 2.0
-    assert wall + 2.0 <= spec.STOCK_REFERENCE_DX < drawing._SECTION_HALF
-    assert drawing._SECTION_HALF == spec.SECTION_HALF_SPAN
-    # Carrier r11/r13: the 12.0's extension lines ran from ~863 mm right of
-    # the slab whatever the view's place. The text stands on A1's -X side and
-    # its extension lines are capped to stop 1.5 sheet mm short of the slab's
-    # -X end, so an origin anywhere on the +X side leaves the same short pair.
-    text_dx = drawing.SECTION_KEEP_MODEL_MM["StockThick"][0] - spec.PIN_HOLES["A1"][0]
-    assert -text_dx > drawing._SECTION_HALF
-    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
-    gap = (-text_dx - drawing._SECTION_HALF) * scale
-    assert math.isclose(drawing.STOCK_WITNESS_MAX_M * 1000.0, gap - 1.5)
+    assert wall + 2.0 <= spec.STOCK_REFERENCE_DX
+    text_x = drawing.EDGE_KEEP_MODEL_MM["StockThick"][0]
+    assert text_x == spec.OUTLINE_X[0] - drawing._EDGE_TEXT_DX
+    assert drawing.EDGE_KEEP_MODEL_MM["StockThick"][1:] == (-spec.THICKNESS / 2.0, 0.0)
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    assert math.isclose(
+        drawing.STOCK_WITNESS_MAX_M * 1000.0, drawing._EDGE_TEXT_DX * scale - 1.5
+    )
     assert drawing.STOCK_WITNESS_MAX_M > 0.005
-    again = inspect.getsource(drawing._reposition_section_dimensions)
-    assert "display.MaxWitnessLineLength = STOCK_WITNESS_MAX_M" in again
+    edge = inspect.getsource(drawing._edge_view)
+    assert "display.MaxWitnessLineLength = STOCK_WITNESS_MAX_M" in edge
 
 
-def test_section_is_full_and_cropped_to_the_cut_span() -> None:
-    """carrier-diag: through this short interior line the PARTIAL section
-    imported no marked dimension at all, while a full section through the
-    same line, same base-view selection, imported its SectionReference
-    dimensions. So A-A is full and cropped to A1's slab (fr_nameplate A-A's
-    Crop2 fence). jig-r9/c4-r4: imported after the crop it lost StockThick,
-    so it is curated first, then cropped; farm r7: centred before its line
-    was shortened, the view jumped off the sheet with the line's midpoint,
-    so it is shortened, then centred and its dimensions placed again."""
-    source = inspect.getsource(drawing._pin_section)
-    assert "partial=False" in source
-    assert "partial=True" not in source
+def test_edge_view_replaces_section_a_a() -> None:
+    """Owner ruling 2026-11-13 left A-A printing only the thickness; its
+    short plane never settled (HA #2762) and its full-length fallback gated
+    machinist review. The *Front edge view at the sheet's scale, aligned
+    under the top view, hidden lines removed, carries the thickness."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for retired in (
+        "create_section_view", "position_section_caption", "SetLineInfo",
+        "SetPartialSection", "Crop2", "_pin_section", "SECTION_CENTER",
+        "SECTION_LINE_STYLE", "SetUserPreferenceInteger(542",
+    ):
+        assert retired not in source, retired
+    edge = inspect.getsource(drawing._edge_view)
     order = [
-        source.index(call)
+        edge.index(call)
         for call in (
-            "create_section_view(",
+            'place_view(adapter, str(SOURCE), "*Front", *EDGE_CENTER, scale=VIEW_SCALE)',
+            "set_hidden_lines_removed(adapter, edge)",
+            "_align_edge_view(adapter, top, edge)",
             "curate_view_dimensions(",
-            "_crop_section(adapter, section)",
-            "_shorten_section_line(adapter, top, section, annotations, full)",
-            "_settle_section(adapter, section, annotations)",
+            "MaxWitnessLineLength",
         )
     ]
     assert order == sorted(order)
-    settle = inspect.getsource(drawing._settle_section)
-    order = [
-        settle.index(call)
-        for call in (
-            "_crop_section(adapter, section)",
-            "_centre_section(adapter, section)",
-            "_reposition_section_dimensions(adapter, section, annotations)",
-            "_assert_section_on_sheet(adapter, section, annotations)",
-        )
-    ]
-    assert order == sorted(order)
-    assert "IsCropped()" in settle.split("_crop_section(")[0]
-    again = inspect.getsource(drawing._reposition_section_dimensions)
-    assert "reposition=keep" in again and ".Visible" in again
-    crop = inspect.getsource(drawing._crop_section)
-    assert "Crop2(False, True, 0)" in crop
-    assert "IsCropped()" in crop
-    # jig-r8: the outline ran 25.6 mm past the 72 mm fence, so the check is
-    # containment within a slack, not width equality; absolute, so a re-crop
-    # of the short partial cut is held to it too.
-    assert "not contains" in crop
-    assert "width + 0.025" not in crop
-    assert "fence_x[-1] - fence_x[0] + _CROP_OUTLINE_SLACK_M" in crop
-    assert 0.0256 < drawing._CROP_OUTLINE_SLACK_M <= 0.040
-    a1x = spec.PIN_HOLES["A1"][0]
-    (x0, y0, _), (x1, y1, _) = drawing.SECTION_CROP_MODEL_MM
-    assert math.isclose(x0, a1x - drawing._SECTION_HALF)
-    assert math.isclose(x1, a1x + drawing._SECTION_HALF)
-    assert y0 < -spec.THICKNESS and y1 > 0.0
-    # The kept text's feature lies inside the fence: the stock line inside
-    # the cut's +X end, A1's wall too.
-    assert x0 < a1x - spec.PIN_HOLE_DIA / 2.0
-    assert a1x + spec.STOCK_REFERENCE_DX < x1
+    assert drawing.EDGE_CENTER[0] == drawing.TOP_CENTER[0]
+    build = inspect.getsource(drawing.build)
+    assert build.index("curate_view_dimensions(") < build.index(
+        "_edge_view(adapter, top)"
+    ) < build.index("set_dimension_callouts(")
+    settled = build[build.index("def pin_controls_settled"):build.index("return await finalize_drawing")]
+    assert "_assert_edge_view(adapter, top, edge, edge_annotations)" in settled
+
+
+class _FakeEdgeView:
+    def __init__(self, outline, position=(0.222, 0.078)):
+        self.outline, self.Position, self.moves = outline, position, []
+
+    def UpdateViewDisplayGeometry(self):
+        pass
+
+    def GetOutline(self):
+        return self.outline
+
+    def SetViewPosition(self, xy, _update):
+        self.moves.append(tuple(xy))
+        self.Position = tuple(xy)
+        return True
+
+
+def _edge_fakes(monkeypatch, offset):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_edge_offset", lambda _a, _t, _e: offset())
+
+
+def test_edge_view_is_moved_under_the_top_view_and_read_back(monkeypatch) -> None:
+    """Fake-driven: the view moves by the measured offset until it reads
+    back within EDGE_ALIGN_TOLERANCE_M; one that will not settle refuses."""
+    view = _FakeEdgeView((0.09, 0.075, 0.353, 0.081))
+    offsets = iter([(0.002, -0.001), (0.0, 0.0)])
+    _edge_fakes(monkeypatch, lambda: next(offsets))
+    drawing._align_edge_view(None, None, view)
+    assert view.moves == [pytest.approx((0.224, 0.077))]
+    _edge_fakes(monkeypatch, lambda: (0.01, 0.0))
+    with pytest.raises(RuntimeError, match="not under the top view"):
+        drawing._align_edge_view(None, None, view)
+
+
+@pytest.mark.parametrize("fault", [None, "misaligned", "stale_outline", "title_block",
+                                   "above_lane", "hidden", "off_sheet_text", "cap_lost"])
+def test_edge_view_check_refuses_a_misplaced_view(monkeypatch, fault) -> None:
+    """Fake-driven: the settled check holds the view under the top view, the
+    plate it projects inside its own outline (HA #2762: the section's
+    outline stayed off the sheet while its transform read centred), inside
+    the border, clear of the title block and below the 20.5's text, its
+    thickness visible on the sheet with its extension lines capped."""
+    centre_y = {"title_block": 0.060, "above_lane": 0.101}.get(fault, 0.078)
+    outline = (
+        (-0.595, 0.075, -0.519, 0.081) if fault == "stale_outline"
+        else (0.088, centre_y - 0.005, 0.356, centre_y + 0.005)
+    )
+    view = _FakeEdgeView(outline)
+    _edge_fakes(monkeypatch, lambda: (0.001, 0.0) if fault == "misaligned" else (0.0, 0.0))
+
+    def edge_map(xyz):
+        x, y, _z = xyz
+        return 0.222 + x / 2000.0, centre_y + (y + spec.THICKNESS / 2.0) / 2000.0
+
+    monkeypatch.setattr(
+        drawing, "_view_mapper",
+        lambda _a, v: edge_map if v is view else (lambda _xyz: (0.25, 0.100)),
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, _item: "StockThick")
+    cap = 0.0 if fault == "cap_lost" else drawing.STOCK_WITNESS_MAX_M
+    monkeypatch.setattr(
+        drawing, "_stock_display",
+        lambda _a, _items: SimpleNamespace(MaxWitnessLineLength=cap),
+    )
+    text = (0.750, 0.078, 0.0) if fault == "off_sheet_text" else (0.084, 0.078, 0.0)
+    dimension = SimpleNamespace(
+        GetPosition=lambda: text, Visible=3 if fault == "hidden" else 1
+    )
+    if fault is None:
+        drawing._assert_edge_view(None, None, view, [dimension])
+        return
+    with pytest.raises(RuntimeError, match="edge view is not in place"):
+        drawing._assert_edge_view(None, None, view, [dimension])
 
 
 def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
@@ -667,223 +718,6 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
     assert "Reattach" not in source
 
 
-def test_section_line_is_one_short_whole_line_across_a1() -> None:
-    """Owner review 2026-11-07 (rule 9): the cutting plane is drawn whole,
-    joining both arrows (swDetailingSectionViewLineStyleDisplay (542)
-    StandardWithConnector, 0, set before the section is cut), and as A-A
-    shows A1 alone, its line crosses A1 only. The cut is still made through
-    the long line (a short full cut does not close, carrier r11), then made
-    partial and its drawn line shortened, with the sketch still shown."""
-    build = inspect.getsource(drawing.build)
-    assert drawing.SECTION_LINE_STYLE == 0
-    assert "SetUserPreferenceInteger(542, 0, SECTION_LINE_STYLE)" in build
-    assert "GetUserPreferenceInteger(542, 0) != SECTION_LINE_STYLE" in build
-    assert build.index("SetUserPreferenceInteger(542") < build.index("_pin_section(")
-    a1x = spec.PIN_HOLES["A1"][0]
-    plus, minus = drawing.SECTION_SHORT_X
-    assert plus - a1x == a1x - minus == drawing.SECTION_SHORT_HALF
-    # Across A1's bore only: no other hole on the pin line within the span,
-    # inside the plate's left end.
-    assert spec.PIN_HOLE_DIA / 2.0 < drawing.SECTION_SHORT_HALF
-    assert minus > spec.OUTLINE_X[0]
-    for tag, (x, y, diameter) in spec.TABLE_HOLES.items():
-        if tag != "A1" and abs(y) <= diameter / 2.0:
-            assert x - diameter / 2.0 > plus or x + diameter / 2.0 < minus, tag
-    section = inspect.getsource(drawing._pin_section)
-    assert section.index("full = _section_line(section)") < section.index(
-        "_shorten_section_line(adapter, top, section, annotations, full)"
-    ) < section.index("_sketch_section_breaks(")
-    # Should the short partial line not settle on the sheet, the full line
-    # (still whole) is drawn again and the view settled on it, loudly.
-    fallback = section.split("except RuntimeError as error:")[1]
-    assert fallback.index("_telemetry.warn(") < fallback.index(
-        '_set_section_line(adapter, section, full, partial=False, label="full")'
-    ) < fallback.index("_settle_section(adapter, section, annotations)")
-    shorten = inspect.getsource(drawing._shorten_section_line)
-    assert "_set_section_line(adapter, section, short, partial=True" in shorten
-    line = inspect.getsource(drawing._set_section_line)
-    assert "SetLineInfo" in line and "_section_line(section)" in line
-    assert line.index("SetPartialSection(partial)") < line.index("SetLineInfo(")
-    assert "GetPartialSection()" in line and "lost its cut" in line
-
-
-class _FakeSection:
-    """IView + IDrSection fakes for _shorten_section_line: hatches before and
-    after the short line, GetSolidHatchCount as the binding's out-param pair."""
-
-    def __init__(self, line, *, partial=True, after_faces=1, persist=True):
-        self.line, self.calls = tuple(line), []
-        self.partial_reads, self.after_faces, self.persist = partial, after_faces, persist
-        self.partial, self.faces = False, 3
-
-    # IView
-    def GetSection(self):
-        return self
-
-    def UpdateViewDisplayGeometry(self):
-        self.calls.append("UpdateViewDisplayGeometry")
-
-    def GetFaceHatchCount(self):
-        return self.faces
-
-    def GetSolidHatchCount(self):
-        return (0, 0)  # (return, out ArraySize)
-
-    # IDrSection
-    def GetLineInfo(self):
-        return self.line
-
-    def SetPartialSection(self, value):
-        self.calls.append(("SetPartialSection", value))
-        self.partial = value and self.partial_reads
-
-    def GetPartialSection(self):
-        return self.partial
-
-    def SetLineInfo(self, values):
-        self.calls.append(("SetLineInfo", tuple(values)))
-        if self.persist:
-            self.line = tuple(values)
-        self.faces = self.after_faces
-        return True
-
-
-@pytest.mark.parametrize("fault", [None, "not_partial", "no_hatch", "not_persisted"])
-def test_short_section_line_is_partial_hatched_and_read_back(monkeypatch, fault) -> None:
-    """Fake-driven (not native): the short line is the reported long line
-    interpolated at SECTION_SHORT_X; the section turns partial BEFORE the
-    short SetLineInfo; GetSolidHatchCount's tuple is read, not int()'d; a
-    non-partial readback, a lost cut or an unpersisted line refuse."""
-    long_x = drawing._SECTION_LINE_X
-    # A sheet-like frame: x = 0.2 + X/2000, y = 0.1, z = 0 (the +X end first).
-    reported = (0.2 + long_x[0] / 2000.0, 0.1, 0.0, 0.2 + long_x[1] / 2000.0, 0.1, 0.0)
-    section = _FakeSection(
-        reported,
-        partial=fault != "not_partial",
-        after_faces=0 if fault == "no_hatch" else 1,
-        persist=fault != "not_persisted",
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(
-        drawing, "_section_line_frame",
-        lambda _adapter, _top, line: (line[:3], line[3:]),
-    )
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
-    visible = SimpleNamespace(Visible=1)
-    if fault is None:
-        drawing._shorten_section_line(None, None, section, [visible], reported)
-        (asked,) = [call[1] for call in section.calls if call[0] == "SetLineInfo"]
-        expected = tuple(
-            value
-            for x in drawing.SECTION_SHORT_X
-            for value in (0.2 + x / 2000.0, 0.1, 0.0)
-        )
-        assert asked == pytest.approx(expected)
-        ordered = [call[0] for call in section.calls if isinstance(call, tuple)]
-        assert ordered == ["SetPartialSection", "SetLineInfo"]
-        assert section.calls.count("UpdateViewDisplayGeometry") == 2
-        return
-    message = {
-        "not_partial": "short line: partial is not True",
-        "no_hatch": "lost its cut",
-        "not_persisted": "short line did not persist",
-    }[fault]
-    with pytest.raises(RuntimeError, match=message):
-        drawing._shorten_section_line(None, None, section, [visible], reported)
-
-
-def test_full_section_line_fallback_restores_the_long_cut(monkeypatch) -> None:
-    """Fake-driven: the fallback draws the reported long line again as a
-    full (not partial) cut, read back the same way."""
-    reported = (0.4, 0.1, 0.0, -0.3, 0.1, 0.0)
-    section = _FakeSection((0.1, 0.1, 0.0, 0.08, 0.1, 0.0))
-    section.partial = True
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
-    drawing._set_section_line(None, section, reported, partial=False, label="full")
-    assert section.line == reported and section.partial is False
-    assert [call for call in section.calls if isinstance(call, tuple)] == [
-        ("SetPartialSection", False), ("SetLineInfo", reported)
-    ]
-
-
-class _FakeSectionView:
-    def __init__(self, outline, *, cropped=True, faces=1):
-        self.outline, self.cropped, self.faces = outline, cropped, faces
-
-    def UpdateViewDisplayGeometry(self):
-        pass
-
-    def GetOutline(self):
-        return self.outline
-
-    def IsCropped(self):
-        return self.cropped
-
-    def GetFaceHatchCount(self):
-        return self.faces
-
-    def GetSolidHatchCount(self):
-        return (0, 0)
-
-
-@pytest.mark.parametrize("fault", [None, "off_sheet", "title_block", "uncropped",
-                                   "unhatched", "dimension_off"])
-def test_section_on_sheet_check_refuses_an_empty_or_off_sheet_view(monkeypatch, fault) -> None:
-    """Fake-driven: farm r7 printed A-A's frame empty, the shortened view
-    ~0.67 m off the sheet. The check holds the outline inside the border,
-    clear of the title block, cropped and hatched, and every section
-    dimension's text on the sheet."""
-    outline = {
-        "off_sheet": (-0.595, 0.023, -0.519, 0.081),
-        "title_block": (0.180, 0.023, 0.256, 0.060),
-    }.get(fault, (0.080, 0.023, 0.156, 0.081))
-    view = _FakeSectionView(
-        outline, cropped=fault != "uncropped", faces=0 if fault == "unhatched" else 1
-    )
-    text = (0.750, 0.050, 0.0) if fault == "dimension_off" else (0.079, 0.052, 0.0)
-    dimension = SimpleNamespace(GetPosition=lambda: text)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, _item: "StockThick")
-    monkeypatch.setattr(drawing._telemetry, "info", lambda *_a, **_k: None)
-    if fault is None:
-        drawing._assert_section_on_sheet(None, view, [dimension])
-        return
-    with pytest.raises(RuntimeError, match="not on the sheet"):
-        drawing._assert_section_on_sheet(None, view, [dimension])
-
-
-def test_section_caption_names_hole_a1() -> None:
-    """Machinist review r7: the view is labelled SECTION A-A, HOLE A1 on its
-    own native caption (label and scale fields kept); no separate note."""
-    native = "<VLNAME> <VLLABEL>\r\n<VLSCALE><VLSCALEV>"
-    assert drawing.section_caption_text(native) == (
-        "<VLNAME> <VLLABEL>,\r\nHOLE A1\r\n<VLSCALE><VLSCALEV>"
-    )
-    assert drawing.section_caption_text("<VLNAME> <VLLABEL>\n<VLSCALE>") == (
-        "<VLNAME> <VLLABEL>,\nHOLE A1\n<VLSCALE>"
-    )
-    for refused in ("<VLNAME>", drawing.section_caption_text(native)):
-        with pytest.raises(RuntimeError, match="unexpected section A-A caption"):
-            drawing.section_caption_text(refused)
-    source = inspect.getsource(drawing._pin_section)
-    assert source.index("_label_section_hole(adapter, section)") < source.index(
-        "position_section_caption("
-    )
-    assert "add_note" not in source
-    for retired in ("SECTION_NOTE", "SECTION_NOTE_XY"):
-        assert not hasattr(drawing, retired), retired
-    assert "A1 ONLY" not in Path(drawing.__file__).read_text(encoding="utf-8")
-    build = inspect.getsource(drawing.build)
-    settled = build[build.index("def pin_controls_settled"):build.index("return await finalize_drawing")]
-    assert "_assert_section_on_sheet(adapter, section, section_annotations)" in settled
-    assert "_assert_section_caption(section)" in settled
-
-
 def test_end_clamp_taps_print_one_2x_callout_naming_the_strap() -> None:
     """Machinist review r7 (rule 10): CL and CR are one size, so one callout
     on CL counts both, and it names the strap it clamps, nothing more."""
@@ -1002,60 +836,24 @@ def test_callouts_and_iso_clear_the_title_block() -> None:
     assert spec.ISOMETRIC_VIEW_NOTE.endswith(
         f"{drawing.ISO_SCALE[0]}:{drawing.ISO_SCALE[1]}"
     )
-    # Section A-A and its caption stand left of the title block.
-    assert drawing.SECTION_CENTER[0] * 1000.0 + 40.0 < _TITLE_BLOCK[0]
-    assert drawing.SECTION_CAPTION_XY[0] * 1000.0 + 25.0 < _TITLE_BLOCK[0]
+    # The edge view's band stands above the title block, below the 20.5's
+    # text and left of the iso's note.
+    half = spec.THICKNESS / 2.0 * drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    edge_y = drawing.EDGE_CENTER[1] * 1000.0
+    assert edge_y - half > _TITLE_BLOCK[3] + 3.0
+    assert edge_y + half + 10.0 < _top_text("PlateLength")[1]
+    assert _on_sheet(spec.OUTLINE_X[1], 0.0)[0] + 2.0 < note_x
 
 
-def _section_sheet(point, sign: float) -> tuple[float, float]:
-    """Model mm in section A-A -> sheet mm, +Y up, +X right (sign 1) or
-    left (-1): the cut keeps SolidWorks' direction, so either may print."""
-    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
-    ax, ay, _az = drawing._SECTION_ANCHOR_MM
-    cx, cy = (value * 1000.0 for value in drawing.SECTION_CENTER)
-    return cx + sign * (point[0] - ax) * scale, cy + (point[1] - ay) * scale
-
-
-def test_section_is_never_reversed_and_fits_either_way() -> None:
-    """jig-r4: the reversed section imported nothing (PlateThick and
-    PinChamferSize missing, available=[]). The cut keeps its direction, so
-    every text must clear the slab, the bottom lanes, the border and the
-    title block whichever way +X reads."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "SetReversedCutDirection" not in source
-    # Carrier r11: through an 18 mm line inside the plate the cut did not
-    # close (the slab printed unhatched). The line crosses the whole plate,
-    # its ends on the sheet, and the crop keeps A1's slab.
-    (right, y0, z0), (left, y1, z1) = drawing.SECTION_LINE_MODEL_MM
-    assert y0 == z0 == y1 == z1 == 0.0
-    assert right > spec.OUTLINE_X[1] and left < spec.OUTLINE_X[0]
-    assert _BORDER[0] + 6.0 < _on_sheet(left, 0.0)[0]
-    assert _on_sheet(right, 0.0)[0] < _BORDER[2] - 3.0
-    a1x = spec.PIN_HOLES["A1"][0]
-    assert math.isclose(drawing._SECTION_ANCHOR_MM[0], a1x)
-    lowest_lane_y = min(_top_text(name)[1] for name in drawing.TOP_KEEP)
-    for sign in (1.0, -1.0):
-        x0, y0 = _section_sheet((a1x - drawing._SECTION_HALF, -spec.THICKNESS), sign)
-        x1, y1 = _section_sheet((a1x + drawing._SECTION_HALF, 0.0), sign)
-        slab = (min(x0, x1), y0, max(x0, x1), y1)
-        assert slab[3] + 5.0 < lowest_lane_y
-        assert slab[2] < _TITLE_BLOCK[0]
-        tx, ty = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
-        assert not (slab[0] - 6.0 < tx < slab[2] + 6.0), sign
-        assert _BORDER[0] + 10.0 < tx < _TITLE_BLOCK[0] - 10.0, sign
-    # Carrier r13: the caption printed above the 520.0's lane, cut off from
-    # the slab by its extension line. It (top-centre anchor, ~46 mm wide,
-    # three ~8.2 mm rows with HOLE A1) stands in the section's own band,
-    # level with the slab, left of the thickness text as +X reads (right,
-    # jig-r5 and r13), inside the border.
-    caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
-    x0, y0 = _section_sheet((a1x - drawing._SECTION_HALF, -spec.THICKNESS), 1.0)
-    x1, y1 = _section_sheet((a1x + drawing._SECTION_HALF, 0.0), 1.0)
-    tx, _ty = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], 1.0)
-    assert _BORDER[0] + 3.0 < caption_x - 23.0
-    assert caption_x + 23.0 < tx - 6.5 - 3.0
-    assert caption_y - 3 * 8.2 > _BORDER[1] + 3.0 and caption_y < y1
-    assert caption_y + 3.0 < lowest_lane_y
+def test_edge_view_text_stands_left_of_the_plate_below_every_top_text() -> None:
+    """The thickness's text stands in its lane left of the plate's -X end,
+    inside the border, below every top-view text (the ream's block
+    included)."""
+    x, _y, _z = drawing.EDGE_KEEP_MODEL_MM["StockThick"]
+    tx = _on_sheet(x, 0.0)[0]
+    assert _BORDER[0] + 10.0 < tx < _on_sheet(spec.OUTLINE_X[0], 0.0)[0] - 6.0
+    ty = drawing.EDGE_CENTER[1] * 1000.0
+    assert all(ty + 10.0 < _top_text(name)[1] for name in drawing.TOP_KEEP)
 
 
 def test_tap_callout_leaders_clear_every_station_text() -> None:
@@ -1109,7 +907,8 @@ def test_all_four_bores_keep_the_unchanged_size_and_locations() -> None:
 
 def test_hole_table_sheet_owns_every_location() -> None:
     """#2151 (owner Option B): one native hole table on its own sheet, its
-    tagged plan the top view; the CARRIER sheet's section names A1 only."""
+    tagged plan the top view; the CARRIER sheet's edge view carries only the
+    thickness."""
     assert drawing.SHEET_NAMES == ("CARRIER", "HOLE TABLE", "HUB CLAMP")
     source = inspect.getsource(drawing._hole_table_sheet)
     assert "SHEET_NAMES[1]" in source
@@ -1120,7 +919,6 @@ def test_hole_table_sheet_owns_every_location() -> None:
     )
     assert "settled_checks=(pin_controls_settled, table_settled, hub_settled)" in build
     assert '"Outer Pin Row Note"' in build
-    assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert not {"ClY", "CrY", "LeverY1", "LeverY2", "RiserY1", "RiserY2"} & set(drawing.TOP_KEEP)
     for retired in ("_LEFT", "_RIGHT", "_LEVER_STATION", "_BAND", "_CHAIN_PLACES"):
         assert not hasattr(drawing, retired), retired
@@ -1139,27 +937,6 @@ def test_ream_control_is_read_back_on_the_carrier_sheet() -> None:
     assert "PlateNearY" in drawing.TABLE_ROW_DIMENSIONS
     ream = inspect.getsource(drawing._assert_ream_control)
     assert 'CALLOUTS_BELOW["PinHoleDia"]' in ream
-
-
-def test_section_caption_stands_in_the_old_note_slot_clear_of_every_line() -> None:
-    """Machinist review r7: the A1-only note is gone; the caption's own third
-    row (HOLE A1) hangs into the slot it held (x 14..75, y 14..35,
-    R4NativeEye 43452045), clear of the thickness lane, the slab, the
-    plate's left extension lines and the border."""
-    caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
-    right = caption_x + 23.0
-    bottom = caption_y - 3 * 8.2
-    assert bottom > _BORDER[1] + 3.0
-    a1x = spec.PIN_HOLES["A1"][0]
-    for sign in (1.0, -1.0):
-        stock_x, _ = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
-        slab_x = min(
-            _section_sheet((a1x - drawing._SECTION_HALF, 0.0), sign)[0],
-            _section_sheet((a1x + drawing._SECTION_HALF, 0.0), sign)[0],
-        )
-        assert right + 3.0 < min(stock_x - 1.0, slab_x), sign
-    # The plate's left extension lines stand at its -X end (sheet x ~92).
-    assert right + 3.0 < _on_sheet(spec.OUTLINE_X[0], 0.0)[0]
 
 
 def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> None:
