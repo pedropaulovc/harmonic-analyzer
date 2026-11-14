@@ -192,7 +192,9 @@ BLADE_START_MM: dict[int, float] = {
     teeth: (
         0.0
         if teeth == REFERENCE_TEETH
-        else inch_grid_mm(_south_face_mm(teeth) + BLADE_INSET, BLADE_LENGTH_PLACES)
+        else inch_grid_mm(
+            _south_face_mm(teeth) + BLADE_INSET, BLADE_LENGTH_PLACES, math.ceil
+        )
     )
     for teeth in GEARS
 }
@@ -405,8 +407,13 @@ _SEAT_EDGE_MID = sum(SEAT_EDGE_MM) / 2.0
 # blades onto their seats, so neither lifts off. It spreads up to
 # SPREAD_MAX_MM in use.
 GRIP_PLACES = 3
-GRIP_SPAN = inch_grid_mm(2.0 * SEAT_EDGE_MM[0] - _XXX, GRIP_PLACES, math.floor)
-if GRIP_SPAN + _XXX > 2.0 * SEAT_EDGE_MM[0]:
+# At its widest print the span still takes this much interference, so the
+# spring always preloads both blades on their seats.
+GRIP_PRELOAD_MIN_MM = 0.002 * INCH
+GRIP_SPAN = inch_grid_mm(
+    2.0 * SEAT_EDGE_MM[0] - _XXX - GRIP_PRELOAD_MIN_MM, GRIP_PLACES, math.floor
+)
+if GRIP_SPAN + _XXX + GRIP_PRELOAD_MIN_MM > 2.0 * SEAT_EDGE_MM[0] + 1e-9:
     raise AssertionError("the U's span must grip T030 at every limit")
 SPREAD_MAX_MM = 2.0 * SEAT_EDGE_MM[1] - (GRIP_SPAN - _XXX)
 # The far arm (.XX wide) is the spring, at rule 17's .080 wall target so its
@@ -431,19 +438,28 @@ INSTALL_SPREAD_MM = INSTALL_LIFT_MM + SPREAD_MAX_MM
 # 1.5 * width * spread / length^2; the slot is long enough to keep that under
 # SPRING_YIELD_STRAIN at its widest and shortest print, and in any case clears
 # the pivot's end.
+# The slot's closed end is a full round (a drilled hole the slot's sides are
+# sawn to), so the spring arm runs into the bridge with no sharp root.
+# SLOT_LENGTH (.XX) runs to the round's centre, where its straight sides end:
+# that straight length is the spring's cantilever, and the round reaches the
+# axis SLOT_END_RADIUS_MM further, clear of the pivot's end.
+SLOT_END_RADIUS_MM = GRIP_SPAN / 2.0
 SPRING_LENGTH_MIN_MM = math.sqrt(
     1.5 * (SPRING_WIDTH + _XX) * INSTALL_SPREAD_MM / SPRING_YIELD_STRAIN
 )
 SLOT_LENGTH = inch_grid_mm(
-    max(PIVOT_END_MAX_MM, SPRING_LENGTH_MIN_MM) + _XX, 2, math.ceil
+    max(PIVOT_END_MAX_MM - SLOT_END_RADIUS_MM, SPRING_LENGTH_MIN_MM) + _XX,
+    2,
+    math.ceil,
 )
+SLOT_END_MM = SLOT_LENGTH + SLOT_END_RADIUS_MM
 SPRING_STRAIN = (
     1.5 * (SPRING_WIDTH + _XX) * INSTALL_SPREAD_MM / (SLOT_LENGTH - _XX) ** 2
 )
 if SPRING_STRAIN >= SPRING_YIELD_STRAIN:
     raise AssertionError(f"the spring arm yields opening ({SPRING_STRAIN:.5f})")
-# The bridge is .25 wide, as the near arm about.
-SHEET_LENGTH = SLOT_LENGTH + 0.25 * INCH
+# The bridge is at least .25 wide past the round, as the near arm about.
+SHEET_LENGTH = inch_grid_mm(SLOT_END_MM + 0.25 * INCH, 2, math.ceil)
 # The far arm's edge stands over every bonded gear's tips on its seat.
 if SEAT_EDGE_MM[0] <= max(tip_radius_limits_mm(t)[1] for t in BONDED_TEETH) + (
     BOND_FLOAT_MM
@@ -455,6 +471,31 @@ if SEAT_EDGE_MM[0] <= max(tip_radius_limits_mm(t)[1] for t in BONDED_TEETH) + (
 # slides at most SLIDE_WIDTH_MM.
 SLIDE_WIDTH_MM = max(seats[-1][1] - seats[0][1] for seats in _SEATS.values())
 LEAN_MAX_RAD = 2.0 * SLIDE_WIDTH_MM / (4.0 * SEAT_EDGE_MM[0])
+# Turned about the radial line through both T030 blades (yaw), the sheet is
+# held only by T030's face: each T030 blade's mid-plane may stand anywhere in
+# its slide at both ends of that face, so a station x north of the south end
+# stands on the line through the two.
+T030_FACE_MM = FACE_WIDTH - _FACE_BAND
+YAW_MAX_RAD = SLIDE_WIDTH_MM / T030_FACE_MM
+
+
+def _seat_lines(seats) -> tuple[tuple[float, float, float], ...]:
+    """(edge, mid at x = 0, mid at x = T030_FACE_MM) of each extreme line."""
+    (e0, m0), (e1, m1) = seats[0], seats[-1]
+    lines = {(e0, m0, m0), (e1, m1, m1), (e0, m0, m1), (e1, m1, m0)}
+    return tuple(sorted(lines))
+
+
+SEAT_LINES: tuple[tuple[float, float, float, float], ...] = tuple(
+    (edge, start, end, sheet)
+    for (_corner, sheet), seats in _SEATS.items()
+    for edge, start, end in _seat_lines(seats)
+)
+
+
+def blade_span_mm(teeth: int) -> tuple[float, float]:
+    """The stretch of a bonded blade inside its own gear's face."""
+    return BLADE_START_MM[teeth], BLADE_START_MM[teeth] + BLADE_LENGTH
 
 
 def _flex_share(station_mm: float) -> float:
@@ -518,13 +559,18 @@ def _conditions(teeth: int, depth_mm: float):
         for k in range(_FLOAT_DIRECTIONS)
     )
     bands = (-_XXX - FLEX_MM[teeth], _XXX)
-    for edge, mid, sheet in SEAT_CONDITIONS:
+    south, north = blade_span_mm(teeth)
+    for edge, start, end, sheet_mm in SEAT_LINES:
+        at_south = start + (end - start) * south / T030_FACE_MM
+        at_north = start + (end - start) * north / T030_FACE_MM
+        mid = (at_south + at_north) / 2.0
+        sweep = abs(at_north - at_south)
         for lean in (-LEAN_MAX_RAD, LEAN_MAX_RAD):
             # Turned about the seat line, a point the depth below it rises
             # by depth * (1 - cos) and moves across by depth * sin.
             rise = depth_mm * (1.0 - math.cos(lean))
             across = depth_mm * math.sin(lean)
-            thick = sheet / math.cos(lean)
+            thick = sheet_mm / math.cos(lean) + sweep
             for corner in range(len(_profiles(teeth))):
                 for band in bands:
                     for radial, tangential in floats:
@@ -536,14 +582,24 @@ def _conditions(teeth: int, depth_mm: float):
                         )
 
 
+# At every limit each blade keeps this much play at its edge (the wax film
+# and a sheared burr live in it) and this much air over its gear's root.
+BLADE_PLAY_MM = 0.0005 * INCH
+ROOT_AIR_MM = 0.002 * INCH
+
+
 def _enters(teeth: int, depth_mm: float) -> bool:
-    """At every limit the blade neither bottoms on the root nor binds."""
+    """At every limit the blade keeps its play and its root air."""
     for corner, edge, mid, sheet in _conditions(teeth, depth_mm):
+        if math.hypot(edge, mid - sheet / 2.0) < root_radius_mm(teeth, corner) + (
+            ROOT_AIR_MM
+        ):
+            return False
         try:
             low, high = _window(teeth, corner, edge, mid, sheet)
         except ValueError:
             return False
-        if high <= low:
+        if (high - low) * math.hypot(edge, mid) < BLADE_PLAY_MM:
             return False
     return True
 
@@ -587,11 +643,19 @@ for _teeth in BONDED_TEETH:
 # Each level passes over the next, smaller gear's tips (its own blade's step
 # stands BLADE_INSET into that gear's face) at the lowest print and seat, its
 # deepest flex and the smaller gear's float.
+INSIDE_CORNER_MAX_MM = 0.040 * INCH
 for _south, _north in zip(GEARS, GEARS[1:], strict=False):
     _band = 0.0 if _south == REFERENCE_TEETH else _XXX + FLEX_MM[_south]
     _lowest = SEAT_EDGE_MM[0] - blade_depth_mm(_south) - _band
     if _lowest <= tip_radius_limits_mm(_north)[1] + BOND_FLOAT_MM:
         raise AssertionError(f"T{_south:03d} level reaches T{_north:03d}'s tips")
+    # The step's inside corner at the title block's R.040 MAX hangs below the
+    # level by at most this over the smaller gear's face.
+    _r = INSIDE_CORNER_MAX_MM
+    _u = min(axial_margins_mm()[gear_tag(_north)], _r)
+    _sag = _r - math.sqrt(_r * _r - (_r - _u) ** 2)
+    if _lowest - _sag <= tip_radius_limits_mm(_north)[1] + BOND_FLOAT_MM:
+        raise AssertionError(f"T{_south:03d} step corner reaches T{_north:03d}'s tips")
 # Past T006's level the near arm's edge returns to the seat line, flexed in
 # by the most the spread bends it there, and stands clear of MHA-DT-38.
 if SEAT_EDGE_MM[0] - _flex_share(SLOT_LENGTH) * SPREAD_MAX_MM <= BUSHING_REACH_MM:
@@ -740,7 +804,11 @@ def _area(points: list[tuple[float, float]]) -> float:
     )
 
 
-SHEET_VOLUME = _area(profile_points_mm()) * SHEET_THICK
+# The slot's round end (between SLOT_POINT and its neighbour) takes a half
+# disc past the polygon's chord.
+SHEET_VOLUME = (
+    _area(profile_points_mm()) - math.pi * SLOT_END_RADIUS_MM**2 / 2.0
+) * SHEET_THICK
 
 # --- Drawing -------------------------------------------------------------------
 PROFILE_SKETCH = "SheetProfile"
@@ -796,6 +864,8 @@ REFERENCE_DIMENSIONS = frozenset({"SheetThick"})
 DEPTH_SUFFIX: dict[str, str] = {
     blade_depth_name(t): f", CLEARS {gear_number(t)} ROOT" for t in BONDED_TEETH
 }
+# The slot's length runs to its full round's centre.
+DEPTH_SUFFIX["SlotLength"] = " TO FULL R"
 CALLOUTS_BELOW: dict[str, str] = {
     "GripSpan": GRIP_TEXT,
     "SheetThick": STOCK_TEXT,

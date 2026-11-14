@@ -5,7 +5,8 @@ south (T036, where both arms stand) left, the near (stepped) arm on top and
 the spring arm below: every step's start from the south end, every blade's
 depth from the near T030 blade's edge (the seat line) and the grip span from
 it to the spring arm's T030 blade, all at the title block's bands. The
-bottom view shows the stock's thickness; note 1 gives the depths' reason. A
+bottom view shows the stock's thickness. Each depth states its reason after
+its value, the grip span its interference; there is no numbered note. A
 shaded isometric gives the picture.
 
 Run with SolidWorks open::
@@ -64,15 +65,15 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 2.64 x .89 U whose shallowest step is .047: 4:1 keeps every step and the
+# A 2.94 x .89 U whose shallowest step is .045: 3:1 keeps every step and the
 # .020 stock legible and leaves the depths' words room on its left.
-SHEET_SCALE = (4.0, 1.0)
-VIEW_SCALE = (4, 1)
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 ISO_SCALE = (1, 2)
 # The model origin (the near arm's south end on the seat line) on the sheet;
 # the bottom view projects straight below.
-FRONT_ORIGIN = (0.128, 0.190)
+FRONT_ORIGIN = (0.135, 0.190)
 BOTTOM_CENTER_Y = 0.105
 # The isometric under the bottom view, left of the title block, its label
 # under it.
@@ -97,24 +98,28 @@ SHEET_BOX = (
 # A vertical dimension whose text stands outside its extension lines prints
 # the text left of its dimension line, the line at the text's right edge (r10
 # render); text inside them is centred on the line. Widths (sheet m): a
-# three-place value 10 mm, a two-place value 7.6 mm; a capital 2.7 mm. A
+# three-place value 10 mm, a two-place value 7.6 mm; a capital 2.5 mm (r11
+# layout audit: 79.6 mm for 32 characters). A
 # line of dimension text stands 5 mm in a block (value, then each callout
 # line).
 DEPTH_TEXT_WIDTH = 0.010
 TWO_PLACE_TEXT_WIDTH = 0.0076
-CHAR_WIDTH = 0.0027
+CHAR_WIDTH = 0.0025
 LINE_HEIGHT = 0.005
 
 # --- Front view dimension text (sheet m) ---------------------------------------
-# Left of the U, from the seat line: the grip span and, chained under it, the
-# spring arm's width, each text centred on its line inside its span, the grip
-# span's under the depths. Further out the depths, the deepest nearest the U:
-# each text stands left of its own line just under its own extension line, so
-# every line further out ends above it and every line nearer stands right of
-# it. The U's height stands right of the bridge. Over the U, every length
-# from the south end in rows, the shortest nearest, the U's length outermost.
-GRIP_X = FRONT_ORIGIN[0] - 0.007
+# Left of the U, from the seat line: the grip span nearest, its text under
+# the U left of its line; the spring arm's width further out, its text
+# centred on its line inside its span. Further out the depths, the deepest
+# nearest the U: each text stands left of its own line under its own
+# extension line and a row under the shallower one's, so every line further
+# out ends above it and every line nearer stands right of it. The U's height
+# stands right of the bridge. Over the U, every length from the south end in
+# rows, the shortest nearest, the U's length outermost.
+GRIP_X = FRONT_ORIGIN[0] - 0.004
+SPRING_X = FRONT_ORIGIN[0] - 0.010
 DEPTH_X0 = FRONT_ORIGIN[0] - 0.011
+DEPTH_TEXT_PITCH = 0.0055
 DEPTH_LINE_PITCH = 0.004
 HEIGHT_X = SHEET_BOX[2] + 0.007
 ROW_Y0 = SHEET_BOX[3] + 0.006
@@ -128,8 +133,13 @@ def depth_line_x(teeth: int) -> float:
 
 
 def depth_text_y(teeth: int) -> float:
-    """Just under the blade's own extension line."""
-    return front_xy(0.0, -part.BLADE_DEPTH_MM[teeth])[1] - 0.001 - LINE_HEIGHT / 2.0
+    """Under the blade's own extension line and a row under the shallower
+    blade's text."""
+    y = math.inf
+    for each in part.BONDED_TEETH[: part.BONDED_TEETH.index(teeth) + 1]:
+        own = front_xy(0.0, -part.BLADE_DEPTH_MM[each])[1] - 0.001 - LINE_HEIGHT / 2.0
+        y = min(own, y - DEPTH_TEXT_PITCH)
+    return y
 
 
 def _block_height(name: str) -> float:
@@ -137,7 +147,9 @@ def _block_height(name: str) -> float:
 
 
 # Dimensions whose text stands outside, left of the line.
-OUTSIDE_LEFT = frozenset(part.blade_depth_name(t) for t in part.BONDED_TEETH)
+OUTSIDE_LEFT = frozenset(
+    {"GripSpan", *(part.blade_depth_name(t) for t in part.BONDED_TEETH)}
+)
 ROWS = (
     *(part.blade_start_name(t) for t in part.BONDED_TEETH),
     "LevelEnd",
@@ -147,11 +159,13 @@ ROWS = (
 
 
 def front_keep() -> dict[str, tuple[float, float]]:
-    deepest_text = depth_text_y(part.BONDED_TEETH[-1]) - LINE_HEIGHT / 2.0
     keep: dict[str, tuple[float, float]] = {
-        "GripSpan": (GRIP_X, deepest_text - 0.003 - _block_height("GripSpan") / 2.0),
-        "SpringWidth": (
+        "GripSpan": (
             GRIP_X,
+            SHEET_BOX[1] - 0.004 - _block_height("GripSpan") / 2.0,
+        ),
+        "SpringWidth": (
+            SPRING_X,
             front_xy(0.0, -part.GRIP_SPAN - part.SPRING_WIDTH / 2.0)[1],
         ),
         "SheetHeight": (HEIGHT_X, (SHEET_BOX[1] + SHEET_BOX[3]) / 2.0),

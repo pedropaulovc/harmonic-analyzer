@@ -298,9 +298,9 @@ flowchart LR
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_tip_bond_clock`
-draws the bonded T006–T024's phasing-comb play, ±0.551 mm of pitch arc per gear
+draws the bonded T006–T024's phasing-comb play, ±0.857 mm of pitch arc per gear
 (the MHA-DT-03-TL-02 comb, one .020 in sheet cut to a U with one blade per gear at
-the title block's bands and a spring arm's second T030 blade that bounds its lean,
+the title block's bands and a spring arm's second T030 blade that bounds its lean, its yaw bounded only by T030's face,
 each bonded gear floating round its bond clearance, T006 worst:
 `dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM`; owner rulings C1 keyed and b1,
 2026-11-09, single blade, 2026-11-10, PR #1992, single sheet, 2026-11-13, and the
@@ -369,7 +369,7 @@ current report does not discharge the operating assumptions or waivers below.
   tooth space beside its phase-0 tooth (owner rulings 2026-11-09,
   2026-11-10 and 2026-11-13) while its LOCTITE 638 bond grabs, so it sits
   within its blade's play, the comb's slide in T030's space and its lean
-  between its two T030 blades (±0.551 mm of pitch arc at T006, the worst),
+  between its two T030 blades and its yaw on T030's face (±0.857 mm of pitch arc at T006, the worst),
   drawn per gear (`cone_tip_bond_clock`). The former D-flat
   play on lands 2–4 and its per-land mean residual retired with the flats.
   Crank in one direction only; a
