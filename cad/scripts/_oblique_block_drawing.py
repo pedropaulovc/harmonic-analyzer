@@ -132,6 +132,12 @@ FLOOR_CUT_BOTTOM_OVERRUN_MM = 16.0
 SECTION_LETTER_HEIGHTS = (.005, .0045, .004, .0035, .003)
 SECTION_LETTER_CLEARANCE = .001
 _PREF_SECTION_ARROW = {27: .0025, 28: .001, 29: .0035}
+# TL-32's lower B stood on the .87's -X extension line with those 3.5 mm
+# arrows (machinist review, farm run 20261114T004142081Z): shorter arrows
+# bring each letter toward its cutting line, and _require_letter_right_of
+# checks the lower B against that extension line.
+FEED_SECTION_ARROW_LENGTH = .0015
+SECTION_LETTER_EDGE_CLEARANCE = .0005
 _PREF_OPTION_NONE = 0
 # The 1:1 pictorial's top vertex touched the border at y .235 (review of farm
 # run 20261027T181901497Z); 7 mm lower it stays clear of B-B's 24.30 (y 175).
@@ -692,11 +698,12 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     _telemetry.info(f'{label}: box {extent!r}')
 
 
-def _set_section_arrows(adapter) -> None:
+def _set_section_arrows(adapter, arrow_length=None) -> None:
     """Set this document's cutting-line arrow sizes, read back, raise on
     mismatch (draw_dt_cone_gear_shaft._pin_witness_line_extension)."""
     extension = _early_bound(adapter.currentModel, 'IModelDoc2').Extension
-    for key, value in _PREF_SECTION_ARROW.items():
+    prefs = _PREF_SECTION_ARROW | ({29: arrow_length} if arrow_length is not None else {})
+    for key, value in prefs.items():
         before = float(extension.GetUserPreferenceDouble(key, _PREF_OPTION_NONE))
         ok = extension.SetUserPreferenceDouble(key, _PREF_OPTION_NONE, value)
         applied = float(extension.GetUserPreferenceDouble(key, _PREF_OPTION_NONE))
@@ -712,6 +719,20 @@ def _set_section_letter_height(adapter, dr, height: float) -> None:
     if not dr.SetTextFormat(False, text_format):
         raise RuntimeError(f'section {dr.GetLabel()!r}: letter height {height} refused')
     rebuild_drawing(adapter, label='section letter height')
+
+
+def _require_letter_right_of(view, x_min: float) -> None:
+    """The section's lower cutting-line letter must start right of ``x_min``
+    (sheet m): TL-32's lower B clear of the .87's -X extension line."""
+    cut = _early_bound(_early_bound(view, 'IView').GetSection(), 'IDrSection')
+    info = [float(v) for v in (cut.GetTextInfo() or ())]
+    if len(info) < 6:
+        raise RuntimeError(f'section {cut.GetLabel()!r}: unreadable letter positions {info!r}')
+    lower = min((info[0:3], info[3:6]), key=lambda point: point[1])
+    _telemetry.info(f'section {cut.GetLabel()!r} lower letter top-left {lower!r}, x min {x_min!r}')
+    if lower[0] < x_min:
+        raise RuntimeError(f'section {cut.GetLabel()!r}: lower letter starts at x {lower[0]!r}, '
+                           f'on or left of the extension line clearance {x_min!r}')
 
 
 def _fit_section_letters(adapter, fitted, matched, *, below_y: float) -> None:
@@ -779,7 +800,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
     # left. A-A stays short; B-B's ends use the reserved annotation lanes.
-    _set_section_arrows(adapter)
+    _set_section_arrows(adapter, FEED_SECTION_ARROW_LENGTH if is_feed else None)
     _pin_sheet_scale(adapter, SHEET_SCALE)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(part.BLOCK_X1+4,0,contract.BLOCK_HEIGHT),'pivot cut start'),
@@ -818,6 +839,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
                                   SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
+    if is_feed:
+        edge = _project(adapter,plan,(part.BLOCK_X0,-part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'-X edge foot')
+        _require_letter_right_of(floor, edge[0] + SECTION_LETTER_EDGE_CLEARANCE)
     annotations += curate_view_dimensions(adapter,floor,keep=floor_keep,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     right_keep = {}

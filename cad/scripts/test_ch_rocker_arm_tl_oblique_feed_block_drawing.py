@@ -483,3 +483,20 @@ def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
     assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
     assert 156.3695 - ref_top >= 2.0
     assert 141.2195 + rise - ref_top >= 10.0
+
+
+@pytest.mark.parametrize('lower_x, clears', ((.1505, True), (.1495, False)))
+def test_feed_lower_section_letter_must_clear_the_lug_extension_line(monkeypatch, lower_x, clears):
+    """Machinist review, farm run 20261114T004142081Z: TL-32's lower B stood
+    on the .87's -X extension line; the sheet refuses a letter left of it."""
+    import _oblique_block_drawing as drawing
+
+    monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
+    section = SimpleNamespace(GetTextInfo=lambda: (.152, .259, 0.0, lower_x, .170, 0.0), GetLabel=lambda: 'B')
+    view = SimpleNamespace(GetSection=lambda: section)
+    assert drawing.FEED_SECTION_ARROW_LENGTH < drawing._PREF_SECTION_ARROW[29]
+    if clears:
+        drawing._require_letter_right_of(view, .150)
+    else:
+        with pytest.raises(RuntimeError, match='lower letter'):
+            drawing._require_letter_right_of(view, .150)
