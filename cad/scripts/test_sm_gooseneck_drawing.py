@@ -7,12 +7,14 @@ import asyncio
 import math
 from pathlib import Path
 import re
+import tomllib
 from types import SimpleNamespace
 
 import pytest
 
 import _config
 from _machinist_review_mode import MachinistReviewMode
+from _paths import CAD_ROOT
 import build_sm_gooseneck as part
 import draw_sm_gooseneck as drawing
 import sm_gooseneck_geom as geom
@@ -207,10 +209,14 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     }
     for feature, by_name in spec.DIMENSION_CALLOUTS.items():
         assert set(by_name) <= spec.DRAWING_DIMENSIONS[feature]
-    assert spec.DIMENSION_CALLOUTS_BY_NAME == {
-        "BendRadius": "TUBE CENTERLINE",
-        "TubeOdRef": ".065 WALL STOCK",
-    }
+    assert set(spec.DIMENSION_CALLOUTS_BY_NAME) == {"BendRadius", "TubeOdRef"}
+    assert spec.DIMENSION_CALLOUTS_BY_NAME["BendRadius"] == "TUBE CENTERLINE"
+    # The stock wall is the supplier's size: its value prints only as a
+    # bracketed reference, never as a bare (toleranced) three-place size.
+    wall = spec.DIMENSION_CALLOUTS_BY_NAME["TubeOdRef"]
+    stock_wall = f"{geom.WALL_T / geom.MM_PER_IN:.3f}".removeprefix("0")
+    assert f"({stock_wall})" in wall and "STOCK" in wall
+    assert wall.replace(f"({stock_wall})", "").count(stock_wall) == 0
 
 
 def test_references_and_the_governing_arm_size() -> None:
@@ -310,6 +316,24 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
         )
     )
     assert set(extra) == {"Manufacturing Notes", "Isometric View Note"}
+
+
+def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
+    equipment = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+    )
+    (row,) = [
+        row
+        for row in equipment["stock"]
+        if "MHA-SM-01" in row.get("note", "") and row.get("form") == "round_tube"
+    ]
+    assert "OnlineMetals part 7322" in row["cite"][0]
+    assert row["od_mm"] == pytest.approx(geom.TUBE_DIA)
+    assert row["wall_mm"] == pytest.approx(geom.WALL_T)
+    # Leg, the bend's centreline arc and the arm straight, plus the owner's
+    # ~2 in tail (#2315), inside the supplier's -1/8 in cut tolerance.
+    developed = geom.LEG_LENGTH + math.pi / 2.0 * geom.BEND_R + geom.TUBE_STRAIGHT
+    assert row["length_mm"] - 3.175 >= developed + 2.0 * geom.MM_PER_IN
 
 
 def test_sheet_is_the_elevation_and_isometric_only() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+import tomllib
 
 import pytest
 
@@ -16,6 +17,7 @@ import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _assembly_contract import assembly_contract
+from _paths import CAD_ROOT
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
@@ -320,7 +322,9 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     # it must slide back out (check 5).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
     # the tool is an 8.0 in bar that spans both mounts, not a class ZZ pin,
     # with a fit route (rule 4): a matched fit to the bores it gauges, whose
-    # maximum is the clearance the rock budget charges.
+    # maximum is the clearance the rock budget charges.  That fit is the
+    # bar's own make record; the step states only the fitter's hand check
+    # (rule 22, PR #2717: no number that needs an instrument).
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
@@ -328,11 +332,22 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert "WITHOUT THE LEVER" in step
     assert step.index("BY HAND") < step.index(notes.KNIFE_GAUGE_BAR) < step.index("TIGHTEN")
     assert step.index("TIGHTEN") < step.index("WITHDRAW THE BAR")
-    assert notes.KNIFE_GAUGE_BAR == (
-        "(Ø.4720) X 8.0 LONG GAUGE BAR, "
-        ".0002-.0017 DIAMETRAL CLEARANCE IN EACH MHA-SM-02 BORE"
-    )
+    assert notes.KNIFE_GAUGE_BAR == "(Ø.4720) X 8.0 LONG GAUGE BAR"
     assert "PIN" not in notes.KNIFE_GAUGE_BAR and "ZZ" not in notes.KNIFE_GAUGE_BAR
+    (bar_step,) = [
+        line for line in notes.ASSEMBLY_STEPS if notes.KNIFE_GAUGE_BAR in line
+    ]
+    assert notes.KNIFE_GAUGE_BAR_FEEL in bar_step and "BY HAND" in bar_step
+    # Rule 4: the matched fit names its mate by drawing number.
+    assert "MADE TO THE MHA-SM-02 BORES" in bar_step
+    # No four-place size is left in the step for an instrument to read.
+    assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
+    record = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+    )["gauges"]["gauge-bar-0472x8"]
+    low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
+    assert f"{low:.4f}".lstrip("0") in record["purchase"]
+    assert f"{high:.4f}".lstrip("0") in record["purchase"]
     assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
     assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE
