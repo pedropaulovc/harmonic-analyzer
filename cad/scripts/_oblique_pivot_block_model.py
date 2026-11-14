@@ -16,10 +16,10 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import (set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance,
+                                 set_dimension_symmetric_tolerance)
 from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_checks import volume_check, report_mass_properties
 from _part_properties import part_drawing_unit
@@ -693,18 +693,17 @@ async def build_block_model(adapter, part) -> None:
     _require_one_solid_body(adapter,label=part.PART_NAME)
     require_block_geometry(adapter, part)
     await volume_check(adapter,"finished block",expected,expected*0.002)
-    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
-                                      places=spec.BORE_PLACES,display_unit=spec.UNIT)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
+    # The pivot seat's DRILLED HOLES band, printed at the seat's own places.
+    for (feature_name,dimension_name),(lower,upper) in part.BILATERAL_DIMENSIONS.items():
+        set_dimension_bilateral_tolerance(adapter,feature_name,dimension_name,lower,upper,
+                                          places=part.DRAWING_PRECISION_BY_NAME[dimension_name],
+                                          display_unit=part.UNIT)
     # TL-32's Tr8/KP08 vendor-line dimensions print exact millimetres with
     # their own bands (owner ruling 4).
     for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():
         set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,display_unit="mm")
         set_metric_vendor_units(adapter,feature_name,dimension_name,places=places)
-    # TL-32's Ø.351 clearance station in Y, ±.002 (owner ruling 2026-11-08
-    # (Pedro), A2 option (i)); its Z is the millimetre band above.
-    for (feature_name,dimension_name),(places,band) in getattr(part,"INCH_TOLERANCED_DIMENSIONS",{}).items():
-        set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,places=places,display_unit="in")
     # TL-32's tap clocking band, every tap (TL-00 F1B sets all four holes in it).
     if hasattr(part,"NUT_CLOCK_DIMENSION"):
         set_dimension_symmetric_angular_tolerance(adapter,"NutPatternReference",part.NUT_CLOCK_DIMENSION,

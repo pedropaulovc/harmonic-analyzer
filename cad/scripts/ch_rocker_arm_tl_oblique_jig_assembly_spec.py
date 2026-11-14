@@ -779,11 +779,12 @@ if pivot_block.PIVOT_THREAD_ENGAGEMENT_MIN < 1.5 * pivot_screw.THREAD_DIA:
     raise AssertionError("the pivot receiver's full-form engagement is under 1.5D")
 if PIVOT_THREAD_ENGAGEMENT != fasteners.PIVOT_SCREW_TO_BLOCK.engagement_mm:
     raise AssertionError("the fastener table's pivot engagement is not the block's")
-# Radially, the shoulder clears its block seat and the carrier's pin holes, and
-# the spacer and shim bores clear the shoulder: no member locates on another.
+# Radially, the shoulder enters its block seat (line to line at worst: the
+# seat's DRILLED HOLES .375 minimum, owner ruling 2026-11-13) and clears the
+# carrier's pin holes, and the spacer and shim bores clear the shoulder.
 _SHOULDER_MAX = pivot_screw.SHOULDER_DIA + pivot_screw.SHOULDER_DIA_BAND[0]
-if pivot_block.PIVOT_LOCATING_CLEARANCE_MIN <= 0.0:
-    raise AssertionError("the shoulder does not clear its block seat")
+if pivot_block.PIVOT_LOCATING_CLEARANCE_MIN < 0.0:
+    raise AssertionError("the shoulder interferes with its block seat")
 if carrier.PIN_HOLE_DIA + min(carrier.PIN_HOLE_BAND) <= _SHOULDER_MAX:
     raise AssertionError("the shoulder does not clear the carrier's pin holes")
 if pivot_spacer.ID + min(pivot_spacer.ID_BAND) <= _SHOULDER_MAX:

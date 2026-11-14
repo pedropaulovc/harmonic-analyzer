@@ -34,7 +34,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-block"
 UNIT = drawing_unit(
@@ -77,9 +77,10 @@ if any(_EDGE_VERTICAL[_i - 1] == _vertical for _i, _vertical in enumerate(_EDGE_
 NUT_FACE_X = LUG_X1
 NUT_AXIS_Y = -lead.SCREW_LATERAL
 NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
-# .351: the smallest three-place drill that clears the Tr8 major at the
-# vertical stack (LEADSCREW_RADIAL_CLEARANCE, below).
-SCREW_CLEARANCE_DIA = 0.351 * 25.4  # 8.915
+# Owner ruling 2026-11-13 (a jig part; no boring head owned): a 3/8 end mill
+# plunged at its DRO station, under the title block's DRILLED HOLES band
+# (.375-.379) at title-block stations; it replaced the bored Ø.351.
+SCREW_CLEARANCE_DIA = 0.375 * 25.4  # 9.525
 # The nut is turned 45° about its axis, so its four holes sit on the lug's
 # diagonals (the owner's option-B sketch, 2026-11-04). The band binds EVERY
 # tap, not one (Codjiflo 4477879822 on #2187): the supplier gives the holes
@@ -140,18 +141,16 @@ DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != 
 }
 # The axis is the leadscrew's closure (not on the .01 grid): three places;
 # its height is the KP08 vendor line's, exact millimetres (owner ruling 4).
-# Owner ruling 2026-11-08 (Pedro), A2 option (i): the Ø.351 leadscrew
-# clearance alone is located ±.002 in Y and Z on VIEW D (±.05 mm on its
-# millimetre height), so its wall to the THRU taps holds the .060 floor with
-# rule 17's drill wander charged; no geometry changes.
+# Owner ruling 2026-11-13: the clearance stands at title-block stations, the
+# .XXX ±.005 in Y and its millimetre equivalent, ±.13 mm, on its height.
 NUT_PATTERN_PLACES = 3
 METRIC_UNIT = "mm"
 METRIC_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=METRIC_UNIT)  # 0.13
-NUT_CLEARANCE_BAND_Z = 0.05  # mm, NutCentreZ (.002 in is 0.0508)
-NUT_CLEARANCE_BAND_Y = 0.002 * 25.4  # NutCentreY, inch
+NUT_CLEARANCE_BAND_Z = METRIC_BAND  # mm, NutCentreZ
+NUT_CLEARANCE_BAND_Y = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # NutCentreY, the title block's
+BILATERAL_DIMENSIONS = dict(pivot.BILATERAL_DIMENSIONS)  # the shared seat's band
 METRIC_DIMENSIONS = {("NutPatternReference", "NutCentreZ"): (NUT_PATTERN_PLACES, NUT_CLEARANCE_BAND_Z)}
-INCH_TOLERANCED_DIMENSIONS = {("NutPatternReference", "NutCentreY"): (NUT_PATTERN_PLACES, NUT_CLEARANCE_BAND_Y)}
-# The leadscrew clearance is drilled: inch drill sizes print three places.
+# The leadscrew clearance prints three places, as inch drill sizes do.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
     "NutClearanceDia", "NutCentreZ", "NutCentreY",
 }
@@ -189,10 +188,10 @@ NUT_CLOCK_REFERENCE = f"{NUMBER} SHEET {NUT_CLOCK_SHEET} {NUT_CLOCK_VIEW}"
 
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
 # The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
-# clearance stands 12.400 ±.05 mm over the carriage face, so the leadscrew may
-# run LEADSCREW_OFFSET_Z (.355 mm) off the clearance's axis vertically
+# clearance stands 12.400 ±.13 mm over the carriage face, so the leadscrew may
+# run LEADSCREW_OFFSET_Z (.435 mm) off the clearance's axis vertically
 # (Codjiflo P1 on #2112); laterally the KP08s float to centre it, within the
-# clearance's own ±.002 station. The Ø.351 clears the Tr8's major at both
+# clearance's own ±.005 station. The Ø.375 clears the Tr8's major at both
 # at the KP08's nominal 15 axis height, which is UNVERIFIED until the pillow
 # blocks are measured (#2184).
 _AXIS_Y_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # .005
@@ -201,8 +200,9 @@ LEADSCREW_OFFSET_Y = NUT_CLEARANCE_BAND_Y
 LEADSCREW_OFFSET = math.hypot(LEADSCREW_OFFSET_Y, LEADSCREW_OFFSET_Z)
 LEADSCREW_RADIAL_CLEARANCE = (SCREW_CLEARANCE_DIA - lead.SCREW_MAJOR_DIA) / 2
 assert LEADSCREW_RADIAL_CLEARANCE > LEADSCREW_OFFSET, (LEADSCREW_RADIAL_CLEARANCE, LEADSCREW_OFFSET)
-# The leadscrew clearance clears the screw at its least size.
-assert SCREW_CLEARANCE_DIA - printed_band_mm(3, unit=UNIT) > lead.SCREW_MAJOR_DIA
+# The leadscrew clearance clears the screw at its least size (DRILLED HOLES:
+# the nominal).
+assert SCREW_CLEARANCE_DIA > lead.SCREW_MAJOR_DIA
 
 # --- Fit-up: each tap spotted through its nut hole ------------------------------
 # A #29 drill (.136) spots each tap through the nut's Ø3.5 hole, so a tap
@@ -262,12 +262,9 @@ if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
 # below from Y: the band is symmetric about 45°, so the two are the same
 # set, and |cos|, |sin| put the same set in every quadrant.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
-# The ±.002 station is a bored hole's (drawing-guidelines' shop table: a
-# drilled hole holds ±.005; restack farm r1 20261108T040030048Z asked for the
-# route), so the Ø.351 is bored at its station and its size takes the title
-# block's .XXX ±.005, not DRILLED HOLES' +.004.
-NUT_CLEARANCE_PROCESS = "BORE"
-_CLEARANCE_R = (SCREW_CLEARANCE_DIA + printed_band_mm(3, unit=UNIT)) / 2
+# The plunged Ø.375 takes the title block's DRILLED HOLES band at its
+# title-block stations (owner ruling 2026-11-13); its callout names no process.
+_CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
 _TAP_RADIUS = feed_nut.HOLE_PCD / 2 + feed_nut.HOLE_STATION_BAND + FIT_UP_RESIDUAL
 _TAP_RADIUS_MIN = feed_nut.HOLE_PCD / 2 - feed_nut.HOLE_STATION_BAND - FIT_UP_RESIDUAL
 _CLOCK_STEPS = 100  # 0.1° across the ±5° band; both limits included
@@ -308,15 +305,15 @@ def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
 
 
 LUG_WALLS_MM = lug_walls_mm()
-# Owner ruling 2026-11-04 (#2177, option B): the clearance-to-tap wall's
-# shortfall under the .080 target, over the .060 floor, is accepted and
-# stated as plain fact on the clearance callout, floored to three places (a
-# MIN never rounds up), the riser RV-01 precedent; with the wander charged
-# it holds by the ±.002 clearance station (owner ruling 2026-11-08 (Pedro),
-# A2 option (i)). The window refuses a wall under the floor and a stale
-# statement once the wall reaches the target.
+# Owner exception, owner 2026-11-13 (RV-04): the plunged Ø.375 at title-block
+# stations leaves .044 to the taps with the wander charged, under the .060
+# floor (rule 17); accepted and stated as plain fact on the clearance callout,
+# floored to three places (a MIN never rounds up), the riser RV-01 precedent.
+# The window refuses a wall under the accepted .044 and a stale statement
+# once the wall reaches the floor.
+NUT_WALL_ACCEPTED_MM = 0.044 * 25.4
 NUT_WALL_MIN_MM = min(LUG_WALLS_MM.values())
-if not WALL_FLOOR_MM <= NUT_WALL_MIN_MM < WALL_TARGET_MM:
+if not NUT_WALL_ACCEPTED_MM <= NUT_WALL_MIN_MM < WALL_FLOOR_MM:
     raise AssertionError("the TL-32 clearance-to-tap wall no longer matches its stated shortfall")
 if min(v for k, v in LUG_WALLS_MM.items() if k != "taps to the leadscrew clearance") < WALL_TARGET_MM:
     raise AssertionError("a TL-32 tap-to-face wall is under the .080 target")
@@ -336,7 +333,8 @@ NUT_Z = (
 )
 assert 0.0 <= NUT_Z[0] and NUT_Z[1] <= BLOCK_HEIGHT
 assert LUG_Y0 <= NUT_Y[0] and NUT_Y[1] < LUG_Y1
-assert BLOCK_WIDTH / 2 - LUG_Y0 < pivot.STOCK_WIDTH
+# The 1.64 comes from the bar's 3 in width; the 3.47 overall runs along it.
+assert BLOCK_LENGTH < pivot.STOCK_WIDTH < BLOCK_WIDTH / 2 - LUG_Y0
 assert abs(NUT_MACHINE_Z - lead.SCREW_AXIS_Z) < 1e-6
 
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX)
@@ -344,7 +342,7 @@ CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {
     # The front view's leader identifies the counterbored face; B-B gives
     # its floor. VIEW D / SHEET 2 identifies the separate leadscrew face.
     "CarriageCounterbores3Dia": "4X COUNTERBORE",
-    "NutClearanceDia": "DRILL THRU",
+    "NutClearanceDia": "THRU",
 }
 # BlockWidth prints nowhere on TL-32 (PlanLugLength replaces it), so it
 # carries no callout.

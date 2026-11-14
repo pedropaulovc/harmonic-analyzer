@@ -535,6 +535,15 @@ present = false
 status = "not owned: to buy"
 use = "MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge"
 
+# The 1/2 in end mill that reaches through TL-32's .96 lug notch (its plan
+# under cad/process/). Owner, 2026-11-13: owned, with at least 1.00 in of flute.
+[tools.endmill-half-long-flute]
+name = "1/2 in end mill, flutes at least 1.00 in"
+kind = "endmill"
+present = true
+source = "owner 2026-11-13"
+use = "MHA-CH-06-TL-32 lug notch through the .96 block height"
+
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
@@ -610,6 +619,16 @@ section_mm = [44.45, 6.35]
 length_mm = 609.6
 on_hand = false
 cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). Allocation: ch-rocker-arm-tl-oblique-feed-block (MHA-CH-06-TL-32) and ch-rocker-arm-tl-oblique-pivot-block (MHA-CH-06-TL-22), each from its own blank sawn off the bar end with its 3.47 or 1.58 in Y length along the bar and its 1.64 in length milled from the 3 in width (cad/process/ch_rocker_arm_tl_oblique_{feed,pivot}_block/plan.toml). Restored here: the record was lost when the shop inventory split (02fdd651e0)."
+# Catalogue nominals 1 x 3 in x 12 in = [76.2, 25.4] x 304.8 mm. Not metrology.
+section_mm = [76.2, 25.4]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
 
 # Not ordered: stock still to buy.
 

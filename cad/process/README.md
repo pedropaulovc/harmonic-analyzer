@@ -158,7 +158,7 @@ grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0. The riser plan needs 0.11.0 too
+need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
 (its `harmonic_riser` adapter).
 
 The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
@@ -231,6 +231,28 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   fillet, not an authored radius. The saw cut at 11.85 is the finished grip
   end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
   has no second vise setup.
+
+The pivot block (`ch_rocker_arm_tl_oblique_pivot_block`, TL-22) and feed block
+(`ch_rocker_arm_tl_oblique_feed_block`, TL-32) plans are written fresh against
+the v50 sheets' manifests (no hand traveler): each saws its own blank from the
+OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`;
+TL-22 a 1.70 strip, then across to 1.70 x 1.70), faces SEAT and TOP with the
+1/2 in end mill, mills the 1.64 length (TL-32: about 1.36 in off the 3 in
+width in .10 layers, #2083) and the sawn ends on end, then cuts every top hole
+in one hold: the 4X .180 holes and .31 counterbores to the .570 floor, and the
+pivot seat (F tap drill, then the LMS 6784 3/8 end mill, miked at .3750 or
+more, plunged to the flat .359 floor, .375–.379 under DRILLED HOLES, owner
+ruling 2026-11-13; then the 5/16-18 tap through). TL-32 adds the lug notch,
+standing on edge (OUTER END down, LUG END out past the jaw side; at the other
+jaw end a spacer offcut faced with the block to its height within .001, not
+the finished TL-22) so the owner's 1 in-flute 1/2 in end mill's end cuts the
+lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
+piloted and plunged in .25 full-retract pecks with the same 3/8 end mill with
+the block standing on SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
+and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
+(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
+boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
+records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
