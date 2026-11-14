@@ -3605,13 +3605,32 @@ def test_a_dependents_non_finite_volume_only_matches_itself(tmp_path, monkeypatc
     assert judged(math.nan, noisy)[0] is False
 
 
-def _reopened(listed: conv.Conversation, errors: int, warnings: int):
+def _reopened(
+    listed: conv.Conversation,
+    errors: int,
+    warnings: int,
+    checked: int | None = 1,
+    acted: bool = False,
+    read: str = "IModelDocExtension.NeedsRebuild2",
+):
     """``listed``, then the assembly it saved reopened (``ISldWorks.OpenDoc6``
-    on the application), answering the document, ``errors`` and ``warnings``."""
+    on the application), answering the document, ``errors`` and ``warnings``;
+    its title read, then (with ``acted``) the document rebuilt, then (unless
+    ``checked`` is None) its Extension's ``read``, answering ``checked``."""
     opened = {"t": [{"h": 900, "p": "PyIDispatch"}, errors, warnings]}
     path = "<OUT>\\sldasm\\assem.SLDASM"
-    reopen = _sw("ISldWorks.OpenDoc6", path, 2, 1, "", 0, 0, result=opened, on=1)
-    return conv.Conversation(_HEADER, [*listed.calls, reopen], {})
+    calls = [
+        *listed.calls,
+        _sw("ISldWorks.OpenDoc6", path, 2, 1, "", 0, 0, result=opened, on=1),
+        _sw("IModelDoc2.GetTitle", result="assem", on=900),
+    ]
+    if acted:
+        calls.append(_sw("IModelDoc2.ForceRebuild3", False, on=900))
+    if checked is not None:
+        extension = {"h": 901, "p": "PyIDispatch"}
+        calls.append(_sw("IModelDoc2.Extension", flags=2, result=extension, on=900))
+        calls.append(_sw(read, flags=2, result=checked, on=901))
+    return conv.Conversation(_HEADER, calls, {})
 
 
 def test_a_dependents_reopen_may_differ_only_in_the_needs_rebuild_warning(
@@ -3619,21 +3638,40 @@ def test_a_dependents_reopen_may_differ_only_in_the_needs_rebuild_warning(
 ):
     regen, already_open = 32, 128
     base = _reopened(_seat_listed("Assem3"), 0, regen)
-    _, diff = _seat_diff(tmp_path, monkeypatch, base)
+    logs, diff = _seat_diff(tmp_path, monkeypatch, base)
 
-    def judged(errors: int, warnings: int, kind: str = "assembly", seat=None):
+    def judged(
+        errors: int,
+        warnings: int,
+        kind: str = "assembly",
+        seat=None,
+        checked: tuple[int | None, int | None] = (1, 1),
+        acted: bool = False,
+        read: str = "IModelDocExtension.NeedsRebuild2",
+    ):
+        steps = {"acted": acted, "read": read}
+        logs["base"] = _reopened(_seat_listed("Assem3"), 0, regen, checked[0], **steps)
         listed = _seat_listed("Assem6", **(_ANOTHER_SEAT if seat is None else seat))
-        found = diff(_reopened(listed, errors, warnings), kind)
+        found = diff(_reopened(listed, errors, warnings, checked[1], **steps), kind)
         return found["title_echo"], found["outcome_signals"]["answers"]
 
     # 2026-11-14, dt_drive_train built twice under one key: its saved assembly
     # reopened with swFileLoadWarning_NeedsRegen on one seat, with none on
-    # another, and nothing else differed.
+    # another, the script then reading its rebuild state alike in both.
     assert judged(0, 0) == (True, "same")
-    # Any other warning bit is other news of the document...
+    # Without that read, the bit is the only news of the document's state...
+    assert judged(0, 0, checked=(None, None)) == (False, "different")
+    assert judged(0, 0, "drawing", checked=(None, None)) == (False, "different")
+    other = "IModelDocExtension.GetWhatsWrongCount"
+    assert judged(0, 0, read=other) == (False, "different")
+    # ... and it is no check when the script acted on the document first, or
+    # when the two builds read another state.
+    assert judged(0, 0, acted=True) == (False, "different")
+    assert judged(0, 0, checked=(1, 0)) == (False, "different")
+    # Any other warning bit is other news of the document, and so is a load
+    # error.
     assert judged(0, regen | already_open) == (False, "different")
     assert judged(0, already_open) == (False, "different")
-    # ... and so is a load error.
     assert judged(1, regen) == (False, "different")
     # A part's reopen answers stay compared whole, the bit included.
     assert judged(0, regen, "part", seat={}) == (True, "same")

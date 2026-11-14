@@ -3308,13 +3308,16 @@ requests still the base's throughout:
 
 - a session read (`IModelDoc2.SummaryInfo`, `ISldWorks.GetUserPreference*`);
 - `swFileLoadWarning_NeedsRegen` (32) in `ISldWorks.OpenDoc6`'s warnings
-  (`_com_outcome._IGNORED_WARNINGS`, here and in the `answers` signal below):
-  reopening the assembly the script just saved, 30 of 33 recordings
-  (2026-11-13..14) read 32 and 3 read 0, two seats that had read 32 before,
-  while the `IModelDocExtension.NeedsRebuild2` read right after, compared
-  exactly, was 1 in all 33. `dt_drive_train` built twice under one key
-  differed in that bit alone. The errors and every other warning bit stay
-  exact;
+  (`_com_outcome._IGNORED_WARNINGS`, here and in the `answers` signal below),
+  only where the script then reads the opened document's
+  `IModelDocExtension.NeedsRebuild2` through its Extension, with no call that
+  may act on the document before it (`_com_outcome._rebuild_checked`), and
+  both builds read the same state. Reopening the assembly the script just
+  saved, 30 of 33 recordings (2026-11-13..14) read 32 and 3 read 0, two seats
+  that had read 32 before, while that read, compared exactly, was 1 in all
+  33. `dt_drive_train` built twice under one key differed in that bit alone.
+  Any other open (a drawing's of the model it shows), the errors and every
+  other warning bit stay exact;
 - a read of an object an enumeration listed (the outermost handle array it
   descends from), when that enumeration is the base's in another order: its
   elements' records (each element's calls, in order, on it or on what it
@@ -3368,8 +3371,8 @@ difference stays `request`. The `answers` signal compares
 `IModelDoc2.ClosestDistance` by its distance only: between parallel faces any
 pair of points witnesses it (`dt_drive_train` built twice under one key: the
 same 6.882839 mm, witnesses 17.47 mm apart). It compares a dependent's
-`IInterference.Volume` within 1e-6, relative, and `ISldWorks.OpenDoc6`
-without the NeedsRegen warning bit (above). A drawing whose `pdf` signal
+`IInterference.Volume` within 1e-6, relative, and a rebuild-checked
+`ISldWorks.OpenDoc6` without the NeedsRegen warning bit (above). A drawing whose `pdf` signal
 differs gets `pdf_cause=jagged_outline` (`_com_outcome.jagged_outline`) only
 when every condition holds:
 

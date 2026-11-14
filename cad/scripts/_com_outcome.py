@@ -177,18 +177,30 @@ DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
 # 6.882839 mm both times, the witnesses 17.47 mm apart along the faces.
 _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
 # Load-warning bits a dependent's :func:`title_echo` and ``answers`` signal
-# ignore, per member (:func:`_unwarned`). ``ISldWorks.OpenDoc6`` answers the
-# document, then its ``Errors`` and ``Warnings`` out-parameters, the warnings
-# a bitmask (skill developing-solidworks, enums/swFileLoadWarning_e.md).
+# ignore, per member, where the script itself then checks the opened
+# document's rebuild state exactly (:func:`_rebuild_checked`, :func:`_unwarned`).
+# ``ISldWorks.OpenDoc6`` answers the document, then its ``Errors`` and
+# ``Warnings`` out-parameters, the warnings a bitmask (skill
+# developing-solidworks, enums/swFileLoadWarning_e.md).
 # ``swFileLoadWarning_NeedsRegen`` (32, "the document needs to be rebuilt")
 # on reopening the assembly the script just saved is the seat's: of 33 such
 # reopens recorded 2026-11-13..14, 30 read 32 and 3 read 0 (swmaker000005
 # and swmaker00000A after 09:47Z on the 14th, seats that had read 32), while
-# the ``IModelDocExtension.NeedsRebuild2`` the script reads right after,
-# compared exactly, was 1 in all 33. dt_drive_train built twice under one key
-# differed in that bit alone. The errors and every other warning bit stay
-# exact.
+# the ``IModelDocExtension.NeedsRebuild2`` the script reads right after
+# ("Gets whether the model document needs to be rebuilt"), compared exactly,
+# was 1 in all 33. dt_drive_train built twice under one key differed in that
+# bit alone. Any other open (a drawing's of the model it shows, with no such
+# read), the errors and every other warning bit stay exact.
 _IGNORED_WARNINGS = {"ISldWorks.OpenDoc6": 32}
+# The read that checks an opened document's rebuild state, and the methods a
+# script may call on the document before it (:func:`_rebuild_checked`), reads
+# both in the API reference: ``GetTitle`` "Gets the title of the document";
+# ``GetActiveConfiguration`` is superseded by the property
+# ``IConfigurationManager.ActiveConfiguration``.
+_REBUILD_CHECK = "IModelDocExtension.NeedsRebuild2"
+_DOCUMENT_READS = frozenset(
+    {"IModelDoc2.GetTitle", "IModelDoc2.GetActiveConfiguration"}
+)
 # Members SolidWorks computes approximately, with the relative tolerance a
 # dependent's ``answers`` signal and :func:`_order_only`'s records compare
 # their floats within, each on the larger of the two (:func:`_approximately`).
@@ -796,7 +808,8 @@ def title_echo(
     A dependent's answers (:data:`DEPENDENT_KINDS`; a part's are judged as
     above) may also differ where the seat made them differ, its requests the
     base's throughout (:func:`_order_only`), and in the load warnings
-    :data:`_IGNORED_WARNINGS` names (:func:`_unwarned`)."""
+    :data:`_IGNORED_WARNINGS` names where both builds then checked the
+    document's rebuild state alike (:func:`_warned_alike`)."""
     if len(a) != len(b):
         return False
     differing: list[int] = []
@@ -810,7 +823,7 @@ def title_echo(
         if not _alike(_answer(x), _answer(y)):
             if kind not in DEPENDENT_KINDS:
                 return False
-            if not _alike(_answer(_unwarned(x)), _answer(_unwarned(y))):
+            if not _warned_alike(a, b, index):
                 differing.append(index)
     return _order_only(a, b, differing)
 
@@ -822,6 +835,19 @@ def _alike(a: Any, b: Any) -> bool:
     if conv.same(a, b) and not _nan(a):
         return True
     return _close(a, b)
+
+
+def _warned_alike(a: Sequence[conv.Call], b: Sequence[conv.Call], index: int) -> bool:
+    """Whether the answers at ``index`` differ only in :data:`_IGNORED_WARNINGS`
+    bits, and both builds then checked the opened document's rebuild state
+    (:func:`_rebuild_checked`) with the same answer."""
+    x, y = _unwarned(a[index]), _unwarned(b[index])
+    if (x is a[index] and y is b[index]) or not _alike(_answer(x), _answer(y)):
+        return False
+    checks = _rebuild_checked(a, index), _rebuild_checked(b, index)
+    if checks[0] is None or checks[1] is None:
+        return False
+    return _exact(_answer(checks[0])) == _exact(_answer(checks[1]))
 
 
 def _unwarned(call: conv.Call) -> conv.Call:
@@ -838,6 +864,30 @@ def _unwarned(call: conv.Call) -> conv.Call:
     if not out[2] & bits:
         return call
     return replace(call, result={**answer, "t": [*out[:2], out[2] & ~bits]})
+
+
+def _rebuild_checked(calls: Sequence[conv.Call], index: int) -> conv.Call | None:
+    """The :data:`_REBUILD_CHECK` read of the document the call at ``index``
+    opened: the first call on that document, or on anything a call on it
+    answered (its wrappers, its Extension), to be that read, every call on
+    them before it a read (:data:`_READ_KINDS`, :data:`_DOCUMENT_READS`).
+    ``None`` when a call that may act on the document comes first, or there
+    is no such read."""
+    answer = calls[index].result
+    out = answer.get("t") if isinstance(answer, dict) else None
+    if not isinstance(out, list) or not out or not _is_handle(out[0]):
+        return None
+    opened = {out[0]["h"]}
+    for later in range(index + 1, len(calls)):
+        call = calls[later]
+        if call.handle not in opened:
+            continue
+        if call.site == _REBUILD_CHECK:
+            return call
+        if call.kind not in _READ_KINDS and call.site not in _DOCUMENT_READS:
+            return None
+        opened.update(_handles([call.result, call.outs]))
+    return None
 
 
 def _nan(value: Any) -> bool:
@@ -1828,7 +1878,9 @@ def _dependent_answers(
     """:func:`_answers_signal`'s arguments: for a dependent
     (:data:`DEPENDENT_KINDS`), each :data:`_DISTANCE_ONLY` answer cut to its
     first element, the distance, and each :data:`_IGNORED_WARNINGS` bit
-    cleared (:func:`_unwarned`), each keyed again; a part's as recorded."""
+    cleared where the script then checked the opened document's rebuild state
+    (:func:`_rebuild_checked`; the check itself is an answer compared
+    exactly), each keyed again; a part's as recorded."""
     if kind not in DEPENDENT_KINDS:
         return keyed[0], keyed[1], a, b
     (keys_a, cut_a), (keys_b, cut_b) = _cut(keyed[0], a), _cut(keyed[1], b)
@@ -1842,7 +1894,10 @@ def _cut(
     for index, call in enumerate(calls):
         if keyed[index][2] is None:
             continue
-        cut = _unwarned(_distance_cut(call))
+        cut = _distance_cut(call)
+        unwarned = _unwarned(cut)
+        if unwarned is not cut and _rebuild_checked(calls, index) is not None:
+            cut = unwarned
         if cut is call:
             continue
         kept_calls[index] = cut
