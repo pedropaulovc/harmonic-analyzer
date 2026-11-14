@@ -454,8 +454,8 @@ diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places; the
 seat's `+.004/0` band comes from `BILATERAL_DIMENSIONS` (the DRILLED HOLES row,
 set on `BoreDia` as a native bilateral tolerance), and the thread identity
 comes from `PIVOT_TAP`. The rows are DRILL size THRU, the UNC THRU thread,
-the counterbore symbol with seat size, band and depth, and the SEAT FOR
-TL-VN-77 SHOULDER reason. No geometry number is copied into the recipe. Native
+the counterbore symbol with seat size, band and depth, and the LOCATING FIT ON
+TL-VN-77 SHOULDER row (rule 4's fit name for the tight band). No geometry number is copied into the recipe. Native
 dimension-link properties, split-STACK parsing and the carrier-table
 semantic-parser dependency are removed.
 

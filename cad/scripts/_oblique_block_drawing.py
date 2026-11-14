@@ -260,13 +260,13 @@ def _pivot_stack_text(contract):
     # from #2445's BORE): the shoulder bottoms on its square floor. Standard
     # counterbored-hole form (rule 26, machinist review be53204cdd): the
     # through hole and its thread, then the counterbore by symbol with its
-    # own band (a counterbore otherwise reads at .XXX), then the one reason
-    # row (rule 7).
+    # own band (a counterbore otherwise reads at .XXX), then the fit that
+    # band makes on its mate, by rule 4's standard name (rule 7).
     return (
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
         f'{contract.PIVOT_TAP} UNC THRU\n'
         f'<HOLE-SPOT><MOD-DIAM>{size("BoreDia")} {_seat_band_text(contract)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
-        '  SEAT FOR TL-VN-77 SHOULDER'
+        'LOCATING FIT ON TL-VN-77 SHOULDER'
     )
 
 
@@ -275,7 +275,7 @@ def _pivot_stack_estimate(text):
 
     One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
     row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
-    glyph. At the current spec: [189,103.7]..[289,126] mm, 3.7 mm minimum air.
+    glyph. At the current spec: [189,103.7]..[306.5,126] mm, 3.7 mm minimum air.
     """
     glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('<HOLE-SPOT>', '⌴')
     if len(glyphs.splitlines()) != 4:
@@ -540,7 +540,7 @@ def _inch_ref(mm: float) -> str:
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
     'BoreDia': {'prefix': '<HOLE-SPOT><MOD-DIAM>', 'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
-                'below': f'SEAT FOR {PIVOT_SCREW_NUMBER} SHOULDER'},
+                'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',
                            'below': f'MATCHES {CARRIAGE_NUMBER} CARRIAGE'},

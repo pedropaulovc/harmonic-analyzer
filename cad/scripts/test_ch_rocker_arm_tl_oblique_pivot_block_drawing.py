@@ -426,7 +426,7 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
     screw = _config.parts('ch-rocker-arm-tl-vn-oblique-pivot-screw')['number']
     kit = _config.parts('ch-rocker-arm-tl-vn-oblique-rail-kit')['number']
     assert (drawing.PIVOT_SCREW_NUMBER, drawing.CARRIAGE_NUMBER) == (screw, kit)
-    assert printed['BoreDia']['below'] == f'SEAT FOR {screw} SHOULDER'
+    assert printed['BoreDia']['below'] == f'LOCATING FIT ON {screw} SHOULDER'
     assert printed['CarriageDrills1Dia']['below'] == f'MATCHES {kit} CARRIAGE'
     # The floor keeps RV-01's plain fact, in the words its exception quotes.
     (engagement,) = _config.parts(spec.PART_NAME)['machinist_exceptions']
@@ -473,7 +473,7 @@ _PIVOT_GENERATED_TEXT = (
     '<MOD-DIAM>.257 DRILL THRU\n'
     '5/16-18 UNC THRU\n'
     '<HOLE-SPOT><MOD-DIAM>.375 +.004/0 <HOLE-DEPTH>.359\n'
-    '  SEAT FOR TL-VN-77 SHOULDER'
+    'LOCATING FIT ON TL-VN-77 SHOULDER'
 )
 
 
@@ -531,7 +531,7 @@ def test_compact_pivot_estimate_retains_margin_in_measured_lower_right_lane():
 
     text = drawing._pivot_stack_text(spec)
     box = drawing._pivot_stack_estimate(text)
-    assert box.mm() == pytest.approx((189.0, 103.7, 289.0, 126.0))
+    assert box.mm() == pytest.approx((189.0, 103.7, 306.5, 126.0))
     assert drawing.PIVOT_STACK_LANE == (.185, .100, .312, .130)
     left, bottom, right, top = drawing.PIVOT_STACK_LANE
     assert min(box.xmin - left, box.ymin - bottom, right - box.xmax, top - box.ymax) == pytest.approx(.0037)
@@ -626,7 +626,7 @@ def test_lower_right_pivot_route_clears_retained_389_annotation_ink(start_y_mm):
     assert crossing is not None and crossing[0] < .191828
     box = drawing._pivot_stack_estimate(drawing._pivot_stack_text(spec))
     assert box.ymin - .097780 == pytest.approx(.00592)  # A-A view outline
-    assert .317220 - box.xmax == pytest.approx(.02822)  # B-B view outline
+    assert .317220 - box.xmax == pytest.approx(.01072)  # B-B view outline
     assert .1425728 - box.ymax == pytest.approx(.0165728)  # existing counterbore caption
 
 
@@ -750,7 +750,7 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     proof = case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert len(case.inserted) == 1 and len(case.rebuilds) == 2
     assert case.native.font.CharHeight == case.drawing.PIVOT_NOTE_HEIGHT
-    assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((189.0, 103.7, 289.0, 126.0))
+    assert case.reports[0]['estimated_text_bounds_mm'] == pytest.approx((189.0, 103.7, 306.5, 126.0))
     tap = case.rows['TapDrillDia']
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('<HOLE-SPOT>', '⌴').replace('\n', '\r\n')
