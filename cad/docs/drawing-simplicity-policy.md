@@ -325,16 +325,20 @@ Including `.XXX` nominal rounding gives relative pin-shape bounds
 
 No stud, sleeve or nose locates the strap: every strap hole is reamed at the
 HUB DRO setting. `pin_relative_stack` therefore charges each edge the R4
-`HUB_RADIAL_STACK` (`.12588 mm`: offset band, printed-offset rounding and pin
-shoulder clearance, including the `.11218 mm` shoulder term), that pass's
+`HUB_RADIAL_STACK` (`.14832 mm`: offset band, printed-offset rounding and pin
+shoulder clearance, including the `.13462 mm` shoulder term), that pass's
 correlated pin error and `trammel.CARRIAGE_PLAY_RADIUS`, each once, against
 half the strap's unchanged `0/-.020` radial limits. Owner **P1-A, 2026-11-07**,
 approved tightening carriage acceptance from `.05` to `.02 mm TIR` with the
 existing `1.0` radius factor to close
 [PR #2236 P1](https://github.com/pedropaulovc/harmonic-analyzer/pull/2236#discussion_r4504212381)
-(thread `PRRT_kwDOPHDy386074XU`). The resulting top/inner stack is about
-`.14971 mm` (`.005894 in`) and bottom/outer `.24419 mm` (`.009614 in`),
-both inside `.254 mm` (`.010 in`). The source guard rejects the original
+(thread `PRRT_kwDOPHDy386074XU`). With the owner's 2026-11-13 ream band
+(`.3760-.3770`, shoulder clearance `.0010-.0030 in`), the top/inner stack is
+about `.17215 mm` (`.006777 in`), inside `.254 mm` (`.010 in`), and the
+bottom/outer `.26662 mm` (`.010497 in`), `.0005 in` over the half band. The
+owner accepts that overrun as carrier exception RV-03
+(`PIN_RELATIVE_OWNER_OVERRUN`, `.0127 mm`), the only allowance the check
+admits past `.254 mm`. The source guard rejects the original
 `.05 mm` play allowance and an oversized HUB setting stack (for example
 `.0061 in`). Shoulder clearance is already in `HUB_RADIAL_STACK`, not added
 again; product bands and nominal geometry are unchanged.

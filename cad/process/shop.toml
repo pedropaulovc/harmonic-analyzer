@@ -247,10 +247,3 @@ tap_drill_mm = 6.5278
 [gauges.mill-y-dro]
 range_mm = [0.0, 222.25]
 resolution_mm = 0.005
-
-# The shop's 90° chamfer mill (owner 2026-11-13; shop-equipment.toml
-# tools.chamfer-mill-330ch): 1/4 in carbide, 90° included, 2 flutes, 2-1/2 in
-# OAL. diameter_mm is the body (largest chamfer) diameter.
-[tools.chamfer-mill-330ch]
-description = "1/4 in carbide chamfer mill, 90° included, 2 flutes, 2-1/2 in OAL (330CH)"
-diameter_mm = 6.35

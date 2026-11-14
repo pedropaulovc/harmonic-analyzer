@@ -34,7 +34,7 @@ title = "Oblique trammel carrier"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
-stock = "{{cad.material_spec}}; {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
+stock = "{{cad.material_spec}}; {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank and a 1 × 3 in reamer test coupon from the same bar."
 note = "Inches. X/Y from the lower-left corner (ZERO END, ZERO EDGE), as sheet 2. Vise off: the plate stays flat on the table on four 1-2-3 blocks under strap clamps. HUB is drilled and tapped at assembly (TL-00 step 10), not here."
 shop = "../shop.toml"
 material_key = "6061-t6511"
@@ -65,6 +65,9 @@ block_outer_offset_in = 7.55
 # .06 of its station. The adapter refuses a block that, anywhere inside that
 # tolerance, could reach a hole edge (A1 and B1 clear by .122, CL by .146).
 block_tolerance_in = 0.06
+# Setup 5 reaches the reamer's test coupon behind the plate: 1 in wide on
+# parallels from about Y 5.4, its hole on its centre at Y 5.9 (149.86 mm).
+coupon_hole_y_mm = 149.86
 # TL-VN-78 (AS62-18-40) OD .625 -.005: the adapter checks the broken underside
 # edge stays inside its seat; the setup 6 picture draws it.
 spacer_seat_dia_in = 0.62
@@ -162,7 +165,7 @@ beam = "other"
 speed_kind = "other"
 tool = "saw"
 sizing = "other"
-instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} from the 1173 bar, waste side of the line; blank ≥{{process.blank_min_length_in:.2f}}. Mic its thickness at the four corners and mid-length; note every reading. Saw a 1.0 coupon off the same bar for the reamer's test hole."
+instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} from the 1173 bar, waste side of the line; blank ≥{{process.blank_min_length_in:.2f}}. Then saw a 1.0 strip off the same bar and cut it to about 1 × 3: the reamer's test coupon."
 feed = "hand"
 
 [[setups]]
@@ -171,7 +174,7 @@ title = "Both long edges to width"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Measure the blank, Lb, and scribe ZERO END across TOP (Lb − {{cad.length_in:.3f}})/2 in from the left sawn end. Flat on four 1-2-3 blocks (1 in up, 3 in across, centred on the width), centres {{cad.block_stations}} ±{{cad.block_tolerance_in:.2dot}} from that line; both long edges overhang. One strap at each end, along X at mid-width, toe over the end block; edges clear."
+holding = "Measure the blank, Lb, and scribe ZERO END across TOP (Lb − {{cad.length_in:.3f}})/2 in from the left sawn end. Flat on four 1-2-3 blocks (1 in up, 3 in across, centred on the width), centres {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}} from that line; both long edges overhang. One strap at each end, along X at mid-width, toe over the end block; edges clear."
 # milling_deflection: blocks only push up, so the two end straps (over the end
 # blocks) are the only hold against the end mill's lift: a pinned span between
 # them, X from the blank's left end. Section: the finished width (the back
@@ -255,7 +258,7 @@ holding = "Same blocks and edge straps (over the end blocks). Each edge strap's 
 # inside the band. milling_deflection: both clampings hold at the end blocks;
 # finished-length frame, section at the finished size (the thinnest).
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-datum = "Z from the mid-length reading (Setup 1). Keep ZERO END and ZERO EDGE marks."
+datum = "Z from the plate's mid-length reading. Re-mark ZERO END and ZERO EDGE on TOP after the last pass."
 diagram = { file = "diagrams/carrier/face-top.svg", alt = "TOP faced to thickness on the blocks under the edge straps; then the end straps on faced metal and the edge-strap footprints faced at the same Z" }
 # Arrives at blank thickness; the last pass leaves the finished top.
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
@@ -265,8 +268,8 @@ vise_hold = "other"
 speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
-instruction = "If every Setup 1 reading is {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, skip to the check; if any is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize. Else face TOP only, +X, +Y stepover .60: passes ≤.030 to Z {{cad.thickness_max_in:.3dot}}, last pass to Z {{cad.thickness_in:.3dot}}; then the footprints the same way."
-instruction_detailed = "If every Setup 1 reading, the thickest included, is already {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, the plate meets the drawing: skip the facing and do the check below. If any reading is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize and facing cannot help. Otherwise touch TOP with a cigarette paper at mid-length and set Z to that spot's Setup 1 reading. Face TOP only, feeding +X along the whole length and stepping .60 in +Y, round each edge strap's footprint: passes of .030 or less down to Z = {{cad.thickness_max_in:.3dot}}, then a last pass to Z = {{cad.thickness_in:.3dot}}. After that last full-area pass, without touching Z: put the end straps back on at mid-width over the end blocks, toes on faced metal with paper under them, snug them, then take the edge straps off and face their footprints the same way: passes of .030 or less to Z = {{cad.thickness_max_in:.3dot}}, last pass at Z = {{cad.thickness_in:.3dot}}. UNDERSIDE stays as the bar came."
+instruction = "Mic the plate at the four corners and mid-length. If every reading is {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, skip to the check; if any is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize. Else face TOP only, +X, +Y stepover .60: passes ≤.030 to Z {{cad.thickness_max_in:.3dot}}, last pass to Z {{cad.thickness_in:.3dot}}; then the footprints the same way; re-mark ZERO END and ZERO EDGE."
+instruction_detailed = "The plate is still on the blocks: mic it at the four finished corners and at mid-length. If every reading, the thickest included, is already {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, the plate meets the drawing: skip the facing and do the check below. If any reading is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize and facing cannot help. Otherwise touch TOP with a cigarette paper at mid-length and set Z to that spot's reading. Face TOP only, feeding +X along the whole length and stepping .60 in +Y, round each edge strap's footprint: passes of .030 or less down to Z = {{cad.thickness_max_in:.3dot}}, then a last pass to Z = {{cad.thickness_in:.3dot}}. After that last full-area pass, without touching Z: put the end straps back on at mid-width over the end blocks, toes on faced metal with paper under them, snug them, then take the edge straps off and face their footprints the same way: passes of .030 or less to Z = {{cad.thickness_max_in:.3dot}}, last pass at Z = {{cad.thickness_in:.3dot}}. Facing takes off the ZERO END and ZERO EDGE marks: mark them on TOP again. UNDERSIDE stays as the bar came."
 settings = "basebar-face-6061-t6511"
 # Settings: 850 rpm, 6.8 in/min (172.72 mm/min), 3/4 in 4-flute: .002 in/tooth.
 milling_cuts = [
@@ -284,12 +287,12 @@ title = "Holes: spot, drill, ream, tap"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{cad.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block (alternate front/back), toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The Setup 1 coupon on two parallels behind the plate at about X 10, under its own strap, its test hole between the parallels."
+holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The 1 × 3 coupon lengthwise on two parallels behind the plate, centred at X 10.25 between the back straps, under its own strap; its test hole at X 10.25, Y 5.9, between the parallels."
 datum = "X0 ZERO END, Y0 ZERO EDGE (edge finder); +X right, +Y away. HUB is not drilled here."
 diagram = { file = "diagrams/carrier/holes.svg", alt = "Plate TOP up on the blocks with one strap over each; all twelve tabled holes from X0 Y0 at the lower-left corner; HUB shown dashed, made at assembly" }
 # Hole centres lie inside the plate. Longest: the chucking reamer in the drill
 # chuck; shortest: the centre drill. The reamer's lead runs deepest.
-envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.width_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
+envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{process.coupon_hole_y_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
 vise_hold = "other"
 # milling_deflection: a strap over each block clamps the plate both ways there;
 # every hole is over air between blocks. The check takes two supports per
@@ -306,8 +309,8 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], sup
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot A1, A2, B1, B2 (full Ø.19 cone) and CL, CR (cone just under .136) from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
-instruction_detailed = "Edge-find ZERO END for X0 and ZERO EDGE for Y0. Spot A1, A2, B1, B2, CL and CR at the table's X/Y: CL and CR with the cone just under the #29 (.136); A1, A2, B1, B2 down to the full Ø.19 body, the largest cone a #2 centre drill cuts, so the 23/64 starts true. R1–R4, L1 and L2 follow in the next op. Every position is ±{{cad.location_tol_in:.3dot}}, except that A2 and B2 sit {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above the A1–B1 line. Sheet 2's note 2 measures B1, A2, B2, CL, CR and R1–R4 from A1 and that line, not from the corner, so keep one zero for every hole and approach each X and each Y from the same side: the holes then sit right relative to A1 even if the edge-find is a little off."
+instruction = "Spot A1, A2, B1, B2 and the coupon (full Ø.19 cone) and CL, CR (cone just under .136) from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
+instruction_detailed = "Edge-find ZERO END for X0 and ZERO EDGE for Y0. Spot A1, A2, B1, B2, CL and CR at the table's X/Y: CL and CR with the cone just under the #29 (.136); A1, A2, B1, B2 down to the full Ø.19 body, the largest cone a #2 centre drill cuts, so the 23/64 starts true; spot the coupon's test hole (X 10.25, Y 5.9) the same way. R1–R4, L1 and L2 follow in the next op. Every position is ±{{cad.location_tol_in:.3dot}}, except that A2 and B2 sit {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above the A1–B1 line. Sheet 2's note 2 measures B1, A2, B2, CL, CR and R1–R4 from A1 and that line, not from the corner, so keep one zero for every hole and approach each X and each Y from the same side: the holes then sit right relative to A1 even if the edge-find is a little off."
 rpm = 3000
 feed = "hand"
 # The #2 centre drill's Ø3/16 body cone, .001 in/rev.

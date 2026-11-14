@@ -730,12 +730,3 @@ kind = "tap"
 present = true
 source = "owner 2026-11-13"
 use = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
-
-# The shop's only 90° countersinking tool (owner 2026-11-13); its cone cuts at
-# most Ø.250. The carrier's pin holes have no underside chamfer (owner ruling
-# 2026-11-13: title-block edge break only).
-[tools.chamfer-mill-330ch]
-name = "330CH carbide chamfer mill, 1/4 in, 90° included, 2 flutes, 2-1/2 in OAL"
-kind = "chamfer_mill"
-present = true
-source = "owner 2026-11-13"
