@@ -71,6 +71,10 @@ def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
         for cfg_step in export_features.configuration_step_paths(stem, out).values():
             cfg_step.write_bytes(step.read_bytes())
             (out / "step" / cfg_step.name).write_bytes(step.read_bytes())
+        for cfg, member in export_features.member_step_paths(stem, out).items():
+            member_labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem, cfg)]
+            member.write_bytes(_step(member.name, member_labels, stamp="2026-10-01T22:03:25", first=10, stride=1))
+            (out / "step" / member.name).write_bytes(member.read_bytes())
         export_features.write_manifest(stem, step, revision="v38")
     return out
 
@@ -129,10 +133,13 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(
         if relative.startswith("features/")
     }
     configured = {
-        stem: export_features.configuration_step_paths(stem, out)
+        stem: {
+            **export_features.configuration_step_paths(stem, out),
+            **export_features.member_step_paths(stem, out),
+        }
         for stem in export_features.SUPPORTED_PARTS
     }
-    assert configured[configured_feature_part]
+    assert export_features.configuration_step_paths(configured_feature_part, out)
     files = 2 * len(export_features.SUPPORTED_PARTS) + sum(map(len, configured.values()))
     assert len(checked) == len(staged) == len(expected) == files
     assert _tree(stage) == expected
@@ -152,6 +159,16 @@ def test_missing_configuration_step_never_stages(
     missing = export_features.configuration_step_paths(configured_feature_part, out)[INSTALLED_CONFIG]
     missing.unlink()
     with pytest.raises(features_bound.FeaturesBoundError, match="cannot read required file"):
+        features_bound.stage_bound_features(out, tmp_path / "stage")
+    assert not (tmp_path / "stage").exists()
+
+
+def test_member_step_drift_never_stages(tmp_path: Path) -> None:
+    out = bound_output(tmp_path)
+    stem = "ch_rocker_arm_tl_vn_oblique_leadscrew_kit"
+    (member,) = export_features.member_step_paths(stem, out).values()
+    member.write_bytes(member.read_bytes().replace(b"2026-10-01T22:03:25", b"2026-10-01T22:03:26"))
+    with pytest.raises(features_bound.FeaturesBoundError, match="member_steps.FeedNut"):
         features_bound.stage_bound_features(out, tmp_path / "stage")
     assert not (tmp_path / "stage").exists()
 

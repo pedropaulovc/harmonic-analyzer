@@ -965,15 +965,18 @@ def _feature_stems() -> tuple[str, ...]:
     return tuple(SUPPORTED_PARTS)
 
 
-def _save_feature_step(doc: Any, stem: str, out: Path, *, reuse_names: bool = False) -> None:
+def _save_feature_step(
+    doc: Any, stem: str, out: Path, *, reuse_names: bool = False, configuration: str | None = None,
+) -> None:
     """The named STEP producer used only by ``--features``.
 
     Name ``stem``'s feature faces on the open part, ``SaveAs3`` under
     :data:`EXPORT_PREFERENCES`, and read the labels back. Names are transient:
     the caller closes the part unsaved and checks the native's SHA-256.
-    ``reuse_names`` exports a later configuration of the already-named part.
+    ``reuse_names`` exports a later configuration of the already-named part;
+    ``configuration`` names the shown member whose own requirements it names.
     """
-    names = name_feature_faces(doc, stem, reuse=reuse_names)
+    names = name_feature_faces(doc, stem, reuse=reuse_names, configuration=configuration)
     _save_as(doc, out)
     faces = step_face_sets(out.read_text(encoding="latin-1"), names)
     if stem == "ch_rocker_arm" and len(faces["pivot_bore"]) != 2:
@@ -1610,12 +1613,14 @@ def export_feature_bundles(stems: list[str]) -> int:
     and must leave its native byte-identical before the manifest reads and
     binds the just-written STEP. A part that declares
     ``FEATURE_STEP_CONFIGURATIONS`` also exports each listed configuration,
-    shown in turn, as its own named STEP in the bundle. No global export
-    output is touched.
+    shown in turn, as its own named STEP in the bundle; a drawing that
+    declares a member's own requirements exports that member, shown, named
+    and saved as its neutral member STEP. No global export output is touched.
     """
     from export_features import (  # noqa: PLC0415
         bundle_paths,
         configuration_step_paths,
+        member_step_paths,
         write_manifest,
     )
 
@@ -1642,6 +1647,10 @@ def export_feature_bundles(stems: list[str]) -> int:
                     _switch_configuration(adapter, doc, stem, cfg)
                     _save_feature_step(doc, stem, cfg_step, reuse_names=True)
                     log(f"saved {cfg_step.name} ({cfg_step.stat().st_size / 1e6:.1f} MB)")
+                for cfg, member_step in member_step_paths(stem, OUT_FEATURES.parent).items():
+                    _switch_configuration(adapter, doc, stem, cfg)
+                    _save_feature_step(doc, stem, member_step, configuration=cfg)
+                    log(f"saved {member_step.name} ({member_step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
                 write_manifest(stem, step, revision=_config.release_revision())

@@ -278,7 +278,7 @@ class _PartDoc:
 def selectors(monkeypatch) -> dict[str, tuple]:
     calls: list[str] = []
 
-    def feature_selectors(stem: str) -> dict[str, tuple]:
+    def feature_selectors(stem: str, configuration: str | None = None) -> dict[str, tuple]:
         calls.append(stem)
         return _SELECTORS
 
@@ -416,7 +416,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     # Patch the shared module, not sys.modules: features_bound must see exactly
     # the inventory the producer supplies, rather than the complete recipe.
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ("ch_rocker_arm",))
-    monkeypatch.setattr(export_features, "feature_selectors", lambda _stem: _SELECTORS)
+    monkeypatch.setattr(export_features, "feature_selectors", lambda _stem, _configuration=None: _SELECTORS)
     monkeypatch.setattr(export_features, "requirement_manifest", requirement_manifest)
 
     class _Adapter:

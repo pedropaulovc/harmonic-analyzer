@@ -8,6 +8,11 @@ its unmodified bytes supply ``step_sha256``.
 Construction is one_piece unless the actual drawing notes explicitly supply
 BUILT_UP_PERMISSION_NOTE, whose exact, nonempty text must occur in DRAWING_NOTES.
 A material/process alternative (casting or solid stock) is not built-up permission.
+
+A requirement declared for a non-default member (``configuration="<Member>"``)
+is named in that member's own STEP, ``member_step_paths``, the neutral member
+name the full export already uses; the manifest records its ``configuration``
+and each member STEP's digest under ``member_steps``.
 """
 
 from __future__ import annotations
@@ -24,9 +29,17 @@ from types import ModuleType
 from typing import Any
 
 import _config
+import _part_configuration_exports
 import _part_properties
 import _surface_finish
-from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
+from _feature_requirements import (
+    declaration_calls,
+    discover_parts,
+    member_configurations,
+    metadata_for,
+    requirements_for,
+    source_tree,
+)
 from _gtol_face import FaceSpec
 from _printed_tolerance import (
     angular_band_deg,
@@ -252,10 +265,16 @@ def source_paths(stem: str) -> tuple[Path, ...]:
     return tuple(sorted(paths))
 
 
-def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
-    """Resolve all STEP patches using each drawing's geometric feature domains."""
+def feature_selectors(stem: str, configuration: str | None = None) -> dict[str, tuple[FaceSpec, ...]]:
+    """Resolve all STEP patches using each drawing's geometric feature domains.
+
+    ``configuration`` selects one non-default member's requirements; ``None``
+    the saved default member's."""
     drawing = _drawing_module(_stem(stem))
-    return {name: declared.faces for name, declared in requirements_for(drawing).items()}
+    return {
+        name: declared.faces for name, declared in requirements_for(drawing).items()
+        if declared.configuration == configuration
+    }
 
 
 def _finish_precision() -> int:
@@ -272,6 +291,15 @@ def _drawing_features(
         call = calls[name]
         feature = {"kind": declared.kind, "frame": "model", "requirements": list(declared.requirements)}
         citations = {}
+        if declared.configuration is not None:
+            if declared.configuration not in member_step_configurations(stem):
+                raise ValueError(f"draw_{stem}.{name}: configuration must be a literal non-default member")
+            dashed = stem.replace("_", "-")
+            feature["configuration"] = declared.configuration
+            citations["configuration"] = [
+                *call,
+                f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}.configuration_quantities.{declared.configuration}",
+            ]
         for key, (value, sources) in declared.fields.items():
             feature[key] = list(value) if isinstance(value, tuple) else value
             citations[key] = list(dict.fromkeys([*call, *_spec_cite(module, sources)]))
@@ -399,6 +427,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     return {
         "part": dashed, "units": "mm", "precision": facts.get("precision", UNKNOWN),
         "step": bundle_paths(stem)[1].name, "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
+        **_member_steps(stem),
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
         "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": facts.get("material.finish", row.get("finish", UNKNOWN)), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material"), *fact_citations.get("material.finish", registry_cite("finish")), *fact_citations.get("material.thickness", [])]},
@@ -486,6 +515,48 @@ def configuration_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
     }
 
 
+@lru_cache(maxsize=256)
+def member_step_configurations(stem: str) -> tuple[str, ...]:
+    """The non-default members the drawing declares requirements for.
+
+    Read statically from the literal ``configuration=`` keywords, so dodo never
+    imports a drawing; each must be a registry member other than the saved
+    default, whose faces the bundle STEP already carries. A stem with no
+    drawing source (a test inventory) declares no member, as
+    ``step_configurations`` reads a missing spec.
+    """
+    stem = _stem(stem)
+    drawing = Path(__file__).resolve().parent / f"draw_{stem}.py"
+    if not drawing.is_file():
+        return ()
+    names = member_configurations(source_tree(drawing))
+    members = _part_configuration_exports.member_configurations(stem)[1:]
+    for name in names:
+        if name not in members:
+            raise ValueError(f"draw_{stem}: requirement configuration {name!r} is not a non-default member {members!r}")
+    return names
+
+
+def member_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
+    """Each declared member's STEP beside the bundle STEP, under the member's
+    neutral name (``<part>--<member>.STEP``), so the full export's member STEP
+    is these exact bytes."""
+    _manifest, step = bundle_paths(stem, out)
+    dashed = _stem(stem).replace("_", "-")
+    return {
+        name: step.with_name(f"{_part_configuration_exports.mesh_key(dashed, name)}{step.suffix}")
+        for name in member_step_configurations(stem)
+    }
+
+
+def _member_steps(stem: str) -> dict[str, Any]:
+    """The manifest's ``member_steps`` table, absent for a single-member bundle."""
+    paths = member_step_paths(stem)
+    if not paths:
+        return {}
+    return {"member_steps": {name: {"step": path.name, "step_sha256": UNKNOWN} for name, path in paths.items()}}
+
+
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     """Bind all labelled STEP faces and write the adjacent requirements TOML."""
     from _export_feature_faces import step_face_sets
@@ -494,11 +565,21 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     step = Path(step)
     content = step.read_bytes()
     manifest = requirement_manifest(stem)
-    faces = step_face_sets(content.decode("latin-1"), manifest["features"].keys())
     step_cite = f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"
-    for name, feature in manifest["features"].items():
-        feature["faces"] = faces[name]
-        feature["cite"]["faces"] = [step_cite]
+    scopes = {None: (content, step_cite)}
+    for cfg, member_path in member_step_paths(stem).items():
+        member_step = step.with_name(member_path.name)
+        member = member_step.read_bytes()
+        member_cite = f"harmonic-analyzer/cad/out/features/{stem}/{member_step.name}"
+        scopes[cfg] = (member, member_cite)
+        manifest["member_steps"][cfg].update(step_sha256=hashlib.sha256(member).hexdigest(), cite=[member_cite])
+    for cfg, (scoped, scoped_cite) in scopes.items():
+        names = [name for name, feature in manifest["features"].items() if feature.get("configuration") == cfg]
+        faces = step_face_sets(scoped.decode("latin-1"), names)
+        for name in names:
+            feature = manifest["features"][name]
+            feature["faces"] = faces[name]
+            feature["cite"]["faces"] = [scoped_cite]
     manifest["step"] = step.name
     manifest["step_sha256"] = hashlib.sha256(content).hexdigest()
     manifest["cite"]["step_sha256"] = [step_cite]

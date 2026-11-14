@@ -105,6 +105,8 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   and 2026-11-08, #2315): a 4130-N `[[stock]]` row of form `round_tube`
   (OnlineMetals 7322, one 24 in cut), read by `test_sm_gooseneck_drawing.py`
   against the bent tube's developed length plus its ~2 in tail.
+- the leadscrew kit's hacksaw (`tools.kit-hacksaw`) and 3/16 in-body 82°
+  countersink (`tools.kit-countersink-82`), not owned (HA #2740);
 
 One fact lives in one file. The same object may appear in both files with
 disjoint fields (the DTI, for example), but no field is duplicated. Together
@@ -144,7 +146,7 @@ Owner rulings (Pedro), recorded for the cutover:
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
 `prechips:<stem>` task: the oblique-trammel base bar, end bracket, feed
-lever and riser. `build` and `release` do not run it, and releases carry no travelers while
+lever, riser, pivot block, feed block and leadscrew kit. `build` and `release` do not run it, and releases carry no travelers while
 prechips stabilises. Each run renders two travelers from the same plan:
 `traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
 setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
@@ -253,6 +255,21 @@ and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
 (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
+
+The leadscrew kit's plan (`ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml`,
+MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.0 (released): its
+`harmonic_leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
+cut end and five flats, the FeedNut member's faced seat, countersinks and
+receipt limits), and its `kit-*` setup pictures are prechips layouts. The route
+is authored (no hand traveler): receive and check the kit, hacksaw the screw
+long, mill the cut end to length from the NEAR END, mill the five set-screw
+flats on the BS-0 dividing head (the handwheel flat in its own 16 mm re-grip:
+at the cut-end KP08 flats' 42 mm stick-out `milling_deflection` estimates about
+0.09 mm against the 0.025 mm finish limit), face the nut's spigot in the lathe
+on the threaded offcut and countersink its four holes by hand. It declares its
+milling beams and cuts, so it renders with `milling_deflection` enforced. The
+hacksaw and the 3/16 in-body 82° countersink are not owned
+(`shop-equipment.toml`, `present = false`).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
