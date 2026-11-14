@@ -71,15 +71,15 @@ BLOCK_Z = cone_tip_cluster.BLOCK_DEPTH_MM  # .430
 # head clear at every limit of the tip's axial stack
 # (build_dt_drive_train_assembly's END_SCREW_EMBED_WORST_MM); the shallow
 # side's 1.39D engagement there is an owner exception (ruling 2026-11-09,
-# dt-drive-train DT-07).  #2697: .730, .008 north of that ruling's station,
-# by the same two criteria.  The post's 19/64 mounting holes give its turn
+# dt-drive-train DT-07).  #2697: .731, .007 north of that ruling's station,
+# by the same two criteria.  The post's letter M mounting holes give its turn
 # room to line the tip up, and the same clearance lets the pushed post carry
 # the shaft further north (build_dt_drive_train_assembly books it one-sided);
 # the block follows so the shallow side keeps the ruling's 1.39D and the deep
-# side gains reach (0.27 mm to the head, 0.03 before).  The realized
+# side gains reach (0.30 mm to the head, 0.03 before).  The realized
 # south face stands TIP_BLOCK_GAP_MM (.27547) north of the layout T006 north
 # face.  Every consumer reads the block's stations from here.
-TIP_BLOCK_PIVOT_OFFSET = 18.542  # .730
+TIP_BLOCK_PIVOT_OFFSET = 18.5674  # .731
 TIP_BLOCK_STATION = PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET
 TIP_BLOCK_NORTH_FACE = TIP_BLOCK_STATION + BLOCK_Z / 2.0
 TIP_BLOCK_SOUTH_FACE = TIP_BLOCK_STATION - BLOCK_Z / 2.0
@@ -123,7 +123,7 @@ BLOCK_HEIGHT_PLACES = 2
 # (build_dt_drive_train_assembly's vertical take-up) reads this band.
 AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
-# .XX (#2697): turning the post on its 19/64 holes takes up the tip's whole
+# .XX (#2697): turning the post on its letter M holes takes up the tip's whole
 # lateral error with room to spare (build_dt_drive_train_assembly's
 # TIP_LATERAL_CAPACITY_MM).
 PASSAGE_CENTER_PLACES = 2
