@@ -298,10 +298,13 @@ flowchart LR
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_tip_bond_clock`
-draws the bonded T006–T024's phasing-comb play, ±0.479 mm of pitch arc per gear
-(the MHA-DT-03-TL-02 comb's single blade per gear at its shop-row limits, T012 worst:
+draws the bonded T006–T024's phasing-comb play, ±0.857 mm of pitch arc per gear
+(the MHA-DT-03-TL-02 comb, one .020 in sheet cut to a U with one blade per gear at
+the title block's bands and a spring arm's second T030 blade that bounds its lean, its yaw bounded only by T030's face,
+each bonded gear floating round its bond clearance, T006 worst:
 `dt_cone_gear_tl_phasing_comb_spec.PHASE_ERROR_MM`; owner rulings C1 keyed and b1,
-2026-11-09, and single blade, 2026-11-10, PR #1992), and `cone_key_play`
+2026-11-09, single blade, 2026-11-10, PR #1992, single sheet, 2026-11-13, and the
+U over the standing cone, 2026-11-14, #2734), and `cone_key_play`
 the T030–T120 keyway side clearance on the MHA-DT-VN-71 key (0–.004 in,
 `cone_land_key.KEYWAY_SIDE_CLEARANCE_MM`) about its 0.0508 mm mean — `class: channel` drawn once per draw and shared by every trial,
 `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
@@ -363,10 +366,11 @@ current report does not discharge the operating assumptions or waivers below.
   its play is a common crank-index time shift and only each keyway's side
   clearance scatters. The four tip gears T006–T024 have no bore feature: each
   is clocked to T030 by one blade of the MHA-DT-03-TL-02 phasing comb in the
-  tooth space beside its phase-0 tooth (owner rulings 2026-11-09 and
-  2026-11-10) while its LOCTITE 638 bond grabs, so it sits within its blade's
-  and T030's blade's play plus the blade location zone (±0.479 mm of pitch arc
-  at T012, the worst), drawn per gear (`cone_tip_bond_clock`). The former D-flat
+  tooth space beside its phase-0 tooth (owner rulings 2026-11-09,
+  2026-11-10 and 2026-11-13) while its LOCTITE 638 bond grabs, so it sits
+  within its blade's play, the comb's slide in T030's space and its lean
+  between its two T030 blades and its yaw on T030's face (±0.857 mm of pitch arc at T006, the worst),
+  drawn per gear (`cone_tip_bond_clock`). The former D-flat
   play on lands 2–4 and its per-land mean residual retired with the flats.
   Crank in one direction only; a
   reversal re-seats every mesh on the other flank (0.05–0.20 mm backlash).

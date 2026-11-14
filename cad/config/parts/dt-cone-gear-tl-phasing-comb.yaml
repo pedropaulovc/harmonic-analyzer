@@ -2,22 +2,25 @@ dt-cone-gear-tl-phasing-comb:
   title: Cone Tip Gear Phasing Comb
   # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
   # Owner ruling 2026-11-09 (b1) via PR #1992
-  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): one flat
-  # plate that phases T030 (keyed) and the bonded T024, T018, T012 and T006
+  # (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): one
+  # comb that phases T030 (keyed) and the bonded T024, T018, T012 and T006
   # together while LOCTITE 638 grabs (MHA-DT-00 step 1); owner ruling
   # 2026-11-10 via PR #1992: a single blade per gear, dropped in one tooth
-  # space of it. Never in the drive-train BOM.
+  # space of it; owner ruling 2026-11-13: cut to shape from a single sheet of
+  # brass or other metal; owner, 2026-11-14 (#2734): the cone stands up and
+  # the comb is a flat U clipped over its tip. Never in the drive-train BOM.
+  # Stock: .020 1095 blue-tempered spring steel (McMaster-Carr 9014K143, 6 x
+  # 12 in sheet, $22.72, read 2026-11-14), pending owner confirmation (default
+  # taken on a timeout, #2734). Brass is a drop-in: material
+  # "C26000 BRASS, HALF-HARD" and material_specification "C26000 half-hard
+  # brass shim stock, .020 in +/-.002 in, ASTM B36" (McMaster-Carr 9011K111);
+  # the spec proves the spring arm on brass and picks the model's material
+  # from this row.
   number: MHA-DT-03-TL-02
-  material: LOW-CARBON STEEL, E.G. 1018 CF
-  material_specification: low-carbon cold-finished steel flat, 3/32 in, ASTM A108 (1018)
-  finish: as machined
+  material: 1095 SPRING STEEL, BLUE-TEMPERED
+  material_specification: 1095 blue-tempered spring steel shim stock, .020 in +/-.001 in, ASTM A684, SAE AMS5122
+  finish: as cut
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "mill 3/32 in flat to thickness, then saw and mill the plate's stepped edge; mill each blade from both faces; break edges, not the blade edges"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "minor"
-      where: "bottom view, each blade's thickness; the plate-thickness callout: BLADE WALL .022 MIN"
-      finding: "each blade, a wall .022 to .025 thick, below the .060 wall floor (rules 17, 20)"
-      reason: "owner ruling 2026-11-10 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): single blade per gear. Each blade drops into one tooth space of its 48 DP gear, as thick as that space allows where it enters (about .025 at the blade tip) less a clearance, so no blade can reach the .060 floor; the sheet states the thinnest blade as a plain fact. Shop tooling, never in a machine; a damaged blade is remade."
+  process: "cut the U outline from .020 in sheet; deburr"

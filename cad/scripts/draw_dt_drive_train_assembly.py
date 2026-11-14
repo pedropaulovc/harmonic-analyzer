@@ -1439,7 +1439,7 @@ CONE_CRANK_STEPS = _note_text(
         # first so no solvent carries the wax onto the land (Codjiflo review
         # of PR #2531), and the wax comes off once T024 has cured (as 7E).
         "1P. DEGREASE T024'S BORE AND ITS MHA-DT-04 LAND.",
-        f"1Q. COAT T030'S BACK FACE, THE KEY'S BACK END AND THE {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER WITH {HANDLE_RELEASE}, NONE ON THE LAND.",
+        f"1Q. COAT T030'S BACK FACE, THE KEY'S BACK END, THE {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER AND THE {PHASING_COMB} BLADES WITH {HANDLE_RELEASE}, NONE ON THE LAND.",
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
         f"1R. BOND T024 ON THE LAND, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
@@ -1448,20 +1448,24 @@ CONE_CRANK_STEPS = _note_text(
         # (dt_cone_gear_spec), and its blade takes the space beside that tooth,
         # 180/30 deg off the key; the comb goes on only one way round, so the
         # step names the key and the other blades take the bonded gears'
-        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  The
-        # sheet 15 code key names the comb and its blades (code_key_text).
+        # spaces at the same time (dt_cone_gear_tl_phasing_comb_spec).  Owner,
+        # 2026-11-14 (#2734): the comb is a flat U clipped over the tip of the
+        # cone standing on its journal, both arms on T036; its spring arm's
+        # second T030 blade keeps it from leaning, and its blades are waxed
+        # with the faces in 1Q so no squeeze-out holds it.  The sheet 15 code
+        # key names the comb and its blades (code_key_text).
         # #2470: the bonds cure in two rounds so no joint waits on the others
         # inside the fixture time: T024 alone first (the comb's other blades
         # stand over air), then the spigot's three joints once T024 has cured,
         # since pushing T018 onto T024 loads it.
-        f"1S. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        f"1S. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STANDING ON ITS JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         f"1T. REMOVE {PHASING_COMB} AND THE FEELER ONCE THE BOND GRABS.",
         "1U. AFTER T024'S 24 H CURE, WIPE THE WAX OFF T030 AND THE KEY END.",
         # #2470: T024 cures alone so it is accepted alone, before three wet
         # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
         # fit has nothing to adjust, so the remedy parts it (drawing-
         # guidelines: about 250 C releases 638) and cleans the cured film out.
-        f"1V. CHECK THAT {PHASING_COMB} DROPS INTO T030 AND T024.",
+        f"1V. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024.",
         "1W. IF IT DOES NOT, TAKE T024 OFF AT 250 DEG C.",
         "1X. CLEAN THE CURED 638 OUT OF ITS BORE AND OFF THE LAND.",
         "1Y. REDO FROM 1P.",
@@ -1469,10 +1473,13 @@ CONE_CRANK_STEPS = _note_text(
         # before the post goes on.
         "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
-        f"2B. ENGAGE {PHASING_COMB} AT ONCE, T030'S BLADE BESIDE THE KEY.",
+        f"2B. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STANDING ON ITS JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024
-        # before the bonds grab.
+        # before the bonds grab.  Standing on its journal does not hold it:
+        # the tip's few grams are far less than that air's push, so the hold
+        # stays; the comb's bridge stands clear above the pivot, open at both
+        # faces of the sheet.
         "2C. HOLD MHA-DT-37 HOME, T018 ON T024, UNTIL THE BONDS GRAB.",
         f"2D. REMOVE {PHASING_COMB}.",
         # The cured tip is accepted on the comb; the remedy parts every tip
@@ -1480,7 +1487,7 @@ CONE_CRANK_STEPS = _note_text(
         # redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off, so
         # it is pressed back on before 1M (Codjiflo reviews of PR #2531;
         # machinist review of PR #2557 named the parts and the restart).
-        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} DROPS INTO ALL FIVE GEARS.",
+        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS.",
         "2F. IF IT DOES NOT, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
         "2H. REDO FROM 1L.",
@@ -3022,7 +3029,7 @@ def code_key_text(rows: Sequence[tuple[int, str]], cylinder_gears: int) -> str:
     lines.append(
         f"GEAR 0-{cylinder_gears - 1} = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
     )
-    lines.append(f"{PHASING_COMB} = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR.")
+    lines.append(f"{PHASING_COMB} = PHASING COMB, A BLADE IN A TOOTH SPACE OF EACH GEAR.")
     return "\n".join(lines)
 
 
