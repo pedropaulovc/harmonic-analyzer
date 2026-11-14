@@ -266,7 +266,7 @@ disjoint fields; no field is duplicated. See
 
 ## Travelers
 
-`_process_plans.TRAVELER_STEMS` lists the parts with an opt-in
+`_process_plans.TRAVELER_STEMS` lists the parts with a
 `prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
 `ch_rocker_arm_tl_oblique_end_bracket`,
 `ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
@@ -274,12 +274,14 @@ disjoint fields; no field is duplicated. See
 `ch_rocker_arm_tl_vn_oblique_leadscrew_kit` and
 `ch_rocker_arm_tl_oblique_carrier`.
 
-prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
+prechips is not an HA dependency while it stabilises
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
 locked prechips made every prechips release change `uv.lock`, which re-keys every
-`check:machinist_review:*`, so prechips stays out of the lock, `build` and
-`release` do not run or require travelers, and releases carry no travelers until
-they are re-enabled. The plans, the shop file and the setup pictures stay in HA.
+`check:machinist_review:*`, so prechips stays out of the lock. `build` does not
+run travelers; `release` runs every enrolled one and ships its hobby sheet as a
+PDF (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
+carry none; see [Releases](#releases)). The plans, the shop file and the setup
+pictures stay in HA.
 
 Run it for an enrolled part with:
 
@@ -299,30 +301,40 @@ copied from a release asset's `features/<stem>/`. Both always use the latest
 prechips release from PyPI, so they need `uv` and network access to PyPI.
 
 The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
-previous `traveler.html` and `traveler-hobby.html` under
-`cad/out/travelers/<stem>/`, resolves the newest prechips release, logs its
-version once (`_telemetry.info`, shown on the console at
-`HARMONIC_VERBOSITY=info`), and then renders both sheets from the same plan with
-that version:
+previous `traveler.html`, `traveler-hobby.html` and `<slug>-traveler.pdf` under
+`cad/out/travelers/<stem>/`, finds the PDF browser, resolves the newest prechips
+release, logs its version once (`_telemetry.info`, shown on the console at
+`HARMONIC_VERBOSITY=info`), renders both sheets from the same plan with that
+version, and prints the hobby sheet to PDF:
 
 ```text
 uv tool run --from prechips@latest python -c "<print prechips version>"
 uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml --profile pro --out cad/out/travelers/<stem>/traveler.html
 uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml --profile hobby --out cad/out/travelers/<stem>/traveler-hobby.html
+msedge --headless --no-pdf-header-footer --user-data-dir=<temp> --print-to-pdf=cad/out/travelers/<stem>/<slug>-traveler.pdf file:///…/traveler-hobby.html
 ```
+
+`<slug>` is the dashed stem (`ch-rocker-arm-tl-oblique-base-bar`). The browser
+is `HARMONIC_PDF_BROWSER` when set, else the first of `msedge`, `chrome`,
+`chromium` or `google-chrome` on `PATH`, else Edge or Chrome at its default
+Windows install location. The print keeps the sheet's own `@page` (Letter,
+0.5 in margins) and drops the browser's header and footer; a throwaway profile
+keeps it out of any running browser session.
 
 `@latest` makes uv revalidate its cached PyPI index and ignore a
 `uv tool install`-ed copy; a bare `--from prechips` may reuse either, so the
 hand command uses `@latest` too. Pinning the two renders to the resolved
-version keeps both sheets on the release that was logged. If `uv` is missing
-or the latest release cannot be resolved, the wrapper exits 1 before writing a
-sheet.
+version keeps both sheets on the release that was logged. If `uv` or a browser
+is missing, or the latest release cannot be resolved, the wrapper exits 1
+before writing a sheet.
 
-If either render exits nonzero, the wrapper removes both files. A render whose
+If either render exits nonzero, the wrapper removes every output. A render whose
 stderr carries uv's own diagnostic (`error:` for fetch, parse or install
 failures, exit 2; `×` for an unresolvable pin, exit 1) is a uv failure and the
 wrapper exits 1; otherwise it returns prechips' exit code, so exit 2 is always a
-prechips refusal. The hobby run starts only after the pro run passes. The task is
+prechips refusal. The hobby run starts only after the pro run passes, and the
+print only after both pass; a print that fails or leaves no `%PDF-` file exits 1
+and removes every output. The task is
 SolidWorks-free, submitter-only (including under the farm executor) and not
 remote-cache-keyed. Because its generator version floats, it always runs when
 requested (`uptodate: [False]`). Its only task dependency is its own
@@ -330,22 +342,22 @@ requested (`uptodate: [False]`). Its only task dependency is its own
 plan directory (including the `diagrams/*.svg` setup pictures the hobby sheet
 embeds), `cad/process/shop.toml`, the scoped `features.toml` and the wrapper's
 script closure. Its targets are the stamp
-`cad/out/reports/prechips-<stem>.ok`, `traveler.html` and
-`traveler-hobby.html`; the stamp is removed before each run so a refusal never
+`cad/out/reports/prechips-<stem>.ok`, `traveler.html`,
+`traveler-hobby.html` and `<slug>-traveler.pdf`; the stamp is removed before each run so a refusal never
 leaves an old stamp. If `cad/process/<stem>/plan.toml` is missing, the graph
 still loads and only that task fails, naming the missing plan.
 
 | exit (either profile) | task | meaning |
 |---|---|---|
-| 0 from both | pass | `traveler.html` and `traveler-hobby.html` written |
-| 1 (wrapper) | fail, no stamp | uv itself failed: `uv` missing, the latest prechips could not be resolved, or a render's `uv tool run` failed before prechips ran (stderr carries uv's `error:` or `×` diagnostic, not prechips' `prechips:` prefix); not a refusal, so neither file kept and the plan is not at fault |
-| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`, `machine_capacity`); neither file kept |
-| other nonzero | fail, no stamp | consumer failure; neither file kept |
+| 0 from both, PDF printed | pass | `traveler.html`, `traveler-hobby.html` and `<slug>-traveler.pdf` written |
+| 1 (wrapper) | fail, no stamp | infrastructure failed: `uv` or a browser missing, the latest prechips could not be resolved, a render's `uv tool run` failed before prechips ran (stderr carries uv's `error:` or `×` diagnostic, not prechips' `prechips:` prefix), or the PDF print failed; not a refusal, so no file kept and the plan is not at fault |
+| 2 | fail, no stamp | refusal: bad input, or a failed enforced check (`stock_fit`, `turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`, `machine_capacity`); no file kept |
+| other nonzero | fail, no stamp | consumer failure; no file kept |
 
 The `pro` profile enforces every check listed above and prints a concise sheet.
 The `hobby` profile prints the plan's setup pictures and requires one for every
 setup. A refusal names the check; a pass prints no checker text on the sheet.
-Each traveler is one standalone HTML file. It carries no report, hash or
+Each HTML traveler is one standalone file. It carries no report, hash or
 certificate, and a pass is not permission to machine: shop measurements,
 physical setup verification and machining approval remain human
 responsibilities.
@@ -353,9 +365,10 @@ responsibilities.
 The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
 `prechips-traveler`; the wrapper continues the task trace with a
 `pipeline.prechips_traveler` span, a `prechips.resolve` span around the version
-lookup and one `prechips.traveler` span per profile around the CLI. The
+lookup, one `prechips.traveler` span per profile around the CLI and a
+`prechips.pdf` span (with `browser`) around the print. The
 pipeline and per-profile spans carry the resolved `prechips.version`.
-A missing plan, an unresolved version or a nonzero exit marks the pipeline span
+A missing plan, an unresolved version, a nonzero exit or a failed print marks the pipeline span
 as failed.
 
 Current state: under prechips 0.10.1 the base bar and end bracket pass both
@@ -374,8 +387,18 @@ requirements needs a prechips adapter release before its traveler passes again.
 
 ## Releases
 
-Releases carry no travelers while prechips stabilises: `cut_release.py` stages
-no `travelers/` directory and the release notes list none.
+Releases ship every enrolled part's hobby traveler as a PDF (owner ruling
+2026-11-14). `release` depends on every `prechips:<stem>` task, so each release
+re-renders them with the then-latest prechips. `cut_release.py` copies each
+`cad/out/travelers/<stem>/<slug>-traveler.pdf` to the bundle's
+`travelers/<slug>-traveler.pdf`, where `SHA256SUMS.txt` hashes them like every
+other staged file, and names the directory in the release
+notes. A missing or empty PDF fails the cut before anything is zipped; the HTML
+sheets do not ship. A prechips refusal, an unreachable PyPI or a missing
+browser therefore blocks the release, like any other release gate. The
+supervised farm release runs `doit -s prechips` on the submitter after
+restoring the farm outputs, before `doit -s release`
+([`DEVELOPING.md`](../../../DEVELOPING.md#supervised-farm-releases)).
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

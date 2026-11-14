@@ -304,17 +304,21 @@ completed
 
 ## Process travelers
 
-`prechips:<stem>` tasks are opt-in: `build` and `release` do not run them, and
-releases carry no travelers while prechips stabilises (owner ruling 2026-11-11,
-[#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)).
-prechips is not in `uv.lock`; the wrapper runs the latest PyPI release with
-`uv tool run` outside the project environment, logs its version once and
-records it on its spans, so it needs `uv` and network access to PyPI. The
-tasks run on the submitter, including when SolidWorks leaves run on the farm,
-and always run when requested. To render a part's two travelers
-(`traveler.html` under `--profile pro`, `traveler-hobby.html` under
-`--profile hobby` with setup pictures) after its scoped feature bundle exists
-under `cad/out/features/<stem>/` (from a build or a release asset):
+`build` does not run `prechips:<stem>` tasks; `release` runs every enrolled one
+and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
+bundle (owner ruling 2026-11-14). prechips is not in `uv.lock`
+([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)); the
+wrapper runs the latest PyPI release with `uv tool run` outside the project
+environment, logs its version once and records it on its spans, so it needs
+`uv` and network access to PyPI. It prints the PDF with a headless Edge or
+Chrome, found on `PATH` or at its default install location; set
+`HARMONIC_PDF_BROWSER` to name another Chromium-family browser. The tasks run
+on the submitter, including when SolidWorks leaves run on the farm, and always
+run when requested. To render a part's travelers (`traveler.html` under
+`--profile pro`, `traveler-hobby.html` under `--profile hobby` with setup
+pictures, and that hobby sheet printed to `<slug>-traveler.pdf`) after its
+scoped feature bundle exists under `cad/out/features/<stem>/` (from a build or
+a release asset):
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
@@ -323,9 +327,10 @@ uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --prof
 ```
 
 The doit task also runs its `package:features:<stem>` leaf first. Only exit 0
-from both profiles is success. Exit 2 from either is a prechips refusal (bad
-input or a failed enforced check) and leaves neither file; exit 1 means uv
-itself failed (no `uv`, no PyPI, or a `uv tool run` error before prechips ran).
+from both profiles and a printed PDF is success. Exit 2 from either profile is
+a prechips refusal (bad input or a failed enforced check) and leaves no
+traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool
+run` error before prechips ran) or the browser was missing or failed to print.
 Plan authoring and the shop files are described in
 [`cad/process/README.md`](cad/process/README.md).
 
@@ -1134,9 +1139,12 @@ tracked image and `release.yaml` updates. Launch
 with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing
 and check gates). Once successful, restore the complete `cad/out` from the
 recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
-the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
-followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
-the gallery and publish in the owning worktree without local COM redispatch.
+the owning worktree. Then run `uv run --frozen python -m doit -s gallery`,
+`uv run --frozen python -m doit -s prechips` (every enrolled traveler, rendered
+from the restored feature bundles) and
+`uv run --frozen python -m doit -s release -- vNN` there. This keeps the
+gallery, travelers and publish in the owning worktree without local COM
+redispatch; the cut fails if any traveler PDF is missing.
 
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,

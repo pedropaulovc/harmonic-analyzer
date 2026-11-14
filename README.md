@@ -174,20 +174,19 @@ uv run python -m doit          # every part + assembly + every gate
 
 Without a seat you can still run the offline gates
 (`uv run python -m doit check:math`), and every release ships the STEP, STL and
-glTF exports plus the drawing PDFs.
+glTF exports plus the drawing PDFs and the process travelers.
 
 Drawing-bound requirement manifests are exported with named STEP face sets.
-Opt-in `prechips:<stem>` tasks render two standalone HTML
+`prechips:<stem>` tasks render two standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
 sheet and a `hobby` sheet with setup pictures) for each part
 in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end bracket,
 feed lever, riser, pivot block, feed block, leadscrew kit and carrier; all but
 the first two need prechips 0.11.0, the carrier 0.11.1, both released) from its `cad/process/<stem>/plan.toml`, which reads that part's
-exported manifest. They always use the latest prechips release from PyPI, run
-with `uv tool run` outside the project environment. While prechips stabilises,
-`build` and `release` do not run them and releases carry no travelers (owner
-ruling 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)).
-See the
+exported manifest, and print the hobby sheet to `<slug>-traveler.pdf`. They
+always use the latest prechips release from PyPI, run with `uv tool run`
+outside the project environment. `build` does not run them; every release
+renders them and ships the hobby PDFs under `travelers/`. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References

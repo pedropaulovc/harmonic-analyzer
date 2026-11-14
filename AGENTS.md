@@ -445,7 +445,7 @@ such build:
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
-| `prechips:<stem>` (enrolled process travelers; opt-in — NOT in build/release) | **no** (latest PyPI prechips via `uv tool run`) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
+| `prechips:<stem>` (enrolled process travelers; in `release`, NOT in `build`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -490,12 +490,14 @@ table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
 Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end
-bracket, feed lever, riser, pivot block, feed block, leadscrew kit and carrier) has an opt-in `prechips:<stem>` task. `build` and `release` do not
-run it, and releases carry no travelers while prechips stabilises (owner ruling
-2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502):
-prechips stays out of `uv.lock`, because every prechips release changed the lock
-and re-keyed every `check:machinist_review:*`). The plans, `cad/process/shop.toml`
-and the setup pictures stay in HA. The task runs
+bracket, feed lever, riser, pivot block, feed block, leadscrew kit and carrier)
+has a `prechips:<stem>` task. `build` does not run it; `release` runs every one
+and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
+bundle (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
+carry no travelers). prechips still stays out of `uv.lock`
+([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502): every
+prechips release changed the lock and re-keyed every `check:machinist_review:*`).
+The plans, `cad/process/shop.toml` and the setup pictures stay in HA. The task runs
 `cad/scripts/prechips_traveler.py <stem>`, which runs prechips outside the
 project environment with uv's tool runner, always the latest PyPI release:
 `uv tool run --from prechips@latest` resolves that release (`@latest` revalidates
@@ -509,6 +511,11 @@ runs twice from the same plan: `--profile pro` writes
 (`cad/process/<stem>/diagrams/*.svg`, which are task inputs). uv's own failures
 exit 1, never 2: no `uv` or no PyPI before any sheet, or a render whose
 `uv tool run` failed before prechips ran (uv's `error:`/`×` diagnostic).
+A headless Edge or Chrome (`HARMONIC_PDF_BROWSER` overrides discovery) then
+prints `traveler-hobby.html`, at the sheet's own `@page` Letter size and
+margins, to `<slug>-traveler.pdf` beside it (`<slug>` is the dashed stem). No
+browser (checked before any sheet) or a failed print also exits 1 and removes
+every output.
 prechips itself is stdlib-only: no FreeCAD, no geometry kernel, no report or
 hash certificate. The plan reads its CAD values from the part's
 `features.toml`, which must exist under `cad/out/features/<stem>/` (from a
@@ -524,9 +531,9 @@ shop data, "no pedantism of not measured value inferred; if it is in the
 inputs they will be considered" (2026-11-10). `shop.toml` values are used as
 written, with no measured/placeholder provenance, and they are HA's own
 recorded values (the deleted inventory's, where it had one; tool diameters stay
-nominal), not prechips example values. Only exit 0 from both profiles passes; exit 2 from
-either is a prechips refusal (bad input or a failed enforced check) and leaves neither
-file nor a stamp. The task is not cache-keyed and always runs when asked
+nominal), not prechips example values. Only exit 0 from both profiles and a printed
+PDF passes; exit 2 from either profile is a prechips refusal (bad input or a failed
+enforced check) and leaves no traveler file nor a stamp. The task is not cache-keyed and always runs when asked
 (`uptodate: [False]`), because its generator version floats. A stem without a
 plan fails only its own task. Under prechips 0.10.1 (the base-bar and feed-lever
 plans read its new adapter bindings) the base bar and end bracket
@@ -567,8 +574,10 @@ See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
   success restore the complete `cad/out` from `.done`'s `outputs` path to the
-  owning worktree, then run `uv run --frozen python -m doit -s gallery` and
-  `uv run --frozen python -m doit -s release -- vNN` there. This avoids
+  owning worktree, then run `uv run --frozen python -m doit -s gallery`,
+  `uv run --frozen python -m doit -s prechips` (every enrolled traveler, from the
+  restored feature bundles) and `uv run --frozen python -m doit -s release -- vNN`
+  there. This avoids
   postpublish changes being discarded with the snapshot and prevents local COM
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).

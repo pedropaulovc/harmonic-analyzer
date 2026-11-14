@@ -1,5 +1,5 @@
-"""Wrapper contracts for the opt-in prechips travelers, without SolidWorks or
-network: every ``uv tool run`` call is stubbed at ``subprocess.run``."""
+"""Wrapper contracts for the prechips travelers, without SolidWorks, network or
+a browser: every ``uv tool run`` and browser call is stubbed at ``subprocess.run``."""
 
 from __future__ import annotations
 
@@ -19,6 +19,9 @@ _VERSION = "9.9.9"
 def process(tmp_path, monkeypatch):
     monkeypatch.setattr(plans, "PROCESS_ROOT", tmp_path / "process")
     monkeypatch.setenv("UV", _UV)
+    printer = tmp_path / "browser-under-test.exe"
+    printer.write_bytes(b"")
+    monkeypatch.setenv(wrapper.BROWSER_ENV, str(printer))
 
     def author(stem: str) -> None:
         plans.plan_path(stem).parent.mkdir(parents=True)
@@ -27,14 +30,20 @@ def process(tmp_path, monkeypatch):
     return tmp_path / "out", author
 
 
-def _uv_stub(monkeypatch, *, probe=None, traveler=None):
+def _uv_stub(monkeypatch, *, probe=None, traveler=None, printed=True):
     """Route stubbed ``uv tool run`` calls: the ``@latest`` version probe, then
     each pinned ``prechips traveler`` run (writes its ``--out`` unless refused).
-    ``traveler(profile)`` returns an exit code or ``(code, stderr)``."""
+    ``traveler(profile)`` returns an exit code or ``(code, stderr)``. A browser
+    call writes a PDF naming the sheet it printed, unless ``printed`` is False."""
     calls = []
 
     def run(cmd, **kwargs):
         calls.append(cmd)
+        if cmd[0] != _UV:
+            if printed:
+                pdf = next(arg for arg in cmd if arg.startswith("--print-to-pdf="))
+                Path(pdf.split("=", 1)[1]).write_bytes(b"%PDF-1.4 " + cmd[-1].encode())
+            return subprocess.CompletedProcess(cmd, 0, "", "")
         if f"{wrapper.PACKAGE}@latest" in cmd:
             return probe(cmd) if probe else subprocess.CompletedProcess(cmd, 0, f"{_VERSION}\n", "")
         profile = cmd[cmd.index("--profile") + 1]
@@ -48,12 +57,12 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None):
     return calls
 
 
-def test_latest_release_renders_pro_then_hobby_pinned_to_one_version(process, monkeypatch):
+def test_latest_release_renders_pro_then_hobby_then_prints_hobby_pdf(process, monkeypatch):
     out, author = process
     author("smoke_part")
     calls = _uv_stub(monkeypatch)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 0
-    probe, *runs = calls
+    probe, *runs, printing = calls
     assert probe[:5] == [_UV, "tool", "run", "--from", "prechips@latest"]
     pro, hobby = plans.traveler_paths("smoke_part", out)
     head = [_UV, "tool", "run", "--from", f"prechips=={_VERSION}", "prechips", "traveler",
@@ -64,6 +73,10 @@ def test_latest_release_renders_pro_then_hobby_pinned_to_one_version(process, mo
     ]
     assert pro.read_text(encoding="utf-8") == "pro"
     assert hobby.read_text(encoding="utf-8") == "hobby"
+    pdf = plans.traveler_pdf_path("smoke_part", out)
+    assert pdf == hobby.parent / "smoke-part-traveler.pdf"
+    assert printing[-1] == hobby.resolve().as_uri()
+    assert pdf.read_bytes() == b"%PDF-1.4 " + hobby.resolve().as_uri().encode()
 
 
 def test_latest_version_reads_the_probe_output(monkeypatch):
@@ -78,7 +91,7 @@ def test_latest_version_reads_the_probe_output(monkeypatch):
 def test_refusal_propagates_and_removes_previous_travelers(process, monkeypatch):
     out, author = process
     author("refused_part")
-    paths = plans.traveler_paths("refused_part", out)
+    paths = plans.traveler_outputs("refused_part", out)
     paths[0].parent.mkdir(parents=True)
     for path in paths:
         path.write_text("previous success", encoding="utf-8")
@@ -95,7 +108,29 @@ def test_hobby_refusal_removes_the_pro_traveler(process, monkeypatch):
     author("smoke_part")
     _uv_stub(monkeypatch, traveler=lambda profile: 0 if profile == "pro" else 2)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
-    assert not any(path.exists() for path in plans.traveler_paths("smoke_part", out))
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+
+
+def test_failed_print_removes_every_traveler(process, monkeypatch):
+    out, author = process
+    author("smoke_part")
+    _uv_stub(monkeypatch, printed=False)
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+
+
+def test_missing_browser_fails_before_any_sheet(process, monkeypatch, tmp_path):
+    out, author = process
+    author("smoke_part")
+    monkeypatch.delenv(wrapper.BROWSER_ENV)
+    monkeypatch.setattr(wrapper.shutil, "which", lambda _name: None)
+    for variable in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        monkeypatch.setenv(variable, str(tmp_path / "no-browser"))
+    calls = _uv_stub(monkeypatch)
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
+    assert calls == []
+    with pytest.raises(RuntimeError, match="no Edge or Chrome found"):
+        wrapper.browser()
 
 
 # uv's own diagnostics, as uv 0.9.8 printed them when provoked on this host:
@@ -111,7 +146,7 @@ def test_uv_failure_during_render_is_not_a_refusal(process, monkeypatch, code, s
     author("smoke_part")
     _uv_stub(monkeypatch, traveler=lambda profile: 0 if profile == "pro" else (code, stderr))
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
-    assert not any(path.exists() for path in plans.traveler_paths("smoke_part", out))
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
     assert wrapper.uv_error(stderr) is not None
     assert wrapper.uv_error("usage: prechips ...\nprechips: error: bad plan\n") is None
 
@@ -123,7 +158,7 @@ def test_missing_plan_fails_without_running_uv(process, monkeypatch):
         lambda *args, **kwargs: pytest.fail("uv ran without a plan"),
     )
     assert wrapper.main(["unplanned_part", "--out", str(out)]) == 2
-    assert not any(path.exists() for path in plans.traveler_paths("unplanned_part", out))
+    assert not any(path.exists() for path in plans.traveler_outputs("unplanned_part", out))
 
 
 def test_unreachable_pypi_fails_before_any_sheet(process, monkeypatch):
