@@ -65,8 +65,13 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
     assert drawing.SHAFT_NUMBER in callouts["HubLength"]
-    # The plate's tight offset names the bars it spaces (rule 4).
-    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
+    # The plate's tight offset names the bars it spaces (rule 4), in the
+    # numbered note its location dimension flags (rule 7).
+    flag = callouts["PlateOffset"]
+    assert drawing.BAR_NUMBER not in flag
+    assert flag == f"SEE NOTE {drawing.PLATE_OFFSET_NOTE_NUMBER}"
+    assert drawing.PLATE_OFFSET_NOTE.startswith(f"{drawing.PLATE_OFFSET_NOTE_NUMBER}. ")
+    assert drawing.BAR_NUMBER in drawing.PLATE_OFFSET_NOTE
     # Rule 7: a hole location carries its value and band only.
     for location in ("BarPinCx", "SpringCx"):
         assert location not in callouts
@@ -185,3 +190,22 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     # keep their bands with nothing masked (as the rocker arms, MHA-CH-06).
     assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"
     assert int(part["quantity"]) == 20
+
+
+def test_the_plate_stays_flat_by_its_route_not_by_a_frame() -> None:
+    """#2340: the plate's bow is bounded by its thickness and plate-offset
+    bands (the bar-to-bar gap spends exactly those), so the sheet carries no
+    flatness frame; the registry route takes equal stock off both faces of
+    the bought 5/16 flat, and the figure it states is the model's."""
+    import _config
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_feature_control_frame" not in source
+    process = _config.parts("ch-channel-lever")["process"]
+    bar = 0.3125 * 25.4
+    per_face = (bar - spec.LEVER_THICKNESS) / 2.0 / 25.4
+    assert f"{per_face:.3f}".lstrip("0") in process
+    # Equal stock off both faces: the plate sits centred on the hub.
+    assert spec.PLATE_OFFSET + spec.LEVER_THICKNESS / 2.0 == pytest.approx(
+        spec.HUB_LENGTH / 2.0
+    )

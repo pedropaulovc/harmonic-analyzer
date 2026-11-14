@@ -122,6 +122,11 @@ from ch_fulcrum_keeper_spec import (
     LUG_HALF_T as KEEPER_LUG_HALF_T,
     SHAFT_AXIS_H as KEEPER_SHAFT_AXIS_H,
 )
+from ch_fulcrum_shaft_spec import (
+    FLAT_HEIGHT as FULCRUM_FLAT_Y,
+    FLAT_PITCH as FULCRUM_FLAT_PITCH,
+    SHAFT_R as FULCRUM_SHAFT_R,
+)
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
     APEX_ABOVE_BORE as BRACKET_APEX_ABOVE_BORE,
@@ -279,6 +284,19 @@ PIVOT_SHAFT_BALLOON_POINT_MM = (
 # corner and clear of the washer ring beside the stub's tip (measured on the
 # sheet of run 20261023T234951749Z).
 PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
+# Balloon 2 (the lever fulcrum shaft) walked to a body extreme among the
+# stacked lever hubs, where the shaft shows only as slivers, and read as
+# naming the levers (machinist review on PR #2702, three runs of three). Its
+# landing is the south flat's eye-side edge at the flat's middle, as balloon
+# 1's: withdrawn south (ch_channel_explode_spec), that flat stands on the bare
+# run past the exploded south keeper, the shaft's only clear length. Part
+# frame (ch_fulcrum_shaft_spec): axis along z centred on 0, flats on +y,
+# unturned in the assembly.
+FULCRUM_SHAFT_BALLOON_POINT_MM = (
+    math.sqrt(FULCRUM_SHAFT_R**2 - FULCRUM_FLAT_Y**2),
+    FULCRUM_FLAT_Y,
+    -FULCRUM_FLAT_PITCH / 2.0,
+)
 # The rendered circle's read-back may sit a viewport pixel off the request
 # at fit zoom (position_bom_balloon's pixel bound); a millimetre still proves
 # the circle left its ring slot for the strip.
@@ -482,6 +500,7 @@ class BankView:
     exploded: bool = False
     letter: str = ""  # a detail's letter, at its boundary in the parent
     letter_corner: tuple[int, int] = (1, 1)  # letter_xy's corner for it
+    letter_offset: float | None = None  # sheet m past the boundary; None: default
     label_xy: tuple[float, float] | None = None  # caption point, if not under it
     # The scale of the sheet the view is placed on: a view at that scale
     # prints none (drawing-guidelines.md rule 9).
@@ -605,11 +624,13 @@ def letter_xy(
     centre: tuple[float, float],
     radius: float,
     corner: tuple[int, int] = (1, 1),
+    offset: float | None = None,
 ) -> tuple[float, float]:
-    """A detail letter's note point, past its boundary toward ``corner``
-    (x, y signs: (1, 1) upper right)."""
-    offset = radius + DETAIL_LETTER_OFFSET
-    return centre[0] + corner[0] * offset, centre[1] + corner[1] * offset
+    """A detail letter's note point, ``offset`` (sheet m, default
+    DETAIL_LETTER_OFFSET) past its boundary toward ``corner`` (x, y signs:
+    (1, 1) upper right)."""
+    reach = radius + (DETAIL_LETTER_OFFSET if offset is None else offset)
+    return centre[0] + corner[0] * reach, centre[1] + corner[1] * reach
 
 
 LEVER_BANK = BankView(
@@ -838,8 +859,11 @@ NORTH_KEEPER_DETAIL = BankView(
     letter="C",
     # Lower right: at the upper right, lever balloon 14's leader ran through
     # the letter (r8 layout audit, leader-through-text); r7's leaders pass
-    # 10 mm clear of the lower right.
+    # 10 mm clear of the lower right. 6 mm out, not 2: at 2 the letter stood
+    # on the bar bank's right edge and its outline struck through the C
+    # (machinist review on PR #2702).
     letter_corner=(1, -1),
+    letter_offset=0.006,
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 # The partial views with a viewing arrow on sheet 1, and every lettered view.
@@ -858,6 +882,7 @@ KEEPER_DETAIL_BALLOON_MARGIN = 0.010
 KEEPER_BALLOON_POINT_MM = (-KEEPER_LUG_HALF_T, KEEPER_CROWN_TOP_Y, 0.0)
 BALLOON_POINTS_MM = {
     PIVOT_SHAFT_STEM: PIVOT_SHAFT_BALLOON_POINT_MM,
+    explode.FULCRUM_SHAFT: FULCRUM_SHAFT_BALLOON_POINT_MM,
     explode.BRACKET: BRACKET_BALLOON_POINT_MM,
     explode.KEEPER: KEEPER_BALLOON_POINT_MM,
 }
@@ -1265,12 +1290,12 @@ def _fitup_text() -> dict[str, str]:
             f"THE EAR PUSHING {washer} AND THE BANK LEFT."
         ),
         "south-bracket-zeroed": (
-            "WITH A TEST INDICATOR IN THE SPINDLE, READ ZERO ON THE RIGHT "
-            f"{bracket} FOOT END AND ZERO THE DRO ALONG {shaft} THERE."
+            f"ZERO A SPINDLE TEST INDICATOR ON THE RIGHT {bracket} FOOT END."
         ),
+        "south-bracket-dro-zeroed": f"ZERO THE DRO ALONG {shaft} THERE.",
         "south-bracket-slid-off": (
-            f"MOVE THE INDICATOR CLEAR AND SLIDE THE RIGHT {bracket} OFF {shaft}, "
-            "LEAVING THE BASE UNMOVED ON THE TABLE."
+            f"WITH THE INDICATOR CLEAR, SLIDE THE RIGHT {bracket} OFF {shaft}, "
+            "BASE UNMOVED ON THE TABLE."
         ),
         # Machinist review (#2108): the BOM carries one spring, so its run
         # along the shaft is a check, with its own remedy.
@@ -1286,23 +1311,22 @@ def _fitup_text() -> dict[str, str]:
         # tapped to the indicator (Codjiflo r1 on #2489: the spring alone
         # leaves nothing holding it at the target).
         "south-bracket-refitted": (
-            f"STAND THE RIGHT {bracket} BACK ON {support} WITH {shaft} IN ITS EAR "
-            "AND CLAMP IT LIGHTLY."
+            f"STAND THE RIGHT {bracket} BACK ON {support}, {shaft} IN ITS EAR."
         ),
+        "south-bracket-clamped-lightly": "CLAMP IT LIGHTLY.",
         # The spring-back check runs while the bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
         # (machinist review, PR #1605).
         "south-bracket-spring-set": (
             f"WITH THE DRO AT THE SPRING SET OF {detail}, RIGHT OF THE STEP "
-            f"{n('south-bracket-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
+            f"{n('south-bracket-dro-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
             "INDICATOR READS ZERO ON IT."
         ),
         "south-bracket-clamped": (
-            f"TIGHTEN THE CLAMP ON THE RIGHT {bracket}, KEEPING THE INDICATOR AT ZERO."
+            f"TIGHTEN THE RIGHT {bracket} CLAMP, INDICATOR STILL AT ZERO."
         ),
         "spring-back-checked": (
-            "CHECK THE BANK, PUSHED RIGHT AND RELEASED, SPRINGS BACK AGAINST "
-            f"THE LEFT {washer}."
+            f"CHECK THE PUSHED-RIGHT BANK SPRINGS BACK TO THE LEFT {washer}."
         ),
         "south-bracket-reset": (
             "IF IT DOES NOT, EASE THE CLAMP AND RETURN TO STEP "
@@ -2192,7 +2216,7 @@ def _mark_detail(
     _sketch_view_circle(adapter, view, centre, radius, label=label)
     adapter.currentModel.ClearSelection2(True)
     _activate_view(adapter, view, label=parent)
-    point = letter_xy(centre, radius, detail.letter_corner)
+    point = letter_xy(centre, radius, detail.letter_corner, detail.letter_offset)
     if add_note(adapter, detail.letter, *point) is None:
         raise RuntimeError(f"failed to letter the {label}")
 
