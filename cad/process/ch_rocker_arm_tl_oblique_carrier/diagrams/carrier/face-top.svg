@@ -1,3 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: TOP faced, then the toe patches. Shell, styles and legend: prechips.jig_diagrams. -->
+<!-- Setup 4: TOP faced to thickness, then the edge-strap footprints. Shell, styles and legend: prechips.jig_diagrams. -->
 <svg xmlns="http://www.w3.org/2000/svg" data-cad-template="jig-carrier-table" data-step="face"/>
