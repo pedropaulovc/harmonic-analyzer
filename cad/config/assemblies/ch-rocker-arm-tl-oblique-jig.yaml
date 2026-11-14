@@ -69,10 +69,5 @@ machinist_exceptions:
     where: "Steps 5A-5C: each M4 X 20 SHCS cut to its own counterbore floor height + .189, engaging .183-.195 of the HGH15CA carriage's M4 x 5"
     finding: "carriage screw full-thread engagement .162 min (4.12 mm, 1.03D; the tip reaches .183, less its 0.75P chamfer), under rule 18's 1.5D"
     reason: "The HGH15CA-style kit carriage's M4 holes are 5 mm deep (HIWIN reference geometry, checked at receipt), so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A: the TL-22/TL-32 counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach against the .151 the uncut screw left, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Owner ruling 2026-11-08 (Pedro), #2144 item 1.4: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load."
-  - id: "RV-06"
-    kind: "accept"
-    where: "Steps 1 and 14C: carriage play .0008 TIR MAX, each kit carriage rocked sideways on its rail and the carrier rocked at the shoulder-screw head"
-    finding: ".0008 is a millimetre value converted to inch, not a plain inch step (rule 4)"
-    reason: "Owner P1-A, 2026-11-07 (PR #2236 comment 4504212381): the carriage play acceptance is 0.02 mm TIR (trammel CARRIAGE_PLAY_TIR_MAX), the #2177 shoulder-head sideways check. The inch sheet prints it converted to four places, .0008; .001 would accept carriages the owner rejects and .0005 would reject carriages the owner accepts. The radial stack charges the printed .0008 (0.020 mm)."
 # drawing_unit: the jig sheet, its TOL_* rows and the saved model's units (#290).
 drawing_unit: in

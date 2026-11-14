@@ -143,8 +143,8 @@ def test_pin_holes_are_slide_reamed_and_name_the_pin() -> None:
     assert hole["dia"] == pytest.approx(
         [spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[1], spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]]
     )
-    # The REAM_SLIDE hole always clears the bought shoulder (the trammel's
-    # radius error reads this clearance).
+    # The reamed hole (.3760-.3770, owner ruling 2026-11-13) always clears
+    # the bought shoulder (the trammel's radius error reads this clearance).
     assert 0.0 < spec.PIN_CLEARANCE_MIN < spec.PIN_CLEARANCE_MAX
     assert (spec.PIN_CLEARANCE_MIN, spec.PIN_CLEARANCE_MAX) == pytest.approx(
         trammel.SHOULDER_CARRIER_CLEARANCE
@@ -153,7 +153,7 @@ def test_pin_holes_are_slide_reamed_and_name_the_pin() -> None:
     # clearance REF; rule 7 (#2649): at most two lines of words under the
     # process line, the mate in the hole table's short TL- form.
     assert hole["note"] == (
-        "4X REAM THRU RUNNING FIT ON TL-VN-77 (CLEARANCE .0010-.0025)"
+        "4X REAM THRU RUNNING FIT ON TL-VN-77 (CLEARANCE .0010-.0030)"
     )
     assert len(drawing.PIN_FIT_CALLOUT.splitlines()[1:]) <= 2
     assert "DIAMETRAL" not in drawing.CALLOUTS_BELOW["PinHoleDia"]
@@ -317,16 +317,16 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
     assert trammel.HUB[1] - trammel.APEX_Y == pytest.approx(trammel.HUB_OFFSET)
     half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
     assert half == pytest.approx(0.010 * trammel.INCH)  # .020 one-sided profile
-    # The setting: the printed .5125 at a .0001 DRO, held to ±.0005.
+    # The setting: the printed .5125, held to ±.0002 (owner ruling 2026-11-13).
     assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5125"
-    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0005 * trammel.INCH)
+    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0002 * trammel.INCH)
     # The shift: the widest pin clearance, x 1.77 on R.
     shift = trammel.RADIUS_PER_SPACING * spec.PIN_CLEARANCE_MAX
     worst = (
         spec.HUB_OFFSET_BAND + abs(spec.HUB_OFFSET_PRINTED - trammel.HUB_OFFSET) + shift
     )
     assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
-    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.126"
+    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.141"
     assert spec.HUB_RADIAL_STACK < half
     # #2236 P1-A: the HUB setting, each pass's correlated pin error and
     # carriage play, counted once against the same HUB, stay inside half-band.
@@ -351,7 +351,7 @@ def test_table_states_each_size_group_once() -> None:
     assert sorted(tag for tags in groups for tag in tags) == sorted(spec.TABLE_HOLES)
     assert spec.PIN_NUMBER == "MHA-CH-06-TL-VN-77"
     assert groups[("A1", "B1", "A2", "B2")] == [
-        "<MOD-DIAM>.3760-.3765", "4X REAM THRU", "RUNNING FIT ON TL-VN-77", "SEE NOTES 1, 2",
+        "<MOD-DIAM>.3760-.3770", "4X REAM THRU", "RUNNING FIT ON TL-VN-77", "SEE NOTES 1, 2",
     ]
     # CL/CR bench-drilled (2X, as sheet 1); the HUB, the same tap in the same
     # native run, made at assembly (TL-00 step 10, sheet 3).
@@ -363,10 +363,10 @@ def test_table_states_each_size_group_once() -> None:
         "4X <MOD-DIAM>.089 THRU", "4-40 UNC THRU", "HOLDS TL-24", "SEE NOTE 2",
     ]
     assert groups[("L1", "L2")] == ["2X <MOD-DIAM>.257 THRU", "5/16-18 UNC THRU", "HOLDS TL-26"]
-    # The pin limits are the sheet-1 4X REAM's .3750 +.0015/+.0010.
+    # The pin limits are the sheet-1 4X REAM's .3750 +.0020/+.0010.
     low, high = sorted(spec.PIN_HOLE_BAND)
     assert spec.inch_text(spec.PIN_HOLE_DIA + low, 4) == ".3760"
-    assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3765"
+    assert spec.inch_text(spec.PIN_HOLE_DIA + high, 4) == ".3770"
     for retired in ("R800", "R816", "SEE CALLOUT", "ORIGIN", "X AXIS", "MHA-CH-06-"):
         assert not any(retired in line for lines in groups.values() for line in lines), retired
     for retired in ("HOLE_SIZES_NOTE", "ROW_FLAGS", "ROW_NOTES", "ROW_SIZES", "ROW_MATES"):
@@ -409,26 +409,21 @@ def test_hub_row_is_tagged_ref_and_agrees_with_sheet_3() -> None:
     assert _at(hub) == pytest.approx(spec.HUB)
 
 
-def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
-    """The entry break leaves a broad seat on the purchased spacer."""
+def test_pin_edge_break_retains_the_spacer_thrust_seat() -> None:
+    """Owner ruling 2026-11-13: no underside chamfer; the purchased spacer
+    seats on the title block's broken edge, which leaves it a broad seat."""
     import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
+    from _printed_tolerance import edge_break_chamfer_mm
 
-    mouth = (spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]) / 2.0 + spec.PIN_CHAMFER
-    assert mouth + spec.PIN_CHAMFER_BAND[0] < (
+    mouth = (spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]) / 2.0
+    assert mouth + edge_break_chamfer_mm(unit=spec.UNIT) < (
         pivot_spacer.OD + pivot_spacer.OD_BAND[1]
     ) / 2.0
     assert spec.SECTION_REFERENCE in spec.REFERENCE_SKETCHES
-    assert spec.DRAWING_DIMENSIONS[spec.SECTION_REFERENCE] == {
-        "PinChamferSize",
-        "StockThick",
-    }
-    assert spec.prints_exactly(
-        spec.PIN_CHAMFER, spec.DRAWING_PRECISION_BY_NAME["PinChamferSize"]
-    )
-    callout = spec.CALLOUTS_BELOW["PinChamferSize"]
-    assert "UNDERSIDE" in callout and "TL-VN-78 SPACER" in callout
-    assert spec.PIN_CHAMFER_TOL_TYPE == 5  # swTolMIN
-    assert part.V_PIN_CHAMFER > 0.0
+    assert spec.DRAWING_DIMENSIONS[spec.SECTION_REFERENCE] == {"StockThick"}
+    assert not any("Chamfer" in name for name in spec.CALLOUTS_BELOW)
+    source = inspect.getsource(part)
+    assert "add_chamfer" not in source and "PinChamfer" not in source
 
 
 def test_section_reference_is_on_its_own_hidden_cutting_plane() -> None:
@@ -488,8 +483,8 @@ def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
 def test_section_is_full_and_cropped_to_the_cut_span() -> None:
     """carrier-diag: through this short interior line the PARTIAL section
     imported no marked dimension at all, while a full section through the
-    same line, same base-view selection, imported PinChamferSize and
-    StockThick. So A-A is full and cropped to A1's slab (fr_nameplate A-A's
+    same line, same base-view selection, imported its SectionReference
+    dimensions. So A-A is full and cropped to A1's slab (fr_nameplate A-A's
     Crop2 fence). jig-r9/c4-r4: imported after the crop it lost StockThick,
     so it is curated first, then cropped; farm r7: centred before its line
     was shortened, the view jumped off the sheet with the line's midpoint,
@@ -515,7 +510,6 @@ def test_section_is_full_and_cropped_to_the_cut_span() -> None:
             "_crop_section(adapter, section)",
             "_centre_section(adapter, section)",
             "_reposition_section_dimensions(adapter, section, annotations)",
-            "offset_dimension_text(",
             "_assert_section_on_sheet(adapter, section, annotations)",
         )
     ]
@@ -538,8 +532,8 @@ def test_section_is_full_and_cropped_to_the_cut_span() -> None:
     assert math.isclose(x0, a1x - drawing._SECTION_HALF)
     assert math.isclose(x1, a1x + drawing._SECTION_HALF)
     assert y0 < -spec.THICKNESS and y1 > 0.0
-    # Both kept texts' features lie inside the fence: the chamfer at A1's
-    # wall and the stock line inside the cut's +X end.
+    # The kept text's feature lies inside the fence: the stock line inside
+    # the cut's +X end, A1's wall too.
     assert x0 < a1x - spec.PIN_HOLE_DIA / 2.0
     assert a1x + spec.STOCK_REFERENCE_DX < x1
 
@@ -1048,19 +1042,6 @@ def test_section_is_never_reversed_and_fits_either_way() -> None:
         tx, ty = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
         assert not (slab[0] - 6.0 < tx < slab[2] + 6.0), sign
         assert _BORDER[0] + 10.0 < tx < _TITLE_BLOCK[0] - 10.0, sign
-        # Machinist review (3 runs FIX): beside the slab, the chamfer text's
-        # dimension line ran back along the underside as its shelf. The line
-        # stands under the -X chamfer; the text hangs under the slab, above
-        # the border, on a short OffsetText leader from it.
-        lx, ly = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["PinChamferSize"], sign)
-        assert slab[0] < lx < slab[2] and slab[1] - 4.0 < ly < slab[1] - 2.0, sign
-        cx, cy = _section_sheet(drawing.SECTION_CHAMFER_TEXT_MODEL_MM, sign)
-        rows = spec.CALLOUTS_BELOW["PinChamferSize"].splitlines()
-        half = 2.36 * max(len(row) for row in rows) / 2.0
-        half_height = 5.0 * (1 + len(rows)) / 2.0  # value row + callout rows
-        assert cy + half_height < ly and cy - half_height > _BORDER[1], sign
-        assert 0.0 < (cx - lx) * sign - half < 25.0, sign
-        assert _BORDER[0] < cx - half and cx + half < _TITLE_BLOCK[0]
     # Carrier r13: the caption printed above the 520.0's lane, cut off from
     # the slab by its extension line. It (top-centre anchor, ~46 mm wide,
     # three ~8.2 mm rows with HOLE A1) stands in the section's own band,
@@ -1361,63 +1342,3 @@ def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatc
         return
     with pytest.raises(RuntimeError):
         check()
-
-
-@pytest.fixture
-def raw_dimension_binding(monkeypatch):
-    """Model _com_invoke's bare PyIDispatch, not a prewrapped dimension fake."""
-    import _com
-
-    class RawDispatch:
-        def InvokeTypes(self, *_args):
-            raise AssertionError("raw dispatch must be bound before member access")
-
-    wrappers = {}
-
-    def retained(wrapper, interface):
-        raw = RawDispatch()
-        wrappers[raw] = (interface, wrapper)
-        return raw
-
-    def early_bound(value, interface):
-        # Match the real passthrough: bare raw dispatch has no _oleobj_.
-        # Only _bind supplies the envelope needed to select a native wrapper.
-        raw = getattr(value, "_oleobj_", None)
-        if raw in wrappers:
-            expected, wrapper = wrappers[raw]
-            assert interface == expected
-            return wrapper
-        return value
-
-    monkeypatch.setattr(_com, "_early_bound", early_bound)
-    monkeypatch.setattr(part, "_early_bound", early_bound)
-    return retained
-
-
-def test_pin_chamfer_binds_raw_named_dimension_before_value_and_tolerance(
-    monkeypatch, raw_dimension_binding,
-) -> None:
-    values = {}
-
-    def set_values(lower, upper):
-        values.update(lower=lower, upper=upper)
-        return True
-
-    tolerance = SimpleNamespace(
-        Type=0, SetValues=set_values,
-        GetMinValue=lambda: values["lower"], GetMaxValue=lambda: values["upper"],
-    )
-    raw = raw_dimension_binding(
-        SimpleNamespace(SystemValue=spec.PIN_CHAMFER / 1000.0, Tolerance=tolerance),
-        "IDimension",
-    )
-    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (None, raw))
-    part._pin_chamfer_min_limit(None)
-    assert tolerance.Type == spec.PIN_CHAMFER_TOL_TYPE
-    assert values == pytest.approx({
-        "lower": spec.PIN_CHAMFER_BAND[1] / 1000.0,
-        "upper": spec.PIN_CHAMFER_BAND[0] / 1000.0,
-    })
-    assert '_early_bound(_bind(dimension, "IDimension"), "IDimension")' in inspect.getsource(
-        part._pin_chamfer_min_limit
-    )

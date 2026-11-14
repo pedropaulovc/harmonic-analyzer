@@ -4,23 +4,25 @@ ch-rocker-arm-tl-oblique-carrier:
   number: MHA-CH-06-TL-21
   # The pin holes are reamed and the plate must stay flat on two pins: a
   # stable (stress-relieved), free-machining grade. The source is the owned
-  # OnlineMetals 1173 bar (shop inventory), milled to width on edge in the
-  # vise, no bandsaw rip (owner ruling #2083).
+  # OnlineMetals 1173 bar (shop inventory), milled to width clamped flat on
+  # the mill table, no bandsaw rip (owner rulings #2083, 2026-11-13 #2743).
   material: 6061-T6511 aluminium
   material_specification: 1/2 x 6 in 6061-T6511 aluminium bar, ASTM B221 (owned OnlineMetals 1173)
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
   process: >-
-    saw a 21.3 in length from the 1/2 x 6 bar and mill it to width on edge
-    in the vise, no bandsaw rip (the 6 in width does not fit the 5 3/4 in
-    vise jaws flat); face to .47 drawing thickness and mill to 20.5 x 5.1;
-    locate holes from the native table's A1 bore origin, +X on A1-B1;
-    use .XXX coordinates at the title-block ±.005, except the flagged
-    A2/B2 Y .964 ±.002 row; drill and ream the four pivot-pin holes
-    with the .3760 reamer; chamfer each pin hole's underside edge .012 min x
-    45 deg; drill and tap the CL and CR end-clamp holes #8-32 THRU, then the
-    riser and feed-lever holes. Break edges. At the assembled jig's HUB DRO
+    saw a 21.3 in length from the 1/2 x 6 bar; clamp it flat on 1-2-3
+    blocks on the mill table under strap clamps (the 6 in width does not fit
+    the 5 3/4 in vise jaws flat, and on edge the jaws grip too little of its
+    height), no bandsaw rip; mill it to 20.5 x 5.1 and face to .47 drawing
+    thickness; locate holes from the hole table's origin, the plate's
+    lower-left corner on sheet 2; use .XXX coordinates at the title-block
+    ±.005, except the flagged A2/B2 Y .964 ±.002 row; drill and ream the
+    four pivot-pin holes with the .3760 reamer; drill and tap the CL and CR
+    end-clamp holes #8-32 THRU, then the riser and feed-lever holes. Break
+    edges, the pin holes' underside edges included (the spacers seat on
+    them). At the assembled jig's HUB DRO
     setting (TL-00 step 10), spindle-guide the tap drill and tap for the
     ordinary #8-32 THRU HUB receiver; its table location is REF, never an
     independent predrilling control. Each strap is drilled and reamed at

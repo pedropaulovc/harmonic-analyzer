@@ -714,26 +714,7 @@ use = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
 name = ".3760 in over reamer (3/8 in, REAM_SLIDE)"
 kind = "reamer"
 present = true
-use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3765 REAM THRU"
-
-# The carrier's .3760-.3765 bores are a .0005 band: the pin-gauge set's .001
-# steps cannot hold the .3765 limit. To buy: one class X GO and one NO-GO pin.
-[gauges.pin-0376-go-nogo]
-name = "Vermont Gage class X pins: GO .3760 plus (141137600), NO-GO .3765 minus (141237650)"
-kind = "pin_gauge"
-make = "Vermont Gage"
-present = false
-status = "not owned: to buy"
-purchase = "GO 141137600: Travers 58-013-760, $23.59 (listing read live 2026-11-13). NO-GO 141237650: not on Travers' class X list; Raptor Supplies lists it (search result 2026-11-13; page behind bot protection, price not confirmed)."
-use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 bore check; the GO pin also carries the DTI for the A1 relations"
-
-# The carrier plan's underside chamfers (.012 min x 45°) are turned by hand.
-[tools.jig-csk-90]
-name = "1/2 in 90° (included) countersink with a T-handle"
-kind = "countersink"
-present = false
-status = "not recorded as owned: to buy, or record if on the shelf"
-use = "MHA-CH-06-TL-21 carrier: 4X underside pin-hole chamfers"
+use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with the owned pin-gauge set)"
 
 # Plug taps the carrier plan names besides the 8-32 (tools.taps-unc-hand).
 [tools.jig-tap-4-40-plug]
@@ -750,9 +731,9 @@ present = true
 source = "owner 2026-11-13"
 use = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
 
-# The shop's only 90° countersinking tool (owner 2026-11-13). Its cone cuts at
-# most Ø.250, so it cannot reach the carrier pin holes' Ø.401 underside chamfer
-# mouth on a Ø.376 bore (tools.jig-csk-90 above stays to buy until ruled).
+# The shop's only 90° countersinking tool (owner 2026-11-13); its cone cuts at
+# most Ø.250. The carrier's pin holes have no underside chamfer (owner ruling
+# 2026-11-13: title-block edge break only).
 [tools.chamfer-mill-330ch]
 name = "330CH carbide chamfer mill, 1/4 in, 90° included, 2 flutes, 2-1/2 in OAL"
 kind = "chamfer_mill"

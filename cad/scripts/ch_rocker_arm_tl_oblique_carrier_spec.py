@@ -40,7 +40,6 @@ import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_spec as rocker
 from _fit_deviations import deviations
-from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -99,9 +98,11 @@ A2_DX = trammel.A2[0] - trammel.A1[0]  # -.2844 (outward)
 A2_DY = trammel.A2[1] - trammel.A1[1]  # .9638
 if abs(abs(A2_DX) - (trammel.D2 - trammel.D1) / 2.0) > 1e-9:
     raise AssertionError("A2 is not chained (D2 - D1)/2 outboard of A1")
-# Fit doc F17: REAM_SLIDE on the 3/8 shoulder, cut by the owned .3760 reamer.
+# A jig running fit on the 3/8 shoulder, loosened from REAM_SLIDE by owner
+# ruling 2026-11-13: .3760-.3770, what the owned .3760 over reamer cuts, read
+# with the owned .001-step pin set (.376 GO / .377 NO-GO); no class X pins.
 PIN_HOLE_DIA = 9.525  # .3750
-PIN_HOLE_BAND = REAM_SLIDE  # +.0015/+.0010: .3760-.3765
+PIN_HOLE_BAND = (0.0508, 0.0254)  # +.0020/+.0010: .3760-.3770
 PIN_MATE_BAND = pivot_screw.SHOULDER_DIA_BAND
 _hole_low, _hole_high = deviations(PIN_HOLE_BAND)
 _mate_low, _mate_high = deviations(PIN_MATE_BAND)
@@ -139,22 +140,17 @@ PIN_HOLE_CALLOUT = (
 STRAP_NUMBER = "MHA-CH-13"
 STRAP_DEPTH = trammel.R_OUTER - trammel.R_INNER
 
-# Underside chamfer: clears the entry and leaves a spacer thrust seat.
-PIN_CHAMFER = 0.3048  # .012
-PIN_CHAMFER_BAND = (0.1016, 0.0)  # +.004/0
-PIN_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".012 MIN"
-PIN_CHAMFER_PLACES = 3
-_PIN_CHAMFER_MOUTH_MAX = (
-    (PIN_HOLE_DIA + PIN_HOLE_BAND[0]) / 2.0 + PIN_CHAMFER + PIN_CHAMFER_BAND[0]
+# Underside: the title block's edge break, no chamfer (owner ruling
+# 2026-11-13). The AS62-18-40 spacer (smallest OD .625 -.005) seats on the
+# broken edge: the largest break round the largest hole still leaves it a
+# thrust seat.
+_PIN_EDGE_MOUTH_MAX = (PIN_HOLE_DIA + PIN_HOLE_BAND[0]) / 2.0 + edge_break_chamfer_mm(
+    unit=UNIT
 )
-# The AS62-18-40 spacer's smallest OD (.625 -.005) bounds its thrust seat.
-if _PIN_CHAMFER_MOUTH_MAX >= (pivot_spacer.OD + pivot_spacer.OD_BAND[1]) / 2.0:
-    raise AssertionError("pin-hole chamfer consumes the spacer's thrust seat")
-if not prints_exactly(PIN_CHAMFER, PIN_CHAMFER_PLACES):
-    raise AssertionError("the pin-hole chamfer must print exactly at its places")
+if _PIN_EDGE_MOUTH_MAX >= (pivot_spacer.OD + pivot_spacer.OD_BAND[1]) / 2.0:
+    raise AssertionError("the pin hole's edge break consumes the spacer's thrust seat")
 # The hidden reference sketch section A-A imports (fr_nameplate's
-# SectionReference): the printed chamfer leg, which drives the chamfer
-# feature's distance, and the finished thickness, driven from Plate's depth. A
+# SectionReference): the finished thickness, driven from Plate's depth. A
 # partial section imports a hidden sketch in its plane (pd_platen A-A, pivot
 # block B-B) but not a body feature's depth: jig-r4/r5 asked it for Plate's
 # and got nothing at all, as ms_stick's G-G did for its cut depth. It lies on
@@ -165,7 +161,6 @@ if not prints_exactly(PIN_CHAMFER, PIN_CHAMFER_PLACES):
 # jig-r6's import came back empty.
 SECTION_PLANE = "SectionAPlane"
 SECTION_REFERENCE = "SectionReference"
-PIN_CHAMFER_CALLOUT = "X 45\u00b0, 4X UNDERSIDE\nSEATS ON TL-VN-78 SPACER"
 # Section A-A cuts SECTION_HALF_SPAN either side of A1's axis; the stock line
 # stands STOCK_REFERENCE_INSET inside the cut's +X end, so the thickness's
 # extension lines leave the slab at its end.
@@ -275,7 +270,7 @@ SAG_CUTTING_LOAD = CUTTING_LOAD_N * D1**3 / (48.0 * E_6061 * _I)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth", "PlateNearY"},
     "PinHoleProfile": {"PinHoleDia"},
-    SECTION_REFERENCE: {"PinChamferSize", "StockThick"},
+    SECTION_REFERENCE: {"StockThick"},
     STATION_REFERENCE: {"EdgeX"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -294,7 +289,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "B2DY": TABLE_LOCATION_PLACES,
     },
     SECTION_REFERENCE: {
-        "PinChamferSize": PIN_CHAMFER_PLACES,
         "StockThick": THICKNESS_PLACES,
     },
     "ClTap": {"ClY": TABLE_LOCATION_PLACES},
@@ -323,7 +317,10 @@ if not set().union(*DRAWING_DIMENSIONS.values()) <= set(DRAWING_PRECISION_BY_NAM
 # and accepted carriage play below complete it.
 _TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 HUB_OFFSET_PLACES = 4  # a .0001 DRO, as the alignment table
-HUB_OFFSET_BAND = 0.0005 * trammel.INCH  # ±.0005 on the DRO setting
+# ±.0002 on the DRO setting: the MagXact scales' 5 um count. Owner ruling
+# 2026-11-13 loosened the pin bores to .3760-.3770; this and the carriage-play
+# acceptance (trammel.CARRIAGE_PLAY_TIR_MAX) close pin_relative_stack again.
+HUB_OFFSET_BAND = 0.0002 * trammel.INCH
 HUB_OFFSET_PRINTED = (
     round(trammel.HUB_OFFSET / trammel.INCH, HUB_OFFSET_PLACES) * trammel.INCH
 )
@@ -571,7 +568,6 @@ if RISER_WALLS_FROM_A1 < WALL_TARGET_MM:
 
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "PinChamferSize": PIN_CHAMFER_CALLOUT,
 }
 CALLOUT_PREFIXES: dict[str, str] = {}
 

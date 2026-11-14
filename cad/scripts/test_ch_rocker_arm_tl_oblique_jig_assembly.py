@@ -1925,7 +1925,7 @@ def test_step_10_taps_the_carrier_hub_in_situ_at_the_recorded_dro() -> None:
     gauge stack in Y, so its ±.0005 needs no exception."""
     steps = {text.split(". ", 1)[0]: text for text in (*spec.ASSEMBLY_STEPS, *spec.OPERATION_STEPS)}
     assert "ORIGIN" in steps["10C"] and "STEP 6F" in steps["10C"]
-    assert "X 0, Y .5125 ±.0005" in steps["10D"] and "GAUGE STACK" in steps["10D"]
+    assert "X 0, Y .5125 ±.0002" in steps["10D"] and "GAUGE STACK" in steps["10D"]
     assert spec.gauge_stack(spec._HUB_Y_TEXT) == (1005, 1120, 3000)
     assert "RECORD" in steps["10E"] and "STEPS 19E AND 20" in steps["10E"]
     assert carrier.HUB_THREAD in steps["10G"] and "NO COUNTERBORE" in steps["10F"]
@@ -1954,7 +1954,7 @@ def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> N
     assert spec.STATION_BAND == pytest.approx(0.0005 * inch)
     assert len(spec.GAUGE_BLOCKS_TENTHS) == len(set(spec.GAUGE_BLOCKS_TENTHS)) == 81
     assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0184, abs=0.0005)
-    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1509, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1657, abs=0.0005)
     assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
     assert [row[:2] for row in spec.RAIL_SETTING_ROWS] == [("4.00", "ORIGIN"), ("11.00", "S 4.00")]
     for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):
@@ -2497,15 +2497,15 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
 
     rail_item, carriage_item = spec.ITEM_NUMBERS[spec.RAIL], spec.ITEM_NUMBERS[spec.CARRIAGE]
     assert int(carriage_item) == int(rail_item) + 1
-    # The printed check reads the owner's play (P1-A, 2026-11-07: 0.02 mm)
-    # converted to four places, .0008 TIR, accepted by RV-06; its radius
-    # sits inside the shoulder allowance and, with it, the half band.
+    # The printed check reads the owner's play (P1-A, 2026-11-07, tightened
+    # to .0005 in with the 2026-11-13 ream ruling), a plain inch step, so no
+    # exception; its radius sits inside the shoulder allowance and the band.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     check = steps["14C"]
-    assert check.endswith(f"{spec._PLAY_TIR}.") and spec._PLAY_TIR == ".0008 TIR MAX"
+    assert check.endswith(f"{spec._PLAY_TIR}.") and spec._PLAY_TIR == ".0005 TIR MAX"
     assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS" in check
     play = trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * spec.CARRIAGE_PLAY_TIR_PRINTED
-    assert play == pytest.approx(0.02032, abs=1e-9)
+    assert play == pytest.approx(0.0127, abs=1e-9)
     assert abs(spec.CARRIAGE_PLAY_TIR_PRINTED - trammel.CARRIAGE_PLAY_TIR_MAX) <= 0.00005 * trammel.INCH
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
@@ -2514,9 +2514,7 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
         row.id: row
         for row in load_exceptions(CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly")
     }
-    accept = rows["RV-06"]
-    assert ".0008" in accept.where and "P1-A" in accept.reason and "4504212381" in accept.reason
-    assert "RV-07" not in rows
+    assert "RV-06" not in rows and "RV-07" not in rows
     assert play <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX

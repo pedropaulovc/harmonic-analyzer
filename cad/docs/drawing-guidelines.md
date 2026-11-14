@@ -185,7 +185,7 @@ a chamfer gets the loosest title-block band that serves it.
   set by the printed limits of size; the callout names it with one of those
   standard fit names (`RUNNING FIT ON MHA-CH-06-TL-VN-77`), and the resulting
   clearance or interference range may follow as REF (`(CLEARANCE
-  .0010-.0025)`). Beside printed limits of size, `DIAMETRAL CLEARANCE` or
+  .0010-.0030)`). Beside printed limits of size, `DIAMETRAL CLEARANCE` or
   `DIAMETRAL INTERFERENCE` as the stated requirement repeats the limits in
   private words. A matched pair whose nominal is REF has no limits to repeat;
   there the stated clearance or interference range is the requirement (below).

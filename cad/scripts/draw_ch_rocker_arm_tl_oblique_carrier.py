@@ -14,7 +14,8 @@ hole-location dimensions remain.
 The CARRIER sheet keeps the outline, the reamed size and its running fit,
 the native tap callouts, each naming its mate, and section A-A (3:1,
 labelled SECTION A-A, HOLE A1 and cropped to A1's slab, carrying the
-finished thickness and underside chamfer; its cutting plane a short whole
+finished thickness (the bore's underside edge carries the title block's
+break only); its cutting plane a short whole
 line across A1 alone, rule 9); the shaded isometric stands
 above the title block. The HOLE TABLE sheet holds the thirteen-row table and
 its tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout,
@@ -54,7 +55,6 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_reference_dimension,
@@ -171,7 +171,7 @@ CALLOUTS_BELOW = {**part_spec.CALLOUTS_BELOW, "PinHoleDia": PIN_FIT_CALLOUT}
 # section through a short interior line imports nothing at all (no marked
 # dimension even from the entire model; selected SectionReference or Plate
 # through the base view: an empty array), while a full section through the
-# same line, same selection, imports PinChamferSize and StockThick. A full
+# same line, same selection, imports the SectionReference dimensions. A full
 # section's line must still cross the part: through that 18 mm interior line
 # carrier r11 printed the slab uncut (unhatched, no bore), its stock
 # extension lines ~800 mm long over the iso and the title block
@@ -182,7 +182,7 @@ CALLOUTS_BELOW = {**part_spec.CALLOUTS_BELOW, "PinHoleDia": PIN_FIT_CALLOUT}
 # span (fr_nameplate's _crop_section). The finished thickness is the native
 # SectionReference StockThick dimension (driven from Plate's depth). Its dimensions
 # are imported BEFORE the crop: cropped (jig-r9, c4-r4), the same import
-# delivered PinChamferSize but not StockThick, whose stock line stands 0.5 mm
+# delivered the chamfer leg but not StockThick, whose stock line stands 0.5 mm
 # inside the fence's +X end and whose sketch text stands 5 mm past it.
 # Already imported, they are placed again once the cropped view is centred.
 # Carrier r11 and r13 printed the 12.0's extension lines from ~863 mm right
@@ -245,20 +245,12 @@ _SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
 # border, its caption cut off from it by the 520.0's extension line and the
 # chamfer text against the border. At 3:1 the band under the bottom lanes
 # (75) holds, left to right: the caption (x ~20..66), the thickness text
-# (lane x 79) and the slab (91..145 x 34..70), the chamfer text under it.
+# (lane x 79) and the slab (91..145 x 34..70).
 SECTION_CENTER = (0.118, 0.052)
 _STOCK_TEXT_DX = 13.0  # A1's axis to the thickness lane, model mm (-X side)
 SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
     "StockThick": (_A1[0] - _STOCK_TEXT_DX, -part_spec.THICKNESS / 2.0, 0.0),
-    # The chamfer leg's dimension line: 1 mm under the -X chamfer.
-    "PinChamferSize": (_A1[0] - part_spec.PIN_HOLE_DIA / 2.0, -part_spec.THICKNESS - 1.0, 0.0),
 }
-# Machinist review (3 runs FIX): with its text beside the slab, the chamfer's
-# dimension line ran back along the underside as the text's shelf. The text
-# now hangs under the slab, A1's +X side (sheet ~121..178 x 16.5..30.5,
-# its underline 3.8 mm over the inner border: review at bccedc541), on a
-# short angled OffsetText leader from that line (the text centres on it).
-SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 3.5, 0.0)
 # The thickness's extension lines from its lane (4 model mm, 12 sheet mm,
 # outside the slab's -X end) stop 1.5 sheet mm short of the slab: sheet m.
 STOCK_WITNESS_MAX_M = (
@@ -1253,18 +1245,12 @@ def _assert_section_on_sheet(adapter: Any, section: Any, annotations: list[Any])
 
 def _settle_section(adapter: Any, section: Any, annotations: list[Any]) -> list[Any]:
     """Once its line is final: cropped (again if the line change dropped the
-    crop), centred, its dimensions and the chamfer text placed again, and
-    proven on the sheet."""
+    crop), centred, its dimensions placed again, and proven on the sheet."""
     if not bool(_early_bound(section, "IView").IsCropped()):
         _telemetry.warn("carrier section A-A lost its crop with its line; cropping again")
         _crop_section(adapter, section)
     _centre_section(adapter, section)
     annotations = _reposition_section_dimensions(adapter, section, annotations)
-    chamfer_text = model_point_in_view(
-        adapter, section, _metres(SECTION_CHAMFER_TEXT_MODEL_MM),
-        label="section A-A chamfer text",
-    )
-    offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
     _assert_section_on_sheet(adapter, section, annotations)
     return annotations
 
@@ -1313,7 +1299,7 @@ def _assert_section_caption(section: Any) -> None:
 
 def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], Any]:
     """Full section A-A along the pin line, cropped to A1's slab, carrying the
-    finished thickness and the chamfer leg, both from SectionReference.
+    finished thickness from SectionReference.
 
     The hidden owner sketch lies in the cutting plane; a derived view takes it
     from the part as it stands when cut and selects it through its base view,
@@ -1350,7 +1336,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
             section_label="A",
             scale=SECTION_SCALE,
             partial=False,
-            label="pin-hole chamfer section",
+            label="pin-hole section",
         )
         _orient_section(adapter, section)
         set_hidden_lines_removed(adapter, section)

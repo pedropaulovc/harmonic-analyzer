@@ -72,15 +72,17 @@ def test_owner_pin_only_bounds_and_rounded_budget():
         name: spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
         for name, error in spec.PIN_RELATIVE_ERROR.items()
     })
-    assert spec.HUB_RADIAL_STACK == pytest.approx(.12588, abs=5e-6)
-    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.11218, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.14971, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.24419, abs=5e-6)
+    assert spec.HUB_RADIAL_STACK == pytest.approx(.14070, abs=5e-6)
+    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.13462, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.15723, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.25170, abs=5e-6)
     assert spec.PIN_RELATIVE_REMAINING == pytest.approx({
         name: half - stack for name, stack in spec.PIN_RELATIVE_STACK.items()
     })
     assert min(spec.PIN_RELATIVE_REMAINING.values()) > 0
-    assert spec.HUB_RADIAL_STACK <= .005 * I
+    # The retired .005 PIN_RELATIVE_ALLOWANCE no longer bounds the HUB stack:
+    # the functional limit is the half band, charged with every term above.
+    assert spec.HUB_RADIAL_STACK < half
 
 
 @pytest.mark.parametrize("hub_stack_in,fits", [(.004956, True), (.0053, True), (.0061, False), (.0065, False)])
@@ -103,7 +105,7 @@ def test_carriage_play_is_charged_once_and_old_acceptance_is_rejected(monkeypatc
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
     without_play = spec.pin_relative_stack()
     for name in accepted:
-        assert accepted[name] - without_play[name] == pytest.approx(.02)
+        assert accepted[name] - without_play[name] == pytest.approx(.0127)
     # PR #2236 P1: the old .05 acceptance exceeds the unchanged .254 half-band.
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", .05)
     with pytest.raises(AssertionError, match="radial band"):
@@ -116,8 +118,8 @@ def test_station_cut_and_sweep_consumers_charge_carriage_play_once(monkeypatch, 
     cut = spec.station_cut_error(point, pass_name)
     sweep = spec.station_sweep_error(point, pass_name)
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
-    assert cut - spec.station_cut_error(point, pass_name) == pytest.approx(.02)
-    assert sweep - spec.station_sweep_error(point, pass_name) == pytest.approx(.02)
+    assert cut - spec.station_cut_error(point, pass_name) == pytest.approx(.0127)
+    assert sweep - spec.station_sweep_error(point, pass_name) == pytest.approx(.0127)
 
 
 def _circle(a, b):
@@ -237,7 +239,7 @@ def test_size_groups_are_one_merged_note_each_with_their_count_and_flags():
     NOTE 1 or 2 govern flag them there (rule 7)."""
     notes = dict(table.NOTE_GROUPS)
     assert notes[("A1", "B1", "A2", "B2")] == (
-        "<MOD-DIAM>.3760-.3765\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
+        "<MOD-DIAM>.3760-.3770\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
     )
     # CL/CR are bench-drilled (2X, as sheet 1); the HUB, the same #8-32 tap
     # in the same native run, is made at assembly and says so on its own
