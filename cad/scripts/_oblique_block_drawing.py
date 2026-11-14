@@ -232,7 +232,7 @@ PIVOT_STACK_LANE = (.185, .100, .312, .130)
 
 def _pivot_stack_semantics(text):
     """Plain note rows: retain numbers, signs and precision; normalize whitespace/symbols."""
-    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>')
+    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>').replace('⌴', '<HOLE-SPOT>')
     return tuple(' '.join(row.split()) for row in text.splitlines())
 
 
@@ -245,14 +245,16 @@ def _pivot_stack_text(contract):
     def size(name):
         return render_number(round(contract.DRAWING_VALUES[name] / MM_PER_INCH, places[name]), 'in', places[name])
 
-    # A plain .375 under DRILLED HOLES, flat-bottomed (owner ruling
-    # 2026-11-13, loosened from #2445's BORE): the shoulder bottoms on the
-    # seat's square floor. Size, then depth, then the floor's form.
+    # A plain .375 under DRILLED HOLES (owner ruling 2026-11-13, loosened
+    # from #2445's BORE): the shoulder bottoms on its square floor. Standard
+    # counterbored-hole form (rule 26, machinist review be53204cdd): the
+    # through hole and its thread, then the counterbore by symbol, then the
+    # one reason row (rule 7).
     return (
-        f'<MOD-DIAM>{size("BoreDia")} <HOLE-DEPTH>{size("TopBoreDepth")} FLAT BOTTOM\n'
-        '  SEAT FOR TL-VN-77 SHOULDER\n'
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
-        f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
+        f'{contract.PIVOT_TAP} UNC THRU\n'
+        f'<HOLE-SPOT><MOD-DIAM>{size("BoreDia")} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        '  SEAT FOR TL-VN-77 SHOULDER'
     )
 
 
@@ -261,9 +263,9 @@ def _pivot_stack_estimate(text):
 
     One full cap-height per glyph (versus the shared 0.62 average), 1.6-height
     row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
-    glyph. At the current spec: [189,103.7]..[306.5,126] mm, 3.7 mm minimum air.
+    glyph. At the current spec: [189,103.7]..[289,126] mm, 3.7 mm minimum air.
     """
-    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧')
+    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('<HOLE-SPOT>', '⌴')
     if len(glyphs.splitlines()) != 4:
         raise RuntimeError('pivot stacked callout must remain four short lines')
     box = estimate_text_box(glyphs, anchor=PIVOT_STACK_XY, height=PIVOT_NOTE_HEIGHT,
@@ -519,7 +521,7 @@ def _inch_ref(mm: float) -> str:
 # (rule 7). The floor keeps the RV-01 fact, worded as RV-01's ``where``.
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
-    'BoreDia': {'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)} FLAT BOTTOM', 'above': '',
+    'BoreDia': {'prefix': '<HOLE-SPOT><MOD-DIAM>', 'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
                 'below': f'SEAT FOR {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',

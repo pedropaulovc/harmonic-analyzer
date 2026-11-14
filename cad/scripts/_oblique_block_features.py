@@ -30,7 +30,7 @@ ROW_FROM = {
     "ch-rocker-arm-tl-oblique-pivot-block": "minus_y_side",
     "ch-rocker-arm-tl-oblique-feed-block": "plus_y_side",
 }
-# Where each sheet prints the seat's FLAT BOTTOM and the tap's DRILL THRU: TL-22's
+# Where each sheet prints the seat's ⌴ (flat floor) and the tap's DRILL THRU: TL-22's
 # one stacked note, TL-32's dimension callouts.
 SEAT_CALLOUT = {
     "ch-rocker-arm-tl-oblique-pivot-block": (
