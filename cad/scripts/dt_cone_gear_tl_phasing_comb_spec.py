@@ -776,12 +776,22 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
 # --- Sheet words ----------------------------------------------------------------
 # Each blade's depth states its function on its own line in rule 3's form: it
 # clears its gear's root, named by number (rule 4). The grip span states its
-# function at the dimension: it spans the two T030 blades' edges. The
+# fit at the dimension (rule 26): the interference its limits take across
+# T030's roots, from none at the tightest pair to SPREAD_MAX_MM. The
 # thickness is the stock's, printed as a reference over SHEET STOCK
 # (pn-pen-hanger, pd-platen-clip): the stock's own tolerance governs. No
 # numbered note is left.
 STOCK_TEXT = "SHEET STOCK"
-GRIP_TEXT = f"GRIPS ROOTS OF\n{gear_number(REFERENCE_TEETH)}"
+GRIP_INTERFERENCE_IN = (
+    math.floor((2.0 * SEAT_EDGE_MM[0] - GRIP_SPAN - _XXX) / INCH * 1000.0) / 1000.0,
+    math.ceil(SPREAD_MAX_MM / INCH * 1000.0) / 1000.0,
+)
+if GRIP_INTERFERENCE_IN[0] < 0.0:
+    raise AssertionError("the grip span must interfere at every limit")
+GRIP_TEXT = (
+    f"{GRIP_INTERFERENCE_IN[0]:.3f}-{GRIP_INTERFERENCE_IN[1]:.3f}".replace("0.", ".")
+    + f" INTERFERENCE\nON {gear_number(REFERENCE_TEETH)} ROOTS"
+)
 REFERENCE_DIMENSIONS = frozenset({"SheetThick"})
 DEPTH_SUFFIX: dict[str, str] = {
     blade_depth_name(t): f", CLEARS {gear_number(t)} ROOT" for t in BONDED_TEETH
