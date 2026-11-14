@@ -257,7 +257,8 @@ feed = "8 in/min"
 # TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
 # ruling 2026-11-13).
 # block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
-# flute (owner 2026-11-13), which reaches through TL-32's .96 lug notch.
+# flute (owner 2026-11-13), which reaches through TL-32's .96 lug notch; its
+# setting is jig-em-half's (1250 rpm, 3 in/min).
 [tools.block-drill-15]
 description = "#15 (.180 in) drill, 115-piece index"
 diameter_mm = 4.572
@@ -276,3 +277,9 @@ diameter_mm = 9.525
 [tools.block-em-half-long]
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
+
+[settings.block-em-half-long-6061-t6511]
+tool = "block-em-half-long"
+material = "6061-t6511"
+rpm = 1250
+feed = "3 in/min"

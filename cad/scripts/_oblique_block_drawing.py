@@ -250,7 +250,7 @@ def _pivot_stack_text(contract):
     # seat's square floor. Size, then depth, then the floor's form.
     return (
         f'<MOD-DIAM>{size("BoreDia")} <HOLE-DEPTH>{size("TopBoreDepth")} FLAT BOTTOM\n'
-        '  LOCATING FIT, TL-VN-77 SHOULDER\n'
+        '  SEAT FOR TL-VN-77 SHOULDER\n'
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
         f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
     )
@@ -520,7 +520,7 @@ def _inch_ref(mm: float) -> str:
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
     'BoreDia': {'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)} FLAT BOTTOM', 'above': '',
-                'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
+                'below': f'SEAT FOR {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',
                            'below': f'MATCHES {CARRIAGE_NUMBER} CARRIAGE'},
