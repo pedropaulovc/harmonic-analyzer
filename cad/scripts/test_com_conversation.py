@@ -3585,6 +3585,26 @@ def test_a_dependents_interference_volumes_compare_within_the_modellers_toleranc
     assert echo is not True and answers == "different"
 
 
+def test_a_dependents_non_finite_volume_only_matches_itself(tmp_path, monkeypatch):
+    overlap, noisy = 12.285502183837625e-9, 12.285495794652596e-9
+    logs, diff = _seat_diff(
+        tmp_path, monkeypatch, _seat_listed("Assem3", volumes=(overlap, math.inf))
+    )
+
+    def judged(*volumes: float) -> tuple:
+        found = diff(_seat_listed("Assem6", **_ANOTHER_SEAT, volumes=volumes))
+        return found["title_echo"], found["outcome_signals"]["answers"]
+
+    # An infinite volume matches the same infinity, in another report order.
+    assert judged(math.inf, noisy) == (True, "same")
+    # No finite volume is within any tolerance of it, nor is the other one.
+    assert judged(5e-9, noisy) == (False, "different")
+    assert judged(-math.inf, noisy) == (False, "different")
+    # NaN matches nothing, itself included.
+    logs["base"] = _seat_listed("Assem3", volumes=(overlap, math.nan))
+    assert judged(math.nan, noisy)[0] is False
+
+
 def test_a_dependents_relational_reads_name_the_element_they_ask_about(
     tmp_path, monkeypatch
 ):

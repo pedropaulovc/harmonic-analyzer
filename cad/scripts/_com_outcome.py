@@ -870,7 +870,8 @@ def _order_only(
             return False
         if touched[0] is not None and touched[0][0] in roots:
             asked.setdefault(touched[0], []).append(index)
-    base, new = _records(a, asked, roots), _records(b, asked, roots)
+    base = _records(a, asked, roots, element)
+    new = _records(b, asked, roots, _elements(b))
     if base is None or new is None:
         return False
     return all(_permuted(base[root], new[root]) for root in roots)
@@ -885,18 +886,19 @@ def _records(
     calls: Sequence[conv.Call],
     asked: dict[tuple[int, int], list[int]],
     roots: set[int],
+    element: Callable[[int], tuple[int, int] | None],
 ) -> dict[int, dict[int, _Record]] | None:
     """Per enumeration in ``roots``, each element's record in ``calls``: per
     call at its ``asked`` indices, the member, the arguments and the answer,
     handles erased and strings normalised (:func:`_keyed`), an
     :data:`_APPROXIMATE` answer kept apart. A handle argument naming an object
-    of such an enumeration is recorded as what it names (#2761): the element
-    it descends from, by that element's own record (its entries with such
-    arguments erased), and its place among the objects that element's calls
-    allocated. Not by number: the same request names another element once
-    the seat listed them in another order. ``None`` when such an argument
-    names an element with no record."""
-    element = _elements(calls)
+    of such an enumeration (``element``: :func:`_elements` of ``calls``) is
+    recorded as what it names (#2761): the element it descends from, by that
+    element's own record (its entries with such arguments erased), and its
+    place among the objects that element's calls allocated. Not by number:
+    the same request names another element once the seat listed them in
+    another order. ``None`` when such an argument names an element with no
+    record."""
     related = [
         found
         for indices in asked.values()
@@ -1007,13 +1009,19 @@ def _approximately_all(x: list[list[Any]], y: list[list[Any]]) -> bool:
 def _approximately(a: Any, b: Any, tolerance: float) -> bool:
     """Two answers (handles erased) alike within ``tolerance``, relative: the
     same structure and normalised strings, each float within ``tolerance``
-    of the larger of the two, so 0.0 only matches 0.0 and NaN nothing."""
+    of the larger of the two, so 0.0 only matches 0.0. A non-finite float
+    only matches itself: an infinity the same infinity, NaN nothing."""
     left: list[float] = []
     right: list[float] = []
     if not _same_shape(a, b, left, right):
         return False
     return all(
-        x == y or abs(x - y) <= tolerance * max(abs(x), abs(y))
+        x == y
+        or (
+            math.isfinite(x)
+            and math.isfinite(y)
+            and abs(x - y) <= tolerance * max(abs(x), abs(y))
+        )
         for x, y in zip(left, right, strict=True)
     )
 
