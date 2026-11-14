@@ -4153,6 +4153,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_fit_bands.py",
         # The shared single MAX/MIN limit setter's state and rejection paths.
         SCRIPTS_DIR / "test_single_limit_tolerance.py",
+        # The shared two-limit (LIMIT) setter's state and rejection paths.
+        SCRIPTS_DIR / "test_limit_tolerance.py",
         # Fixture pose, hook transform and conservative swept-wire clearance.
         SCRIPTS_DIR / "test_mg_fixture_installation.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",

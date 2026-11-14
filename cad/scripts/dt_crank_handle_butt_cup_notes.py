@@ -57,5 +57,10 @@ POCKET_NOTE_TEXT = "\n".join(
 BODY_CHAMFER_CALLOUT = "\n".join(
     ("X 45°", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
 )
+# The floor hole's pocket-side mouth break (#1757) names the MHA-DT-32 corner
+# it clears, so the head seats flat on the floor (rule 3's CLEARS form).
+FLOOR_HOLE_CHAMFER_CALLOUT = "\n".join(
+    ("X 45°", f"CLEARS {SCREW_NUMBER}", "UNDER-HEAD RADIUS")
+)
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

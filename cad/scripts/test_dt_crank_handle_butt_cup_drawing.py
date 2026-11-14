@@ -14,6 +14,7 @@ import _config
 import build_dt_crank_handle_butt_cup as part
 import dt_crank_handle_butt_cup_notes as notes
 import dt_crank_handle_butt_cup_spec as spec
+import dt_crank_handle_butt_cup_seat_spec as seat
 import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -41,12 +42,19 @@ def test_required_drawing_paths_and_registry_entry() -> None:
 
 
 def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SECTION_KEEP) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    # The part's complete contract is the head-seat module's: the spec's rows
+    # plus the floor hole's mouth break (#1757).
+    assert part.DRAWING_DIMENSIONS is seat.CUP_DRAWING_DIMENSIONS
+    assert drawing.DRAWING_DIMENSIONS is seat.CUP_DRAWING_DIMENSIONS
+    marked = set().union(*seat.CUP_DRAWING_DIMENSIONS.values())
+    assert marked == set().union(*spec.DRAWING_DIMENSIONS.values()) | {"FloorHoleChamfer"}
+    assert set(drawing.SECTION_KEEP) | set(drawing.DETAIL_KEEP) == marked
+    assert not set(drawing.SECTION_KEEP) & set(drawing.DETAIL_KEEP)
+    assert set(seat.CUP_DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    # No model band beside the separate native radial MAX limit: the
-    # chamfer, the body and the pocket depth hold the title block's .XXX band.
+    # No model band beside the separate native radial MAX and LIMIT
+    # setters: the chamfer, the body and the pocket depth hold the title
+    # block's .XXX band.
     assert model_toleranced_dimensions(part) == {}
     assert spec.DRAWING_PRECISION_BY_NAME["BodyChamfer"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["BodyDia"] == 3
@@ -273,6 +281,7 @@ def cup_build(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         "apply_package_model_units",
         "clear_dimensions_for_drawing", "mark_dimensions_for_drawing",
         "apply_drawing_precision", "apply_drawing_properties", "_pocket_floor_max_limit",
+        "set_limits",
     ):
         helpers[name] = MagicMock()
         monkeypatch.setattr(part, name, helpers[name])
@@ -322,9 +331,11 @@ def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_buil
     assert sweep == pytest.approx(math.pi / 2)
     lines = {name: points for name, (kind, points) in captured.entities.items()
              if kind == "line"}
+    # The flat floor starts past the floor hole's mouth break (#1757).
     floor = next(name for name, p in lines.items()
                  if p == pytest.approx(
-                     (-depth, spec.FLOOR_HOLE_DIA / 2.0, -depth, pocket_r - radius)
+                     (-depth, spec.FLOOR_HOLE_DIA / 2.0 + seat.FLOOR_HOLE_CHAMFER,
+                      -depth, pocket_r - radius)
                  ))
     wall = next(name for name, p in lines.items()
                 if p == pytest.approx((radius - depth, pocket_r, 0.0, pocket_r)))
@@ -354,19 +365,22 @@ def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_buil
     )
     captured.helpers["_pocket_floor_max_limit"].assert_called_once_with(captured.adapter)
     captured.helpers["apply_drawing_precision"].assert_called_once_with(
-        captured.adapter, spec.DRAWING_PRECISION
+        captured.adapter, seat.CUP_DRAWING_PRECISION
     )
     captured.helpers["mark_dimensions_for_drawing"].assert_called_once_with(
-        captured.adapter, "CupProfile", spec.DRAWING_DIMENSIONS["CupProfile"]
+        captured.adapter, "CupProfile", seat.CUP_DRAWING_DIMENSIONS["CupProfile"]
     )
     captured.adapter.check_sketch_fully_defined.assert_awaited_once()
     assert captured.adapter.currentSketchManager.AddToDB is False
 
 
 def test_bottom_chamfer_has_real_legs_and_a_sound_root_at_the_new_body(cup_build) -> None:
+    # The body's bottom edge is the diagonal at the overall length; the other
+    # is the floor hole's mouth break (#1757).
     chamfer, = (
         points for kind, points in cup_build.entities.values()
         if kind == "line" and points[0] != points[2] and points[1] != points[3]
+        and min(points[0], points[2]) == pytest.approx(-spec.OVERALL_LENGTH)
     )
     body_r = spec.BODY_DIA / 2.0
     assert chamfer == pytest.approx((
@@ -395,6 +409,36 @@ def test_model_properties_need_no_general_manufacturing_note(cup_build) -> None:
     assert not hasattr(notes, "DRAWING_NOTES")
 
 
+def test_floor_hole_mouth_break_is_a_45_degree_model_feature_at_its_limits(
+    cup_build,
+) -> None:
+    # #1757: the pocket-side mouth of the floor hole, modelled mid-limits,
+    # its printed radial leg and its axial leg equal by equation.
+    c = seat.FLOOR_HOLE_CHAMFER
+    hole_r = spec.FLOOR_HOLE_DIA / 2.0
+    lines = {name: points for name, (kind, points) in cup_build.entities.items()
+             if kind == "line"}
+    mouth = next(name for name, p in lines.items()
+                 if p == pytest.approx(
+                     (-(spec.POCKET_DEPTH + c), hole_r, -spec.POCKET_DEPTH, hole_r + c)
+                 ))
+    assert cup_build.dimensions["FloorHoleChamfer"] == (
+        (f"{mouth}.start", f"{mouth}.end", "horizontal_distance", c), '"FloorHoleChamfer"'
+    )
+    assert cup_build.dimensions["FloorHoleChamferRise"] == (
+        (f"{mouth}.start", f"{mouth}.end", "vertical_distance", c), '"FloorHoleChamfer"'
+    )
+    assert seat.FLOOR_HOLE_CHAMFER_LIMITS[0] < c < seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
+    cup_build.helpers["set_limits"].assert_called_once_with(
+        cup_build.adapter,
+        "CupProfile",
+        "FloorHoleChamfer",
+        limits=seat.FLOOR_HOLE_CHAMFER_LIMITS,
+        places=3,
+        display_unit=spec.UNIT,
+    )
+
+
 def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:
     # Independently integrate disks over the quarter arc; the angle substitution
     # avoids the square-root endpoint singularity of direct axial integration.
@@ -419,7 +463,17 @@ def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:
         - (spec.FLOOR_HOLE_DIA / 2) ** 2 * spec.FLOOR_THICKNESS
         - spec.BODY_CHAMFER**2 * (spec.BODY_DIA / 2 - spec.BODY_CHAMFER / 3)
     )
-    assert part.V_CUP == pytest.approx(sharp + filled, abs=1e-10)
+    # The mouth break removes a 45-degree ring: integrate its annuli.
+    c = seat.FLOOR_HOLE_CHAMFER
+    hole_r = spec.FLOOR_HOLE_DIA / 2.0
+    steps = 2000
+    dz = c / steps
+    mouth = sum(
+        math.pi * ((hole_r + c - (k + 0.5) * dz) ** 2 - hole_r**2) * dz
+        for k in range(steps)
+    )
+    assert part.V_FLOOR_HOLE_CHAMFER == pytest.approx(mouth, rel=1e-6)
+    assert part.V_CUP == pytest.approx(sharp + filled - part.V_FLOOR_HOLE_CHAMFER, abs=1e-10)
 
 
 _R_M = spec.POCKET_FLOOR_CORNER_R_MAX / 1000.0
@@ -674,3 +728,30 @@ def test_measured_layout_preserves_generous_views_and_asme_alignment() -> None:
     assert drawing.SECTION_CENTER == (0.225, 0.165)
     assert drawing.ISO_CENTER == (0.368, 0.215)
     assert drawing.END_CENTER[1] == drawing.SECTION_CENTER[1]
+
+
+def test_mouth_break_detail_frames_the_break_inside_the_sheet() -> None:
+    # #1757: the floor hole's mouth break prints in its own 20:1 detail of
+    # section A-A, curated before the section so its dimension lands there.
+    focus_x, focus_y = drawing.DETAIL_FOCUS_MM
+    for x, y in (drawing._MOUTH_ON_HOLE, drawing._MOUTH_ON_FLOOR):
+        assert math.hypot(x - focus_x, y - focus_y) < drawing.DETAIL_RADIUS_MM
+    x, y = drawing.DETAIL_CENTER
+    crop = drawing.DETAIL_CROP_RADIUS
+    assert 0.0127 < x - crop and x + crop < 0.4191
+    assert 0.0127 < y - crop and y + crop < 0.2667
+    assert x + crop < 0.218 or y - crop > 0.065  # clear of the title block
+    for kx, ky in drawing.DETAIL_KEEP.values():
+        assert 0.0127 < kx < 0.4191 and 0.065 < ky < 0.2667
+    # The axial leg's line runs over the circle and its block stands right of
+    # both extension lines, so no line strikes the text.
+    kx, ky = drawing.DETAIL_KEEP["FloorHoleChamfer"]
+    line_y = ky - drawing.FLOOR_HOLE_CHAMFER_LINE_DROP
+    assert line_y > y + crop
+    block_left = kx - drawing.FLOOR_HOLE_CHAMFER_TEXT_WIDTH / 2.0
+    for point in (drawing._MOUTH_ON_HOLE, drawing._MOUTH_ON_FLOOR):
+        assert block_left > drawing._detail_xy(*point)[0]
+    assert notes.FLOOR_HOLE_CHAMFER_CALLOUT.startswith("X 45")
+    assert "MHA-DT-32" in notes.FLOOR_HOLE_CHAMFER_CALLOUT
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.index("keep=DETAIL_KEEP") < source.index("keep=SECTION_KEEP")
