@@ -159,7 +159,9 @@ def test_each_gear_is_named_once_and_every_depth_flags_note_one() -> None:
     named = "\n".join((spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values()))
     for teeth in spec.GEARS:
         assert named.count(spec.gear_number(teeth)) == 1, teeth
+    assert notes[1].startswith("2. FLAGGED EDGE SEATS IN ")
     assert spec.gear_number(spec.REFERENCE_TEETH) in notes[1]
+    assert spec.SEAT_FLAG == "SEE NOTE 2"
     assert "ROOT" in notes[0]
     # No method (rule 7).
     for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE"):
@@ -211,6 +213,19 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
     assert thick[3] < drawing.BOTTOM_CENTER_Y - edge_half - 0.003
     assert thick[0] > drawing.SHEET_THICK_X + 0.002
     assert "offset_dimension_text" in inspect.getsource(drawing.build)
+    # Note 2's flag stands in the pocket under the T030 blade: between the
+    # south end's and the first step's extension lines, above the first
+    # start row, its leader tip on the seat edge.
+    flag = drawing.SEAT_FLAG_BLOCK
+    south, first_step = drawing.SEAT_EDGE_X
+    assert south + 0.003 < flag[0] and flag[2] < first_step - 0.003
+    assert flag[1] > drawing.START_ROW_Y0 + drawing.LINE_HEIGHT / 2.0 + 0.003
+    assert flag[3] < drawing.SEAT_FLAG_TIP[1] - 0.005
+    assert south < drawing.SEAT_FLAG_TIP[0] < first_step
+    assert drawing.SEAT_FLAG_TIP[1] == drawing.front_xy(0.0, 0.0)[1]
+    for name, box in blocks.items():
+        assert _apart(flag, box), name
+    assert "add_leader_note" in inspect.getsource(drawing.build)
     # The notes sit left of the title block, inside the border.
     width = max(len(line) for line in spec.SHEET_NOTES.splitlines()) * 0.0026
     assert drawing.NOTES_XY[0] + width < title[0]
