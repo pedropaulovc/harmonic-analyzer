@@ -2737,11 +2737,13 @@ def test_unshimmed_gap_opens_at_every_band_and_stock_shims_fit_it() -> None:
 def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
     shaft_low = pivot_screw.SHOULDER_DIA + pivot_screw.SHOULDER_DIA_BAND[1]
     shaft_high = pivot_screw.SHOULDER_DIA + pivot_screw.SHOULDER_DIA_BAND[0]
-    for diameter, band in (
-        (carrier.PIN_HOLE_DIA, carrier.PIN_HOLE_BAND),
-        (pivot_block.BORE_DIA, pivot_block.BORE_BAND),
-    ):
-        assert 0.0 < diameter + min(band) - shaft_high < diameter + max(band) - shaft_low
+    carrier_low = carrier.PIN_HOLE_DIA + min(carrier.PIN_HOLE_BAND)
+    assert 0.0 < carrier_low - shaft_high < carrier.PIN_HOLE_DIA + max(carrier.PIN_HOLE_BAND) - shaft_low
+    # The block seat's DRILLED HOLES .375 minimum meets the shoulder's .375
+    # maximum line to line (owner ruling 2026-11-13): never an interference.
+    seat_low, seat_high = pivot_block.BORE_LIMITS
+    assert 0.0 == pytest.approx(seat_low - shaft_high) and seat_low - shaft_high >= 0.0
+    assert seat_low - shaft_high < seat_high - shaft_low
     assert pivot_spacer.ID + pivot_spacer.ID_BAND[1] >= shaft_high
     assert pivot_shim.ID + pivot_shim.ID_BAND[1] > shaft_high
     allowed = contracts.ALLOWED_PAIRS

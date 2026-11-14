@@ -41,9 +41,12 @@ def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
     # The cut tip stays inside the block bottom by .011 at every band.
     assert spec.PIVOT_TIP_CLEARANCE_MIN>=0.011*INCH-1e-9
     assert spec.PIVOT_TIP_CLEARANCE>spec.PIVOT_TIP_CLEARANCE_MIN
-    # The shoulder slides in the reamed seat: clearance at every band.
-    assert 0.0<spec.PIVOT_LOCATING_CLEARANCE_MIN<spec.PIVOT_LOCATING_CLEARANCE_MAX
-    assert spec.PIVOT_LOCATING_CLEARANCE_MAX<=0.0025*INCH+1e-9
+    # The shoulder enters the seat at every band: the title block's DRILLED
+    # HOLES row, .375-.379 (owner ruling 2026-11-13).
+    assert spec.BORE_LIMITS==pytest.approx((.375*INCH,.379*INCH))
+    assert spec.PIVOT_LOCATING_CLEARANCE_MIN==pytest.approx(0.0)
+    assert 0.0<=spec.PIVOT_LOCATING_CLEARANCE_MIN<spec.PIVOT_LOCATING_CLEARANCE_MAX
+    assert spec.PIVOT_LOCATING_CLEARANCE_MAX==pytest.approx(.005*INCH)
 
 
 def test_carriage_screws_cut_to_fit_from_the_lowered_floor():
@@ -412,7 +415,7 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
     assert printed['CarriageCounterbores3Dia'] == {
         'prefix': '4X <HOLE-SPOT><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
     assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
-    assert printed['BoreDia']['suffix'] == ' BORE <HOLE-DEPTH> (.359)'
+    assert printed['BoreDia']['suffix'] == ' <HOLE-DEPTH> (.359) FLAT BOTTOM'
     assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)
     assert printed['TapDrillDia'] == {'suffix': ' DRILL THRU', 'above': '', 'below': '5/16-18 UNC THRU'}
     assert printed['CarriageDrills1Dia']['prefix'] == '4X <MOD-DIAM>'
@@ -466,7 +469,7 @@ def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
 
 
 _PIVOT_GENERATED_TEXT = (
-    '<MOD-DIAM>.3750 +.0015/+.0005 BORE <HOLE-DEPTH>.359\n'
+    '<MOD-DIAM>.375 <HOLE-DEPTH>.359 FLAT BOTTOM\n'
     '  LOCATING FIT, TL-VN-77 SHOULDER\n'
     '<MOD-DIAM>.257 DRILL THRU\n'
     '5/16-18 UNC TAP THRU BELOW SEAT'
@@ -477,7 +480,7 @@ def _pivot_text_contract():
     return SimpleNamespace(
         UNIT=spec.UNIT, DRAWING_VALUES=dict(spec.DRAWING_VALUES),
         DRAWING_PRECISION_BY_NAME=dict(spec.DRAWING_PRECISION_BY_NAME),
-        BORE_BAND=spec.BORE_BAND, BORE_PLACES=spec.BORE_PLACES, PIVOT_TAP=spec.PIVOT_TAP,
+        PIVOT_TAP=spec.PIVOT_TAP,
     )
 
 
@@ -493,37 +496,31 @@ def test_compact_pivot_text_is_four_spec_generated_rows_at_normal_height():
 
 
 @pytest.mark.parametrize('change,printed', (
-    ('BoreDia', '<MOD-DIAM>.5000'), ('TopBoreDepth', '<HOLE-DEPTH>.400'),
-    ('TapDrillDia', '<MOD-DIAM>.250'), ('band', '+.0030/+.0020'),
-    ('precision', '<MOD-DIAM>.375'), ('thread', '3/8-16 UNC TAP'),
+    ('BoreDia', '<MOD-DIAM>.500 '), ('TopBoreDepth', '<HOLE-DEPTH>.400'),
+    ('TapDrillDia', '<MOD-DIAM>.250'),
+    ('precision', '<MOD-DIAM>.3750'), ('thread', '3/8-16 UNC TAP'),
 ))
-def test_generated_pivot_text_tracks_spec_values_bands_places_and_thread(change, printed):
+def test_generated_pivot_text_tracks_spec_values_places_and_thread(change, printed):
     import _oblique_block_drawing as drawing
     from _title_block_units import MM_PER_INCH
 
     contract = _pivot_text_contract()
     if change in ('BoreDia', 'TopBoreDepth', 'TapDrillDia'):
         contract.DRAWING_VALUES[change] = {'BoreDia': .5, 'TopBoreDepth': .4, 'TapDrillDia': .25}[change] * MM_PER_INCH
-    elif change == 'band':
-        contract.BORE_BAND = (.003 * MM_PER_INCH, .002 * MM_PER_INCH)
     elif change == 'precision':
-        contract.DRAWING_PRECISION_BY_NAME['BoreDia'] = 3
+        contract.DRAWING_PRECISION_BY_NAME['BoreDia'] = 4
     else:
         contract.PIVOT_TAP = '3/8-16'
     text = drawing._pivot_stack_text(contract)
     assert printed in text and text != _PIVOT_GENERATED_TEXT
 
 
-def test_generated_pivot_text_refuses_wrong_units_and_inverted_band():
+def test_generated_pivot_text_refuses_wrong_units():
     import _oblique_block_drawing as drawing
 
     contract = _pivot_text_contract()
     contract.UNIT = 'mm'
     with pytest.raises(RuntimeError, match='inch'):
-        drawing._pivot_stack_text(contract)
-    contract.UNIT = 'in'
-    contract.BORE_BAND = tuple(reversed(spec.BORE_BAND))
-    with pytest.raises(ValueError, match='inverted'):
         drawing._pivot_stack_text(contract)
 
 
@@ -634,7 +631,6 @@ def test_lower_right_pivot_route_clears_retained_389_annotation_ink(start_y_mm):
 def _stacked_pivot_fixture(monkeypatch):
     import _oblique_block_drawing as drawing
     from _drawing_edges import ViewEdge, ViewEdges
-    from _fit_deviations import deviations
 
     plan, outer, inner = object(), object(), object()
     origin = drawing.PLAN_XY
@@ -647,8 +643,7 @@ def _stacked_pivot_fixture(monkeypatch):
     for name, feature in (
         ('BoreDia', 'TopBoreProfile'), ('TopBoreDepth', 'TopBore'), ('TapDrillDia', 'PivotTapProfile'),
     ):
-        lower, upper = deviations(spec.BORE_BAND) if name == 'BoreDia' else (0.0, 0.0)
-        tolerance = SimpleNamespace(Type=2 if name == 'BoreDia' else 0, lower=lower / 1000, upper=upper / 1000)
+        tolerance = SimpleNamespace(Type=0, lower=0.0, upper=0.0)
         tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
         tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
         dimension = SimpleNamespace(FullName=f'{name}@{feature}@block.Part',
@@ -739,7 +734,7 @@ def _stacked_pivot_fixture(monkeypatch):
 
 @pytest.mark.parametrize('fault', (
     None, 'unicode_crlf', 'duplicate_captions', 'drill_value', 'depth_value',
-    'missing_band', 'rounded_band', 'negative_band', 'printed_places', 'missing_diameter', 'note_height',
+    'printed_places', 'missing_diameter', 'note_height',
     'source_identity', 'source_feature', 'source_value', 'source_precision', 'source_band', 'source_tokens',
     'source_position', 'source_shown', 'depth_hidden', 'wrong_owner', 'hidden_note', 'note_position',
     'two_leaders', 'wrong_attachment', 'inner_tip', 'centre_crossing',
@@ -756,19 +751,13 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     if fault == 'unicode_crlf':
         case.note.text = case.note.text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('\n', '\r\n')
     elif fault == 'duplicate_captions':
-        case.note.text = case.note.text.replace('BORE', 'BORE BORE')
+        case.note.text = case.note.text.replace('FLAT BOTTOM', 'FLAT BOTTOM BOTTOM')
     elif fault == 'drill_value':
         case.note.text = case.note.text.replace('.257', '.258')
     elif fault == 'depth_value':
         case.note.text = case.note.text.replace('.359', '.360')
-    elif fault == 'missing_band':
-        case.note.text = case.note.text.replace('+.0015/+.0005', '')
-    elif fault == 'rounded_band':
-        case.note.text = case.note.text.replace('.0015', '.002')
-    elif fault == 'negative_band':
-        case.note.text = case.note.text.replace('+.0005', '-.0005')
     elif fault == 'printed_places':
-        case.note.text = case.note.text.replace('.3750', '.375')
+        case.note.text = case.note.text.replace('.375 ', '.3750 ')
     elif fault == 'missing_diameter':
         case.note.text = case.note.text.replace('<MOD-DIAM>', '', 1)
     elif fault == 'note_height':
@@ -782,7 +771,7 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     elif fault == 'source_precision':
         tap.places = 2
     elif fault == 'source_band':
-        case.rows['BoreDia'].dimension.Tolerance.upper += .00001
+        case.rows['BoreDia'].dimension.Tolerance.Type = 2
     elif fault == 'source_tokens':
         tap.texts = (*tap.texts[:4], 'CHANGED', *tap.texts[5:])
     elif fault == 'source_position':
@@ -838,7 +827,7 @@ def test_generated_note_refuses_native_sources_that_disagree_with_spec_before_in
     elif fault == 'precision':
         case.rows['TapDrillDia'].places = 2
     else:
-        case.rows['BoreDia'].dimension.Tolerance.upper += .00001
+        case.rows['BoreDia'].dimension.Tolerance.Type = 2
     with pytest.raises(RuntimeError):
         case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert not case.inserted
@@ -962,8 +951,8 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     if fault == 'split_symbols':
         first = spans.pop(0)
         spans[:0] = [
-            replace(first, text='.3750+.0015/+.0005BORE', xmin=.193, xmax=.248),
-            replace(first, text='.359', xmin=.251, xmax=.263),
+            replace(first, text='.375', xmin=.193, xmax=.205),
+            replace(first, text='.359FLATBOTTOM', xmin=.208, xmax=.248),
         ]
     elif fault == 'unordered_display':
         texts.reverse()
@@ -972,7 +961,7 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     elif fault == 'missing_display':
         texts.pop()
     elif fault == 'wrong_value':
-        spans[0] = replace(spans[0], text=spans[0].text.replace('.3750', '.3751'))
+        spans[0] = replace(spans[0], text=spans[0].text.replace('.375', '.376'))
     elif fault == 'text_outside':
         spans[0] = replace(spans[0], xmax=.320)
     elif fault == 'other_text':

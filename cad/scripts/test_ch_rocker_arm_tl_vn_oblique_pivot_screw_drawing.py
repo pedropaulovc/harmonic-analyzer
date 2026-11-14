@@ -84,11 +84,10 @@ def test_supplier_dimensions_and_physical_contract():
     assert spec.HEAD_DIA > spec.SHOULDER_DIA > spec.THREAD_DIA
     assert spec.AXIS_NAME == part.AXIS_NAME == "PivotAxis"
     assert spec.UNIT == "in"
-    # The shoulder slides in the reamed seat with clearance at every band.
+    # The shoulder enters the block seat at every band (line to line at worst).
     import ch_rocker_arm_tl_oblique_pivot_block_spec as block
 
-    seat_low = block.BORE_DIA + min(block.BORE_BAND)
-    assert seat_low > spec.SHOULDER_DIA + max(spec.SHOULDER_DIA_BAND)
+    assert block.BORE_LIMITS[0] >= spec.SHOULDER_DIA + max(spec.SHOULDER_DIA_BAND)
 
 
 def test_native_supplier_witness_inventory():

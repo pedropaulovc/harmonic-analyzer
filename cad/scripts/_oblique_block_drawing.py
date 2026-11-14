@@ -33,7 +33,6 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_types import layout_report_path
 from _drawing_view_display import set_hidden_lines_removed
-from _fit_deviations import deviations
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
@@ -240,18 +239,11 @@ def _pivot_stack_text(contract):
     def size(name):
         return render_number(round(contract.DRAWING_VALUES[name] / MM_PER_INCH, places[name]), 'in', places[name])
 
-    def signed(mm):
-        magnitude = render_number(round(abs(mm) / MM_PER_INCH, contract.BORE_PLACES), 'in', contract.BORE_PLACES)
-        return ('-' if mm < 0 else '+') + magnitude
-
-    lower, upper = deviations(contract.BORE_BAND)
-    # BORE, not REAM (#2445): the shoulder bottoms on the seat's square
-    # floor, which a reamer's 45° lead cannot reach at full diameter and a
-    # 3/8 end mill reaches only under the shoulder's size; a boring bar
-    # sizes the wall and squares the floor in one pass. Size first, then
-    # the process word (rule 26), as the sheet's 4X DRILL callout reads.
+    # A plain .375 under DRILLED HOLES, flat-bottomed (owner ruling
+    # 2026-11-13, loosened from #2445's BORE): the shoulder bottoms on the
+    # seat's square floor. Size, then depth, then the floor's form.
     return (
-        f'<MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} BORE <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        f'<MOD-DIAM>{size("BoreDia")} <HOLE-DEPTH>{size("TopBoreDepth")} FLAT BOTTOM\n'
         '  LOCATING FIT, TL-VN-77 SHOULDER\n'
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
         f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
@@ -316,17 +308,10 @@ def _stack_pivot_callout(adapter, plan, annotations, contract, printed=None):
         if int(ann.OwnerType) != 0 or ann.IsDangling():
             raise RuntimeError(f'{name}: source is not a live drawing-view dimension')
         sources[name] = (_early_bound(display.GetDimension2(0), 'IDimension'), state)
-    bore_state = sources['BoreDia'][1]
-    tolerance_kind, lower, upper = bore_state[5]
-    tolerance_places = bore_state[3] if bore_state[4] == -3 else bore_state[4]
-    expected_lower, expected_upper = deviations(contract.BORE_BAND)
-    if (tolerance_kind != 2 or not all(math.isfinite(v) for v in (lower, upper))
-            or tolerance_places != contract.BORE_PLACES
-            or not math.isclose(lower * 1000, expected_lower, rel_tol=0, abs_tol=1e-6)
-            or not math.isclose(upper * 1000, expected_upper, rel_tol=0, abs_tol=1e-6)):
-        raise RuntimeError('BoreDia: native locating-fit band disagrees with the generated spec band')
-    if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
-        raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
+    # Every source prints under the title block: the seat's DRILLED HOLES row
+    # (owner ruling 2026-11-13), the depth's .XXX and the drill's DRILLED HOLES.
+    if any(sources[name][1][5][0] != 0 for name in names):
+        raise RuntimeError('pivot stacked callout: unexpected explicit seat/depth/drill tolerance')
 
     text = _pivot_stack_text(contract)
     expected = _pivot_stack_semantics(text)
@@ -528,7 +513,7 @@ def _inch_ref(mm: float) -> str:
 # (rule 7). The floor keeps the RV-01 fact, worded as RV-01's ``where``.
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
-    'BoreDia': {'suffix': f' BORE <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
+    'BoreDia': {'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)} FLAT BOTTOM', 'above': '',
                 'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',

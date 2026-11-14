@@ -1,18 +1,18 @@
 # Source: the v49 MHA-CH-06-TL-32 sheets through the feature manifest (sizes,
-# lug, stations, rows, limits, the flat-floored BORE and its 5/16-18 tap, the
-# Ø.351 leadscrew BORE and its row and height). No hand traveler exists for
+# lug, stations, rows, limits, the flat-bottomed .375 seat and its 5/16-18 tap,
+# the Ø.351 leadscrew BORE and its row and height). No hand traveler exists for
 # this block. Route, tools, speeds, workholding and datums are authored here,
 # as for TL-22 (its plan.toml): one blank from the OnlineMetals 1187 1 x 3 in
 # bar with the 3.47 overall along the bar, both faces faced, the 1.64 length
 # milled from the 3 in width on edge (owner ruling #2083: mill to size, no
 # bandsaw rip), the sawn ends faced on end, then the lug notch with LUG END out
-# past the jaw side, the top holes in one hold, and the leadscrew bore with the
-# block standing on SPINDLE END. The four #4-40 nut taps are transferred
-# through the MHA-CH-06-TL-VN-84 feed nut at TL-00 assembly (the sheet's
-# note): no operation here.
+# past the jaw side, the top holes in one hold (the seat a plunged 3/8 end
+# mill, as TL-22's), and the leadscrew bore with the block standing on SPINDLE
+# END. The four #4-40 nut taps are transferred through the MHA-CH-06-TL-VN-84
+# feed nut at TL-00 assembly (the sheet's note): no operation here.
 # Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
-# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; Ø.376 1676 → 1650,
+# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650,
 # also used for the Ø.351 bore, under its 1796).
 title = "Oblique trammel feed block"
 part = "{{cad.drawing_number}}"
@@ -87,8 +87,8 @@ name = "3/4 in end mill"
 ref = "basebar-em-face"
 [[tools]]
 id = "em-half"
-name = "1/2 in end mill"
-ref = "jig-em-half"
+name = "1/2 in end mill (1 in flutes)"
+ref = "block-em-half-long"
 [[tools]]
 id = "spot"
 name = "#2 centre drill"
@@ -105,6 +105,10 @@ ref = "basebar-counterbore"
 id = "drill-f"
 name = "F drill"
 ref = "jig-drill-f"
+[[tools]]
+id = "em-3-8"
+name = "3/8 in end mill"
+ref = "block-em-3-8"
 [[tools]]
 id = "drill-5-16"
 name = "5/16 drill"
@@ -238,7 +242,7 @@ speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
 instruction = "Notch {{cad.lug_length_in:.2f}} from LUG END × {{cad.lug_x_in:.2dot}} from SPINDLE END, through (tip .04 below SEAT); ≤.10 steps."
-instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SPINDLE END, zero Y on it. The notch is everything within {{cad.lug_x_in:.2dot}} of SPINDLE END for {{cad.lug_length_in:.2f}} back from LUG END, through the full height. Cutter tip .04 below SEAT (it is in free air past the jaws); its flutes must reach that deep (1.00). Step in toward the lug face no more than .10 per pass, feeding along X, and finish the step face square with the cutter's side; the inside corner keeps the cutter's own sharp corner."
+instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SPINDLE END, zero Y on it. The notch is everything within {{cad.lug_x_in:.2dot}} of SPINDLE END for {{cad.lug_length_in:.2f}} back from LUG END, through the full height. Cutter tip .04 below SEAT (it is in free air past the jaws), inside the cutter's 1 in of flute. Step in toward the lug face no more than .10 per pass, feeding along X, and finish the step face square with the cutter's side; the inside corner keeps the cutter's own sharp corner."
 settings = "jig-em-half-6061-t6511"
 inspection = "Lug {{cad.lug_x_min_in:.3dot}}–{{cad.lug_x_max_in:.3dot}} from SPINDLE END; step {{cad.lug_length_min_in:.3f}}–{{cad.lug_length_max_in:.3f}} from LUG END."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lug_x_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.lug_length_band_mm}}" }]
@@ -301,22 +305,13 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-5-16"
-sizing = "other"
-instruction = "B: plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}; flat floor for the bar."
-instruction_detailed = "Still on B, plunge the 5/16 end mill to Z −{{cad.bore_depth_nominal_in:.3dot}}. Its flat end leaves the floor the boring bar enters and squares."
-rpm = 2000
-feed = "hand"
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "boring"
-sizing = "other"
-instruction = "Bore B to Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor; last passes ≤.002."
-instruction_detailed = "Fit the 5/16 in (3/4 reach) bar, set Z stop at −{{cad.bore_depth_nominal_in:.3dot}}. Open the 5/16 bore a few thousandths at a time, feeding to the stop each pass so the bar's tip squares the floor ring; last passes ≤.002 on the dial. Stop at Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the .376 pin enters full depth, the .377 does not."
+tool = "em-3-8"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Seat B: plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor."
+instruction_detailed = "Still on B, plunge the 3/8 end mill over the F hole to Z −{{cad.bore_depth_nominal_in:.3dot}}, pecking out the chips; dwell a moment at depth so the floor cleans up flat. The cutter itself sizes the seat: the .375 pin enters full depth, the .379 does not."
 rpm = 1650
 feed = "hand"
-inspection = "Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."
+inspection = "Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.bore_depth_band_mm}}" }]
 
 [[setups.operations]]

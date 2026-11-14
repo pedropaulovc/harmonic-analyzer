@@ -535,17 +535,14 @@ present = false
 status = "not owned: to buy"
 use = "MHA-FR-01 and MHA-FR-02 4X Ø.206 DRILL TO SOCKET, part on edge"
 
-# Carriage blocks MHA-CH-06-TL-22 and TL-32 (their plans under cad/process/):
-# the pivot seat's Ø.3755-.3765 flat-floored BORE and the TL-32 Ø.351
-# leadscrew BORE. The deleted inventory (45952b66bc) named LMS 3662 from a
-# photo of a carbide-tipped bar set, but only as a #1413 trial ownership
-# assumption, so nothing records the shop owning a boring head.
-[tools.boring-head]
-name = "R8 boring head, 2 in, with carbide-tipped bars for bores from 5/16 in"
-kind = "boring_head"
-present = false
-status = "not owned: to buy (or to record, if the shop has the LMS 3662 seen in the archived photo)"
-use = "TL-22/TL-32 pivot seat (Ø.3755-.3765, .359 deep, flat floor) and TL-32 Ø.351 leadscrew bore"
+# The 1/2 in end mill that reaches through TL-32's .96 lug notch (its plan
+# under cad/process/). Owner, 2026-11-13: owned, with at least 1.00 in of flute.
+[tools.endmill-half-long-flute]
+name = "1/2 in end mill, flutes at least 1.00 in"
+kind = "endmill"
+present = true
+source = "owner 2026-11-13"
+use = "MHA-CH-06-TL-32 lug notch through the .96 block height"
 
 # --- workholding ------------------------------------------------------------
 

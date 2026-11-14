@@ -16,10 +16,9 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
 from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_checks import volume_check, report_mass_properties
 from _part_properties import part_drawing_unit
@@ -693,8 +692,6 @@ async def build_block_model(adapter, part) -> None:
     _require_one_solid_body(adapter,label=part.PART_NAME)
     require_block_geometry(adapter, part)
     await volume_check(adapter,"finished block",expected,expected*0.002)
-    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
-                                      places=spec.BORE_PLACES,display_unit=spec.UNIT)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
     # TL-32's Tr8/KP08 vendor-line dimensions print exact millimetres with
     # their own bands (owner ruling 4).

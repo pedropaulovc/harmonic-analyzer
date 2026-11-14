@@ -30,7 +30,7 @@ ROW_FROM = {
     "ch-rocker-arm-tl-oblique-pivot-block": "minus_y_side",
     "ch-rocker-arm-tl-oblique-feed-block": "plus_y_side",
 }
-# Where each sheet prints the seat's BORE and the tap's DRILL THRU: TL-22's
+# Where each sheet prints the seat's FLAT BOTTOM and the tap's DRILL THRU: TL-22's
 # one stacked note, TL-32's dimension callouts.
 SEAT_CALLOUT = {
     "ch-rocker-arm-tl-oblique-pivot-block": (
@@ -96,7 +96,7 @@ def seat_fields(part: ModuleType, height: str) -> Fields:
 
 
 def bore_fields(part: ModuleType) -> Fields:
-    """The pivot seat, bored flat-bottomed (#2445) .359 deep from the top."""
+    """The pivot seat: .375 under DRILLED HOLES, flat-bottomed .359 deep from the top."""
     depth_places = pivot.DRAWING_PRECISION_BY_NAME["TopBoreDepth"]
     return {
         "at": (
@@ -105,8 +105,8 @@ def bore_fields(part: ModuleType) -> Fields:
         ),
         "axis": FROM_TOP,
         "dia": (
-            limits(pivot.BORE_DIA, pivot.BORE_PLACES, pivot.BORE_BAND),
-            ((PIVOT, "BORE_DIA"), (PIVOT, "BORE_BAND"), (PIVOT, "BORE_PLACES")),
+            drilled_limits(pivot.BORE_DIA, pivot.BORE_PLACES, unit=pivot.UNIT),
+            ((PIVOT, "BORE_DIA"), (PIVOT, "BORE_PLACES")),
         ),
         "dia_nominal": (pivot.BORE_DIA, ((PIVOT, "BORE_DIA"),)),
         "depth": (

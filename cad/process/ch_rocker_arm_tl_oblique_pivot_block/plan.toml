@@ -1,15 +1,16 @@
 # Source: the v49 MHA-CH-06-TL-22 sheet through its feature manifest (sizes,
-# stations, rows, limits, the flat-floored BORE and its 5/16-18 tap). No hand
-# traveler exists for this block. Route, tools, speeds, workholding and datums
-# are authored here: one blank sawn from the OnlineMetals 1187 1 x 3 in bar
-# (cad/config/shop-equipment.toml [[stock]]), both faces faced, the 1.64
+# stations, rows, limits, the flat-bottomed .375 seat and its 5/16-18 tap). No
+# hand traveler exists for this block. Route, tools, speeds, workholding and
+# datums are authored here: one blank sawn from the OnlineMetals 1187 1 x 3 in
+# bar (cad/config/shop-equipment.toml [[stock]]), both faces faced, the 1.64
 # length milled from the 3 in width on edge (owner ruling #2083: mill to size,
 # no bandsaw rip), the sawn ends faced on end, then every hole from TOP in one
-# hold. The seat is bored, as the sheet calls it: a reamer's lead cannot square
-# its flat floor (#2445), and reaming deeper would eat the 5/16-18 engagement.
+# hold. The seat takes the title block's DRILLED HOLES band, .375-.379 (owner
+# ruling 2026-11-13), so a plunged 3/8 end mill (LMS 6784 set) cuts it and
+# squares its floor; the owned pin set checks it.
 # Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
-# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; Ø.376 1676 → 1650).
+# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
 title = "Oblique trammel pivot block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -52,8 +53,6 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 drill_projection_max_mm = 112.8
 # A plug tap runs its 3-5 chamfered threads (5 × 1.411 mm pitch) and a little
 # more past SEAT before full thread reaches it; the parallels leave the gap.
-# The boring head (archive LMS 3662 trial estimate: 60 mm head + 3/4 in bar
-# reach) lies between the shortest and longest tools.
 tap_tip_z_mm = -8.0
 
 [[tools]]
@@ -81,9 +80,9 @@ id = "drill-f"
 name = "F drill"
 ref = "jig-drill-f"
 [[tools]]
-id = "boring"
-name = "Boring head"
-ref = "block-boring-head"
+id = "em-3-8"
+name = "3/8 in end mill"
+ref = "block-em-3-8"
 [[tools]]
 id = "tap"
 name = "5/16-18 plug tap"
@@ -248,22 +247,13 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-5-16"
-sizing = "other"
-instruction = "B: plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}; flat floor for the bar."
-instruction_detailed = "Still on B, plunge the 5/16 end mill to Z −{{cad.bore_depth_nominal_in:.3dot}}. Its flat end leaves the floor the boring bar enters and squares."
-rpm = 2000
-feed = "hand"
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "boring"
-sizing = "other"
-instruction = "Bore B to Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor; last passes ≤.002."
-instruction_detailed = "Fit the 5/16 in (3/4 reach) bar, set Z stop at −{{cad.bore_depth_nominal_in:.3dot}}. Open the 5/16 bore a few thousandths at a time, feeding to the stop each pass so the bar's tip squares the floor ring; last passes ≤.002 on the dial. Stop at Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: the .376 pin enters full depth, the .377 does not."
+tool = "em-3-8"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Seat B: plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor."
+instruction_detailed = "Still on B, plunge the 3/8 end mill over the F hole to Z −{{cad.bore_depth_nominal_in:.3dot}}, pecking out the chips; dwell a moment at depth so the floor cleans up flat. The cutter itself sizes the seat: the .375 pin enters full depth, the .379 does not."
 rpm = 1650
 feed = "hand"
-inspection = "Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."
+inspection = "Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.bore_depth_band_mm}}" }]
 
 [[setups.operations]]
