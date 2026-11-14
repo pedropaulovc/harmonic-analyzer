@@ -109,35 +109,75 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     dx = x - sheet.TOP_CENTER[0]
     assert y + radius < sheet.TOP_CENTER[1] - (top_r**2 - dx**2) ** 0.5
     assert x - radius > sheet.TOP_CENTER[0] + fixture.DOWEL_DIA / 2000.0
-    # The steps start below the BOM, the checks below the steps and end
-    # above the title block (y <= .066 m at x >= .216 m).
+    # The steps start below the BOM and end above the title block (y <= .066
+    # m at x >= .216 m).
     assert sheet.STEPS_XY[1] < sheet.BOM_ANCHOR[1] - 0.070
-    steps_lines = len(sheet.ASSEMBLY_STEPS.splitlines())
-    assert sheet.CHECKS_XY[1] < sheet.STEPS_XY[1] - steps_lines * sheet.LINE_PITCH
-    checks_lines = len(sheet.ASSEMBLY_CHECKS.splitlines())
-    assert sheet.CHECKS_XY[1] - checks_lines * sheet.LINE_PITCH > 0.066
+    lines = sheet.ASSEMBLY_STEPS.splitlines()
+    assert sheet.STEPS_XY[1] - len(lines) * sheet.LINE_PITCH > 0.066
+    assert max(map(len, lines)) <= sheet.STEP_WIDTH
 
 
-def test_the_register_is_set_as_a_numbered_step_at_the_budgets_tir() -> None:
-    # The heading carried 'INDICATED TRUE' with no limit (run
-    # 20261114T221042598Z): K3 names item 1's OD, the budget's TIR and the
-    # instrument; the throw and phase budgets carry the same REGISTER_TIR.
-    k3 = sheet.KIT_STEPS[sheet.KIT_STEPS.index("K3. ") :]
-    assert f"Ø{fixture.BODY_DIA_TEXT} OD" in k3
-    assert f"{fixture.REGISTER_TIR_TEXT} TIR" in k3
-    assert "DIAL TEST INDICATOR" in k3
-    assert fixture.REGISTER_TIR_TEXT == ".0005"
-    assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
-    assert "INDICATED TRUE" not in sheet.FITTING_STEPS
-    # Check 5 is the check alone; each remedy action is its own numbered check.
-    checks = sheet.ASSEMBLY_CHECKS.splitlines()
-    five = checks.index(f"5. {fixture.FIRST_CAM_CHECK_TEXT}")
-    assert checks[five + 1 :] == [
-        f"{number}. {text}"
-        for number, text in enumerate(fixture.FIRST_CAM_REMEDY_TEXT, start=6)
+def _step(number: int) -> str:
+    return sheet.STEPS[number - 1]
+
+
+def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
+    # Run 20261114T231845023Z's review (rule 22): a separate CHECKS block was
+    # out of step with the work; one numbered sequence as the arbor kit has.
+    for name in ("KIT_STEPS", "FITTING_STEPS", "ASSEMBLY_CHECKS", "CHECKS_XY"):
+        assert not hasattr(sheet, name), name
+    numbered = [
+        line for line in sheet.ASSEMBLY_STEPS.splitlines() if re.match(r"^\d+\. ", line)
     ]
-    assert checks[-1].startswith("8. ")
-    assert "REWORK ITEM 1 TO MHA-DT-12-TL-01" in checks[five + 2]
+    assert [int(line.split(".")[0]) for line in numbered] == list(
+        range(1, len(sheet.STEPS) + 1)
+    )
+    # Each press, its slip-fit bond at the same seat, then its check.
+    for item, first in (("2", 1), ("3", 4)):
+        assert _step(first).startswith(f"PRESS ITEM {item} ")
+        bond = _step(first + 1)
+        assert bond.startswith(f"IF ITEM {item} SLID IN BY HAND, BOND IT AT ")
+        assert f"{sheet.BOND}, CURE 24 H." in bond
+        assert _step(first + 2) == f"CHECK: ITEM {item} DOES NOT MOVE BY HAND."
+    assert fixture.STUB_STAND_TEXT in _step(1)
+    # The register set-up, then its check.
+    indicate = _step(sheet.INDICATE_STEP)
+    assert f"Ø{fixture.BODY_DIA_TEXT} OD" in indicate
+    assert f"{fixture.REGISTER_TIR_TEXT} TIR" in indicate
+    assert "DIAL TEST INDICATOR" in indicate
+    assert sheet.RUNOUT_STEP == sheet.INDICATE_STEP + 1
+    assert _step(sheet.RUNOUT_STEP).startswith("CHECK: ")
+    assert fixture.STUB_RUNOUT_TEXT in _step(sheet.RUNOUT_STEP)
+    # Each gear: slide on, check; turn onto the pin, clamp, check.
+    gear_steps = sheet.STEPS[sheet.FIRST_GEAR_STEP - 1 : sheet.FIRST_CAM_STEP - 1]
+    assert gear_steps[0].startswith("SLIDE THE GEAR")
+    assert gear_steps[1].startswith("CHECK: ")
+    turning = [i for i, step in enumerate(gear_steps) if "CLOCKWISE" in step]
+    tighten = [i for i, step in enumerate(gear_steps) if "TIGHTEN" in step]
+    assert fixture.CUT_TURNS_GEAR_CLOCKWISE
+    assert turning == [2] and "TOP VIEW" in gear_steps[2] and tighten == [3]
+    assert gear_steps[-1] == "CHECK: THE GEAR DOES NOT TURN BY HAND."
+    # The first cam's check, then one action per remedy step, last of all.
+    first_cam = sheet.STEPS[sheet.FIRST_CAM_STEP - 1 :]
+    assert first_cam[0] == f"CHECK: ONCE TURNED, {fixture.FIRST_CAM_CHECK_TEXT}"
+    assert first_cam[1].startswith(f"IF STEP {sheet.FIRST_CAM_STEP} FAILS, RE-INDICATE")
+    assert f"(STEP {sheet.INDICATE_STEP})" in first_cam[1]
+    assert first_cam[2] == (
+        f"IF STEP {sheet.FIRST_CAM_STEP} STILL FAILS, REWORK ITEM 1 TO "
+        f"{fixture.PART_NUMBER}."
+    )
+    assert first_cam[3].startswith("CUT THE OTHER 19 GEARS ONLY AFTER STEP")
+    assert len(first_cam) == 4
+
+
+def test_the_register_tir_is_the_budgets_and_a_4_jaw_setting() -> None:
+    # .001: no tighter than the shop's runout row (run 20261114T231845023Z's
+    # review); the throw and phase budgets and the runout window carry it.
+    assert fixture.REGISTER_TIR_TEXT == ".001"
+    assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
+    low, high = (float(value) for value in fixture.STUB_RUNOUT_TEXT.split(" TO "))
+    band = 2.0 * (fixture.POSITION_BAND + fixture.REGISTER_OFFSET) / 25.4
+    assert high - low == pytest.approx(2.0 * band, abs=1e-4)
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
@@ -168,42 +208,29 @@ def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
     assert all(limit > 0.0 for limit in interference.ALLOWED_PAIRS.values())
 
 
-def test_at_most_three_fitting_steps_and_the_gear_turns_clockwise_onto_the_pin() -> (
-    None
-):
-    numbered = [
-        line for line in sheet.FITTING_STEPS.splitlines() if re.match(r"^\d+\. ", line)
-    ]
-    assert len(numbered) <= 3
-    assert fixture.CUT_TURNS_GEAR_CLOCKWISE
-    turning = [line for line in numbered if "CLOCKWISE" in line]
-    assert len(turning) == 1 and "TOP VIEW" in turning[0]
-    tighten = next(i for i, line in enumerate(numbered) if "TIGHTEN" in line)
-    assert numbered.index(turning[0]) < tighten
-
-
-def test_every_step_and_check_is_at_most_six_lines() -> None:
-    for block in (sheet.KIT_STEPS, sheet.FITTING_STEPS, sheet.ASSEMBLY_CHECKS):
-        steps: list[list[str]] = []
-        for line in block.splitlines()[1:]:
-            if re.match(r"^(K?\d+)\. ", line):
-                steps.append([line])
-            elif steps:
-                steps[-1].append(line)
-        assert steps and all(len(step) <= 6 for step in steps)
+def test_every_step_is_at_most_three_printed_lines() -> None:
+    steps: list[list[str]] = []
+    for line in sheet.ASSEMBLY_STEPS.splitlines()[1:]:
+        if re.match(r"^\d+\. ", line):
+            steps.append([line])
+        else:
+            steps[-1].append(line)
+    assert len(steps) == len(sheet.STEPS) and all(len(step) <= 3 for step in steps)
 
 
 def test_the_sheet_states_the_engagement_value_and_the_runout_window() -> None:
     # The value only: the reviewer objected to pointing at rule 18's floor.
-    assert fixture.SCREW_ENGAGEMENT_TEXT in sheet.FITTING_STEPS
-    assert "FLOOR" not in sheet.FITTING_STEPS
-    assert "1.5D" not in sheet.FITTING_STEPS
-    assert fixture.STUB_STAND_TEXT in sheet.KIT_STEPS
-    assert fixture.STUB_RUNOUT_TEXT in sheet.ASSEMBLY_CHECKS
+    assert fixture.SCREW_ENGAGEMENT_TEXT in sheet.ASSEMBLY_STEPS
+    assert "1.5D" not in sheet.ASSEMBLY_STEPS
     low, high = (float(value) for value in fixture.STUB_RUNOUT_TEXT.split(" TO "))
     assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
-    # The first cam accepts the fixture (delegated ruling 2026-11-14).
-    assert f"5. {fixture.FIRST_CAM_CHECK_TEXT}" in sheet.ASSEMBLY_CHECKS
+    # The exception names the step that prints the engagement.
+    engage = next(
+        number
+        for number, step in enumerate(sheet.STEPS, start=1)
+        if fixture.SCREW_ENGAGEMENT_TEXT in step
+    )
+    assert engage == 13
 
 
 def test_the_short_screw_engagement_is_a_delegated_rule_18_exception() -> None:

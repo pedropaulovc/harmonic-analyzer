@@ -1259,11 +1259,11 @@ tight; for the 64T the head is tilted and there is no tail centre.
 ### Cylinder-gear cam
 
 The cam is turned last, on the fixture MHA-DT-12-TL-01. The body is gripped in the four-jaw chuck,
-its Ø3.25 OD (the register) indicated to .0005 TIR with a dial test indicator once
-(MHA-DT-12-TL-00 step K3, the TIR the throw and phase budgets below assume) and left there for
+its Ø3.25 OD (the register) indicated to .001 TIR with a dial test indicator once
+(MHA-DT-12-TL-00 step 8, the TIR the throw and phase budgets below assume) and left there for
 all 20 gears. Each gear goes on the fixture's Ø3/8 stub by its reamed bore, with the notched
 tooth space over the clock pin, is
-turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 2) and is clamped
+turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 12) and is clamped
 by the screw in the stub's end. One screw and a Ø.0375 pin hold it, and the cut is interrupted
 until the cam cleans up, so rough each cam close to size before it goes on the fixture and take
 light finishing cuts there. Check the throw with a micrometer over the cam and a Ø.376 pin in the
@@ -1272,20 +1272,21 @@ own errors, which every gear inherits alike, can be larger than what varies from
 
 | | gear to gear | fixed in the fixture | worst total | MHA-DT-12 print (gear to gear) |
 |---|--:|--:|--:|--:|
-| cam phase to the notch | .13° | .39° | .60° | ±.25° |
-| throw | .0007 in | .0023 in | .0030 in | ±.0020 in |
+| cam phase to the notch | .13° | .43° | .64° | ±.25° |
+| throw | .0007 in | .0025 in | .0032 in | ±.0020 in |
 
 Gear-to-gear scatter is inside the print. The fixed part is common to every gear: a common
-throw error scales the whole drawn curve (.7% at .0023 in) and a common phase error mixes each
-harmonic's sine into its cosine (.7% of the summed amplitudes at .39°), the same for all 20
+throw error scales the whole drawn curve (.7% at .0025 in) and a common phase error mixes each
+harmonic's sine into its cosine (.7% of the summed amplitudes at .43°), the same for all 20
 channels. MHA-DT-12's throw and phase bands are gear-to-gear and the fixture's common part is
 accepted (delegated ruling 2026-11-14, pending owner confirmation,
 [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923)).
-The first cam is the fixture's acceptance (MHA-DT-12-TL-00 check 5): its throw within MHA-DT-12's
-print before the other 19 are cut; if it fails, item 1 is re-indicated and checks 1 and 5
+The first cam is the fixture's acceptance (MHA-DT-12-TL-00 step 15): its throw within MHA-DT-12's
+print before the other 19 are cut; if it fails, item 1 is re-indicated and steps 9 and 15
 repeated, and if it still fails item 1 is reworked to MHA-DT-12-TL-01. The clamp screw's .16-.25 in
 (0.84D-1.30D) engagement, under rule 18's 1.5D floor, is accepted by the same ruling
-(MHA-DT-12-TL-00 RV-01).
+(MHA-DT-12-TL-00 RV-01). The stub and clock pin are pressed; either one that slides in by hand
+is bonded at its seat with LOCTITE 638 (steps 2 and 5).
 
 ### T006 special cutter
 

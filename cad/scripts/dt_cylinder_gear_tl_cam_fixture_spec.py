@@ -53,13 +53,13 @@ the gear's tooth form within its own bands): (b) is asserted inside the
 gear's printed band for the fixture's worst as-made state; (a) is common to
 all 20 gears and accepted, the total recorded.
 
-* Throw: (a) ``THROW_FIXED_MAX_MM`` .0023, (b) ``THROW_PER_PART_MAX_MM``
-  .0007 inside the print's gear-to-gear +/-.0020, total .0030. A common
+* Throw: (a) ``THROW_FIXED_MAX_MM`` .0025, (b) ``THROW_PER_PART_MAX_MM``
+  .0007 inside the print's gear-to-gear +/-.0020, total .0032. A common
   throw error is a uniform gain on every channel.
-* Phase: (a) ``PHASE_FIXED_WORST_DEG`` .39 deg, (b)
+* Phase: (a) ``PHASE_FIXED_WORST_DEG`` .43 deg, (b)
   ``PHASE_PER_PART_WORST_DEG`` .13 deg inside the print's gear-to-gear
-  +/-.25 deg, total ``PHASE_TOTAL_WORST_DEG`` .60 deg. Every gear seats on
-  the same flank of the pin (TL-00 step 2), so the pin stands its mean
+  +/-.25 deg, total ``PHASE_TOTAL_WORST_DEG`` .64 deg. Every gear seats on
+  the same flank of the pin (TL-00 step 12), so the pin stands its mean
   half-play (``SEATED_HALF_PLAY_DEG``, .19 deg) counter-clockwise of the
   phase and a nominal fixture's common error is nil. A common phase error
   phi0 is NOT a uniform gain: every channel draws cos(k theta + phi0), the
@@ -204,9 +204,12 @@ if STUB_RETENTION_LBF <= CLAMP_PRELOAD_LBF:
     raise AssertionError("the clamp screw can pull the stub out of the body")
 
 # --- Throw, worst case ------------------------------------------------------------
-# The DTI's .0005 division is the register's indicated runout (TIR): the
-# register axis then sits within half of it of the lathe axis.
-REGISTER_TIR = 0.0005 * INCH
+# The register's indicated runout (TIR) in the 4-jaw: .001, a setting a
+# 4-jaw reaches with a dial test indicator and no tighter than check 1 needs
+# (run 20261114T231845023Z's review: .0005 was tighter than the shop's
+# runout row). The register axis then sits within half of it of the lathe
+# axis; the throw and phase budgets below carry that offset.
+REGISTER_TIR = 0.001 * INCH
 REGISTER_OFFSET = REGISTER_TIR / 2.0
 # Fixed in the fixture, so the same on all 20 gears: the stub's station and
 # the register's indication. Per gear: the gear's bore floating on the stub.
@@ -642,22 +645,19 @@ STUB_STAND_TEXT = f"{inch_text(STUB_STAND, 2)} ±{inch_text(STUB_STAND_BAND, 2)}
 # RV-01 on MHA-DT-12-TL-00, cad/config/assemblies).
 SCREW_ENGAGEMENT_TEXT = f"{inch_text(SCREW_ENGAGEMENT_MIN_PRINTED * INCH, 2)} MIN"
 # The first cam is the fixture's acceptance: its throw within the gear's
-# print before the other 19 are cut (delegated ruling 2026-11-14). The check
-# and each action of its remedy are their own numbered checks on the sheet.
+# print before the other 19 are cut (delegated ruling 2026-11-14). The kit
+# sheet numbers it and its one-action remedy steps in its one sequence.
 FIRST_CAM_CHECK_TEXT = "THE FIRST CAM'S THROW IS WITHIN MHA-DT-12'S PRINT."
-FIRST_CAM_REMEDY_TEXT = (
-    "IF CHECK 5 FAILS, RE-INDICATE ITEM 1 PER K3 AND REPEAT CHECKS 1 AND 5.",
-    "IF IT STILL FAILS, REWORK ITEM 1 TO MHA-DT-12-TL-01.",
-    "CUT THE OTHER 19 GEARS ONLY AFTER CHECK 5 PASSES.",
-)
 # The register's set-up: item 1's OD (its sheet's Ø3.25) indicated to the
 # REGISTER_TIR the throw and phase budgets carry, with a dial test indicator.
 BODY_DIA_TEXT = inch_text(BODY_DIA, 2)
-REGISTER_TIR_TEXT = inch_text(REGISTER_TIR, 4)
-# The stub's runout with the register true: twice its station, +/- twice
-# the station band, read on the 1 in dial indicator.
+REGISTER_TIR_TEXT = inch_text(REGISTER_TIR, 3)
+# The stub's runout with the register set: twice its distance from the lathe
+# axis, so twice its station +/- twice (the station band plus the register's
+# offset), read on the 1 in dial indicator.
 STUB_RUNOUT_TIR = 2.0 * STUB_OFFSET
+_STUB_RUNOUT_BAND = 2.0 * (POSITION_BAND + REGISTER_OFFSET)
 STUB_RUNOUT_TEXT = (
-    f"{inch_text(STUB_RUNOUT_TIR - 2.0 * POSITION_BAND, 4)} TO "
-    f"{inch_text(STUB_RUNOUT_TIR + 2.0 * POSITION_BAND, 4)}"
+    f"{inch_text(STUB_RUNOUT_TIR - _STUB_RUNOUT_BAND, 4)} TO "
+    f"{inch_text(STUB_RUNOUT_TIR + _STUB_RUNOUT_BAND, 4)}"
 )

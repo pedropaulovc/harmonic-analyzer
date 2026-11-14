@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import textwrap
 from collections.abc import Callable
 from typing import Any
 
@@ -186,7 +187,6 @@ STUB_BALLOON_XY = (0.125, 0.150)
 ISO_NOTE_XY = (0.119, 0.035)
 BOM_ANCHOR = (0.219, 0.262)
 STEPS_XY = (0.219, 0.184)
-CHECKS_XY = (0.219, 0.116)
 # The view placing point: the register axis on the body's front face.
 REGISTER_FACE_MM = (0.0, 0.0, fixture.THICKNESS)
 TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
@@ -195,60 +195,82 @@ ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 # Kit-frame radii and heights the exploded view and its labels use. The top
 # view carries no dimensions: the throw and pin station are item 1's own
-# geometry, printed on its sheet, and check 1 accepts the throw by indicator
-# (run 20261113T204849556Z's review: over-specification).
+# geometry, printed on its sheet, and the stub's runout step accepts the
+# throw by indicator (run 20261113T204849556Z's review: over-specification).
 _R = fixture.BODY_DIA / 2.0
 _STUB_R = fixture.DOWEL_DIA / 2.0
 _STUB_TOP = fixture.THICKNESS + fixture.STUB_STAND
 _PIN_TOP = fixture.THICKNESS + fixture.PIN_STAND
 
-KIT_STEPS = "\n".join(
-    (
-        "KIT ASSEMBLY (ONCE)",
-        "K1. PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW,",
-        f"    TAPPED END OUT, UNTIL IT STANDS {fixture.STUB_STAND_TEXT} ABOVE THE FACE",
-        "    (CALIPER DEPTH ROD).",
-        "K2. PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
-        "K3. GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT; INDICATE ITS "
-        f"Ø{fixture.BODY_DIA_TEXT} OD",
-        f"    TO {fixture.REGISTER_TIR_TEXT} TIR WITH A DIAL TEST INDICATOR. "
-        "IT STAYS FOR ALL 20 GEARS.",
-    )
+# One numbered sequence (rule 22; the arbor kit's dt_cone_gear_tl_arbor_
+# assembly_spec): the kit's one-time presses and set-up, then the steps for
+# each gear, then the first cam's acceptance and its remedy, each check
+# straight after the work it verifies (run 20261114T231845023Z's review: a
+# separate CHECKS block was out of step with K1-K3 and fitting 1-3). Each
+# press has its slip-fit branch, bonded at the same stand (rule 23). The
+# turning direction before clamping is CUT_TURNS_GEAR_CLOCKWISE's (spec).
+BOND = "LOCTITE 638"
+_KIT: tuple[str, ...] = (
+    "PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW, TAPPED END "
+    f"OUT, TO STAND {fixture.STUB_STAND_TEXT} ABOVE THE FACE (CALIPER DEPTH ROD).",
+    f"IF ITEM 2 SLID IN BY HAND, BOND IT AT THAT STAND: {BOND}, CURE 24 H.",
+    "CHECK: ITEM 2 DOES NOT MOVE BY HAND.",
+    "PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
+    f"IF ITEM 3 SLID IN BY HAND, BOND IT AT THE FLOOR: {BOND}, CURE 24 H.",
+    "CHECK: ITEM 3 DOES NOT MOVE BY HAND.",
+    "GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT; LEAVE IT THERE FOR ALL 20 GEARS.",
+    f"INDICATE ITEM 1'S Ø{fixture.BODY_DIA_TEXT} OD TO {fixture.REGISTER_TIR_TEXT} "
+    "TIR WITH A DIAL TEST INDICATOR.",
 )
-# At most three fitting steps; the turning direction before clamping is
-# CUT_TURNS_GEAR_CLOCKWISE's (spec).
-FITTING_STEPS = "\n".join(
-    (
-        "FITTING STEPS (ONE GEAR AT A TIME, ITEM 1 SET BY K3)",
-        "1. SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1,",
-        "   ITS NOTCHED TOOTH SPACE OVER ITEM 3 (SHEET 2).",
-        "2. TURN THE GEAR CLOCKWISE IN THE TOP VIEW UNTIL THE NOTCHED",
-        "   SPACE STOPS ON ITEM 3, AND HOLD IT THERE.",
-        "3. FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2; TIGHTEN FIRMLY (5/32 KEY).",
-        f"   ITEM 5 ENGAGES ITEM 2'S THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
-    )
+INDICATE_STEP = len(_KIT)
+_KIT += (
+    f"CHECK: A 1 IN DIAL INDICATOR ON ITEM 2 READS {fixture.STUB_RUNOUT_TEXT} TIR.",
 )
-ASSEMBLY_STEPS = f"{KIT_STEPS}\n{FITTING_STEPS}"
-ASSEMBLY_CHECKS = "\n".join(
-    (
-        "CHECKS",
-        "1. WITH ITEM 1 SET BY K3, A 1 IN DIAL INDICATOR ON ITEM 2",
-        f"   READS {fixture.STUB_RUNOUT_TEXT} TIR.",
-        "2. A GEAR'S NOTCHED SPACE ENTERS ITEM 3 WITH THE GEAR FLAT ON ITEM 1.",
-        "3. ITEMS 2 AND 3 DO NOT MOVE BY HAND.",
-        "4. AFTER STEP 3 THE GEAR DOES NOT TURN BY HAND.",
-        f"5. {fixture.FIRST_CAM_CHECK_TEXT}",
-        *(
-            f"{number}. {text}"
-            for number, text in enumerate(fixture.FIRST_CAM_REMEDY_TEXT, start=6)
-        ),
-    )
+RUNOUT_STEP = len(_KIT)
+_GEAR: tuple[str, ...] = (
+    "SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1, ITS NOTCHED "
+    "TOOTH SPACE OVER ITEM 3 (SHEET 2).",
+    "CHECK: THE GEAR LIES FLAT ON ITEM 1 WITH ITEM 3 IN ITS NOTCHED SPACE.",
+    "TURN THE GEAR CLOCKWISE IN THE TOP VIEW UNTIL ITS NOTCHED SPACE STOPS ON "
+    "ITEM 3, AND HOLD IT THERE.",
+    "FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2 AND TIGHTEN FIRMLY (5/32 KEY); "
+    f"ITEM 5 ENGAGES ITEM 2'S THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
+    "CHECK: THE GEAR DOES NOT TURN BY HAND.",
 )
-if (
-    not fixture.CUT_TURNS_GEAR_CLOCKWISE
-    or "CLOCKWISE IN THE TOP VIEW" not in FITTING_STEPS
+FIRST_GEAR_STEP = len(_KIT) + 1
+FIRST_CAM_STEP = len(_KIT) + len(_GEAR) + 1
+_FIRST_CAM: tuple[str, ...] = (
+    f"CHECK: ONCE TURNED, {fixture.FIRST_CAM_CHECK_TEXT}",
+    f"IF STEP {FIRST_CAM_STEP} FAILS, RE-INDICATE ITEM 1 (STEP {INDICATE_STEP}); "
+    f"REPEAT STEPS {RUNOUT_STEP} AND {FIRST_CAM_STEP}.",
+    f"IF STEP {FIRST_CAM_STEP} STILL FAILS, REWORK ITEM 1 TO {fixture.PART_NUMBER}.",
+    f"CUT THE OTHER 19 GEARS ONLY AFTER STEP {FIRST_CAM_STEP} PASSES.",
+)
+STEPS: tuple[str, ...] = (*_KIT, *_GEAR, *_FIRST_CAM)
+# Characters a printed line: about 2.45 mm each from x .219 (run
+# 20261113T171903296Z's render), 78 ending some 8 mm inside the right border.
+STEP_WIDTH = 78
+
+
+def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
+    lines: list[str] = []
+    for number, step in enumerate(steps, start=1):
+        head = f"{number}. "
+        lines += textwrap.wrap(
+            step, STEP_WIDTH, initial_indent=head, subsequent_indent=" " * len(head)
+        )
+    return tuple(lines)
+
+
+STEPS_HEADING = (
+    f"FITTING STEPS (1-{RUNOUT_STEP} ONCE; {FIRST_GEAR_STEP}-{FIRST_CAM_STEP - 1} "
+    f"FOR EACH GEAR; {FIRST_CAM_STEP}-{len(STEPS)} ON THE FIRST CAM)"
+)
+ASSEMBLY_STEPS = "\n".join((STEPS_HEADING, *_numbered(STEPS)))
+if not fixture.CUT_TURNS_GEAR_CLOCKWISE or not any(
+    "CLOCKWISE IN THE TOP VIEW" in step for step in _GEAR
 ):
-    raise AssertionError("step 2 must turn the gear the way the cut pushes it")
+    raise AssertionError("the gear must be turned the way the cut pushes it")
 
 # --- sheet 2: the exploded view ----------------------------------------------
 # The kit's right view at 2:1 with items 1-3 seated; the phantom gear, item 4
@@ -523,7 +545,6 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
     )
     for text, xy, label in (
         (ASSEMBLY_STEPS, STEPS_XY, "steps"),
-        (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
         (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
         (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),

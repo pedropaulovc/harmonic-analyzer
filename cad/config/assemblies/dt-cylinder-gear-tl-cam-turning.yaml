@@ -20,6 +20,6 @@ drawing_unit: in
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "sheet 1, fitting step 3: ITEM 5 ENGAGES ITEM 2'S THREAD .16 MIN (item 5, the 10-32 x 5/16 SHCS MHA-DT-12-TL-VN-52, in item 2's tap, MHA-DT-12-TL-VN-50)"
+    where: "sheet 1, fitting step 13: ITEM 5 ENGAGES ITEM 2'S THREAD .16 MIN (item 5, the 10-32 x 5/16 SHCS MHA-DT-12-TL-VN-52, in item 2's tap, MHA-DT-12-TL-VN-50)"
     finding: "thread engagement .16-.25 in (0.84D-1.30D of the 10-32) is under rule 18's 1.5D floor"
-    reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation: the screw only holds a brass gear against a light finishing cut (https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923). The pull-out dowel's tap is .255 deep at least and the gear, washer and stub stand fix the screw's reach, so a longer screw bottoms in the tap; step 3 prints the least engagement as the value only. Accepts this one joint's .16-.25 (0.84D-1.30D) engagement, no other joint or value."
+    reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation: the screw only holds a brass gear against a light finishing cut (https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923). The pull-out dowel's tap is .255 deep at least and the gear, washer and stub stand fix the screw's reach, so a longer screw bottoms in the tap; step 13 prints the least engagement as the value only. Accepts this one joint's .16-.25 (0.84D-1.30D) engagement, no other joint or value."
