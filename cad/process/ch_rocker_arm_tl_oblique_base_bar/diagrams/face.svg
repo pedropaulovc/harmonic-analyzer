@@ -57,8 +57,8 @@
 
   <text x="340" y="250">fixed jaw: ZERO EDGE against it</text>
   <line x1="336" y1="246" x2="245" y2="245" stroke="#111" stroke-width="1"/>
-  <text x="340" y="276">side 2: flip end-for-end,</text>
-  <text x="340" y="294">ZERO EDGE stays at fixed jaw.</text>
-  <text x="340" y="312">After both faces: ZERO END left,</text>
-  <text x="340" y="330">ZERO EDGE back, then mark top.</text>
+  <text x="340" y="276">side 2: flip end-for-end, ZERO EDGE stays at</text>
+  <text x="340" y="294">fixed jaw. Then 1/2 in end mill: square left</text>
+  <text x="340" y="312">end (ZERO END), right end to length, mark top;</text>
+  <text x="340" y="330">mill slots S1–S2 in light depth steps.</text>
 </svg>
