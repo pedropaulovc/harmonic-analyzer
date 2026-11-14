@@ -262,6 +262,7 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     monkeypatch.setattr(wrapper._process_plans, "traveler_paths", lambda *args: (html, hobby))
     monkeypatch.setenv("UV", "uv")
     monkeypatch.setattr(wrapper, "latest_version", lambda _uv: "9.9.9")
+    monkeypatch.setattr(wrapper, "browser", lambda: "browser-under-test")
     calls = []
 
     def run(cmd, **kwargs):

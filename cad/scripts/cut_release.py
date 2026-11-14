@@ -39,7 +39,10 @@ What it does, in order:
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/`` + ``features/``). Records the SW revision.
+     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/``). Records the SW
+     revision. ``travelers/`` holds each enrolled part's hobby prechips
+     traveler printed to ``<slug>-traveler.pdf`` by its ``prechips:<stem>``
+     task; a missing one fails the cut.
      (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
@@ -102,6 +105,7 @@ from _paths import CAD_ROOT, OUT_SLDASM
 import _config
 from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
+from _process_plans import TRAVELER_STEMS, traveler_pdf_path
 from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
 from _release_drawing_diff import extract_release_pdfs, previous_published_release
 from export_models import stage_release_neutral
@@ -754,6 +758,38 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
+def stage_travelers(stage: Path) -> list[str]:
+    """Copy each enrolled part's hobby traveler PDF to ``travelers/<slug>-traveler.pdf``.
+
+    The PDF is the output of ``prechips:<stem>``. A full ``doit release`` runs
+    those tasks first, but ``doit -s release`` does not, so a missing, empty or
+    stale PDF fails the cut: stale means older than the part's
+    ``features/<stem>/features.toml``, the manifest it was rendered from (the
+    same mtime refusal ``stage_comparisons`` applies to the gallery).
+    """
+    from export_features import bundle_paths
+
+    out = CAD_ROOT / "out"
+    destination_dir = stage / "travelers"
+    staged: list[str] = []
+    for stem in TRAVELER_STEMS:
+        source = traveler_pdf_path(stem, out)
+        rerun = f"run `doit -s prechips:{stem}`"
+        if not source.is_file() or source.stat().st_size == 0:
+            raise RuntimeError(f"required traveler is missing: {source} ({rerun})")
+        manifest, _step = bundle_paths(stem, out)
+        if not manifest.is_file():
+            raise RuntimeError(f"traveler {source.name} has no feature manifest at {manifest}")
+        if source.stat().st_mtime < manifest.stat().st_mtime:
+            raise RuntimeError(
+                f"traveler is stale: {source} is older than its manifest {manifest} ({rerun})"
+            )
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination_dir / source.name)
+        staged.append(f"travelers/{source.name}")
+    return staged
+
+
 def drawing_diff(stage: Path, version: str) -> dict[str, Any]:
     """Create the required separate drawing asset before any tag or publication.
 
@@ -1100,6 +1136,7 @@ def bundle(
     # Artwork the sheets name by bundle path (e.g. the nameplate's contours),
     # beside the PDFs that name it.
     facts["artwork"] = stage_noted_artwork(stage, drawing_note_texts())
+    facts["travelers"] = stage_travelers(stage)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The
@@ -1246,6 +1283,12 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `cad/comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
+        + (
+            f"- `travelers/` -- hobby process travelers as `<slug>-traveler.pdf` "
+            f"({len(facts['travelers'])} parts), rendered by prechips\n"
+            if facts.get("travelers")
+            else ""
+        )
         + (
             f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
             f"({facts['comparisons']['pairs']} pairs"

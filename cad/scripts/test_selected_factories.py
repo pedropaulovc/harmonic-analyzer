@@ -566,7 +566,7 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
     assert str(source.resolve()) in selected[f"prechips:{stem}"].file_dep
     assert str(diagram.resolve()) in selected[f"prechips:{stem}"].file_dep
     assert [Path(target).name for target in selected[f"prechips:{stem}"].targets] == [
-        f"prechips-{stem}.ok", "traveler.html", "traveler-hobby.html",
+        f"prechips-{stem}.ok", "traveler.html", "traveler-hobby.html", "ch-rocker-arm-traveler.pdf",
     ]
     owners = dodo.canonical_target_owners()
     for target in selected[f"prechips:{stem}"].targets:
@@ -834,8 +834,9 @@ def _case_alias_scan_covers_exact_declared_target_depth(dodo, ordinary, monkeypa
         ("features.toml", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe.STEP", frozenset({"features.toml"}), frozenset({".step"})),
         ("ownership-probe-Installed.STEP", frozenset({"features.toml"}), frozenset({".step"})),
-        ("traveler.html", frozenset(), frozenset({".html"})),
-        ("traveler-hobby.html", frozenset(), frozenset({".html"})),
+        ("traveler.html", frozenset(), frozenset({".html", ".pdf"})),
+        ("traveler-hobby.html", frozenset(), frozenset({".html", ".pdf"})),
+        ("ownership-probe-traveler.pdf", frozenset(), frozenset({".html", ".pdf"})),
     ):
         scanned.clear()
         children[:] = [entry(stem / filename, alias=True)]

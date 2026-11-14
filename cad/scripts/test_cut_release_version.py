@@ -382,7 +382,6 @@ def test_release_notes_report_native_count() -> None:
 
     assert "native Pack-and-Go (137 referenced documents" in notes
     assert "99 referenced documents" not in notes
-    assert "traveler" not in notes
 
 
 def test_release_notes_count_shared_member_files_not_part_documents() -> None:
@@ -423,6 +422,9 @@ def _byte_record(path: Path, out: Path) -> dict:
 
 def _refuse_release_host_action(*_args, **_kwargs):
     raise AssertionError("release fixture reached a host-action collaborator")
+
+
+_TRAVELER_STEM = "ch_rocker_arm_tl_oblique_base_bar"
 
 
 @pytest.fixture
@@ -565,6 +567,11 @@ def feature_release(
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
+    # One enrolled traveler whose prechips task printed its hobby PDF.
+    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", (_TRAVELER_STEM,))
+    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out")
+    pdf.parent.mkdir(parents=True, exist_ok=True)
+    pdf.write_bytes(b"%PDF-1.4 hobby traveler; v38\n")
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},
@@ -703,7 +710,6 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
             "drawing-diff" in line
             for line in archive.read("SHA256SUMS.txt").decode().splitlines()
         )
-    assert "travelers" not in facts
     assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
 
 
@@ -730,17 +736,45 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     assert not stage.with_suffix(".zip").exists()
 
 
-def test_release_ships_no_travelers(feature_release: Path) -> None:
-    """Releases carry no travelers while prechips stabilises (owner ruling
-    2026-11-11, #2502), even when ``cad/out/travelers/`` holds generated sheets."""
-    sheets = feature_release / "travelers" / "ch_rocker_arm"
-    sheets.mkdir(parents=True)
+def test_release_ships_each_hobby_traveler_pdf(feature_release: Path) -> None:
+    """Each enrolled part's hobby traveler ships as ``travelers/<slug>-traveler.pdf``
+    (owner ruling 2026-11-14); the HTML sheets beside it do not ship."""
+    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out")
     for name in ("traveler.html", "traveler-hobby.html"):
-        (sheets / name).write_text("<p>MHA-CH-06; v38</p>", encoding="utf-8")
+        (pdf.parent / name).write_text("<p>MHA-CH-06-TL-20; v38</p>", encoding="utf-8")
     zip_path, facts = cut_release.bundle("v38")
-    assert "travelers" not in facts
+    shipped = "travelers/ch-rocker-arm-tl-oblique-base-bar-traveler.pdf"
+    assert facts["travelers"] == [shipped]
     with zipfile.ZipFile(zip_path) as archive:
-        assert not any(name.startswith("travelers/") for name in archive.namelist())
+        assert [
+            info.filename for info in archive.infolist()
+            if info.filename.startswith("travelers/") and not info.is_dir()
+        ] == [shipped]
+        assert archive.read(shipped) == pdf.read_bytes()
+        sums = archive.read("SHA256SUMS.txt").decode()
+    assert f"{hashlib.sha256(pdf.read_bytes()).hexdigest()}  {shipped}" in sums.splitlines()
+
+
+def test_release_refuses_a_missing_traveler(feature_release: Path) -> None:
+    cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out").unlink()
+    with pytest.raises(RuntimeError, match="required traveler is missing"):
+        cut_release.bundle("v38")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
+
+
+def test_release_refuses_a_traveler_older_than_its_manifest(feature_release: Path) -> None:
+    """``doit -s release`` renders no traveler, so a PDF left from an earlier run
+    beside a newer restored feature bundle must not ship."""
+    import export_features
+
+    out = cut_release.CAD_ROOT / "out"
+    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, out)
+    manifest, _step = export_features.bundle_paths(_TRAVELER_STEM, out)
+    newer = manifest.stat().st_mtime
+    os.utime(pdf, (newer - 60, newer - 60))
+    with pytest.raises(RuntimeError, match="traveler is stale"):
+        cut_release.bundle("v38")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
 
 
 @pytest.fixture

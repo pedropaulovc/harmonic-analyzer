@@ -22,7 +22,7 @@ Task groups (the prefix says whether SolidWorks is required):
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
-  prechips:<stem>    pro + hobby HTML travelers, latest PyPI prechips (opt-in; NO SolidWorks)
+  prechips:<stem>    pro + hobby HTML travelers + hobby PDF, latest PyPI prechips (in build + release, not build_bare; NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -4909,8 +4909,8 @@ def _prechips_task(stem: str) -> dict[str, Any]:
         # The wrapper runs the latest prechips release from PyPI (not a locked
         # dependency, #2502), so no local input pins the generator: always run.
         "uptodate": [False],
-        # A refusal must not leave a previous success's stamp beside no HTML;
-        # the wrapper removes both HTML files itself.
+        # A refusal must not leave a previous success's stamp beside no sheet;
+        # the wrapper removes the HTML and PDF itself.
         "actions": [
             (Path.unlink, [Path(targets[0])], {"missing_ok": True}),
             (_run_stamped, [cmd, label, targets[0], label]),
@@ -4921,8 +4921,10 @@ def _prechips_task(stem: str) -> dict[str, Any]:
 
 
 def task_prechips():
-    """Opt-in prechips travelers for enrolled parts (pro and hobby HTML each), rendered
-    by the latest PyPI release; ``build`` and ``release`` do not run them."""
+    """prechips travelers for enrolled parts (pro and hobby HTML, plus the hobby
+    sheet printed to ``<slug>-traveler.pdf``), rendered by the latest PyPI release.
+    ``build`` and ``release`` run every one (release ships the PDFs);
+    ``build_bare`` runs none."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
@@ -5171,9 +5173,12 @@ def task_release():
     (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
     ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
     ``check:*`` -- so a release cannot publish past a stale/failing gate or
-    package a missing/stale drawing. Releases ship no travelers while prechips
-    stabilises (owner ruling 2026-11-11, #2502); ``prechips:<stem>`` is opt-in.
+    package a missing/stale drawing. It also renders every enrolled
+    ``prechips:<stem>`` traveler, whose hobby PDF the bundle ships under
+    ``travelers/`` (owner ruling 2026-11-14).
     """
+    import _process_plans
+
     return {
         "task_dep": [
             "export",
@@ -5185,6 +5190,7 @@ def task_release():
             *(f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
+            *(f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS),
         ],
         "uptodate": [False],
         "pos_arg": "relargs",
@@ -5195,8 +5201,9 @@ def task_release():
 
 def task_build():
     """THE fully-safe entry point (also ``default_tasks``): every part + assembly
-    + every gate (SolidWorks ``verify:*``, offline ``check:*``). The opt-in
-    ``prechips:<stem>`` travelers are not part of it.
+    + every gate (SolidWorks ``verify:*``, offline ``check:*``) + every drawing,
+    and beside the drawing PDFs every enrolled ``prechips:<stem>`` traveler
+    (HTML + hobby ``<slug>-traveler.pdf``). ``build_bare`` renders none.
 
     Use ``doit -n N`` to fan out SolidWorks-free work alongside the COM stream
     (serialized by the seat lock, not a spine).
@@ -5207,8 +5214,10 @@ def task_build():
     per-seat order so two cold builders diverge and split the fleet cache.
 
     Every COM gate is farm-dispatchable: under ``--executor farm`` each cache-missing
-    gate runs on a worker. Offline checks run on the submitter.
+    gate runs on a worker. Offline checks and travelers run on the submitter.
     """
+    import _process_plans
+
     return {
         "actions": None,
         "task_dep": (
@@ -5218,6 +5227,7 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
+            + [f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS]
         ),
     }
 
@@ -5307,7 +5317,7 @@ def _canonical_targets(name: str) -> list[str]:
 
         return [
             str(REPORTS / f"prechips-{subname}.ok"),
-            *(str(path) for path in _process_plans.traveler_paths(subname, CAD_OUT)),
+            *(str(path) for path in _process_plans.traveler_outputs(subname, CAD_OUT)),
         ]
     if family == "package":
         if subname.startswith("features:"):
@@ -5530,9 +5540,9 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
     if (
         queried_namespace(traveler_root)
         or traveler_stamp
-        # Every traveler target is an .html file directly under its stem.
+        # Every traveler target is an .html or .pdf file directly under its stem.
         or _ownership_namespace_has_aliases(
-            traveler_root, filenames=frozenset(), suffixes=frozenset({".html"}),
+            traveler_root, filenames=frozenset(), suffixes=frozenset({".html", ".pdf"}),
         )
         or any(path.is_symlink() for path in REPORTS.glob("prechips-*.ok"))
     ):

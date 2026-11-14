@@ -15,7 +15,8 @@ package. It is not an HA dependency while it stabilises (owner ruling
 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)):
 it stays out of `uv.lock`, and every traveler run uses the latest PyPI release
 through uv's tool runner. It reads the plan, the shop file and the part's
-exported `features.toml`, and writes standalone HTML travelers. It needs no
+exported `features.toml`, and writes standalone HTML travelers; the traveler
+task prints the hobby sheet to `<slug>-traveler.pdf`, which releases ship. It needs no
 FreeCAD or geometry kernel and checks no hashes. HA does not rewrite, bind or
 stamp the plan; prechips reads the tracked file directly.
 
@@ -144,12 +145,16 @@ Owner rulings (Pedro), recorded for the cutover:
 
 ## Travelers
 
-`cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
+`cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
 `prechips:<stem>` task: the oblique-trammel base bar, end bracket, feed
-lever, riser, pivot block, feed block, leadscrew kit and carrier. `build` and `release` do not run it, and releases carry no travelers while
-prechips stabilises. Each run renders two travelers from the same plan:
-`traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
-setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
+lever, riser, pivot block, feed block, leadscrew kit and carrier. `build` runs
+every one beside the drawing PDFs (`build_bare` runs none); `release` runs
+every one and ships each hobby sheet as
+`travelers/<slug>-traveler.pdf` (owner ruling 2026-11-14). Each run renders two
+travelers from the same plan: `traveler.html` (`pro`, concise) and
+`traveler-hobby.html` (`hobby`, with the setup pictures in `<stem>/diagrams/`),
+then prints the hobby sheet to `<slug>-traveler.pdf` with a headless Edge or
+Chrome. A plan that prechips refuses therefore blocks the release. Under prechips 0.10.1 the base bar and
 end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
 need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
@@ -300,15 +305,18 @@ prechips release from PyPI (`@latest` makes uv revalidate its index and skip
 any `uv tool install`-ed copy), so they need `uv` and network access. The doit
 task always runs when requested.
 
-The wrapper removes any previous `traveler.html` and `traveler-hobby.html`
-under `cad/out/travelers/<stem>/`, resolves and logs the latest prechips
-version, then runs
+The wrapper removes any previous `traveler.html`, `traveler-hobby.html` and
+`<slug>-traveler.pdf` under `cad/out/travelers/<stem>/`, finds a headless Edge
+or Chrome (`HARMONIC_PDF_BROWSER` overrides), resolves and logs the latest
+prechips version, then runs
 `uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml`
-with `--profile pro` and then `--profile hobby`. Exit 0 from both is the only
-pass. Exit 1 means uv itself failed: no `uv`, no PyPI, or a render whose
-`uv tool run` failed before prechips ran (uv's `error:` or `×` diagnostic on
-stderr); it is never a finding about the plan. A nonzero prechips exit from
-either is returned and removes both files; exit 2 is
+with `--profile pro` and then `--profile hobby`, and prints the hobby sheet to
+`<slug>-traveler.pdf`. Exit 0 from both renders and a printed `%PDF-` file is
+the only pass. Exit 1 is an infrastructure failure: no `uv`, no PyPI, a render
+whose `uv tool run` failed before prechips ran (uv's `error:` or `×` diagnostic
+on stderr), no browser, or a failed print; it is never a finding about the
+plan. A nonzero prechips exit from either profile is returned and removes all
+three files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `milling_deflection`, `cutting_speeds`, `tool_sizing`,
 `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`,
