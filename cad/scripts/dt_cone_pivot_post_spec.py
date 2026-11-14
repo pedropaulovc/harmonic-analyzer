@@ -129,13 +129,15 @@ MAIN_BODY_DIA_BAND = (0.0, -0.508)  # +.00/-.02
 # purchased-stock spec owns the actual head envelope, stock-length,
 # cut-to-fit and engagement guards.  Raising the casting also raises that
 # floor, so the former 3-1/2-inch stock is no longer long enough.
-# #2697: 19/64, 3/64 over the 1/4 screw.  MHA-DT-00 turns the post on these
+# #2697: letter M (.295), .045 over the 1/4 screw; the sheet prints the drill's
+# own decimal, so the owned drill meets DRILLED HOLES +.004/0 (19/64 prints
+# .297 and cuts .2969, under it).  MHA-DT-00 turns the post on these
 # screws until the MHA-DT-37 pivot runs free in MHA-DT-39; at 9/32 that turn
 # covered the tip's print-worst lateral error with 0.13 mm to spare
 # (build_dt_drive_train_assembly's TIP_LATERAL_CAPACITY_MM), which held three
 # MHA-DT-21 stations at .XXX.  The fillister head still seats all round the
 # hole ("counterbore floor annulus" below).
-ATTACHMENT_THRU_DIA = 7.540625  # 19/64
+ATTACHMENT_THRU_DIA = 7.493  # .295, letter M
 ATTACHMENT_CBORE_DIA = 11.5062  # .453
 ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 # The mounting counterbores' Hole Wizard callout prints its diameters at
@@ -216,9 +218,9 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
-# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011), with the 19/64
+# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011), with the letter M
 # through drills of #2697 (111 752.8114 at 9/32).
-HARVESTED_VOLUME_MM3 = 111_018.3626 + math.pi * (
+HARVESTED_VOLUME_MM3 = 111_108.31256 + math.pi * (
     (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
@@ -234,8 +236,10 @@ HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 #            (cone shaft MHA-DT-04)
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
-# below), nothing else on this casting is an accuracy feature, so nothing else
-# carries a band: the title block's general grades govern.
+# below), nothing else on this casting is an accuracy feature: the title
+# block's general grades govern.  The body's diameter keeps that grade's width,
+# one-sided (MAIN_BODY_DIA_BAND, #2756); crank_boss_rim still sweeps the
+# symmetric growth, which over-books it.
 RUNNING_BORE_BAND = REAM_H7  # the crank bore
 JOURNAL_BORE_BAND = (0.0254, 0.0127)  # the cone journal bore
 

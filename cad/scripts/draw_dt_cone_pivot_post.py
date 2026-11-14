@@ -291,7 +291,7 @@ FRONT_KEEP = {
     # One row since the FLUSH rows went (machinist review: the two bands, not
     # the word, define the body and the boss faces): text centred 2.3 mm over
     # its line, as HeadDia's, keeps the line at the three-row callout's 71.6 mm.
-    "MainBodyDia": (0.150, 0.074),
+    "MainBodyDia": (0.150, 0.0753),
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),

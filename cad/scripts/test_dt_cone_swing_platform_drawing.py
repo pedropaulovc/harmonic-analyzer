@@ -1320,7 +1320,7 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
     assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.730 * 25.4)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.731 * 25.4)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 

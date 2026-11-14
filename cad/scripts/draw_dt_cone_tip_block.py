@@ -267,9 +267,9 @@ ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
 # The callout's shoulder keeps the place it was proven at when a function
 # flag stood over it ("IN LINE WITH MHA-DT-05", 55.1 x 3.6 mm from its
 # upper-left corner).  #2697: the bore's location prints .34 at .XX (the
-# post's 19/64 holes leave its turn 2.8 mm past the tip's print-worst lateral
+# post's letter M holes leave its turn 2.5 mm past the tip's print-worst lateral
 # error, build_dt_drive_train_assembly TIP_LATERAL_ERROR_MM 6.76 against
-# TIP_LATERAL_CAPACITY_MM 9.59), so it holds no tight band and needs no
+# TIP_LATERAL_CAPACITY_MM 9.24), so it holds no tight band and needs no
 # reason; machinist review of 0613bba70 read the flag as a location given in
 # words (rule 26), and it is gone.  The height is made to MHA-DT-05 (note 2).
 ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0551, 0.0)
@@ -289,10 +289,6 @@ _ADJUSTER_SHOULDER_DX = (
 ) / math.tan(ADJUSTER_LEADER_ANGLE)
 ADJUSTER_CALLOUT_DX = _ADJUSTER_SHOULDER_DX + ADJUSTER_CALLOUT_EXTENT[0]
 ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]
-# The name stands centred over the callout.
-ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
-    ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
-) / 2.0
 # The right view's north face stands ADJUSTER_VIEW_AIR past the callout's
 # right end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over
 # that face; the right view slid 5 mm then, the removed views with it.  Blind

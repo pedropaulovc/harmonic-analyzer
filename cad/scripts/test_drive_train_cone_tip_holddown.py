@@ -244,7 +244,7 @@ def test_pushed_post_only_makes_the_embed_shallower() -> None:
     """#2697: MHA-DT-00 holds MHA-DT-05 pushed toward MHA-DT-21 while it is
     turned and tightened, so its screw clearance moves the shaft north only:
     the shallow extreme carries all of it, the deep one none.  Booked both
-    ways, the 19/64 holes' clearance would bottom the screw's head."""
+    ways, the letter M holes' clearance would bottom the screw's head."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
