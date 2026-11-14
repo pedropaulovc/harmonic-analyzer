@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 import sys
 
 import pytest
@@ -75,24 +74,31 @@ def test_one_seat_fits_every_blank_inside_the_tir_share() -> None:
 
 
 def test_the_note_names_every_mate_by_its_drawing_number() -> None:
-    """Rule 4's matched pair: every keyed blank named and numbered in full in
-    note 1 (no range, no pointer to the kit sheet's list), each a setup
-    table row on the kit sheet; the key's bond named; every line inside the
-    72 characters before the title block."""
+    """Rule 4's matched pair: both mate drawings by name and full number in
+    note 1 (no range, no pointer to the kit sheet's list): the cone gear's
+    tabulated drawing, whose keyed members are every cone blank on the kit's
+    setup table, and the crank drive gear; the key's bond named; rule 7's
+    four lines, each inside the 72 characters before the title block."""
+    import dt_cone_gear_spec as cone
     import dt_cone_gear_tl_arbor_assembly_spec as kit
 
     note = " ".join(spec.SHEET_NOTES.split())
     assert "LISTED ON" not in note and " TO MHA-" not in note
+    assert (
+        "MATCHED TO THE KEYED BORES OF CONE GEAR MHA-DT-03 AND CRANK DRIVE GEAR "
+        "MHA-DT-07, CLEARANCE .0000-.0013 IN EACH BORE;"
+    ) in note
+    assert spec.CONE_NUMBER == _config.parts("dt-cone-gear")["number"] == "MHA-DT-03"
+    assert spec.CRANK_NUMBER == _config.parts("dt-crank-drive-gear")["number"]
+    assert set(cone.ROUND_BORE_TEETH).isdisjoint(cone.KEYED_TEETH)
     for blank in spec.KEYED_GEARS:
-        assert re.search(rf"(?<![\w-]){re.escape(blank.number)}(?![\w-])", note), (
-            blank.tag
-        )
+        assert blank.number.startswith(f"{spec.CONE_NUMBER}-T") or (
+            blank.number == spec.CRANK_NUMBER
+        ), blank.tag
         assert blank.number in (row[0] for row in kit.SETUP_TABLE_ROWS), blank.tag
-    assert "CONE GEARS MHA-DT-03-T030, MHA-DT-03-T036," in note
-    assert "AND CRANK DRIVE GEAR MHA-DT-07, CLEARANCE" in note
     assert f"KEY {spec.KEY_NUMBER} BONDED WITH {spec.KEY_BOND}" in note
     assert f"COAT ITEM 5 WITH {spec.KEY_BOND}." in kit.ASSEMBLY_STEPS
-    assert note.count(f"{spec.SEAT_NOTE_NUMBER}. ") == 1
+    assert len(spec.SHEET_NOTES.splitlines()) <= 4
     assert max(map(len, spec.SHEET_NOTES.splitlines())) <= 72
     # The pilot only carries the loose collars: a clearance size at the title
     # block's .XXX band, never a fit name.
