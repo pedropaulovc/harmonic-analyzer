@@ -203,6 +203,32 @@ name = "Straightedge"
 kind = "straightedge"
 present = false
 
+# Owner inventory, 2026-11-13 (Pedro): these are the only boring tools; there is
+# no milling boring head (the archived LMS 3662 was never owned).
+# https://www.msdiscounttool.com/catalog/product_info.php?products_id=110767
+[tools.boring-bars-meda-6045000]
+name = "MEDA 6045000 5 pc double-ended boring bar set, 3/8, 1/2, 5/8, 3/4, 1 in bars for tool bits"
+kind = "boring_bar_set"
+make = "MEDA (Superior Import)"
+sku = "6045000"
+present = true
+note = "Lathe bars; each has two broached tool-bit holes, 45 deg at one end and 90 deg at the other (listing read 2026-11-13)."
+
+[tools.boring-bar-s10r-sclcr3]
+name = "S10R-SCLCR3 indexable boring bar, 10 mm shank, CCMT/CCGT inserts"
+kind = "boring_bar"
+sku = "S10R-SCLCR3"
+present = true
+note = "Owner inventory 2026-11-13; lathe boring bar."
+
+# Owner inventory, 2026-11-13: the shop's only 90 deg countersinking tool. No
+# 82 deg countersink is owned.
+[tools.chamfer-mill-330ch-1-4-90]
+name = "330CH 1/4 in 90 deg included 2-flute chamfer mill, 2-1/2 in OAL"
+kind = "chamfer_mill"
+sku = "330CH"
+present = true
+
 [tools.transfer-punches]
 name = "Transfer punch set, fractional and number sizes"
 kind = "transfer_punch_set"
