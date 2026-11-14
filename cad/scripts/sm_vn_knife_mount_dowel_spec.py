@@ -11,8 +11,9 @@ block carries only slip bands).  Owner ruling 2026-11-08 (Pedro), #2144
 item 11.3 (scheme S1): one dowel and the #10-24 knife-hanger hex bolt
 (MHA-SM-VN-52) hang each block; the bolt clamps the seat to the casting
 underside, the pin locates it, and the block's yaw about the pin is set at
-MHA-SM-00 by a Ø.4720 gauge bar slid through both mounts' bores while the
-bolts are tightened.
+MHA-SM-00: the front block's by a Ø.4720 gauge bar slid through both
+mounts' bores while its bolt is tightened (step 5), the rear block's by the
+rock gauge (6G) before its bolt is tightened (6H).
 
 Catalogue: 1/8 x 3/4 alloy-steel dowel, Round x Chamfer ends, diameter
 +0.0001/+0.0003 in, Rockwell C47 min, ASME B18.8.2; the size row, the end
@@ -96,8 +97,9 @@ _XXX = printed_band_mm(3, unit=_FRAME_UNIT)
 # the ream's station .XXX from its screw axis (HANGER_OFFSET_TOL).  Owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the -X pin, its
 # crossbar ream and the block's slot (datum C) are deleted; the block turns
-# about its one pin until the MHA-SM-00 gauge bar, slid through both
-# mounts' bores, sets its yaw (``build_sm_summing_assembly``).
+# about its one pin until its yaw is set at MHA-SM-00: the front block's by
+# the gauge bar slid through both mounts' bores (step 5), the rear block's
+# by the rock gauge (6G) (``build_sm_summing_assembly``).
 PER_MOUNT = 1
 MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS

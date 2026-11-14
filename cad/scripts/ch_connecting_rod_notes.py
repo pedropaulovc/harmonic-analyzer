@@ -16,7 +16,7 @@ from __future__ import annotations
 # each tight band names its mate at its own callout or through a flag note
 # that callout links (drawing-guidelines.md rules 4 and 7). The tines' known
 # shortfall against the .080 wall target is the near tine's own printed lower
-# limit, named TINE WALL on its callout (rule 20). The material (1018 plate),
+# limit, named TINE WALL on its callout (rule 20). The material (1018 CF flat),
 # the black finish and the inside corners' R.040 MAX are title-block rows,
 # never restated here (rule 2).
 #

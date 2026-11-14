@@ -25,7 +25,9 @@ boss-hook / counter-spring / gooseneck chain.
   ruling 2026-10-24, T+H3); the knife mount's blind round hole slips onto
   it.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the
   block may turn about its one dowel; a Ø.4720 gauge bar through both
-  mounts' bores sets the yaw at MHA-SM-00 before the screws are tightened.
+  mounts' bores sets the front mount's yaw at MHA-SM-00 before its screw is
+  tightened (step 5); the rock gauge sets the rear mount's (6G) before its
+  screw is tightened (6H).
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -212,8 +214,9 @@ KNIFE_DOWEL_X_OFFSETS = (knife_mount.PIN_HOLE_X,)
 # station sits at its limit.  Owner ruling 2026-11-08 (Pedro), #2144 item
 # 11.3 (scheme S1): one dowel (pressed into the crossbar, slipping into
 # the block's round hole B) and the bolt hang each block, which so fits one
-# way round only; the block may turn about its dowel, and the MHA-SM-00
-# gauge bar sets that turn.
+# way round only; the block may turn about its dowel, and at MHA-SM-00 the
+# gauge bar sets the front block's turn (step 5), the rock gauge the rear's
+# (6G).
 # Along the dowel line (X): the ream's .XXX station from the screw axis
 # (0.127), the tap's ⌖Ø.005|A|B|C zone radius (0.064; owner ruling
 # 2026-11-10 (Pedro), #2334 option B1, S1: the tap is cut on the part, not

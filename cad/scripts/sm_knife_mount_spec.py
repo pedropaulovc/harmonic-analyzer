@@ -32,10 +32,12 @@ dowel presses into the MHA-FR-02 crossbar, knocked out from its faced top,
 and slips into this block's round hole (datum B).  Owner ruling 2026-11-08
 (Pedro), #2144 item 11.3 (scheme S1): one dowel and the screw hang the
 block; datum C, its slot open to the -X face and every slot control are
-deleted, and the block's yaw about the dowel is set at MHA-SM-00 by a
-Ø.4720 gauge bar slid through both mounts' bores while the screws are
-tightened.  Owner ruling 2026-11-10 (Pedro), #2334 option B1 with S1 and
-S2, superseding the 2026-11-08 SM-02 harden-less ruling (O1 drawn back to
+deleted, and the block's yaw about the dowel is set at MHA-SM-00: the front
+mount's by a Ø.4720 gauge bar slid through both mounts' bores while its
+screw is tightened (step 5), the rear mount's by the rock gauge (6G) before
+its screw is tightened (6H).  Owner ruling 2026-11-10 (Pedro), #2334
+option B1 with S1 and S2, superseding the 2026-11-08 SM-02 harden-less
+ruling (O1 drawn back to
 40-45 HRC, fit sizes cut after hardening): the block is cut complete from
 AISI 4140/4142 HT bar as supplied, 28-32 HRC, with no heat treatment in the
 shop, so every printed band is cut once, in its final condition, with HSS;
@@ -121,11 +123,15 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # --- Knife-mount gauge bar (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3) --
 # A tool, not a BOM part: with each MHA-SM-02 hung on its one MHA-SM-VN-53
 # dowel and its bolt finger-tight, a gauge bar slides through BOTH mounts'
-# bores; the bolts are tightened and the bar must slide back out.  It sets
-# the front mount's yaw about its dowel (and proves both mounts' pitch); the
-# rear mount is then re-hung on the lever's stub and swung until the rock
-# gauge passes (this fit-up order owner-confirmed 2026-11-08 (Pedro), #2144
-# item 11.3; ``build_sm_summing_assembly`` budgets both).  Owner ruling
+# bores; the front mount's bolt is tightened and the bar must slide back
+# out.  It sets the front mount's yaw about its dowel (and proves both
+# mounts' pitch); the rear mount, its bolt left finger-tight through step 5,
+# is then taken off, slid onto the lever's stub, re-hung and swung until the
+# rock gauge passes (6G) before its bolt is tightened (6H) (this fit-up order
+# owner-confirmed 2026-11-08 (Pedro), #2144 item 11.3; rear bolt tightened
+# at 6H, not 5: Delegated ruling 2026-11-11 (SmGauge2400), no precedent;
+# owner review #2144, #2400; ``build_sm_summing_assembly`` budgets both).
+# Owner ruling
 # 2026-11-10 (Pedro), #2334, S2: a 2 in class ZZ pin cannot reach both
 # mounts, whose outer faces stand 7.67 apart, so the tool is an 8.0 in bar.
 # A bar that long has no gauge class, so it is made to the measured bores
@@ -171,8 +177,10 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # separate ∥.002|A holds its axis parallel to the top seat (its pitch).  A|B
 # leaves the bore's yaw about B free: the part no longer sets it.  At
 # MHA-SM-00 a Ø.4720 gauge bar slid through both mounts' bores with the
-# screws finger-tight sets the yaw before they are tightened, and must slide
-# out after (``build_sm_summing_assembly``'s rock budget charges the bar's
+# screws finger-tight sets the front mount's yaw before its screw is
+# tightened, and must slide out after; the rear mount's yaw is set by the
+# rock gauge (6G) before its screw is tightened (6H)
+# (``build_sm_summing_assembly``'s rock budget charges the bar's
 # clearance, not this frame; pitch does not enter the lateral rock model).
 # The former composite ⌖ to A|B|C (owner ruling 2026-10-27, #2016) went
 # with the slot; the bore is now itself datum C, the tap's clocking datum
