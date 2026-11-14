@@ -363,8 +363,11 @@ TAG_XY_MM: dict[str, tuple[float, float]] = {
     "R4": (303.0, BLANK_WIDTH + 12.0),
     "P1": (10.0, -12.0),
     "CL": (34.0, -12.0),
-    "CR": (BLANK_LENGTH - 34.0, -12.0),
-    "P2": (BLANK_LENGTH - 10.0, -12.0),
+    # P2 12 mm (sheet) in from the right end, CR a tag's pitch left of it:
+    # at 5 mm P2's text ran into the 13.80 overall's right extension line
+    # (dfm-2340 r14: 2/3 runs).
+    "CR": (BLANK_LENGTH - 42.0, -12.0),
+    "P2": (BLANK_LENGTH - 24.0, -12.0),
 }
 if set(TAG_XY_MM) != set(TABLE_HOLES):
     raise AssertionError("every riser table tag needs a position")
