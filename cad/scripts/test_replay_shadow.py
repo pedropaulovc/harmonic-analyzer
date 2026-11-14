@@ -686,6 +686,37 @@ def test_a_sidecar_is_served_only_as_published(blob, spans):
     assert cache.fetch_sidecar(name) is None
 
 
+def test_a_sidecar_past_one_request_is_staged_and_still_create_only(blob, monkeypatch):
+    # #2750: the top-assembly drawing's recording, 115 MB, was past the one
+    # request a sidecar went in, and so never stored.
+    bound = cache._SIDECAR_MAX
+    monkeypatch.setattr(cache, "_SINGLE_PUT_MAX", 8)
+    monkeypatch.setattr(cache, "_BLOCK_SIZE", 4)
+    prefix = shadow.blob_prefix(_ENGINE, _STEM)
+    name, data = f"{prefix}{'a' * 64}.json", b"0123456789abcdefghij"
+    assert cache.publish_sidecar(name, data) == "stored"
+    assert [len(block) for _, block in blob.committed[_blob_of(name)]] == [4] * 5
+    assert cache.fetch_sidecar(name) == data
+    # Another writer's blocks commit only while the name is missing: the
+    # first writer's bytes stand.
+    assert cache.publish_sidecar(name, data[::-1]) == "exists"
+    assert cache.fetch_sidecar(name) == data
+    # Past the bound, nothing is sent.
+    monkeypatch.setattr(cache, "_SIDECAR_MAX", len(data) - 1)
+    other = f"{prefix}{'b' * 64}.json"
+    assert cache.publish_sidecar(other, data) == "error"
+    assert _blob_of(other) not in blob.committed
+    # The real bound holds the top-assembly drawing's recording (sent to a
+    # backend that only takes its size).
+    monkeypatch.setattr(cache, "_SIDECAR_MAX", bound)
+    sent: list[int] = []
+    monkeypatch.setattr(
+        cache._BlobBackend, "put_sidecar", lambda _, __, data: sent.append(len(data))
+    )
+    assert cache.publish_sidecar(other, bytes(115_333_120)) == "stored"
+    assert sent == [115_333_120]
+
+
 def test_an_epoch_bump_lists_and_fetches_no_older_sidecar(blob, logged, monkeypatch):
     prefix = shadow.blob_prefix(_ENGINE, _STEM)
     name = f"{prefix}{'a' * 64}.json"
@@ -867,6 +898,42 @@ def test_the_lookup_lists_every_name_before_it_takes_the_newest(blob):
     found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=1)
     assert (found.listed, found.read) == (1001, 1)
     assert found.base is not None and found.base.manifest["recording_id"] == "newest"
+
+
+def test_a_dependents_lookup_reads_its_children_group_and_the_ungrouped(blob):
+    # 2026-11-14, assembly-ha_harmonic_analyzer: 35 manifests listed, the 16
+    # newest read, none of them made on its children.
+    prefix = shadow.blob_prefix(_ENGINE, _STEM)
+    ours = shadow.children_group({_CHILD: "a" * 64})
+    theirs = shadow.children_group({_CHILD: "b" * 64})
+    assert len({ours, theirs}) == 2
+    # The children themselves, in whatever order they were named.
+    pair = {_CHILD: "a" * 64, "cad/out/sldprt/.sh-pin.execution": "c" * 64}
+    assert shadow.children_group(pair) == shadow.children_group(
+        dict(reversed(pair.items()))
+    )
+
+    def publish(index: int, group: str | None, inputs: dict[str, str]) -> None:
+        _, name = shadow.blob_names(_ENGINE, _STEM, f"{index:064x}", group)
+        record = json.dumps(_manifest(inputs, f"{group}-{index}")).encode()
+        assert cache.publish_sidecar(name, record) == "stored"
+
+    publish(0, None, {"a": "now"})  # published before groups: oldest
+    publish(1, ours, {"a": "old"})
+    for index in range(2, 42):  # newer, every one made on other children
+        publish(index, theirs, {"a": "now"})
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=2, group=ours)
+    assert (found.listed, found.other_groups, found.read) == (42, 40, 2)
+    assert found.base is not None and found.base.manifest["recording_id"] == "None-0"
+    read = [call[1] for call in blob.calls if call[0] == "download"]
+    assert len(read) == 2 and not [name for name in read if f"/{theirs}/" in name]
+    # Ungrouped, every manifest is the listing's: the newest are another
+    # group's.
+    found = shadow.find_base(prefix, {"a": "now"}, None, _SALT, limit=2)
+    assert (found.listed, found.other_groups, found.read) == (42, 0, 2)
+    assert found.base is not None and found.base.manifest["recording_id"] == (
+        f"{theirs}-41"
+    )
 
 
 def test_the_lookup_gives_up_past_its_budget(blob):
@@ -3952,7 +4019,9 @@ def test_a_drawing_is_judged_against_the_nearest_base_on_its_children(
     assert " | split=noop same_children=1/1 " in line and " | record=+" in line
     assert " | truth=same | outcome=same cause=- | " in line and "\n" not in line
     engine = json.loads(second.summary_path.read_text("utf-8"))["engine"]
-    _, manifest_name = shadow.blob_names(engine, second.name, second.key)
+    # Published under its children's group, which its lookups list.
+    group = shadow.children_group(second.children)
+    _, manifest_name = shadow.blob_names(engine, second.name, second.key, group)
     published = json.loads(cache.fetch_sidecar(manifest_name))
     assert (published["kind"], published["argv"]) == ("drawing", [_STEM])
     assert published["children"] == {cache._rel(token): "a" * 64}
@@ -3970,13 +4039,17 @@ def test_a_drawing_is_judged_against_the_nearest_base_on_its_children(
     assert "pdf:different" in record["outcome_signals"]
     assert (record["candidates"], record["same_children"]) == (2, 2)
     assert record["base_key"] == second.key and not record["seat_nondeterminism"]
-    # Another model: no earlier recording was made on it.
+    # Another model: no earlier recording was made on it, each listed under
+    # another children group and so never read (the one read is its own,
+    # just published, which is no candidate).
     _, record = build(120, "b", "c" * 64)
-    assert (record["split"], record["candidates"], record["same_children"]) == (
-        "children_changed",
-        3,
-        0,
-    )
+    assert (
+        record["split"],
+        record["candidates"],
+        record["same_children"],
+        record["other_children"],
+        record["read"],
+    ) == ("children_changed", 0, 0, 3, 1)
     assert "base_key" not in record and record["outcome"] == "evaluated"
     assert [s["replay.split"] for s in spans.named("replay.split ")] == [
         "noop",

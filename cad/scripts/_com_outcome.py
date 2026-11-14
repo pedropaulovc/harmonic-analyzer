@@ -193,7 +193,7 @@ _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
 # read), the errors and every other warning bit stay exact.
 _IGNORED_WARNINGS = {"ISldWorks.OpenDoc6": 32}
 # The read that checks an opened document's rebuild state, and the methods a
-# script may call on the document before it (:func:`_rebuild_checked`), reads
+# script may call before it, on any object (:func:`_rebuild_checked`), reads
 # both in the API reference: ``GetTitle`` "Gets the title of the document";
 # ``GetActiveConfiguration`` is superseded by the property
 # ``IConfigurationManager.ActiveConfiguration``.
@@ -869,10 +869,12 @@ def _unwarned(call: conv.Call) -> conv.Call:
 def _rebuild_checked(calls: Sequence[conv.Call], index: int) -> conv.Call | None:
     """The :data:`_REBUILD_CHECK` read of the document the call at ``index``
     opened: the first call on that document, or on anything a call on it
-    answered (its wrappers, its Extension), to be that read, every call on
-    them before it a read (:data:`_READ_KINDS`, :data:`_DOCUMENT_READS`).
-    ``None`` when a call that may act on the document comes first, or there
-    is no such read."""
+    answered (its wrappers, its Extension), to be that read, every call
+    before it, on any object, a read (:data:`_READ_KINDS`,
+    :data:`_DOCUMENT_READS`), and the read answered: a count, nothing raised.
+    ``None`` when a call that may act comes first, by whatever route (the
+    application activating a document, a second handle on the document from
+    ``ActiveDoc``), the read raised, or there is no such read."""
     answer = calls[index].result
     out = answer.get("t") if isinstance(answer, dict) else None
     if not isinstance(out, list) or not out or not _is_handle(out[0]):
@@ -880,13 +882,14 @@ def _rebuild_checked(calls: Sequence[conv.Call], index: int) -> conv.Call | None
     opened = {out[0]["h"]}
     for later in range(index + 1, len(calls)):
         call = calls[later]
-        if call.handle not in opened:
-            continue
-        if call.site == _REBUILD_CHECK:
+        if call.handle in opened and call.site == _REBUILD_CHECK:
+            if call.raised is not None or type(call.result) is not int:
+                return None
             return call
         if call.kind not in _READ_KINDS and call.site not in _DOCUMENT_READS:
             return None
-        opened.update(_handles([call.result, call.outs]))
+        if call.handle in opened:
+            opened.update(_handles([call.result, call.outs]))
     return None
 
 

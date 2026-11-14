@@ -3239,12 +3239,14 @@ recording could be judged against, and the farm always builds FULL. A
 `POST_ASSEMBLY` hook (none today) would run after the recorded window. The
 recording lives in `cad/out/replay/<kind>-<stem>/` and is published under
 `com-replay/<engine 16>/<kind>-<stem>/` (stems hold no `-`, so a drawing never
-shares its part's recordings); the engine is unchanged, so part recordings and
-part reuse are untouched. An assembly's bundle also carries `outputs/`: the
-files Python writes beside it that the outcome compares (every assembly cache
-output but the models, the renders and the input ledger: `.massprops.sha`,
-`.dof.json`, the jig's `.sweep.json`, the top assembly's BOM), copied when the
-driver exits 0, before a lost store could adopt the winner's.
+shares its part's recordings), its manifest under
+`manifest/<children group>/<key>.json` (below); the engine is unchanged, so
+part recordings and part reuse are untouched. An assembly's bundle also
+carries `outputs/`: the files Python writes beside it that the outcome
+compares (every assembly cache output but the models, the renders and the
+input ledger: `.massprops.sha`, `.dof.json`, the jig's `.sweep.json`, the top
+assembly's BOM), copied when the driver exits 0, before a lost store could
+adopt the winner's.
 
 **Children.** `dodo._child_identities` names every model the build opens, by
 the SHA-256 in its `.execution` token: an assembly's references, transitively
@@ -3258,10 +3260,17 @@ the INFO line's `children_unreadable` marker carry it, so a worker that lacks
 a token is told from one that cannot read it.
 
 **Judgement** (`_replay_shadow._judge_dependent`, after the store, off the
-seat). Nothing is replayed. The lookup reads at most 16 manifests of the stem,
-newest first, within 3 s. A candidate is another recording of the same kind
-under the same cache salt; the base is the nearest candidate (fewest differing
-key inputs, then newest) made on exactly the same children. The fresh
+seat). Nothing is replayed. A base must have been made on exactly the same
+children, so a manifest is published under its children's group
+(`_replay_shadow.children_group`: the 16-hex SHA-256 of the `children` map)
+and the lookup lists every manifest of the stem but reads only its own
+group's and the ungrouped ones published before groups, at most 64, newest
+first, within 10 s (`DEPENDENT_MANIFESTS`, `DEPENDENT_LOOKUP_SECONDS`); other
+groups' are skipped unread (`other_children`). Reading the 16 newest of all,
+2026-11-14's `assembly-ha_harmonic_analyzer` lookup listed 35 and found none
+on its children. A candidate is another recording of the same kind under the
+same cache salt; the base is the nearest candidate (fewest differing key
+inputs, then newest) made on exactly the same children. The fresh
 recording, the ground truth of what the current source asked, is then diffed
 against the base's (`com_replay.py diff --kind <kind>`):
 
@@ -3269,13 +3278,14 @@ against the base's (`com_replay.py diff --kind <kind>`):
 | --- | --- |
 | `noop` | same children, the base's exact requests (with component arrays bound by name, `name_bound`), or the same requests but for the title counters the script echoed (`title_echo`): the own-closure change was a no-op for SolidWorks |
 | `diverged` | same children, other requests; `truth_cause` says what preceded the first difference: `request` (the source asked something else) or `response:<member>` (SolidWorks answered differently first; `seat_nondeterminism` when it also made the same model, `seat_path_divergence` when the requests differ only by detours of reads and selections on the same geometry) |
-| `children_changed` | candidates were read, none made on these children: not comparable |
+| `children_changed` | candidates were read, or listed under other children groups, none made on these children: not comparable |
 | `children_unknown` | a child's token held no SHA-256 (`children_unreadable` names which and why) |
 | `oversize`, `timeout`, `unavailable`, `error` | no judgement: a log past 500,000 calls, the 60 s comparison budget, the base bundle, the diff |
 
-No candidate at all (or the lookup's budget spent) is the record outcome
-`no_base`. The outcome is judged per kind (`_com_outcome.SIGNALS`): an
-assembly on `mass`, `requests`, `answers` and `sidecars` (byte for byte); a
+No candidate at all, read or listed under another group (or the lookup's
+budget spent), is the record outcome `no_base`. The outcome is judged per kind
+(`_com_outcome.SIGNALS`): an assembly on `mass`, `requests`, `answers` and
+`sidecars` (byte for byte); a
 drawing on `requests`, `answers` and `pdf`, the ink of every PDF SolidWorks
 wrote (text runs and path pieces per page, coordinates to 1 um), never its
 bytes, which carry the export's date. Nothing of these kinds is reused, so a
@@ -3320,12 +3330,15 @@ requests still the base's throughout:
 - `swFileLoadWarning_NeedsRegen` (32) in `ISldWorks.OpenDoc6`'s warnings
   (`_com_outcome._IGNORED_WARNINGS`, here and in the `answers` signal below),
   only where the script then reads the opened document's
-  `IModelDocExtension.NeedsRebuild2` through its Extension, with no call that
-  may act on the document before it (`_com_outcome._rebuild_checked`), and
-  both builds read the same state. Reopening the assembly the script just
-  saved, 30 of 33 recordings (2026-11-13..14) read 32 and 3 read 0, two seats
-  that had read 32 before, while that read, compared exactly, was 1 in all
-  33. `dt_drive_train` built twice under one key differed in that bit alone.
+  `IModelDocExtension.NeedsRebuild2` through its Extension, every call before
+  it, on any object, a read (so neither the document nor the application
+  activating it, nor a second handle on it from `ActiveDoc`, may act first:
+  `_com_outcome._rebuild_checked`), that read answered a count and raised
+  nothing, and both builds read the same state. Reopening the assembly the
+  script just saved, 30 of 33 recordings (2026-11-13..14) read 32 and 3 read
+  0, two seats that had read 32 before, while that read, compared exactly, was
+  1 in all 33. `dt_drive_train` built twice under one key differed in that bit
+  alone.
   Any other open (a drawing's of the model it shows), the errors and every
   other warning bit stay exact;
 - a read of an object an enumeration listed (the outermost handle array it
@@ -3468,7 +3481,13 @@ upper bound). Their counts size a second engine identity for these kinds.
 characters to spare (`test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit`);
 an assembly's or drawing's bundle whose files exceed 512 MiB on disk
 (`bundle_size`) is never built in memory, published or kept
-(`publish=oversize`). On 788 recorded
+(`publish=oversize`). Below that, the cache stores any sidecar: past the
+64 MiB one request takes, as 4 MiB blocks under writer-unique IDs committed
+only while the name is still missing, like an archive
+(`_artifact_cache._BlobBackend.put_sidecar`). The top-assembly drawing's
+recording, 115,333,120 bytes, was refused at 64 MiB until then (#2750); a
+bundle does not compress, its log and captures being gzip already (the three
+largest stored, 28.7 to 44.6 MB, deflate by under 0.4%). On 788 recorded
 part builds (2026-11-12) the recorder cost 1.8% of the window at p50 and 2.8%
 at p95, at 101 recipe requests per window second (p95 156) and 176 bundle
 bytes per request (p95 680); the diff took about 3 s plus 0.5 ms per request.
