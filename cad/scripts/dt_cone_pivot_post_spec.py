@@ -113,6 +113,11 @@ BORE_DIA = 12.2682  # .483 in
 # the body's Ø: the Ø1.65 body (dt_cone_post_envelope.BLOCK_DIA) sits on the
 # .XX grid, so each boss end stands ~.002 proud of the body's tangent line.
 CONE_BOSS_LENGTH = 42.011
+# #2756 (machinist review of #2725, run 20261114T024302494Z): at the title
+# block's +/-.01 the body's upper limit (radius .830) swallowed the boss ends
+# (.825 at their least).  The body's band is one-sided, down from the envelope
+# diameter the platform is laid out on, so no boss end ever lies inside it.
+MAIN_BODY_DIA_BAND = (0.0, -0.508)  # +.00/-.02
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
@@ -172,6 +177,15 @@ _CONE_BOSS_HALF_BAND = printed_band_mm(3, unit=UNIT) / 2.0  # ConeBossLen .XXX
 CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
     math.floor(_CONE_BOSS_HALF_BAND / MM_PER_IN * 1000.0 + 1e-9) / 1000.0 * MM_PER_IN
 )  # +/-.002
+# At the printed values the body's largest radius (.825) meets the boss ends'
+# least station (.827 - .002): flush on the post's axial line at worst, and the
+# boss still stands off the round everywhere else round its rim.
+BODY_RADIUS_MAX_IN = round((post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[0]) / 2.0 / MM_PER_IN, 3)
+CONE_BOSS_END_MIN_IN = round(
+    (CONE_BOSS_NORTH_STATION - CONE_BOSS_NORTH_STATION_TOLERANCE_MM) / MM_PER_IN, 3
+)
+if BODY_RADIUS_MAX_IN > CONE_BOSS_END_MIN_IN:
+    raise AssertionError("the body's largest radius swallows a cone boss end")
 if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
     raise AssertionError(
         "north cone-boss face station band exceeds the stacks' half band"
@@ -303,7 +317,7 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": _printed_limits(post_envelope.BLOCK_DIA, 2)[0] / 2.0
+    "body foot OD": (post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[1]) / 2.0
     - _printed_limits(ATTACHMENT_X, 2)[1]
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN
