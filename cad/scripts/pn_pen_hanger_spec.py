@@ -346,16 +346,24 @@ if SCREW_HOLE_WALL_MIN < WALL_TARGET_MM:
         f"hanger screw hole wall {SCREW_HOLE_WALL_MIN:.3f} at the printed worst "
         f"case (< {WALL_TARGET_MM})"
     )
-# Every tight band names its mate on the dimension it governs.
+# Every tight band names its mate on the dimension it governs.  The two
+# numbered notes are flagged from the features they govern (rule 7: SEE NOTE
+# n puts the note at the callout): note 1, the plates' braze to the strap
+# front, from the lower plate's stock callout in the front view (a location
+# dimension carries only its value and band, so the upper plate's drop takes
+# no flag; #2721 review 20261113T172037696Z); note 2, the slots in line, from
+# the slot width.  Rule 7: at most two lines of words under the slot's limits.
+BRAZE_NOTE = 1
+SLOTS_NOTE = 2
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",
+    "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
     # The strap's and the plates' thickness is the sheet's as supplied, not a
     # machined size: printed as a reference (parenthesised) with the gauge
     # named under it.
     "StrapThick": "11 GA SHEET",
-    "PlateThick": "12 GA SHEET",
+    "PlateThick": f"12 GA SHEET\nSEE NOTE {BRAZE_NOTE}",
 }
 # Model dimensions the sheet parenthesises as reference (the stock governs).
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
@@ -367,9 +375,9 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. TWO GUIDE PLATES ALIKE, BRAZED (BAg-7) TO STRAP FRONT;",
+        f"{BRAZE_NOTE}. TWO GUIDE PLATES ALIKE, BRAZED (BAg-7) TO STRAP FRONT;",
         "   LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS.",
-        f"2. SLOTS IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES FREELY",
+        f"{SLOTS_NOTE}. SLOTS IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES FREELY",
         "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )

@@ -245,12 +245,14 @@ FRONT_KEEP = {
     # (20261014T024823419Z: keep 4 under the foot put the block at
     # y 0.0554..0.0661, x 0.0232..0.0507, its "(1.5)" struck by the StrapRise
     # foot extension line at y 0.065 and the 170.0 arrowhead).  Keep 9 under
-    # the foot drops the ~10.7 mm block to about y 0.050..0.061: its top
-    # ~4 mm under that extension line and the 170.0 arrowhead, its shelf
-    # ~2 mm under the StrapBotWidth row (y 0.0522), whose line starts at
-    # x 0.058, ~7 mm right of the block.  The line stays 12 mm left of the
-    # plate edge; its downward tail to the shelf crosses no other line.
-    "PlateThick": (_fx(_X[1]) - 0.012, _fy(STRAP_BOT_Y) - 0.009),
+    # the foot dropped the ~10.7 mm two-row block to about y 0.050..0.061:
+    # its top ~4 mm under that extension line and the 170.0 arrowhead.  The
+    # third row (SEE NOTE 1, ~5 mm) moves the keep 2.7 mm lower so that top
+    # stays put, the shelf now ~5 mm under the StrapBotWidth row (y 0.0522),
+    # whose line starts at x 0.058, ~7 mm right of the block.  The line stays
+    # 12 mm left of the plate edge; its downward tail to the shelf crosses no
+    # other line.
+    "PlateThick": (_fx(_X[1]) - 0.012, _fy(STRAP_BOT_Y) - 0.0117),
     "StrapBotWidth": (_fx(0.0), _fy(STRAP_BOT_Y) - 0.010),
     "StrapTaperDx": (
         _fx((STRAP_TOP_X[0] + STRAP_BOT_X[0]) / 2.0),
@@ -310,12 +312,14 @@ SECTION_KEEP = {
     # plate's -x edge.
     "SlotCornerR": (_ax(-_HALF_PLATE) + 0.019, _az(SLOT_BOTTOM_Z) + 0.012),
 }
-# The slot width's offset text block (value, band and two callout rows,
-# about 49 x 15 mm, positioned by its centre): its left end 4 mm right of
-# the section's rightmost ink (the strap end), centred just below the slot
-# row so the leader runs nearly level to the dimension line, crossing only
-# the plate's -x extension line.
-_SLOT_TEXT_HALF_WIDTH = 0.0245
+# The slot width's offset text block (value, band and two callout rows --
+# the fit on its mate and SEE NOTE 2 -- about 75 x 16 mm, its 27-character
+# fit row ~2.76 mm a character as the 17-character rows measured 47 mm on
+# run 20261113T084036645Z's sheet; positioned by its centre): its left end
+# 4 mm right of the section's rightmost ink (the strap end), centred just
+# below the slot row so the leader runs nearly level to the dimension line,
+# crossing only the plate's -x extension line.
+_SLOT_TEXT_HALF_WIDTH = 0.0375
 SLOT_WIDTH_TEXT_XY = (
     _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
     SECTION_ROW_Y["SlotWidth"] - 0.004,

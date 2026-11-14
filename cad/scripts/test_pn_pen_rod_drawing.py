@@ -407,6 +407,40 @@ def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
     )
 
 
+def test_stud_tap_drill_leaves_a_plug_tap_lead_at_the_printed_bands() -> None:
+    """#1609: the shallowest printed drill clears the deepest printed full
+    thread by a plug tap's four chamfered threads plus a pitch."""
+    from _printed_tolerance import printed_band_mm
+
+    band = printed_band_mm(spec.STUD_TAP_DEPTH_PLACES, unit=spec.UNIT)
+    drill_min = spec.STUD_TAP_SPEC.depth_mm - band
+    thread_max = spec.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] + band
+    assert drill_min - thread_max == pytest.approx(spec.STUD_TAP_LEAD_ROOM_MIN)
+    assert drill_min - thread_max >= 5.0 * 25.4 / 80.0
+    # Every depth sits on its printed .XX grid.
+    for depth in (
+        spec.STUD_TAP_SPEC.depth_mm,
+        spec.STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
+    ):
+        assert depth / 25.4 == pytest.approx(round(depth / 25.4, 2), abs=1e-9)
+
+
+def test_square_is_bought_key_stock_inside_the_printed_band() -> None:
+    """#2438: the square stays as the key stock supplies it, so its whole
+    catalogue section lies inside the printed SQ band, one bar yields the rod,
+    and the title-block finish says the square takes no cut."""
+    import _config
+
+    low, high = spec.STOCK_SECTION_MIN, spec.STOCK_SECTION_MAX
+    assert spec.ROD_SECTION + spec.SECTION_BAND[1] <= low <= high
+    assert high <= spec.ROD_SECTION + spec.SECTION_BAND[0]
+    assert spec.TOTAL_LENGTH < spec.STOCK_LENGTH_MIN
+    row = _config.parts("pn-pen-rod")
+    assert spec.STOCK_SKU in str(row["material_specification"])
+    assert "square as supplied" in str(row["finish"]).lower()
+    assert "AS SUPPLIED" not in spec.DRAWING_NOTES
+
+
 def test_overall_length_is_one_parenthesised_reference() -> None:
     """Rule 10: the end-to-end length prints once, as a reference."""
     assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.414
