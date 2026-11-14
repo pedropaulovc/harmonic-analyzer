@@ -383,8 +383,11 @@ KNOCKOUT_CALLOUT_XY = (0.064, 0.115)
 # line (x 0.0897).  The mark lies left of the text's middle, so the leader
 # leaves the text's left end and rises steeply to the mark at about 225 deg on
 # the dome: clear of its own first row, and left of the knockout callout's
-# leader (x 0.036-0.038) all the way up.
-FIDUCIAL_NOTE_XY = (0.022, 0.100)
+# leader (x 0.036-0.038) all the way up.  #1679 (owner ruling 2026-11-13):
+# the knockout callout gained its WALL row, and SolidWorks centres the block
+# on its point, so its last row stands half a row (2.7 mm) lower; the note
+# drops 3 mm with it.
+FIDUCIAL_NOTE_XY = (0.022, 0.097)
 # The 16T retention-pin hole is match-drilled through the seated pinion's
 # radial hole at assembly; its callout (dt_crankshaft_notes.PINION_PIN_CALLOUT)
 # gives the REF size, the operation, the pinion hole that locates it and the

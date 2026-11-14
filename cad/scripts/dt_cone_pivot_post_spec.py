@@ -113,6 +113,11 @@ BORE_DIA = 12.2682  # .483 in
 # the body's Ø: the Ø1.65 body (dt_cone_post_envelope.BLOCK_DIA) sits on the
 # .XX grid, so each boss end stands ~.002 proud of the body's tangent line.
 CONE_BOSS_LENGTH = 42.011
+# #2756 (machinist review of #2725, run 20261114T024302494Z): at the title
+# block's +/-.01 the body's upper limit (radius .830) swallowed the boss ends
+# (.825 at their least).  The body's band is one-sided, down from the envelope
+# diameter the platform is laid out on, so no boss end ever lies inside it.
+MAIN_BODY_DIA_BAND = (0.0, -0.508)  # +.00/-.02
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
@@ -124,7 +129,15 @@ CONE_BOSS_LENGTH = 42.011
 # purchased-stock spec owns the actual head envelope, stock-length,
 # cut-to-fit and engagement guards.  Raising the casting also raises that
 # floor, so the former 3-1/2-inch stock is no longer long enough.
-ATTACHMENT_THRU_DIA = 7.14248
+# #2697: letter M (.295), .045 over the 1/4 screw; the sheet prints the drill's
+# own decimal, so the owned drill meets DRILLED HOLES +.004/0 (19/64 prints
+# .297 and cuts .2969, under it).  MHA-DT-00 turns the post on these
+# screws until the MHA-DT-37 pivot runs free in MHA-DT-39; at 9/32 that turn
+# covered the tip's print-worst lateral error with 0.13 mm to spare
+# (build_dt_drive_train_assembly's TIP_LATERAL_CAPACITY_MM), which held three
+# MHA-DT-21 stations at .XXX.  The fillister head still seats all round the
+# hole ("counterbore floor annulus" below).
+ATTACHMENT_THRU_DIA = 7.493  # .295, letter M
 ATTACHMENT_CBORE_DIA = 11.5062  # .453
 ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 # The mounting counterbores' Hole Wizard callout prints its diameters at
@@ -166,6 +179,15 @@ _CONE_BOSS_HALF_BAND = printed_band_mm(3, unit=UNIT) / 2.0  # ConeBossLen .XXX
 CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
     math.floor(_CONE_BOSS_HALF_BAND / MM_PER_IN * 1000.0 + 1e-9) / 1000.0 * MM_PER_IN
 )  # +/-.002
+# At the printed values the body's largest radius (.825) meets the boss ends'
+# least station (.827 - .002): flush on the post's axial line at worst, and the
+# boss still stands off the round everywhere else round its rim.
+BODY_RADIUS_MAX_IN = round((post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[0]) / 2.0 / MM_PER_IN, 3)
+CONE_BOSS_END_MIN_IN = round(
+    (CONE_BOSS_NORTH_STATION - CONE_BOSS_NORTH_STATION_TOLERANCE_MM) / MM_PER_IN, 3
+)
+if BODY_RADIUS_MAX_IN > CONE_BOSS_END_MIN_IN:
+    raise AssertionError("the body's largest radius swallows a cone boss end")
 if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
     raise AssertionError(
         "north cone-boss face station band exceeds the stacks' half band"
@@ -196,8 +218,9 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
-# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011).
-HARVESTED_VOLUME_MM3 = 111_752.8114 + math.pi * (
+# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011), with the letter M
+# through drills of #2697 (111 752.8114 at 9/32).
+HARVESTED_VOLUME_MM3 = 111_108.31256 + math.pi * (
     (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
@@ -213,8 +236,10 @@ HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 #            (cone shaft MHA-DT-04)
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
-# below), nothing else on this casting is an accuracy feature, so nothing else
-# carries a band: the title block's general grades govern.
+# below), nothing else on this casting is an accuracy feature: the title
+# block's general grades govern.  The body's diameter keeps that grade's width,
+# one-sided (MAIN_BODY_DIA_BAND, #2756); crank_boss_rim still sweeps the
+# symmetric growth, which over-books it.
 RUNNING_BORE_BAND = REAM_H7  # the crank bore
 JOURNAL_BORE_BAND = (0.0254, 0.0127)  # the cone journal bore
 
@@ -296,7 +321,7 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": _printed_limits(post_envelope.BLOCK_DIA, 2)[0] / 2.0
+    "body foot OD": (post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[1]) / 2.0
     - _printed_limits(ATTACHMENT_X, 2)[1]
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN

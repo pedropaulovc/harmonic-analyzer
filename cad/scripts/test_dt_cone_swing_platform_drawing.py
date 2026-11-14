@@ -297,16 +297,18 @@ def test_corner_attachment_owns_only_the_arc_at_the_model_fillet_centre(monkeypa
         )
 
 
-def test_south_east_chamfer_is_two_legs_from_the_sharp_corner() -> None:
-    """#1038: the south-east corner is cut 1.04 x .34 in, stated by its run
-    along the south edge and its rise square to it, both from the sharp
-    corner; the cut's ends lie on the plate's own south and east edges."""
+def test_south_east_chamfer_starts_from_the_pivot_axis_and_rises_from_the_corner() -> None:
+    """#1038: the south-east corner is cut 1.04 x .34 in; the cut's ends lie
+    on the plate's own south and east edges.  #2697: its start on the south
+    edge prints from the pivot-bore axis (.10), the datum of the edge's other
+    stations, and its rise square to the edge from the sharp corner."""
     corners = {label: (x, z) for label, x, z, _r in geometry.PLATE_CORNERS}
     se, ne, sw = corners["SE"], corners["NE"], corners["SW"]
     south, east = geometry.SE_CHAMFER_SOUTH_XZ, geometry.SE_CHAMFER_EAST_XZ
     assert geometry.SE_CHAMFER_RUN / 25.4 == pytest.approx(1.04)
     assert geometry.SE_CHAMFER_RISE / 25.4 == pytest.approx(0.34)
     assert south == pytest.approx((se[0] + geometry.SE_CHAMFER_RUN, se[1]))
+    assert south[0] / 25.4 == pytest.approx(0.10)
     assert se[0] < south[0] < sw[0]
     assert east[1] - se[1] == pytest.approx(geometry.SE_CHAMFER_RISE)
     # On the east taper: collinear with the sharp NE and SE corners.
@@ -324,11 +326,11 @@ def test_south_east_chamfer_is_two_legs_from_the_sharp_corner() -> None:
     for index, a in enumerate(outline):
         b, c = outline[(index + 1) % 5], outline[(index + 2) % 5]
         assert (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < 0.0
-    # The build's cut is the triangle on those three points, and both printed
-    # legs are marked model dimensions at the outline's two places.
-    assert drawing_spec.DRAWING_DIMENSIONS["CornerSEProfile"] == {"CornerSERun", "CornerSERise"}
+    # The build's cut is the triangle on those three points, and the printed
+    # start and rise are marked model dimensions at the outline's two places.
+    assert drawing_spec.DRAWING_DIMENSIONS["CornerSEProfile"] == {"CornerSEStartX", "CornerSERise"}
     assert drawing_spec.DRAWING_PRECISION["CornerSEProfile"] == {
-        "CornerSERun": 2, "CornerSERise": 2,
+        "CornerSEStartX": 2, "CornerSERise": 2,
     }
     assert "CornerSE" not in drawing_spec.DRAWING_DIMENSIONS
 
@@ -354,22 +356,26 @@ def test_south_east_chamfer_leaves_the_post_foot_on_the_plate() -> None:
     assert min(margins, key=margins.get) == "edge 3"
 
 
-def test_chamfer_legs_stand_over_the_corner_clear_of_the_corner_station() -> None:
-    """Sheet 1's south-east corner (top left): the run's row stands between
-    the south edge and the corner's own station from the pivot axis, and the
-    rise stands left of the east edge under the cut's lower witness."""
+def test_chamfer_start_and_rise_stand_clear_of_the_corner_station() -> None:
+    """Sheet 1's south-east corner (top left): the start's row stands between
+    the south edge and the corner's own station's row, its value just west
+    of its short span from the pivot axis and short of the south-west
+    station's value; the rise stands left of the east edge under the cut's
+    lower witness."""
     px, py = drawing.PROFILE_PIVOT_XY
     per_mm = 0.0005
     south_y = py - geometry.PLATE_SOUTH_Z * per_mm
     corner_x = px - geometry.EAST_HALF_S * per_mm
-    run, station, rise = (
-        drawing.PROFILE_KEEP[name] for name in ("CornerSERun", "SouthEastX", "CornerSERise")
+    start, station, rise = (
+        drawing.PROFILE_KEEP[name] for name in ("CornerSEStartX", "SouthEastX", "CornerSERise")
     )
     half_text = 0.00195
-    assert run[1] - half_text > south_y + 0.002
-    assert station[1] - run[1] >= 0.0055
-    assert run[0] == station[0]
-    assert run[0] + 0.006 < corner_x - 0.002
+    assert start[1] - half_text > south_y + 0.002
+    assert station[1] - start[1] >= 0.0055
+    assert station[0] + 0.006 < corner_x - 0.002
+    start_x = px + geometry.SE_CHAMFER_SOUTH_XZ[0] * per_mm
+    assert start[0] - 0.004 > start_x + 0.002
+    assert start[0] + 0.004 < drawing.PROFILE_KEEP["SouthWestX"][0] - 0.004
     cut_low_y = py - geometry.SE_CHAMFER_EAST_XZ[1] * per_mm
     assert rise[1] + half_text < cut_low_y - 0.0015
     assert drawing.PROFILE_KEEP["PlateLenDim"][0] + 0.010 < rise[0] < corner_x - 0.006
@@ -1314,7 +1320,7 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
     assert spec.HOLDDOWN_LOCAL_X == -1.016
     assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
-    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.738 * 25.4)
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-0.731 * 25.4)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
