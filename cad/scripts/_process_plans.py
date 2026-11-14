@@ -17,6 +17,7 @@ TRAVELER_STEMS: tuple[str, ...] = (
     "ch_rocker_arm_tl_oblique_base_bar",
     "ch_rocker_arm_tl_oblique_end_bracket",
     "ch_rocker_arm_tl_oblique_feed_lever",
+    "ch_rocker_arm_tl_oblique_riser",
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_PATH = PROCESS_ROOT / "shop.toml"

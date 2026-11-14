@@ -39,8 +39,9 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-The base bar, end bracket and feed lever have plans, ported from the prechips
-0.10 examples; each header names its sources. Each plan's `adapter` is a prechips
+The base bar, end bracket and feed lever have plans ported from the prechips
+0.10 examples. The riser's plan is authored here, and prechips `examples/riser.toml`
+copies it. Each header names its sources. Each plan's `adapter` is a prechips
 adapter written against that part's manifest contents, so a drawing change that
 alters the manifest's requirements needs a prechips adapter release before the
 traveler passes again.
@@ -142,8 +143,8 @@ Owner rulings (Pedro), recorded for the cutover:
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: the oblique-trammel base bar, end bracket and feed
-lever. `build` and `release` do not run it, and releases carry no travelers while
+`prechips:<stem>` task: the oblique-trammel base bar, end bracket, feed
+lever and riser. `build` and `release` do not run it, and releases carry no travelers while
 prechips stabilises. Each run renders two travelers from the same plan:
 `traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
 setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
@@ -157,8 +158,20 @@ grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` once 0.11.0 is
-published.
+need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0. The riser plan needs 0.11.0 too
+(its `harmonic_riser` adapter).
+
+The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
+adapter and the `milling_deflection` check. It passes both profiles, with every
+check enforced, on the v49 manifest. Setups 1–4 make the bar
+and drill the stop-pin holes P1/P2 at their printed stations. Setup 1 calipers
+the bar: Setup 2 faces it only when it is over the .25 thickness limit, from three
+straps then four, because a single strap span along the bar's length bends the
+thin bar ~.23 mm under the cutter. The other seven
+holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted them
+from the carrier and drills each at its own mark, so its table gives the REF
+X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
+recorded as not owned in `cad/config/shop-equipment.toml`.
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise

@@ -489,8 +489,8 @@ it checks part identity, the adjacent STEP name and sha256, a non-empty features
 table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
-Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar and
-end bracket) has an opt-in `prechips:<stem>` task. `build` and `release` do not
+Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end
+bracket, feed lever and riser) has an opt-in `prechips:<stem>` task. `build` and `release` do not
 run it, and releases carry no travelers while prechips stabilises (owner ruling
 2026-11-11, [#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502):
 prechips stays out of `uv.lock`, because every prechips release changed the lock
@@ -531,8 +531,8 @@ file nor a stamp. The task is not cache-keyed and always runs when asked
 plan fails only its own task. Under prechips 0.10.1 (the base-bar and feed-lever
 plans read its new adapter bindings) the base bar and end bracket
 pass both profiles, including `vise_holding`, on the v48 manifests. The feed
-lever's plan is held, unenrolled: prechips refuses it on `tool_sizing` (see
-`cad/process/README.md`). prechips adapters are tied to the manifest's
+lever and riser plans need prechips 0.11.0 (the riser's `harmonic_riser`
+adapter; see `cad/process/README.md`). prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.

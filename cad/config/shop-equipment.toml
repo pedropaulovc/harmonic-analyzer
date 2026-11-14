@@ -679,3 +679,38 @@ section_mm = [101.6, 3.175]
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 1376 https://www.onlinemetals.com/en/buy/brass/0-125-x-4-brass-rectangle-bar-360-h02-extruded/pid/1376 read live 2026-11-12: 1/8 x 4 brass rectangle bar 360-H02, ASTM B16, 12 in $65.37"]
+
+# --- MHA-CH-06-TL-24 riser (prechips plan, #2447) ---------------------------
+
+# The riser traveler (cad/process/ch_rocker_arm_tl_oblique_riser/plan.toml)
+# saws a 14.00 in blank from 1/4 x 1-3/4 in 6061 bar. TL-00 step 18F makes a
+# new riser if a groove is cut too deep, so two blanks are allowed for.
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "To order: 1/4 x 1-3/4 in 6061-T6511 extruded flat bar, at least 28.25 in. Allocation: MHA-CH-06-TL-24 riser, two 14.00 in blanks (the riser and a TL-00 step 18F replacement) with a 1/8 in kerf. The traveler calipers the bar and faces the top to .240 only when it is over .250 (stock .242-.258 by the cited tolerance), then mills the edges to 1.690. Vendor not chosen. Not owned."
+# Catalogue nominals 1/4 x 1-3/4 in = [44.45, 6.35] mm and 28.25 x 25.4 = 717.55 mm; not metrology.
+section_mm = [44.45, 6.35]
+length_mm = 717.55
+on_hand = false
+cite = ["thyssenkrupp Materials NA (materialsplus.com) ALREC00231 https://materialsplus.com/products/aluminum/6061/rectangular/0-250/1-750/buy/ALREC00231: 6061 rectangle .250 x 1.750, ASTM B221, thickness ±.008, width ±.014 (tolerance reference only; no vendor chosen)"]
+
+# Riser Setup 5 tools the shop has no record of owning: the HUB's 12 mm drill
+# and the 82° countersink for R1-R4's Ø.25 x 82° seats. Same keys as their
+# prechips records in cad/process/shop.toml, which hold the identity (one fact
+# in one file); these records hold only ownership and use. To buy; no vendor
+# or SKU.
+# Owner decision 2026-11-13: buy two 82° countersinks, 3/16 in and 3/8 in;
+# the 3/8 in cuts the riser's seats. The owned 330CH 1/4 in 90° chamfer mill
+# is the wrong angle and too small for Ø.25 to full diameter.
+[tools.riser-drill-12mm]
+kind = "drill"
+present = false
+status = "not owned"
+use = "Riser (MHA-CH-06-TL-24) Setup 5: HUB through after the 1/4 in pilot"
+
+[tools.riser-countersink]
+kind = "countersink"
+present = false
+status = "not owned"
+use = "Riser (MHA-CH-06-TL-24) Setup 5: R1-R4 Ø.25 x 82° seats for #4-40 flat heads"
