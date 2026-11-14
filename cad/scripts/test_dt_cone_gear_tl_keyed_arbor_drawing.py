@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 import sys
 
 import pytest
@@ -74,17 +75,25 @@ def test_one_seat_fits_every_blank_inside_the_tir_share() -> None:
 
 
 def test_the_note_names_every_mate_by_its_drawing_number() -> None:
-    """The seat's mates are the kit sheet's setup table rows, every blank by
-    drawing number; the note points there, and names the key's bond."""
+    """Rule 4's matched pair: every keyed blank named and numbered in full in
+    note 1 (no range, no pointer to the kit sheet's list), each a setup
+    table row on the kit sheet; the key's bond named; every line inside the
+    72 characters before the title block."""
     import dt_cone_gear_tl_arbor_assembly_spec as kit
 
     note = " ".join(spec.SHEET_NOTES.split())
-    assert f"KEYED BORES LISTED ON {spec.KIT_NUMBER}" in note
+    assert "LISTED ON" not in note and " TO MHA-" not in note
     for blank in spec.KEYED_GEARS:
+        assert re.search(rf"(?<![\w-]){re.escape(blank.number)}(?![\w-])", note), (
+            blank.tag
+        )
         assert blank.number in (row[0] for row in kit.SETUP_TABLE_ROWS), blank.tag
+    assert "CONE GEARS MHA-DT-03-T030, MHA-DT-03-T036," in note
+    assert "AND CRANK DRIVE GEAR MHA-DT-07, CLEARANCE" in note
     assert f"KEY {spec.KEY_NUMBER} BONDED WITH {spec.KEY_BOND}" in note
     assert f"COAT ITEM 5 WITH {spec.KEY_BOND}." in kit.ASSEMBLY_STEPS
-    assert len(spec.SHEET_NOTES.splitlines()) <= 4
+    assert note.count(f"{spec.SEAT_NOTE_NUMBER}. ") == 1
+    assert max(map(len, spec.SHEET_NOTES.splitlines())) <= 72
     # The pilot only carries the loose collars: a clearance size at the title
     # block's .XXX band, never a fit name.
     pilot = spec.CALLOUTS_BELOW["PilotDia"]
@@ -235,7 +244,7 @@ def test_the_tight_bands_live_on_the_model_dimensions() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.DRAWING_VALUES_BY_NAME) == marked
     assert set(spec.CALLOUTS_BELOW) <= marked
-    assert len(spec.SHEET_NOTES.splitlines()) <= 4
+    assert spec.SHEET_NOTES.startswith(f"{spec.SEAT_NOTE_NUMBER}. SEAT:")
     for callout in spec.CALLOUTS_BELOW.values():
         assert len(callout.splitlines()) <= 2
 
