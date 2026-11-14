@@ -65,8 +65,13 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
     assert drawing.SHAFT_NUMBER in callouts["HubLength"]
-    # The plate's tight offset names the bars it spaces (rule 4).
-    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
+    # The plate's tight offset names the bars it spaces (rule 4), in the
+    # numbered note its location dimension flags (rule 7).
+    flag = callouts["PlateOffset"]
+    assert drawing.BAR_NUMBER not in flag
+    assert flag == f"SEE NOTE {drawing.PLATE_OFFSET_NOTE_NUMBER}"
+    assert drawing.PLATE_OFFSET_NOTE.startswith(f"{drawing.PLATE_OFFSET_NOTE_NUMBER}. ")
+    assert drawing.BAR_NUMBER in drawing.PLATE_OFFSET_NOTE
     # Rule 7: a hole location carries its value and band only.
     for location in ("BarPinCx", "SpringCx"):
         assert location not in callouts
