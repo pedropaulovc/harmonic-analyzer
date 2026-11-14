@@ -11,7 +11,7 @@ The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
 view (2:1, the sheet scale) lays the rod axis horizontal, as the bar sits in
 the lathe (drawing-guidelines.md rule 11), and carries the square's and the
 pivot's lengths from the shoulder, the pivot's banded diameter between its
-flanks (SEE NOTE 1: its matched fit), the shoulder root's R MAX, the (4.82)
+flanks (SEE NOTE 1: its mate), the shoulder root's R MAX, the (4.82)
 end-to-end reference and VIEW A's lettered arrow onto the tapped top face;
 VIEW A (5:1) under it looks at that face and carries the square's banded SQ
 size, the native Hole Wizard callout of the #0-80 stud tap, its drill Ø at
@@ -192,7 +192,7 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 #     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
 #   row 3 (y 0.2045): the (4.82) reference, end face to end face, its line
 #     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
-# Ø.1260 -.0002/-.0005 between the pivot flanks: its line stands 5.75 mm
+# Ø.1260 -.0005/-.0020 between the pivot flanks: its line stands 5.75 mm
 #   left of the pivot end (x 0.07675), the flanks' extension lines reaching
 #   it, so it rises past every row clear of their lines (all start at the
 #   pivot end or right of it) to the four-row ~56 x 20 mm block centred at
@@ -293,7 +293,7 @@ VIEW_A_ARROW = (
     (_VIEW_A_TIP[0] + VIEW_ARROW_RUN, _VIEW_A_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
     _VIEW_A_TIP,
 )
-# Note 1 (the pivot's matched fit, two lines of ~53 characters, ~125 x 9 mm
+# Note 1 (the pivot's mate, two lines of at most ~53 characters, ~125 x 9 mm
 # at ~2.35 mm a character, anchored top-left) in the empty field under the
 # side view: x 0.150..0.275, y ~0.116..0.125, 14 mm under the R MAX block
 # (bottom 0.139), 25 mm right of the stud tap's callout (x <= 0.1248) and

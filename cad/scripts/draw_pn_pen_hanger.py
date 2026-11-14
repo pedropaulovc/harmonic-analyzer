@@ -7,18 +7,19 @@ export behavior lives in ``_drawing_common``.  Dimension import and curation
 live in ``_drawing_dimension_import``; places and bands are authored on the
 part.
 
-The pen hanger is a black tapered steel strap (11 gauge, .63 -> .48 wide,
+The pen hanger is a black tapered steel strap (1/8 flat, .63 -> .48 wide,
 6.69 tall; decimal-inch sheet) with two open U guide plates brazed across its
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
 the strap outline, the screw-hole station, the upper plate's drop, the
-plates' sheet-stock thickness (a reference) and the centreline both slots
-share; section A-A (2:1) cuts the strap just above the upper plate and looks
-down onto its U, carrying the slot (its depth and the plate's reach both from
-the plate's free end), its corner radius, the strap's sheet-stock thickness
-(a reference) and the plate's overhang past the strap (a reference); the
-shaded isometric (1:1) fills the right of the sheet.
+plates' bar-stock thickness (a reference, SEE NOTE 1) and the
+centreline both slots share; section A-A (2:1) cuts the strap just above the
+upper plate and looks down onto its U, carrying the slot (its depth and the
+plate's reach both from the plate's free end), its corner radius, the strap's
+bar-stock thickness (a reference) and the plate's overhang past the strap's
+edge (its braze station across the strap); the shaded isometric (1:1) fills
+the right of the sheet.
 
 Run with SolidWorks open::
 
@@ -58,7 +59,6 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -75,7 +75,6 @@ from pn_pen_hanger_spec import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
     GUIDE_PLATE_YS,
@@ -152,11 +151,13 @@ _SECTION_X = (min(_STRAP_CUT_X[0], -_HALF_PLATE), max(_STRAP_CUT_X[1], _HALF_PLA
 _SECTION_Z = (PLATE_FRONT_Z, STRAP_Z[1])
 _SX = (_SECTION_X[0] + _SECTION_X[1]) / 2.0
 _SZ = (_SECTION_Z[0] + _SECTION_Z[1]) / 2.0
-# The plate's +x edge past the strap's cut edge, which the section prints as
-# a reference: the same .XX value as the overhang at the plate's top face.
+# The plate's +x edge past the strap's cut edge: the overhang the section
+# prints from the strap's cut corner, the same .XX value as at the plate's
+# top face.
 _OVERHANG_AT_CUT = _HALF_PLATE - _STRAP_CUT_X[1]
-if round(_OVERHANG_AT_CUT / 25.4, DRAWING_REFERENCE_PRECISION) != round(
-    UPPER_PLATE_OVERHANG / 25.4, DRAWING_REFERENCE_PRECISION
+_OVERHANG_PLACES = DRAWING_PRECISION_BY_NAME["PlateOverhang"]
+if round(_OVERHANG_AT_CUT / 25.4, _OVERHANG_PLACES) != round(
+    UPPER_PLATE_OVERHANG / 25.4, _OVERHANG_PLACES
 ):
     raise AssertionError(
         "section A-A sits too far above the plate to read its overhang"
@@ -184,7 +185,7 @@ SECTION_CENTER = (0.230, 0.195)
 # The 1:1 iso is about 42 wide x 158 tall on the sheet (twice the 1:2 view's
 # 21 x 76 on the 20261014T010321468Z sheet): centred at y 0.166 it spans
 # y 0.087..0.245, under the top border (0.267) and above its note; its left
-# edge (x 0.341) stands 40 mm right of the slot width's text block (x 0.298).
+# edge (x 0.341) stands ~17 mm right of the slot width's text block (x ~0.324).
 ISO_CENTER = (0.362, 0.166)
 # The note's top-left: its line (~2.5 mm a character) centres under the iso
 # and stands 12 mm above the title block's top edge (y 0.065 for x >= 0.216).
@@ -269,9 +270,9 @@ FRONT_KEEP = {
 # slot width's 10 mm span cannot hold its banded value and fit callout, so
 # its text is offset onto a leader, right of the section beyond every
 # extension line (SLOT_WIDTH_TEXT_XY).  On the left, the slot depth and,
-# outside it, the plate reach, both from the plate's free end (the plate is
-# cut as its own blank before brazing): shortest nearest, so the slot
-# bottom's extension line stops short of the reach's dimension line.  The
+# outside it, the plate reach, both from the plate's free end: shortest
+# nearest, so the slot bottom's extension line stops short of the reach's
+# dimension line.  The
 # strap stock thickness right of the strap end; the corner radius's text
 # up-right of the -x corner it is attached to, so its leader leaves the arc
 # outward through the arm and crosses no other ink.
@@ -290,6 +291,14 @@ _VALUE_ABOVE_LINE = 0.0027
 # above its line (the 20261013T234201871Z block centre stood 10.5 mm above
 # with two callout rows under the value).
 _BANDED_VALUE_ABOVE_LINE = 0.005
+# The overhang (rule 10: the upper plate's braze station across the strap),
+# from the strap's cut corner to the plate's +x back corner: its row 6 mm
+# above the strap back face; its value left of the plate edge's extension
+# line (the 3 mm span holds no text), as the arm width's sits.  The plate
+# edge's extension line rises past the strap foot, where the plate reach's
+# root extension line leaves the same edge (rule 14: conventional).
+_OVERHANG_ROW_Y = _az(STRAP_Z[1]) + 0.006
+OVERHANG_TEXT_XY = (_ax(_HALF_PLATE) - 0.0085, _OVERHANG_ROW_Y + _VALUE_ABOVE_LINE)
 SECTION_KEEP = {
     "SlotWidth": (_ax(0.0), SECTION_ROW_Y["SlotWidth"] + _BANDED_VALUE_ABOVE_LINE),
     "ArmWidth": (
@@ -305,6 +314,7 @@ SECTION_KEEP = {
         _ax(_HALF_PLATE) - 0.020,
         _az((PLATE_FRONT_Z + STRAP_Z[0]) / 2.0),
     ),
+    "PlateOverhang": OVERHANG_TEXT_XY,
     "StrapThick": (_ax(_SECTION_X[0]) + 0.008, _az((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
     # "2X R.08 MAX" (~30 mm) is wider than the 24.5 mm EACH SLOT row that set
     # the block's width on the 20261024T091056564Z sheet, so the centre moves
@@ -324,7 +334,7 @@ SLOT_WIDTH_TEXT_XY = (
     _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
     SECTION_ROW_Y["SlotWidth"] - 0.004,
 )
-# The strap stock's offset text block ("(.1196)" over 11 GA SHEET, about
+# The strap stock's offset text block ("(.125)" over 1/8 CF FLAT, about
 # 30 x 8 mm, positioned by its centre): its two rows cannot sit in the 6 mm
 # span, so the block stands level with the strap, its left end 4 mm right of
 # the dimension line (8 mm right of the strap end), and the leader runs level
@@ -337,16 +347,6 @@ STRAP_THICK_TEXT_XY = (
 # The native SECTION A-A / SCALE 2 : 1 caption's top centre, under the plate
 # width row.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], SECTION_ROW_Y["PlateWidth"] - 0.012)
-# The overhang reference (rule 10): picked on the strap's cut edge at mid
-# thickness and on the plate's +x edge 7 mm ahead of its back, clear of the
-# plate-back extension line.  Its row 6 mm above the strap back face; its
-# value left of the plate edge's extension line (the 2.5 mm span holds no
-# text), as the arm width's sits.  The plate edge's extension line rises past
-# the strap foot, where the plate reach's root extension line leaves the same
-# edge (rule 14: conventional).
-OVERHANG_PICK_Z = ((STRAP_Z[0] + STRAP_Z[1]) / 2.0, STRAP_Z[0] - 7.0)
-_OVERHANG_ROW_Y = _az(STRAP_Z[1]) + 0.006
-OVERHANG_TEXT_XY = (_ax(_HALF_PLATE) - 0.0085, _OVERHANG_ROW_Y + _VALUE_ABOVE_LINE)
 # The slots' shared centreline (rule 26) in the front view: on the slots'
 # axis (model x 0), from below the lower plate to above the upper one, run
 # ASME Y14.2's uniform 3 mm on paper past both plates.
@@ -485,49 +485,6 @@ def _centre_section(adapter: Any, native: Any) -> None:
         tolerance_xy=(0.0005, 0.0005),
         label="hanger section A-A",
     )
-
-
-def _add_overhang_reference(adapter: Any, section: Any) -> None:
-    """The upper plate's +x edge past the strap's cut edge, as a reference.
-
-    Both ends are real edges of section A-A (the strap's hatched cut and the
-    plate's outline below it); the value is read back before it is
-    parenthesized, so a pick that resolved to a neighbouring line fails the
-    build instead of printing a wrong number.
-    """
-    label = "upper plate overhang reference"
-    strap_edge, plate_edge = model_points_in_view(
-        adapter,
-        section,
-        (
-            (_STRAP_CUT_X[1] / 1000.0, SECTION_Y / 1000.0, OVERHANG_PICK_Z[0] / 1000.0),
-            (_HALF_PLATE / 1000.0, _UPPER_TOP_Y / 1000.0, OVERHANG_PICK_Z[1] / 1000.0),
-        ),
-        label=label,
-        names=("strap cut edge", "plate +x edge"),
-    )
-    display = _early_bound(
-        add_edge_dimension(
-            adapter,
-            section,
-            p0=strap_edge,
-            p1=plate_edge,
-            text_xy=OVERHANG_TEXT_XY,
-            label=label,
-            orientation="horizontal",
-        ),
-        "IDisplayDimension",
-    )
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
-    if abs(measured_mm - _OVERHANG_AT_CUT) > 1e-4:
-        raise RuntimeError(
-            f"{label} measured {measured_mm:g}, expected {_OVERHANG_AT_CUT:g}"
-        )
-    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
-        raise RuntimeError(f"{label} precision did not persist")
 
 
 def _add_slot_centerline(adapter: Any, front: Any) -> None:
@@ -752,8 +709,8 @@ async def build(adapter: Any) -> dict[str, str]:
         {"SlotWidth": SLOT_WIDTH_TEXT_XY, "StrapThick": STRAP_THICK_TEXT_XY},
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # The strap's and the guide plates' thickness is the sheet stock's, each
-    # printed as a reference (no band) over its SHEET STOCK callout row.
+    # The strap's and the guide plates' thickness is the bar stock's, each
+    # printed as a reference (no band) over its 1/8 CF FLAT callout row.
     references = [
         (dimension_name(adapter, item), item)
         for item in annotations
@@ -768,7 +725,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _add_overhang_reference(adapter, section)
     _add_slot_centerline(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")

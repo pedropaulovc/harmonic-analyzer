@@ -335,6 +335,10 @@ def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
     shaft_max = spec.PIVOT_DIA + spec.PIVOT_BAND[0]
     bore_min = v_block.PIVOT_BORE_DIA + v_block.PIVOT_BORE_BAND[1]
     assert shaft_max < bore_min  # always a clearance (slip) fit
+    # #2437: the block's set screw clamps the pivot once the yaw is set, so
+    # the pivot is turned to number: its band is at least the shop's
+    # turned-diameter row (+/-.0005, .001 wide), no measured-bore route.
+    assert spec.PIVOT_BAND[0] - spec.PIVOT_BAND[1] >= 0.001 * 25.4
     assert spec.PIVOT_DIA < spec.ROD_SECTION  # a real shoulder
 
 
@@ -545,9 +549,8 @@ def test_no_gdt_or_part_pmi() -> None:
 
 
 def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
-    """The pivot's .0003 band is narrower than the turned-diameter row, so
-    its matched-fit route (mate, clearance) is a numbered note the diameter
-    links to (drawing-guidelines.md rules 4 and 7)."""
+    """The pivot's mate and its clearance (REF) ride a numbered note the
+    diameter links to (drawing-guidelines.md rules 4 and 7)."""
     assert spec.DIMENSION_CALLOUTS["PivotDia"] == f"SEE NOTE {spec.PIVOT_FIT_NOTE}"
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4

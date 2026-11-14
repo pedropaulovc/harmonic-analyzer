@@ -2,9 +2,10 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
 9:15-10:34).
 
 The black tapered strap bolted to the wheel support bar that guides the pen
-rod: a flat 11 gauge strap tapering .63 -> .48 wide, lying on the bar's front
+rod: a 1/8 flat strap tapering .63 -> .48 wide, lying on the bar's front
 face and running 6.69 down from the bar top to just above the platen, with two
-thin open U guide plates brazed across its front face.  Each plate's
+open U guide plates of the same bar brazed across its front face, both slots
+cut after brazing.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
 slots and lifts straight out of them; the slot sides are the rod's only
 lateral guide, and the slot's two milled bottom corners carry a radius.  The
@@ -17,7 +18,7 @@ Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
 all of the geometry lives in ``pn_pen_hanger_spec``).  The part is authored
 MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
-occupies y -169.926..0, z -3.038..0 (mm), its top edge leaning toward machine
+occupies y -169.926..0, z -3.175..0 (mm), its top edge leaning toward machine
 east (-x); the rod axis is local (0, ., ROD_AXIS_Z).
 Dimensions: cad/DIMENSIONS.md ch. 24.
 
@@ -34,6 +35,7 @@ import sys
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
@@ -46,6 +48,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -91,6 +94,7 @@ from pn_pen_hanger_spec import (
     STRAP_TOP_X,
     STRAP_Z,
     UNIT,
+    UPPER_PLATE_OVERHANG,
 )
 
 import _telemetry
@@ -104,12 +108,56 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success else float("nan")
 
 
+async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> None:
+    """The upper plate's braze station across the strap (pn_pen_hanger_spec
+    UPPER_PLATE_OVERHANG): a construction line along the plate's back edge,
+    from the tapered strap's edge at the plate's top face to the plate's +x
+    back corner, its length driven.  Section A-A prints it from the strap's
+    cut corner; the outline gains no driving constraint."""
+    half_plate, v_back = GUIDE_PLATE_WIDTH / 2.0, -STRAP_Z[0]
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "upper plate overhang reference",
+        await adapter.add_line(
+            half_plate - UPPER_PLATE_OVERHANG, v_back, half_plate, v_back
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{line} did not take the construction flag")
+    check(
+        "upper plate overhang reference root",
+        await adapter.add_sketch_constraint(
+            f"{line}.end", f"{plate_back}.start", "coincident"
+        ),
+    )
+    check(
+        "upper plate overhang reference direction",
+        await adapter.add_sketch_constraint(line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance",
+        UPPER_PLATE_OVERHANG,
+        "upper plate overhang",
+    )
+    sketch.record(
+        "PlateOverhang",
+        '"PlateWidth" / 2 - "StrapBotHalf" * "UpperPlateDrop" / "StrapRise"',
+    )
+
+
 async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str]]:
     """One open U plate: a Top-plane outline ((u, v) = model (x, -z)) extruded
     down from ``drop`` below the strap top.  Emission (rectilinear chain):
     slot width, slot depth, right arm, right reach, plate width, left reach,
     then the slot-bottom-left anchor (x, then the strap-back-face distance);
-    the left arm and the slot's left side close the chain."""
+    the left arm and the slot's left side close the chain.  The upper plate
+    adds its overhang past the strap (_overhang_reference)."""
     v_back, v_bot, v_front = -STRAP_Z[0], SLOT_BOTTOM, -PLATE_FRONT_Z
     half_slot, half_plate = SLOT_WIDTH / 2.0, GUIDE_PLATE_WIDTH / 2.0
     points = [
@@ -140,6 +188,9 @@ async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str
                 '"SlotWidth" / 2',
                 '"SlotBottom"'],
     )
+    if prefix == "Upper":
+        # lines[4] runs from the plate's +x back corner along its back edge.
+        await _overhang_reference(adapter, lines[4], sketch)
     await ensure_fully_defined(adapter, f"{prefix} guide sketch")
     check(f"exit_sketch {prefix} guide", await adapter.exit_sketch())
     profile = f"{prefix}GuideProfile"

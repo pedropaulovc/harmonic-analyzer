@@ -22,7 +22,8 @@ from __future__ import annotations
 import math
 
 import _config
-from _fit_close_running import SHAFT_G6_3_TO_6_MM, measured_close_running_clearance_mm
+from _fit_deviations import deviations
+from _fit_ream_h7 import REAM_H7
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
@@ -68,11 +69,16 @@ if not (
 # (pn_pen_carriage_geom asserts the engagement).
 SQUARE_LENGTH = 112.0  # closure (module docstring); prints 4.41
 
-# Turned pivot end: a close running fit in the v-block's .126 reamed pivot
-# bore (pn_pen_v_block_spec.PIVOT_BORE_DIA, #290 owner ruling: 4 mm -> .126),
-# turned concentric with the square.
+# Turned pivot end: a sliding fit in the v-block's .126 reamed pivot bore
+# (pn_pen_v_block_spec.PIVOT_BORE_DIA, #290 owner ruling: 4 mm -> .126),
+# turned concentric with the square.  The pivot only has to drop into the
+# bore by hand and turn while the pen's yaw is set: the block's cup-point set
+# screw then clamps it (MHA-PN-00 steps 4A-4B), so nothing runs in the bore
+# and any clearance is taken up by the clamp (#2437).  -.0005/-.0020 is a
+# .0015 band, inside the shop's turned-diameter row (+/-.0005 holds .001), so
+# it is turned to number with a micrometer, not to a measured bore.
 PIVOT_DIA = 3.2004  # .126
-PIVOT_BAND = SHAFT_G6_3_TO_6_MM  # -.0002/-.0005: .0002-.0010 in the reamed bore
+PIVOT_BAND = (-0.0127, -0.0508)  # -.0005/-.0020: .0005-.0025 in the reamed bore
 PIVOT_LENGTH = 10.414  # .41, shoulder to end: stops clear above the v-block relief roof
 
 # Adjuster stud tap in the top face. #0-80 is the largest thread whose tap
@@ -226,15 +232,16 @@ if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
     raise AssertionError("one SQ size can only state a square whose flats share a band")
 # Every tight band names its mate on the dimension it governs (rule 4); the
 # shoulder radius names the part its seat face lands on, the tap wall what
-# it is.  The pivot's .0003 band is narrower than the shop's turned-diameter
-# row (+/-.0005), so its fit route (drawing-guidelines.md "What the shop
-# holds": a matched fit to a named mate with its stated clearance) rides
-# numbered note PIVOT_FIT_NOTE, linked from the diameter by SEE NOTE (rule 7:
-# the note counts as at the callout; two lines of words would overrun the
-# border from the diameter's left-hanging block).
+# it is.  The pivot names its mate on numbered note PIVOT_FIT_NOTE, linked
+# from the diameter by SEE NOTE (rule 7: the note counts as at the callout;
+# two lines of words would overrun the border from the diameter's
+# left-hanging block).
 PIVOT_FIT_NOTE = 1
-# The pivot in the v-block's REAM_H7 bore: .0002-.0010 diametral.
-PIVOT_CLEARANCE_MM = measured_close_running_clearance_mm()
+# The pivot in the v-block's REAM_H7 bore (pn_pen_v_block_spec.PIVOT_BORE_BAND,
+# which imports this module): .0005-.0025 diametral, printed as REF.
+_BORE_LOW, _BORE_HIGH = deviations(REAM_H7)
+_PIN_LOW, _PIN_HIGH = deviations(PIVOT_BAND)
+PIVOT_CLEARANCE_MM = (_BORE_LOW - _PIN_HIGH, _BORE_HIGH - _PIN_LOW)
 
 
 def _inch_text(mm: float) -> str:
@@ -253,8 +260,8 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 # and the SQ size above still states the band the stock must hold.
 DRAWING_NOTES = "\n".join(
     (
-        f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE, TURNED",
-        "   TO THE MEASURED BORE (CLEARANCE "
+        f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE",
+        "   (CLEARANCE "
         f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
     )
 )

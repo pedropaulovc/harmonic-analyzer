@@ -1031,25 +1031,37 @@ def _mark_detail_boundary(
         )
     radius = drawn
     letter = notes.DETAIL_LETTERS[detail.key]
-    if detail.key not in LETTERED_LEFT:
-        reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
-        _label_view(
-            adapter, parent, letter, (centre[0] + reach, centre[1] + reach), label=label
-        )
-        return centre, radius
-    # Upper left, the letter's measured box is moved so its lower-right corner
-    # sits on the circle's upper-left 45 degree ray, DETAIL_LETTER_GAP outside
-    # the rim; the whole box then lies up and left of that corner, clear of the
-    # circle. Placing it by an assumed glyph size left the corner 0.4 mm inside
-    # the gap once the glyph read 3.4 x 4.7 mm (rolling main 6d7f35476).
+    # The letter's measured box is moved so its near corner (lower left at
+    # the upper right, lower right at the upper left) sits on the circle's
+    # 45 degree ray, DETAIL_LETTER_GAP outside the rim; the whole box then
+    # lies beyond that corner, clear of the circle. Placing it by an assumed
+    # glyph size left the corner 0.4 mm inside the gap once the glyph read
+    # 3.4 x 4.7 mm (rolling main 6d7f35476); anchoring the note itself on the
+    # ray left A and B struck by their circles (farm run 20261113T172037696Z).
+    left = detail.key in LETTERED_LEFT
     clear = (radius + DETAIL_LETTER_GAP) * math.sqrt(0.5)
-    corner = (centre[0] - clear, centre[1] + clear)
+    corner = (centre[0] - clear if left else centre[0] + clear, centre[1] + clear)
     note, box = _view_note(adapter, parent, letter, corner, label=label)
-    box = _move_note(
-        adapter, note, (corner[0] - box[2], corner[1] - box[1]), label=label
+    near_x = 2 if left else 0
+    # A moved note can re-read its box a fraction of a millimetre off the
+    # translation (A on run 20261113T204545094Z: 0.31 mm low), so the move is
+    # corrected once from the re-read box.
+    for _ in range(2):
+        delta = (corner[0] - box[near_x], corner[1] - box[1])
+        if math.hypot(*delta) <= DETAIL_POSITION_TOL_M:
+            break
+        box = _move_note(adapter, note, delta, label=label)
+    # The requirement: no part of the letter's box within half the gap of
+    # the rim (rule 14: no text struck by a line).
+    nearest = (
+        min(max(centre[0], box[0]), box[2]),
+        min(max(centre[1], box[1]), box[3]),
     )
-    if math.dist((box[2], box[1]), corner) > DETAIL_POSITION_TOL_M:
-        raise RuntimeError(f"{label}: letter {box!r} did not land at {corner!r}")
+    if math.dist(nearest, centre) < radius + DETAIL_LETTER_GAP / 2.0:
+        raise RuntimeError(
+            f"{label}: letter {box!r} stands within {DETAIL_LETTER_GAP / 2.0} "
+            f"of the circle (centre {centre!r}, r {radius!r})"
+        )
     _telemetry.info(f"{label}: circle {centre!r} r {radius!r}, letter {box!r}")
     return centre, radius
 
