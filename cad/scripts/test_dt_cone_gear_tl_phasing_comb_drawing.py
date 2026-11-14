@@ -112,7 +112,29 @@ def test_the_comb_stands_on_t036_and_every_step_fits_the_stack() -> None:
         *(spec.gear_tag(t) for t in spec.BONDED_TEETH),
         "end",
     }
-    assert spec.LEVEL_END_MM == spec.BLADE_START_MM[6] + spec.BLADE_LENGTH
+    xx = 0.01 * INCH
+    face, band = family.FACE_WIDTH, abs(family.FACE_WIDTH_BAND[1])
+    feeler, feeler_band = spec.STACK_FEELER, spec.STACK_FEELER_BAND
+    # Codjiflo round 5 (P2): a step's inside corner may be round to the
+    # title block's R.040; at the shortest print and longest stack that
+    # round still lies wholly north of the larger gear south of it, so it
+    # never deepens that gear's blade.
+    corner = 0.040 * INCH
+    for index, teeth in enumerate(spec.GEARS[1:], start=1):
+        south_face_long = index * (face + band) + feeler + feeler_band
+        assert spec.BLADE_START_MM[teeth] - xx - corner >= south_face_long - 1e-9
+        # No further north than the .01 grid needs.
+        assert spec.BLADE_START_MM[teeth] - 0.01 * INCH - xx - corner < south_face_long
+    # T006's level stops inside T006's north face at its longest print and
+    # the shortest stack.
+    north_short = 4 * face + feeler + face - 5 * band - feeler_band
+    assert spec.LEVEL_END_MM + xx < north_short
+    for teeth in spec.BONDED_TEETH:
+        (short_south, short_north), (long_south, long_north) = spec.blade_spans_mm(
+            teeth
+        )
+        assert long_south < short_south < short_north < long_north
+        assert long_south == pytest.approx(spec.BLADE_START_MM[teeth] - xx - corner)
 
 
 def test_the_u_clears_the_tip_and_grips_t030() -> None:

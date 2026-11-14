@@ -176,19 +176,29 @@ def _south_face_mm(teeth: int) -> float:
 # is T030's south face, where both arms stand: the comb's south end. Each
 # blade's level runs from the step at its south end north to the next step:
 # over its own gear's face, then over the smaller gear beyond it, whose tips
-# it clears (below). Each step stands BLADE_INSET north of its gear's south
-# face, so it never stands over the larger gear south of it (the deeper level
-# would strike that gear's teeth), and T006's level, BLADE_LENGTH long, stops
-# BLADE_INSET inside T006's north face, where MHA-DT-38 is pressed on; past
-# it the arm's edge returns to the seat line, well out of MHA-DT-38's reach.
-# Every length is .XX at
-# the title block's band (rule 3); AXIAL_MARGIN_MM proves each step and the
-# level's end clear at every stack and print limit.
-BLADE_INSET = 0.030 * INCH
-BLADE_LENGTH_PLACES = 2
-BLADE_LENGTH = inch_grid_mm(
-    FACE_WIDTH - 2.0 * BLADE_INSET, BLADE_LENGTH_PLACES, math.floor
-)
+# it clears (below). A step's inside corner may be round to the title
+# block's R.040 MAX; that round hangs below the larger gear's level over the
+# stretch just south of the step. So each step stands the whole R.040 north
+# of its gear's south face at every stack and print: the round lies over its
+# own gear's face, above its own blade's level in that gear's space, and
+# never over the larger gear south of it, whose blade it would deepen. T006's
+# level stops inside T006's north face at every stack and print, where
+# MHA-DT-38 is pressed on; past it the arm's edge returns to the seat line,
+# well out of MHA-DT-38's reach. Every length is .XX at the title block's
+# band (rule 3); axial_margins_mm proves each step and the level's end.
+INSIDE_CORNER_MAX_MM = 0.040 * INCH
+BLADE_START_PLACES = 2
+
+
+def _south_face_max_mm(teeth: int) -> float:
+    """``teeth``'s south face at the longest stack: every face south of it
+    and, past T030, the feeler long."""
+    index = GEARS.index(teeth)
+    return _south_face_mm(teeth) + (
+        index * _FACE_BAND + STACK_FEELER_BAND if index else 0.0
+    )
+
+
 # Blade south ends (the steps) from the comb's south end, printed; T030's
 # blade starts at the south end.
 BLADE_START_MM: dict[int, float] = {
@@ -196,16 +206,22 @@ BLADE_START_MM: dict[int, float] = {
         0.0
         if teeth == REFERENCE_TEETH
         else inch_grid_mm(
-            _south_face_mm(teeth) + BLADE_INSET, BLADE_LENGTH_PLACES, math.ceil
+            _south_face_max_mm(teeth) + _XX + INSIDE_CORNER_MAX_MM,
+            BLADE_START_PLACES,
+            math.ceil,
         )
     )
     for teeth in GEARS
 }
-LEVEL_END_MM = BLADE_START_MM[GEARS[-1]] + BLADE_LENGTH
-# T006's north face at the longest stack: every face and the feeler long.
+# T006's north face at the shortest stack and the longest: every face and
+# the feeler short or long.
+_T006_NORTH_MIN_MM = (
+    _south_face_mm(GEARS[-1]) + FACE_WIDTH - len(GEARS) * _FACE_BAND - STACK_FEELER_BAND
+)
 _T006_NORTH_MAX_MM = (
     _south_face_mm(GEARS[-1]) + FACE_WIDTH + len(GEARS) * _FACE_BAND + STACK_FEELER_BAND
 )
+LEVEL_END_MM = inch_grid_mm(_T006_NORTH_MIN_MM - _XX, BLADE_START_PLACES, math.floor)
 
 
 def axial_margins_mm() -> dict[str, float]:
@@ -214,19 +230,10 @@ def axial_margins_mm() -> dict[str, float]:
     A station moves by every face south of it and, past T030, the feeler; a
     printed length by the title block's band."""
     margins = {
-        gear_tag(teeth): BLADE_START_MM[teeth]
-        - _XX
-        - (_south_face_mm(teeth) + index * _FACE_BAND + STACK_FEELER_BAND)
-        for index, teeth in enumerate(GEARS)
-        if teeth != REFERENCE_TEETH
+        gear_tag(teeth): BLADE_START_MM[teeth] - _XX - _south_face_max_mm(teeth)
+        for teeth in BONDED_TEETH
     }
-    north_min = (
-        _south_face_mm(GEARS[-1])
-        + FACE_WIDTH
-        - len(GEARS) * _FACE_BAND
-        - STACK_FEELER_BAND
-    )
-    margins["end"] = north_min - (LEVEL_END_MM + _XX)
+    margins["end"] = _T006_NORTH_MIN_MM - (LEVEL_END_MM + _XX)
     return margins
 
 
@@ -235,6 +242,11 @@ if AXIAL_MARGIN_MM <= 0.0:
     raise AssertionError(
         f"comb axial margin {AXIAL_MARGIN_MM:.3f} mm: a step overhangs its gear"
     )
+for _teeth in BONDED_TEETH:
+    if axial_margins_mm()[gear_tag(_teeth)] < INSIDE_CORNER_MAX_MM - 1e-9:
+        raise AssertionError(
+            f"T{_teeth:03d}'s step corner overhangs the larger gear south of it"
+        )
 
 # Before the compound grabs a bonded gear may float any way by half its bond
 # clearance (T024 on land 2; T018, T012 and T006's spigot on .0625).
@@ -496,9 +508,29 @@ SEAT_LINES: tuple[tuple[float, float, float, float], ...] = tuple(
 )
 
 
-def blade_span_mm(teeth: int) -> tuple[float, float]:
-    """The stretch of a bonded blade inside its own gear's face."""
-    return BLADE_START_MM[teeth], BLADE_START_MM[teeth] + BLADE_LENGTH
+def blade_spans_mm(teeth: int) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The shortest and the longest stretch of a bonded blade inside its own
+    gear's face at any stack and print: from its step (its corner square) to
+    its gear's north face at the shortest stack, and from its step's corner
+    round (R.040 MAX south of the step) to that face at the longest. T006's
+    stops at its level's end. A shorter stretch yaws less across the space,
+    so leaves more play; a longer one less."""
+    index = GEARS.index(teeth)
+    north_min = (
+        _south_face_mm(teeth)
+        + FACE_WIDTH
+        - (index + 1) * _FACE_BAND
+        - STACK_FEELER_BAND
+    )
+    north_max = _south_face_max_mm(teeth) + FACE_WIDTH + _FACE_BAND
+    if teeth == GEARS[-1]:
+        north_min = min(north_min, LEVEL_END_MM - _XX)
+        north_max = min(north_max, LEVEL_END_MM + _XX)
+    start = BLADE_START_MM[teeth]
+    return (
+        (start + _XX, north_min),
+        (start - _XX - INSIDE_CORNER_MAX_MM, north_max),
+    )
 
 
 def _flex_share(station_mm: float) -> float:
@@ -550,9 +582,10 @@ _FLOAT_DIRECTIONS = 16
 
 def _conditions(teeth: int, depth_mm: float):
     """Every limit a bonded blade meets: each seat, the U leaned either way,
-    each tooth corner of its gear, the depth's band (deeper by the arm's
-    flex) and the gear's float round its circle. Yields (corner, edge,
-    mid-plane, sheet across the space)."""
+    its shortest and longest stretch in its gear's face, each tooth corner of
+    its gear, the depth's band (deeper by the arm's flex) and the gear's float
+    round its circle. Yields (corner, edge, mid-plane, sheet across the
+    space)."""
     drift = _float_mm(teeth)
     floats = tuple(
         (
@@ -562,27 +595,27 @@ def _conditions(teeth: int, depth_mm: float):
         for k in range(_FLOAT_DIRECTIONS)
     )
     bands = (-_XXX - FLEX_MM[teeth], _XXX)
-    south, north = blade_span_mm(teeth)
     for edge, start, end, sheet_mm in SEAT_LINES:
-        at_south = start + (end - start) * south / T030_FACE_MM
-        at_north = start + (end - start) * north / T030_FACE_MM
-        mid = (at_south + at_north) / 2.0
-        sweep = abs(at_north - at_south)
-        for lean in (-LEAN_MAX_RAD, LEAN_MAX_RAD):
-            # Turned about the seat line, a point the depth below it rises
-            # by depth * (1 - cos) and moves across by depth * sin.
-            rise = depth_mm * (1.0 - math.cos(lean))
-            across = depth_mm * math.sin(lean)
-            thick = sheet_mm / math.cos(lean) + sweep
-            for corner in range(len(_profiles(teeth))):
-                for band in bands:
-                    for radial, tangential in floats:
-                        yield (
-                            corner,
-                            edge - depth_mm + band + rise + radial,
-                            mid + across + tangential,
-                            thick,
-                        )
+        for south, north in blade_spans_mm(teeth):
+            at_south = start + (end - start) * south / T030_FACE_MM
+            at_north = start + (end - start) * north / T030_FACE_MM
+            mid = (at_south + at_north) / 2.0
+            sweep = abs(at_north - at_south)
+            for lean in (-LEAN_MAX_RAD, LEAN_MAX_RAD):
+                # Turned about the seat line, a point the depth below it
+                # rises by depth * (1 - cos) and moves across by depth * sin.
+                rise = depth_mm * (1.0 - math.cos(lean))
+                across = depth_mm * math.sin(lean)
+                thick = sheet_mm / math.cos(lean) + sweep
+                for corner in range(len(_profiles(teeth))):
+                    for band in bands:
+                        for radial, tangential in floats:
+                            yield (
+                                corner,
+                                edge - depth_mm + band + rise + radial,
+                                mid + across + tangential,
+                                thick,
+                            )
 
 
 # At every limit each blade keeps this much play at its edge (the wax film
@@ -643,22 +676,15 @@ for _teeth in BONDED_TEETH:
     )
     if math.hypot(_shallowest, _across) >= tip_radius_limits_mm(_teeth)[0]:
         raise AssertionError(f"T{_teeth:03d} blade stands over its gear's tips")
-# Each level passes over the next, smaller gear's tips (its own blade's step
-# stands BLADE_INSET into that gear's face) at the lowest print and seat, its
-# deepest flex and the smaller gear's float.
-INSIDE_CORNER_MAX_MM = 0.040 * INCH
+# Each level passes over the next, smaller gear's tips (that gear's step
+# stands R.040 and more into its face, and the step's corner round lies over
+# that gear's own space) at the lowest print and seat, its deepest flex and
+# the smaller gear's float.
 for _south, _north in zip(GEARS, GEARS[1:], strict=False):
     _band = 0.0 if _south == REFERENCE_TEETH else _XXX + FLEX_MM[_south]
     _lowest = SEAT_EDGE_MM[0] - blade_depth_mm(_south) - _band
     if _lowest <= tip_radius_limits_mm(_north)[1] + BOND_FLOAT_MM:
         raise AssertionError(f"T{_south:03d} level reaches T{_north:03d}'s tips")
-    # The step's inside corner at the title block's R.040 MAX hangs below the
-    # level by at most this over the smaller gear's face.
-    _r = INSIDE_CORNER_MAX_MM
-    _u = min(axial_margins_mm()[gear_tag(_north)], _r)
-    _sag = _r - math.sqrt(_r * _r - (_r - _u) ** 2)
-    if _lowest - _sag <= tip_radius_limits_mm(_north)[1] + BOND_FLOAT_MM:
-        raise AssertionError(f"T{_south:03d} step corner reaches T{_north:03d}'s tips")
 # Past T006's level the near arm's edge returns to the seat line, flexed in
 # by the most the spread bends it there, and stands clear of MHA-DT-38.
 if SEAT_EDGE_MM[0] - _flex_share(SLOT_LENGTH) * SPREAD_MAX_MM <= BUSHING_REACH_MM:
