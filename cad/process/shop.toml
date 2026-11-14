@@ -338,10 +338,12 @@ diameter_mm = 4.7625
 [settings.kit-em-half-sus304]
 tool = "jig-em-half"
 material = "sus304"
-sfm = 70
-feed = "Hand, light: .2 mm a pass (authored; no sourced feed)"
+sfm = 50  # Below LMS 70 for hand feed in 304: ~400 rpm (machinist review 2026-11-14).
+# Feed authored; no sourced feed for 304.
+feed = "Hand, steady and positive; no dwell"
 [settings.kit-flat-sus304]
 tool = "basebar-counterbore"
 material = "sus304"
-sfm = 70
-feed = "Hand, light (authored; no sourced feed)"
+sfm = 50  # Below LMS 70 for hand feed in 304: ~600 rpm (machinist review 2026-11-14).
+# Feed authored; no sourced feed for 304.
+feed = "Hand, steady and positive; no dwell at depth"

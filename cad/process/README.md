@@ -261,9 +261,13 @@ cut end and five flats, the FeedNut member's faced seat, countersinks and
 receipt limits), and its `kit-*` setup pictures are prechips layouts. The route
 is authored (no hand traveler): receive and check the kit, hacksaw the screw
 long, mill the cut end to length from the NEAR END, mill the five set-screw
-flats on the BS-0 dividing head, face the nut's spigot in the lathe and
-countersink its four holes by hand. The hacksaw and the 3/16 in-body 82°
-countersink are not owned (`shop-equipment.toml`, `present = false`).
+flats on the BS-0 dividing head (the handwheel flat in its own 16 mm re-grip:
+at the cut-end KP08 flats' 42 mm stick-out `milling_deflection` estimates about
+0.09 mm against the 0.025 mm finish limit), face the nut's spigot in the lathe
+on the threaded offcut and countersink its four holes by hand. It declares its
+milling beams and cuts, so it renders with `milling_deflection` enforced. The
+hacksaw and the 3/16 in-body 82° countersink are not owned
+(`shop-equipment.toml`, `present = false`).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
