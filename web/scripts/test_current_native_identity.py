@@ -282,7 +282,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 49)
+        self.assertEqual(len(retired), 50)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
@@ -338,6 +338,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             # 2026-11-06 R3 hold-down: the bonded gauge pin retired; its turned
             # hub-stud replacement was removed before release.
             "ch-rocker-arm-tl-vn-oblique-hub-pin": "MHA-CH-06-TL-VN-80",
+            # Owner ruling 2026-11-13 (#2448): the bought brass #8 SAE flat
+            # washer TL-VN-85 retires the turned top-hat washer.
+            "ch-rocker-arm-tl-oblique-hub-washer": "MHA-CH-06-TL-52",
         }
         actual_oblique = {
             target["stem"]: target["number"]

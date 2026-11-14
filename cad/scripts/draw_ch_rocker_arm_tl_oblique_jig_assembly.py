@@ -298,7 +298,7 @@ def _instances(*stems: str) -> set[str]:
 # The owner's list, which the mates must reproduce: the carrier TL-21, the
 # riser and its four screws (the riser-screw family's feed-nut four stay), the
 # feed lever with its screws and wedge-lock washers, and the strap's top
-# workholding: the TL-52 top-hat washer, the two loose SM-VN-53 stock stop
+# workholding: the TL-VN-85 flat washer, the two loose SM-VN-53 stock stop
 # pins and the common screw's CL, CR and HUB clamp occurrences, hidden by
 # occurrence (STRAP_CLAMP_SCREW_INSTANCES), never by the common stem. No strap
 # is modelled. Kept: the base bars, rails, carriages, both blocks, the pivot
@@ -653,8 +653,8 @@ PART_ROWS = {
         "ch-rocker-arm-tl-vn-oblique-pivot-shim"
     ),
     "ch-rocker-arm-tl-oblique-riser": _config.parts("ch-rocker-arm-tl-oblique-riser"),
-    "ch-rocker-arm-tl-oblique-hub-washer": _config.parts(
-        "ch-rocker-arm-tl-oblique-hub-washer"
+    "ch-rocker-arm-tl-vn-oblique-hub-washer": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-hub-washer"
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
