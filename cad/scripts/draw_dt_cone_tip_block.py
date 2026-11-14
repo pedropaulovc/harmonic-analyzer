@@ -264,30 +264,15 @@ ROUND_OUT = 0.0001
 # render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
-# The bore's function, named at its callout (screen review dt-fab-4: the
-# location carries its value only, rule 4).  Its location from the -X face
-# holds the end screw, and with it T006's pivot, in line with the line
-# MHA-DT-05's journal points the shaft along; the post's turn on its screws
-# takes up the rest.  #2697: the location prints .34 at .XX (the post's
-# 19/64 holes leave that turn 2.8 mm past the tip's print-worst lateral
+# The callout's shoulder keeps the place it was proven at when a function
+# flag stood over it ("IN LINE WITH MHA-DT-05", 55.1 x 3.6 mm from its
+# upper-left corner).  #2697: the bore's location prints .34 at .XX (the
+# post's 19/64 holes leave its turn 2.8 mm past the tip's print-worst lateral
 # error, build_dt_drive_train_assembly TIP_LATERAL_ERROR_MM 6.76 against
-# TIP_LATERAL_CAPACITY_MM 9.59), so the flag states the bore's function, no
-# longer a tight band's reason.  Its height is made to the same axis (note 2).
-# Machinist review of PR 2's farm proof (rounds 1 and 2) read "LOCATES
-# MHA-DT-37 PIVOT" as a mate with no function; the v49 release review
-# (3 of 3 runs) read "ON MHA-DT-05 AXIS" as the height alone, so the flag
-# names the side-to-side alignment.
-BORE_FLAG_TEXT = f"IN LINE WITH {POST_NUMBER}"
-# The flag's ink from its upper-left corner: run 20261110T001845485Z printed
-# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; BORE_FLAG_TEXT's
-# glyphs at that pitch, rounded out to 0.1 mm.
-_BORE_FLAG_GLYPH = 0.00262
-ADJUSTER_ENTRY_EXTENT = (
-    0.0,
-    0.0036,
-    math.ceil(len(BORE_FLAG_TEXT) * _BORE_FLAG_GLYPH * 1e4) / 1e4,
-    0.0,
-)
+# TIP_LATERAL_CAPACITY_MM 9.59), so it holds no tight band and needs no
+# reason; machinist review of 0613bba70 read the flag as a location given in
+# words (rule 26), and it is gone.  The height is made to MHA-DT-05 (note 2).
+ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0551, 0.0)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
 ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
@@ -360,8 +345,7 @@ DIMENSION_CALLOUTS_ABOVE = {
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
     "Width": "WITHIN MHA-DT-20 EDGE",
-    # Screen review (dt-fab-4): a location carries its value only; the
-    # shaft-tip function moved to the bore's callout (BORE_FLAG_TEXT).
+    # Screen review (dt-fab-4): a location carries its value only.
     # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
     # stands inside the Ø4.04 bore, so its lower extension line ended on no
     # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
@@ -666,10 +650,13 @@ PINCH_THREAD_CALLOUT_XY = (
 # review of PR 2's farm proof, round 2, found no function on it).  #2697: its
 # station across the block prints .30 at .XX and needs no reason, so the one
 # reason is the .XXX station's alone (the v49 release review, 3 of 3 runs,
-# read it as the across station's when both were .XXX).  Machinist review of
-# 017b38ec2 (3 of 3 runs) read "SETS MHA-DT-39 REACH" as no rule-3 function
-# for the .215, so the reason takes rule 3's form: what the station holds.
-FOOT_TAP_QUALIFIER = "HOLDS MHA-DT-39 ENGAGEMENT"
+# read it as the across station's when both were .XXX).  Rule 7 puts the mate
+# on the hole's size callout, not on the location (machinist review of
+# ecc864e1f refused it under the .215); reviews of 017b38ec2 and 0613bba70
+# refused it here as not at the dimension, so declaration dt-cone-tip-block
+# RV-02 (delegated ruling 2026-11-13) accepts the .215 as printed until the
+# 3/4 end screw of #2726 lets the station print .XX.
+FOOT_TAP_QUALIFIER = "SETS MHA-DT-39 REACH"
 _FOOT_TAP_GLYPH = 0.0576 / 20.0
 _FOOT_TAP_GROWTH = (len(FOOT_TAP_QUALIFIER) - 20) * _FOOT_TAP_GLYPH
 FOOT_TAP_CALLOUT_EXTENT = (
@@ -727,8 +714,6 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
     return (
         # The removed view's caption is its letter, centred under it.
         ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
-        # Review: named above the thread callout it describes.
-        (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
         # The ream callout's SEE NOTE 1 (round 6, #2).
         (DOWEL_NOTE, *DOWEL_NOTE_XY),
         (AXIS_MATCH_NOTE, *AXIS_MATCH_NOTE_XY),
@@ -869,7 +854,6 @@ AXIS_MATCH_NOTE_EXTENT = (
 )
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
-    BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
     "VIEW B": VIEW_CAPTION_EXTENT,
     DOWEL_NOTE: DOWEL_NOTE_EXTENT,
     AXIS_MATCH_NOTE: AXIS_MATCH_NOTE_EXTENT,

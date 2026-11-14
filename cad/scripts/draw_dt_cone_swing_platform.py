@@ -254,10 +254,13 @@ PROFILE_KEEP = {
     "NorthEastX": _planned(0.045, 0.105),
     "NorthWestX": _planned(0.100, 0.115),
     "SouthWestX": _planned(0.104, 0.2640),
-    # Two rows over the south edge (y 0.2443): the chamfer's run from the
-    # sharp corner under the corner's own station from the pivot axis.
+    # Two rows over the south edge (y 0.2443), both from the pivot axis: the
+    # sharp corner's station, and under it the chamfer's start, 1.3 mm west of
+    # the axis on this sheet, its value just west of that short span (#2697:
+    # the start's run from the sharp corner chained two bands, machinist
+    # review of ecc864e1f).
     "SouthEastX": _planned(0.045, 0.2650),
-    "CornerSERun": _planned(0.045, 0.2590),
+    "CornerSEStartX": _planned(0.0795, 0.2590),
     # Left of the east edge and of the two rows' text, which its outside
     # arrows would otherwise cross.
     "CornerSERise": _planned(0.038, 0.2455),

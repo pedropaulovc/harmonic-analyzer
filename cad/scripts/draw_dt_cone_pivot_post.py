@@ -606,7 +606,9 @@ DIMENSION_CALLOUTS = {
     "CrankBossLen": "SEATS\nMHA-DT-11 COLLAR",
     "CrankBoreDia": f"REAM THRU, SEE NOTE {CRANK_BORE_NOTE}",
     "JournalBoreDia": f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}\n{POST_JOURNAL_RIM_BREAK}",
-    "ConeBossLen": "MHA-DT-04 BEARING LENGTH",
+    # Machinist review of ecc864e1f (2 of 3 runs): "MHA-DT-04 BEARING LENGTH"
+    # named again the mate note 2 names once for the bore and the .827 face.
+    "ConeBossLen": f"SEE NOTE {CONE_BORE_NOTE}",
     "ConeBossNorthZ": f"SEE NOTE {CONE_BORE_NOTE}",
     "CrankBossStartZ": f"SEE NOTE {MESH_NOTE}",
 }
