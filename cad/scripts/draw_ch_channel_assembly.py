@@ -292,7 +292,6 @@ PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
 # run past the exploded south keeper, the shaft's only clear length. Part
 # frame (ch_fulcrum_shaft_spec): axis along z centred on 0, flats on +y,
 # unturned in the assembly.
-FULCRUM_SHAFT_STEM = "ch-fulcrum-shaft"
 FULCRUM_SHAFT_BALLOON_POINT_MM = (
     math.sqrt(FULCRUM_SHAFT_R**2 - FULCRUM_FLAT_Y**2),
     FULCRUM_FLAT_Y,
@@ -883,7 +882,7 @@ KEEPER_DETAIL_BALLOON_MARGIN = 0.010
 KEEPER_BALLOON_POINT_MM = (-KEEPER_LUG_HALF_T, KEEPER_CROWN_TOP_Y, 0.0)
 BALLOON_POINTS_MM = {
     PIVOT_SHAFT_STEM: PIVOT_SHAFT_BALLOON_POINT_MM,
-    FULCRUM_SHAFT_STEM: FULCRUM_SHAFT_BALLOON_POINT_MM,
+    explode.FULCRUM_SHAFT: FULCRUM_SHAFT_BALLOON_POINT_MM,
     explode.BRACKET: BRACKET_BALLOON_POINT_MM,
     explode.KEEPER: KEEPER_BALLOON_POINT_MM,
 }
@@ -1320,7 +1319,7 @@ def _fitup_text() -> dict[str, str]:
         # (machinist review, PR #1605).
         "south-bracket-spring-set": (
             f"WITH THE DRO AT THE SPRING SET OF {detail}, RIGHT OF THE STEP "
-            f"{n('south-bracket-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
+            f"{n('south-bracket-dro-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
             "INDICATOR READS ZERO ON IT."
         ),
         "south-bracket-clamped": (

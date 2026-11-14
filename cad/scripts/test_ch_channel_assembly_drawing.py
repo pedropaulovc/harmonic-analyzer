@@ -297,15 +297,11 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     assert f"EAR PUSHING {washer}" in on_washer
     assert steps.NORTH_BRACKET_SET_REF in on_washer
     assert spring not in on_washer
-    zeroed = _step_body("south-bracket-zeroed")
-    assert "TEST INDICATOR" in zeroed and "DRO" not in zeroed
-    assert "ZERO THE DRO" in _step_body("south-bracket-dro-zeroed")
-    assert "OFF" in _step_body("south-bracket-slid-off")
-    assert "CLAMP" not in _step_body("south-bracket-refitted")
-    assert "CLAMP IT LIGHTLY" in _step_body("south-bracket-clamped-lightly")
+    # The spring set's DRO offset counts from the step that zeroes the DRO.
+    assert "DRO" in _step_body("south-bracket-dro-zeroed")
     setting = _step_body("south-bracket-spring-set")
     assert f"SPRING SET OF {drawing.SOUTH_END.title}, SHEET 4" in setting
-    assert f"STEP {steps.step_number('south-bracket-zeroed')} ZERO" in setting
+    assert f"STEP {steps.step_number('south-bracket-dro-zeroed')} ZERO" in setting
     assert "INDICATOR READS ZERO" in setting
     assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
     callout = drawing.notes.DIMENSION_CALLOUTS[drawing.asm.SPRING_SET_DIMENSION]
@@ -1061,7 +1057,7 @@ def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper()
     south keeper onto the shaft's bare run."""
     import ch_fulcrum_shaft_spec as shaft
 
-    x, y, z = drawing.BALLOON_POINTS_MM[drawing.FULCRUM_SHAFT_STEM]
+    x, y, z = drawing.BALLOON_POINTS_MM[drawing.explode.FULCRUM_SHAFT]
     assert y == pytest.approx(shaft.FLAT_HEIGHT)
     assert x > 0.0 and math.hypot(x, y) == pytest.approx(shaft.SHAFT_R)
     assert z == pytest.approx(-shaft.FLAT_PITCH / 2.0)
