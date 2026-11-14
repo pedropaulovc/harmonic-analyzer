@@ -100,7 +100,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     bonds, cleans the film out and redoes the round, the second from
     MHA-DT-38's check, which the heat undoes."""
     feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
-    comb = "ENGAGE MHA-DT-03-TL-02"
+    comb = "CLIP MHA-DT-03-TL-02"
 
     def in_order(text: str, phrases: tuple[str, ...]) -> list[int]:
         positions: list[int] = []
@@ -128,7 +128,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "ONCE THE BOND GRABS",
             "24 H CURE",
             "WIPE THE WAX OFF",
-            "DROPS INTO T030 AND T024",
+            "CLIPS OVER T030 AND T024",
             "250 DEG C",
             "CURED 638",
             "REDO FROM 1P.",
@@ -146,7 +146,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024",
             comb,
             "HOLD MHA-DT-37 HOME",
-            "DROPS INTO ALL FIVE GEARS",
+            "CLIPS OVER ALL FIVE GEARS",
             "250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
