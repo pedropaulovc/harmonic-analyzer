@@ -688,7 +688,7 @@ CRANK_HUB_SPROCKET_AIR_PRINT_WORST = (
 CHAIN_SPIGOT_AXIAL_AIR = COLLAR_LENGTH - seat_geometry.chain_reach_rear(
     seat_geometry.PLATE
 )  # 3.4223 on nominal collar and plate
-CHAIN_SPIGOT_AXIAL_AIR_WORST = COLLAR_LENGTH_MIN - _CHAIN_REACH_REAR_WORST  # 3.1191
+CHAIN_SPIGOT_AXIAL_AIR_WORST = COLLAR_LENGTH_MIN - _CHAIN_REACH_REAR_WORST  # 3.0683
 for _what, _air in (
     ("chain / hub relief shoulder, wheel seated", CHAIN_BARREL_AXIAL_AIR_WORST),
     (

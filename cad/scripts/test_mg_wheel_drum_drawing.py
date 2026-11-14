@@ -72,7 +72,7 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     # printed limits: the longest drum still keeps its face under the
     # shortest spigot's, so it is never proud.
     assert spec.DRUM_LEN < wheel_geom.SPIGOT_LEN
-    assert wheel_geom.DRUM_RECESS[0] >= -1e-9
+    assert wheel_geom.DRUM_RECESS == pytest.approx((0.0, 0.020 * 25.4))
     assert (
         part.V_DRUM
         == math.pi

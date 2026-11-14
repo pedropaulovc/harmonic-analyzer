@@ -173,10 +173,12 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     # The 0.8 pen wire seats at every printed groove corner: the narrowest
     # groove (R at its .XXX min) is wider than the wire, and the shallowest
     # (the .XX rim at its min over the .XXX bottom at its max) still buries it.
+    assert spec.GROOVE_WIDTH_MIN == pytest.approx(0.038 * inch)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx((3.93 - 3.848) * inch / 2.0)
     assert spec.GROOVE_WIDTH_MIN > rim.PEN_WIRE_DIA
     assert spec.GROOVE_DEPTH_MIN >= rim.PEN_WIRE_DIA
-    # The drum is never proud of the spigot face.
-    assert geom.DRUM_RECESS[0] >= -1e-9
+    # The drum is never proud of the spigot face: .000-.020 below it.
+    assert geom.DRUM_RECESS == pytest.approx((0.0, 0.020 * inch))
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
