@@ -60,7 +60,6 @@ import mg_magnifying_lever_geom
 import mg_output_fixture_geom
 import ms_stick_geom
 import paper_drive_geom
-import mg_magnifying_wheel_geom
 import _rocker_interface as rocker_interface
 import _mg_wheel_rim_geometry
 import mg_wheel_bar_geom
@@ -170,7 +169,7 @@ def nominal() -> Nominal:
         lever_r_built=lever_band[1],
         lever_r_max=lever_band[2],
         hook_offset_x=mg_output_fixture_geom.HOOK_OFFSET_X,
-        wheel_ratio=mg_magnifying_wheel_geom.WIRE_RATIO,
+        wheel_ratio=sh_vn_music_wire_lever_geom.BUILT_WIRE_RATIO,
         pen_half=float(_config.machine("output", "pen_trace_half_mm")),
     )
 

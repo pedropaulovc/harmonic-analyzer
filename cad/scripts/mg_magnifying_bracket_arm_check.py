@@ -22,7 +22,7 @@ wheel's rim (build_pn_pen_assembly: the pen rod slides in the hanger's U
 guides, the carriage hangs on it). The carriage mass is
 pn_pen_carriage_geom.plan_cg_local(); the pen rod is pn_pen_rod_spec's 5 mm
 square stock. The wheel balances that weight at RIM_WIRE_R against wire 1 at
-DRUM_WIRE_R, so wire 1 carries WIRE_RATIO (4.995) times the pen-side load.
+the drum, so wire 1 carries the built WIRE_RATIO (5.12) times the pen-side load.
 
 Stiffness criterion: the arm's share of the output chain's SERIES
 compliance. error_budget.yaml has no structural allowance, and the static
@@ -78,7 +78,7 @@ from mg_magnifying_lever_geom import (
 )
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_LENGTH as VROD_LENGTH
-from mg_magnifying_wheel_geom import WIRE_RATIO
+from sh_vn_music_wire_lever_geom import BUILT_WIRE_RATIO as WIRE_RATIO
 from mg_output_fixture_geom import HEX_AF as FIXTURE_HEX_AF
 from mg_output_fixture_geom import OVERALL_LENGTH as FIXTURE_LENGTH
 

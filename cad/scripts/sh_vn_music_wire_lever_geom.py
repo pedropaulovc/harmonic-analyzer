@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import math
 
-from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
+from _mcmaster_9666k142 import DIA as MEMBER_DIA
 from _mg_wheel_rim_geometry import (
+    GROOVE_BOTTOM_DIA,
     RIM_AXIAL as _RIM_AXIAL,
     RIM_INNER_DIA as _RIM_INNER_DIA,
     RIM_OUTER_DIA as _RIM_OUTER_DIA,
@@ -47,9 +48,24 @@ assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
     "fixture groove and wheel drum must carry the same lever wire diameter"
 )
 
-# Ø0.8 design nominal: inside the purchased 9666K56 0.031 +/-0.001 in band.
-if not _STOCK_DIA_MIN <= WIRE_DIA <= _STOCK_DIA_MAX:
-    raise AssertionError("lever wire Ø must lie in the 9666K56 catalogue band")
+# Ø0.8 is the WIRE LANE, not the wire: the envelope the drum, the grooves and
+# the stand-offs were laid out for when the wire was Ø.031 (#2398). The
+# purchased 9666K142 wire is Ø.008 (MEMBER_DIA) and the members are modelled
+# at that size on the lane's centreline, so the real wire rides
+# LANE_INSET nearer the drum and each groove bottom than its model.
+LANE_INSET = (WIRE_DIA - MEMBER_DIA) / 2.0  # 0.298
+if LANE_INSET < 0.0:
+    raise AssertionError("the lever wire is fatter than the lane laid out for it")
+# The wheel's magnification as built: the wire centres ride the rim groove
+# bottom and the drum, not the lane centres, so it is 5.12 where
+# mg_magnifying_wheel_geom.WIRE_RATIO (the lanes) is 4.995. error_budget
+# and the bracket arm check take this one, so the operator's clamp settings
+# and the wire 1 tension follow the wire that is fitted (#2687 re-lays the
+# lanes).
+BUILT_WIRE_RATIO = (GROOVE_BOTTOM_DIA + MEMBER_DIA) / (DRUM_OD + MEMBER_DIA)
+# A knot in a wire this thin is smaller than a tie hole, so each tail is tied
+# round the middle of an offcut of the same wire laid across the hole.
+TOGGLE_LENGTH = 3.175  # 1/8
 
 # --- endpoint anchors (magnifier frame; asserted by build_mg_magnifier_assembly)
 #

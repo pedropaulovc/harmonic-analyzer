@@ -11,8 +11,8 @@ from _check import check
 from _com import _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
 from _feature_tree import name_last_feature
-from _mcmaster_9666k56 import DIA
-from _mcmaster_9666k56_reference import (
+from _mcmaster_9666k142 import DIA
+from _mcmaster_9666k142_reference import (
     SUPPLIER_REFERENCE_CONFIGURATION,
     SUPPLIER_REFERENCE_DIMENSION,
     SUPPLIER_REFERENCE_FEATURE,

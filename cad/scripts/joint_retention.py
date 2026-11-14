@@ -822,7 +822,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "mg_vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
     "mg_vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
     "pn_vn_pen_marker": "felt-tip marker; its barrel lies in the v-block groove under the thumb screw; no thread",
-    "sh_vn_music_wire": "LeverWire and PenWire music-wire members; hooked/wrapped or tied through the adjuster eye, no thread",
+    "sh_vn_music_wire": "LeverWire and PenWire music-wire members; looped/wrapped and knotted, no thread",
     "sh_vn_pivot_pin": "RodPin and BarPin dowels pressed into reamed holes; no thread",
 }
 

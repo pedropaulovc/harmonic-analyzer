@@ -198,13 +198,17 @@ for _label, _left in (
             f"{_label} keeps {_left:.1f} deg of wrap < {WRAP_MARGIN_DEG}"
         )
 
-# TIE 1's tail is twisted off on the hub's back face, beside the back washer
-# and the spacer behind it (the bar is a spacer's length further back). The
-# hole circles the axle as the wheel turns, so the tail must clear the larger
-# of the two at every angle: radially. The tail envelope is the wire plus one
-# twisted turn beside it (1.5 wire dia from the hole centre), about the hole's
-# exit at its farthest axis offset (printed station, angle and drill wander).
-TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE1_OFFSET_MAX
+# TIE 1's tail is knotted round a toggle on the hub's back face, beside the
+# back washer and the spacer behind it (the bar is a spacer's length further
+# back). A knot in a Ø.008 wire is smaller than the hole, so the tail is
+# tied round the middle of a TOGGLE_LENGTH offcut of the same wire, which
+# lies across the hole and cannot enter it. The hole circles the axle as
+# the wheel turns, so the toggle must clear the larger of the two at every
+# angle: radially. The tail envelope is the toggle swung any way about the
+# hole's exit at its farthest axis offset (printed station, angle and drill
+# wander).
+TOGGLE_LENGTH = _lever.TOGGLE_LENGTH
+TAIL_ENVELOPE_R = TOGGLE_LENGTH / 2.0 + _wheel.TIE1_OFFSET_MAX
 _STACK_OD_MAX = max(_back.OD, _spacer.OD_MAX)  # the spacer at its .XX limit
 TAIL_STACK_CLEARANCE = _wheel.TIE1_R - TAIL_ENVELOPE_R - _STACK_OD_MAX / 2.0
 if TAIL_STACK_CLEARANCE <= 0.0:

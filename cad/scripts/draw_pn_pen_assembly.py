@@ -449,7 +449,7 @@ def _silhouette_corner(
 
 ROD_ANCHOR_Y = 63.0
 _HEAD_R = stud.HEAD_DIA / 2.0
-_WIRE_R = wire.WIRE_DIA / 2.0
+_WIRE_R = wire.MEMBER_DIA / 2.0
 _ROD_CORNER = (
     math.copysign(rod.ROD_SECTION / 2.0, _RIGHT[0]),
     math.copysign(rod.ROD_SECTION / 2.0, _RIGHT[2]),

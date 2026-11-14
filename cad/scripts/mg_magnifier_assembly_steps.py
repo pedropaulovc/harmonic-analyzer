@@ -88,10 +88,16 @@ STEPS: tuple[tuple[str, ...], ...] = (
     ("rod-seated",),
     (FIXTURE_SET_KEY, "fixture-thumb-screw-tightened", FIXTURE_HELD_KEY, "fixture-reset"),
     # Lever wire, on the machine.
-    (WIRE_HOOKED_KEY, "lever-wire-led-down", "lever-wire-hook-twisted", "lever-wire-hook-trimmed"),
+    (WIRE_HOOKED_KEY, "lever-wire-led-down", "lever-wire-hook-knotted"),
     ("machine-at-rest",),
     (WHEEL_TURNED_KEY,),
-    ("lever-wire-wrapped", "lever-wire-through-tie", "lever-wire-tie-twisted", WIRE_TIED_KEY),
+    (
+        "lever-wire-wrapped",
+        "lever-wire-through-tie",
+        "lever-wire-tie-knotted",
+        "lever-wire-knots-held",
+        WIRE_TIED_KEY,
+    ),
 )
 SEQUENCE: tuple[str, ...] = tuple(key for step in STEPS for key in step)
 

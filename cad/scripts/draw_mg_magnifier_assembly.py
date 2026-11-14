@@ -394,7 +394,7 @@ def wire_facing_point(
 WIRE_BALLOON_POINT_MM = wire_facing_point(
     sh_vn_music_wire_lever_geom.WIRE_START,
     sh_vn_music_wire_lever_geom.WIRE_END,
-    radius=sh_vn_music_wire_lever_geom.WIRE_DIA / 2.0,
+    radius=sh_vn_music_wire_lever_geom.MEMBER_DIA / 2.0,
     station=sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION * sh_vn_music_wire_lever_geom.WIRE_LEN,
 )
 
