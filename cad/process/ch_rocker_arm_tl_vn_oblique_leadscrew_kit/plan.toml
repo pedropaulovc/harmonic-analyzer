@@ -131,8 +131,8 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.saw_piece_mm}}"
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Mill the sawn end conventional (table away from you), 0.5 mm X steps, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write L on the screw."
-instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw, clear of the parallels. Feed the table away from you across the sawn end (conventional: the cutter climbs if fed the other way), stepping X 0.5 mm a pass, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
+instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Mill the sawn end conventional (table toward you), 0.5 mm X steps, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write L on the screw."
+instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw, clear of the parallels. Feed the table toward you across the sawn end (conventional; fed the other way the cutter climbs), steady hand feed, stepping X 0.5 mm a pass, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
 settings = "kit-em-half-sus304"
 cut_diameter_mm = "{{process.cutter_dia_mm}}"
 milling_cuts = [
@@ -156,7 +156,7 @@ title = "NEAR END flats"
 machine = "PM-30MV / BS-0 dividing head"
 indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
 machine_ref = "pm-30mv"
-holding = "BS-0 on the table's left, chuck facing +X (right); clock the jaws to 2, 6 and 10 o'clock before tightening (the 120° index keeps them there). Screw through the spindle, NEAR END {{process.near_stickout_mm:g}} out of the 3-jaw, threads wrapped in paper; the tail hangs free out the back (about 0.15 kg: no support)."
+holding = "BS-0 on the table's left, chuck facing +X (right). Screw through the spindle, NEAR END {{process.near_stickout_mm:g}} out of the 4-jaw, threads wrapped in paper, jaws at 1, 4, 7 and 10 o'clock (2, 5, 8 and 11 after the 120° index: none on top); indicate the crest true within 0.05. The tail hangs free out the back (about 0.15 kg: no support). Over the flat, dry-run the cutter to depth there with the spindle stopped: the collet and spindle nose must clear the jaws."
 datum = "X0 the NEAR END face; Z0 the thread crest on top."
 diagram = { file = "diagrams/leadscrew-kit/near-flats.svg", alt = "NEAR END out of the dividing-head chuck: the two KP08 flats, 0° then 120°" }
 envelope = { x_span_mm = ["{{cad.near_kp08_centre_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
@@ -169,7 +169,7 @@ speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "X = +D/2 on the NEAR END, then X −{{cad.near_kp08_centre_mm:.2f}}; touch the crest, Z0; cross in Y to Z −{{cad.flat_depth_mm:.2f}} in two passes."
-instruction_detailed = "Touch the NEAR END face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter). Jog once: moving the cutter from the end face over the screw must read minus. Move to X −{{cad.near_kp08_centre_mm:.2f}}: the cutter's edge sits on the flat's start, {{cad.near_kp08_station_mm:g}} from the end. Lower the knee carefully past the clocked jaws, touch the thread crest on top with paper and set Z0. Cross the screw in Y at Z −0.40, then Z −{{cad.flat_depth_mm:.2f}}, with a steady feed and no dwell at depth."
+instruction_detailed = "Touch the NEAR END face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter). Jog once: moving the cutter from the end face over the screw must read minus. Move to X −{{cad.near_kp08_centre_mm:.2f}}: the cutter's edge sits on the flat's start, {{cad.near_kp08_station_mm:g}} from the end. Touch the thread crest on top with paper and set Z0. Cross the screw in Y at Z −0.40, then Z −{{cad.flat_depth_mm:.2f}}, with a steady feed and no dwell at depth."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -182,8 +182,8 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.near_kp08_station_band_mm
 speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
-instruction = "Index {{cad.clock_deg:g}}° (advance the pin 8 spaces); same X and Z for the second flat."
-instruction_detailed = "Disengage the worm, pull the plunger and advance it 8 spaces on the 24-hole direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands: indexing turns the screw about its own axis. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
+instruction = "Index {{cad.clock_deg:g}}° by the setup's index setting; same X and Z for the second flat."
+instruction_detailed = "Disengage the worm, pull the plunger and advance it the number of holes the setup's index setting gives on the direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands: the screw is indicated true, so indexing turns it about its own axis. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -198,7 +198,7 @@ title = "Handwheel flat"
 machine = "PM-30MV / BS-0 dividing head"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "BS-0 as before, jaws at 2, 6 and 10 o'clock. Screw reversed: cut end {{process.wheel_stickout_mm:g}} out of the 3-jaw, threads wrapped. Its angle to the other flats is free (sheet 2 note 1)."
+holding = "BS-0 as before: 4-jaw at 1, 4, 7 and 10 o'clock, crest indicated true within 0.05. Screw reversed: cut end {{process.wheel_stickout_mm:g}} out, threads wrapped; at the first crossing, dry-run the cutter to depth there with the spindle stopped: the collet and spindle nose must clear the jaws. The flat's angle to the others is free (sheet 2 note 1)."
 datum = "X0 the cut end face; Z0 the thread crest. L = the length written on the screw."
 diagram = { file = "diagrams/leadscrew-kit/wheel-flat.svg", alt = "Cut end just out of the dividing-head chuck: the open handwheel flat" }
 envelope = { x_span_mm = ["{{cad.handwheel_from_cut_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
@@ -211,7 +211,7 @@ speed_kind = "spindle"
 tool = "em-flat"
 sizing = "other"
 instruction = "X = +D/2 on the cut end; cross at X −(L − {{cad.handwheel_centre_mm:.2f}}), then at X 0, each at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
-instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Touch the crest, set Z0. Cross at X −(L − {{cad.handwheel_centre_mm:.2f}}) (X −{{cad.handwheel_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}) at both depths, then at X 0 at both depths, so the flat runs out through the end."
+instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Touch the crest, set Z0. With a steady hand feed and no dwell at depth, cross at X −(L − {{cad.handwheel_centre_mm:.2f}}) (X −{{cad.handwheel_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}) at both depths, then at X 0 at both depths, so the flat runs out through the end."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -226,7 +226,7 @@ title = "Cut-end KP08 flats"
 machine = "PM-30MV / BS-0 dividing head"
 indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
 machine_ref = "pm-30mv"
-holding = "BS-0 as before, jaws at 2, 6 and 10 o'clock. Screw reversed: cut end {{process.far_stickout_mm:g}} out of the 3-jaw, threads wrapped."
+holding = "BS-0 as before: 4-jaw at 1, 4, 7 and 10 o'clock, crest indicated true within 0.05. Screw reversed: cut end {{process.far_stickout_mm:g}} out, threads wrapped; over the flat, dry-run the cutter to depth there with the spindle stopped: the collet and spindle nose must clear the jaws."
 datum = "X0 the cut end face; Z0 the thread crest. L = the length written on the screw."
 diagram = { file = "diagrams/leadscrew-kit/far-flats.svg", alt = "Cut end out of the dividing-head chuck: the two KP08 flats, 0° then 120°" }
 envelope = { x_span_mm = ["{{cad.far_kp08_from_cut_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
@@ -239,7 +239,7 @@ speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "X = +D/2 on the cut end, then X −(L − {{cad.far_kp08_centre_mm:.2f}}); touch the crest, Z0; cross to Z −{{cad.flat_depth_mm:.2f}} in two passes."
-instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Move to X −(L − {{cad.far_kp08_centre_mm:.2f}}) (X −{{cad.far_kp08_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}): the cutter's edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. Lower the knee carefully past the clocked jaws, touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}, steady feed, no dwell at depth."
+instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Move to X −(L − {{cad.far_kp08_centre_mm:.2f}}) (X −{{cad.far_kp08_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}): the cutter's edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. Touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}, steady feed, no dwell at depth."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -252,8 +252,8 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.far_kp08_station_band_m
 speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
-instruction = "Index {{cad.clock_deg:g}}° (advance the pin 8 spaces); second flat at the same X and Z. Deburr all flats."
-instruction_detailed = "Disengage the worm, pull the plunger and advance it 8 spaces on the 24-hole direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
+instruction = "Index {{cad.clock_deg:g}}° by the setup's index setting; second flat at the same X and Z. Deburr all flats."
+instruction_detailed = "Disengage the worm, pull the plunger and advance it the number of holes the setup's index setting gives on the direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands (the screw is indicated true). Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -303,7 +303,7 @@ speed_kind = "other"
 tool = "csk"
 sizing = { kind = "band", band_mm = "{{cad.csk_cutter_band_mm}}" }
 instruction = "{{cad.csk_count:d}}× countersink on the flange's body side by hand to Ø{{cad.csk_dia_mm:.2f}}; keep off the body."
-instruction_detailed = "Hold the nut by its flange O.D. in soft jaws, body up. Turn the {{cad.csk_angle_deg:g}}° countersink by hand in each hole, checking the mouth with calipers every few turns, to Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}} (design note, not measured: {{cad.csk_wall_note}})."
+instruction_detailed = "Hold the nut by its flange O.D. in soft jaws, body up. Turn the {{cad.csk_angle_deg:g}}° countersink by hand in each hole, checking the mouth with calipers every few turns, to Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}} (sheet 3: {{cad.csk_wall_note}})."
 feed = "hand"
 inspection = "Mouths Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}} × {{cad.csk_angle_deg:g}}°. The flat heads seat on the cone and stand slightly proud; do not open a mouth to sink them."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.csk_dia_band_mm}}" }]
