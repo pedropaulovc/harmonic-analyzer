@@ -29,8 +29,11 @@ IN = 25.4
 
 # Near-wall clearance (#5 drill, .206). It passes the standard 10-32 tap's
 # .194 shank, so a standard long-shank tap reaches the far wall through it,
-# and it is no smaller than the tube's .197 match drill it guides at
-# assembly (MHA-FR-00 steps 2 and 5).
+# and it passes the stock screw. MHA-FR-00 (#2388) spots each tube through it
+# with a 13/64 transfer punch (lower-/upper-holes-marked; the punch-entry check
+# is draw_fr_frame_assembly.TRANSFER_PUNCH_IN), then drills the tube's .197
+# match hole on the mill, out of the casting, so no drill runs through this
+# hole; being no smaller than that .197 hole is no longer a process need.
 NEAR_WALL_CLEARANCE_SIZE = "#10"
 NEAR_WALL_CLEARANCE_FIT = "close"
 NEAR_WALL_CLEARANCE_DIAMETER = CLEARANCE_MM[
