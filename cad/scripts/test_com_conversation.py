@@ -1243,9 +1243,11 @@ def _closest(handle: int, *point: float, query=_QUERY) -> conv.Call:
     )
 
 
-def _answers(a: list[conv.Call], b: list[conv.Call]) -> tuple[str, Any]:
+def _answers(
+    a: list[conv.Call], b: list[conv.Call], kind: str = "part"
+) -> tuple[str, Any]:
     keyed_a, keyed_b = _com_outcome._keyed_calls(a), _com_outcome._keyed_calls(b)
-    signal, detail = _com_outcome._answers_signal(keyed_a, keyed_b, a, b)
+    signal, detail = _com_outcome._answers_signal(keyed_a, keyed_b, a, b, kind)
     return signal.value, detail
 
 
@@ -3102,18 +3104,21 @@ def _assembled(
     mate: str = "arbor",
     named: str = "IComponent2.Name2",
     title: str | None = None,
+    first: int = 10,
+    on: int = 4,
 ) -> conv.Conversation:
     """An assembly script that reads every component's name, then visits the
     components in name order (the sort #2686 brings), 2026-11-13: the
-    components SolidWorks enumerated as ``names``, each wrapped by pywin32,
-    early-bound and named (``named``), then each selected in ``visit`` order
-    (sorted by default), then a mate on ``mate``; then, with ``title``, the
-    document's title echoed into an equation (:func:`_echoing`). Handles are
-    numbered in allocation order."""
-    raw = list(range(10, 10 + len(names)))
+    components SolidWorks enumerated as ``names`` (from handle ``first``, of
+    the document ``on``), each wrapped by pywin32, early-bound and named
+    (``named``), then each selected in ``visit`` order (sorted by default),
+    then a mate on ``mate``; then, with ``title``, the document's title
+    echoed into an equation (:func:`_echoing`). Handles are numbered in
+    allocation order."""
+    raw = list(range(first, first + len(names)))
     bound = [handle + len(names) for handle in raw]
     listed = {"t": [{"h": handle, "p": "PyIDispatch"} for handle in raw]}
-    calls = [_sw("IAssemblyDoc.GetComponents", False, result=listed, on=4)]
+    calls = [_sw("IAssemblyDoc.GetComponents", False, result=listed, on=on)]
     calls += [
         conv.Call(0, handle, "GetTypeInfo", [], "__WrapDispatch") for handle in raw
     ]
@@ -3126,7 +3131,7 @@ def _assembled(
     for name in sorted(names) if visit is None else visit:
         calls.append(_sw("IComponent2.Select4", False, on=of[name]))
     calls.append(
-        _sw("IAssemblyDoc.AddMate5", {"h": of[mate], "p": "PyIDispatch"}, on=4)
+        _sw("IAssemblyDoc.AddMate5", {"h": of[mate], "p": "PyIDispatch"}, on=on)
     )
     if title is not None:
         calls += _echoing(title)
@@ -3174,6 +3179,26 @@ def test_a_dependents_components_are_compared_by_name_not_enumeration_order():
         None,
         1,
     )
+
+
+def test_a_dependents_later_arrays_bind_on_top_of_earlier_ones():
+    def built(first: tuple[str, ...], second: tuple[str, ...]) -> conv.Conversation:
+        # Two documents' components listed, then a mate on the first's collar.
+        collar = {"h": 10 + len(first) + first.index("collar"), "p": "PyIDispatch"}
+        calls = [
+            *_assembled(first).calls,
+            *_assembled(second, mate="pin", first=30, on=5).calls,
+            _sw("IAssemblyDoc.AddMate5", collar, on=4),
+        ]
+        return conv.Conversation(_HEADER, calls, {})
+
+    base = built(("brace", "arbor", "collar"), ("rod", "pin"))
+    new = built(("collar", "brace", "arbor"), ("pin", "rod"))
+    named, arrays = _com_outcome.name_bound(base, new)
+    # The last mate is on the first document's collar, renamed by the first
+    # binding though a second came between.
+    assert arrays == 2
+    assert conv.compare_conversations(base, named)["request_divergence"] is None
 
 
 def test_only_a_dependents_diff_binds_components_by_name(tmp_path, monkeypatch):
@@ -3362,6 +3387,9 @@ def _seat_listed(
     aim: str = "collar",
     pick: bool = False,
     asked: tuple[tuple[str, float], ...] = (),
+    related: tuple[tuple[int, float], ...] = (),
+    volumes: tuple[float, ...] = (),
+    classify: str = "",
     dated: str = "IModelDoc2.SummaryInfo",
     date: str = "Friday, November 13, 2026 7:01:14 PM",
 ) -> conv.Conversation:
@@ -3376,7 +3404,11 @@ def _seat_listed(
     ``asked`` question at its position (a parameter read, its answer), then
     with ``pick`` the set's first element added to the selection; then a
     ``dated`` read answering ``date`` (by default the save date, a session
-    read)."""
+    read). With ``volumes``, each report's volume is read after its names;
+    with ``classify``, each reported component's path is read and then its
+    transform (``read``, pd_paper_drive's chain classification) or its
+    suppression set (``act``). ``related`` asks the set's element at each
+    position about the element at another (its distance from it)."""
     calls = [
         _sw("IModelDoc2.GetTitle", result=title),
         _sw("IModelDocExtension.SelectByID2", f"{aim}@{title}", "COMPONENT", on=5),
@@ -3386,12 +3418,31 @@ def _seat_listed(
     calls.append(
         _sw("IInterferenceDetectionMgr.GetInterferences", result=_handles_of(found))
     )
+    transforms = itertools.count(100)
     for index, (report, pair) in enumerate(zip(found, reports, strict=True)):
         members = [60 + 2 * index, 61 + 2 * index]
         result = _handles_of(members)
         calls.append(_sw("IInterference.Components", flags=2, result=result, on=report))
         for member, name in zip(members, pair, strict=True):
             calls += _late_name(member, name)
+            if classify:
+                path = f"C:/parts/{name}.SLDPRT"
+                calls.append(_sw("IComponent2.GetPathName", result=path, on=member))
+            if classify == "read":
+                transform = {"h": next(transforms), "p": "PyIDispatch"}
+                calls.append(
+                    _sw(
+                        "IComponent2.GetTotalTransform",
+                        False,
+                        result=transform,
+                        on=member,
+                    )
+                )
+            if classify == "act":
+                calls.append(_sw("IComponent2.SetSuppression2", 2, result=1, on=member))
+        if volumes:
+            volume = _f(volumes[index])
+            calls.append(_sw("IInterference.Volume", flags=2, result=volume, on=report))
     members = [80 + index for index in range(len(listed))]
     calls.append(_sw("IAssemblyDoc.GetComponents", True, result=_handles_of(members)))
     for member, name in zip(members, listed, strict=True):
@@ -3400,6 +3451,11 @@ def _seat_listed(
         read = [61, 0, 2, 1, question]
         site = "CDispatch.Parameter"
         calls.append(conv.Call(0, member, "Invoke", read, site, result=_f(value)))
+    for position, (other, value) in enumerate(related):
+        about = [63, 0, 2, 1, {"h": members[other], "p": "PyIDispatch"}]
+        distance = _f(value)
+        on = members[position]
+        calls.append(conv.Call(0, on, "Invoke", about, "CDispatch.Distance", distance))
     if pick:
         first = {"h": members[0], "p": "PyIDispatch"}
         calls.append(_sw("ISelectionMgr.AddSelectionListObject", first, None, on=7))
@@ -3407,17 +3463,22 @@ def _seat_listed(
     return conv.Conversation(_HEADER, calls, {})
 
 
-def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
-    tmp_path, monkeypatch
-):
+# Another seat's order for :func:`_seat_listed`: the interference report, the
+# name set and the components listed otherwise.
+_ANOTHER_SEAT: dict[str, Any] = {
+    "reports": (("rod-2", "pin-2"), ("rod-1", "pin-1")),
+    "listed": ("collar", "arbor", "brace"),
+    "names": ("collar", "brace", "arbor"),
+}
+
+
+def _seat_diff(
+    tmp_path: Path, monkeypatch: Any, base: conv.Conversation
+) -> tuple[dict[str, conv.Conversation], Any]:
+    """``com_replay.py diff`` of fixture logs: the logs it reads (``base``, and
+    ``new`` per diff; either replaceable) and the diff of a new log."""
     import com_replay
 
-    base = _seat_listed("Assem3", date="Friday, November 13, 2026 6:49:23 PM")
-    seat = {
-        "reports": (("rod-2", "pin-2"), ("rod-1", "pin-1")),
-        "listed": ("collar", "arbor", "brace"),
-        "names": ("collar", "brace", "arbor"),
-    }
     logs: dict[str, conv.Conversation] = {"base": base}
     monkeypatch.setattr(conv, "load", lambda path: logs[Path(path).name])
 
@@ -3428,6 +3489,16 @@ def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
             ["diff", "base", "new", "--kind", kind, "--result", str(result)]
         )
         return json.loads(result.read_text("utf-8"))
+
+    return logs, diff
+
+
+def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
+    tmp_path, monkeypatch
+):
+    base = _seat_listed("Assem3", date="Friday, November 13, 2026 6:49:23 PM")
+    logs, diff = _seat_diff(tmp_path, monkeypatch, base)
+    seat = _ANOTHER_SEAT
 
     # Another seat: another title counter, the components and the interference
     # report enumerated in another order, another save date. The echo comes
@@ -3473,6 +3544,63 @@ def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
         "Assem6", **seat, dated="IModelDoc2.GetCustomInfoValue", date="BRASS"
     )
     assert diff(custom)["title_echo"] is False
+
+
+def test_a_dependents_title_echo_reads_component_paths_and_transforms(
+    tmp_path, monkeypatch
+):
+    base = _seat_listed("Assem3", classify="read")
+    logs, diff = _seat_diff(tmp_path, monkeypatch, base)
+    # pd_paper_drive (2026-11-14): its chain classification asks each
+    # interfering component its path and transform, methods that only read.
+    found = diff(_seat_listed("Assem6", **_ANOTHER_SEAT, classify="read"))
+    assert found["title_echo"] is True
+    # Any other method on those components acts on them: no echo.
+    logs["base"] = _seat_listed("Assem3", classify="act")
+    found = diff(_seat_listed("Assem6", **_ANOTHER_SEAT, classify="act"))
+    assert found["title_echo"] is False
+
+
+def test_a_dependents_interference_volumes_compare_within_the_modellers_tolerance(
+    tmp_path, monkeypatch
+):
+    overlap = 12.285502183837625e-9
+    base = _seat_listed("Assem3", volumes=(overlap, 3.0e-9))
+    _, diff = _seat_diff(tmp_path, monkeypatch, base)
+
+    def judged(*volumes: float, reports=_ANOTHER_SEAT["reports"]) -> tuple:
+        seat = {**_ANOTHER_SEAT, "reports": reports}
+        found = diff(_seat_listed("Assem6", **seat, volumes=volumes))
+        return found["title_echo"], found["outcome_signals"]["answers"]
+
+    # pd_paper_drive (2026-11-14): one overlap 5.2e-7 apart in builds of
+    # identical geometry, the report in another order.
+    assert judged(3.0e-9, 12.285495794652596e-9) == (True, "same")
+    # 1e-4 apart is another overlap, and one that vanished another again.
+    assert judged(3.0e-9, overlap * (1 + 1e-4)) == (False, "different")
+    assert judged(0.0, overlap) == (False, "different")
+    # So is an interference more, however small.
+    more = (*_ANOTHER_SEAT["reports"], ("rod-3", "pin-3"))
+    echo, answers = judged(3.0e-9, overlap, 1e-15, reports=more)
+    assert echo is not True and answers == "different"
+
+
+def test_a_dependents_relational_reads_name_the_element_they_ask_about(
+    tmp_path, monkeypatch
+):
+    # #2761: the base lists arbor, brace, collar and asks each component
+    # about the next one listed: arbor about brace, brace about collar.
+    base = _seat_listed("Assem3", related=((1, 5.0), (2, 7.0)))
+    logs, diff = _seat_diff(tmp_path, monkeypatch, base)
+    seat = {**_ANOTHER_SEAT, "listed": ("brace", "arbor", "collar")}
+    # Listed brace, arbor, collar, the same requests ask brace about arbor
+    # and arbor about collar, though each component's answer is the base's.
+    found = diff(_seat_listed("Assem6", **seat, related=((1, 7.0), (2, 5.0))))
+    assert found["title_echo"] is False
+    # Asked about itself, each component is asked the same in any order.
+    logs["base"] = _seat_listed("Assem3", related=((0, 5.0), (1, 7.0), (2, 9.0)))
+    itself = ((0, 7.0), (1, 5.0), (2, 9.0))
+    assert diff(_seat_listed("Assem6", **seat, related=itself))["title_echo"] is True
 
 
 def _display_probe(site: str, *values: Any, result: Any) -> conv.Call:
