@@ -28,6 +28,7 @@ import ha_harmonic_analyzer_assembly_steps as steps
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _drawing_balloon_display import rendered_balloon_circle
 from _session import run_build
 from _drawing_common import (
@@ -515,10 +516,11 @@ def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
         raise RuntimeError(f"{label}: no configuration {configuration_name!r}")
     root = _early_bound(configuration, "IConfiguration").GetRootComponent3(True)
     spares = []
-    pending = list(root.GetChildren() or ()) if root is not None else []
+    # Stacked reversed, so pop() visits siblings in ascending name order.
+    pending = list(reversed(by_name(root.GetChildren()))) if root is not None else []
     while pending:
-        component = _early_bound(pending.pop(), "IComponent2")
-        pending.extend(component.GetChildren() or ())
+        name, component = pending.pop()
+        pending.extend(reversed(by_name(component.GetChildren())))
         # A pattern member or virtual part may carry no file path, so the
         # stem is read without _component_stem's refusal.
         if (
@@ -529,18 +531,18 @@ def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
             )
             == notes.SPARE_SPROCKET_CONFIG
         ):
-            spares.append(component)
+            spares.append((name, component))
     if len(spares) != 1:
         raise RuntimeError(
             f"{label}: {len(spares)} {notes.SPARE_SPROCKET_STEM} "
             f"{notes.SPARE_SPROCKET_CONFIG} instances in {configuration_name!r}, "
             "expected one"
         )
-    spare = spares[0]
+    name, spare = spares[0]
     parent = spare.GetParent()
     if parent is None or _component_stem(parent) != notes.PAPER_DRIVE:
-        raise RuntimeError(f"{label}: {spare.Name2!r} is not the paper drive's")
-    path = str(spare.Name2 or "").replace("\\", "/")
+        raise RuntimeError(f"{label}: {name!r} is not the paper drive's")
+    path = name.replace("\\", "/")
     values = [
         float(value)
         for value in _early_bound(spare.Transform2, "IMathTransform").ArrayData
@@ -764,8 +766,7 @@ def _validate_source(source_model: Any) -> None:
                 f"complete-machine {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -775,8 +776,7 @@ def _validate_source(source_model: Any) -> None:
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"complete-machine source must open collapsed: {component.Name2!r} "
-                "is displaced"
+                f"complete-machine source must open collapsed: {name!r} is displaced"
             )
     if counts != dict.fromkeys(BOM_COMPONENTS, 1):
         raise RuntimeError(

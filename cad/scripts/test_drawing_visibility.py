@@ -163,8 +163,13 @@ def test_family_preserves_parent_and_checks_nested_leaves(monkeypatch):
     components[0].GetChildren = (components[1], components[2])
     root = SimpleNamespace(GetChildren=(components[0],))
     view.RootDrawingComponent2 = lambda _: root
-    monkeypatch.setattr(visibility, "_drawing_component_stems",
-                        lambda _, component, stems: {"family"} if component is components[1] else set())
+    monkeypatch.setattr(
+        visibility,
+        "_drawing_component_stems",
+        lambda _, component, _name, stems: (
+            {"family"} if component is components[1] else set()
+        ),
+    )
     visibility.isolate_drawing_view_components(
         adapter, view, visible_stems=frozenset({"family"}), label="nested"
     )
@@ -205,8 +210,11 @@ def test_family_refuses_to_claim_leaf_is_visible_through_hidden_parent(monkeypat
     root = SimpleNamespace(GetChildren=(components[0],))
     view.RootDrawingComponent2 = lambda _: root
     monkeypatch.setattr(
-        visibility, "_drawing_component_stems",
-        lambda _, component, stems: {"family"} if component is components[1] else set(),
+        visibility,
+        "_drawing_component_stems",
+        lambda _, component, _name, stems: (
+            {"family"} if component is components[1] else set()
+        ),
     )
     with pytest.raises(RuntimeError, match="hidden ancestor"):
         visibility.isolate_drawing_view_components(
@@ -547,8 +555,11 @@ def test_family_isolation_returns_reacquired_section(monkeypatch):
 
     model.EditRebuild3 = rebuild
     monkeypatch.setattr(
-        visibility, "_drawing_component_stems",
-        lambda adapter, component, stems: {"family"} if component is components[1] else set(),
+        visibility,
+        "_drawing_component_stems",
+        lambda adapter, component, _name, stems: (
+            {"family"} if component is components[1] else set()
+        ),
     )
     returned = visibility.isolate_drawing_view_components(
         adapter, view, visible_stems=frozenset({"family"}), label="family section"
@@ -700,8 +711,11 @@ def test_section_releases_all_transient_component_proxies_before_reresolution(mo
         )
     else:
         monkeypatch.setattr(
-            visibility, "_drawing_component_stems",
-            lambda adapter, component, stems: {"family"} if component.Name == components[1].Name else set(),
+            visibility,
+            "_drawing_component_stems",
+            lambda adapter, component, _name, stems: (
+                {"family"} if component.Name == components[1].Name else set()
+            ),
         )
         returned = visibility.isolate_drawing_view_components(
             adapter, view, visible_stems=frozenset({"family"}), label="lifetime"

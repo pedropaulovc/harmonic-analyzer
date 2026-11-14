@@ -33,6 +33,7 @@ import _config
 
 from _check import check
 from _com import _early_bound
+from _component_order import by_name, drawing_components_by_name
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     _BALLOON_LANDING_TOLERANCE_M,
@@ -970,11 +971,12 @@ def _visible_circle_at_height(
     """Resolve a visible circular edge by component identity and native geometry."""
     view = _early_bound(view, "IView")
     full_components: dict[str, Any] = {}
-    for raw_drawing_component in _as_tuple(
-        view.GetVisibleDrawingComponents(),
-        label=f"{label} visible drawing components",
+    for _, drawing_component in drawing_components_by_name(
+        _as_tuple(
+            view.GetVisibleDrawingComponents(),
+            label=f"{label} visible drawing components",
+        )
     ):
-        drawing_component = _early_bound(raw_drawing_component, "IDrawingComponent")
         component = _early_bound(drawing_component.Component, "IComponent2")
         name = str(component.Name2 or "").rsplit("/", 1)[-1]
         if name in full_components:
@@ -982,13 +984,12 @@ def _visible_circle_at_height(
         full_components[name] = component
 
     candidates: list[tuple[tuple[float, ...], Any]] = []
-    for visible_component in _as_tuple(
-        view.GetVisibleComponents(), label=f"{label} visible components"
+    for native_name, visible_component in by_name(
+        _as_tuple(view.GetVisibleComponents(), label=f"{label} visible components")
     ):
-        visible_component = _early_bound(visible_component, "IComponent2")
         if _component_stem(visible_component) != component_stem:
             continue
-        name = str(visible_component.Name2 or "").rsplit("/", 1)[-1]
+        name = native_name.rsplit("/", 1)[-1]
         full_component = full_components.get(name)
         if full_component is None:
             raise RuntimeError(f"{label}: component {name!r} has no full peer")
@@ -1629,11 +1630,10 @@ def _validate_persisted_explode(source_model: Any) -> None:
             raise RuntimeError(
                 f"frame source {owner} exploded views {names!r} != {(wanted,)!r}"
             )
-    components = tuple(assembly.GetComponents(True) or ())
+    components = by_name(assembly.GetComponents(True))
     if len(components) != sum(BOM_QUANTITIES.values()):
         raise RuntimeError("frame source must contain exactly 29 components")
-    for raw_component in components:
-        component = _early_bound(raw_component, "IComponent2")
+    for name, component in components:
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
         if any(
@@ -1641,7 +1641,7 @@ def _validate_persisted_explode(source_model: Any) -> None:
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"frame source must open collapsed: {component.Name2!r} is displaced"
+                f"frame source must open collapsed: {name!r} is displaced"
             )
 
 
@@ -1886,15 +1886,14 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
 
 def _frame_visible_components(view: Any) -> dict[str, list[tuple[Any, Any]]]:
     full = {}
-    for raw in view.GetVisibleDrawingComponents() or ():
-        component = _early_bound(
-            _early_bound(raw, "IDrawingComponent").Component, "IComponent2"
-        )
+    for _, drawing_component in drawing_components_by_name(
+        view.GetVisibleDrawingComponents()
+    ):
+        component = _early_bound(drawing_component.Component, "IComponent2")
         full[str(component.Name2).rsplit("/", 1)[-1]] = component
     families: dict[str, list[tuple[Any, Any]]] = {}
-    for raw in view.GetVisibleComponents() or ():
-        component = _early_bound(raw, "IComponent2")
-        name = str(component.Name2).rsplit("/", 1)[-1]
+    for native_name, component in by_name(view.GetVisibleComponents()):
+        name = native_name.rsplit("/", 1)[-1]
         families.setdefault(_component_stem(component), []).append(
             (component, full[name])
         )

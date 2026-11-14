@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _assembly import _ledger_record, assert_component_placed, component_transform
 from _com import _early_bound, _read_member
+from _component_order import by_name
 from _visibility import blank_reference_geometry
 
 
@@ -153,12 +154,13 @@ def _select_pattern_inputs(
             )
 
 
-def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
-    components = _early_bound(model, "IAssemblyDoc").GetComponents(False) or []
+def _new_pattern_components(model: Any, before: set[str]) -> list[tuple[str, Any]]:
+    """The components absent from ``before``, named, in natural name order."""
+    components = _early_bound(model, "IAssemblyDoc").GetComponents(False)
     return [
-        component
-        for component in components
-        if str(_read_member(component, "Name2")) not in before
+        (name, component)
+        for name, component in by_name(components)
+        if name not in before
     ]
 
 
@@ -262,9 +264,7 @@ async def linear_component_pattern(
                 f"{label} created {len(created)} components, expected {expected}"
             )
         names = []
-        for component in created:
-            component = _early_bound(component, "IComponent2")
-            name = str(_read_member(component, "Name2"))
+        for name, component in created:
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
             names.append(name)
@@ -350,9 +350,7 @@ async def grid_component_pattern(
                 f"{label} created {len(created)} components, expected {expected}"
             )
         names = []
-        for component in created:
-            component = _early_bound(component, "IComponent2")
-            name = str(_read_member(component, "Name2"))
+        for name, component in created:
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
             names.append(name)
@@ -417,9 +415,7 @@ async def circular_component_pattern(
                 f"{label} created {len(created)} components, expected {expected}"
             )
         names = []
-        for component in created:
-            component = _early_bound(component, "IComponent2")
-            name = str(_read_member(component, "Name2"))
+        for name, component in created:
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
             names.append(name)

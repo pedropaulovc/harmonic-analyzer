@@ -17,6 +17,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 from _com import _early_bound
+from _component_order import by_name
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _activate_and_select_view, _select_edge
 from _title_block_units import LENGTH_UNITS
@@ -477,7 +478,12 @@ def bom_row_identities(
     row_count_after = -1
     try:
         for row in range(1, row_count):
-            components = tuple(annotation.GetComponents2(row, configuration) or ())
+            components = tuple(
+                component
+                for _, component in by_name(
+                    annotation.GetComponents2(row, configuration)
+                )
+            )
             if not components:
                 raise RuntimeError(f"BOM row {row} has no native component association")
             row_keys: set[str] = set()
@@ -1071,13 +1077,12 @@ def validate_bom_number_property(
     visible_cell(0, quantity_column, "quantity header")
     snapshot: list[tuple[int, tuple[tuple[str, str, int], ...], str, str]] = []
     for row in data_rows:
-        components = tuple(annotation.GetComponents2(row, configuration) or ())
+        components = by_name(annotation.GetComponents2(row, configuration))
         if not components:
             raise RuntimeError(f"{label} BOM row {row} has no native components")
         numbers: set[str] = set()
         identities: dict[tuple[str, str], int] = {}
-        for raw_component in components:
-            component = _early_bound(raw_component, "IComponent2")
+        for name, component in components:
             identity = component_identity(component)
             identities[identity] = identities.get(identity, 0) + 1
             native = component.GetModelDoc2()
@@ -1096,7 +1101,7 @@ def validate_bom_number_property(
             ).strip()
             if not number:
                 raise RuntimeError(
-                    f"{label} BOM row {row}: {component.Name2!r} "
+                    f"{label} BOM row {row}: {name!r} "
                     f"configuration {member!r} has no Number property"
                 )
             numbers.add(number)

@@ -39,6 +39,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _component_references import component_reference_names
 import _config
 from _drawing_balloons import (
@@ -4023,9 +4024,8 @@ def _validate_source(source_model: Any) -> SourceFacts:
     numbers: dict[str, set[str]] = {}
     reference_names = component_reference_names(source_model, COMPONENT_IDENTITIES)
     roles = {name: selector[1:] for selector, name in reference_names.items()}
-    for raw_component in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw_component, "IComponent2")
-        name = _component_name(component)
+    for native_name, component in by_name(assembly.GetComponents(True)):
+        name = native_name.rsplit("/", 1)[-1]
         stem = _component_stem(component)
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform").ArrayData
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform").ArrayData

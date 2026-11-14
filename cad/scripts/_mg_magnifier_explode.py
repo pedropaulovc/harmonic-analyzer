@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple
 
+import _component_order
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
@@ -146,11 +147,8 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
         model, {"@LeverWire:1": ("sh-vn-music-wire", LEVER_WIRE_CONFIGURATION)}
     )
 
-    components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
-    )
-    by_name = {str(component.Name2): component for component in components}
+    components = _component_order.by_name(assembly.GetComponents(True))
+    by_name = dict(components)
     if len(by_name) != len(components):
         raise RuntimeError(f"{view_name}: duplicate component identities")
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}

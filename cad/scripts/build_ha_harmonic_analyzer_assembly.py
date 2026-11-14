@@ -83,6 +83,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _com import _early_bound
+from _component_order import by_name
 from _assembly import (
     activate_assembly_contract,
     _discard_copy_source,
@@ -191,10 +192,9 @@ def _assert_ms_working_pose(adapter: Any, instance: str) -> None:
     if component is None:
         raise RuntimeError(f"{ASM_NAME}: missing measuring-stick instance {instance!r}")
     screws = [
-        _early_bound(child, "IComponent2")
-        for child in (component.GetChildren() or ())
-        if Path(str(_early_bound(child, "IComponent2").GetPathName())).stem
-        == ms.THUMB_SCREW
+        child
+        for _, child in by_name(component.GetChildren())
+        if Path(str(child.GetPathName())).stem == ms.THUMB_SCREW
     ]
     if len(screws) != 1:
         raise RuntimeError(

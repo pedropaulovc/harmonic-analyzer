@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
@@ -124,20 +125,19 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
         model, {"@PenWire:1": ("sh-vn-music-wire", PEN_WIRE_CONFIGURATION)}
     )
 
-    components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
-    )
-    groups: dict[str, list[Any]] = {stem: [] for stem in QUANTITIES}
-    for component in components:
+    components = _component_order.by_name(assembly.GetComponents(True))
+    groups: dict[str, list[tuple[str, Any]]] = {stem: [] for stem in QUANTITIES}
+    for name, component in components:
         stem = Path(str(component.GetPathName() or "")).stem.casefold()
         if stem not in groups:
-            raise RuntimeError(f"{view_name}: unexpected component {component.Name2}: {stem}")
-        groups[stem].append(component)
+            raise RuntimeError(f"{view_name}: unexpected component {name}: {stem}")
+        groups[stem].append((name, component))
     counts = {stem: len(group) for stem, group in groups.items()}
     if counts != QUANTITIES:
         raise RuntimeError(f"{view_name} component counts: {counts!r} != {QUANTITIES!r}")
-    baseline = {str(component.Name2): _presentation_transform(component) for component in components}
+    baseline = {
+        name: _presentation_transform(component) for name, component in components
+    }
     if len(baseline) != sum(QUANTITIES.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
@@ -154,7 +154,7 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
             raise RuntimeError(f"{view_name}: auto steps remain")
         for step_index, (label, stems, key, distance_mm) in enumerate(EXPLODE_STEPS, 1):
-            moved = [component for stem in stems for component in groups[stem]]
+            moved = [member for stem in stems for member in groups[stem]]
             distance = distance_mm / 1000.0
             with _telemetry.span("assembly.pn_explode.step", label=label, moved=len(moved)):
                 model.ClearSelection2(True)
@@ -163,9 +163,9 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
                 if data is None:
                     raise RuntimeError(f"{label}: cannot create component selection data")
                 data.Mark = 1
-                for component in moved:
+                for name, component in moved:
                     if not component.Select4(True, data, False):
-                        raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                        raise RuntimeError(f"{label}: cannot select {name}")
                 axis_name, positive = axes[key]
                 if not model.Extension.SelectByID2(
                     axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
@@ -197,14 +197,13 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
                     str(_early_bound(component, "IComponent2").Name2)
                     for component in (step.GetComponents() or ())
                 }
-                intended = {str(component.Name2) for component in moved}
+                intended = {name for name, _component in moved}
                 if actual != intended or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9:
                     raise RuntimeError(f"{label}: step component/distance readback mismatch: {actual!r}")
                 for name in intended:
                     expected[name]["xyz".index(key)] += distance
                 # Read every instance, the unmoved ones too.
-                for component in components:
-                    name = str(component.Name2)
+                for name, component in components:
                     current = _presentation_transform(component)
                     delta = tuple(current[i + 9] - baseline[name][i + 9] for i in range(3))
                     if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
@@ -222,8 +221,7 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
             model.ClearSelection2(True)
             if not assembly.ShowExploded2(False, view_name) or not model.EditRebuild3():
                 raise RuntimeError(f"{view_name}: failed to restore collapsed operational assembly")
-            for component in components:
-                name = str(component.Name2)
+            for name, component in components:
                 current = _presentation_transform(component)
                 transform = _early_bound(component.Transform2, "IMathTransform")
                 operational = tuple(float(value) for value in transform.ArrayData)

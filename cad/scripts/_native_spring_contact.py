@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 import _telemetry
 from _com import _early_bound, _read_member
+from _component_order import by_name
 from solidworks_mcp.adapters.com_variant import dispatch_array
 
 
@@ -356,13 +357,10 @@ def _assembly_spring_instances(
     if components is None:
         raise RuntimeError("native spring contact: top-level components unavailable")
     found = {family: [] for family in families}
-    for raw in components:
-        component = _early_bound(raw, "IComponent2")
-        if component is None:
-            raise RuntimeError("native spring contact: invalid top-level component")
-        name = str(_read_member(component, "Name2") or "")
+    # by_name raises on a None element or a component without a Name2.
+    for name, component in by_name(components):
         source = _read_member(component, "GetPathName")
-        if not name or not isinstance(source, str) or not source:
+        if not isinstance(source, str) or not source:
             raise RuntimeError(
                 "native spring contact: component identity unavailable "
                 f"(name={name!r}, source={source!r})"

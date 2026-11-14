@@ -10,7 +10,6 @@ from dataclasses import dataclass, replace
 from itertools import product
 import math
 from pathlib import Path, PureWindowsPath
-import re
 import sys
 from time import perf_counter
 from typing import Any, Iterable, Literal, Mapping, Sequence
@@ -21,6 +20,7 @@ from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 from _com import _bind, _com_invoke, _early_bound
+from _component_order import by_name, drawing_components_by_name, natural_key
 from _component_references import (
     REFERENCE_IDENTITIES,
     member_configuration,
@@ -536,13 +536,14 @@ def _component_path(adapter: Any, component: Any) -> str:
 
 
 def _component_leaf(
-    adapter: Any, drawing_component: Any, *, visible: bool = True
+    adapter: Any, drawing_component: Any, name: str, *, visible: bool = True
 ) -> _ComponentLeaf:
     """Read identities from the drawing occurrence's bound ``IComponent2``.
 
-    Call ``GetPathName`` through the bound interface and propagate read failures.
-    A shared reference also needs a readable, non-empty ``Name2`` before its
-    parent scope can be determined.
+    ``name`` is the occurrence's ``IDrawingComponent.Name``, already read by the
+    caller's walk (:mod:`_component_order`). Call ``GetPathName`` through the
+    bound interface and propagate read failures. A shared reference also needs
+    a readable, non-empty ``Name2`` before its parent scope can be determined.
     """
     component = adapter._attempt(
         lambda dc=drawing_component: dc.Component, default=None
@@ -559,7 +560,6 @@ def _component_leaf(
         reference = str(
             adapter._attempt(lambda: native.ComponentReference, default="") or ""
         )
-    name = str(drawing_component.Name or "")
     referenced = reference.split(":", 1)[0] in REFERENCE_IDENTITIES
     native_path = (
         str(native.Name2 or "").replace("\\", "/")
@@ -614,11 +614,11 @@ def _stems_matching(identities: frozenset[str], stems: frozenset[str]) -> set[st
 
 
 def _drawing_component_stems(
-    adapter: Any, drawing_component: Any, stems: frozenset[str]
+    adapter: Any, drawing_component: Any, name: str, stems: frozenset[str]
 ) -> set[str]:
     """Return requested file stems represented by one leaf drawing component."""
     return _stems_matching(
-        _component_leaf(adapter, drawing_component).identities, stems
+        _component_leaf(adapter, drawing_component, name).identities, stems
     )
 
 
@@ -626,8 +626,9 @@ def _drawing_component_stems(
 def _view_component_leaves(
     adapter: Any, view: Any, *, label: str
 ) -> tuple[_ComponentLeaf, ...]:
-    """Every leaf drawing component of ``view``, in depth-first walk order,
-    each marked shown or hidden in this view.
+    """Every leaf drawing component of ``view``, in depth-first walk order
+    (siblings in ascending natural name order, :mod:`_component_order`, never
+    the seat's order), each marked shown or hidden in this view.
 
     Balloon anchoring used to repeat this walk once PER BALLOON -- ~3 s of
     fixed cost on every ``drawing.pick_balloon_anchor`` span across the farm
@@ -638,17 +639,26 @@ def _view_component_leaves(
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
     leaves: list[_ComponentLeaf] = []
-    pending = [(child, True) for child in _drawing_component_children(root)]
+    # Stacked reversed, so pop() visits siblings in ascending name order.
+    pending = [
+        (name, child, True)
+        for name, child in reversed(
+            drawing_components_by_name(_drawing_component_children(root))
+        )
+    ]
     while pending:
-        drawing_component, shown = pending.pop()
+        name, drawing_component, shown = pending.pop()
         shown = shown and bool(
             adapter._attempt(lambda dc=drawing_component: dc.Visible, default=True)
         )
         children = _drawing_component_children(drawing_component)
-        pending.extend((child, shown) for child in children)
+        pending.extend(
+            (child_name, child, shown)
+            for child_name, child in reversed(drawing_components_by_name(children))
+        )
         if children:
             continue
-        leaf = _component_leaf(adapter, drawing_component, visible=shown)
+        leaf = _component_leaf(adapter, drawing_component, name, visible=shown)
         leaves.append(leaf)
     _span_scan_attrs(leaves=len(leaves))
     return tuple(leaves)
@@ -856,18 +866,25 @@ def _visibility_components(view: Any, *, label: str) -> list[_VisibilityComponen
     root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    pending = [(child, ()) for child in _drawing_component_children(root)]
+    # Stacked reversed, so pop() visits siblings in ascending name order.
+    pending = [
+        (name, child, ())
+        for name, child in reversed(
+            drawing_components_by_name(_drawing_component_children(root))
+        )
+    ]
     rows: list[_VisibilityComponent] = []
     names: set[str] = set()
     while pending:
-        raw, ancestors = pending.pop()
-        component = _early_bound(raw, "IDrawingComponent")
-        name = str(component.Name or "")
-        if not name or name in names:
-            raise RuntimeError(f"{label}: empty or duplicate drawing component name {name!r}")
+        name, component, ancestors = pending.pop()
+        if name in names:
+            raise RuntimeError(f"{label}: duplicate drawing component name {name!r}")
         names.add(name)
         children = _drawing_component_children(component)
-        pending.extend((child, (*ancestors, name)) for child in children)
+        pending.extend(
+            (child_name, child, (*ancestors, name))
+            for child_name, child in reversed(drawing_components_by_name(children))
+        )
         visible = component.Visible
         if type(visible) is not bool:
             raise RuntimeError(f"{label}: unreadable drawing visibility for {name!r}: {visible!r}")
@@ -1080,7 +1097,9 @@ def isolate_drawing_view_components(
         if row.parent:
             desired[row.name] = row.visible
             continue
-        matched = _drawing_component_stems(adapter, row.component, visible_stems)
+        matched = _drawing_component_stems(
+            adapter, row.component, row.name, visible_stems
+        )
         desired[row.name] = bool(matched)
         found.update(matched)
     missing = sorted(visible_stems - found)
@@ -1125,15 +1144,6 @@ def set_drawing_view_instance_visibility(
     )
 
 
-def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:
-    """``dt-cone-gear-2`` before ``dt-cone-gear-10``: digit runs compare as numbers."""
-    return tuple(
-        (0, int(part)) if part.isdigit() else (1, part.casefold())
-        for part in re.split(r"(\d+)", name)
-        if part
-    )
-
-
 def _shown_instances(
     leaves: Sequence[_ComponentLeaf],
     stem: str,
@@ -1146,14 +1156,15 @@ def _shown_instances(
     The drawing-component tree lists children in no stable order: over 26
     frame_assembly runs the old first-match walk anchored the cap balloon on
     tube-frame-cap 1, 2, 3 and 4 in turn. The instance path is the one order
-    that cannot move, compared as a machinist reads it (2 before 10). A
-    hidden instance (drive-train isolates one cluster per view) is never a
-    candidate, and a pinned instance is the only one.
+    that cannot move, compared as a machinist reads it (2 before 10,
+    :func:`_component_order.natural_key`). A hidden instance (drive-train
+    isolates one cluster per view) is never a candidate, and a pinned
+    instance is the only one.
     """
     wanted = frozenset({stem})
     matching = sorted(
         (leaf for leaf in leaves if _stems_matching(leaf.identities, wanted)),
-        key=lambda leaf: _natural_sort_key(leaf.path or _instance_name(leaf.name)),
+        key=lambda leaf: natural_key(leaf.path or _instance_name(leaf.name)),
     )
     shown = [
         leaf
@@ -1270,7 +1281,7 @@ def _view_explode_offsets(
             path = _component_path(adapter, step.GetComponent(member))
             if not path:
                 if instances is None:
-                    instances = _configuration_instance_paths(adapter, configuration)
+                    instances = _configuration_instance_paths(configuration)
                 name = str(step.GetComponentName(member) or "").replace("\\", "/")
                 path = instances.get(name.casefold(), "")
                 if not path:
@@ -1321,19 +1332,19 @@ def _shown_explode_step_count(
     return count
 
 
-def _configuration_instance_paths(adapter: Any, configuration: Any) -> dict[str, str]:
+def _configuration_instance_paths(configuration: Any) -> dict[str, str]:
     """Every component instance path of ``configuration``, casefolded -> as read,
     walked from its own root (``GetRootComponent3(True)`` resolves a
-    configuration that is not the model's active one)."""
+    configuration that is not the model's active one), siblings in ascending
+    name order."""
     root = configuration.GetRootComponent3(True)
     paths: dict[str, str] = {}
-    pending = list(root.GetChildren() or ()) if root is not None else []
+    pending = list(reversed(by_name(root.GetChildren()))) if root is not None else []
     while pending:
-        component = _early_bound(pending.pop(), "IComponent2")
-        path = _component_path(adapter, component)
-        if path:
-            paths[path.casefold()] = path
-        pending.extend(component.GetChildren() or ())
+        name, component = pending.pop()
+        path = name.replace("\\", "/")
+        paths[path.casefold()] = path
+        pending.extend(reversed(by_name(component.GetChildren())))
     return paths
 
 

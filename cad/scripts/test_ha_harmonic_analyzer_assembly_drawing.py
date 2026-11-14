@@ -443,6 +443,7 @@ def test_a_blank_line_separates_each_numbered_step() -> None:
 def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axis) -> None:
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     screw = SimpleNamespace(
+        Name2=f"ms-measuring-stick-1/{ms.THUMB_SCREW}-1",
         GetPathName=lambda: f"C:/models/{ms.THUMB_SCREW}.SLDPRT",
         Transform2=SimpleNamespace(
             ArrayData=(*axis, 1, 0, 0, 0, 0, 1, 10, 20, 30, 1)
@@ -451,7 +452,10 @@ def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axi
 
     # Other children are ignored; applying the parent's rotation a second time
     # would corrupt the correct root-frame axis supplied by Transform2.
-    other = SimpleNamespace(GetPathName=lambda: f"C:/models/{ms.STICK}.SLDPRT")
+    other = SimpleNamespace(
+        Name2=f"ms-measuring-stick-1/{ms.STICK}-1",
+        GetPathName=lambda: f"C:/models/{ms.STICK}.SLDPRT",
+    )
     component = SimpleNamespace(GetChildren=lambda: (other, screw))
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(GetComponentByName=lambda instance: component)
@@ -468,6 +472,7 @@ def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axi
 def test_native_ha_final_guard_rejects_unresolved_nested_screw(monkeypatch, defect) -> None:
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     screw = SimpleNamespace(
+        Name2=f"ms-measuring-stick-1/{ms.THUMB_SCREW}-1",
         GetPathName=lambda: f"C:/models/{ms.THUMB_SCREW}.SLDPRT",
         Transform2=None,
     )

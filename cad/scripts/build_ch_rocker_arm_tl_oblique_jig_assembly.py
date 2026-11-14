@@ -49,6 +49,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _assembly import (
@@ -341,11 +342,12 @@ def jig_exploded_view_name(configuration: str) -> str:
 def explode_step_components(
     label: str,
     selectors: Sequence[str],
-    groups: Mapping[str, Sequence[Any]],
+    groups: Mapping[str, Sequence[tuple[str, Any]]],
     by_name: Mapping[str, Any],
     member_names: Mapping[str, str],
-) -> list[Any]:
-    """The native components one ``spec.EXPLODE_STEPS`` entry moves.
+) -> list[tuple[str, Any]]:
+    """The native components one ``spec.EXPLODE_STEPS`` entry moves, each with
+    its Name2.
 
     A family selector moves its whole identity group. An instance selector
     (``spec.instance_name``; the riser and nut screws share a family but
@@ -370,10 +372,10 @@ def explode_step_components(
                 raise RuntimeError(
                     f"{label}: explode occurrence {selector!r} has no component {name!r}"
                 )
-            members = (by_name[name],)
-        for component in members:
-            moved.setdefault(str(component.Name2), component)
-    return list(moved.values())
+            members = ((name, by_name[name]),)
+        for name, component in members:
+            moved.setdefault(name, component)
+    return list(moved.items())
 
 
 def _presentation_transform(component: Any) -> tuple[float, ...]:
@@ -473,33 +475,31 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
             f"{view_name}: {configuration_name} unexpectedly contains exploded views"
         )
 
-    components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
-    )
+    components = _component_order.by_name(assembly.GetComponents(True))
     member_names = component_reference_names(model, spec.MEMBER_COMPONENT_REFERENCES)
-    groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
-    for component in components:
+    groups: dict[str, list[tuple[str, Any]]] = {
+        family: [] for family in spec.QUANTITIES
+    }
+    for name, component in components:
         identity = component_identity(component)
         try:
             family = spec.component_family(*identity)
         except ValueError as error:
             raise RuntimeError(
-                f"{view_name}: unexpected component {component.Name2}: {identity!r}"
+                f"{view_name}: unexpected component {name}: {identity!r}"
             ) from error
-        groups[family].append(component)
+        groups[family].append((name, component))
     counts = {stem: len(group) for stem, group in groups.items()}
     if counts != spec.QUANTITIES:
         raise RuntimeError(
             f"{view_name} component counts: {counts!r} != {spec.QUANTITIES!r}"
         )
     baseline = {
-        str(component.Name2): _presentation_transform(component)
-        for component in components
+        name: _presentation_transform(component) for name, component in components
     }
     if len(baseline) != sum(spec.QUANTITIES.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
-    by_name = {str(component.Name2): component for component in components}
+    by_name = dict(components)
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     axes = _global_axes(adapter, assembly, view_name)
 
@@ -529,9 +529,9 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
                         f"{label}: cannot create component selection data"
                     )
                 data.Mark = 1
-                for component in moved:
+                for name, component in moved:
                     if not component.Select4(True, data, False):
-                        raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                        raise RuntimeError(f"{label}: cannot select {name}")
                 axis_name, positive = axes[key]
                 if not model.Extension.SelectByID2(
                     axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
@@ -575,7 +575,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
                     str(_early_bound(component, "IComponent2").Name2)
                     for component in (step.GetComponents() or ())
                 }
-                intended = {str(component.Name2) for component in moved}
+                intended = {name for name, _component in moved}
                 if (
                     actual != intended
                     or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9
@@ -586,8 +586,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
                 for name in intended:
                     expected[name]["xyz".index(key)] += distance
                 # Read every instance, the unmoved ones too.
-                for component in components:
-                    name = str(component.Name2)
+                for name, component in components:
                     current = _presentation_transform(component)
                     delta = tuple(
                         current[i + 9] - baseline[name][i + 9] for i in range(3)
@@ -614,8 +613,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
                 raise RuntimeError(
                     f"{view_name}: failed to restore collapsed operational assembly"
                 )
-            for component in components:
-                name = str(component.Name2)
+            for name, component in components:
                 current = _presentation_transform(component)
                 transform = _early_bound(component.Transform2, "IMathTransform")
                 operational = tuple(float(value) for value in transform.ArrayData)

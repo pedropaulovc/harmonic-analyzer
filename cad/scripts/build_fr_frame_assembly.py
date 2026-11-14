@@ -94,6 +94,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _component_order
 import _telemetry
 
 from _check import check
@@ -490,37 +491,33 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         "fr-nameplate": 1, "sh-vn-brass-fillister-screw": 4, "fr-vn-frame-cross-screw": 8,
         "fr-vn-gooseneck-set-screw": 1,
     }
-    components = tuple(
-        _early_bound(component, "IComponent2")
-        for component in (assembly.GetComponents(True) or ())
-    )
-    groups: dict[str, list[Any]] = {stem: [] for stem in quantities}
-    for component in components:
+    components = _component_order.by_name(assembly.GetComponents(True))
+    groups: dict[str, list[tuple[str, Any]]] = {stem: [] for stem in quantities}
+    for name, component in components:
         stem = Path(str(component.GetPathName() or "")).stem.casefold()
         if stem not in groups:
-            raise RuntimeError(f"{view_name}: unexpected component {component.Name2}: {stem}")
-        groups[stem].append(component)
+            raise RuntimeError(f"{view_name}: unexpected component {name}: {stem}")
+        groups[stem].append((name, component))
     actual_counts = {stem: len(group) for stem, group in groups.items()}
     if actual_counts != quantities:
         raise RuntimeError(f"{view_name} component counts: {actual_counts!r} != {quantities!r}")
-    for group in groups.values():
-        group.sort(key=lambda component: str(component.Name2))
-    baseline = {str(component.Name2): _explode_transform(component) for component in components}
+    baseline = {name: _explode_transform(component) for name, component in components}
     if len(baseline) != sum(quantities.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     front, rear, upper, lower = [], [], [], []
-    for component in groups["fr-vn-frame-cross-screw"]:
-        _, y, z = baseline[str(component.Name2)][9:12]
+    for member in groups["fr-vn-frame-cross-screw"]:
+        name = member[0]
+        _, y, z = baseline[name][9:12]
         if abs(y * 1000.0 - TOP_SCREW_Y) <= 1e-3:
-            upper.append(component)
+            upper.append(member)
         elif abs(y * 1000.0 - BASE_SCREW_Y) <= 1e-3:
-            lower.append(component)
+            lower.append(member)
         else:
-            raise RuntimeError(f"{component.Name2}: unexpected cross-screw Y {y * 1000.0:g} mm")
+            raise RuntimeError(f"{name}: unexpected cross-screw Y {y * 1000.0:g} mm")
         if z == 0.0:
-            raise RuntimeError(f"{component.Name2}: cross screw on assembly mid-plane")
-        (front if z < 0.0 else rear).append(component)
+            raise RuntimeError(f"{name}: cross screw on assembly mid-plane")
+        (front if z < 0.0 else rear).append(member)
     if tuple(map(len, (front, rear, upper, lower))) != (4, 4, 4, 4):
         raise RuntimeError(f"{view_name}: cross-screw station split is not 4/4/4/4")
     plans = (
@@ -597,9 +594,9 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
                 if data is None:
                     raise RuntimeError(f"{label}: cannot create component selection data")
                 data.Mark = 1
-                for component in moved:
+                for name, component in moved:
                     if not component.Select4(True, data, False):
-                        raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                        raise RuntimeError(f"{label}: cannot select {name}")
                 axis_name, positive = axes[key]
                 if not model.Extension.SelectByID2(
                     axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
@@ -631,15 +628,14 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
                     str(_early_bound(component, "IComponent2").Name2)
                     for component in (step.GetComponents() or ())
                 }
-                intended = {str(component.Name2) for component in moved}
+                intended = {name for name, _component in moved}
                 if actual != intended or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9:
                     raise RuntimeError(f"{label}: step component/distance readback mismatch: {actual!r}")
                 for name in intended:
                     expected[name]["xyz".index(key)] += distance
                 # Read every instance, including unmoved ones: mixed local frames
                 # and native pattern followers must never silently change intent.
-                for component in components:
-                    name = str(component.Name2)
+                for name, component in components:
                     current = _explode_transform(component)
                     delta = tuple(current[i + 9] - baseline[name][i + 9] for i in range(3))
                     _telemetry.event(
@@ -662,8 +658,7 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
             model.ClearSelection2(True)
             if not assembly.ShowExploded2(False, view_name) or not model.EditRebuild3():
                 raise RuntimeError(f"{view_name}: failed to restore collapsed operational assembly")
-            for component in components:
-                name = str(component.Name2)
+            for name, component in components:
                 current = _explode_transform(component)
                 transform = _early_bound(component.Transform2, "IMathTransform")
                 operational = tuple(float(value) for value in transform.ArrayData)

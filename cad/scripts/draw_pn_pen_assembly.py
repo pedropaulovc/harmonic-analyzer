@@ -42,6 +42,7 @@ import pn_vn_pen_marker_spec as marker
 import sh_vn_music_wire_pen_geom as wire
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_balloons import (
@@ -776,8 +777,7 @@ def _validate_source(source_model: Any) -> None:
         source_model, {"@PenWire:1": (spec.WIRE, wire.CONFIGURATION)}
     )
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         if stem == spec.WIRE:
             selected = component_identity(component)
@@ -792,9 +792,7 @@ def _validate_source(source_model: Any) -> None:
             abs(float(actual) - float(expected)) > 1e-9
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
-            raise RuntimeError(
-                f"pen source must open collapsed: {component.Name2!r} is displaced"
-            )
+            raise RuntimeError(f"pen source must open collapsed: {name!r} is displaced")
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"pen families {counts!r} != contract {BOM_QUANTITIES!r}")
 

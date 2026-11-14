@@ -105,6 +105,7 @@ from _chain import (
 )
 from _check import check, log
 from _com import _early_bound
+from _component_order import by_name
 from _component_references import component_identity, component_reference_names
 from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
 from _appearance import POLISHED_STEEL
@@ -2290,8 +2291,8 @@ def _chain_station_point(station: int) -> tuple[float, float, float]:
     return x, y, CHAIN_MID_Z
 
 
-def _chain_station_components(model) -> dict[int, object]:
-    """Associate native members with unique loop stations, never Name2 indices.
+def _chain_station_names(model) -> dict[int, str]:
+    """Each native member's Name2 by its unique loop station, never by Name2 indices.
 
     A station is the link's pin-0 position on the inherited visual guide.
     The nearest station must be less than half a pitch away, all stations must
@@ -2300,9 +2301,8 @@ def _chain_station_components(model) -> dict[int, object]:
     """
     assembly = _early_bound(model, "IAssemblyDoc")
     points = tuple(_chain_station_point(station) for station in range(LINK_COUNT))
-    stations = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    stations: dict[int, str] = {}
+    for name, component in by_name(assembly.GetComponents(True)):
         stem, configuration = component_identity(component)
         if stem not in (CHAIN_LINK_STEM, CONNECTING_LINK_STEM):
             continue
@@ -2311,9 +2311,9 @@ def _chain_station_components(model) -> dict[int, object]:
         distances = tuple(math.dist(origin, point) for point in points)
         station = min(range(LINK_COUNT), key=distances.__getitem__)
         if distances[station] >= LINK_PITCH / 2.0:
-            raise RuntimeError(f"{component.Name2}: no unambiguous chain loop station")
+            raise RuntimeError(f"{name}: no unambiguous chain loop station")
         if abs(origin[2] - CHAIN_MID_Z) > 0.5 or abs(transform[8] - 1.0) > 1e-6:
-            raise RuntimeError(f"{component.Name2}: chain member leaves its native plate plane")
+            raise RuntimeError(f"{name}: chain member leaves its native plate plane")
         expected = (
             (CONNECTING_LINK_STEM, "Default")
             if station == LINK_COUNT - 1
@@ -2328,7 +2328,7 @@ def _chain_station_components(model) -> dict[int, object]:
             )
         if station in stations:
             raise RuntimeError(f"duplicate chain loop station {station}")
-        stations[station] = component
+        stations[station] = name
     if set(stations) != set(range(LINK_COUNT)):
         raise RuntimeError(
             f"chain loop stations missing: {sorted(set(range(LINK_COUNT)) - stations.keys())!r}"
@@ -2338,14 +2338,14 @@ def _chain_station_components(model) -> dict[int, object]:
 
 def _chain_reference_names(model) -> dict[str, str]:
     """Read every saved semantic role and prove its native loop association."""
-    stations = _chain_station_components(model)
+    stations = _chain_station_names(model)
     names = component_reference_names(model, CHAIN_COMPONENT_REFERENCES)
-    for station, component in stations.items():
+    for station, name in stations.items():
         if station == LINK_COUNT - 1:
             continue
         role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
         selector = f"@{role}:{station // 2 + 1}"
-        if names[selector] != str(component.Name2):
+        if names[selector] != name:
             raise RuntimeError(f"chain reference {selector} does not identify loop station {station}")
     return names
 
@@ -2353,24 +2353,20 @@ def _chain_reference_names(model) -> dict[str, str]:
 def _assign_chain_references(adapter) -> dict[str, str]:
     """Assign pattern references and preserve placed pose witnesses across rebuild."""
     model = adapter.currentModel
-    stations = _chain_station_components(model)
-    before = {station: str(component.Name2) for station, component in stations.items()}
-    for station, component in stations.items():
+    before = _chain_station_names(model)
+    for station, name in before.items():
         if station != LINK_COUNT - 1:
             role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
             set_component_reference(
                 adapter,
-                str(component.Name2),
+                name,
                 f"{role}:{station // 2 + 1}",
                 rebuild=False,
             )
     if not bool(model.ForceRebuild3(False)):
         raise RuntimeError("chain component reference rebuild failed")
     names = _chain_reference_names(model)
-    after = {
-        station: str(component.Name2)
-        for station, component in _chain_station_components(model).items()
-    }
+    after = _chain_station_names(model)
     # The connector has no shared Role:N; the validated station census still
     # carries its placement witness through the same native address change.
     for station in sorted(before):
@@ -2761,7 +2757,7 @@ async def _insert_roller_chain(adapter) -> None:
     # Pattern copies may inherit a seed's ComponentReference. Assign all
     # role-local ordinals from validated loop poses after the final copy exists.
     _assign_chain_references(adapter)
-    links = [str(component.Name2) for component in _chain_station_components(adapter.currentModel).values()]
+    links = list(_chain_station_names(adapter.currentModel).values())
     worst = 0.0
     for name in links:
         array = component_transform(adapter, name)
