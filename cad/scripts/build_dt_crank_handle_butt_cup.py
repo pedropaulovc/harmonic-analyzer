@@ -50,12 +50,11 @@ from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _fit_deviations import deviations
+from _limit_tolerance import set_limits
 from dt_crank_handle_butt_cup_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
     BODY_DIA,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
     POCKET_DEPTH,
@@ -63,6 +62,13 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
+    UNIT,
+)
+from dt_crank_handle_butt_cup_seat_spec import (
+    CUP_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
+    CUP_DRAWING_PRECISION as DRAWING_PRECISION,
+    FLOOR_HOLE_CHAMFER,
+    FLOOR_HOLE_CHAMFER_LIMITS,
 )
 
 PART_NAME = "dt-crank-handle-butt-cup"
@@ -79,11 +85,17 @@ V_POCKET_FLOOR_CORNER = 2.0 * math.pi * (
     * (1.0 - math.pi / 4.0)
     + POCKET_FLOOR_CORNER_R_MAX**3 / 6.0
 )
+# The floor hole's pocket-side mouth break (#1757) removes its corner
+# triangle: legs FLOOR_HOLE_CHAMFER, centroid FLOOR_HOLE_R + FLOOR_HOLE_CHAMFER/3.
+V_FLOOR_HOLE_CHAMFER = math.pi * FLOOR_HOLE_CHAMFER**2 * (
+    FLOOR_HOLE_R + FLOOR_HOLE_CHAMFER / 3.0
+)
 V_CUP = math.pi * (
     BODY_R**2 * OVERALL_LENGTH
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
 ) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0) + V_POCKET_FLOOR_CORNER
+V_CUP -= V_FLOOR_HOLE_CHAMFER
 
 
 def _pocket_floor_max_limit(adapter) -> None:
@@ -133,6 +145,7 @@ async def build(adapter) -> dict[str, str]:
         ("FloorHoleDia", FLOOR_HOLE_DIA),
         ("BodyChamfer", BODY_CHAMFER),
         ("PocketFloorRadius", POCKET_FLOOR_CORNER_R_MAX),
+        ("FloorHoleChamfer", FLOOR_HOLE_CHAMFER),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -140,8 +153,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Stepped section on the Front plane, revolved about the X axis: pocket
     # mouth -> face -> body OD -> bottom chamfer -> bottom -> floor hole ->
-    # flat floor -> tangent quarter arc -> pocket wall.  The round adds
-    # material inside the pocket, within the head's minimum radial clearance.
+    # 45-degree mouth break -> flat floor -> tangent quarter arc -> pocket
+    # wall.  The round adds material inside the pocket, within the head's
+    # minimum radial clearance; the break takes the MHA-DT-32 under-head
+    # radius (#1757).
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -159,7 +174,8 @@ async def build(adapter) -> dict[str, str]:
         (-(OVERALL_LENGTH - BODY_CHAMFER), BODY_R),
         (-OVERALL_LENGTH, BODY_R - BODY_CHAMFER),
         (-OVERALL_LENGTH, FLOOR_HOLE_R),
-        (-POCKET_DEPTH, FLOOR_HOLE_R),
+        (-(POCKET_DEPTH + FLOOR_HOLE_CHAMFER), FLOOR_HOLE_R),
+        (-POCKET_DEPTH, FLOOR_HOLE_R + FLOOR_HOLE_CHAMFER),
         floor_round_end,
     ]
     lines = await add_line_chain(adapter, points, close=False)
@@ -175,14 +191,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, [floor_round_start, points[0]], close=False
     )
     set_sketch_direct_db(adapter, False)
-    face, body_od, chamfer, bottom, floor_hole, floor_top = lines
+    face, body_od, chamfer, bottom, floor_hole, hole_chamfer, floor_top = lines
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
     for line, (u0, v0), (u1, v1) in (
         *zip(lines, points, points[1:], strict=False),
         (pocket_wall, floor_round_start, points[0]),
     ):
         if u0 != u1 and v0 != v1:
-            continue  # the 45-degree bottom chamfer; its two legs define it
+            continue  # a 45-degree chamfer; its two legs define it
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"cup profile {relation} {line}",
@@ -242,6 +258,27 @@ async def build(adapter) -> dict[str, str]:
         "cup bottom chamfer rise",
     )
     profile.record("BodyChamferRise", '"BodyChamfer"')
+    # The floor hole's pocket-side mouth break prints its axial leg, as the
+    # body chamfer and the screw's head break; its radial leg equals it by
+    # equation: 45 degrees.
+    await dimension_between(
+        adapter,
+        f"{hole_chamfer}.start",
+        f"{hole_chamfer}.end",
+        "horizontal_distance",
+        FLOOR_HOLE_CHAMFER,
+        "cup floor-hole mouth break",
+    )
+    profile.record("FloorHoleChamfer", '"FloorHoleChamfer"')
+    await dimension_between(
+        adapter,
+        f"{hole_chamfer}.start",
+        f"{hole_chamfer}.end",
+        "vertical_distance",
+        FLOOR_HOLE_CHAMFER,
+        "cup floor-hole mouth break rise",
+    )
+    profile.record("FloorHoleChamferRise", '"FloorHoleChamfer"')
     for name, line, u_mid, radius in (
         ("BodyDia", body_od, -(OVERALL_LENGTH - BODY_CHAMFER) / 2.0, BODY_R),
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
@@ -292,6 +329,14 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _pocket_floor_max_limit(adapter)
+    set_limits(
+        adapter,
+        "CupProfile",
+        "FloorHoleChamfer",
+        limits=FLOOR_HOLE_CHAMFER_LIMITS,
+        places=DRAWING_PRECISION["CupProfile"]["FloorHoleChamfer"],
+        display_unit=UNIT,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -11,6 +11,8 @@ import pytest
 import _config
 import build_dt_crank_handle_pivot_screw as part
 import dt_crank_handle_butt_cup_spec as cup
+import dt_crank_handle_butt_cup_seat_spec as cup_seat
+import dt_crank_handle_head_seat_spec as seat
 import dt_crank_handle_pivot_screw_notes as notes
 import dt_crank_handle_pivot_screw_spec as spec
 import dt_crank_handle_spec as handle
@@ -52,27 +54,36 @@ def test_part_registry_row_is_the_made_screw() -> None:
 
 
 def test_spec_is_the_single_source_of_marked_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP)
+    # The part's complete contract is the head-seat module's: the spec's rows
+    # plus the under-head radius and the head break (#1757).
+    assert part.DRAWING_DIMENSIONS is seat.SCREW_DRAWING_DIMENSIONS
+    assert drawing.DRAWING_DIMENSIONS is seat.SCREW_DRAWING_DIMENSIONS
+    marked = set().union(*seat.SCREW_DRAWING_DIMENSIONS.values())
+    assert marked == set().union(*spec.DRAWING_DIMENSIONS.values()) | {
+        "UnderHeadRadius",
+        "HeadChamfer",
+    }
+    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP, drawing.DETAIL_B_KEEP)
     assert set().union(*map(set, keeps)) == marked
     assert sum(map(len, keeps)) == len(marked)
     # The threaded section is defined by its callout, not a Ø4.826 dimension.
     assert "ThreadDia" not in marked
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
-    # The 45-degree lead's leg prints in detail A alone (#2172).
+    # The 45-degree lead's leg prints in detail A alone (#2172), the head
+    # seat in detail B alone (#1757).
     assert set(drawing.DETAIL_KEEP) == {"ReliefLead"}
+    assert set(drawing.DETAIL_B_KEEP) == {"UnderHeadRadius", "HeadChamfer"}
 
 
 def test_model_owns_places_and_bands() -> None:
     assert "draw_dt_crank_handle_pivot_screw.py" in PRECISION_MIGRATED_DRAWINGS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    marked = set().union(*seat.SCREW_DRAWING_DIMENSIONS.values())
+    assert set(seat.SCREW_DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head and the small features that could print as
-    # nothing at two places (tip chamfer, relief Ø) at three; the stations,
-    # slot and relief width at the title block's .XX.
-    assert spec.DRAWING_PRECISION_BY_NAME == {
+    # nothing at two places (tip chamfer, relief Ø, the head seat) at three;
+    # the stations, slot and relief width at the title block's .XX.
+    assert seat.SCREW_DRAWING_PRECISION_BY_NAME == {
         "HeadDia": 3,
         "HeadLength": 3,
         "ShoulderDia": 3,
@@ -82,6 +93,8 @@ def test_model_owns_places_and_bands() -> None:
         "ReliefWidth": 2,
         "ReliefLead": 3,
         "TipChamfer": 3,
+        "UnderHeadRadius": 3,
+        "HeadChamfer": 3,
         "SlotWidth": 2,
         "SlotDepth": 2,
         "OverallLength": 2,
@@ -437,13 +450,32 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     # from the relief floor, stays; the tip chamfer's goes.
     lead_v = 2.0 * math.pi * (relief_r + lead / 3.0) * (lead * lead / 2.0)
     assert part.V_LEAD == pytest.approx(lead_v)
+    # The head seat (#1757), integrated over thin axial slices: the head
+    # break's ring goes, the under-head round's fill stays.
+    shoulder_r, head_r = spec.SHOULDER_DIA / 2.0, spec.HEAD_DIA / 2.0
+    r, c, steps = seat.UNDER_HEAD_RADIUS_MAX, seat.HEAD_CHAMFER, 4000
+    dz = r / steps
+    round_fill = sum(
+        math.pi
+        * ((shoulder_r + r - math.sqrt(r * r - ((k + 0.5) * dz) ** 2)) ** 2 - shoulder_r**2)
+        * dz
+        for k in range(steps)
+    )
+    dz = c / steps
+    head_break = sum(
+        math.pi * (head_r**2 - (head_r - c + (k + 0.5) * dz) ** 2) * dz
+        for k in range(steps)
+    )
+    assert part.V_UNDER_HEAD_RADIUS == pytest.approx(round_fill, rel=1e-4)
+    assert part.V_HEAD_CHAMFER == pytest.approx(head_break, rel=1e-6)
+    seat_v = part.V_UNDER_HEAD_RADIUS - part.V_HEAD_CHAMFER
     assert part.V_BODY == pytest.approx(
-        head + shoulder + relief + thread(spec.THREAD_LENGTH) + lead_v - tip(chamfer)
+        head + shoulder + relief + thread(spec.THREAD_LENGTH) + lead_v - tip(chamfer) + seat_v
     )
     # Filed flush with the arm, under the tip's edge break.
     installed = spec.INSTALLED_THREAD_LENGTH, spec.INSTALLED_TIP_CHAMFER
     assert part.turned_volume(*installed) == pytest.approx(
-        head + shoulder + relief + thread(installed[0]) + lead_v - tip(installed[1])
+        head + shoulder + relief + thread(installed[0]) + lead_v - tip(installed[1]) + seat_v
     )
     assert part.V_INSTALLED == pytest.approx(part.turned_volume(*installed) - part.V_SLOT)
     # A 1.0 strip across a Ø6 circle: integrate the chord 2*sqrt(r^2 - y^2)
@@ -526,9 +558,13 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         *drawing.SIDE_KEEP.values(),
         *drawing.END_KEEP.values(),
         *drawing.DETAIL_KEEP.values(),
+        *drawing.DETAIL_B_KEEP.values(),
         drawing.DETAIL_CENTER,
         drawing.DETAIL_LABEL_XY,
         drawing.DETAIL_LETTER_XY,
+        drawing.DETAIL_B_CENTER,
+        drawing.DETAIL_B_LABEL_XY,
+        drawing.DETAIL_B_LETTER_XY,
         drawing.NOTES_XY,
     ]
     for x, y in points:
@@ -696,3 +732,200 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
+
+
+def _round_to_break_air(radius: float, leg: float) -> float:
+    """Least gap from a corner's round to a mating 45-degree break, sampled.
+
+    The round's corner sits at the origin with its faces along +x and -y;
+    the mating part's broken edge is the line x - y = leg.
+    """
+    steps = 2000
+    return min(
+        (leg - ((radius - radius * math.cos(a)) - (-radius + radius * math.sin(a))))
+        / math.sqrt(2.0)
+        for a in (k * (math.pi / 2.0) / steps for k in range(steps + 1))
+    )
+
+
+def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> None:
+    # #1757: the title block's inside corner (R.040 MAX) would let the
+    # under-head corner ride on the floor hole's edge; the seat limits make
+    # the smallest break clear the largest round on both corners.
+    assert seat.UNDER_HEAD_RADIUS_BAND == (0.0, -seat.UNDER_HEAD_RADIUS_MAX)
+    under_head = _round_to_break_air(
+        seat.UNDER_HEAD_RADIUS_MAX, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[0]
+    )
+    head_edge = _round_to_break_air(
+        cup.POCKET_FLOOR_CORNER_R_MAX, seat.HEAD_CHAMFER_LIMITS[0]
+    )
+    # The tangent points govern: the spec's closed form is the sampled least.
+    assert under_head == pytest.approx(seat.UNDER_HEAD_AIR_MIN, abs=1e-6)
+    assert head_edge == pytest.approx(seat.HEAD_EDGE_AIR_MIN, abs=1e-6)
+    assert min(under_head, head_edge) > 0.0
+    # Each break is modelled inside its limits and no larger than the title
+    # block's edge break, so the specs' existing annulus budgets still hold.
+    for nominal, (low, high) in (
+        (seat.HEAD_CHAMFER, seat.HEAD_CHAMFER_LIMITS),
+        (cup_seat.FLOOR_HOLE_CHAMFER, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS),
+    ):
+        assert low < nominal < high <= edge_break_chamfer_mm(unit=spec.UNIT)
+    # The flat annulus left on the narrow side, from the printed limits:
+    # smallest head less its largest break, over the largest drilled hole
+    # plus its largest break, the head pushed over by its running play.  The
+    # screw spec's one annulus figure, which budgets the edge break on both
+    # edges, still holds it.
+    hole_max = cup.FLOOR_HOLE_DIA + drilled_oversize_mm(unit=cup.UNIT)
+    flat = (
+        (spec.HEAD_DIA - spec.HEAD_DIA_TOL) / 2.0
+        - seat.HEAD_CHAMFER_LIMITS[1]
+        - hole_max / 2.0
+        - cup_seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
+        - spec.HEAD_RUNNING_OFFSET_MAX
+    )
+    assert flat >= spec.HEAD_BEARING_RADIAL_MIN - 1e-9
+    assert flat >= 0.1  # the ruling's flat bearing floor (#1757)
+    # The cup's recipes stay out of the screw spec's closure (Codjiflo r2).
+    assert "dt_crank_handle_pivot_screw_spec" not in Path(
+        cup_seat.__file__
+    ).read_text(encoding="utf-8")
+
+
+def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
+    # The limits are the model dimensions' own (swTolMAX, swTolLIMIT); the
+    # callouts name what each feature clears and carry no number.
+    for callout in (notes.UNDER_HEAD_RADIUS_CALLOUT, notes.HEAD_CHAMFER_CALLOUT):
+        assert "MHA-DT-35" in callout
+        assert not re.search(r"\.\d", callout)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_single_limit(" in source and '"UnderHeadRadius"' in source
+    assert "limits=HEAD_CHAMFER_LIMITS" in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"UnderHeadRadius": UNDER_HEAD_RADIUS_CALLOUT' in drawing_source
+    assert '"HeadChamfer": HEAD_CHAMFER_CALLOUT' in drawing_source
+
+
+def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
+    focus_z, focus_r = drawing.DETAIL_B_FOCUS_MM
+    for z, r in (drawing._ROUND_ON_SHOULDER, drawing._ROUND_ON_FACE, drawing._BREAK_ON_OD):
+        assert math.hypot(z - focus_z, r - focus_r) < drawing.DETAIL_B_RADIUS_MM
+    x, y = drawing.DETAIL_B_CENTER
+    crop = drawing.DETAIL_B_CROP_RADIUS
+    assert 0.0127 < x - crop and x + crop < 0.4191 and 0.0127 < y - crop
+    # Clear of the title block and of detail A.
+    assert x + crop < 0.218 or y - crop > 0.065
+    ax, ay = drawing.DETAIL_CENTER
+    assert math.hypot(x - ax, y - ay) > crop + drawing.DETAIL_CROP_RADIUS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.index("keep=DETAIL_B_KEEP") < source.index("keep=SIDE_KEEP")
+
+
+class _ProfileCaptured(Exception):
+    """Raised at the revolve's volume check: the profile is complete."""
+
+
+def test_profile_runs_the_head_seat_into_a_tangent_round_and_dimensions_it(
+    monkeypatch,
+) -> None:
+    # #1757: drive the real build through the revolve profile with a
+    # recording adapter, stopping at the first volume check.
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    entities: dict[str, tuple[str, tuple[float, ...]]] = {}
+    dimensions: list[tuple[object, ...]] = []
+
+    def success(data: object = None) -> SimpleNamespace:
+        return SimpleNamespace(is_success=True, data=data)
+
+    def entity(kind: str, *coordinates: float) -> SimpleNamespace:
+        key = f"{kind}_{len(entities)}"
+        entities[key] = (kind, coordinates)
+        return success(key)
+
+    async def between(_adapter, start, end, kind, value, _label):
+        dimensions.append((start, end, kind, value))
+
+    async def sketch_dimension(first, second, kind, value):
+        dimensions.append((first, second, kind, value))
+        return success("dim")
+
+    adapter = SimpleNamespace(
+        currentSketchManager=SimpleNamespace(AddToDB=False),
+        _attempt=lambda read, default=None: read(),
+        create_part=AsyncMock(return_value=success()),
+        create_sketch=AsyncMock(return_value=success()),
+        add_centerline=AsyncMock(side_effect=lambda *p: entity("axis", *p)),
+        add_line=AsyncMock(side_effect=lambda *p: entity("line", *p)),
+        add_arc=AsyncMock(side_effect=lambda *p: entity("arc", *p)),
+        add_sketch_constraint=AsyncMock(return_value=success("constraint")),
+        add_sketch_dimension=AsyncMock(side_effect=sketch_dimension),
+        exit_sketch=AsyncMock(return_value=success()),
+        create_revolve=AsyncMock(return_value=success()),
+    )
+    for name in (
+        "set_global", "add_diametric_linear_dimension", "anchor_point_to_origin",
+        "ensure_fully_defined",
+    ):
+        monkeypatch.setattr(part, name, AsyncMock())
+    for name in ("apply_package_model_units", "name_last_feature"):
+        monkeypatch.setattr(part, name, MagicMock())
+    monkeypatch.setattr(part, "dimension_between", between)
+    monkeypatch.setattr(part.SketchDims, "apply", lambda *_args: [])
+
+    async def stop(*_args, **_kwargs):
+        raise _ProfileCaptured
+
+    monkeypatch.setattr(part, "volume_check", stop)
+    with pytest.raises(_ProfileCaptured):
+        asyncio.run(part.build(adapter))
+
+    r = seat.UNDER_HEAD_RADIUS_MAX
+    c = seat.HEAD_CHAMFER
+    shoulder_r, head_r = spec.SHOULDER_DIA / 2.0, spec.HEAD_DIA / 2.0
+    lines = {k: p for k, (kind, p) in entities.items() if kind == "line"}
+    (arc, (cx, cy, sx, sy, ex, ey)), = (
+        (k, p) for k, (kind, p) in entities.items() if kind == "arc"
+    )
+    assert (cx, cy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r + r))
+    assert (sx, sy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r))
+    assert (ex, ey) == pytest.approx((-spec.HEAD_LENGTH, shoulder_r + r))
+    # add_arc is CCW: the 90-degree fill, not its 270-degree complement.
+    sweep = (math.atan2(ey - cy, ex - cx) - math.atan2(sy - cy, sx - cx)) % math.tau
+    assert sweep == pytest.approx(math.pi / 2)
+    # The profile is one closed loop through the arc.
+    ends = [p[:2] for p in lines.values()] + [p[2:] for p in lines.values()]
+    ends += [(sx, sy), (ex, ey)]
+    for point in ends:
+        assert sum(1 for other in ends if other == pytest.approx(point)) == 2
+    head_break = next(
+        k for k, p in lines.items()
+        if p == pytest.approx(
+            (-(spec.HEAD_LENGTH - c), head_r, -spec.HEAD_LENGTH, head_r - c)
+        )
+    )
+    under_head_face = next(
+        k for k, p in lines.items()
+        if p == pytest.approx(
+            (-spec.HEAD_LENGTH, head_r - c, -spec.HEAD_LENGTH, shoulder_r + r)
+        )
+    )
+    shoulder = next(
+        k for k, p in lines.items()
+        if p == pytest.approx((sx, sy, -spec.SEAT_STATION, shoulder_r))
+    )
+    assert (arc, None, "radial", r) in dimensions
+    assert (f"{head_break}.start", f"{head_break}.end", "horizontal_distance", c) in (
+        dimensions
+    )
+    assert (f"{head_break}.start", f"{head_break}.end", "vertical_distance", c) in (
+        dimensions
+    )
+    constraints = [call.args for call in adapter.add_sketch_constraint.call_args_list]
+    assert (under_head_face, arc, "tangent") in constraints
+    assert (arc, shoulder, "tangent") in constraints
+    assert (under_head_face, None, "vertical") in constraints
+    assert (shoulder, None, "horizontal") in constraints
+    assert (head_break, None, "vertical") not in constraints
+    assert (head_break, None, "horizontal") not in constraints

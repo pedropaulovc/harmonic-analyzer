@@ -10,7 +10,10 @@ Layout: one revolve about local +Z.  The slotted head face is at z=0; the head,
 shoulder and threaded section follow in +Z, the threaded section opening
 with a thread-relief groove against the seat face (a 45-degree lead from its
 floor into the seat face) so a die runs out into air and the shoulder seats
-tight, and closing with a 45-degree thread-start chamfer on the tip.  The driver slot is sketched on the Front
+tight, and closing with a 45-degree thread-start chamfer on the tip.  The head
+meets the shoulder in a tangent under-head radius, and its outer under-head
+edge carries a 45-degree break (``dt_crank_handle_head_seat_spec``, #1757), so
+the head seats flat on the MHA-DT-35 floor.  The driver slot is sketched on the Front
 Plane (the head face) and cut 1.0 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
 ``Axis1`` the screw axis, for the assembly mates.
@@ -41,6 +44,7 @@ from _rebuild import (
     assert_saved_configurations_regenerate,
     force_rebuild,
 )
+from _limit_tolerance import set_limits
 from _session import run_build
 from _single_limit_tolerance import set_single_limit
 from _sketch import (
@@ -62,9 +66,16 @@ from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
+from dt_crank_handle_head_seat_spec import (
+    HEAD_CHAMFER,
+    HEAD_CHAMFER_LIMITS,
+    SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
+    SCREW_DRAWING_PRECISION as DRAWING_PRECISION,
+    UNDER_HEAD_RADIUS_BAND,
+    UNDER_HEAD_RADIUS_MAX,
+    UNDER_HEAD_RADIUS_TOL_TYPE,
+)
 from dt_crank_handle_pivot_screw_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     HEAD_DIA,
     HEAD_LENGTH,
     INSTALLED_CONFIG,
@@ -107,6 +118,16 @@ SLOT_SPAN = HEAD_DIA + 2.0
 # RELIEF_LEAD, centroid RELIEF_R + RELIEF_LEAD/3 from the axis) left standing.
 V_LEAD = math.pi * RELIEF_LEAD**2 * (RELIEF_R + RELIEF_LEAD / 3.0)
 V_RELIEF = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD
+# The head seat (#1757).  The under-head radius fills the square outside a
+# quarter disk at the shoulder: area R^2(1 - pi/4), first radial moment about
+# the shoulder surface R^3(10 - 3 pi)/12 (Pappus).  The head's 45-degree break
+# removes its corner triangle (legs HEAD_CHAMFER, centroid HEAD_R -
+# HEAD_CHAMFER/3 from the axis).
+_R = UNDER_HEAD_RADIUS_MAX
+V_UNDER_HEAD_RADIUS = 2.0 * math.pi * (
+    SHOULDER_R * _R**2 * (1.0 - math.pi / 4.0) + _R**3 * (10.0 - 3.0 * math.pi) / 12.0
+)
+V_HEAD_CHAMFER = math.pi * HEAD_CHAMFER**2 * (HEAD_R - HEAD_CHAMFER / 3.0)
 
 
 def turned_volume(thread_length: float, tip_chamfer: float) -> float:
@@ -121,7 +142,7 @@ def turned_volume(thread_length: float, tip_chamfer: float) -> float:
         + THREAD_R**2 * thread_length
     )
     chamfer = math.pi * tip_chamfer**2 * (THREAD_R - tip_chamfer / 3.0)
-    return turned - V_RELIEF - chamfer
+    return turned - V_RELIEF - chamfer + V_UNDER_HEAD_RADIUS - V_HEAD_CHAMFER
 
 
 V_BODY = turned_volume(THREAD_LENGTH, TIP_CHAMFER)
@@ -165,6 +186,8 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefWidth", RELIEF_WIDTH),
         ("ReliefLead", RELIEF_LEAD),
         ("TipChamfer", TIP_CHAMFER),
+        ("HeadChamfer", HEAD_CHAMFER),
+        ("UnderHeadRadius", UNDER_HEAD_RADIUS_MAX),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
     ):
@@ -184,12 +207,22 @@ async def build(adapter) -> dict[str, str]:
     )
     # The thread-relief groove is part of the profile: the seat face steps down
     # to a 45-degree lead onto the relief floor, which runs to RELIEF_WIDTH
-    # from the seat face before the flank rises to the thread major.
-    points = [
+    # from the seat face before the flank rises to the thread major.  The head
+    # seat (#1757): the head's OD breaks 45 degrees onto the flat under-head
+    # face, which runs down into a tangent quarter arc onto the shoulder.
+    round_r = UNDER_HEAD_RADIUS_MAX
+    round_center = (-(HEAD_LENGTH + round_r), SHOULDER_R + round_r)
+    round_on_shoulder = (-(HEAD_LENGTH + round_r), SHOULDER_R)
+    round_on_face = (-HEAD_LENGTH, SHOULDER_R + round_r)
+    head_points = [
         (0.0, 0.0),
         (0.0, HEAD_R),
-        (-HEAD_LENGTH, HEAD_R),
-        (-HEAD_LENGTH, SHOULDER_R),
+        (-(HEAD_LENGTH - HEAD_CHAMFER), HEAD_R),
+        (-HEAD_LENGTH, HEAD_R - HEAD_CHAMFER),
+        round_on_face,
+    ]
+    shank_points = [
+        round_on_shoulder,
         (-SEAT_STATION, SHOULDER_R),
         (-SEAT_STATION, RELIEF_R + RELIEF_LEAD),
         (-(SEAT_STATION + RELIEF_LEAD), RELIEF_R),
@@ -198,11 +231,21 @@ async def build(adapter) -> dict[str, str]:
         (-(OVERALL_LENGTH - TIP_CHAMFER), THREAD_R),
         (-OVERALL_LENGTH, THREAD_R - TIP_CHAMFER),
         (-OVERALL_LENGTH, 0.0),
+        head_points[0],
     ]
-    lines = await add_line_chain(adapter, points)
+    head_lines = await add_line_chain(adapter, head_points, close=False)
+    # add_arc is CCW: shoulder -> face is the 90-degree arc, not the
+    # 270-degree complement (build_dt_crank_handle_butt_cup's floor round).
+    under_head_round = check(
+        "under-head round",
+        await adapter.add_arc(*round_center, *round_on_shoulder, *round_on_face),
+    )
+    shank_lines = await add_line_chain(adapter, shank_points, close=False)
     set_sketch_direct_db(adapter, False)
-    for index, line in enumerate(lines):
-        (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(lines)]
+    for line, (u0, v0), (u1, v1) in (
+        *zip(head_lines, head_points[:-1], head_points[1:], strict=True),
+        *zip(shank_lines, shank_points[:-1], shank_points[1:], strict=True),
+    ):
         if u0 != u1 and v0 != v1:
             continue  # a 45-degree lead or chamfer; its two legs define it
         relation = "horizontal" if v0 == v1 else "vertical"
@@ -210,17 +253,20 @@ async def build(adapter) -> dict[str, str]:
             f"screw profile {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    head_outline, shoulder_outline = lines[1], lines[3]
-    relief_lead, relief_floor, thread_outline = lines[5], lines[6], lines[8]
-    tip_chamfer = lines[9]
+    head_face, head_outline, head_chamfer, under_head_face = head_lines
+    shoulder_outline = shank_lines[0]
+    relief_lead, relief_floor, thread_outline = shank_lines[2], shank_lines[3], shank_lines[5]
+    tip_chamfer = shank_lines[6]
     # The threaded section is sized from the seat face to the tip, across the
     # relief; the relief width and the lead's axial leg from the seat face; the
     # tip chamfer's axial leg from the tip.
     for name, start, end, value in (
-        ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
+        # Head face to the flat under-head face, and that face to the seat:
+        # both stations stand on the flat face, past the break and the round.
+        ("HeadLength", f"{head_face}.end", f"{under_head_face}.start", HEAD_LENGTH),
         (
             "ShoulderLength",
-            f"{shoulder_outline}.start",
+            f"{under_head_face}.end",
             f"{shoulder_outline}.end",
             SHOULDER_LENGTH,
         ),
@@ -228,6 +274,7 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefWidth", f"{relief_lead}.start", f"{relief_floor}.end", RELIEF_WIDTH),
         ("ReliefLead", f"{relief_lead}.start", f"{relief_lead}.end", RELIEF_LEAD),
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
+        ("HeadChamfer", f"{head_chamfer}.start", f"{head_chamfer}.end", HEAD_CHAMFER),
     ):
         await dimension_between(
             adapter, start, end, "horizontal_distance", value, f"screw {name}"
@@ -252,6 +299,15 @@ async def build(adapter) -> dict[str, str]:
         "screw tip chamfer rise",
     )
     profile.record("TipChamferRise", '"TipChamfer"')
+    await dimension_between(
+        adapter,
+        f"{head_chamfer}.start",
+        f"{head_chamfer}.end",
+        "vertical_distance",
+        HEAD_CHAMFER,
+        "screw head chamfer rise",
+    )
+    profile.record("HeadChamferRise", '"HeadChamfer"')
     for name, line, u_mid, radius in (
         ("HeadDia", head_outline, -HEAD_LENGTH / 2.0, HEAD_R),
         (
@@ -277,8 +333,23 @@ async def build(adapter) -> dict[str, str]:
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
         profile.record(name, f'"{name}"')
+    check(
+        "under-head radius",
+        await adapter.add_sketch_dimension(
+            under_head_round, None, "radial", UNDER_HEAD_RADIUS_MAX
+        ),
+    )
+    profile.record("UnderHeadRadius", '"UnderHeadRadius"')
+    for first, second, label in (
+        (under_head_face, under_head_round, "under-head face"),
+        (under_head_round, shoulder_outline, "shoulder"),
+    ):
+        check(
+            f"under-head round tangent to {label}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     await anchor_point_to_origin(
-        adapter, f"{lines[0]}.start", 0.0, 0.0, "screw head face centre"
+        adapter, f"{head_face}.start", 0.0, 0.0, "screw head face centre"
     )
     await ensure_fully_defined(adapter, "screw profile sketch")
     check("exit_sketch screw profile", await adapter.exit_sketch())
@@ -287,7 +358,10 @@ async def build(adapter) -> dict[str, str]:
     check("revolve screw", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Screw")
     await volume_check(
-        adapter, "turned shoulder screw with thread relief and tip chamfer", V_BODY, 0.005 * V_BODY
+        adapter,
+        "turned shoulder screw with thread relief, tip chamfer and head seat",
+        V_BODY,
+        0.005 * V_BODY,
     )
 
     # Straight driver slot across the full head, sketched on the head face
@@ -404,6 +478,24 @@ async def build(adapter) -> dict[str, str]:
         limit=TIP_CHAMFER,
         band=TIP_CHAMFER_BAND,
         tol_type=TIP_CHAMFER_TOL_TYPE,
+    )
+    # The head seat (#1757): the under-head radius as its single limit
+    # R.004 MAX, the head's break as its two limits.
+    set_single_limit(
+        adapter,
+        "ScrewProfile",
+        "UnderHeadRadius",
+        limit=UNDER_HEAD_RADIUS_MAX,
+        band=UNDER_HEAD_RADIUS_BAND,
+        tol_type=UNDER_HEAD_RADIUS_TOL_TYPE,
+    )
+    set_limits(
+        adapter,
+        "ScrewProfile",
+        "HeadChamfer",
+        limits=HEAD_CHAMFER_LIMITS,
+        places=DRAWING_PRECISION["ScrewProfile"]["HeadChamfer"],
+        display_unit=UNIT,
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the
