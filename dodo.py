@@ -3602,6 +3602,9 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         # --force bypasses the PDF diff precheck and its judge inputs.
         "machinist_review_precheck.md",
         "machinist_review_precheck_schema.json",
+        # The shadow drawing-change gate is not a review input.
+        "machinist_review_change_gate.md",
+        "machinist_review_change_gate_schema.json",
     }
     prompts = [
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
@@ -4207,6 +4210,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_machinist_review.py",
         SCRIPTS_DIR / "test_machinist_review_overlays.py",
         SCRIPTS_DIR / "test_machinist_review_precheck.py",
+        # The shadow drawing-change gate: its deterministic stages and its
+        # mapping of the precheck decision, offline on generated PDFs.
+        SCRIPTS_DIR / "test_machinist_review_change_gate.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         SCRIPTS_DIR / "test_machinist_review_bench.py",

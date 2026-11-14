@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reason"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["noise", "meaningful", "unsure"] },
+    "reason": { "type": "string", "minLength": 1 }
+  }
+}

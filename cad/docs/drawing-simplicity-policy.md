@@ -748,3 +748,47 @@ state and required view modes. A finish attachment identifies the controlled
 model face and keeps its physical leader landing, not merely a non-dangling
 transient silhouette. A sheet-derived linear reference reads back a linear
 native dimension type before its system value is read as a length.
+
+### Shadow drawing-change gate
+
+`uv run --frozen python cad/scripts/machinist_review_change_gate.py --before
+<anchor.pdf> --after <current.pdf>` (optionally with `--kind`, `--before-layout`
+and `--after-layout`) evaluates the owner ruling that a drawing regenerated
+incrementally need not be reviewed again when its sheet did not meaningfully
+change. The anchor is the last machinist-reviewed PDF. The first deciding stage
+wins: identical bytes, or no changed page in the overlay diff, is `unchanged`;
+a different page count or printed text-run multiset (only the title-block
+version stamp is ignored), or a layout-audit finding absent from the anchor's
+report, is `meaningful`. None of these stages calls a model. Otherwise Claude
+Haiku (`claude-haiku-5-5`, effort `low`) judges, in the variant chosen by
+`--judge-variant`. The default `side_by_side` variant shows BEFORE pages,
+AFTER pages and overlays on one pixel grid with
+`cad/scripts/prompts/machinist_review_change_gate.md` and its schema, and
+answers `noise`, `meaningful` or `unsure` directly. The `precheck` variant is
+the existing minimal-change precheck described above, with its prompt, schema,
+overlay package and evidence checks unchanged: a `rendering_noise` skip is
+`noise`, a `review` decision is `meaningful`, and an `assembly_single_part`
+skip is also `meaningful` for now, with the skip kind recorded in
+`precheck_skip_kind`. Either way, a
+failed or invalid judge is `unsure`. The `<name>.change-gate.json` sidecar and
+the `drawing_change_gate` span record both SHA-256 values, the deciding stage,
+verdict, judge variant, model and error, the SHA-256 of the prompt actually
+sent, diff statistics and reason.
+`cad/scripts/diagnostics/change_gate_calibration.py` runs both variants over a
+manifest of labeled real sheet pairs and reports confusion matrices, false
+noise, stability and wall time.
+
+Calibration on 2026-11-10 (37 labeled pairs of real sheets, 3 repeats, 111
+runs per variant): `precheck` on Haiku returned `meaningful` on every run, so
+it never mislabels a real change and never recognizes movement.
+`side_by_side` recognized 59 of 63 movement-only runs but called a real change
+`noise` in 5 of 48 runs, all one case: a small view rescaled 2:1 to 2.5:1 and
+moved in the same edit. The 16 meaningful pairs cover only two kinds of change
+(view rescale, lost datum attachment), so these rates do not qualify either
+variant to skip a review.
+
+The gate is shadow-only and **does not yet replace machinist review**. No
+`build`, `release` or `check:machinist_review` task runs or reads it, an
+`unchanged` or `noise` verdict skips nothing, and neither the gate module nor
+its prompt files are review cache-key inputs. Changed sheets still require
+review under the policy above.
