@@ -1465,7 +1465,7 @@ CONE_CRANK_STEPS = _note_text(
         # joints wait on the comb (Codjiflo review of PR #2531); a bonded slip
         # fit has nothing to adjust, so the remedy parts it (drawing-
         # guidelines: about 250 C releases 638) and cleans the cured film out.
-        f"1V. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024.",
+        f"1V. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
         "1W. IF IT DOES NOT, TAKE T024 OFF AT 250 DEG C.",
         "1X. CLEAN THE CURED 638 OUT OF ITS BORE AND OFF THE LAND.",
         "1Y. REDO FROM 1P.",
@@ -1473,7 +1473,11 @@ CONE_CRANK_STEPS = _note_text(
         # before the post goes on.
         "2. BOND T012 AND T018 ON THE MHA-DT-37 SPIGOT PER THE SHEET 1 NOTE.",
         "2A. BOND MHA-DT-37 IN MHA-DT-04, T018 ON T024, PER THE SHEET 1 NOTE.",
-        f"2B. CLIP {PHASING_COMB} OVER THE TIP, MHA-DT-04 STANDING ON ITS JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
+        # Round 2's wet joints sit beside the deeper blades, and 1Q's film has
+        # been through 1T and 1U, so the blades are coated again (Codjiflo
+        # review of PR #2735); step 2 has no letter left for a step of its own.
+        # MHA-DT-04 still stands on its journal from 1S.
+        f"2B. CLIP {PHASING_COMB}, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY.",
         # #2470: the coated spigot seals the blind socket's air in as it
         # enters; held home, the compressed air cannot back T018 off T024
         # before the bonds grab.  Standing on its journal does not hold it:
@@ -1487,7 +1491,7 @@ CONE_CRANK_STEPS = _note_text(
         # redoes the tip from 1L: cleaning the pivot takes MHA-DT-38 off, so
         # it is pressed back on before 1M (Codjiflo reviews of PR #2531;
         # machinist review of PR #2557 named the parts and the restart).
-        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS.",
+        f"2E. ONCE CURED, CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
         "2F. IF IT DOES NOT, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2G. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET.",
         "2H. REDO FROM 1L.",

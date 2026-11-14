@@ -132,11 +132,14 @@ SHEET_LIMITS_MM = (
 )
 # The model's material follows the row (see _appearance.apply_material).
 MATERIAL = "Brass" if "BRASS" in str(_ROW["material"]).upper() else "Plain Carbon Steel"
-# The spring arm is proven on the weaker stock, so it serves in either:
+# The spring arm is sized on the weaker stock's nominal bending strain:
 # half-hard C26000 yields at Rp0.2 >= 270 MPa (Wieland M30, H02) on a 110 GPa
 # modulus (16,000 ksi, Copper Development Association C26000), both read
 # 2026-11-14; hardened 1095 at about 230 ksi tensile (Precision Brand AMS 5122
-# certificate) on about twice the modulus bends several times as far.
+# certificate) on about twice the modulus bends several times as far. No root
+# factor is applied (the root is a full round 3.5 arm widths across): on the
+# 1095 the row names the margin is several-fold, on brass it is a fraction of
+# a percent, so brass waits on the owner's material ruling (#2734).
 SPRING_YIELD_STRAIN = 270.0 / 110_000.0
 
 
@@ -843,9 +846,10 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
 
 # --- Sheet words ----------------------------------------------------------------
 # Each blade's depth states its function on its own line in rule 3's form: it
-# clears its gear's root, named by number (rule 4). The grip span states its
-# fit at the dimension (rule 26): the interference its limits take across
-# T030's roots, from none at the tightest pair to SPREAD_MAX_MM. The
+# clears its gear's root, named by number (rule 4). The grip span's printed
+# limits govern; the interference they take across T030's roots, from
+# GRIP_PRELOAD_MIN_MM to SPREAD_MAX_MM, follows in parentheses as a
+# reference (rule 4's form). The
 # thickness is the stock's, printed as a reference over SHEET STOCK
 # (pn-pen-hanger, pd-platen-clip): the stock's own tolerance governs. No
 # numbered note is left.
@@ -857,8 +861,9 @@ GRIP_INTERFERENCE_IN = (
 if GRIP_INTERFERENCE_IN[0] < 0.0:
     raise AssertionError("the grip span must interfere at every limit")
 GRIP_TEXT = (
-    f"{GRIP_INTERFERENCE_IN[0]:.3f}-{GRIP_INTERFERENCE_IN[1]:.3f}".replace("0.", ".")
-    + f" INTERFERENCE\nON {gear_number(REFERENCE_TEETH)} ROOTS"
+    "(INTERFERENCE "
+    + f"{GRIP_INTERFERENCE_IN[0]:.3f}-{GRIP_INTERFERENCE_IN[1]:.3f}".replace("0.", ".")
+    + f")\nON {gear_number(REFERENCE_TEETH)} ROOTS"
 )
 REFERENCE_DIMENSIONS = frozenset({"SheetThick"})
 DEPTH_SUFFIX: dict[str, str] = {

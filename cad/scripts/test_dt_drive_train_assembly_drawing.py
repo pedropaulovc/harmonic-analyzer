@@ -1323,12 +1323,18 @@ def test_cone_station_rows_run_front_to_back() -> None:
     # Owner, 2026-11-14 (#2734): the comb is a U clipped over the tip of the
     # cone standing on its journal, both arms on T036.
     steps = " ".join(drawing.CONE_CRANK_STEPS.split())
-    for head in ("1S", "2B"):
+    assert steps[steps.index("1S. ") :].startswith(
+        "1S. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
+        " JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
+    )
+    # Round 2 waxes the blades again: its wet joints sit beside them.
+    assert steps[steps.index("2B. ") :].startswith(
+        "2B. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
+        " ON T036, T030'S BLADE BESIDE THE KEY."
+    )
+    for head in ("1V", "2E"):
         step = steps[steps.index(f"{head}. ") :]
-        assert step.startswith(
-            f"{head}. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
-            " JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
-        )
+        assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps
 
 

@@ -225,7 +225,7 @@ def test_each_depth_states_its_function_and_each_gear_is_named_once() -> None:
         and high * INCH >= spec.SPREAD_MAX_MM > (high - 0.001) * INCH
     )
     assert spec.CALLOUTS_BELOW["GripSpan"].splitlines() == [
-        f"{low:.3f}-{high:.3f} INTERFERENCE".replace("0.", "."),
+        f"(INTERFERENCE {low:.3f}-{high:.3f})".replace("0.", "."),
         f"ON {spec.gear_number(spec.REFERENCE_TEETH)} ROOTS",
     ]
     words = (*spec.DEPTH_SUFFIX.values(), spec.GRIP_TEXT)
