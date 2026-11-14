@@ -144,6 +144,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 diagram = { file = "diagrams/carrier/saw.svg", alt = "The carrier blank from the 1173 bar" }
+beam = "other"
 
 [[setups.operations]]
 speed_kind = "other"
@@ -159,6 +160,11 @@ machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Flat on four 1-2-3 blocks (1 in up, 3 in across, centred on the width) at {{cad.block_stations}} from the finished ZERO END (blank ~{{process.blank_length_in:.1f}} long, trim equal); both long edges overhang. One strap at each end, along X at mid-width, toe over the end block; edges clear."
+# milling_deflection: blocks only push up, so the two end straps (over the end
+# blocks) are the only hold against the end mill's lift: a pinned span between
+# them, X from the blank's left end. Section: the finished width (the back
+# edge's last pass, the narrowest) at the blank thickness.
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.end_block_blank_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.blank_thickness_mm}}" } }
 datum = "Face up = TOP. Front edge milled first becomes ZERO EDGE. +X right, +Y away."
 diagram = { file = "diagrams/carrier/edges.svg", alt = "Blank flat on four 1-2-3 blocks with an end strap at mid-width of each end; front edge cut in +X makes ZERO EDGE, back edge cut in −X finishes the width" }
 # Cutter centre runs past both blank ends and across the 6 in blank.
@@ -171,6 +177,11 @@ tool = "em-half"
 sizing = "other"
 instruction = "Cutter .04–.08 below underside. Front edge in +X, conventional; rough .050–.080 radial, finish .005–.010; take about half the {{process.blank_width_in:.1f}} − {{cad.width_in:.1f}} excess. Mark ZERO EDGE on TOP. Keep this clamping."
 settings = "basebar-edge-6061-t6511"
+# Settings: 1250 rpm, 6 in/min (152.4 mm/min), 1/2 in 2-flute: .0024 in/tooth.
+milling_cuts = [
+  { name = "front edge rough .080", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 2.032, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "front edge finish .010", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -178,6 +189,10 @@ tool = "em-half"
 sizing = "other"
 instruction = "Back edge in −X, conventional; rough .050–.080 radial, finish to {{cad.width_in:.1f}} wide from ZERO EDGE."
 settings = "basebar-edge-6061-t6511"
+milling_cuts = [
+  { name = "back edge rough .080", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 2.032, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "back edge finish .010", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+]
 inspection = "Width {{cad.width_min_in:.1f}}–{{cad.width_max_in:.1f}} at both ends and mid-length."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 
@@ -187,9 +202,14 @@ title = "Both ends to length"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Plate stays on the blocks. Add two straps across the finished long edges, toes {{process.strap_toe_in:.2f}} in from the edge over the two inner blocks (one from the front, one from the back); snug, then remove the end straps. Do not move the plate."
+holding = "Plate stays on the blocks. Add two straps across the finished long edges, toes {{process.strap_toe_in:.2f}} in from the edge over the two end blocks (front at the left, back at the right); snug, then remove the end straps. Do not move the plate."
+# milling_deflection: the edge straps over the end blocks hold the plate both
+# ways (straps over the inner blocks left a 7.5 in overhang that bent 0.037 mm
+# under the right end's finish pass). Blank frame; finished width at the blank
+# thickness. Both end cuts are declared at the blank's ends, the farthest out.
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.end_block_blank_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.blank_thickness_mm}}" } }
 datum = "First squared end (left) becomes ZERO END, X0. Keep ZERO EDGE."
-diagram = { file = "diagrams/carrier/ends.svg", alt = "Straps moved onto the long edges over the inner blocks; left end squared in −Y to ZERO END, right end cut in +Y to length" }
+diagram = { file = "diagrams/carrier/ends.svg", alt = "Straps moved onto the long edges over the end blocks; left end squared in −Y to ZERO END, right end cut in +Y to length" }
 # Cutter centre runs past both ends (final X = length + D/2) and across the width.
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = "other"
@@ -201,6 +221,10 @@ sizing = "other"
 instruction = "Cutter .04 below plate. Square left end in −Y, .020 passes; mark ZERO END on TOP. Right end in +Y, .010 passes; final cutter-centre X = {{cad.length_in:.3f}} + D/2 (D = measured cutter Ø)."
 instruction_detailed = "Measure the cutter, D. Cutter .04 below the plate. Square the left end in −Y with .020 passes; with the cutter still touching that end, set DRO X = −D/2, so X0 is the end face; mark ZERO END on TOP. Right end in +Y with .010 passes; read the length on the DRO before the last pass; last pass at cutter-centre X = {{cad.length_in:.3f}} + D/2."
 settings = "basebar-edge-6061-t6511"
+milling_cuts = [
+  { name = "left end .020 passes to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 152.4, stations_mm = 0 },
+  { name = "right end .010 passes to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 12.7, flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, stations_mm = "{{cad.blank_length_mm}}" },
+]
 inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}} on the DRO from ZERO END."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 
@@ -210,7 +234,10 @@ title = "Face TOP"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Same blocks and edge straps. After the first pass over all but the two toe patches: end straps back on at mid-width over the end blocks, toes on faced metal with paper under them; then remove the edge straps."
+holding = "Same blocks and edge straps (over the end blocks). After the first pass over all but the two toe patches: end straps back on at mid-width over the end blocks, toes on faced metal with paper under them; then remove the edge straps."
+# milling_deflection: both clampings hold at the end blocks; finished-length
+# frame, section at the finished size (the thinnest).
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 datum = "Z from T (Setup 1). Keep ZERO END and ZERO EDGE marks."
 diagram = { file = "diagrams/carrier/face-top.svg", alt = "TOP faced on the blocks under the edge straps; then the end straps on faced metal and the two toe patches faced at the same Z" }
 # Arrives at blank thickness; the deepest pass leaves the finished top.
@@ -224,6 +251,11 @@ sizing = "other"
 instruction = "Take half of (T − {{cad.thickness_in:.3dot}}) off TOP: .010 per pass, +X, +Y stepover .60, all but the two toe patches. Move the straps as above; face both patches at the same Z."
 instruction_detailed = "Touch TOP with a cigarette paper at mid-length and set Z = T. Take half of (T − {{cad.thickness_in:.3dot}}) off TOP in .010 passes: feed +X along the whole length, step .60 in +Y, leaving a cutter's width round each edge-strap toe. Without touching Z: put the end straps back on at mid-width over the end blocks, toes on faced metal with paper under them, snug them, then take the edge straps off and face the two toe patches."
 settings = "basebar-face-6061-t6511"
+# Settings: 850 rpm, 6.8 in/min (172.72 mm/min), 3/4 in 4-flute: .002 in/tooth.
+milling_cuts = [
+  { name = "TOP .010 passes", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 19.05, flutes = 4, axial_doc_mm = 0.254, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.length_mm}}"] },
+  { name = "toe patches", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 19.05, flutes = 4, axial_doc_mm = 0.254, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, stations_mm = "{{cad.end_block_x_mm}}" },
+]
 
 [[setups]]
 machine_kind = "other"
@@ -231,7 +263,8 @@ title = "Face UNDERSIDE to thickness"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Rolled over on the same blocks, UNDERSIDE up: ZERO END still left, ZERO EDGE now at the back. Edge straps over the inner blocks; then the end straps for the toe patches, as Setup 4."
+holding = "Rolled over on the same blocks, UNDERSIDE up: ZERO END still left, ZERO EDGE now at the back. Edge straps over the end blocks; then the end straps for the toe patches, as Setup 4."
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 datum = "Z from the plate's measured thickness after Setup 4."
 diagram = { file = "diagrams/carrier/face-under.svg", alt = "Plate rolled over, UNDERSIDE up and ZERO EDGE at the back, faced to thickness in the same two clampings" }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"] }
@@ -244,6 +277,11 @@ sizing = "other"
 instruction = "Face UNDERSIDE to {{cad.thickness_in:.3dot}}: .010 roughing passes, last pass .003–.005; toe patches after the strap move, same Z. Mark UNDERSIDE."
 instruction_detailed = "Mic the plate again (T1). Touch UNDERSIDE with a cigarette paper and set Z = T1. Face down to Z = {{cad.thickness_in:.3dot}} with .010 passes and a .003–.005 last pass, +X, .60 stepover, round the edge-strap toes; move the straps as in Setup 4 and face the two patches at the same Z. Mark UNDERSIDE."
 settings = "basebar-face-6061-t6511"
+milling_cuts = [
+  { name = "UNDERSIDE .010 roughing", kind = "end", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 19.05, flutes = 4, axial_doc_mm = 0.254, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.length_mm}}"] },
+  { name = "UNDERSIDE last pass .005", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 19.05, flutes = 4, axial_doc_mm = 0.127, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.length_mm}}"] },
+  { name = "toe patches", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 19.05, flutes = 4, axial_doc_mm = 0.127, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, stations_mm = "{{cad.end_block_x_mm}}" },
+]
 inspection = "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} at the four corners and mid-length."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }]
 
@@ -260,19 +298,47 @@ diagram = { file = "diagrams/carrier/holes.svg", alt = "Plate TOP up on the bloc
 # chuck; shortest: the centre drill. The reamer's lead runs deepest.
 envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.width_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
 vise_hold = "other"
+# milling_deflection: a strap over each block clamps the plate both ways there;
+# every hole is over air between blocks. The check takes two supports per
+# operation, so each hole group declares the two clamps that bracket it and
+# ignores the others (the weaker hold): R1–R4 and L1, L2 between the inner
+# blocks (R3, R4 as overhangs past them); CL, CR between the end blocks; A1,
+# A2, B1, B2 beyond the end blocks' outer edges, the fulcrum a drill's thrust
+# bends the plate over (cantilever from block_span_mm). Drills and spots are
+# hand fed; each cut states the chip load the operator applies (in/rev = 2 ×
+# feed_per_tooth_mm). The finished section.
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.inner_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot all {{cad.hole_count:d}} holes from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
+instruction = "Spot A1, A2, B1, B2, CL, CR from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
 instruction_detailed = "Edge-find ZERO END for X0 and ZERO EDGE for Y0. Spot all {{cad.hole_count:d}} holes at the table's X/Y, cone just under each drill. Every position is ±{{cad.location_tol_in:.3dot}}, except that A2 and B2 sit {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above the A1–B1 line. Sheet 2's note 2 measures B1, A2, B2, CL, CR and R1–R4 from A1 and that line, not from the corner, so keep one zero for every hole and approach each X and each Y from the same side: the holes then sit right relative to A1 even if the edge-find is a little off."
 rpm = 3000
 feed = "hand"
+# The #2 centre drill's Ø3/16 body cone, .001 in/rev.
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [
+  { name = "A1, A2, B1, B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.pin_x_mm}}" },
+  { name = "CL, CR", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.clamp_x_mm}}" },
+]
 
 [setups.operations.table]
 columns = ["Hole", "X", "Y", "Thread / bore"]
 rows = "{{cad.hole_rows}}"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+sizing = "other"
+instruction = "Spot R1–R4, L1, L2 the same way, from the same zero."
+rpm = 3000
+feed = "hand"
+milling_cuts = [
+  { name = "R1–R4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" },
+  { name = "L1, L2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.lever_x_mm}}" },
+]
 
 # Drill and ream speeds: LittleMachineShop "Cutting Speeds", Drilling &
 # Reaming table, row wrought aluminum 6061-T6: drilling 350-400 ft/min,
@@ -286,6 +352,7 @@ sizing = { kind = "band", band_mm = "{{cad.riser_drill_band_mm}}" }
 instruction = "R1–R4 through; peck .1."
 rpm = 3000
 feed = "hand"
+milling_cuts = [{ name = "R1–R4 at .001 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 2.2606, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -294,6 +361,8 @@ sizing = { kind = "band", band_mm = "{{cad.clamp_drill_band_mm}}" }
 instruction = "CL, CR through; peck .1."
 rpm = 3000
 feed = "hand"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [{ name = "CL, CR at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.clamp_x_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -302,6 +371,7 @@ sizing = { kind = "band", band_mm = "{{cad.lever_drill_band_mm}}" }
 instruction = "L1, L2 through; peck .1."
 rpm = 3000
 feed = "hand"
+milling_cuts = [{ name = "L1, L2 at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 6.5278, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.lever_x_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -310,6 +380,8 @@ sizing = "other"
 instruction = "A1, B1, A2, B2 through for the reamer; peck .1."
 rpm = 3000
 feed = "hand"
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [{ name = "A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 9.128125, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -319,6 +391,10 @@ instruction = "Ream A1, B1, A2, B2 through."
 instruction_detailed = "Reamer in the drill chuck at the same X/Y as each 23/64 hole. Brush on cutting fluid (WD-40 or kerosene for aluminium) and feed down in one steady pass until the full-diameter flutes are through the underside; do not dwell or stop in the bore. Withdraw with the spindle still running, then wipe the chips off the flutes before the next hole."
 rpm = 3000
 feed = "hand"
+# No reamer kind: its thrust is declared as a twist drill's at the reamer Ø
+# (the larger, chisel-edge figure), .004 in/rev.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [{ name = "ream A1, A2, B1, B2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 9.5504, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 inspection = "Ø{{cad.pin_dia_min_in:.4dot}}–{{cad.pin_dia_max_in:.4dot}}: the .376 GO pin enters full depth, the .377 NO-GO does not start, each hole."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_dia_band_mm}}" }]
 
@@ -364,6 +440,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 diagram = { file = "diagrams/carrier/inspect.svg", alt = "Section at A1 with the broken underside edge inside the TL-VN-78 spacer seat, and the pin-hole relations read from A1" }
+beam = "other"
 
 [[setups.operations]]
 instruction = "Every edge and hole end, the pin holes' undersides included, R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. Run a screw into every thread."

@@ -611,12 +611,15 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # Rule 4: the reamed pin holes; the band is millimetres, UNIT prints it
-    # in inches. The native table owns every location at the title block.
+    # in inches at the nominal's four places (+.0020/+.0010: inch tolerances
+    # carry the dimension's places, ASME Y14.5 inch practice). The native table
+    # owns every location at the title block.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",
         "PinHoleDia",
         *deviations(PIN_HOLE_BAND),
+        places=DRAWING_PRECISION["PinHoleProfile"]["PinHoleDia"],
         display_unit=UNIT,
     )
     # Owner's flagged .964 ±.002 control: unchanged geometric nominal,
