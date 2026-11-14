@@ -207,16 +207,30 @@ _PIN_TOP = fixture.THICKNESS + fixture.PIN_STAND
 # each gear, then the first cam's acceptance and its remedy, each check
 # straight after the work it verifies (run 20261114T231845023Z's review: a
 # separate CHECKS block was out of step with K1-K3 and fitting 1-3). Each
-# press has its slip-fit branch, bonded at the same stand (rule 23). The
-# turning direction before clamping is CUT_TURNS_GEAR_CLOCKWISE's (spec).
-BOND = "LOCTITE 638"
+# press has its slip-fit branch (rule 23): a press that slides in by hand
+# means item 1's ream misses its callout's press fit, so item 1 is rejected
+# and the kit restarted (run 20261114T234325728Z's review: a fallback bond
+# lacked rule 23's bonded-joint items). The turning direction before
+# clamping is CUT_TURNS_GEAR_CLOCKWISE's (spec).
+
+
+def _slip_reject(item: int, pressed: str) -> str:
+    """The slip branch of the press of ``item``: the words of item 1's
+    callout for the hole (``PRESS FIT ON <pressed>``), then the rejection."""
+    return (
+        f"IF ITEM {item} SLID IN BY HAND, ITEM 1 FAILS ITS PRESS FIT ON "
+        f"{fixture.kit_short_form(pressed)}: REJECT IT, MAKE A NEW ONE AND "
+        "REPEAT FROM STEP 1."
+    )
+
+
 _KIT: tuple[str, ...] = (
     "PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW, TAPPED END "
     f"OUT, TO STAND {fixture.STUB_STAND_TEXT} ABOVE THE FACE (CALIPER DEPTH ROD).",
-    f"IF ITEM 2 SLID IN BY HAND, BOND IT AT THAT STAND: {BOND}, CURE 24 H.",
+    _slip_reject(2, fixture.STUB_NUMBER),
     "CHECK: ITEM 2 DOES NOT MOVE BY HAND.",
     "PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
-    f"IF ITEM 3 SLID IN BY HAND, BOND IT AT THE FLOOR: {BOND}, CURE 24 H.",
+    _slip_reject(3, fixture.CLOCK_PIN_NUMBER),
     "CHECK: ITEM 3 DOES NOT MOVE BY HAND.",
     "GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT; LEAVE IT THERE FOR ALL 20 GEARS.",
     f"INDICATE ITEM 1'S Ø{fixture.BODY_DIA_TEXT} OD TO {fixture.REGISTER_TIR_TEXT} "

@@ -1285,8 +1285,8 @@ The first cam is the fixture's acceptance (MHA-DT-12-TL-00 step 15): its throw w
 print before the other 19 are cut; if it fails, item 1 is re-indicated and steps 9 and 15
 repeated, and if it still fails item 1 is reworked to MHA-DT-12-TL-01. The clamp screw's .16-.25 in
 (0.84D-1.30D) engagement, under rule 18's 1.5D floor, is accepted by the same ruling
-(MHA-DT-12-TL-00 RV-01). The stub and clock pin are pressed; either one that slides in by hand
-is bonded at its seat with LOCTITE 638 (steps 2 and 5).
+(MHA-DT-12-TL-00 RV-01). The stub and clock pin are pressed; if either one slides in by hand,
+item 1 fails that hole's press fit and is rejected and remade (steps 2 and 5).
 
 ### T006 special cutter
 

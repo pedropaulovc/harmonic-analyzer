@@ -132,13 +132,23 @@ def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
     assert [int(line.split(".")[0]) for line in numbered] == list(
         range(1, len(sheet.STEPS) + 1)
     )
-    # Each press, its slip-fit bond at the same seat, then its check.
-    for item, first in (("2", 1), ("3", 4)):
+    # Each press, its slip branch (reject item 1 in the words of its hole
+    # callout, restart the kit; no fallback bond), then its check.
+    for item, first, pressed in (
+        ("2", 1, fixture.STUB_NUMBER),
+        ("3", 4, fixture.CLOCK_PIN_NUMBER),
+    ):
         assert _step(first).startswith(f"PRESS ITEM {item} ")
-        bond = _step(first + 1)
-        assert bond.startswith(f"IF ITEM {item} SLID IN BY HAND, BOND IT AT ")
-        assert f"{sheet.BOND}, CURE 24 H." in bond
+        slip = _step(first + 1)
+        callout = f"PRESS FIT ON {fixture.kit_short_form(pressed)}"
+        assert slip.startswith(f"IF ITEM {item} SLID IN BY HAND, ITEM 1 FAILS ITS ")
+        assert callout in slip and any(
+            callout in text for text in fixture.CALLOUTS_BELOW.values()
+        )
+        assert "REJECT IT" in slip and slip.endswith("REPEAT FROM STEP 1.")
         assert _step(first + 2) == f"CHECK: ITEM {item} DOES NOT MOVE BY HAND."
+    assert "LOCTITE" not in sheet.ASSEMBLY_STEPS
+    assert "CURE" not in sheet.ASSEMBLY_STEPS
     assert fixture.STUB_STAND_TEXT in _step(1)
     # The register set-up, then its check.
     indicate = _step(sheet.INDICATE_STEP)
