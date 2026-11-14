@@ -32,7 +32,6 @@ _MODEL_VALUES = {
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
-    "TapWallMin": spec.TAP_WALL_MIN_MM,
 }
 
 
@@ -194,13 +193,8 @@ def test_printed_precision_is_authored_for_every_marked_dimension() -> None:
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert set(spec.DRAWING_PRECISION[feature]) == names
     # Every rail, window and envelope size feeds a printed-worst-case stack,
-    # so nothing prints .X; everything prints .XX except the stated tap wall's
-    # limit, .XXX.
-    three_place = {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
-    }
-    assert three_place == {"TapWallMin"}
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
+    # so nothing prints .X: everything prints the title block's .XX.
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
     assert "assert_imported_precision" in inspect.getsource(drawing.build)
 
 
@@ -229,7 +223,7 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     assert spec.RAIL_END - one - lead < 1.5 * major
     # Rule 17: the tap station prints .16 (.XX) about the .155 mid-plane, so
     # the near wall keeps the target and the far wall falls between the floor
-    # and the target (RV-01), stated natively as .074 MIN.
+    # and the target (RV-01), stated once on the .16 that sets it (rule 20).
     printed = 0.16 * 25.4
     assert spec.SET_SCREW_NEAR_WALL_MIN == pytest.approx(printed - two - major / 2.0)
     assert spec.SET_SCREW_NEAR_WALL_MIN >= WALL_TARGET_MM
@@ -239,8 +233,8 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     assert WALL_FLOOR_MM <= far < WALL_TARGET_MM
     assert spec.TAP_WALL_MIN_MM == pytest.approx(0.074 * 25.4)
     assert far == pytest.approx(spec.TAP_WALL_MIN_MM, abs=0.001)
-    assert spec.TAP_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
-    assert spec.TAP_WALL_START_Z == pytest.approx(spec.FRAME_DEPTH / 2.0 + major / 2.0)
+    assert list(spec.DIMENSION_CALLOUTS) == ["ScrewZ"]
+    assert ".074 MIN" in spec.DIMENSION_CALLOUTS["ScrewZ"]
 
 
 def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
@@ -394,21 +388,19 @@ def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     assert "process=" not in inspect.getsource(drawing.build)
 
 
-def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
-    # The wall's run is shorter than its two-row text: the text is offset on
-    # a leader, left of where its extension lines end (1 mm past its line).
-    line_x, line_y = drawing.BOTTOM_KEEP["TapWallMin"]
-    x, y = drawing.TAP_WALL_TEXT_XY
-    half = _half_width(".074 MIN")
+def test_station_text_stands_on_a_shelf_clear_of_every_line() -> None:
+    # The .16's run is shorter than its two rows: the text is offset on a
+    # leader, left of where its extension lines end (1 mm past its line).
+    line_x, line_y = drawing.BOTTOM_KEEP["ScrewZ"]
+    x, y = drawing.SCREW_Z_TEXT_XY
+    half = _half_width(spec.DIMENSION_CALLOUTS["ScrewZ"])
     assert y == line_y
     assert x + half < line_x - 0.001 - 0.002
     assert x - half > 0.0127  # inside the left border
-    # Its rows (value on the anchor, TAP WALL below) stand left of the .16's
-    # text and under the front view's lowest dimension row.
-    screw_x, _ = drawing.BOTTOM_KEEP["ScrewZ"]
-    assert x + half < screw_x - _half_width(_printed_text("ScrewZ")) - 0.002
+    # Its rows (value on the anchor, the wall below) stand under the front
+    # view's lowest dimension row.
     assert y + 0.0035 < drawing.FRONT_KEEP["LeftWall"][1] - 0.0035 - 0.005
-    assert "_offset_tap_wall_text(adapter, annotations)" in inspect.getsource(
+    assert "_offset_screw_z_text(adapter, annotations)" in inspect.getsource(
         drawing.build
     )
 

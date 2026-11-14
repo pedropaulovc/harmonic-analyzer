@@ -17,9 +17,9 @@ The tapped hole's axis is the named axis ``SetScrewAxis``
 
 Every printed size is a native associative dimension (``DRAWING_DIMENSIONS``)
 or the Hole Wizard callout; no note carries geometry.  The tap's far wall
-(rule 17, under the .080 target: RV-01 in ``pn-pen-frame.yaml``) prints as
-the native single limit ``TapWallMin`` on a hidden Top-plane reference sketch
-(``TapWallReference``), the pilot cam's ``ThinWallMin`` recipe.
+(rule 17, under the .080 target: RV-01 in ``pn-pen-frame.yaml``) is stated
+once, as rule 20's plain fact, on the .16 station ``ScrewZ`` that sets it
+(``TAP_WALL_CALLOUT``, ``WALL .074 MIN``).
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each the exact decimal of the inch value it prints.
@@ -98,7 +98,7 @@ if SET_SCREW_RADIAL_WALL < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
 # which together fully define the ring sketch; the window corners print no
 # radius (the title block governs).  Bottom view: the extrude depth and the tapped
 # hole's two coordinates, each from a real outer face, beside the hole's
-# wizard callout, and the tap's stated far-wall minimum. ---
+# wizard callout. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {
         "OuterSpanX",
@@ -110,7 +110,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Ring": {"Depth"},
     "ScrewHole": {"ScrewX", "ScrewZ"},
-    "TapWallReference": {"TapWallMin"},
 }
 
 # Printed places (drawing-guidelines.md rule 3).  Every rail, window and
@@ -120,14 +119,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # protect a wall).  The model keeps the station on the .155 mid-plane, where
 # the carriage puts the thumb screw (pn_pen_carriage_geom.FRAME_X_CENTER_LOCAL
 # reads FRAME_DEPTH / 2), so it prints rounded, .16, and every check below
-# judges it about that printed value.  The stated tap wall prints its limit
-# at .XXX.
-TAP_WALL_MIN_PLACES = 3
+# judges it about that printed value.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {
-        name: TAP_WALL_MIN_PLACES if name == "TapWallMin" else 2 for name in names
-    }
-    for feature, names in DRAWING_DIMENSIONS.items()
+    feature: dict.fromkeys(names, 2) for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -172,8 +166,8 @@ if BOTTOM_RAIL_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size]:
 # (the stirrup's fit between the v-block's paper end and its body step leaves
 # 0.016 mm, pn_pen_carriage_geom), so the far wall, (.31 - .01) - (.16 + .01)
 # - .056 = .074, falls under the rule 17 .080 target and over the .060 floor:
-# RV-01 (pn-pen-frame.yaml, owner ruling 2026-11-01), stated on the sheet by
-# TapWallMin as .074 MIN.
+# RV-01 (pn-pen-frame.yaml, owner ruling 2026-11-01), stated on the .16 as
+# WALL .074 MIN.
 _SCREW_Z = FRAME_DEPTH / 2.0
 _SCREW_Z_LOW, _SCREW_Z_HIGH = printed_deviations(
     _SCREW_Z, DRAWING_PRECISION_BY_NAME["ScrewZ"], unit=UNIT
@@ -186,28 +180,22 @@ SET_SCREW_FAR_WALL_MIN = (
 SET_SCREW_PRINTED_WALL_MIN = min(SET_SCREW_NEAR_WALL_MIN, SET_SCREW_FAR_WALL_MIN)
 if SET_SCREW_PRINTED_WALL_MIN < WALL_FLOOR_MM:  # drawing-guidelines.md rule 17
     raise AssertionError("printed bands let the #4-40 tap break the .060 wall floor")
-# The far wall's printed minimum at its places: .074 is exact on the #4-40's
+# The far wall's printed minimum at three places: .074 is exact on the #4-40's
 # .1120 basic major; THREAD_MAJOR_MM carries that major on the 0.001 mm grid
 # (2.845), which leaves the computed wall 0.0001 mm short of it.
+TAP_WALL_MIN_PLACES = 3
 TAP_WALL_MIN_MM = round(
     round(SET_SCREW_FAR_WALL_MIN / 25.4, TAP_WALL_MIN_PLACES) * 25.4, 9
 )
 if not math.isclose(SET_SCREW_FAR_WALL_MIN, TAP_WALL_MIN_MM, abs_tol=0.001):
     raise AssertionError("the stated tap wall is not the printed worst case")
-TAP_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
-# A MIN single limit whose upper deviation reaches the far wall's printed
-# maximum (the depth long, the station short).
-_SET_SCREW_FAR_WALL_MAX = (
-    (FRAME_DEPTH + _band("Depth")) - (_SCREW_Z + _SCREW_Z_LOW) - _THREAD_R
-)
-TAP_WALL_MIN_BAND = (round(_SET_SCREW_FAR_WALL_MAX - TAP_WALL_MIN_MM, 6), 0.0)
-TAP_WALL_CALLOUT = "TAP WALL"
-DIMENSION_CALLOUTS = {"TapWallMin": TAP_WALL_CALLOUT}
-# The hidden reference line runs +Z up the far wall from the thread's major
-# diameter on the hole's axis, as long as the stated minimum.
-TAP_WALL_START_Z = _SCREW_Z + _THREAD_R
-if TAP_WALL_START_Z + TAP_WALL_MIN_MM >= FRAME_DEPTH:
-    raise AssertionError("the tap wall reference runs out of the frame")
+# Stated on the station that sets it (rule 20), not as a dimension of its own:
+# the nominal wall is .099, so a .074 line from the thread's major (which no
+# view draws) ends inside the rail and neither of its extension lines starts
+# on drawn geometry (machinist review 20261114T090444426Z, 3/3; #2779).
+_WALL_TEXT = f"{TAP_WALL_MIN_MM / 25.4:.{TAP_WALL_MIN_PLACES}f}".removeprefix("0")
+TAP_WALL_CALLOUT = f"WALL {_WALL_TEXT} MIN"
+DIMENSION_CALLOUTS = {"ScrewZ": TAP_WALL_CALLOUT}
 
 DRAWING_NOTES = ""
 # Every view is at the sheet's 2:1, which the title block states (rule 9);

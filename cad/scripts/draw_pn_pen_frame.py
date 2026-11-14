@@ -12,9 +12,8 @@ size is a native associative dimension marked on the part
 window's size and its lower-left corner from the left and bottom faces (the
 window corners print no radius: the title block governs); the bottom view,
 looking up at the tapped rail, carries the depth, the hole's two coordinates
-from the outer faces, the
-hole's native Hole Wizard callout and the tap's stated far-wall minimum (the
-hidden TapWallReference sketch, shown in that view only).  No datums, no
+from the outer faces (the .16 stating the far wall it sets, WALL .074 MIN),
+and the hole's native Hole Wizard callout.  No datums, no
 frames (drawing-guidelines.md rule 5), no note block.  The sheet runs 2:1 in
 decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1, so
 only the pictorial carries a caption, without a scale (rule 9).
@@ -74,8 +73,6 @@ from pn_pen_frame_spec import (
     OUTER_WIDTH,
     RAIL_END,
     SET_SCREW_TAP_SPEC,
-    TAP_WALL_MIN_MM,
-    TAP_WALL_START_Z,
 )
 
 
@@ -170,27 +167,18 @@ FRONT_KEEP = {
 }
 # Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
 # right; the hole callout stands above-right, between the bottom view and the
-# front view's height dimension.  The tap's far-wall minimum (.074 MIN over
-# TAP WALL) stands left too, outboard of the .16: its reference line runs up
-# the far wall from the thread's rim on the hole's axis (sheet y
-# ~0.108..0.112), so its extension lines run left across the rail above the
-# .16's top extension line (y 0.105, from the hole's centre).
+# front view's height dimension.
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
     "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
-    "TapWallMin": (
-        BOTTOM_LEFT_X - 0.020,
-        _bottom_xy(0.0, TAP_WALL_START_Z + TAP_WALL_MIN_MM / 2.0)[1],
-    ),
 }
-# The wall's 3.8 mm run cannot hold its ~21 x 9 mm two-row text: centred on
-# its own line, the line, its arrows and both extension lines ran through
-# ".074 min. TAP WALL" (machinist review of 6988bc279, 3/3).  Native
-# OffsetText parks the text on a leader left of the extension lines' ends
-# (line x - 0.001), its right edge ~4 mm clear of them and ~12 mm clear of
-# the .16's text; the anchor is the value row's bottom centre.
-TAP_WALL_TEXT_XY = (BOTTOM_LEFT_X - 0.036, BOTTOM_KEEP["TapWallMin"][1])
+# The .16's 8 mm run cannot hold its two rows (.16 over WALL .074 MIN, ~36 mm
+# wide): centred on its line the wall row would cross both extension lines.
+# Native OffsetText parks the text on a leader left of where the extension
+# lines end (line x - 0.001), its right edge ~5 mm clear of them; the anchor
+# is the value row's bottom centre.
+SCREW_Z_TEXT_XY = (BOTTOM_LEFT_X - 0.034, BOTTOM_KEEP["ScrewZ"][1])
 _TEXT_SETTLE_M = 0.0005
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 HOLE_CALLOUT_XY = (0.165, 0.128)
@@ -215,22 +203,22 @@ def _tap_drill_variable(definitions: dict[int, str]) -> str:
 ISO_VIEW_NOTE_XY = (ISO_CENTER[0] - len(ISOMETRIC_VIEW_NOTE) * 0.0025 / 2.0, 0.116)
 
 
-def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
-    """Park the tap wall's text on its leader shelf and read it back."""
-    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+def _offset_screw_z_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the .16's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"ScrewZ": SCREW_Z_TEXT_XY})
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
-        if dimension_name(adapter, annotation) != "TapWallMin":
+        if dimension_name(adapter, annotation) != "ScrewZ":
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         position = annotation.GetPosition()
         if (
             not bool(display.OffsetText)
             or position is None
-            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+            or math.dist(position[:2], SCREW_Z_TEXT_XY) > _TEXT_SETTLE_M
         ):
             raise RuntimeError(
-                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+                f"ScrewZ text at {position!r}, not offset to {SCREW_Z_TEXT_XY!r}"
             )
 
 
@@ -314,7 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _offset_tap_wall_text(adapter, annotations)
+    _offset_screw_z_text(adapter, annotations)
 
     # The template may centre-mark the tap as the view is placed: every round's
     # layout audit found two identical marks on it (duplicate-annotation, as
