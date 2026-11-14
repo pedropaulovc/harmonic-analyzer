@@ -120,8 +120,10 @@ if any(len(text.splitlines()) > 2 for text in DIMENSION_CALLOUTS.values()):
 
 
 def cutter_description() -> str:
-    # The tool is ground to the T006 tooth space; sheet 2 defines that space.
-    return f"NOT STOCK; FORM = TOOTH SPACE, SHEET {CUTTER_DETAIL_SHEET_NUMBER}"
+    # The fly-cutter bit MHA-DT-37-TL-01 carries the T006 tooth space as its
+    # edge (#2358); sheet 2 defines that space.
+    bit = _config.parts("dt-cone-tip-gear-tl-form-cutter")["number"]
+    return f"{bit}; FORM = TOOTH SPACE, SHEET {CUTTER_DETAIL_SHEET_NUMBER}"
 
 
 def tooth_form() -> str:
