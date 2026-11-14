@@ -3301,7 +3301,28 @@ carries the two (`display`, `base_display`: `<w>x<h> px/mm=<p>`).
 counter the script echoed (`truth_cause=response:title_counter`), and the
 whole streams are the same requests once title counters are masked, every
 answer the same but for noise. The split is `noop`; `ground_truth=diverged`
-and the cause are kept, and the INFO line ends with `title_echo`.
+and the cause are kept, and the INFO line ends with `title_echo`. A
+dependent's streams are the name-bound ones (below), and its answers may also
+differ where the seat made them differ (`_com_outcome._order_only`), its
+requests still the base's throughout:
+
+- a session read (`IModelDoc2.SummaryInfo`, `ISldWorks.GetUserPreference*`);
+- a read of an object an enumeration listed (the outermost handle array it
+  descends from), when that enumeration is the base's in another order: its
+  elements' records (each element's calls, in order, on it or on what it
+  answered: member, arguments and answer, handles erased, title counters
+  masked) are the base's records permuted, and every call on or with any of
+  its objects is a read (a get, a wrap, a dispid lookup, a QueryInterface).
+
+A record that is not the base's (a name changed, a read or a question moved
+between elements) or a call that acts on an element (a selection of the first
+element is another component once the seat listed it in another order) is no
+echo. Not caught: an order-dependent pick carried only by an index into
+another enumeration the script did not read. The first same-key pairs after
+#2730 (2026-11-14, `ch_channel` and `dt_drive_train`) are such echoes: the
+title echoed into `SelectByID2` before any array was bound, then the
+interference report and the component-pattern name sets read in the seat's
+order, and two save dates.
 
 The judge names a dependent's causes more finely than a part's (only for
 `_com_outcome.DEPENDENT_KINDS`; a part's reuse and audit judgement is
@@ -3348,8 +3369,9 @@ thing of each component under a seat-dependent number. Before a dependent's
 split, `_com_outcome.name_bound` binds such an array to the base's by name. It
 does so only when all of these hold:
 
-- both builds issued the request alike and were answered with the same handle
-  numbers;
+- both builds issued every request up to it, and it, alike but for title
+  counters (a title the script echoed earlier, `title_echo`'s case, does not
+  stop the walk), and it was answered with the same handle numbers;
 - the calls right after it identify every element and do nothing else: pywin32
   wraps (`GetTypeInfo`), `early_bound` QueryInterfaces, and one identity read
   per element (`*.Name2`, or `IDrawingComponent.Name` for a drawing view's

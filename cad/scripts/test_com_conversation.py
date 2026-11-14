@@ -3339,6 +3339,142 @@ def test_a_stream_that_differs_only_by_echoed_titles_is_a_title_echo(monkeypatch
     ]
 
 
+def _late_name(handle: int, name: str) -> list[conv.Call]:
+    """A component's ``Name2`` read late-bound (``_read_member``), as pywin32
+    logs it: a wrap, the name's dispid, the property read."""
+    return [
+        conv.Call(0, handle, "GetTypeInfo", [], "__WrapDispatch"),
+        conv.Call(0, handle, "GetIDsOfNames", [0, "Name2"], "__AttrToID__", result=59),
+        conv.Call(0, handle, "Invoke", [59, 0, 2, 1], "CDispatch.Name2", result=name),
+    ]
+
+
+def _handles_of(handles: list[int]) -> dict[str, Any]:
+    return {"t": [{"h": handle, "p": "PyIDispatch"} for handle in handles]}
+
+
+def _seat_listed(
+    title: str,
+    reports: tuple[tuple[str, str], ...] = (("rod-1", "pin-1"), ("rod-2", "pin-2")),
+    listed: tuple[str, ...] = ("arbor", "brace", "collar"),
+    *,
+    names: tuple[str, ...] = ("brace", "arbor", "collar"),
+    aim: str = "collar",
+    pick: bool = False,
+    asked: tuple[tuple[str, float], ...] = (),
+    dated: str = "IModelDoc2.SummaryInfo",
+    date: str = "Friday, November 13, 2026 7:01:14 PM",
+) -> conv.Conversation:
+    """The first same-key pairs after #2730 (2026-11-14, ch_channel and
+    dt_drive_train) reduced: the document's title echoed into a component
+    selection (``aim@title``) before anything was enumerated; the components
+    SolidWorks enumerated as ``names``, read by name and visited in name order
+    (:func:`_assembled`); an interference report listing ``reports`` in the
+    seat's order, each pair's names read late-bound (ch_channel's); a
+    late-bound name set over the components in ``listed`` order (a component
+    pattern's ``before`` set, dt_drive_train's), each element then asked the
+    ``asked`` question at its position (a parameter read, its answer), then
+    with ``pick`` the set's first element added to the selection; then a
+    ``dated`` read answering ``date`` (by default the save date, a session
+    read)."""
+    calls = [
+        _sw("IModelDoc2.GetTitle", result=title),
+        _sw("IModelDocExtension.SelectByID2", f"{aim}@{title}", "COMPONENT", on=5),
+        *_assembled(names).calls,
+    ]
+    found = [40 + index for index in range(len(reports))]
+    calls.append(
+        _sw("IInterferenceDetectionMgr.GetInterferences", result=_handles_of(found))
+    )
+    for index, (report, pair) in enumerate(zip(found, reports, strict=True)):
+        members = [60 + 2 * index, 61 + 2 * index]
+        result = _handles_of(members)
+        calls.append(_sw("IInterference.Components", flags=2, result=result, on=report))
+        for member, name in zip(members, pair, strict=True):
+            calls += _late_name(member, name)
+    members = [80 + index for index in range(len(listed))]
+    calls.append(_sw("IAssemblyDoc.GetComponents", True, result=_handles_of(members)))
+    for member, name in zip(members, listed, strict=True):
+        calls += _late_name(member, name)
+    for member, (question, value) in zip(members if asked else (), asked, strict=True):
+        read = [61, 0, 2, 1, question]
+        site = "CDispatch.Parameter"
+        calls.append(conv.Call(0, member, "Invoke", read, site, result=_f(value)))
+    if pick:
+        first = {"h": members[0], "p": "PyIDispatch"}
+        calls.append(_sw("ISelectionMgr.AddSelectionListObject", first, None, on=7))
+    calls.append(_sw(dated, 2, flags=2, result=date))
+    return conv.Conversation(_HEADER, calls, {})
+
+
+def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
+    tmp_path, monkeypatch
+):
+    import com_replay
+
+    base = _seat_listed("Assem3", date="Friday, November 13, 2026 6:49:23 PM")
+    seat = {
+        "reports": (("rod-2", "pin-2"), ("rod-1", "pin-1")),
+        "listed": ("collar", "arbor", "brace"),
+        "names": ("collar", "brace", "arbor"),
+    }
+    logs: dict[str, conv.Conversation] = {"base": base}
+    monkeypatch.setattr(conv, "load", lambda path: logs[Path(path).name])
+
+    def diff(new: conv.Conversation, kind: str = "assembly") -> dict[str, Any]:
+        logs["new"] = new
+        result = tmp_path / "diff.json"
+        com_replay.main(
+            ["diff", "base", "new", "--kind", kind, "--result", str(result)]
+        )
+        return json.loads(result.read_text("utf-8"))
+
+    # Another seat: another title counter, the components and the interference
+    # report enumerated in another order, another save date. The echo comes
+    # before every array, yet the arrays are bound by name, and the rest is
+    # the seat's order: the same requests, a no-op.
+    found = diff(_seat_listed("Assem6", **seat))
+    assert found["truth_cause"] == _com_outcome.TITLE_COUNTER_CAUSE
+    assert found["name_bound"]["arrays"] == 1 and found["title_echo"] is True
+    # A part's answers stay compared whole, in order.
+    assert diff(_seat_listed("Assem6", **seat), "part")["title_echo"] is False
+    # The echoed selection on another component is the script's own request.
+    found = diff(_seat_listed("Assem6", **seat, aim="brace"))
+    assert found["truth_cause"] == "request" and found["title_echo"] is None
+    # A read set with one name changed is no reordering...
+    changed = {**seat, "listed": ("collar", "axle", "brace")}
+    assert diff(_seat_listed("Assem6", **changed))["title_echo"] is False
+    # ... nor is an interference report pairing other components.
+    paired = {**seat, "reports": (("rod-2", "pin-1"), ("rod-1", "pin-2"))}
+    assert diff(_seat_listed("Assem6", **paired))["title_echo"] is False
+    # Nor is an answer moved to an element asked another question: asked by
+    # position, each component was asked something else in the other order.
+    asked = (("D1@Sketch1", 5.0), ("D2@Sketch1", 7.0), ("D3@Sketch1", 9.0))
+    logs["base"] = _seat_listed("Assem3", asked=asked)
+    moved = (("D1@Sketch1", 9.0), ("D2@Sketch1", 5.0), ("D3@Sketch1", 7.0))
+    assert diff(_seat_listed("Assem6", **seat, asked=moved))["title_echo"] is False
+    # The same question of every component, answered per component, is only
+    # the seat's order.
+    uniform = tuple(("D1@Sketch1", value) for _, value in asked)
+    logs["base"] = _seat_listed("Assem3", asked=uniform)
+    same = tuple(("D1@Sketch1", value) for _, value in moved)
+    assert diff(_seat_listed("Assem6", **seat, asked=same))["title_echo"] is True
+    # Selecting the set's first element selects another component once the
+    # seat listed it in another order, by the very same request...
+    logs["base"] = _seat_listed("Assem3", pick=True)
+    assert diff(_seat_listed("Assem6", **seat, pick=True))["title_echo"] is False
+    # ... and is no difference when the set came in the base's order.
+    alike = {**seat, "listed": ("arbor", "brace", "collar")}
+    assert diff(_seat_listed("Assem6", **alike, pick=True))["title_echo"] is True
+    # Only a session read may answer anything else: another property value is
+    # the model's, however the components were enumerated.
+    logs["base"] = _seat_listed("Assem3", dated="IModelDoc2.GetCustomInfoValue")
+    custom = _seat_listed(
+        "Assem6", **seat, dated="IModelDoc2.GetCustomInfoValue", date="BRASS"
+    )
+    assert diff(custom)["title_echo"] is False
+
+
 def _display_probe(site: str, *values: Any, result: Any) -> conv.Call:
     """An inert IModelView read of ``_seat_forensics.display_geometry``, as
     the 2026-11-12 ms_stop_plate recording logged it."""
