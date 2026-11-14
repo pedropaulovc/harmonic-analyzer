@@ -93,6 +93,7 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_REFERENCE_Z,
     PART_DATUMS,
     JOURNAL_BORE_BAND,
+    MAIN_BODY_DIA_BAND,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
     UNIT,
@@ -924,6 +925,15 @@ async def build(adapter: Any) -> dict[str, str]:
         "JournalBoreProfile",
         "JournalBoreDia",
         *deviations(JOURNAL_BORE_BAND),
+        display_unit=UNIT,
+    )
+    # The body's one-sided band keeps it under the cone boss ends
+    # (dt_cone_pivot_post_spec.MAIN_BODY_DIA_BAND, #2756).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "MainBodyProfile",
+        "MainBodyDia",
+        *deviations(MAIN_BODY_DIA_BAND),
         display_unit=UNIT,
     )
     # The mesh band on the bore-to-bore spacing (derivation in
