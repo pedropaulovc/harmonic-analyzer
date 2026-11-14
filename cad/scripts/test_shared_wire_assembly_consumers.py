@@ -832,5 +832,5 @@ def test_wire_application_instructions_stay_with_the_assembly_consumers():
         f"ITEM {notes.ITEM_NUMBERS[stem]}" for stem in (notes.WIRE, notes.FIXTURE, notes.DRUM)
     )
     hooked = notes.STEP_TEXT[magnifier.steps.WIRE_HOOKED_KEY]
-    assert hooked.startswith(f"HOOK {wire} ") and "SPIGOT GROOVE" in hooked and fixture in hooked
-    assert notes.STEP_TEXT["lever-wire-wrapped"].startswith(f"WRAP THE WIRE ROUND {drum} ")
+    assert f" {wire} " in hooked and "SPIGOT GROOVE" in hooked and fixture in hooked
+    assert f" ROUND {drum} " in notes.STEP_TEXT["lever-wire-wrapped"]

@@ -730,7 +730,7 @@ def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
         drawing.sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION * wire.WIRE_LEN
     )
     assert station == pytest.approx(wire.WIRE_LEN / 2.0)
-    assert math.hypot(x, z) == pytest.approx(wire.WIRE_DIA / 2.0)
+    assert math.hypot(x, z) == pytest.approx(wire.MEMBER_DIA / 2.0)
     assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm == drawing.WIRE_BALLOON_POINT_MM
     # Turned into the machine frame, the point's outward normal faces +X+Y+Z.
     delta = [h - d for h, d in zip(wire.WIRE_START, wire.WIRE_END)]

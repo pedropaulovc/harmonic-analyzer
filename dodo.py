@@ -4193,6 +4193,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # ... and the A1 bracket arm's stiffness/joint check (the arm grew to
         # reach the plumb plane at the drum wire lane).
         SCRIPTS_DIR / "test_mg_magnifying_bracket_arm_check.py",
+        # #2398: the thin wire's bending strain, strength, fit and the
+        # clamp travel that takes up its wheel ratio.
+        SCRIPTS_DIR / "test_sh_vn_thin_wire.py",
         # Threaded MG cutover: all direct adapter calls bind to the pinned SDK,
         # without importing or executing a recipe, SDK implementation or COM.
         SCRIPTS_DIR / "test_mg_threaded_adapter_contract.py",

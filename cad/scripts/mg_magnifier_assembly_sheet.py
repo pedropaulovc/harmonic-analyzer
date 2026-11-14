@@ -37,6 +37,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
 )
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
+from sh_vn_music_wire_lever_geom import TOGGLE_LENGTH as _TOGGLE_LENGTH
 from mg_magnifying_wheel_geom import DRUM_RECESS as _DRUM_RECESS
 from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
 from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
@@ -498,16 +499,15 @@ STEP_TEXT = {
     # amplitude at zero with the plate top level; the hook, rod and drum lane
     # share one plumb plane (option A1).
     _steps.WIRE_HOOKED_KEY: (
-        f"HOOK {_WIRE} LEVER WIRE ONCE ROUND THE SPIGOT GROOVE OF {_FIXTURE}."
+        f"PASS THE END OF {_WIRE} LEVER WIRE ONCE ROUND THE SPIGOT GROOVE OF "
+        f"{_FIXTURE}."
     ),
     "lever-wire-led-down": (
         f"LEAD THE WIRE STRAIGHT DOWN TO {_DRUM}, AS THE RIGHT SIDE VIEW ON "
         "SHEET 1 SHOWS."
     ),
-    "lever-wire-hook-twisted": (
-        "TWIST THE WIRE END ROUND THE WIRE AT THE GROOVE AT LEAST THREE TURNS."
-    ),
-    "lever-wire-hook-trimmed": "TRIM THE WIRE TAIL CLOSE TO THE TWIST.",
+    # A thin wire is tied, not twisted (#2398, owner ruling 2026-11-12).
+    "lever-wire-hook-knotted": "KNOT THE WIRE END ROUND THE WIRE BELOW THE GROOVE.",
     "machine-at-rest": (
         "SET MHA-HA-00 AT REST: EVERY CHANNEL AMPLITUDE AT ZERO AND THE "
         "MHA-SM-03 PLATE TOP LEVEL."
@@ -518,14 +518,18 @@ STEP_TEXT = {
         "(PROTRACTOR)."
     ),
     "lever-wire-wrapped": (
-        f"WRAP THE WIRE ROUND {_DRUM} TO {_TIE_HOLE}, CLOCKWISE AS SEEN IN "
-        f"{WHEEL_REST_VIEW_TITLE}."
+        f"WRAP THE WIRE TWO FULL TURNS ROUND {_DRUM} AND ON TO {_TIE_HOLE}, "
+        f"CLOCKWISE AS SEEN IN {WHEEL_REST_VIEW_TITLE}."
     ),
     "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
-    "lever-wire-tie-twisted": (
-        "TWIST THE WIRE TAIL ROUND THE WIRE AT LEAST THREE TURNS."
+    "lever-wire-tie-knotted": (
+        "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A "
+        f"{inch_fraction(_TOGGLE_LENGTH, what='wire toggle')} LONG OFFCUT OF THE "
+        "WIRE LAID ACROSS THE HOLE."
     ),
-    _steps.WIRE_TIED_KEY: "TRIM THE WIRE TAIL CLOSE TO THE TWIST.",
+    # Each hand-made joint is checked to hold (rule 23).
+    "lever-wire-knots-held": "CHECK NEITHER KNOT SLIPS UNDER A LIGHT PULL BY HAND.",
+    _steps.WIRE_TIED_KEY: "TRIM BOTH WIRE TAILS CLOSE TO THEIR KNOTS.",
 }
 if tuple(STEP_TEXT) != _steps.SEQUENCE:
     raise AssertionError("STEP_TEXT must follow mg_magnifier_assembly_steps.SEQUENCE")
@@ -540,7 +544,7 @@ STEP_GROUPS = (
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
     (
         "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "
-        f"{_BAR} IN PLACE AND SCREWED {_BRACKET} TO {SUMMING_LEVER_NUMBER}:",
+        f"{_BAR} AND SCREWED {_BRACKET} TO {SUMMING_LEVER_NUMBER}:",
         _steps.WIRE_HOOKED_KEY,
     ),
 )

@@ -103,7 +103,7 @@ recipes:
 | 94025A164 | — (retired MHA-DT-VN-55 `dt-vn-cone-tip-adjuster`, 2026-11-09, owner decision C1 keyed, PR #1992: the MHA-DT-39 end screw replaces it; diagnostic recipe removed) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
 | 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
-| 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
+| 9666K142 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.008 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -1690,24 +1690,29 @@ Catalog specifications checked on September 10, 2026:
   nut was the counter anchor's jam nut on the summing-lever boss until the
   2026-11-09 ruling (#2326) retired it: nothing torques the hook, so it
   threads straight into the boss.
-- [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
+- [9666K142](https://www.mcmaster.com/9666K142/) supplies both amplification
   wires, the `LeverWire` and `PenWire` configurations of `sh-vn-music-wire`
   (MHA-SH-VN-56; `mg-vn-lever-wire` MHA-MG-VN-56 and `pn-vn-pen-wire`
   MHA-PN-VN-57 until 2026-10-20), both cut from one coil. Their end
   terminations, wraps and developed cut lengths
-  are not yet modelled, so both sheets of the package stay DO NOT RELEASE. Read live
-  on October 14, 2026: lubricated 1080 spring steel music wire, ASTM A228,
-  cold drawn, spring temper, phosphate coated, 261,000 psi tensile, diameter
-  0.031 in with -0.001/+0.001 in tolerance, 110 ft in a 1/4 lb coil;
-  straightness is not rated. The models keep the Ø0.8 design nominal, which
-  lies inside that 0.762-0.813 band (`_mcmaster_9666k56.py`, asserted by
-  `sh_vn_music_wire_lever_geom.py` and `sh_vn_music_wire_pen_geom.py`). 8907K32, the same wire
-  in 1 ft straight lengths, was rejected: the lever wire's straight rest run
-  alone is about 353, longer than 304.8. McMaster offers no metric 0.8 music
-  wire. No vendor solid is used; the wire is a plain cylinder.
-  The supplier drawing's exact .0310-in nominal is shown separately as a
-  .7874-mm model-owned construction circle in zero-body `SUPPLIER_REFERENCE`.
-  It does not dimension either installed .8-mm cylinder. Both sheets retain
+  are not modelled. Read live
+  on November 13, 2026: lubricated 1080 spring steel music wire, ASTM A228,
+  cold drawn, hardened, phosphate coated, 261,000 psi tensile, diameter
+  0.008 in with -0.001/+0.001 in tolerance, 1,450 ft in a 1/4 lb coil, $21.00. It replaces the 0.031 in 9666K56 (#2398,
+  owner ruling 2026-11-12: the wire only lifts a pen, so it is a thin single
+  wire as on the original, knotted). Wound on the Ø.744 drum it bends to
+  1.1 % strain against the old wire's 4 %. Its breaking load is 13 lbf (10 lbf
+  at the thin end of the band); taking a knot at half of that, the thin-end
+  wire still holds twice the arm check's wire 1 maximum (2.3 lbf) and three
+  times the pen's weight through the wheel (1.5 lbf). The built wheel ratio
+  with this wire is 5.12 (`BUILT_WIRE_RATIO`), which `error_budget` and the
+  arm check use; the modelled lanes stay at 4.995 (#2687). The drum, grooves and tie
+  holes keep the Ø0.8 wire lanes they were laid out for; the members are
+  modelled Ø.2032 on those lanes' centrelines (`_mcmaster_9666k142.py`,
+  `sh_vn_music_wire_lever_geom.py`, `test_sh_vn_thin_wire.py`).
+  No vendor solid is used; the wire is a plain cylinder.
+  The catalogue's .008-in nominal is also shown as a
+  .2032-mm model-owned construction circle in zero-body `SUPPLIER_REFERENCE`. Both sheets retain
   their configuration-qualified native `Depth@Wire` straight-run references;
   package length is ordering metadata, not a developed cut length.
 - [90114A124](https://www.mcmaster.com/90114A124/)

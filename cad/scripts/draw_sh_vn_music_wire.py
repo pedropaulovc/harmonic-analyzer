@@ -1,4 +1,4 @@
-r"""Create the one-sheet purchase drawing for shared McMaster 9666K56 wire.
+r"""Create the one-sheet purchase drawing for shared McMaster 9666K142 wire.
 
 Replacement needs the supplier wire diameter and the purchase identity, not
 the installed members' straight rest runs: the formed ends, wraps and cut
@@ -243,7 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Shared Music Wire Purchase Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "music wire; McMaster-Carr 9666K56; supplier wire diameter",
+            3: "music wire; McMaster-Carr 9666K142; supplier wire diameter",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

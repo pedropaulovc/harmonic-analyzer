@@ -1,4 +1,4 @@
-r"""McMaster 9666K56 music wire, with the two existing straight rest-run members.
+r"""McMaster 9666K142 music wire, with the two existing straight rest-run members.
 
 LeverWire retains the drum-origin frame, midpoint balloon edge, hook/hub
 reference points and wire axis. PenWire retains the eye-origin frame and its
@@ -53,7 +53,7 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _mcmaster_9666k56 import SKU
+from _mcmaster_9666k142 import SKU
 from _sketch_circle import define_circle
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 from _supplier_wire_stock import author_nominal_stock_cross_section
@@ -62,7 +62,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 PART_NAME = "sh-vn-music-wire"
 MATERIAL = "Plain Carbon Steel"
 CONFIGURATIONS = (lever.CONFIGURATION, pen.CONFIGURATION)
-WIRE_DIA = lever.WIRE_DIA
+WIRE_DIA = lever.MEMBER_DIA
 WIRE_LEN = lever.WIRE_LEN
 BALLOON_RING_FRACTION = lever_spec.BALLOON_RING_FRACTION
 BALLOON_RING_STATION = BALLOON_RING_FRACTION * WIRE_LEN
@@ -85,8 +85,8 @@ DESCRIPTIONS = {
 # supplier dimension on the drawing, never note text.
 DRAWING_NOTES = f"PURCHASED WIRE: McMASTER-CARR {SKU}"
 
-if not math.isclose(WIRE_DIA, pen.WIRE_DIA, abs_tol=1e-12):
-    raise ValueError("the two 9666K56 members must retain their shared stock diameter")
+if not math.isclose(WIRE_DIA, pen.MEMBER_DIA, abs_tol=1e-12):
+    raise ValueError("the two 9666K142 members must retain their shared stock diameter")
 
 
 def _wire_cylinder_areas(adapter) -> list[tuple[object, float]]:
@@ -338,7 +338,7 @@ async def build(adapter) -> dict[str, str]:
         await report_mass_properties(adapter)
 
     clear_dimensions_for_drawing(adapter)
-    # The supplier's .7874-mm stock circle lives only in its own zero-body
+    # The supplier's .2032-mm stock circle lives only in its own zero-body
     # construction reference state; it is the package's one printed dimension.
     await author_nominal_stock_cross_section(adapter)
     row = _config.parts(PART_NAME)
