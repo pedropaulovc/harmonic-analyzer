@@ -278,9 +278,11 @@ feed = "hand"
 columns = ["Hole", "X", "Y", "Thread / bore"]
 rows = "{{cad.hole_rows}}"
 
-# Drill speeds: LittleMachineShop drilling and reaming table, row wrought
-# aluminium 6061-T6: 350-400 ft/min drilling and reaming, above the PM-30MV's
-# 3000 rpm top speed for every size here.
+# Drill and ream speeds: LittleMachineShop "Cutting Speeds", Drilling &
+# Reaming table, row wrought aluminum 6061-T6: drilling 350-400 ft/min,
+# reaming 350-400 ft/min (https://littlemachineshop.com/pages/cutting-speeds,
+# read 2026-11-13). Every size here computes above the PM-30MV's 3000 rpm top
+# speed, so drills and the reamer run at 3000 (owner ruling 2026-11-13, #2748).
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-43"

@@ -258,3 +258,10 @@ resolution_mm = 0.005
 [gauges.pin-0376-go-nogo]
 range_mm = [9.5504, 9.5631]
 resolution_mm = 0.001016
+
+# The shop's 90° chamfer mill (owner 2026-11-13; shop-equipment.toml
+# tools.chamfer-mill-330ch): 1/4 in carbide, 90° included, 2 flutes, 2-1/2 in
+# OAL. diameter_mm is the body (largest chamfer) diameter.
+[tools.chamfer-mill-330ch]
+description = "1/4 in carbide chamfer mill, 90° included, 2 flutes, 2-1/2 in OAL (330CH)"
+diameter_mm = 6.35

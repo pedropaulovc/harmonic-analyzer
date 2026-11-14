@@ -739,13 +739,22 @@ use = "MHA-CH-06-TL-21 carrier: 4X underside pin-hole chamfers"
 [tools.jig-tap-4-40-plug]
 name = "4-40 UNC plug hand tap"
 kind = "tap"
-present = false
-status = "not recorded as owned: to buy, or record if on the shelf"
+present = true
+source = "owner 2026-11-13"
 use = "MHA-CH-06-TL-21 carrier R1-R4"
 
 [tools.jig-tap-5-16-18-plug]
 name = "5/16-18 UNC plug hand tap"
 kind = "tap"
-present = false
-status = "not recorded as owned: to buy, or record if on the shelf"
+present = true
+source = "owner 2026-11-13"
 use = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
+
+# The shop's only 90° countersinking tool (owner 2026-11-13). Its cone cuts at
+# most Ø.250, so it cannot reach the carrier pin holes' Ø.401 underside chamfer
+# mouth on a Ø.376 bore (tools.jig-csk-90 above stays to buy until ruled).
+[tools.chamfer-mill-330ch]
+name = "330CH carbide chamfer mill, 1/4 in, 90° included, 2 flutes, 2-1/2 in OAL"
+kind = "chamfer_mill"
+present = true
+source = "owner 2026-11-13"
