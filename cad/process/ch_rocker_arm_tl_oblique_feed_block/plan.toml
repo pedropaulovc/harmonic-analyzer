@@ -6,13 +6,17 @@
 # OnlineMetals 1187 1 x 3 in bar (the sheet's material block; coordinator
 # 2026-11-14) with the 3.47 overall along the bar, both faces faced, the 1.64
 # milled from the 3 in width on edge in ≤.10 layers (owner ruling #2083: mill
-# to size, no bandsaw rip), the sawn ends faced on end, then the lug notch
-# with the block on edge, OUTER END down, so the end mill's square end cuts
-# the lug face and leaves the inside corner sharp (INSIDE CORNERS R.040 MAX;
-# blind review 2026-11-14 L1), the top holes in one hold (the seat a plunged
-# 3/8 end mill, as TL-22's), and the leadscrew clearance with the block
-# standing on SPINDLE END, plunged with the same 3/8 end mill (owner ruling
-# 2026-11-13; RV-04 accepts its .044 wall to the taps). The four #4-40 nut
+# to size, no bandsaw rip), the sawn ends faced on end, the top holes in one
+# hold (the seat a plunged 3/8 end mill, as TL-22's), the leadscrew clearance
+# with the block standing on SPINDLE END, plunged with the same 3/8 end mill
+# (owner ruling 2026-11-13; RV-04 accepts its .044 wall to the taps), and
+# last the lug notch with the block on edge, OUTER END down, so the end
+# mill's square end cuts the lug face and leaves the inside corner sharp
+# (INSIDE CORNERS R.040 MAX; blind review 2026-11-14 L1). Both hole setups
+# come before the notch (Codjiflo, #2745/#397): the block is still a full
+# rectangle, so the fixed jaw meets all of SPINDLE END and the block stands
+# on all of it; the clearance is cut blind past where the lug face will be,
+# and the notch opens it. The four #4-40 nut
 # taps are transferred through the MHA-CH-06-TL-VN-84 feed nut at TL-00
 # assembly (the sheet's note): no operation here. The KP08 axis-height check
 # (#2184) is an assembly check, not this part's.
@@ -78,7 +82,13 @@ drill_projection_max_mm = 112.8
 # A plug tap runs its 3-5 chamfered threads (5 × 1.411 mm pitch) and a little
 # more past SEAT before full thread reaches it; the parallels leave the gap.
 tap_tip_z_mm = -8.0
-# 5/16 drill and 3/8 end mill tips ~.1 past the lug's underside.
+# The leadscrew clearance, cut before the notch: blind from OUTER END to
+# Z −.90, past the lug face to come (1.650 − .860 = .790 from OUTER END at
+# worst), so the notch opens it. Its floor stands 1.64 − .90 = .74 above
+# SPINDLE END (18.796 mm); the 5/16 drill and 3/8 end mill tips run ~.1
+# below that.
+lug_bore_depth_in = 0.90
+lug_bore_floor_mm = 18.796
 drill_tip_z_mm = -2.54
 # Milling deflection (prechips milling_deflection). A part standing in the
 # vise on the 1/2 in parallels is gripped only up to the jaw tops:
@@ -89,11 +99,8 @@ drill_tip_z_mm = -2.54
 # (.002 in/rev).
 jaw_grip_mm = 32.2453
 # The lug, (1.64 − .87) in = 19.558 mm: its height above OUTER END in the
-# notch setup and its smallest section. The fixed jaw meets SPINDLE END only
-# off the lug, along body_y_mm = overall − lug length = 88.138 − 48.006 from
-# ROW SIDE.
+# notch setup and its smallest section.
 lug_width_mm = 19.558
-body_y_mm = 40.132
 
 [[tools]]
 id = "saw"
@@ -261,43 +268,6 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.overall_y_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
-title = "Mill the lug notch"
-machine = "PM-30MV / 6 in vise"
-indexing = "none"
-machine_ref = "pm-30mv"
-holding = "On edge, OUTER END down on 1/2 in parallels, TOP at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; a {{cad.height_nominal_in:.2dot}} spacer across the jaws (TL-22) at the left jaw end."
-datum = "X0 LUG END (touched), +X into the part; Y0 TOP = fixed jaw face, +Y toward you; Z0 SPINDLE END (touched with the cutter)."
-diagram = { file = "diagrams/feed-block/notch.svg", alt = "Front view, moving jaw not shown: the block on edge, LUG END past the right jaw side, the notch cut down from SPINDLE END to the lug face" }
-# The cutter works only past the jaw side: along the lug plus a cutter
-# diameter either side, across the .96 plus one diameter, down to the lug
-# face .77 above the parallels.
-envelope = { x_span_mm = ["{{cad.lug_length_mm}}", "{{process.half_cutter_dia_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{process.lug_width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
-vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["rest", "{{process.notch_overhang_mm}}"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-# Stations from LUG END. The lug hangs out past the jaw side, a cantilever
-# from it at the 2.15 worst case; the finished lug section (.96 across the
-# jaws, .77 high) is taken for every pass, the weakest.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.overall_y_mm}}"], clamp_mm = ["{{process.notch_overhang_mm}}", "{{cad.overall_y_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{process.lug_width_mm}}" } }
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "em-half"
-sizing = "other"
-instruction = "Notch {{cad.lug_length_in:.2f}} from LUG END, down to Z −{{cad.lug_x_nominal_in:.3dot}} in ≤.10 layers (last .005–.010), three passes per layer at Y .20/.48/.76; finish the step face at X {{cad.lug_length_in:.3dot}}."
-instruction_detailed = "Touch SPINDLE END and zero Z. Spindle off, set the cutter's edge at X {{cad.lug_length_in:.3dot}} just above SPINDLE END and sight down: the jaw side must lie at least .15 beyond the cutter. Each layer is no deeper than .10. The middle pass at Y .48 (a full slot) and the Y .20 pass start in the air past LUG END, table moving right, and stop with the cutter's edge at X 1.88. The Y .76 pass then starts at the step: plunge the layer there (the slot beside it is open), cutter's edge at X 1.88, and run out past LUG END, table moving left. All three are conventional. The flutes (≥1.00) cover the {{cad.lug_x_nominal_in:.2dot}} depth. Take the last layer .005–.010 to Z −{{cad.lug_x_nominal_in:.3dot}}: the cutter's end makes the lug face and its square corner the inside corner. Last, with the cutter's edge at X {{cad.lug_length_in:.3dot}}, take the .01 off the step face in one pass across, table moving away from you (conventional)."
-# block-em-half-long-6061-t6511: 1800 rpm, 8 in/min (203.2 mm/min). The
-# side passes are ~.25 wide; the slot is the full width.
-milling_cuts = [
-  { name = "notch slot layers", kind = "slot", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 2.54, radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
-  { name = "notch side passes", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 2.54, radial_woc_mm = 6.35, rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
-  { name = "lug face last layer", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.254, radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
-  { name = "step face", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.lug_x_mm}}", radial_woc_mm = 0.254, rpm = 1800, feed_mm_min = 203.2, stations_mm = "{{cad.lug_length_mm}}" },
-]
-settings = "block-em-half-long-6061-t6511"
-inspection = "Lug face {{cad.lug_x_min_in:.3dot}}–{{cad.lug_x_max_in:.3dot}} from SPINDLE END; step {{cad.lug_length_min_in:.3f}}–{{cad.lug_length_max_in:.3f}} from LUG END; inside corner the cutter's square corner (R.040 max)."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lug_x_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.lug_length_band_mm}}" }]
-
-[[setups]]
-machine_kind = "other"
 title = "Holes from TOP"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
@@ -309,8 +279,8 @@ diagram = { file = "diagrams/feed-block/holes.svg", alt = "Block SEAT down, SPIN
 # shortest: the 5/16 in end mill in its collet. The tap tip runs deepest.
 envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.length_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{process.tap_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.length_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.height_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-# Stations from ROW SIDE; the jaws grip the body, not the notched lug.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.y_length_mm}}"], clamp_mm = [0, "{{process.body_y_mm}}"], section_mm = { y = "{{cad.length_mm}}", z = "{{cad.height_mm}}" } }
+# Stations from ROW SIDE. Before the notch the jaws grip the whole length.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.y_length_mm}}"], clamp_mm = [0, "{{cad.y_length_mm}}"], section_mm = { y = "{{cad.length_mm}}", z = "{{cad.height_mm}}" } }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -389,15 +359,16 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "On SPINDLE END on 1/2 in parallels, SEAT at the fixed jaw, LUG END on your right, centred."
 datum = "X0 LUG END (touched): the bore's X runs left from it, −X on the DRO; Y0 SEAT = fixed jaw face; Z0 OUTER END."
-diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on SPINDLE END, SEAT at the fixed jaw: the leadscrew clearance down through the lug from OUTER END" }
+diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on all of SPINDLE END, SEAT at the fixed jaw: the leadscrew clearance down from OUTER END, blind past where the notch's lug face will be" }
 # The hole and the LUG END touch lie within the overall length; across, the
-# .96 height. The drill and end-mill tips run deepest, just past the lug's
-# underside; longest: that jobber drill in the chuck; shortest: an end mill
-# in its collet.
-envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.height_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.lug_x_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
+# .96 height. The drill and end-mill tips run deepest, just past the blind
+# floor; longest: that jobber drill in the chuck; shortest: an end mill in
+# its collet.
+envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.height_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{process.lug_bore_floor_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-# Standing on SPINDLE END, drilled down its own height from OUTER END:
-# thrust along the upright block compresses it, so these cuts bend nothing.
+# Standing on all of SPINDLE END (the notch comes later), drilled down from
+# OUTER END: thrust along the upright block compresses it, so these cuts
+# bend nothing.
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.overall_y_mm}}", y = "{{cad.height_mm}}" } }
 
 [[setups.operations]]
@@ -414,7 +385,8 @@ feed = "hand"
 speed_kind = "spindle"
 tool = "drill-5-16"
 sizing = "other"
-instruction = "Pilot through the lug."
+instruction = "Pilot to Z −{{process.lug_bore_depth_in:.2dot}}."
+instruction_detailed = "Touch OUTER END and zero Z. Drill the pilot to Z −{{process.lug_bore_depth_in:.2dot}}, past where the lug face will be; no pecks (under 3 diameters deep). The notch opens the hole later."
 milling_cuts = [{ name = "leadscrew pilot", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 7.9375, stations_mm = "{{cad.length_mm}}" }]
 rpm = 2000
 feed = "hand"
@@ -423,13 +395,50 @@ feed = "hand"
 speed_kind = "spindle"
 tool = "em-3-8"
 sizing = { kind = "band", band_mm = "{{cad.screw_dia_band_mm}}" }
-instruction = "3/8 end mill miked ≥.3750; plunge through the lug: Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
-instruction_detailed = "Change to the 3/8 end mill, table still locked; it must mike .3750 or more across its flutes. Plunge it down the pilot right through the lug; its 3/8 shank follows the flutes into the hole. The cutter sizes the hole: the .375 pin passes through, the .379 does not."
+instruction = "3/8 end mill miked ≥.3750; plunge to Z −{{process.lug_bore_depth_in:.2dot}}: Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
+instruction_detailed = "Change to the 3/8 end mill, table still locked; it must mike .3750 or more across its flutes. Touch OUTER END with it and zero Z. Plunge it down the pilot to Z −{{process.lug_bore_depth_in:.2dot}}; its 3/8 shank follows the flutes into the hole. The cutter sizes the hole: the .375 pin enters full depth, the .379 does not."
 milling_cuts = [{ name = "leadscrew clearance", kind = "plunge", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 9.525, stations_mm = "{{cad.length_mm}}" }]
 rpm = 1650
 feed = "hand"
 inspection = "Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}} (pins); {{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}} from LUG END; {{cad.screw_z_min_in:.4dot}}–{{cad.screw_z_max_in:.4dot}} ({{cad.screw_z_band_text}}) from SEAT."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.screw_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.screw_y_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.screw_z_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Mill the lug notch"
+machine = "PM-30MV / 6 in vise"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "On edge, OUTER END down on 1/2 in parallels, TOP at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; a {{cad.height_nominal_in:.2dot}} spacer across the jaws (TL-22) at the left jaw end."
+datum = "X0 LUG END (touched), +X into the part; Y0 TOP = fixed jaw face, +Y toward you; Z0 SPINDLE END (touched with the cutter)."
+diagram = { file = "diagrams/feed-block/notch.svg", alt = "Front view, moving jaw not shown: the block on edge, LUG END past the right jaw side, the notch cut down from SPINDLE END to the lug face" }
+# The cutter works only past the jaw side: along the lug plus a cutter
+# diameter either side, across the .96 plus one diameter, down to the lug
+# face .77 above the parallels.
+envelope = { x_span_mm = ["{{cad.lug_length_mm}}", "{{process.half_cutter_dia_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{process.lug_width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["rest", "{{process.notch_overhang_mm}}"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+# Stations from LUG END. The lug hangs out past the jaw side, a cantilever
+# from it at the 2.15 worst case; the finished lug section (.96 across the
+# jaws, .77 high) is taken for every pass, the weakest.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.overall_y_mm}}"], clamp_mm = ["{{process.notch_overhang_mm}}", "{{cad.overall_y_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{process.lug_width_mm}}" } }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = "other"
+instruction = "Notch {{cad.lug_length_in:.2f}} from LUG END, down to Z −{{cad.lug_x_nominal_in:.3dot}} in ≤.10 layers (last .005–.010), three passes per layer at Y .20/.48/.76; finish the step face at X {{cad.lug_length_in:.3dot}}."
+instruction_detailed = "Touch SPINDLE END and zero Z. Spindle off, set the cutter's edge at X {{cad.lug_length_in:.3dot}} just above SPINDLE END and sight down: the jaw side must lie at least .15 beyond the cutter. Each layer is no deeper than .10. The middle pass at Y .48 (a full slot) and the Y .20 pass start in the air past LUG END, table moving right, and stop with the cutter's edge at X 1.88. The Y .76 pass then starts at the step: plunge the layer there (the slot beside it is open), cutter's edge at X 1.88, and run out past LUG END, table moving left. All three are conventional. The flutes (≥1.00) cover the {{cad.lug_x_nominal_in:.2dot}} depth. From Z −.74 the layers break into the leadscrew clearance, an interrupted cut: keep the feed steady. Take the last layer .005–.010 to Z −{{cad.lug_x_nominal_in:.3dot}}: the cutter's end makes the lug face and its square corner the inside corner. Last, with the cutter's edge at X {{cad.lug_length_in:.3dot}}, take the .01 off the step face in one pass across, table moving away from you (conventional)."
+# block-em-half-long-6061-t6511: 1800 rpm, 8 in/min (203.2 mm/min). The
+# side passes are ~.25 wide; the slot is the full width.
+milling_cuts = [
+  { name = "notch slot layers", kind = "slot", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 2.54, radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
+  { name = "notch side passes", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 2.54, radial_woc_mm = 6.35, rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
+  { name = "lug face last layer", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.254, radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.lug_length_mm}}"] },
+  { name = "step face", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.lug_x_mm}}", radial_woc_mm = 0.254, rpm = 1800, feed_mm_min = 203.2, stations_mm = "{{cad.lug_length_mm}}" },
+]
+settings = "block-em-half-long-6061-t6511"
+inspection = "Lug face {{cad.lug_x_min_in:.3dot}}–{{cad.lug_x_max_in:.3dot}} from SPINDLE END; step {{cad.lug_length_min_in:.3f}}–{{cad.lug_length_max_in:.3f}} from LUG END; inside corner the cutter's square corner (R.040 max)."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.lug_x_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.lug_length_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
