@@ -50,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _chain as chain
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _component_references import component_identity
 from sh_vn_chain_link_spec import (
     INNER_LINK_BOM_DESCRIPTION,
@@ -3184,9 +3185,7 @@ def _source_family_counts(model: Any) -> Counter[str]:
     assembly = _early_bound(model, "IAssemblyDoc")
     counts: Counter[str] = Counter()
     seen_names: set[str] = set()
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
-        name = str(component.Name2)
+    for name, component in by_name(assembly.GetComponents(True)):
         if name in seen_names:
             raise RuntimeError(f"paper-drive repeats native component {name!r}")
         seen_names.add(name)

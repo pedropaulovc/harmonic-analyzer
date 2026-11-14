@@ -543,7 +543,8 @@ def test_health_top_level_collection_preserves_instance_targets(monkeypatch, mod
     _assembly.assert_model_healthy(adapter, label="assembly", rebuilt=True, **kwargs)
 
     assert calls.enumerations == [True]
-    assert calls.children == ["shared-2", "unloaded-1", "shared-1", "self-1"]
+    # Visited by name, never in the enumeration's order (#2686).
+    assert calls.children == ["self-1", "shared-1", "shared-2", "unloaded-1"]
     assert calls.targets == [root, child, child]  # same document, two instance checks
     assert calls.rebuilds == []
     spans = capture.get_finished_spans()

@@ -108,8 +108,10 @@ def gear_data(teeth: int) -> str:
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
         # The fit route of the tip, thickness and root bands (drawing-
         # guidelines "What the shop holds"): the cone mesh is set by feel at
-        # assembly, so its backlash is accepted there, from no binding up.
-        ("BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
+        # assembly (MHA-DT-00 check 4), which measures no backlash, so the
+        # range is reference only, from no binding to the loosest running
+        # centre (#2586).
+        ("BACKLASH WITH MATE (REF), FEEL SET AT ASSEMBLY",
          f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),

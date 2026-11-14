@@ -60,7 +60,8 @@ CLAMP_CALLOUT_PRECISION = {
     "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
     "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
 }
-# The west slots' runs need .XXX to close the column-pitch stack, and their
+# The west slots' runs need .XXX for the slid head's clearance to the slot
+# counterbore's wall (DIMENSION_CALLOUTS states it), and their
 # width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
 # carries explicit asymmetric limits: the minimum (.330) clears the head's
 # full-float envelope, while the upper deviation stays the ordinary .XX
@@ -195,9 +196,9 @@ DIMENSION_CALLOUTS = {
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
     # and nears the counterbore's wall (clamp_slot_head_clearance). The
-    # counterbored slot names its mate once, on the width (rule 4, one feature
-    # names its mate once; round 4 machinist review read "MAX SEATS ... HEADS"
-    # as rationale): the standard form, a clearance for the screw. Short
+    # through slot names the screw it clears in the standard form, a
+    # clearance for the screw (round 4 machinist review read "MAX SEATS ...
+    # HEADS" as rationale); the counterbore names the head it serves. Short
     # lines: detail C is 2:1 in a corner. The slot width's broken leader runs
     # down its text's left end to the underline, so the widest row's first
     # glyph rode that line (machinist review round 4). A no-break space each
@@ -205,9 +206,14 @@ DIMENSION_CALLOUTS = {
     # the centred rows stand clear.
     "ClampSlotWidth": "\u00a0THRU, CLEARANCE FOR\u00a0\nMHA-SH-VN-53",
     # The counterbore slot shares the through slot's radius centres, the one
-    # .118 detail C dimensions (rule 12; round 4 machinist review). Two short
-    # lines keep the block inside its old width, clear of section B-B.
-    "ClampSlotCboreWidth": "ON .118\nSLOT CENTRES",
+    # .118 detail C dimensions (rule 12; round 4 machinist review). The .118
+    # keeps .XXX for the head: at .XX the slid head's overrun leaves .002 to
+    # the counterbore's wall (clamp_slot_head_clearance), so the callout
+    # states that function once, naming the head's screw by number (v49
+    # machinist review: .118 had no stated function; then "THE HEAD" named no
+    # mate). The block grows left from its shoulder at the leader; its widest
+    # row (~49 mm) clears section B-B (draw_pd_support_bar.SLOT_SECTION_CENTER).
+    "ClampSlotCboreWidth": "ON .118 CENTRES FOR\nMHA-SH-VN-53 HEAD",
 }
 # Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
 DIMENSION_CALLOUTS_ABOVE = {

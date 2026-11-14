@@ -69,8 +69,11 @@ if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
 # 20261107T102825912Z).
 BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
 # The tube is cut from stock as supplied: its reference Ø names its stock
-# wall (hidden on the elevation, cut by no section, rule 9).
-TUBE_OD_CALLOUT = f"{_inch(geom.WALL_T, 3)} WALL STOCK"
+# wall (hidden on the elevation, cut by no section, rule 9).  The wall is the
+# supplier's size, bracketed as a reference like the Ø it rides: printed bare
+# at three places it read as a .XXX-toleranced wall (machinist review of the
+# v49 release, PR #2677, over_specification).
+TUBE_OD_CALLOUT = f"({_inch(geom.WALL_T, 3)}) WALL STOCK"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "TubeOdReference": {"TubeOdRef": TUBE_OD_CALLOUT},

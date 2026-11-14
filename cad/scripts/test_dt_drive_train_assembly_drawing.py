@@ -593,19 +593,27 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set by
     feel at assembly (owner direction 2026-11-11, #2365; cone_set_stack):
-    each pedestal tapped in to the first bind at its end and tightened,
-    then the swing brought in to the first bind, eased out only until the
-    gears turn, and locked with MHA-DT-VN-51 -- never the stop, and nothing
-    gauged."""
+    the set held at a stated pose (swung in to a bind, #2587), each pedestal
+    tapped either way to a bind at its end and tightened, then the swing
+    brought in to the first bind, eased out to an observable stop (#2585),
+    and locked with MHA-DT-VN-51 -- never the stop, and nothing gauged."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    (hold,) = re.findall(r"4D\. [^.]*\.", check)
+    (taps,) = re.findall(r"4E\. [^.]*\.", check)
+    (ease,) = re.findall(r"4N\. [^.]*\.", check)
+    assert "BIND" in hold and "HOLD" in hold
+    assert " IN " in taps and " OUT " in taps
+    assert "AT ITS END" in taps
+    assert "SMALL STEPS" in ease and "RUN FREE" in ease
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
-        check.index("TAP EACH MHA-DT-02 IN UNTIL THE GEARS AT ITS END JUST BIND"),
+        check.index(hold),
+        check.index(taps),
         check.index("TIGHTEN MHA-DT-VN-62"),
         check.index("SWING THE CONE SET OUT"),
         check.index("SWING IN UNTIL A GEAR JUST BINDS"),
-        check.index("EASE OUT UNTIL THE GEARS TURN FREELY"),
+        check.index(ease),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
     assert order == sorted(order), check
@@ -993,7 +1001,7 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     # the clamp and the punch; sequence, not wording (AGENTS.md).
     route = [
         "JUST BIND",
-        "TURN FREELY THROUGH",
+        "RUN FREE",
         "CLAMP MHA-DT-20 TO MHA-FR-01.",
         "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.",
         "LIFT MHA-DT-20 OFF.",

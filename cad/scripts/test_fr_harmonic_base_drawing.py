@@ -3258,7 +3258,18 @@ def test_retained_underside_callouts_define_socket_bosses_ribs_and_lug_bottoms()
         "PocketLen", "PocketWid", "PocketX", "PocketY", "SocketBossDia",
         "PocketFilletRadius", "LongRibThickness", "CrossRibThickness",
     }
-    assert callouts["SocketBossDia"] == "4X SOCKET\nBOSSES"
+    # The bosses are cut on the sockets' own stations, so the callout ties
+    # each boss to its socket rather than leaving the arcs unlocated (PR
+    # #2702 proof, machinist review): the coaxiality the sheet states is the
+    # model's.
+    boss_callout = callouts["SocketBossDia"]
+    assert boss_callout.startswith(f"{len(part.SOCKET_BOSS_SHAPES)}X SOCKET BOSSES")
+    assert "COAXIAL WITH SOCKETS" in boss_callout
+    assert len(boss_callout.splitlines()) <= 2
+    assert [(x, z) for _kind, x, z, _r in part.SOCKET_BOSS_SHAPES] == list(spec.COLUMN_SOCKET_XZ)
+    boss_x, _boss_y = sheet.UNDERSIDE_BOTTOM_KEEP["SocketBossDia"]
+    boss_half_w = max(map(len, boss_callout.splitlines())) * _NOTE_CHAR_MM / 2000.0
+    assert boss_x + boss_half_w < sheet._bottom_xy(-spec.BOTTOM_LENGTH / 2.0, 0.0)[0] - 0.003
     assert callouts["PocketFilletRadius"] == f"{part.POCKET_FILLET_COUNT}X POCKET\nCORNERS"
     # Counts, not words, on section B-B's heights (rule 7).
     assert sheet.UNDERSIDE_SECTION_AFFIXES == {"LugBottom": ("4X ", ""), "RibRelief": ("2X ", "")}

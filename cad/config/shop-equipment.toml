@@ -92,7 +92,7 @@ kind = "gauge_bar"
 present = false
 shop_made = true
 purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
-note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Printed as a matched fit, .0002-.0017 diametral clearance in each bore; the .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Its matched fit, .0002-.0017 diametral clearance in each bore, is made here (purchase); step 5B states only the fitter's hand check, that it slides with no perceptible shake (PR #2717). The .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
 pieces = 1
 
 # --- assembly tools, gauges and consumables (#2392) ------------------------
@@ -202,6 +202,32 @@ present = true
 name = "Straightedge"
 kind = "straightedge"
 present = false
+
+# Owner inventory, 2026-11-13 (Pedro): these are the only boring tools; there is
+# no milling boring head (the archived LMS 3662 was never owned).
+# https://www.msdiscounttool.com/catalog/product_info.php?products_id=110767
+[tools.boring-bars-meda-6045000]
+name = "MEDA 6045000 5 pc double-ended boring bar set, 3/8, 1/2, 5/8, 3/4, 1 in bars for tool bits"
+kind = "boring_bar_set"
+make = "MEDA (Superior Import)"
+sku = "6045000"
+present = true
+note = "Lathe bars; each has two broached tool-bit holes, 45 deg at one end and 90 deg at the other (listing read 2026-11-13)."
+
+[tools.boring-bar-s10r-sclcr3]
+name = "S10R-SCLCR3 indexable boring bar, 10 mm shank, CCMT/CCGT inserts"
+kind = "boring_bar"
+sku = "S10R-SCLCR3"
+present = true
+note = "Owner inventory 2026-11-13; lathe boring bar."
+
+# Owner inventory, 2026-11-13: the shop's only 90 deg countersinking tool. No
+# 82 deg countersink is owned.
+[tools.chamfer-mill-330ch-1-4-90]
+name = "330CH 1/4 in 90 deg included 2-flute chamfer mill, 2-1/2 in OAL"
+kind = "chamfer_mill"
+sku = "330CH"
+present = true
 
 [tools.transfer-punches]
 name = "Transfer punch set, fractional and number sizes"
@@ -605,6 +631,17 @@ section_mm = [31.75, 15.875]
 length_mm = 101.6
 on_hand = false
 cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
+
+# MHA-SM-01 gooseneck tube (owner rulings 2026-10-27 (Pedro), #1951; 2026-11-08, #2315).
+[[stock]]
+form = "round_tube"
+material = "4130-N seamless alloy steel tube"
+note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 24 in cut. Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail (#2315), sawn and faced after the bend: 23.6 in, inside the 24 in cut's -1/8 in length tolerance. No spare for a trial bend (a 36 in cut is $76.61). Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
+od_mm = 12.7
+wall_mm = 1.651
+length_mm = 609.6
+on_hand = false
+cite = ["OnlineMetals part 7322 https://www.onlinemetals.com/en/buy/alloy-steel/0-5-od-x-0-065-wall-x-0-37-id-alloy-steel-round-tube-4130-cond-n-seamless/pid/7322 read live 2026-11-13: 1/2 OD x .065 wall 4130 Cond. N seamless, 24 in $51.88, 36 in $76.61; length tolerance +/-1/8 in", "Owner rulings 2026-10-27 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/1951 and 2026-11-08, https://github.com/pedropaulovc/harmonic-analyzer/issues/2315"]
 
 # MHA-FR-02 top-frame casting (owner rulings 2026-11-10 (Pedro), #2333).
 [[stock]]

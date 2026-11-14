@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import count
 from types import SimpleNamespace
 
 import pytest
@@ -164,8 +165,11 @@ def test_native_bom_rows_preserve_repeated_purchase_numbers_and_member_quantitie
         lambda raw, _interface, *_methods: raw,
     )
 
+    serial = count(1)
+
     def component(native_stem, member):
         return SimpleNamespace(
+            Name2=f"{native_stem}-{next(serial)}",
             GetPathName=lambda: f"C:/cad/{native_stem}.SLDPRT",
             ReferencedConfiguration=f"{member} Simplified",
         )

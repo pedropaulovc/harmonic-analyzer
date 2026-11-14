@@ -35,6 +35,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _check import check
 from _com import _com_invoke, _early_bound
+from _component_order import by_name
 from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_common import (
@@ -297,7 +298,7 @@ def _instances(*stems: str) -> set[str]:
 # The owner's list, which the mates must reproduce: the carrier TL-21, the
 # riser and its four screws (the riser-screw family's feed-nut four stay), the
 # feed lever with its screws and wedge-lock washers, and the strap's top
-# workholding: the TL-52 top-hat washer, the two loose SM-VN-53 stock stop
+# workholding: the TL-VN-85 flat washer, the two loose SM-VN-53 stock stop
 # pins and the common screw's CL, CR and HUB clamp occurrences, hidden by
 # occurrence (STRAP_CLAMP_SCREW_INSTANCES), never by the common stem. No strap
 # is modelled. Kept: the base bars, rails, carriages, both blocks, the pivot
@@ -652,8 +653,8 @@ PART_ROWS = {
         "ch-rocker-arm-tl-vn-oblique-pivot-shim"
     ),
     "ch-rocker-arm-tl-oblique-riser": _config.parts("ch-rocker-arm-tl-oblique-riser"),
-    "ch-rocker-arm-tl-oblique-hub-washer": _config.parts(
-        "ch-rocker-arm-tl-oblique-hub-washer"
+    "ch-rocker-arm-tl-vn-oblique-hub-washer": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-hub-washer"
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
@@ -1140,7 +1141,7 @@ _CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
 # not a jig part, so it has no BOM row.
 _STRAP = _config.parts("ch-rocker-strap")
 STRAP_BLANK_KEY = (
-    f"STRAP BLANK (STEPS 1M-1N, 19-21J): {str(_STRAP['number']).upper()}, "
+    f"STRAP BLANK (STEPS 1M-1N, 19-21L): {str(_STRAP['number']).upper()}, "
     f"{int(_STRAP['quantity'])} OFF; NOT A JIG PART."
 )
 # The one sequence, in print order: the general torque note, the pivot-hole,
@@ -1458,8 +1459,7 @@ def _validate_source(source_model: Any) -> None:
         if names != (wanted,):
             raise RuntimeError(f"jig {owner} exploded views {names!r} != {(wanted,)!r}")
     counts: dict[str, int] = {}
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
@@ -1468,9 +1468,7 @@ def _validate_source(source_model: Any) -> None:
             abs(float(actual) - float(expected)) > 1e-9
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
-            raise RuntimeError(
-                f"jig source must open collapsed: {component.Name2!r} is displaced"
-            )
+            raise RuntimeError(f"jig source must open collapsed: {name!r} is displaced")
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"jig families {counts!r} != contract {BOM_QUANTITIES!r}")
     component_reference_names(source_model, spec.MEMBER_COMPONENT_REFERENCES)

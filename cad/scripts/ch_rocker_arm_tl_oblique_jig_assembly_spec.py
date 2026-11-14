@@ -47,8 +47,9 @@ Its raw edge seats toward -Y against two loose stock 1/8 x 3/4 dowels
 the TL-24 riser's #30 stop holes on the carrier top; CL and CR clamp the
 ends. The strap's hub hole is then drilled and reamed in place at the same
 DRO position (step 10) that tapped the carrier's HUB #8-32, through into the
-riser's relief, and the HUB clamp seats the brass top-hat washer's spigot in
-that hole. CL, CR and HUB are common-screw occurrences that ride the carrier
+riser's relief, and the HUB clamp seats on a bought brass #8 SAE flat washer
+(TL-VN-85, owner ruling 2026-11-13) over that hole. CL, CR and HUB are
+common-screw occurrences that ride the carrier
 while the rail and bracket-family bar screws stay fixed: each occurrence, not
 each family, is fixed or moving (``LOCKED_TO``'s ``None`` entries,
 ``is_moving``). ``STRAP_CLAMP_SCREW_INSTANCES`` publishes their stable
@@ -112,7 +113,7 @@ import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
-import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
+import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as hub_washer
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
@@ -186,7 +187,7 @@ PIVOT_SPACER = "ch-rocker-arm-tl-vn-oblique-pivot-spacer"
 PIVOT_SHIM = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
 CARRIER = "ch-rocker-arm-tl-oblique-carrier"
 RISER = "ch-rocker-arm-tl-oblique-riser"
-HUB_WASHER = "ch-rocker-arm-tl-oblique-hub-washer"
+HUB_WASHER = "ch-rocker-arm-tl-vn-oblique-hub-washer"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 # Bought hardware (parent-scoped TL-VN and shared SH-VN-57; VN-72 retired),
@@ -725,15 +726,15 @@ RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in trammel.RISER_SCREWS
 )
 # The strap's holding (owner rulings 2026-11-07): the CL and CR common screws'
-# heads on the strap's end waste; the brass top-hat washer's seat face on the
-# strap at HUB (its spigot down into the reamed hub hole), the HUB common
+# heads on the strap's end waste; the brass flat washer's seat face on the
+# strap over its reamed hub hole (owner ruling 2026-11-13), the HUB common
 # screw's head on the washer; the two loose stop pins chamfered end down on
 # the carrier top in the riser's stop holes. No strap is modelled.
 STRAP_CLAMP_ROLES = ("CL", "CR", "HUB")
 STRAP_CLAMP_POINTS = {**carrier.END_CLAMPS, "HUB": carrier.HUB}
 STRAP_CLAMP_SCREW_PLACEMENTS: tuple[Placement, ...] = (
     *(_carried(STRAP_CLAMP_POINTS[role], PART_TOP_Z) for role in ("CL", "CR")),
-    _carried(STRAP_CLAMP_POINTS["HUB"], PART_TOP_Z + hub_washer.THICK),
+    _carried(STRAP_CLAMP_POINTS["HUB"], PART_TOP_Z + hub_washer.THICKNESS),
 )
 HUB_WASHER_PLACEMENTS = ((_at(carrier.HUB, PART_TOP_Z), PIN_ROWS),)
 STOP_PIN_PLACEMENTS: tuple[Placement, ...] = tuple(
@@ -1097,7 +1098,7 @@ BOM_DESCRIPTIONS = {
     PIVOT_SHIM: "SHIM 3/8 X 5/8, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
     RISER: "RISER",
-    HUB_WASHER: "TOP-HAT HUB CLAMP WASHER",
+    HUB_WASHER: f"{hub_washer.SCREW_SIZE} SAE FLAT WASHER, BRASS",
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     # Kit members print their native per-configuration descriptions.
@@ -1130,7 +1131,7 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 
 # --- Native explode (JIG_EXPLODED) -------------------------------------------------
 # Presentation separates the pivot stacks and carrier. The strap clamps, the
-# top-hat washer and the loose stop pins lift out above the carrier's riders.
+# HUB flat washer and the loose stop pins lift out above the carrier's riders.
 # (label, selectors, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -1291,8 +1292,8 @@ for _screw in _END_CLAMP_SCREWS:
     if _tip <= _RISER_TOP_EXPLODED:
         raise AssertionError(f"the exploded {_screw} stands in the riser")
 if (
-    PART_TOP_Z + hub_washer.THICK - rail_screw.DIMS.length + explode_lift(_HUB_CLAMP_SCREW)
-    <= PART_TOP_Z + hub_washer.THICK + explode_lift(HUB_WASHER)
+    PART_TOP_Z + hub_washer.THICKNESS - rail_screw.DIMS.length + explode_lift(_HUB_CLAMP_SCREW)
+    <= PART_TOP_Z + hub_washer.THICKNESS + explode_lift(HUB_WASHER)
 ):
     raise AssertionError("the exploded hub screw stands in its washer")
 # Every occurrence's selector, ``instance_name`` by family and index.
@@ -2261,11 +2262,8 @@ if CHAIN_RADIAL_STACK > trammel.TOP_EDGE_HALF_BAND:
     raise AssertionError(
         f"the rail-setting chain breaks the strap's top-edge budget: {CHAIN_RADIAL_STACK:.4f} mm"
     )
-# The top-hat washer's flank clearance, inch at .XXX, rounded up: the
-# conservative side of holding.WASHER_CLEARANCE_MIN.
-WASHER_CLEARANCE_PRINTED = _outward(holding.WASHER_CLEARANCE_MIN, 3, up=True)
-if min(holding.WASHER_GAPS_MIN.values()) < WASHER_CLEARANCE_PRINTED:
-    raise AssertionError("the designed washer gaps do not meet the printed minimum")
+# Owner ruling 2026-11-13 (#2448): the HUB flat washer's only floor is the
+# real one, gap > 0 to every complete cutter sweep (holding.require_clearance).
 # The leadscrew's settings close its metric cut along the KP08 stations
 # (owner ruling 4, 2026-11-01, option B, prints those stations in mm on the
 # bracket and bar). The steps are settings on an inch sheet, so they print
@@ -2303,8 +2301,9 @@ if (
 # The strap cut's depth (TL-00 machinist review of afe1018: the retired
 # MHA-CH-06 plan carried it): the cutter's end goes past the strap's
 # underside by more than the breakthrough budget and stays well clear of the
-# step 18 groove floor (checked against RISER_GROOVE_DEPTH below).
-STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.10 * trammel.INCH)
+# step 18 groove floor (checked against RISER_GROOVE_DEPTHS below). Owner
+# ruling 2026-11-13 (#2447): .02-.07, half the shallowest loose groove.
+STRAP_CUT_OVERTRAVEL = (0.02 * trammel.INCH, 0.07 * trammel.INCH)
 ASSEMBLY_STEPS = (
     f"1. CHECK EACH OF THE KIT'S {KIT_CARRIAGES_SUPPLIED} CARRIAGES {_item(CARRIAGE)} "
     f"ROCKED SIDEWAYS ON ITS RAIL UNDER A TEST INDICATOR: {_PLAY_TIR}.",
@@ -2500,7 +2499,7 @@ ASSEMBLY_STEPS = (
     f"11D. FINISH THE RISER TO {carrier.RISER_NUMBER}.",
     f"11E. FIT THE RISER WITH {len(riser.SCREW_HOLES)} {_RISER_SCREW}S "
     f"{_item(RISER_SCREW)}: BOTH STOP PINS LOOSE IN THEIR HOLES.",
-    f"11F. LEAVE OUT THE TOP-HAT WASHER {_item(HUB_WASHER)} AND THE 3 STRAP "
+    f"11F. LEAVE OUT THE HUB WASHER {_item(HUB_WASHER)} AND THE 3 STRAP "
     "CLAMP SCREWS UNTIL STEPS 19-21.",
     f"12. FIT THE FEED LEVER {_item(FEED_LEVER)} WITH 2 {_LEVER_SCREW} "
     f"{_item(LEVER_SCREW)} AND WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}: "
@@ -2551,21 +2550,21 @@ HOLD_DOWN_REFERENCE = (
 # from the seated riser's top and never through to the carrier under it. The
 # deepest accepted groove leaves a skin under the thinnest printed riser
 # (riser.THICKNESS - riser.THICKNESS_BAND, .23); the shallowest still takes
-# the flat 3/8 cutter's overtravel past the strap's underside many times over.
-RISER_GROOVE_DEPTH = 0.215 * trammel.INCH
-RISER_GROOVE_BAND = 0.010 * trammel.INCH
-_GROOVE_MIN = RISER_GROOVE_DEPTH - RISER_GROOVE_BAND
-_GROOVE_MAX = RISER_GROOVE_DEPTH + RISER_GROOVE_BAND
-if _GROOVE_MAX >= riser.THICKNESS - riser.THICKNESS_BAND:
+# the flat 3/8 cutter's overtravel past the strap's underside twice over.
+# Owner ruling 2026-11-13 (#2447): a loose band, any depth .15-.20 read with
+# the caliper depth rod (was .215 +/-.010 on a depth micrometer); only a
+# groove past .20 scraps the riser. The skin is then .030 MIN. The HUB
+# relief notching both groove walls is accepted as it is (#2447).
+RISER_GROOVE_DEPTHS = (0.15 * trammel.INCH, 0.20 * trammel.INCH)
+_GROOVE_MIN, _GROOVE_MAX = RISER_GROOVE_DEPTHS
+RISER_GROOVE_SKIN_MIN = riser.THICKNESS - riser.THICKNESS_BAND - _GROOVE_MAX
+if RISER_GROOVE_SKIN_MIN <= 0.0:
     raise AssertionError("the riser groove can cut through to the carrier")
 if _GROOVE_MIN <= holding.TOOL_OVERTRAVEL_BUDGET:
     raise AssertionError("the riser groove leaves no breakthrough room")
 if not holding.TOOL_OVERTRAVEL_BUDGET < STRAP_CUT_OVERTRAVEL[0] < STRAP_CUT_OVERTRAVEL[1] <= _GROOVE_MIN / 2:
     raise AssertionError("the strap cut misses breakthrough or nears the groove floor")
-_GROOVE = (
-    f"{_length(RISER_GROOVE_DEPTH, 3)} DEEP",
-    f"{_length(_GROOVE_MIN, 3)}-{_length(_GROOVE_MAX, 3)}",
-)
+_GROOVE = f"{_length(_GROOVE_MIN, 2)}-{_length(_GROOVE_MAX, 2)}"
 
 
 # Strap blank preparation and drilling on the jig (#2443): the retired
@@ -2659,22 +2658,24 @@ OPERATION_STEPS = (
     "PINS AT FULL HEIGHT: CLEARANCE SEEN OR MEASURED AT EACH.",
     "17B. REPEAT STEPS 17-17A AFTER ANY TOOL, DEPTH OR SETUP CHANGE.",
     "17C. REDO STEP 6 AFTER ANY CHANGE TO THE TABLE SETUP.",
-    f"18. CUT A GROOVE {_GROOVE[0]} FROM THE RISER TOP WITH THE "
+    f"18. CUT A GROOVE {_GROOVE} DEEP FROM THE RISER TOP WITH THE "
     f"{trammel.RISER_CUTTER_IN} CUTTER OVER THE INNER PASS, "
     "MARK TO MARK, BEFORE THE FIRST STRAP: WASHER AND CLAMP SCREWS OUT, RISER "
     "SCREWS AND STOP PINS IN.",
     "18A. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
     "18B. CUT THE OUTER PASS'S GROOVE AS IN STEP 18.",
     "18C. MOVE THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
-    "18D. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP WITH A DEPTH MICROMETER "
-    f"AT BOTH PASS ENDS: {_GROOVE[1]}.",
-    "18E. IF A GROOVE IS SHALLOW, DEEPEN IT AS IN STEPS 18-18C.",
-    "18F. IF A GROOVE IS DEEP, REDO STEPS 11-11E AND 18-18C, NEW RISER.",
+    "18D. CHECK EACH GROOVE'S DEPTH FROM THE RISER TOP AT BOTH PASS ENDS: "
+    f"{_GROOVE} (CALIPER DEPTH ROD).",
+    f"18E. IF A GROOVE IS SHALLOWER THAN {_length(_GROOVE_MIN, 2)}, DEEPEN IT AS IN "
+    "STEPS 18-18C.",
+    f"18F. IF A GROOVE IS DEEPER THAN {_length(_GROOVE_MAX, 2)}, REDO STEPS 11-11E "
+    "AND 18-18C, NEW RISER.",
     "19. MARK X 0 ON EACH STEP 1N BLANK MIDWAY BETWEEN ITS SQUARE ENDS AND Y 0 "
     "ALONG ITS LOWER RAW EDGE.",
     "19A. MARK THE INNER CHAIN'S POINTS FROM THE STRAP BLANK LAYOUT TABLE (SHEET "
     f"{LAYOUT_SHEET_NUMBER}), ANY POINT OFF THE BLANK ON THE LAYOUT SURFACE BESIDE IT.",
-    "19B. MARK THE OUTER CHAIN'S POINTS FROM THE SAME TABLE IN THE SAME WAY.",
+    "19B. MARK THE OUTER CHAIN'S POINTS FROM THE SAME TABLE LIKEWISE.",
     "19C. JOIN EACH CHAIN'S MARKS IN X ORDER WITH STRAIGHT LINES TO BOTH "
     "SQUARE ENDS, ON THE BLANK ONLY.",
     "19D. BANDSAW AWAY THE WASTE BELOW THE INNER CHAIN AND ABOVE THE OUTER "
@@ -2699,15 +2700,15 @@ OPERATION_STEPS = (
     "INTO THE RISER'S RELIEF.",
     "20C. RETURN THE TABLE TO THE ORIGIN AS IN STEP 6F: BOTH ORIGIN-STOP "
     "INDICATORS AT 0.",
-    f"21. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
-    "HOLE: FLANGE FLAT ON THE STRAP.",
+    f"21. SEAT THE HUB WASHER {_item(HUB_WASHER)} FLAT ON THE STRAP OVER THE "
+    "REAMED HOLE.",
     f"21A. TORQUE THE HUB CLAMP SCREW, A {_STRAP_CLAMPS}, TO "
     f"{_torque(holding.HUB_TORQUE_NM)} THROUGH THE WASHER INTO THE CARRIER'S "
-    "HUB TAP: HEAD SEATED ON THE FLANGE.",
+    "HUB TAP: HEAD SEATED ON THE WASHER.",
     "21B. CHECK THE WASHER AND STRAP BY HAND: NEITHER TURNS NOR LIFTS.",
     "21C. REPEAT STEPS 17-17A WITH THE WASHER AND 3 CLAMP SCREWS FITTED.",
-    "21D. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
-    f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
+    "21D. CHECK THE HUB WASHER TO BOTH CUTTER FLANKS WITH ALL 3 CLAMP SCREWS "
+    "FITTED: CLEARANCE SEEN OR MEASURED AT EACH.",
     f"21E. SET THE CUTTER'S END {_length(STRAP_CUT_OVERTRAVEL[0], 2)}-"
     f"{_length(STRAP_CUT_OVERTRAVEL[1], 2)} BELOW THE SEATED STRAP'S UNDERSIDE, "
     "GAUGED FROM ITS TOP AND MEASURED THICKNESS, NOT FROM THE "
@@ -2718,6 +2719,10 @@ OPERATION_STEPS = (
     "A FULL-WIDTH SLOT OR A PLUNGE.",
     "21H. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
     "21J. CUT THE OUTER EDGE OVER THE OUTER PASS AS IN STEPS 21E-21G.",
+    # TL-00 machinist review of #2746 (run 20261113T225945350Z): the run
+    # ended at 21J with the strap clamped and no word on the other blanks.
+    "21K. LIFT OFF THE STRAP WITH ALL 3 CLAMP SCREWS AND THE WASHER OUT.",
+    "21L. REPEAT 19E-21K FOR EACH OTHER BLANK, IN THE STEP 18 GROOVES.",
 )
 # The fixture's highest point over the strap: the uncut stock stop pins at
 # full length and tilt (holding.TOOLING_TOP_Z_MAX), above every clamp head.
@@ -2846,8 +2851,8 @@ def _component_local_boxes() -> dict[str, Box3]:
         PIVOT_SHIM: ((-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (0.0, pivot_shim.THICKNESS)),
         CARRIER: (carrier.OUTLINE_X, (-carrier.THICKNESS, 0.0), (-carrier.OUTLINE_Y[1], -carrier.OUTLINE_Y[0])),
         RISER: ((0.0, riser.BLANK_LENGTH), (0.0, riser.BLANK_WIDTH), (0.0, riser.THICKNESS)),
-        # The top-hat washer: flange above its seat face, spigot below it.
-        HUB_WASHER: ((-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.SPIGOT_LENGTH, hub_washer.THICK)),
+        # The flat washer: strap-side face on its Front Plane, axis +Z.
+        HUB_WASHER: ((-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (hub_washer.BOTTOM_Z, hub_washer.TOP_Z)),
         FEED_LEVER: ((0.0, feed_lever.LEVER_LENGTH), (0.0, feed_lever.LEVER_THICK), (-feed_lever.LEVER_WIDTH, 0.0)),
         # The supplier's maximum pin, tilted in its loose hole: the holding
         # proof's height and full top float about its nominal axis.
@@ -2888,7 +2893,7 @@ def _component_label(stem: str, index: int) -> str:
         PIVOT_SCREW: "pivot screw", PIVOT_SPACER: "pivot spacer",
         PIVOT_SHIM: "pivot shim",
         CARRIER: "carrier", RISER: "riser", FEED_LEVER: "feed lever",
-        HUB_WASHER: "HUB top-hat washer", STOP_PIN: "stop pin",
+        HUB_WASHER: "HUB washer", STOP_PIN: "stop pin",
         FEED_NUT: "feed nut",
         LEADSCREW: "screw", HANDWHEEL: "handwheel",
         END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",

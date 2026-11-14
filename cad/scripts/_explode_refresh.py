@@ -52,6 +52,7 @@ from _assembly import (
 )
 from _check import check
 from _com import _early_bound
+from _component_order import by_name
 from _part_save import set_isometric_view
 from _paths import OUT_SLDASM
 from _saved_display_data import assert_saved_display_data
@@ -115,10 +116,9 @@ def _component_poses(model: Any) -> dict[str, tuple[float, ...]]:
     """Every top-level component's ``Transform2`` in the active configuration."""
     assembly = _early_bound(model, "IAssemblyDoc")
     poses = {}
-    for component in assembly.GetComponents(True) or ():
-        component = _early_bound(component, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         transform = _early_bound(component.Transform2, "IMathTransform")
-        poses[str(component.Name2)] = tuple(float(v) for v in transform.ArrayData)
+        poses[name] = tuple(float(v) for v in transform.ArrayData)
     return poses
 
 

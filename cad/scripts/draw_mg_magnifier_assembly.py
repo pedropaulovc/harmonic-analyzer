@@ -69,6 +69,7 @@ import mg_vn_wheel_axle_front_washer_spec as front_washer
 import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
+from _component_order import by_name, drawing_components_by_name
 from _component_references import component_identity, component_reference_names
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
@@ -1728,8 +1729,9 @@ def _unique_projection(adapter: Any, view: Any, *, stage: str) -> Any:
 def _assert_projection_components(view: Any) -> None:
     """Keep the intended real components and their source configurations."""
     shown = {}
-    for raw in _early_bound(view, "IView").GetVisibleDrawingComponents() or ():
-        drawing_component = _early_bound(raw, "IDrawingComponent")
+    for _, drawing_component in drawing_components_by_name(
+        _early_bound(view, "IView").GetVisibleDrawingComponents()
+    ):
         component = _early_bound(drawing_component.Component, "IComponent2")
         stem = _component_stem(component)
         if stem not in LEVER_TIP.stems:
@@ -2250,10 +2252,9 @@ def _validate_source(
     )
     counts: dict[str, int] = {}
     instances = []
-    for raw in tuple(assembly.GetComponents(True) or ()):
-        component = _early_bound(raw, "IComponent2")
+    for name, component in by_name(assembly.GetComponents(True)):
         stem = _component_stem(component)
-        instances.append(explode.Instance(str(component.Name2), stem))
+        instances.append(explode.Instance(name, stem))
         if stem == notes.WIRE:
             selected = component_identity(component)
             expected = (notes.WIRE, sh_vn_music_wire_lever_geom.CONFIGURATION)
@@ -2268,8 +2269,7 @@ def _validate_source(
             for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
         ):
             raise RuntimeError(
-                f"magnifier source must open collapsed: {component.Name2!r} "
-                "is displaced"
+                f"magnifier source must open collapsed: {name!r} is displaced"
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(

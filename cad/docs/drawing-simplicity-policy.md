@@ -350,9 +350,12 @@ from `CARRIAGE_PLAY_TIR_MAX` in the rail-kit note, TL-00 BOM note and final
 shoulder-head check.
 
 The same correlated errors feed the tooling-clearance and riser-wall checks.
-The TL-52 washer keeps about `1.793 mm` to the limiting complete cutter sweep
-(OD and the #2249A spigot's `.14605 mm` float at their limits, each pass's own
-pin error and `.020 mm` carriage play), above the unchanged `1.5 mm` floor.
+The bought TL-VN-85 #8 SAE flat washer (owner ruling 2026-11-13,
+[#2448](https://github.com/pedropaulovc/harmonic-analyzer/issues/2448)) keeps
+about `0.942 mm` to the limiting complete cutter sweep (OD at its Table 11
+maximum, offset `.806 mm` by its screw float and OD-to-ID runout, each pass's
+own pin error and `.020 mm` carriage play); the ruling's floor is any gap
+above zero, replacing the turned washer's `1.5 mm`.
 The end-clamp heads and stop pins charge their table-row (or riser `.XX`
 station) error and accepted carriage play with the moved cut over the whole
 sweep. The self-cut riser-wall bounds likewise include carriage play once:

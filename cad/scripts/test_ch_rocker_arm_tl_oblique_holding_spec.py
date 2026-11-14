@@ -8,7 +8,7 @@ import pytest
 import ch_rocker_arm_tl_oblique_holding_spec as holding
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_oblique_hub_washer_spec as washer
+import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as washer
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 
@@ -51,10 +51,10 @@ def test_common_screws_have_supplier_length_engagement_and_no_protrusion() -> No
     assert holding.COMMON_SCREW.part_no == "91251A197"
     assert holding.SCREW_LENGTH_LIMITS == pytest.approx((18.288, 19.05))
     assert holding.END_FULL_THREAD_MIN == pytest.approx(8.37565)
-    assert holding.HUB_FULL_THREAD_MIN == pytest.approx(6.59765)
+    assert holding.HUB_FULL_THREAD_MIN == pytest.approx(6.72465)
     assert min(holding.END_FULL_THREAD_MIN, holding.HUB_FULL_THREAD_MIN) >= 1.5 * holding.COMMON_SCREW.major_dia
     assert holding.END_UNDERSIDE_CLEARANCE_MIN == pytest.approx(0.9398)
-    assert holding.HUB_UNDERSIDE_CLEARANCE_MIN > 0.0
+    assert holding.HUB_UNDERSIDE_CLEARANCE_MIN == pytest.approx(1.8542)
     assert holding.END_FILLET_CLEARANCE_MIN > 0.0
     holding.require_clearance()
 
@@ -119,31 +119,41 @@ def test_compatible_standard_reamer_clears_without_counterbore() -> None:
         holding.tool_depth_reserve(-1.0, 0.0, 0.0)
 
 
-def test_spigot_centres_washer_and_free_seating_uses_available_clearance() -> None:
-    assert holding.SPIGOT_DIA_LIMITS == washer.SPIGOT_DIA_LIMITS
-    assert holding.SPIGOT_FLOAT_MAX == washer.SPIGOT_FLOAT_MAX
-    assert holding.SPIGOT_DIA_LIMITS == pytest.approx((9.8806, 9.9822))
-    assert holding.SPIGOT_FLOAT_MAX == pytest.approx(0.14605)
-    assert holding.SPIGOT_LAND_MIN == washer.SPIGOT_LAND_MIN > 0.1
-    assert holding.HUB_ASSEMBLY_OFFSET_CAPACITY == pytest.approx(
-        (washer.BORE_LIMITS[0] - holding.SCREW_FILLET_DIA_MAX) / 2.0 + washer.ROOT_SEAT_CLEARANCE_MIN
-    )
-    assert holding.HUB_ASSEMBLY_OFFSET_CAPACITY == pytest.approx(0.2032)
+def test_screw_centres_bought_washer_and_its_offset_reaches_the_cutter_gaps() -> None:
+    # Owner ruling 2026-11-13 (#2448): McMaster 90231A116 to ASME B18.21.1
+    # Table 11 No. 8 Type A, ID .188 +.008/-.005, OD .438 +.015/-.005.
+    assert washer.SKU == "90231A116" and washer.QUANTITY == 1
+    assert (washer.ID_MIN, washer.ID_MAX) == pytest.approx((0.183 * 25.4, 0.196 * 25.4))
+    assert (washer.OD_MIN, washer.OD_MAX) == pytest.approx((0.433 * 25.4, 0.453 * 25.4))
+    assert (washer.THICKNESS_MIN, washer.THICKNESS_MAX) == pytest.approx((0.036 * 25.4, 0.065 * 25.4))
+    assert washer.OD_ID_RUNOUT_MAX == pytest.approx(0.013 * 25.4)
+    # The bore's float on the #8-32 least major plus the full runout.
+    assert holding.WASHER_FLOAT_MAX == pytest.approx((washer.ID_MAX - holding.SCREW_MAJOR_MIN) / 2.0)
+    assert holding.WASHER_FLOAT_MAX == pytest.approx(0.47625)
+    assert holding.WASHER_OFFSET_MAX == pytest.approx(0.47625 + 0.3302)
+    # The least bore passes the screw; the least O.D. spans the largest hole.
+    assert holding.WASHER_SCREW_CLEARANCE_MIN == pytest.approx(0.24130)
+    assert holding.PRODUCT_HOLE_LIMITS == pytest.approx((10.16, 10.1727))
+    assert holding.STRAP_BEARING_LAND_CONCENTRIC == pytest.approx(0.41275)
+    # At the worst offset the rim overhangs the hole on one side: the partial
+    # bearing the ruling accepts, disclosed, not gated.
     assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(
-        washer.SEAT_RING_MIN - washer.STRAP_HOLE_ENTRY_BREAK_MAX
+        holding.STRAP_BEARING_LAND_CONCENTRIC - holding.WASHER_OFFSET_MAX - carrier.HUB_RADIAL_STACK
     )
-    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(0.0762)
+    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(-0.51958, abs=5e-5)
+    # The under-head fillet can overlap the least bore by .0025 in; brass coins.
+    assert holding.FILLET_BORE_OVERLAP_MAX == pytest.approx(0.0635)
     assert holding.WASHER_GAPS == pytest.approx({
         "inner": trammel.HUB_RADIUS - trammel.R_INNER - washer.OD / 2.0,
         "outer": trammel.R_OUTER - trammel.HUB_RADIUS - washer.OD / 2.0,
     })
-    assert min(holding.WASHER_GAPS_MIN.values()) >= holding.WASHER_CLEARANCE_MIN == 1.5
+    assert min(holding.WASHER_GAPS_MIN.values()) > 0.0
+    assert not hasattr(holding, "WASHER_CLEARANCE_MIN")
+    assert not hasattr(holding, "SPIGOT_FLOAT_MAX")
     base = holding.washer_cutter_gaps()
     shifted = holding.washer_cutter_gaps(0.1)
     for name, gap in base.items():
         assert gap - shifted[name] == pytest.approx(0.1)
-    assert washer.OD == pytest.approx(0.433 * 25.4)
-    assert washer.OD_LIMITS == pytest.approx((10.8712, 11.1252))
     assert holding.HUB_TORQUE_NM == 1.0
     with pytest.raises(ValueError):
         holding.washer_cutter_gaps(-0.001)
@@ -154,26 +164,29 @@ def test_guard_rejects_screw_protrusion_and_real_cutter_floor(monkeypatch) -> No
     with pytest.raises(AssertionError, match="protrudes"):
         holding.require_clearance()
     monkeypatch.setattr(holding, "END_UNDERSIDE_CLEARANCE_MIN", 1.0)
-    monkeypatch.setattr(holding, "WASHER_GAPS_MIN", {"inner": 2.0, "outer": 1.499})
-    with pytest.raises(AssertionError, match="1.5 mm"):
+    monkeypatch.setattr(holding, "WASHER_GAPS_MIN", {"inner": 2.0, "outer": 0.0})
+    with pytest.raises(AssertionError, match="cutter sweep"):
+        holding.require_clearance()
+    monkeypatch.setattr(holding, "WASHER_GAPS_MIN", {"inner": 2.0, "outer": 0.001})
+    monkeypatch.setattr(holding, "STRAP_BEARING_LAND_CONCENTRIC", 0.0)
+    with pytest.raises(AssertionError, match="drops into the hub hole"):
         holding.require_clearance()
 
 
 def test_table_layer_charges_each_correlated_pin_error_once() -> None:
     # Washer: each pass's own correlated pin error against the in-situ HUB,
-    # beside spigot float, HUB setting and carriage play, never the product band.
+    # beside the washer's offset, HUB setting and carriage play, never the product band.
     base = holding.washer_cutter_gaps()
     for name in trammel.SWEEP:
         assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
             base[name] - carrier.PIN_RELATIVE_ERROR[name]
         )
         assert holding.WASHER_GAPS_MIN[name] == pytest.approx(
-            holding.cutter_gap(trammel.HUB, washer.OD_LIMITS[1] / 2.0, name)
-            - holding.SPIGOT_FLOAT_MAX - carrier.PIN_RELATIVE_STACK[name]
+            holding.cutter_gap(trammel.HUB, washer.OD_MAX / 2.0, name)
+            - holding.WASHER_OFFSET_MAX - carrier.PIN_RELATIVE_STACK[name]
         )
-    # #2249A spigot .391 ±.002: float .14605 plus .02 play leaves ~1.793 outer.
-    assert min(holding.WASHER_GAPS_MIN.values()) == pytest.approx(1.793, abs=5e-4)
-    assert min(holding.WASHER_GAPS_MIN.values()) >= 1.79 > holding.WASHER_CLEARANCE_MIN
+    # OD .453 offset .806 mm plus .02 play leaves ~0.942 outer, above the > 0 floor.
+    assert holding.WASHER_GAPS_MIN == pytest.approx({"inner": 1.54474, "outer": 0.94226}, abs=5e-5)
     # End heads: each point's own table-row and cut displacement.
     for name in trammel.SWEEP:
         assert holding.END_HEAD_GAPS_MIN[name] == pytest.approx(min(

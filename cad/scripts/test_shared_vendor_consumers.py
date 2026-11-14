@@ -200,7 +200,9 @@ def _leaf(component, *, visible=True, drawing_name=None):
         Component=component,
         Name=drawing_name or f"view-root/{component.Name2}@Drawing View1",
     )
-    return balloons._component_leaf(adapter, drawing_component, visible=visible)
+    return balloons._component_leaf(
+        adapter, drawing_component, drawing_component.Name, visible=visible
+    )
 
 
 @pytest.fixture

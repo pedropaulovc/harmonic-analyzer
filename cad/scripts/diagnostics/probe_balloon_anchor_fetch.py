@@ -34,6 +34,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
 
 from _check import check  # noqa: E402
 from _com import _early_bound  # noqa: E402
+from _component_order import drawing_components_by_name  # noqa: E402
 from _drawing_balloons import (  # noqa: E402
     _drawing_component_children,
     _drawing_component_stems,
@@ -65,16 +66,21 @@ def _raw_visible_entities(view: Any, component: Any, kind: int) -> tuple[Any, ..
 
 def _walk_leaves(adapter: Any, view: Any, stem: str) -> tuple[int, Any]:
     root = view.RootDrawingComponent2(False)
-    pending = list(_drawing_component_children(root))
+    # Siblings in ascending name order (_component_order), never the seat's.
+    pending = list(
+        reversed(drawing_components_by_name(_drawing_component_children(root)))
+    )
     visited = 0
     while pending:
-        drawing_component = pending.pop()
+        name, drawing_component = pending.pop()
         children = _drawing_component_children(drawing_component)
-        pending.extend(children)
+        pending.extend(reversed(drawing_components_by_name(children)))
         if children:
             continue
         visited += 1
-        if stem in _drawing_component_stems(adapter, drawing_component, frozenset({stem})):
+        if stem in _drawing_component_stems(
+            adapter, drawing_component, name, frozenset({stem})
+        ):
             return visited, drawing_component
     return visited, None
 

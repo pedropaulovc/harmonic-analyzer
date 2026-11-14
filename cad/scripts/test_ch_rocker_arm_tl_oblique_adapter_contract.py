@@ -17,13 +17,13 @@ import test_pd_transgear_adapter_contract as sdk
 
 
 SCRIPTS = Path(__file__).resolve().parent
-# Census classes in RECIPES order (nine recipes, one class each):
+# Census classes in RECIPES order (eight recipes, one class each):
 #   CARRIER   carrier: native build, covered by the parametrized census only.
 #   JOINT     pivot and feed blocks: sketch and cut-extrude, shared helper module.
-#   HARDWARE  pivot screw, spacer, shim and hub washer: create_part, create_sketch
-#             and each part's own body interfaces (HARDWARE_RECIPES below): the
-#             pivot parts extrude; the top-hat washer revolves a centerline
-#             profile and cuts its bore.
+#   HARDWARE  pivot screw, spacer and shim: create_part, create_sketch and each
+#             part's own body interfaces (HARDWARE_RECIPES below): they extrude.
+#             The bought hub washer (TL-VN-85) is a McMaster stock recipe,
+#             outside this jig-authored census like the lever washer.
 #   ASSEMBLY  jig assembly: reached by the parametrized census; not a hardware part.
 #   KIT       shared SH-VN-57 clamping kit: a single-unit census of its own.
 RECIPES = (
@@ -33,7 +33,6 @@ RECIPES = (
     "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py",
-    "build_ch_rocker_arm_tl_oblique_hub_washer.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
     "build_sh_vn_clamping_kit_hardware.py",
 )
@@ -41,11 +40,6 @@ HARDWARE_RECIPES = {
     "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py": {"create_extrusion"},
     "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py": {"create_extrusion"},
     "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py": {"create_extrusion"},
-    "build_ch_rocker_arm_tl_oblique_hub_washer.py": {
-        "add_centerline",
-        "create_revolve",
-        "create_cut_extrude",
-    },
 }
 
 
@@ -271,7 +265,7 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 
 def test_census_covers_every_new_physical_interface() -> None:
-    assert len(RECIPES) == len(set(RECIPES)) == 9
+    assert len(RECIPES) == len(set(RECIPES)) == 8
     assert "build_ch_rocker_arm_tl_oblique_jig_assembly.py" in RECIPES
     assert "build_ch_rocker_arm_tl_oblique_jig_assembly.py" not in HARDWARE_RECIPES
     assert set(HARDWARE_RECIPES) <= set(RECIPES)

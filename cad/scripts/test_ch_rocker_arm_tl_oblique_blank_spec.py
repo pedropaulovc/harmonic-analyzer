@@ -108,9 +108,12 @@ def test_entry_fraction_is_nominal_side_engagement_not_a_false_accepted_percenta
 
 
 def test_two_common_heads_and_hub_washer_have_real_stock_under_them() -> None:
-    import ch_rocker_arm_tl_oblique_hub_washer_spec as washer
+    import ch_rocker_arm_tl_oblique_holding_spec as holding
+    import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as washer
 
     for point, radius in ((trammel.CL, common_screw.head_dia / 2.0),
                           (trammel.CR, common_screw.head_dia / 2.0),
-                          (trammel.HUB, washer.OD / 2.0)):
+                          # The bought washer floats on its screw: its largest
+                          # OD at its farthest offset still lands on stock.
+                          (trammel.HUB, washer.OD_MAX / 2.0 + holding.WASHER_OFFSET_MAX)):
         assert blank.disk_material_area(point, radius) == pytest.approx(math.pi * radius**2, abs=1e-8)

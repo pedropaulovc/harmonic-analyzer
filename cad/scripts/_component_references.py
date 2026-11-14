@@ -15,6 +15,7 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound
+from _component_order import by_name
 from _simplified_names import SIMPLIFIED_SUFFIX
 
 # Only the configured members and the two same-stock drive-train roles need
@@ -98,12 +99,11 @@ def component_reference_names(
         normalized[canonical] = identity
     found: dict[str, str] = {}
     assembly = _early_bound(model, "IAssemblyDoc")
-    for raw in assembly.GetComponents(False) or ():
-        component = _early_bound(raw, "IComponent2")
+    for native_name, component in by_name(assembly.GetComponents(False)):
         reference = str(component.ComponentReference or "")
         if not reference:
             continue
-        name = str(component.Name2 or "").replace("\\", "/")
+        name = native_name.replace("\\", "/")
         parent, separator, _leaf = name.rpartition("/")
         selector = f"{parent}/@{reference}" if separator else f"@{reference}"
         if selector not in normalized:
@@ -119,8 +119,6 @@ def component_reference_names(
                 f"component reference {selector!r} on {name!r} selects "
                 f"{actual!r}, expected {normalized[selector]!r}"
             )
-        if not name:
-            raise RuntimeError(f"component reference {selector!r} has no native name")
         found[selector] = name
     missing = sorted(set(normalized) - found.keys())
     if missing:

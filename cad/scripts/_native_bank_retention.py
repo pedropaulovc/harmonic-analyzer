@@ -26,6 +26,7 @@ import dt_vn_cylinder_bank_spring_spec as spring
 import pinion_rig_layout as rig
 import pinion_rig_park_geometry as park
 from _com import _early_bound
+from _component_order import by_name
 from _native_cone_tip_air import (
     NATIVE_RESOLUTION_MM,
     _array,
@@ -58,8 +59,7 @@ def _inventory(assembly, assembly_kind: Literal["drive_train", "top_assembly"]):
     if not isinstance(raw, (tuple, list)) or not raw:
         raise RuntimeError("bank retention: actual saved component inventory unavailable")
     found = {}
-    for value in raw:
-        component = _early_bound(value, "IComponent2")
+    for _, component in by_name(raw):
         path = component.GetPathName()
         if type(path) is not str or not path:
             raise RuntimeError("bank retention: actual component path unavailable")
