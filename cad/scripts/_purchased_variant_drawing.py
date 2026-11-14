@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+import time
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -51,7 +52,6 @@ from _purchased_fastener_drawing import (
 from _purchased_title_fit import fit_purchased_title_block
 from _rebuild import active_configuration_name
 from _reference_source_lifecycle import (
-    _activate_reference_document,
     _preserve_reference_source_file,
     _show_reference_configuration,
 )
@@ -172,7 +172,11 @@ async def build_purchased_variant_drawing(
     text the sheets set can write through to the part in memory; only the
     file is guarded. The one allowed state change is the declared
     ``source_configuration``: every check requires exactly that member
-    active, and exit restores the saved one.
+    active, and exit leaves it active. Nothing saved depends on the source's
+    active member after the drawing closes: the SLDDRW, PDF, PNG and layout
+    audit are written first, and session teardown discards the read-only
+    source unsaved. Switching the dirty multi-configuration source back at
+    exit only risked a native fault (#2775).
     """
     if (additional_sheet_scales is None) != (append_sheets is None):
         raise ValueError("additional sheets require both scales and an author")
@@ -231,10 +235,34 @@ async def build_purchased_variant_drawing(
             )
 
         primary: BaseException | None = None
+        # The member this lifecycle leaves active; the exit check requires it.
+        shown = saved
+        opened = time.perf_counter()
         try:
             if active != saved:
                 # The just-opened part is the active document, as the transition requires.
-                _show_reference_configuration(adapter, model, active, label=label)
+                with _telemetry.span(
+                    "drawing.reference_source_transition",
+                    label=label,
+                    before=saved,
+                    requested=active,
+                ):
+                    _telemetry.event(
+                        "drawing.reference_source_transition.before",
+                        configuration=saved,
+                        requested=active,
+                        dirty=False,
+                    )
+                    started = time.perf_counter()
+                    _show_reference_configuration(adapter, model, active, label=label)
+                    shown = active
+                    _telemetry.event(
+                        "drawing.reference_source_transition.after",
+                        configuration=active,
+                        requested=active,
+                        dirty=bool(model.GetSaveFlag()),
+                        elapsed_s=time.perf_counter() - started,
+                    )
             assert_source("before view creation")
             return await _draw_purchased_variants(
                 adapter,
@@ -263,14 +291,26 @@ async def build_purchased_variant_drawing(
             raise
         finally:
             try:
-                if active != saved:
-                    _activate_reference_document(adapter, model, label=label)
-                    _show_reference_configuration(adapter, model, saved, label=label)
+                left = active_configuration_name(adapter, model)
+                dirty = bool(model.GetSaveFlag())
+                held_s = time.perf_counter() - opened
+                _telemetry.event(
+                    "drawing.reference_source_exit",
+                    configuration=left,
+                    expected=shown,
+                    saved_configuration=saved,
+                    dirty=dirty,
+                    held_s=held_s,
+                )
+                _telemetry.info(
+                    f"{label}: source exit: configuration={left!r}; saved={saved!r}; "
+                    f"dirty={dirty!r}; held {held_s:.1f}s; left unsaved for teardown"
+                )
                 require_source_state(
                     adapter,
                     model,
                     source,
-                    saved,
+                    shown,
                     source_sha256,
                     stage="drawing lifecycle exit",
                     label=label,
