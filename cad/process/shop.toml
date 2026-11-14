@@ -250,20 +250,21 @@ feed = "8 in/min"
 # its setting, jig-em-half and its setting, jig-spot and basebar-counterbore
 # (the 5/16 in end mill: counterbores and the pivot seat's flat floor).
 # The drills are the 115-piece index sizes the sheets print (#15 .180, F .257
-# tap drill); the 5/16 drill pilots the Ø.351 leadscrew bore. The boring head
-# is the archived LMS 3662 identity (45952b66bc inventory, a #1413 trial
-# assumption, not owned): cad/config/shop-equipment.toml tools.boring-head
-# records it to buy, with the 5/16-18 tap.
+# tap drill); the 5/16 drill pilots the Ø.351 leadscrew bore. jig-drill-f and
+# jig-tap-5-16-18-plug are the carrier's (TL-21) records, byte-identical: keep
+# one copy when both land. The boring head is the archived LMS 3662 identity
+# (45952b66bc inventory, a #1413 trial assumption, not owned):
+# cad/config/shop-equipment.toml tools.boring-head records it to buy.
 [tools.block-drill-15]
 description = "#15 (.180 in) drill, 115-piece index"
 diameter_mm = 4.572
-[tools.block-drill-f]
+[tools.jig-drill-f]
 description = "F (.257 in) drill, 115-piece index"
 diameter_mm = 6.5278
 [tools.block-drill-5-16]
 description = "5/16 in drill, 115-piece index"
 diameter_mm = 7.9375
-[tools.block-tap-5-16-18]
+[tools.jig-tap-5-16-18-plug]
 description = "5/16-18 UNC plug tap; T-handle wrench"
 tap_drill_mm = 6.5278
 [tools.block-boring-head]

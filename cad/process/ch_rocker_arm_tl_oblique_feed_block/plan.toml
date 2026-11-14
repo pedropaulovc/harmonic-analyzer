@@ -104,7 +104,7 @@ ref = "basebar-counterbore"
 [[tools]]
 id = "drill-f"
 name = "F drill"
-ref = "block-drill-f"
+ref = "jig-drill-f"
 [[tools]]
 id = "drill-5-16"
 name = "5/16 drill"
@@ -116,7 +116,7 @@ ref = "block-boring-head"
 [[tools]]
 id = "tap"
 name = "5/16-18 plug tap"
-ref = "block-tap-5-16-18"
+ref = "jig-tap-5-16-18-plug"
 
 [[setups]]
 machine_kind = "other"

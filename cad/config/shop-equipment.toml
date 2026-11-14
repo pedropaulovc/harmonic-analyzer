@@ -547,13 +547,6 @@ present = false
 status = "not owned: to buy (or to record, if the shop has the LMS 3662 seen in the archived photo)"
 use = "TL-22/TL-32 pivot seat (Ø.3755-.3765, .359 deep, flat floor) and TL-32 Ø.351 leadscrew bore"
 
-[tools.tap-5-16-18]
-name = "5/16-18 UNC plug tap"
-kind = "tap"
-present = false
-status = "not owned: to buy"
-use = "TL-22/TL-32 5/16-18 tapped through hole under the pivot seat (F .257 drill)"
-
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed

@@ -245,8 +245,9 @@ the jaw side and a spacer at the other jaw end, and the Ø.351 leadscrew bore
 with the block standing on SPINDLE END, after an arrival check of both KP08 axis
 heights (#2184); its four #4-40 nut taps stay with the TL-00 transfer. Their
 adapters (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips
-0.11.0. The boring head and the 5/16-18 tap are recorded to buy
-(`shop-equipment.toml` `tools.boring-head`, `tools.tap-5-16-18`).
+0.11.0. The boring head is recorded to buy (`shop-equipment.toml`
+`tools.boring-head`); the F drill and 5/16-18 plug tap share the carrier's
+records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 ```text
 uv run --frozen python -m doit prechips:<stem>
