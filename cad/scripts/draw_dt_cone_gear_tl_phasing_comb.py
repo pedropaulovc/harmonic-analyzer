@@ -1,11 +1,12 @@
 r"""Manufacturing drawing of the cone tip gears' phasing comb (MHA-DT-03-TL-02).
 
-One sheet. The front view draws the brass sheet's stepped edge as it lies
-parallel to the cone's radial plane, south (T030) left, the gears' axis
-below: every step's start from the sheet's south end, every blade's depth
-from the T030 blade's edge (the seat line), all at the title block's bands.
-The bottom view shows the stock's thickness; note 1 names the gear each blade
-serves. A shaded isometric gives the picture.
+One sheet. The front view draws the flat U as it stands over the cone's tip,
+south (T036, where both arms stand) left, the near (stepped) arm on top and
+the spring arm below: every step's start from the south end, every blade's
+depth from the near T030 blade's edge (the seat line) and the grip span from
+it to the spring arm's T030 blade, all at the title block's bands. The
+bottom view shows the stock's thickness; note 1 gives the depths' reason. A
+shaded isometric gives the picture.
 
 Run with SolidWorks open::
 
@@ -45,7 +46,6 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,20 +65,20 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 1.42 x .49 sheet whose shallowest step is .048: 5:1 keeps every step and
-# the .020 stock legible.
+# A 2.36 x .87 U whose shallowest step is .048: 5:1 keeps every step and the
+# .020 stock legible and fills the sheet's width.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
-ISO_SCALE = (1, 1)
-# The model origin (the sheet's south end on the seat line) on the sheet;
+ISO_SCALE = (1, 2)
+# The model origin (the near arm's south end on the seat line) on the sheet;
 # the bottom view projects straight below.
-FRONT_ORIGIN = (0.035, 0.215)
-BOTTOM_CENTER_Y = 0.118
-# The isometric and its label in the free upper right; the notes left of the
+FRONT_ORIGIN = (0.105, 0.185)
+BOTTOM_CENTER_Y = 0.085
+# The isometric and its label over the U's length; the notes left of the
 # title block.
-ISO_CENTER = (0.372, 0.246)
-ISO_NOTE_XY = (0.325, 0.227)
+ISO_CENTER = (0.340, 0.247)
+ISO_NOTE_XY = (0.200, 0.255)
 NOTES_XY = (0.020, 0.036)
 
 
@@ -90,18 +90,17 @@ def front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
 
 
 _POINTS = part.profile_points_mm()
-_SOUTH_X, _NORTH_X = _POINTS[0][0], _POINTS[-1][0]
-_TOP_Y = part.SHEET_HEIGHT
-_LOW_Y = min(y for _, y in _POINTS)
-SHEET_BOX = (*front_xy(_SOUTH_X, _LOW_Y), *front_xy(_NORTH_X, _TOP_Y))
+SHEET_BOX = (
+    *front_xy(min(x for x, _ in _POINTS), min(y for _, y in _POINTS)),
+    *front_xy(max(x for x, _ in _POINTS), max(y for _, y in _POINTS)),
+)
 
 # --- Measured text (layout audit) ----------------------------------------------
 # A dimension whose text stands outside its extension lines prints the text
-# on one side of its dimension line, with the line at the text's edge: the
-# depths and the thickness to the right of the line. Widths (sheet m): a
-# three-place value 10 mm, a two-place value 7.6 mm; a capital 2.7 mm. A line
-# of dimension text stands 5 mm in a block (value, then each callout line),
-# which is centred on its keep point.
+# right of its dimension line, the line at the text's left edge. Widths
+# (sheet m): a three-place value 10 mm, a two-place value 7.6 mm; a capital
+# 2.7 mm. A line of dimension text stands 5 mm in a block (value, then each
+# callout line), centred on its keep point unless it stands outside.
 TEXT_GAP = 0.004
 DEPTH_TEXT_WIDTH = 0.010
 TWO_PLACE_TEXT_WIDTH = 0.0076
@@ -109,81 +108,113 @@ CHAR_WIDTH = 0.0027
 LINE_HEIGHT = 0.005
 
 # --- Front view dimension text (sheet m) ---------------------------------------
-# The sheet's length over it; the step starts below it, one row each, from
-# the south end, the shortest nearest. The heights stand in one baseline row
-# right of the north end, shallowest first: the sheet's height has its text
-# in its span, every depth below the seat has its text in one row under the
-# sheet's deepest blade, each line TEXT_GAP right of the text before it, so
-# no line runs through a text.
-BASELINE_X0 = SHEET_BOX[2] + 0.008
-DEPTH_TEXT_Y = SHEET_BOX[1] - 0.014
-START_ROW_Y0 = SHEET_BOX[1] - 0.010
-START_ROW_PITCH = 0.008
+# Left of the U, from the seat line: the near arm's width up, the grip span
+# and the spring arm's width down. Each depth (value and gear on one line)
+# stands outside its line, right of it, in the gap between its own and the
+# next deeper depth's extension lines (the deepest under its own), so the
+# shallowest line stands nearest the U and each deeper one further out: no
+# extension line crosses a depth's line or text. The grip span's line stands
+# outside them all, its text under its lower end; the spring arm's width
+# hangs just left of the U, its text under the U's corner. The step starts,
+# T006's level end and the slot length stand in rows inside the slot under
+# the deepest blade, the shortest nearest; the step-out right of its riser;
+# the U's length over it.
+ARM_X = FRONT_ORIGIN[0] - 0.006
+DEPTH_X0 = FRONT_ORIGIN[0] - 0.056
+DEPTH_LINE_PITCH = 0.005
+GRIP_X = DEPTH_X0 - len(part.BONDED_TEETH) * DEPTH_LINE_PITCH - 0.006
+START_ROW_Y0 = front_xy(0.0, -part.BLADE_DEPTH_MM[6])[1] - 0.0045
+START_ROW_PITCH = 0.0055
+STEP_OUT_X = front_xy(part.LEVEL_END_MM, 0.0)[0] + 0.007
+LENGTH_Y = SHEET_BOX[3] + 0.010
 
 
-def front_keep() -> dict[str, tuple[float, float]]:
-    keep: dict[str, tuple[float, float]] = {
-        "SheetLength": ((SHEET_BOX[0] + SHEET_BOX[2]) / 2.0, SHEET_BOX[3] + 0.010),
-        "SheetHeight": (BASELINE_X0, front_xy(0.0, part.SHEET_HEIGHT / 2.0)[1]),
-    }
-    for row, teeth in enumerate(part.BONDED_TEETH):
-        south, _north = part.blade_x_mm(teeth)
-        keep[part.blade_start_name(teeth)] = (
-            front_xy((_SOUTH_X + south) / 2.0, 0.0)[0],
-            START_ROW_Y0 - row * START_ROW_PITCH,
-        )
-    x = BASELINE_X0 + TEXT_GAP
-    for teeth in part.BONDED_TEETH:
-        keep[part.blade_depth_name(teeth)] = (x, DEPTH_TEXT_Y)
-        x += depth_block_width(teeth) + TEXT_GAP
-    return keep
+def depth_line_x(teeth: int) -> float:
+    """The depth's dimension line, T024's (shallowest) nearest the U."""
+    return DEPTH_X0 - DEPTH_LINE_PITCH * part.BONDED_TEETH.index(teeth)
+
+
+def depth_text_y(teeth: int) -> float:
+    """Midway between the blade's own extension line and the next deeper
+    one's; the deepest a row under its own."""
+    here = front_xy(0.0, -part.BLADE_DEPTH_MM[teeth])[1]
+    index = part.BONDED_TEETH.index(teeth)
+    if index + 1 < len(part.BONDED_TEETH):
+        deeper = part.BONDED_TEETH[index + 1]
+        return (here + front_xy(0.0, -part.BLADE_DEPTH_MM[deeper])[1]) / 2.0
+    return here - 0.0045
 
 
 def depth_block_width(teeth: int) -> float:
-    """A depth's text block: its value, its gear and its note flag."""
-    lines = part.CALLOUTS_BELOW[part.blade_depth_name(teeth)].splitlines()
-    return max([DEPTH_TEXT_WIDTH, *(len(line) * CHAR_WIDTH for line in lines)])
+    """A depth's text: its value, a space and its gear."""
+    return DEPTH_TEXT_WIDTH + CHAR_WIDTH * len(
+        part.DEPTH_SUFFIX[part.blade_depth_name(teeth)]
+    )
+
+
+def _block_height(name: str) -> float:
+    return (1 + len(part.CALLOUTS_BELOW.get(name, "").splitlines())) * LINE_HEIGHT
+
+
+# Dimensions whose text stands outside, right of the line.
+OUTSIDE_RIGHT = frozenset(
+    {"GripSpan", "SpringWidth", *(part.blade_depth_name(t) for t in part.BONDED_TEETH)}
+)
+
+
+def front_keep() -> dict[str, tuple[float, float]]:
+    def mid(y_mm: float) -> float:
+        return front_xy(0.0, y_mm / 2.0)[1]
+
+    keep: dict[str, tuple[float, float]] = {
+        "ArmWidth": (ARM_X, mid(part.ARM_WIDTH)),
+        "GripSpan": (
+            GRIP_X,
+            front_xy(0.0, -part.GRIP_SPAN)[1] - 0.004 - _block_height("GripSpan") / 2.0,
+        ),
+        "SpringWidth": (ARM_X, SHEET_BOX[1] - 0.003 - LINE_HEIGHT / 2.0),
+        "SheetLength": ((SHEET_BOX[0] + SHEET_BOX[2]) / 2.0, LENGTH_Y),
+        "StepOut": (
+            STEP_OUT_X,
+            front_xy(0.0, -(part.BLADE_DEPTH_MM[6] + part.CLEAR_DEPTH_MM) / 2.0)[1],
+        ),
+    }
+    for teeth in part.BONDED_TEETH:
+        keep[part.blade_depth_name(teeth)] = (depth_line_x(teeth), depth_text_y(teeth))
+    rows = [
+        (part.blade_start_name(t), part.BLADE_START_MM[t]) for t in part.BONDED_TEETH
+    ]
+    rows += [("LevelEnd", part.LEVEL_END_MM), ("SlotLength", part.SLOT_LENGTH)]
+    for row, (name, end) in enumerate(rows):
+        keep[name] = (front_xy(end / 2.0, 0.0)[0], START_ROW_Y0 - row * START_ROW_PITCH)
+    return keep
 
 
 FRONT_KEEP = front_keep()
 
-# Note 2's flag: SEE NOTE 2 in the pocket under the T030 blade, between the
-# south end and the first step's extension lines and above the first start
-# row, on a straight leader up to the middle of the seat edge it governs.
-# A note's position is its text's top-left corner.
-SEAT_EDGE_X = (SHEET_BOX[0], front_xy(part.BLADE_START_MM[24], 0.0)[0])
-SEAT_FLAG_TIP = ((SEAT_EDGE_X[0] + SEAT_EDGE_X[1]) / 2.0, front_xy(0.0, 0.0)[1])
-SEAT_FLAG_WIDTH = len(part.SEAT_FLAG) * CHAR_WIDTH
-SEAT_FLAG_XY = (SEAT_FLAG_TIP[0] - SEAT_FLAG_WIDTH / 2.0, SEAT_FLAG_TIP[1] - 0.016)
-SEAT_FLAG_BLOCK = (
-    SEAT_FLAG_XY[0],
-    SEAT_FLAG_XY[1] - LINE_HEIGHT,
-    SEAT_FLAG_XY[0] + SEAT_FLAG_WIDTH,
-    SEAT_FLAG_XY[1],
-)
-
 # --- Bottom view ---------------------------------------------------------------
-# The stock's thickness across the edge view, just right of the sheet's
-# north end. Its arrows stand 2.5 mm apart, too close to hold the text, so
-# the text (value, SHEET STOCK under it) stands off below and right on a
-# leader, clear of both extension lines (pd-platen-clip's SheetDepth).
-SHEET_THICK_X = SHEET_BOX[2] + 0.008
+# The stock's thickness across the edge view, just left of the U's south end.
+# Its arrows stand 2.5 mm apart, too close to hold the text, so the text
+# (value, SHEET STOCK under it) stands off below and left on a leader, clear
+# of both extension lines (pd-platen-clip's SheetDepth).
+SHEET_THICK_X = SHEET_BOX[0] - 0.008
 BOTTOM_KEEP = {"SheetThick": (SHEET_THICK_X, BOTTOM_CENTER_Y)}
-OFFSET_TEXT = {"SheetThick": (SHEET_BOX[2] + 0.030, BOTTOM_CENTER_Y - 0.014)}
+OFFSET_TEXT = {"SheetThick": (SHEET_BOX[0] - 0.035, BOTTOM_CENTER_Y - 0.014)}
 
 
 def text_blocks() -> dict[str, tuple[float, float, float, float]]:
     """(left, bottom, right, top) of each dimension's text: its value's line
-    and its callout's lines, a depth's run right of its line, an offset
-    text centred on its offset point, the rest centred on its line."""
+    (with any suffix) and its callout's lines, centred on its keep or offset
+    point, or right of its line when it stands outside."""
     blocks = {}
     for name, (x, y) in (FRONT_KEEP | BOTTOM_KEEP).items():
         callout = part.CALLOUTS_BELOW.get(name, "").splitlines()
         places = part.DRAWING_PRECISION_BY_NAME[name]
         value = DEPTH_TEXT_WIDTH if places == 3 else TWO_PLACE_TEXT_WIDTH
+        value += CHAR_WIDTH * len(part.DEPTH_SUFFIX.get(name, ""))
         width = max([value, *(len(line) * CHAR_WIDTH for line in callout)])
         x, y = OFFSET_TEXT.get(name, (x, y))
-        left = x if name.startswith("BladeDepth") else x - width / 2.0
+        left = x if name in OUTSIDE_RIGHT else x - width / 2.0
         half = (1 + len(callout)) * LINE_HEIGHT / 2.0
         blocks[name] = (left, y - half, left + width, y + half)
     return blocks
@@ -191,6 +222,31 @@ def text_blocks() -> dict[str, tuple[float, float, float, float]]:
 
 def sheet_dimension_names() -> set[str]:
     return set().union(*part.DRAWING_DIMENSIONS.values())
+
+
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+
+
+def _set_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Each depth's gear after its value, on its line (rule 4)."""
+    remaining = dict(part.DEPTH_SUFFIX)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        display.SetText(_DIMENSION_TEXT_SUFFIX, text)
+        if str(display.GetText(_DIMENSION_TEXT_SUFFIX)) != text:
+            raise RuntimeError(
+                f"{name}: suffix reads back {display.GetText(_DIMENSION_TEXT_SUFFIX)!r}"
+            )
+    if remaining:
+        raise RuntimeError(f"depth suffixes not applied: {sorted(remaining)}")
+    rebuild_drawing(adapter, label="depth suffixes")
 
 
 def _place_point(
@@ -243,7 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip Gear Phasing Comb Drawing",
             1: "Harmonic Analyzer shop tooling drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip gear phasing comb; brass sheet, one blade each, T030-T006; MHA-DT-03-TL-02",
+            3: "cone tip gear phasing comb; flat sheet U, one blade each, T030-T006; MHA-DT-03-TL-02",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -288,6 +344,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"sheet prints {sorted(printed)}, the part marks {sorted(sheet_dimension_names())}"
         )
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_BELOW)
+    _set_suffixes(adapter, annotations)
     # The sheet's thickness is the stock's, a reference over SHEET STOCK.
     references = [
         (dimension_name(adapter, item), item)
@@ -304,14 +361,6 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
-    add_leader_note(
-        adapter,
-        part.SEAT_FLAG,
-        text_xy=SEAT_FLAG_XY,
-        attach_xy=SEAT_FLAG_TIP,
-        label="seat edge flag",
-        view=front,
-    )
     drawing.ClearSelection2(True)
     _early_bound(drawing, "IDrawingDoc").EditSheet()
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

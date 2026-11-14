@@ -20,19 +20,25 @@ from _machinist_review_mode import MachinistReviewMode
 INCH = 25.4
 
 
-def test_registry_row_is_brass_sheet_tooling_in_inch() -> None:
+def test_registry_row_is_sheet_tooling_in_inch_its_stock_a_one_line_change() -> None:
     row = _config.parts(spec.PART_NAME)
     assert row["number"] == spec.PART_NUMBER == "MHA-DT-03-TL-02"
     assert row["drawing_unit"] == "in"
     assert int(row["quantity"]) == 1
     # Owner ruling 2026-11-13: one sheet, cut to shape, at the stock's
-    # thickness; no thin-wall exception is left to carry.
+    # thickness; no thin-wall exception is left to carry. The stock is 1095
+    # spring steel by default (pending the owner) and brass a drop-in: the
+    # row names it and the model's material follows.
     assert ".020 in" in row["material_specification"]
-    assert "brass" in row["material_specification"].lower()
+    assert "1095" in row["material"]
+    assert spec.MATERIAL == "Plain Carbon Steel"
     assert "machinist_exceptions" not in row
     assert "mill" not in row["process"]
     assert spec.SHEET_THICK == pytest.approx(0.020 * INCH)
+    # The proof takes brass's wider +/-.002 so either stock serves.
     assert spec.SHEET_THICK_TOLERANCE_MM == pytest.approx(0.002 * INCH)
+    assert "MATERIAL" not in vars(part) or part.MATERIAL == spec.MATERIAL
+    assert "apply_material(adapter, MATERIAL)" in inspect.getsource(part.build)
     entry = DRAWINGS_BY_NAME["dt_cone_gear_tl_phasing_comb"]
     assert entry.artifact_stem == spec.PART_NAME == part.PART_NAME
     assert entry.layout is DrawingLayout.LANDSCAPE
@@ -93,32 +99,62 @@ def test_each_bonded_blade_enters_without_bottoming_or_binding() -> None:
 def test_every_level_clears_the_smaller_gear_beyond_it() -> None:
     band = 0.005 * INCH
     for south, north in zip(spec.GEARS, spec.GEARS[1:], strict=False):
-        lowest = (
-            spec.SEAT_EDGE_MM[0]
-            - spec.blade_depth_mm(south)
-            - (band if south != spec.REFERENCE_TEETH else 0.0)
-        )
+        lowest = spec.SEAT_EDGE_MM[0] - spec.blade_depth_mm(south)
+        if south != spec.REFERENCE_TEETH:
+            lowest -= band + spec.FLEX_MM[south]
         assert lowest > spec.tip_radius_limits_mm(north)[1] + spec.BOND_FLOAT_MM
 
 
-def test_every_step_fits_the_stack_axially() -> None:
-    assert spec.AXIAL_PLACEMENT_WINDOW_MM >= 0.1
-    assert spec.SHEET_LENGTH == spec.BLADE_START_MM[6] + spec.BLADE_LENGTH
+def test_the_comb_stands_on_t036_and_every_step_fits_the_stack() -> None:
+    assert spec.BLADE_START_MM[spec.REFERENCE_TEETH] == 0.0
+    assert spec.AXIAL_MARGIN_MM > 0.0
+    assert set(spec.axial_margins_mm()) == {
+        *(spec.gear_tag(t) for t in spec.BONDED_TEETH),
+        "end",
+    }
+    assert spec.LEVEL_END_MM == spec.BLADE_START_MM[6] + spec.BLADE_LENGTH
 
 
-def test_the_profile_is_a_rectilinear_staircase_on_the_seat_origin() -> None:
+def test_the_u_clears_the_tip_and_grips_t030() -> None:
+    """The bridge clears MHA-DT-37's pivot and the near arm MHA-DT-38 at
+    every limit; the span is under T030's root diameter at every limit, so
+    the spring arm holds both T030 blades on their seats."""
+    xx = 0.01 * INCH
+    assert spec.SLOT_LENGTH - xx > spec.PIVOT_END_MAX_MM
+    deepest_inner = spec.BLADE_DEPTH_MM[6] + 0.005 * INCH - (spec.STEP_OUT - xx)
+    assert deepest_inner < spec.SEAT_EDGE_MM[0] - spec.BUSHING_REACH_MM
+    assert spec.GRIP_SPAN + 0.005 * INCH <= 2.0 * spec.SEAT_EDGE_MM[0]
+    assert 0.0 < spec.SPREAD_MAX_MM < 1.0
+    # Opened to pass MHA-DT-38, the spring arm stays elastic in either stock.
+    assert spec.INSTALL_SPREAD_MM > spec.SPREAD_MAX_MM
+    assert spec.SPRING_STRAIN < spec.SPRING_YIELD_STRAIN
+    # The near arm bends little under the spread: a few hundredths at most.
+    assert all(0.0 < flex < 0.05 for flex in spec.FLEX_MM.values())
+
+
+def test_both_t030_blades_hold_the_lean_under_half_a_degree() -> None:
+    assert 0.0 < spec.SLIDE_WIDTH_MM < 0.15
+    assert spec.LEAN_MAX_RAD == pytest.approx(
+        spec.SLIDE_WIDTH_MM / (2.0 * spec.SEAT_EDGE_MM[0])
+    )
+    assert math.degrees(spec.LEAN_MAX_RAD) < 0.5
+
+
+def test_the_profile_is_a_rectilinear_u_on_the_seat_origin() -> None:
     points = spec.profile_points_mm()
     assert points[1] == (0.0, 0.0)
-    assert len(points) == 2 * len(spec.GEARS) + 2
+    assert len(points) == 2 * len(spec.GEARS) + 8
     for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True):
         assert (x0 == x1) != (y0 == y1)
-    assert points[-1][0] - points[0][0] == spec.SHEET_LENGTH
+    assert max(x for x, _ in points) == spec.SHEET_LENGTH
+    assert points[spec.GRIP_POINT] == (0.0, -spec.GRIP_SPAN)
     for teeth in spec.BONDED_TEETH:
         assert points[spec.step_corner_index(teeth)] == (
             spec.BLADE_START_MM[teeth],
             -spec.BLADE_DEPTH_MM[teeth],
         )
     assert spec.SHEET_VOLUME == pytest.approx(spec._area(points) * spec.SHEET_THICK)
+    assert {name for name, *_ in spec.SKETCH_DIMENSIONS} == spec.PROFILE_DIMENSIONS
 
 
 def test_every_dimension_prints_at_the_title_block() -> None:
@@ -131,41 +167,41 @@ def test_every_dimension_prints_at_the_title_block() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP) == marked
     for name in marked:
         assert name in spec.GLOBALS, name
-        places = 3 if name == "SheetThick" or name.startswith("BladeDepth") else 2
+        three = name in ("SheetThick", "GripSpan") or name.startswith("BladeDepth")
+        places = 3 if three else 2
         assert spec.DRAWING_PRECISION_BY_NAME[name] == places, name
     assert spec.REFERENCE_DIMENSIONS == {"SheetThick"}
     assert spec.CALLOUTS_BELOW["SheetThick"] == "SHEET STOCK"
     assert "set_reference_dimension" in inspect.getsource(drawing.build)
-    assert (
-        ".020 in +/-.002 in" in _config.parts(spec.PART_NAME)["material_specification"]
-    )
+    assert ".020 in" in _config.parts(spec.PART_NAME)["material_specification"]
 
 
-def test_each_gear_is_named_once_and_every_depth_flags_note_one() -> None:
-    """Rule 4: each bonded blade's depth names its gear and flags note 1,
-    the depth's reason; note 2 names T030, whose blade is the depths'
-    datum. Rule 7: each note one line, a reason of at most six words plus
-    the mate's number."""
+def test_each_gear_is_named_once_and_note_one_gives_the_depths_reason() -> None:
+    """Rule 4: each bonded blade's depth names its gear after its value; the
+    grip span names T030, whose blades it spans. Rule 7: note 1 one line, a
+    reason of at most six words."""
     for teeth in spec.BONDED_TEETH:
-        assert spec.CALLOUTS_BELOW[spec.blade_depth_name(teeth)].splitlines() == [
-            spec.gear_number(teeth),
-            "SEE NOTE 1",
-        ]
+        assert spec.DEPTH_SUFFIX[spec.blade_depth_name(teeth)] == (
+            f" {spec.gear_number(teeth)}"
+        )
+    assert spec.CALLOUTS_BELOW["GripSpan"].splitlines() == [
+        "GRIPS ROOTS OF",
+        spec.gear_number(spec.REFERENCE_TEETH),
+    ]
     notes = spec.SHEET_NOTES.splitlines()
-    assert [line[:3] for line in notes] == ["1. ", "2. "]
+    assert [line[:3] for line in notes] == ["1. "]
     for line in notes:
         words = [w for w in line[3:].split() if not w.startswith("MHA-")]
         assert len(words) <= 6, line
-    named = "\n".join((spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values()))
+    named = "\n".join(
+        (spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values(), *spec.DEPTH_SUFFIX.values())
+    )
     for teeth in spec.GEARS:
         assert named.count(spec.gear_number(teeth)) == 1, teeth
-    assert notes[1].startswith("2. FLAGGED EDGE SEATS IN ")
-    assert spec.gear_number(spec.REFERENCE_TEETH) in notes[1]
-    assert spec.SEAT_FLAG == "SEE NOTE 2"
     assert "ROOT" in notes[0]
     # No method (rule 7).
-    for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE"):
-        assert word not in spec.SHEET_NOTES
+    for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE", "BEND"):
+        assert word not in "\n".join((spec.SHEET_NOTES, *spec.CALLOUTS_BELOW.values()))
 
 
 def test_no_old_plate_wording_survives() -> None:
@@ -179,53 +215,78 @@ def _apart(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
     return a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]
 
 
+def _off_the_u(box: tuple[float, ...]) -> bool:
+    """No edge of the drawn U runs through ``box`` and ``box`` is not inside
+    it (its centre outside the outline)."""
+    points = [drawing.front_xy(x, y) for x, y in spec.profile_points_mm()]
+    for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True):
+        if (
+            x0 == x1
+            and box[0] < x0 < box[2]
+            and min(y0, y1) < box[3]
+            and max(y0, y1) > box[1]
+        ):
+            return False
+        if (
+            y0 == y1
+            and box[1] < y0 < box[3]
+            and min(x0, x1) < box[2]
+            and max(x0, x1) > box[0]
+        ):
+            return False
+    cx, cy = (box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0
+    inside = False
+    for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True):
+        if (y0 > cy) != (y1 > cy) and cx < x0 + (cy - y0) * (x1 - x0) / (y1 - y0):
+            inside = not inside
+    return not inside
+
+
 def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> None:
     left, bottom, right, top = 0.0127, 0.0127, 0.4191, 0.2667
     title = (0.216, 0.0, right, 0.066 + 0.003)
     blocks = drawing.text_blocks()
     names = list(blocks)
+    assert drawing.SHEET_BOX[0] > left and drawing.SHEET_BOX[2] < right - 0.005
     for i, a in enumerate(names):
         box = blocks[a]
         assert left < box[0] and box[2] < right and bottom < box[1] and box[3] < top, a
         assert _apart(box, title), a
-        assert _apart(box, drawing.SHEET_BOX) or a == "SheetLength", a
+        assert _off_the_u(box), a
         for b in names[i + 1 :]:
             assert _apart(box, blocks[b]), (a, b)
-    # Each depth's text runs right of its line, the next line clear of it.
-    row = sorted(
-        (x, teeth)
-        for teeth in spec.BONDED_TEETH
-        for name, (x, _y) in drawing.FRONT_KEEP.items()
-        if name == spec.blade_depth_name(teeth)
-    )
-    for (x0, t0), (x1, _t1) in zip(row, row[1:], strict=False):
-        assert x1 - (x0 + drawing.depth_block_width(t0)) >= drawing.TEXT_GAP - 1e-9
-    # The bottom view's text stands clear of the front view's start rows.
-    lowest_start = min(
-        y for name, (_x, y) in drawing.FRONT_KEEP.items() if name.startswith("Start")
-    )
-    assert blocks["SheetThick"][3] < lowest_start - 0.004
+    # Each depth's text stands right of its line, between its own extension
+    # line and the next deeper one's, left of the U: no extension line or
+    # other depth's line runs through it.
+    for index, teeth in enumerate(spec.BONDED_TEETH):
+        box = blocks[spec.blade_depth_name(teeth)]
+        own = drawing.front_xy(0.0, -spec.BLADE_DEPTH_MM[teeth])[1]
+        assert box[3] < own - 0.001
+        if index + 1 < len(spec.BONDED_TEETH):
+            deeper = spec.BONDED_TEETH[index + 1]
+            assert (
+                box[1] > drawing.front_xy(0.0, -spec.BLADE_DEPTH_MM[deeper])[1] + 0.001
+            )
+        assert box[2] < drawing.FRONT_ORIGIN[0] - 0.004
+        for shallower in spec.BONDED_TEETH[:index]:
+            line = blocks[spec.blade_depth_name(shallower)]
+            assert box[0] < drawing.depth_line_x(shallower) and line[1] > box[3]
+    # The grip span's text stands under every depth, below its own lower
+    # extension line; the start rows under the deepest blade in the slot.
+    grip = blocks["GripSpan"]
+    assert grip[3] < drawing.front_xy(0.0, -spec.GRIP_SPAN)[1]
+    rows = [blocks[n] for n in drawing.FRONT_KEEP if n.startswith("Start")]
+    assert max(r[3] for r in rows) < drawing.front_xy(0.0, -spec.BLADE_DEPTH_MM[6])[1]
+    assert min(r[1] for r in rows) > drawing.front_xy(0.0, -spec.GRIP_SPAN)[1]
     # The thickness's text stands off its 2.5 mm arrows on a leader, below
-    # both extension lines and right of its dimension line.
+    # both extension lines and left of its dimension line.
     edge_half = spec.SHEET_THICK * 5.0 / 2000.0
     thick = blocks["SheetThick"]
     assert set(drawing.OFFSET_TEXT) == {"SheetThick"}
     assert thick[3] < drawing.BOTTOM_CENTER_Y - edge_half - 0.003
-    assert thick[0] > drawing.SHEET_THICK_X + 0.002
+    assert thick[2] < drawing.SHEET_THICK_X - 0.002
     assert "offset_dimension_text" in inspect.getsource(drawing.build)
-    # Note 2's flag stands in the pocket under the T030 blade: between the
-    # south end's and the first step's extension lines, above the first
-    # start row, its leader tip on the seat edge.
-    flag = drawing.SEAT_FLAG_BLOCK
-    south, first_step = drawing.SEAT_EDGE_X
-    assert south + 0.003 < flag[0] and flag[2] < first_step - 0.003
-    assert flag[1] > drawing.START_ROW_Y0 + drawing.LINE_HEIGHT / 2.0 + 0.003
-    assert flag[3] < drawing.SEAT_FLAG_TIP[1] - 0.005
-    assert south < drawing.SEAT_FLAG_TIP[0] < first_step
-    assert drawing.SEAT_FLAG_TIP[1] == drawing.front_xy(0.0, 0.0)[1]
-    for name, box in blocks.items():
-        assert _apart(flag, box), name
-    assert "add_leader_note" in inspect.getsource(drawing.build)
+    assert "_set_suffixes" in inspect.getsource(drawing.build)
     # The notes sit left of the title block, inside the border.
     width = max(len(line) for line in spec.SHEET_NOTES.splitlines()) * 0.0026
     assert drawing.NOTES_XY[0] + width < title[0]
@@ -255,6 +316,7 @@ def test_the_shop_kit_holds_the_comb() -> None:
     top = spec.KIT_POSITION_MM[1] + max(y for _, y in points)
     bottom = spec.KIT_POSITION_MM[1] + min(y for _, y in points)
     rim = kit.plate.PLATE_DIA / 2.0
-    assert -rim - top >= 12.0  # a balloon between the rim and the comb
+    # Clear of the rim; its balloon lands beside it, past the isometric.
+    assert -rim - top >= 7.0
     iso_top = kit.ISO_CENTER[1] + rim / 2000.0
     assert kit.FRONT_CENTER[1] + bottom / 1000.0 > iso_top + 0.005

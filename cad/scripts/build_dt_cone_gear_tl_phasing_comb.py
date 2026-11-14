@@ -1,16 +1,18 @@
 r"""Build the cone tip gears' phasing comb (MHA-DT-03-TL-02; shop tooling).
 
-One flat brass sheet (dt_cone_gear_tl_phasing_comb_spec), cut to shape: its
-stepped edge carries one blade per gear, T030, T024, T018, T012 and T006,
-each dropping into one tooth space of that gear while LOCTITE 638 grabs
-(MHA-DT-00 step 1). Model frame (spec docstring): X north along the sheet,
-Y radially outward, Z through the thickness; the origin is the sheet's south
-end on the seat line (its T030 blade's edge).
+One flat sheet (dt_cone_gear_tl_phasing_comb_spec), cut to a U: its near
+arm's stepped edge carries one blade per gear, T030, T024, T018, T012 and
+T006, each dropping into one tooth space of that gear while LOCTITE 638 grabs
+(MHA-DT-00 step 1); its far arm, a spring, holds a second blade in T030's
+mirror space; the bridge joins them over the tip. Model frame (spec
+docstring): X north along the cone, Y radially outward through the near arm,
+Z through the thickness; the origin is the near arm's south end on the seat
+line (its T030 blade's edge).
 
 Features:
 
-* ``SheetProfile`` on the Front plane: the closed staircase outline, every
-  length and depth driven from the spec's globals.
+* ``SheetProfile`` on the Front plane: the closed U outline, every length,
+  width and depth driven from the spec's globals.
 * ``Sheet``: the outline extruded +Z by the stock's thickness.
 
 Run (SolidWorks already open)::
@@ -43,24 +45,21 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, dimension_between, ensure_fully_defined
 from dt_cone_gear_tl_phasing_comb_spec import (
-    BONDED_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GLOBALS,
     ISOMETRIC_VIEW_NOTE,
+    MATERIAL,
+    ORIGIN,
     PROFILE_SKETCH,
     SHEET_FEATURE,
     SHEET_THICK,
     SHEET_VOLUME,
-    blade_depth_name,
-    blade_start_name,
-    gear_tag,
+    SKETCH_DIMENSIONS,
     profile_points_mm,
-    step_corner_index,
 )
 
 PART_NAME = "dt-cone-gear-tl-phasing-comb"
-MATERIAL = "Brass"  # see _appearance.apply_material docstring
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
@@ -81,10 +80,9 @@ def _require_one_solid_body(adapter: Any, *, label: str) -> None:
 
 
 async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The closed staircase (``profile_points_mm``): every segment horizontal
-    or vertical, the south end's seat corner on the origin, every step's
-    start from the south end and every depth from the seat line (the
-    origin's), both at the step's lower corner."""
+    """The closed U (``profile_points_mm``): every segment horizontal or
+    vertical, the near arm's seat corner on the origin, each driving
+    dimension of ``SKETCH_DIMENSIONS`` between its two points."""
     points = profile_points_mm()
     check("create_sketch sheet profile", await adapter.create_sketch("Front"))
     lines = await add_line_chain(adapter, points)
@@ -104,44 +102,15 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
         ),
     )
 
-    def start(index: int) -> str:
-        return f"{lines[index]}.start"
+    def ref(point: str | int) -> str:
+        return ORIGIN if point == ORIGIN else f"{lines[point]}.start"
 
     dims = SketchDims()
-    top = len(points) - 1
-    await dimension_between(
-        adapter,
-        start(0),
-        start(top),
-        "horizontal_distance",
-        points[top][0] - points[0][0],
-        "sheet length",
-    )
-    dims.record("SheetLength", '"SheetLength"')
-    await dimension_between(
-        adapter, "origin", start(0), "vertical_distance", points[0][1], "sheet height"
-    )
-    dims.record("SheetHeight", '"SheetHeight"')
-    for teeth in BONDED_TEETH:
-        corner = step_corner_index(teeth)
+    for name, start, end, kind in SKETCH_DIMENSIONS:
         await dimension_between(
-            adapter,
-            "origin",
-            start(corner),
-            "horizontal_distance",
-            points[corner][0],
-            f"{gear_tag(teeth)} blade start",
+            adapter, ref(start), ref(end), kind, GLOBALS[name], name
         )
-        dims.record(blade_start_name(teeth), f'"{blade_start_name(teeth)}"')
-        await dimension_between(
-            adapter,
-            "origin",
-            start(corner),
-            "vertical_distance",
-            -points[corner][1],
-            f"{gear_tag(teeth)} blade depth",
-        )
-        dims.record(blade_depth_name(teeth), f'"{blade_depth_name(teeth)}"')
+        dims.record(name, f'"{name}"')
     await ensure_fully_defined(adapter, "sheet profile")
     check("exit_sketch sheet profile", await adapter.exit_sketch())
     name_last_feature(adapter, PROFILE_SKETCH)
