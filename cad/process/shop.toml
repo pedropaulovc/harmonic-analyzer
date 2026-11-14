@@ -214,3 +214,33 @@ tool = "ms-stick-engraver"
 material = "ms-stick-brass"
 rpm = 3000
 feed = "3 in/min"
+
+# Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
+# stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
+# drill pilots the 12 mm and the 82° countersink cuts the Ø.25 × 82° seats.
+# Nominal sizes × 25.4 (#30 .1285 in, #9 .1960 in). The 12 mm drill and the
+# countersink are not owned (cad/config/shop-equipment.toml, same keys).
+[tools.riser-drill-30]
+description = "#30 (.1285 in) drill, 115-piece index"
+diameter_mm = 3.2639
+[tools.riser-drill-9]
+description = "#9 (.1960 in) drill, 115-piece index"
+diameter_mm = 4.9784
+[tools.riser-drill-quarter]
+description = "1/4 in drill, 115-piece index"
+diameter_mm = 6.35
+[tools.riser-drill-12mm]
+description = "12 mm jobber drill"
+diameter_mm = 12.0
+[tools.riser-countersink]
+description = "3/8 in 82° countersink"
+
+# Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
+# coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
+# in the PM-30MV high belt range (1400-3000 rpm) with Setups 4-5's drills, so
+# no belt change: 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
+[settings.riser-em-half-6061-t6511]
+tool = "jig-em-half"
+material = "6061-t6511"
+rpm = 1800
+feed = "8 in/min"
