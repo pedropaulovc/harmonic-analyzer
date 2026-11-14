@@ -1385,9 +1385,14 @@ UNDERSIDE_BOTTOM_KEEP = {
     "CrossRibThickness": (0.128 + CROSS_RIB_CENTER_X * VIEW_SCALE / 1000.0, 0.247),
 }
 UNDERSIDE_BOTTOM_NOTE_XY = (0.030, 0.258)
+# The socket bosses are sketched on the sockets' own ColumnX/ColumnZ
+# stations (build_fr_harmonic_base: both circles driven by the same globals),
+# so the Ø callout states that relation instead of a second set of boss
+# stations: bare, the four boss arcs read as unlocated (machinist review,
+# PR #2702 proof, gating blockers; the sockets are blind from below).
 UNDERSIDE_BOTTOM_CALLOUTS = {
     "PocketLen": "POCKET",
-    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET\nBOSSES",
+    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET BOSSES,\nCOAXIAL WITH SOCKETS",
     "PocketFilletRadius": f"{POCKET_FILLET_COUNT}X POCKET\nCORNERS",
     "LongRibThickness": "RIB",
     "CrossRibThickness": "RIB",
