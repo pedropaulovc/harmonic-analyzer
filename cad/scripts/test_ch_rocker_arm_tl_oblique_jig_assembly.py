@@ -2128,6 +2128,18 @@ def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
     assert f"{spec._length(cut_low, 2)}-{spec._length(cut_high, 2)} BELOW" in steps["21E"]
 
 
+def test_each_strap_is_unclamped_and_the_run_repeats_for_every_blank() -> None:
+    """TL-00 machinist review of #2746: the run ended at 21J with the strap
+    still clamped; it now lifts the strap off and repeats per blank, the
+    step 18 grooves once."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    order = list(steps)
+    assert order[-2:] == ["21K", "21L"]
+    assert "LIFT OFF THE STRAP WITH ALL 3 CLAMP SCREWS AND THE WASHER OUT" in steps["21K"]
+    # The grooves are not recut: the repeat starts after step 18.
+    assert "19E-21K FOR EACH OTHER BLANK, IN THE STEP 18 GROOVES" in steps["21L"]
+
+
 def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
     """TL-00 round 2: 17A ran before the strap clamp screws and washer were
     fitted; their closest approach is checked at 21C, after 21A-21B."""
