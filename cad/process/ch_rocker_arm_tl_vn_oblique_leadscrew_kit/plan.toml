@@ -29,6 +29,11 @@ screw_stock_length_mm = 600.0
 saw_allowance_mm = 3.0           # Sawn long, milled to length.
 kerf_mm = 1.0                    # Hacksaw kerf.
 rule_mm = 304.8                  # The owned 12 in combination-square rule (no tape or long rule on hand).
+# Second lay on that inch-graduated rule: saw_piece_mm 422.5 - 304.8 = 117.7 mm
+# (adapter saw_rule_step_mm) = 4.634 in; printed as 4 5/8 in = 117.475 mm, so
+# the mark lands at 422.275, 0.2 short: inside the +/-1 mark and the 3 mm saw
+# allowance. Re-derive if saw_piece_mm changes.
+saw_second_lay_mm = 117.475      # 4 5/8 in x 25.4.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
 flat_cutter_dia_mm = 7.9375      # 5/16 in end mill: flat length = one crossing.
 cut_overhang_mm = 10.0           # Cut end past the right jaw side.
@@ -110,7 +115,7 @@ speed_kind = "other"
 tool = "saw"
 sizing = "other"
 instruction = "Mark {{cad.saw_piece_mm:.1f}} from the NEAR END; saw on the offcut side. Keep the offcut."
-instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark {{cad.saw_rule_step_mm:.1f}} more, round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
+instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark 4 5/8 in more ({{process.saw_second_lay_mm:.1f}} mm), round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
 feed = "hand"
 
 [[setups]]
