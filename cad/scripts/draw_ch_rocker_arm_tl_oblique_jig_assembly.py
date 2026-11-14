@@ -1141,7 +1141,7 @@ _CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
 # not a jig part, so it has no BOM row.
 _STRAP = _config.parts("ch-rocker-strap")
 STRAP_BLANK_KEY = (
-    f"STRAP BLANK (STEPS 1M-1N, 19-21J): {str(_STRAP['number']).upper()}, "
+    f"STRAP BLANK (STEPS 1M-1N, 19-21L): {str(_STRAP['number']).upper()}, "
     f"{int(_STRAP['quantity'])} OFF; NOT A JIG PART."
 )
 # The one sequence, in print order: the general torque note, the pivot-hole,

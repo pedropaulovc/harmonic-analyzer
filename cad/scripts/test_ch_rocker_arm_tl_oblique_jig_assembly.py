@@ -2101,22 +2101,43 @@ def test_r4_operation_order_prints_the_blank_route_and_retains_all_clamps() -> N
 
 
 def test_riser_groove_has_a_depth_and_a_bench_acceptance() -> None:
-    """TL-00 round 2: the in-place riser cut is a groove .215 ±.010 deep from
-    the riser top, never through the thinnest printed riser to the carrier,
-    checked at both pass ends with its remedies."""
+    """Owner ruling 2026-11-13 (#2447): the in-place riser cut is a loose
+    groove .15-.20 deep from the riser top, read with the caliper depth rod,
+    never through the thinnest printed riser to the carrier; only a groove
+    past .20 scraps the riser."""
     inch = spec.trammel.INCH
     steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
-    assert ".215 DEEP FROM THE RISER TOP" in steps["18"]
+    assert ".15-.20 DEEP FROM THE RISER TOP" in steps["18"]
     assert "INNER PASS" in steps["18"] and "OUTER PASS" in steps["18B"]
-    assert steps["18D"].startswith("18D. CHECK") and ".205-.225" in steps["18D"]
-    assert steps["18E"].startswith("18E. IF ") and steps["18F"].startswith("18F. IF ")
-    assert spec.RISER_GROOVE_DEPTH + spec.RISER_GROOVE_BAND < spec.riser.THICKNESS - spec.riser.THICKNESS_BAND
-    assert spec.RISER_GROOVE_DEPTH == pytest.approx(0.215 * inch)
+    assert steps["18D"].startswith("18D. CHECK") and ".15-.20 (CALIPER DEPTH ROD)" in steps["18D"]
+    assert "MICROMETER" not in steps["18D"]
+    assert steps["18E"].startswith("18E. IF A GROOVE IS SHALLOWER THAN .15,")
+    assert steps["18F"].startswith("18F. IF A GROOVE IS DEEPER THAN .20,") and "NEW RISER" in steps["18F"]
+    low, high = spec.RISER_GROOVE_DEPTHS
+    assert (low, high) == pytest.approx((0.15 * inch, 0.20 * inch))
+    assert spec.RISER_GROOVE_SKIN_MIN == pytest.approx(0.030 * inch)
+    assert spec.RISER_GROOVE_SKIN_MIN == pytest.approx(
+        spec.riser.THICKNESS - spec.riser.THICKNESS_BAND - high
+    )
     # The strap cut's depth is printed from the seated strap: past its
-    # underside by more than the breakthrough budget, well above the groove floor.
-    low, high = spec.STRAP_CUT_OVERTRAVEL
-    assert spec.holding.TOOL_OVERTRAVEL_BUDGET < low < high < spec.RISER_GROOVE_DEPTH - spec.RISER_GROOVE_BAND
-    assert f"{spec._length(low, 2)}-{spec._length(high, 2)} BELOW" in steps["21E"]
+    # underside by more than the breakthrough budget, at most half the
+    # shallowest groove.
+    cut_low, cut_high = spec.STRAP_CUT_OVERTRAVEL
+    assert (cut_low, cut_high) == pytest.approx((0.02 * inch, 0.07 * inch))
+    assert spec.holding.TOOL_OVERTRAVEL_BUDGET < cut_low < cut_high <= low / 2
+    assert f"{spec._length(cut_low, 2)}-{spec._length(cut_high, 2)} BELOW" in steps["21E"]
+
+
+def test_each_strap_is_unclamped_and_the_run_repeats_for_every_blank() -> None:
+    """TL-00 machinist review of #2746: the run ended at 21J with the strap
+    still clamped; it now lifts the strap off and repeats per blank, the
+    step 18 grooves once."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    order = list(steps)
+    assert order[-2:] == ["21K", "21L"]
+    assert "LIFT OFF THE STRAP WITH ALL 3 CLAMP SCREWS AND THE WASHER OUT" in steps["21K"]
+    # The grooves are not recut: the repeat starts after step 18.
+    assert "19E-21K FOR EACH OTHER BLANK, IN THE STEP 18 GROOVES" in steps["21L"]
 
 
 def test_clamp_screw_clearance_is_checked_once_they_are_fitted() -> None:
