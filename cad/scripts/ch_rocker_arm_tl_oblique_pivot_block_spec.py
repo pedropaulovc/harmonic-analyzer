@@ -1,7 +1,7 @@
 """TL-22: one plain shoulder-screw block on rail 2.
 
 Frame: carriage-pattern centre, bottom Z0; +X away from spindle. New
-6061 1 x 3-1/2 inch stock is shared with TL-32. No cartridge hardware.
+6061 1 x 3 inch stock is shared with TL-32. No cartridge hardware.
 The print locates every X from the -X (left) edge and every Y from the -Y
 edge, never from the frame centre or chained through the seat:
 ``PLAN_DATUM_REFERENCE`` carries those ordinates, ``BlockSideY`` the seat's Y.

@@ -235,17 +235,20 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
 The pivot block (`ch_rocker_arm_tl_oblique_pivot_block`, TL-22) and feed block
 (`ch_rocker_arm_tl_oblique_feed_block`, TL-32) plans are written fresh against
 their v49 manifests (no hand traveler): each saws its own blank from the
-OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`),
-faces SEAT and TOP, mills the 1.64 length from the 3 in width on edge (#2083),
-faces the sawn ends on end, then cuts every top hole in one hold: the 4X .180
-holes and .31 counterbores to the .570 floor, and the pivot seat (F tap drill,
-then the LMS 6784 3/8 end mill plunged to the flat .359 floor, .375–.379 under
-DRILLED HOLES, owner ruling 2026-11-13; then the 5/16-18 tap through). TL-32
-adds the lug notch, with LUG END out past the jaw side, a spacer at the other
-jaw end and the owner's 1 in-flute 1/2 in end mill, and the Ø.375 leadscrew
-clearance, piloted and plunged with the same 3/8 end mill with the block
-standing on SPINDLE END, after an arrival check of both KP08 axis heights
-(#2184); its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
+OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`;
+TL-22 a 1.70 strip, then across to 1.70 x 1.70), faces SEAT and TOP with the
+1/2 in end mill, mills the 1.64 length (TL-32: about 1.36 in off the 3 in
+width in .10 layers, #2083) and the sawn ends on end, then cuts every top hole
+in one hold: the 4X .180 holes and .31 counterbores to the .570 floor, and the
+pivot seat (F tap drill, then the LMS 6784 3/8 end mill, miked at .3750 or
+more, plunged to the flat .359 floor, .375–.379 under DRILLED HOLES, owner
+ruling 2026-11-13; then the 5/16-18 tap through). TL-32 adds the lug notch,
+standing on edge (OUTER END down, LUG END out past the jaw side, a TL-22 spacer
+at the other jaw end) so the owner's 1 in-flute 1/2 in end mill's end cuts the
+lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
+piloted and plunged with the same 3/8 end mill with the block standing on
+SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
+and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
 (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0. No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
