@@ -2614,9 +2614,9 @@ def _child_identities(stems: Iterable[str]) -> dict[str, str]:
     """Every model a build opens through ``stems`` (an assembly's references, an
     assembly drawing's source), transitively through subassemblies: the tag of
     each one's execution token -> the SHA-256 it holds, or why it holds none
-    (``_execution_identity``). A COM-conversation recording is judged only
-    against one made on the same (``_replay_shadow.Dependent``); telemetry only,
-    never a key input."""
+    (``_execution_identity``). A COM-conversation recording is judged, and an
+    assembly reused, only against one made on the same
+    (``_replay_shadow.Dependent``); never a key input."""
     found: dict[str, str] = {}
     pending = list(stems)
     while pending:
@@ -3208,9 +3208,39 @@ def build_or_refresh(stem, dependencies, changed, targets):
         plan = explode_plan(stem)
         base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
 
-    # A FULL build's COM-conversation recording (telemetry only; None: run as
-    # ever). REFRESH tiers are not recorded: another script and argument whose
-    # conversations no FULL build's could be judged against.
+    asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
+    # HARMONIC_COM_REPLAY's assembly mode ``audit`` (the default) or ``reuse``
+    # in a cache role that can publish: before the seat, the nearest FULL
+    # build's recording made on the same children and bound to its archive may
+    # make that archive this key's outputs, with SolidWorks absent
+    # (_replay_shadow.reuse_attempt). ``audit`` serves none: its would-be reuse
+    # builds on the seat below and is judged against that base afterwards. A
+    # POST_ASSEMBLY hook changes the model outside any recording: no attempt.
+    reuse = None
+    if probed == "miss" and not POST_ASSEMBLY.get(stem):
+        dependent = _replay_shadow.DependentBuild(
+            _replay_shadow.BuildKind.ASSEMBLY,
+            stem,
+            asm_script,
+            cache_key,
+            file_deps,
+            ContentChecker._digest,
+            cache_outputs,
+            Path(_sldasm(stem)),
+            functools.partial(_com_process_inputs, label),
+            lambda: _assembly_dependent(stem, asm_script),
+            rewritten=(ledger,),
+        )
+        with _replay_shadow.reuse_attempt(dependent) as reuse:
+            if reuse.decision is _replay_shadow.ReuseDecision.REUSED and (
+                _reuse_assembly(stem, cache_key, file_deps, cache_outputs, reuse)
+            ):
+                return
+
+    # A FULL build's COM-conversation recording (a later reuse's base and this
+    # build's audit; None: run as ever). REFRESH tiers are not recorded: another
+    # script and argument whose conversations no FULL build's could be judged
+    # against.
     recording: _replay_shadow.Recording | None = None
     with _com_seat(label) as waited:
         if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
@@ -3250,11 +3280,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
 
             def full_build(reason: str) -> None:
                 nonlocal recording
-                asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
                 recording = _replay_shadow.plan_dependent(
                     _replay_shadow.BuildKind.ASSEMBLY,
                     lambda: _assembly_dependent(stem, asm_script),
                     cache_key,
+                    reuse=reuse,
                 )
                 _exec_com(
                     [sys.executable, str(asm_script)]
@@ -3302,25 +3332,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
             _stamp_assembly_execution(stem)
             _write_input_ledger(ledger, current)
 
-    # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
-    # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
-    # from the top: the channel stretch parts and the top-level gallery PNGs are
-    # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
-    # was first computed, so the early list would publish an incomplete archive
-    # (codex review). They exist now.
-    outputs = _assembly_cache_outputs(stem)
-    with _telemetry.span(
-        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
-    ) as store:
-        _tag_cache_key(store, cache_key)
-        outcome = _cache.store(cache_key, outputs, label)
-        store.set_attribute("cache", outcome)
-        _cache.require_refresh_store(label, outcome)
-    if outcome == "lost":
-        _adopt_canonical(cache_key, outputs, label)
-        _stamp_assembly_execution(stem)
-        _write_input_ledger(ledger, _ledger_inputs(file_deps))
-        outputs = _assembly_cache_outputs(stem)
+    outcome, outputs = _publish_assembly(stem, cache_key, file_deps)
     # Off the seat, after the publication: publish the FULL build's recording
     # and judge it against its base. Telemetry only; never raises.
     _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
@@ -3337,6 +3349,73 @@ def build_or_refresh(stem, dependencies, changed, targets):
         _cache.require_refresh_store(label, outcome)
         # An ordinary alias loss is publish-only: adopting it here would replace
         # this full key's canonical outputs with a different explode variant.
+
+
+def _publish_assembly(
+    stem: str, key: str, file_deps: list[str]
+) -> tuple[str, list[Path]]:
+    """Store an assembly's outputs under ``key`` for other machines OUTSIDE the
+    seat (an Azure upload is network, not COM). The output set is computed
+    HERE, not taken from the task's start: the channel stretch parts and the
+    top-level gallery PNGs are glob-discovered and DID NOT EXIST yet on a clean
+    builder then, so the early list would publish an incomplete archive (codex
+    review). A lost publication adopts the winner's whole archive, re-stamps
+    its token and rewrites the input ledger. The store outcome and the outputs
+    then on disk."""
+    label = f"assembly:{stem}"
+    outputs = _assembly_cache_outputs(stem)
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as store:
+        _tag_cache_key(store, key)
+        outcome = _cache.store(key, outputs, label)
+        store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
+    if outcome == "lost":
+        _adopt_canonical(key, outputs, label)
+        _stamp_assembly_execution(stem)
+        _write_input_ledger(_input_ledger(stem), _ledger_inputs(file_deps))
+        outputs = _assembly_cache_outputs(stem)
+    return outcome, outputs
+
+
+def _reuse_assembly(
+    stem: str,
+    key: str,
+    file_deps: list[str],
+    outputs: list[Path],
+    reuse: _replay_shadow.Reuse,
+) -> bool:
+    """:func:`_reuse_part` for a FULL assembly build: install the base's
+    verified archive as a HIT restores one, re-stamp the ``.execution`` token,
+    which must be the base's, publish the ``reused/`` marker naming the base,
+    rewrite the input ledger from the current inputs (as a HIT does; last, so
+    a failure before it leaves the base's ledger and the seat's tier decision
+    sees the recipe differ), then publish under ``key`` as a build does. No
+    recording (only real builds are bases) and no explode-base alias: a
+    missing alias only forgoes a later EXPLODE tier. False: a step before the
+    store failed (WARN; declined ``fault``/``token_mismatch``), and the
+    caller builds on the seat."""
+    label = f"assembly:{stem}"
+    with _telemetry.span(
+        f"task {label}", label=label, service=_stage_name(label)
+    ) as sp:
+        sp.set_attribute("cache", "reuse")
+        sp.set_attribute("com", "none")
+        _tag_cache_key(sp, key)
+        try:
+            reuse.install(outputs)
+            _stamp_assembly_execution(stem)
+            reuse.check_token(Path(_assembly_execution_token(stem)))
+            reuse.mark()
+            _write_input_ledger(_input_ledger(stem), _ledger_inputs(file_deps))
+        except Exception as exc:  # noqa: BLE001 - a reuse never costs a build
+            sp.set_attribute("cache", "reuse_failed")
+            reuse.fall_through(reuse.phase, exc)
+            return False
+    outcome, _ = _publish_assembly(stem, key, file_deps)
+    reuse.finish(outcome)
+    return True
 
 
 def _close_sw_documents() -> None:

@@ -241,6 +241,7 @@ def _load_dodo() -> Any:
         ("off", shadow.ReplayMode.OFF),
         ("record", shadow.ReplayMode.RECORD),
         (" Shadow ", shadow.ReplayMode.SHADOW),
+        ("audit", shadow.ReplayMode.AUDIT),
         ("reuse", shadow.ReplayMode.REUSE),
     ],
 )
@@ -3166,23 +3167,24 @@ def test_an_audited_key_builds_on_the_seat(blob, tmp_path, monkeypatch, spans):
 
 # --------------------------------------------------------------------------- #
 # Assemblies and drawings: recorded, judged against the nearest earlier
-# recording made on the same children, never reused
+# recording made on the same children; assemblies audited and reused
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (None, ("reuse", "shadow", "shadow")),
-        ("reuse", ("reuse", "shadow", "shadow")),
+        (None, ("reuse", "audit", "shadow")),
+        ("reuse", ("reuse", "reuse", "shadow")),
+        ("audit", ("audit", "audit", "shadow")),
         ("record", ("record", "record", "record")),
         ("off", ("off", "off", "off")),
         ("shadow,drawing=off", ("shadow", "shadow", "off")),
         ("assembly=record", ("reuse", "record", "shadow")),
-        ("drawing=reuse", ("reuse", "shadow", "shadow")),
-        (" Drawing = Record , part=off ", ("off", "shadow", "record")),
+        ("drawing=reuse", ("reuse", "audit", "shadow")),
+        (" Drawing = Record , part=off ", ("off", "audit", "record")),
         ("off,assembly=shadow", ("off", "shadow", "off")),
     ],
 )
-def test_each_kind_has_its_mode_and_dependents_never_reuse(
+def test_each_kind_has_its_mode_and_drawings_never_reuse(
     monkeypatch, logged, value, expected
 ):
     if value is None:
@@ -4132,3 +4134,551 @@ def test_an_assembly_noop_whose_sidecar_differs_is_an_unexplained_divergence(
     assert not [name for name in blob.committed if "/revoked/" in name]
     [span] = spans.named("replay.split ")[-1:]
     assert span["replay.unexplained_output_divergence"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Assembly reuse: a base made on the same children, whose replay opens only
+# them; every audited would-be reuse judged against that base after its build
+# --------------------------------------------------------------------------- #
+_ASSEMBLY_LABEL = f"assembly:{_STEM}"
+_ASSEMBLY_NAME = f"assembly-{_STEM}"
+_MODEL = b"the model"  # drawing_outputs' part: the assembly's one child
+
+
+class _AssemblyShop(_Shop):
+    """:class:`_Shop` building :data:`_ASSEMBLY_SCRIPT`: one child part under
+    the output root with its ``.execution`` token, the SLDASM SolidWorks
+    saves, the proof Python writes and the input ledger dodo rewrites after
+    any build. ``recipes``: a key digest by file name (a model's recipe
+    digest, not its bytes'), the content's otherwise."""
+
+    def __init__(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, digest: Any = _digest
+    ) -> None:
+        self.recipes: dict[str, str] = {}
+        super().__init__(
+            tmp_path,
+            monkeypatch,
+            lambda path: self.recipes.get(Path(path).name) or digest(path),
+            _ASSEMBLY_SCRIPT,
+        )
+        self.settings = self.script.parent / "assembly.json"
+        self.settings.write_text(json.dumps({"proof": "x"}), "utf-8")
+        self.deps.append(str(self.settings))
+        assembled = self.out / "sldasm"
+        self.native = assembled / "sh-widget.SLDASM"
+        self.python_output = assembled / ".sh-widget.massprops.sha"
+        self.ledger = assembled / ".sh-widget.inputs.json"
+        self.outputs = [self.native, self.python_output, self.ledger]
+        self.token = assembled / ".sh-widget.execution"
+        drawing_outputs(self.out)
+        self.model = self.out / "sldprt" / "sh-widget.SLDPRT"
+        self.model_token = self.out / "sldprt" / ".sh-widget.execution"
+        self.model_token.write_text(_sha(_MODEL) + "\n", "utf-8")
+
+    def children(self) -> dict[str, str]:
+        """dodo._child_identities of the one child."""
+        tag = cache._rel(self.model_token)
+        if not self.model_token.is_file():
+            return {tag: "missing"}
+        return {tag: self.model_token.read_text("utf-8").strip()}
+
+    def dependent(self) -> shadow.Dependent:
+        return shadow.Dependent(
+            shadow.BuildKind.ASSEMBLY,
+            _STEM,
+            self.script,
+            (),
+            self.children(),
+            (self.python_output,),
+        )
+
+    def edit(self, *, audited: bool, path: Path | None = None) -> str:
+        path = path or self.script
+        text = path.read_text("utf-8")
+        for n in itertools.count():
+            path.write_text(f"{text}# edit {n}\n", "utf-8")
+            key = cache.key_inputs(self.deps, self.digest)[0]
+            if shadow.audited(key, shadow.DEPENDENT_AUDIT_ONE_IN) is audited:
+                return self.key()
+        raise AssertionError("unreachable")
+
+    def build(self, reuse: shadow.Reuse | None = None) -> shadow.Recording:
+        """The current source built on the fake seat as dodo's FULL assembly
+        build is: under the recorder, the ledger written, stored, observed."""
+        key = self.key()
+        recording = shadow.plan_dependent(
+            shadow.BuildKind.ASSEMBLY, self.dependent, key, reuse=reuse
+        )
+        assert recording is not None
+        env = {k: v for k, v in os.environ.items() if k not in _PINS}
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                DEPENDENT_DRIVER,
+                *recording.command[2:],
+                "--out-root",
+                str(self.out),
+            ],
+            cwd=SCRIPTS,
+            env={**env, "OTEL_EXPORTER_OTLP_ENDPOINT": "", "PYTHONHASHSEED": "0"},
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert not recording.exited(proc.returncode)
+        self.ledger.write_text(json.dumps({"built": key}), "utf-8")
+        assert cache.store(key, self.outputs, _ASSEMBLY_LABEL) == "stored"
+        shadow.after_build(recording, self.deps, self.digest)
+        return recording
+
+    def base(
+        self,
+        *,
+        store: bool = True,
+        native: bytes = _NATIVE,
+        python: bytes = _PY,
+        children: dict[str, str] | None = None,
+    ) -> str:
+        """A base as a recorded FULL build leaves one, without running it (its
+        replay is _replay_as's), made on ``children`` (default: the child's
+        current token)."""
+        key = self.key()
+        self.write(native, python)
+        self.ledger.write_text(json.dumps({"built": key}), "utf-8")
+        if store:
+            assert cache.store(key, self.outputs, _ASSEMBLY_LABEL) == "stored"
+        os.environ[shadow.MODE_ENV] = "record"
+        recording = shadow.plan_dependent(
+            shadow.BuildKind.ASSEMBLY, self.dependent, key
+        )
+        assert recording is not None
+        if children is not None:
+            recording.children = children
+        recording.log.write_bytes(b"log of " + key.encode())
+        recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+        shadow.after_build(recording, self.deps, self.digest)
+        os.environ[shadow.MODE_ENV] = "reuse"
+        return key
+
+    def assembly(
+        self, *, key: str | None = None, rewritten: tuple[Path, ...] | None = None
+    ) -> shadow.DependentBuild:
+        return shadow.DependentBuild(
+            shadow.BuildKind.ASSEMBLY,
+            _STEM,
+            self.script,
+            key or self.key(),
+            list(self.deps),
+            self.digest,
+            list(self.outputs),
+            self.native,
+            lambda: dict(_PINS),
+            self.dependent,
+            rewritten=(self.ledger,) if rewritten is None else rewritten,
+        )
+
+    def attempt(self, **options: Any) -> shadow.Reuse:
+        """dodo's assembly reuse path (build_or_refresh, _reuse_assembly)."""
+        build = self.assembly(**options)
+        with shadow.reuse_attempt(build) as reuse:
+            if reuse.decision is shadow.ReuseDecision.REUSED:
+                reuse.install(build.outputs)
+                self.token.write_text(_sha(self.native.read_bytes()) + "\n", "utf-8")
+                reuse.check_token(self.token)
+                reuse.mark()
+                self.ledger.write_text(json.dumps({"built": build.key}), "utf-8")
+                reuse.finish(cache.store(build.key, build.outputs, _ASSEMBLY_LABEL))
+        return reuse
+
+    def marker(self, key: str, engine: str | None = None) -> dict[str, Any] | None:
+        engine = engine or conv.sha256_file(conv.ENGINE_FILE)
+        data = cache.fetch_sidecar(shadow.reused_name(engine, _ASSEMBLY_NAME, key))
+        return None if data is None else json.loads(data)
+
+
+def _replay_assembly(
+    monkeypatch: pytest.MonkeyPatch, shop: _AssemblyShop, **result: Any
+) -> list[str]:
+    """_replay_as with the synthetic assembly base's outputs, SolidWorks
+    opening its one child."""
+    defaults = {
+        "com_outputs": {"sldasm/sh-widget.SLDASM": _sha(_NATIVE)},
+        "py_outputs": {"sldasm/.sh-widget.massprops.sha": _sha(_PY)},
+        "solidworks_out_inputs": ["sldprt/sh-widget.SLDPRT"],
+    }
+    return _replay_as(monkeypatch, shop, **{**defaults, **result})
+
+
+def test_an_inert_assembly_edit_replays_on_its_children_and_is_reused(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    base = shop.build()
+    built = shop.outputs_now()
+    shop.edit(audited=False)
+    # ``audit``: every check holds against the real replay, nothing served.
+    audited = shop.attempt()
+    assert audited.value == "audited", audited.detail
+    assert audited.base.manifest["key"] == base.key
+    assert audited.replay["verdict"] == "noop"
+    assert audited.replay["solidworks_out_inputs"] == ["sldprt/sh-widget.SLDPRT"]
+    assert audited.children == shop.children()
+    assert audited.token == _sha(built["sh-widget.SLDASM"])
+    assert audited.store is None and shop.marker(shop.key()) is None
+    [record] = _events(tmp_path, "replay_reuse")
+    assert (record["mode"], record["reuse_decision"]) == ("audit", "audited")
+    # ``reuse`` for a label it serves: the base's outputs, no COM at all.
+    monkeypatch.setenv(shadow.MODE_ENV, "reuse")
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_ASSEMBLY_LABEL}))
+    for output in shop.outputs:
+        output.unlink()
+    reuse = shop.attempt()
+    assert reuse.value == "reused", reuse.detail
+    now = shop.outputs_now()
+    assert {
+        name: now[name] for name in ("sh-widget.SLDASM", ".sh-widget.massprops.sha")
+    } == {
+        name: built[name] for name in ("sh-widget.SLDASM", ".sh-widget.massprops.sha")
+    }
+    assert shop.token.read_text("utf-8").strip() == reuse.token == audited.token
+    assert shop.marker(shop.key())["origin_key"] == base.key
+    assert cache.publication(shop.key())[0] == "stored"
+    assert shop.ran == ["replay", "replay"]
+    line = [
+        m
+        for m in logged["info"]
+        if m.startswith(f"[com-replay] {_ASSEMBLY_LABEL}: reuse=")
+    ][-1]
+    assert line.startswith(
+        f"[com-replay] {_ASSEMBLY_LABEL}: reuse=reused | base={base.key[:12]}"
+    )
+    assert logged["error"] == []
+
+
+def _dependent_children_changed(shop, monkeypatch):
+    shop.base(children={cache._rel(shop.model_token): "a" * 64})
+    shop.edit(audited=False)
+
+
+def _dependent_children_unknown(shop, monkeypatch):
+    shop.base()
+    shop.edit(audited=False)
+    shop.model_token.unlink()
+
+
+def _dependent_stranger_opened(shop, monkeypatch):
+    shop.base()
+    shop.edit(audited=False)
+    _replay_assembly(
+        monkeypatch,
+        shop,
+        solidworks_out_inputs=["sldprt/sh-widget.SLDPRT", "sldprt/other.SLDPRT"],
+    )
+
+
+def _dependent_child_bytes_moved(shop, monkeypatch):
+    shop.base()
+    shop.edit(audited=False)
+    shop.model.write_bytes(b"another model under the same token")
+
+
+def _dependent_child_recipe_moved(shop, monkeypatch):
+    # A SolidWorks document among the key inputs whose recipe digest moved
+    # but whose bytes, by its token, are the base's: judged, not refused.
+    shop.deps.append(str(shop.model))
+    shop.recipes[shop.model.name] = "recipe 1"
+    shop.base()
+    shop.recipes[shop.model.name] = "recipe 2"
+
+
+def _dependent_other_model_moved(shop, monkeypatch):
+    other = shop.out / "sldprt" / "other.SLDPRT"
+    other.write_bytes(b"no child of this assembly")
+    shop.deps.append(str(other))
+    shop.recipes[other.name] = "recipe 1"
+    shop.base()
+    shop.recipes[other.name] = "recipe 2"
+
+
+def _dependent_ledger_not_rewritten(shop, monkeypatch):
+    shop.base()
+    shop.edit(audited=False)
+    return {"rewritten": ()}
+
+
+def _dependent_revoked(shop, monkeypatch):
+    key = shop.base()
+    shop.edit(audited=False)
+    assert shadow.revoke(_ENGINE, _ASSEMBLY_NAME, key, "a test") == "stored"
+
+
+def _dependent_inert(shop, monkeypatch):
+    shop.base()
+    shop.edit(audited=False)
+
+
+# case: (setup, the attempt's value)
+_DEPENDENT_CASES = {
+    "inert": (_dependent_inert, "audited"),
+    "children_changed": (_dependent_children_changed, "declined:children_changed"),
+    "children_unknown": (_dependent_children_unknown, "declined:children_unknown"),
+    "stranger_opened": (_dependent_stranger_opened, "declined:unjudged_input"),
+    "child_bytes_moved": (_dependent_child_bytes_moved, "declined:child_mismatch"),
+    "child_recipe_moved": (_dependent_child_recipe_moved, "audited"),
+    "other_model_moved": (_dependent_other_model_moved, "declined:unjudged_input"),
+    "ledger_not_rewritten": (
+        _dependent_ledger_not_rewritten,
+        "declined:output_set_differs",
+    ),
+    "revoked": (_dependent_revoked, "declined:revoked_base"),
+}
+
+
+@pytest.mark.parametrize("case", _DEPENDENT_CASES)
+def test_an_assembly_is_judged_by_its_children(
+    blob, tmp_path, monkeypatch, spans, logged, case
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    setup, expected = _DEPENDENT_CASES[case]
+    options = setup(shop, monkeypatch) or {}
+    reuse = shop.attempt(**options)
+    assert reuse.value == expected, reuse.detail
+    if case == "other_model_moved":
+        assert "out/sldprt/other.SLDPRT" in reuse.detail
+    if case == "stranger_opened":
+        assert "sldprt/other.SLDPRT" in reuse.detail
+    [span] = spans.named("replay.reuse ")
+    assert span["replay.reuse_decision"] == expected
+
+
+def test_an_assembly_is_served_only_for_an_allowed_label_and_an_unaudited_key(
+    blob, tmp_path, monkeypatch
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    assert shop.attempt().value == "audited"
+    # ``reuse`` audits a label it does not serve, and one key in
+    # DEPENDENT_AUDIT_ONE_IN of one it does.
+    monkeypatch.setenv(shadow.MODE_ENV, "reuse")
+    assert shop.attempt().value == "audited"
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_ASSEMBLY_LABEL}))
+    shop.edit(audited=True)
+    assert shop.attempt().value == "audited"
+    key = shop.edit(audited=False)
+    reuse = shop.attempt()
+    assert reuse.value == "reused", reuse.detail
+    assert shop.native.read_bytes() == _NATIVE and reuse.token == _sha(_NATIVE)
+    assert shop.marker(key, _ENGINE)["origin_key"] == base
+    # A forced refresh of the reused key revokes its origin; of the base,
+    # the base itself, recording or not.
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: "suspect")
+    assert shop.attempt(key=key).value == "declined:forced_refresh"
+    assert shadow.revoked(_ENGINE, _ASSEMBLY_NAME, base)
+    assert not shadow.revoked(_ENGINE, _ASSEMBLY_NAME, "f" * 64)
+    assert shop.attempt(key="f" * 64).value == "declined:forced_refresh"
+    assert shadow.revoked(_ENGINE, _ASSEMBLY_NAME, "f" * 64)
+
+
+_SAME_DISPLAY = {"view_window": [1010, 678], "px_per_mm": 3.0}
+# outcome case: (the comparison's outcome, its displays, the audit's judgement)
+_AUDITS = {
+    "same": ("same", None, "confirmed"),
+    "different": ("different", None, "soundness_alarm"),
+    "display": (
+        "different",
+        {"base": _SAME_DISPLAY, "new": {**_SAME_DISPLAY, "px_per_mm": 3.5}},
+        "output_nondeterminism",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", _AUDITS)
+def test_an_audited_assembly_is_judged_against_the_base_it_would_have_served(
+    blob, tmp_path, monkeypatch, spans, logged, case
+):
+    outcome, display, expected = _AUDITS[case]
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    signals = {
+        "requests": "same",
+        "answers": "same",
+        "mass": outcome,
+        "sidecars": outcome,
+    }
+    monkeypatch.setattr(
+        shadow,
+        "_diff",
+        lambda *_a: (
+            0,
+            {
+                "request_divergence": None,
+                "outcome": outcome,
+                "outcome_signals": signals,
+                "display": display,
+            },
+        ),
+    )
+    # The build on the seat, after the audited attempt.
+    recording = shadow.plan_dependent(
+        shadow.BuildKind.ASSEMBLY, shop.dependent, shop.key(), reuse=reuse
+    )
+    assert recording is not None and recording.reuse is reuse
+    recording.log.write_bytes(b"log of the build")
+    recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    _stored(recording.key)
+    shadow.after_build(recording, shop.deps, shop.digest)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    assert (record["reuse_decision"], record["audit"]) == ("audited", expected)
+    assert record["audit_base_key"] == base and record["audit_split"] == "noop"
+    [span] = spans.named("replay.audit ")
+    assert span["replay.audit"] == expected
+    line = [
+        m for m in logged["info"] if m.startswith(f"[com-replay] {_ASSEMBLY_LABEL}: ")
+    ][-1]
+    assert f" | audit={expected} base={base[:12]}" in line
+    alarmed = expected == "soundness_alarm"
+    assert shadow.revoked(_ENGINE, _ASSEMBLY_NAME, base) is alarmed
+    assert ("SOUNDNESS ALARM" in line) is alarmed
+    errors = [m for m in logged["error"] if "SOUNDNESS ALARM" in m]
+    assert len(errors) == alarmed
+    if alarmed:
+        assert errors[0].startswith(f"[com-replay] SOUNDNESS ALARM {_ASSEMBLY_LABEL}: ")
+        assert record["revoked"] == "stored"
+    if case == "display":
+        assert record["audit_cause"] == "seat_display"
+        assert any(
+            m.startswith("[com-replay] audit output_nondeterminism")
+            for m in logged["warn"]
+        )
+
+
+def test_every_childs_model_is_the_one_beside_its_token():
+    dodo = _load_dodo()
+    stems = [s.stem.removeprefix("build_") for s in _buildgraph.part_scripts()]
+    tokens = {
+        **{
+            dodo._rel_tag(dodo._part_execution_token(s)): dodo._sldprt(s) for s in stems
+        },
+        **{
+            dodo._rel_tag(dodo._assembly_execution_token(s)): dodo._sldasm(s)
+            for s in _buildgraph.ASSEMBLY_ORDER
+        },
+    }
+    natives = shadow._child_natives(dict.fromkeys(tokens, "a" * 64))
+    assert natives == {
+        shadow._out_relative(Path(native)): (
+            shadow._fold(dodo._rel_tag(native)),
+            "a" * 64,
+        )
+        for native in tokens.values()
+    }
+
+
+def _assembly_action(
+    dodo: Any, shop: _AssemblyShop, monkeypatch: pytest.MonkeyPatch
+) -> tuple[list[str], list[Any]]:
+    """build_or_refresh on a cache miss: the seat and build faked (the build
+    writes its own outputs), the cache and reuse real."""
+    order: list[str] = []
+    recordings: list[Any] = []
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: list(shop.deps))
+    monkeypatch.setattr(
+        dodo, "_assembly_cache_outputs", lambda _stem: list(shop.outputs)
+    )
+    monkeypatch.setattr(dodo, "_input_ledger", lambda _stem: shop.ledger)
+    monkeypatch.setattr(dodo, "_sldasm", lambda _stem: str(shop.native))
+    monkeypatch.setattr(
+        dodo, "_assembly_execution_token", lambda _stem: str(shop.token)
+    )
+    monkeypatch.setattr(
+        dodo, "_assembly_dependent", lambda _stem, _script: shop.dependent()
+    )
+    monkeypatch.setattr(dodo, "POST_ASSEMBLY", {})
+    monkeypatch.setattr(
+        dodo, "explode_plan", lambda _stem: types.SimpleNamespace(closure=())
+    )
+    monkeypatch.setattr(dodo, "_probe_cache", lambda *_a: "miss")
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_com_process_inputs", lambda _task: dict(_PINS))
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: order.append("sw.connect"))
+    monkeypatch.setattr(
+        dodo, "_assembly_tier", lambda *_a: (dodo.RefreshTier.FULL, "target missing")
+    )
+
+    @contextlib.contextmanager
+    def seat(_label: str):
+        order.append("seat")
+        yield 0.0
+
+    def exec_com(cmd, label, log_stem=None, **options):
+        order.append("build")
+        shop.write(native=b"built on the seat")
+        recordings.append(options.get("recording"))
+
+    store = cache.store
+
+    def counted_store(key, outputs, label, **options):
+        order.append("store")
+        return store(key, outputs, label, **options)
+
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(cache, "store", counted_store)
+    monkeypatch.setattr(
+        dodo._replay_shadow,
+        "after_build",
+        lambda recording, deps, digest: order.append("observe"),
+    )
+    dodo.build_or_refresh(_STEM, [], [], [str(shop.native)])
+    return order, recordings
+
+
+@pytest.mark.parametrize("value", ["reuse", "audit"])
+def test_a_reused_assembly_leaf_runs_no_com_and_an_audited_one_builds(
+    blob, tmp_path, monkeypatch, spans, logged, value
+):
+    dodo = _load_dodo()
+    shop = _AssemblyShop(tmp_path, monkeypatch, digest=dodo.ContentChecker._digest)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, value)
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_ASSEMBLY_LABEL}))
+    order, recordings = _assembly_action(dodo, shop, monkeypatch)
+    [record] = _events(tmp_path, "replay_reuse")
+    assert record["base_key"] == base
+    if value == "audit":
+        assert order == ["seat", "sw.connect", "build", "store", "observe"]
+        [recording] = recordings
+        assert recording.reuse.value == "audited" and recording.reuse.replayed
+        assert recording.kind is shadow.BuildKind.ASSEMBLY
+        return
+    assert order == ["store"] and recordings == []
+    assert shop.native.read_bytes() == _NATIVE
+    assert shop.token.read_text("utf-8").strip() == _sha(_NATIVE)
+    # The ledger names this key's inputs, as after a HIT.
+    ledger = json.loads(shop.ledger.read_text("utf-8"))
+    assert ledger == {"inputs": dodo._ledger_inputs(shop.deps)}
+    [task] = spans.named("task ")
+    assert (task["cache"], task["com"]) == ("reuse", "none")
+    assert (record["reuse_decision"], record["store"], record["marker"]) == (
+        "reused",
+        "stored",
+        "stored",
+    )
+    assert shop.marker(shop.key(), _ENGINE)["origin_key"] == base
