@@ -34,8 +34,6 @@ KIT = "dt_cone_gear_tl_arbor"
 def test_the_kit_sheet_is_a_reviewed_shop_fixture() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert assembly_contract(spec.ASM_NAME).number == "MHA-DT-03-TL-05"
-    # The arbor's note 1 points at this sheet's setup table by its number.
-    assert arbor.KIT_NUMBER == assembly_contract(spec.ASM_NAME).number
     assert KIT in bg.ASSEMBLY_ORDER
     assert KIT not in bg.MACHINE_ASSEMBLIES
     assert bg.is_shop_fixture(KIT)
@@ -138,11 +136,13 @@ def _after(steps: list[str], words: str) -> list[str]:
 def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None:
     """Rule 22: numbered, at most six printed lines, one action each; rule
     23: the bond's degrease, coat, cure and bench check; the key's clock set
-    on its own two side faces with no blank on item 1 (an indicator zeroed
-    on one, the head turned half a turn, the other read at the same Z DRO
-    height), checked with its band, its remedy a separate step; the head
-    locked while the blank, its collar and the nut go on, the nut's clamp
-    checked; the index last."""
+    on its own two side faces with item 1 gripped in the head's chuck and no
+    blank on it (an indicator zeroed on one, the head turned half a turn,
+    the other read at the same Z DRO height), checked with its band, its
+    remedy a separate step; the head locked while the blank, its collar and
+    the nut go on, a cone blank's tailstock centre after the nut, the clamp
+    checked; the index last. No step uses a rule-26 private phrase or a
+    direction tied to the reader."""
     steps = _steps()
     assert [step.split(".", 1)[0] for step in steps] == [
         str(number) for number in range(1, len(steps) + 1)
@@ -166,8 +166,8 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         f"OFF ITEM {a}'S Ø.376 SEAT, LEAVING THE KEYSEAT FILLED",
         "CURE 24 H",
         f"CHECK: ITEM {k} DOES NOT MOVE BY HAND",
-        f"SET ITEM {a} IN THE DIVIDING HEAD, BARE BUT FOR ITEM {k}",
-        f"UNTIL ITEM {k} POINTS AWAY FROM YOU",
+        f"GRIP ITEM {a}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP",
+        f"UNTIL ITEM {k} POINTS AWAY FROM THE CUTTER, ROUGHLY LEVEL",
         f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {k}'S UPPER SIDE FACE",
         "NOTE THE Z DRO READING",
         "TURN THE HEAD 180°.",
@@ -175,14 +175,12 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         f"CHECK: THE INDICATOR READS ZERO WITHIN "
         f"{arbor.inch_text(spec.KEY_SIDE_READING, 3)}",
         f"IF STEP {spec.CHECK_STEP} FAILS",
-        f"IF ITEM {k} POINTS AWAY FROM YOU, TURN THE HEAD 180°",
-        f"CHECK: ITEM {k} POINTS TOWARD YOU, AT THE CUTTER",
+        f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°",
         "LOCK THE HEAD'S SPINDLE",
-        "BACK THE TAILSTOCK CENTRE OUT",
         "SLIDE THE BLANK ONTO",
         "COLLAR (SETUP TABLE)",
         f"TIGHTEN ITEM {n}",
-        "RUN THE TAILSTOCK CENTRE BACK",
+        "RUN THE TAILSTOCK CENTRE INTO ITEM",
         "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND",
         "UNLOCK THE HEAD'S SPINDLE",
         "FIRST INDEX (SETUP TABLE)",
@@ -203,6 +201,15 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
     assert flat[spec.CHECK_STEP].endswith(f"REPEAT FROM STEP {spec.ZERO_STEP}.")
     assert "CENTRE PLANE" not in spec.ASSEMBLY_STEPS
     assert "90°" not in spec.ASSEMBLY_STEPS
+    private = ("TO SUIT", "ON SEAM", "IN PHASE", "MIRRORS", "SAME X AS", "BY EYE")
+    for words in (*private, " AIR", "TRUE D", " YOU", "BETWEEN CENTRES", "BACK OUT"):
+        assert words not in spec.ASSEMBLY_STEPS, words
+    # The tailstock centre comes in only once item 6 is tight, and only for a
+    # cone blank: the chuck alone holds item 1 from the clock to the nut.
+    tail = next(i for i, s in enumerate(flat) if "TAILSTOCK" in s)
+    assert f"FOR AN {spec.CONE_NUMBER} BLANK" in flat[tail]
+    assert sum("TAILSTOCK" in s for s in flat) == 1
+    assert tail > next(i for i, s in enumerate(flat) if f"TIGHTEN ITEM {n}" in s)
 
 
 def _upper_face_height(key_deg: float, station: float) -> float:
@@ -245,7 +252,7 @@ def _run_clock_steps(start_error_deg: float) -> float:
         step = steps[index]
         index += 1
         rough = re.fullmatch(
-            rf"TURN THE HEAD UNTIL ITEM {k} POINTS (.+), LEVEL BY EYE\.", step
+            rf"TURN THE HEAD UNTIL ITEM {k} POINTS (.+), ROUGHLY LEVEL\.", step
         )
         if rough:
             key_deg = spec.POINTING_DEG[rough[1]] + start_error_deg
@@ -266,13 +273,11 @@ def _run_clock_steps(start_error_deg: float) -> float:
         elif step.startswith(f"IF STEP {spec.CHECK_STEP} FAILS") and not passed:
             key_deg = _turn_until(zero + reading / 2.0, key_deg, station)
             index = spec.ZERO_STEP - 1
-        elif step == f"IF ITEM {k} POINTS AWAY FROM YOU, TURN THE HEAD 180°.":
+        elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°.":
             assert not locked
-            if math.cos(math.radians(key_deg - spec.POINTING_DEG["AWAY FROM YOU"])) > 0:
+            away = spec.POINTING_DEG["AWAY FROM THE CUTTER"]
+            if math.cos(math.radians(key_deg - away)) > 0:
                 key_deg += 180.0
-        elif step == f"CHECK: ITEM {k} POINTS TOWARD YOU, AT THE CUTTER.":
-            off = math.radians(key_deg - spec.POINTING_DEG["TOWARD YOU"])
-            assert math.cos(off) > math.cos(math.radians(45.0))
         elif step == "LOCK THE HEAD'S SPINDLE.":
             locked = True
         elif step == "UNLOCK THE HEAD'S SPINDLE.":
@@ -290,13 +295,13 @@ def test_the_printed_steps_leave_the_key_on_the_cutters_radius() -> None:
     covers it, and a key whose side faces read level points along the
     cutter's radius or opposite it, never a quarter turn off. Acting out the
     printed steps on the key's side faces, from the head first set off level
-    by eye either way, leaves item 5 pointing at the cutter (the machine
+    by hand either way, leaves item 5 pointing at the cutter (the machine
     arrangement machining-dfm.md states: the cutter on the vertical spindle,
     cutting on the operator's side of the blank) within the clock its
     reading band holds, inside the arbor's setting allowance, and the head
     does not turn while the blank goes on."""
-    assert spec.POINTING_DEG["TOWARD YOU"] == spec.CUTTER_SIDE_DEG
-    assert spec.POINTING_DEG["AWAY FROM YOU"] == spec.CUTTER_SIDE_DEG + 180.0
+    assert spec.POINTING_DEG["AT THE CUTTER"] == spec.CUTTER_SIDE_DEG
+    assert spec.POINTING_DEG["AWAY FROM THE CUTTER"] == spec.CUTTER_SIDE_DEG + 180.0
     for start_error in (-3.0, -0.4, 0.0, 0.4, 3.0):
         pointing = _run_clock_steps(start_error)
         off = math.remainder(pointing - spec.CUTTER_SIDE_DEG, 360.0)

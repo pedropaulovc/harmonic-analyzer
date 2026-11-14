@@ -191,31 +191,44 @@ def blank_collar(tag: str) -> str:
 # vertical plane through it for the 64T); the cutter cuts on the operator's
 # side of the blank, its plane through the head's axis (for the 64T, at the
 # crossing station). The space it cuts is centred on the horizontal radius
-# from the axis toward the operator. Directions here are angles about the
-# head's axis in its transverse plane: 0 at the operator, 90 straight up.
+# from the axis toward the operator: the steps name that direction AT THE
+# CUTTER (machinist review of farm 20261114T203106731Z: "toward you" is tied
+# to nothing on the sheet). Directions here are angles about the head's axis
+# in its transverse plane: 0 at the cutter, 90 straight up.
 CUTTER_SIDE_DEG = 0.0
 POINTING_DEG: dict[str, float] = {
-    "TOWARD YOU": CUTTER_SIDE_DEG,
-    "AWAY FROM YOU": CUTTER_SIDE_DEG + 180.0,
+    "AT THE CUTTER": CUTTER_SIDE_DEG,
+    "AWAY FROM THE CUTTER": CUTTER_SIDE_DEG + 180.0,
 }
+
+# --- The hold ------------------------------------------------------------------------
+# The BS-0's 3-jaw grips item 1's Ø.62 grip, its jaw faces on the grip's
+# step, for the clock and for the whole mount (Codjiflo P2 on #2664: an arbor
+# set between centres would ride the head centre and its dog alone while the
+# tailstock is backed off for the blank, and the clock just set could
+# shift). The chuck holds it while the blank, its collar and item 6 go on, so
+# the clock set on the bare key survives. A cone blank then takes the
+# tailstock centre in item 1's threaded-end centre hole, brought in after
+# item 6 is tight; the 64T's raised head leaves no room for one.
+CONE_NUMBER = str(_config.parts("dt-cone-gear")["number"])
 
 # --- The key's clock on the cutter -------------------------------------------------
 # Set before the blank goes on: the key lies wholly under every blank
 # (dt_cone_gear_tl_keyed_arbor_spec), so nothing touches it once one is on
 # (Codjiflo P1 on #2664). Its side faces lie w/2 either side of its centre
-# plane, which holds the axis. With the key pointed away from the operator,
-# level by eye, a test indicator in the spindle is zeroed on its upper side
+# plane, which holds the axis. With the key pointed away from the cutter,
+# roughly level, a test indicator in the spindle is zeroed on its upper side
 # face at radius r from the axis; the head turns exactly 180° (20 crank
-# turns), bringing the other side face up and the key toward the operator;
+# turns), bringing the other side face up and the key toward the cutter;
 # the indicator crosses over item 1 by the cross feed and comes back down to
 # the same Z DRO reading on that face, at the mirrored radius. With the
 # centre plane e off level, the first touch stood r sin(e) above a level
 # face's height and the second stands r sin(e) below it, so the reading is
 # 2 r sin(e), whatever w is: equal readings put the centre plane level
-# through the axis, the key straight at the operator, on the cutter's
-# radius, or straight away from it. A level key is never a quarter turn
-# from the cutter (Codjiflo P1 on #2664): the head turns half a turn only
-# if the key points away. Turning the head until the indicator reads half
+# through the axis, the key straight at the cutter, on its radius, or
+# straight away from it. A level key is never a quarter turn from the
+# cutter (Codjiflo P1 on #2664): the head turns half a turn only if the key
+# points away. Turning the head until the indicator reads half
 # its reading levels that face (the remedy). Only Y and Z move between the
 # touches, so on the 64T's raised head both touches share their axial term
 # at one table X and the reading is 2 r sin(e) / cos(12°), only finer. The
@@ -304,12 +317,15 @@ SETUP_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
 # label (machinist review of farm 20261113T171903293Z).
 _K, _A, _N = (BOM_ITEMS[s] for s in (KEY, ARBOR, NUT))
 _READING = arbor.inch_text(KEY_SIDE_READING, 3)
-_TOWARD, _AWAY = POINTING_DEG  # at the cutter, and opposite it
+_AWAY = "AWAY FROM THE CUTTER"
+if _AWAY not in POINTING_DEG:
+    raise AssertionError("the steps' pointing words are not a declared direction")
 # The key's clock (above): set on its own two side faces before the blank
 # goes on, touched in turn by one test indicator at one height, the head
 # turned half a turn between them (the cutter's centre plane is nothing a
 # builder can touch; machinist review of farm 20261113T204539922Z); then a
-# half turn, only if it points away, brings it to the cutter's side.
+# half turn, only if it points away, brings it to the cutter. Rule 26's
+# private phrases (BY EYE among them) appear in no step.
 _FITTING: tuple[str, ...] = (
     f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
     f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
@@ -319,8 +335,9 @@ _FITTING: tuple[str, ...] = (
     "KEYSEAT FILLED.",
     "LET THE BOND CURE 24 H.",
     f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
-    f"SET ITEM {_A} IN THE DIVIDING HEAD, BARE BUT FOR ITEM {_K}.",
-    f"TURN THE HEAD UNTIL ITEM {_K} POINTS {_AWAY}, LEVEL BY EYE.",
+    f"GRIP ITEM {_A}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP, "
+    f"ONLY ITEM {_K} ON IT.",
+    f"TURN THE HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
     f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {_K}'S UPPER SIDE FACE.",
 )
 ZERO_STEP = len(_FITTING)
@@ -337,13 +354,12 @@ _SETTING += (
     f"IF STEP {CHECK_STEP} FAILS, TURN THE HEAD UNTIL THE INDICATOR READS HALF "
     f"ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
     f"IF ITEM {_K} POINTS {_AWAY}, TURN THE HEAD 180°.",
-    f"CHECK: ITEM {_K} POINTS {_TOWARD}, AT THE CUTTER.",
     "LOCK THE HEAD'S SPINDLE.",
-    f"IF ITEM {_A} RUNS BETWEEN CENTRES, BACK THE TAILSTOCK CENTRE OUT OF IT.",
     f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",
     f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
     f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
-    f"IF ITEM {_A} RUNS BETWEEN CENTRES, RUN THE TAILSTOCK CENTRE BACK INTO IT.",
+    f"FOR AN {CONE_NUMBER} BLANK, RUN THE TAILSTOCK CENTRE INTO ITEM {_A}'S "
+    "THREADED-END CENTRE HOLE.",
     "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
     "UNLOCK THE HEAD'S SPINDLE.",
     "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",

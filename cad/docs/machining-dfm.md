@@ -1242,10 +1242,11 @@ sheet's fitting steps point the key at the cutter before the blank goes on, then
 the blank's first index from the kit's setup table, which centres a tooth on the keyway as the gear
 sheets draw it. Use the largest collar under the blank's root
 (Ø.50 for T030 to T048, Ø1.00 for T054 to T084, Ø1.75 for T090 to T120 and the 64T) and feed
-toward the collar. The cone gears run between the BS-0's centres. For the 64T the head is tilted
-and there is no tail centre: grip the arbor's Ø.62 end in the head's chuck against its step,
-which leaves the blank more than .75 in clear of the jaws for the cutter to run out, and indicate
-the seat within the sheet's setup allowance before cutting.
+toward the collar. Every blank is cut with the arbor's Ø.62 end gripped in the head's chuck against
+its step, from the key's clock through the blank's mount, which leaves the blank more than .75 in
+clear of the jaws for the cutter to run out; indicate the seat within the sheet's setup allowance
+before cutting. The cone gears add the tailstock centre in the arbor's threaded end once the nut is
+tight; for the 64T the head is tilted and there is no tail centre.
 
 ### T006 special cutter
 

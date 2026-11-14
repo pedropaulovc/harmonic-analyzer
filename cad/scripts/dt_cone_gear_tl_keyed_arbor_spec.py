@@ -9,16 +9,17 @@ the machine's own undersized 1/16 stock (MHA-DT-03-TL-06), bears on the
 integral shoulder, and is clamped there by one backing collar
 (MHA-DT-03-TL-04, three sizes) and a 1/4-28 hex nut (MHA-DT-03-TL-VN-50).
 
-Two holds, one arbor:
-
-* Cone gears: between the BS-0's centres, driven by a dog on the grip. A 60°
-  centre hole in each end: Ø.11 in the grip end, Ø.070 in the 1/4-28 end,
-  the largest whose wall to the thread root stays over rule 17's .060 floor.
-* 64T: the head tilted 12° (machining-dfm.md, crossed crank pair) leaves no
-  tailstock, so the BS-0's 3-jaw grips the Ø.62 grip with its jaw faces on the
-  grip's step; the blank's near face (the shoulder) then stands STANDOFF from
-  the jaws, at least the .75 the #2533 setup asks (issue #2465 comment), so the
-  cutter on the vertical stub arbor runs out past the face.
+One hold for every blank: the BS-0's 3-jaw grips the Ø.62 grip with its jaw
+faces on the grip's step, from the key's clock through the blank's mount
+(MHA-DT-03-TL-05's fitting steps), so the clock set on the bare key is never
+left to a head centre and a dog. The blank's near face (the shoulder) then
+stands STANDOFF from the jaws, at least the .75 the #2533 setup asks (issue
+#2465 comment), so the cutter on the vertical stub arbor runs out past the
+face. A cone blank adds the tailstock centre in the 1/4-28 end once the nut
+is tight; the 64T's head, tilted 12° (machining-dfm.md, crossed crank pair),
+leaves no tailstock. A 60° centre hole in each end (the arbor is turned
+between them): Ø.11 in the grip end, Ø.070 in the 1/4-28 end, the largest
+whose wall to the thread root stays over rule 17's .060 floor.
 
 Frame (the SolidWorks model, MHA-DT-04's recipe): the axis is model +Z; z = 0
 is the grip's end face, the shoulder (the blank's datum) stands at
@@ -35,6 +36,7 @@ blank the arbor carries with its printed bore, face and root limits.
 from __future__ import annotations
 
 import math
+import textwrap
 from dataclasses import dataclass
 
 import _config
@@ -132,7 +134,7 @@ FACE_MAX_MM = max(blank.face[1] for blank in KEYED_GEARS)
 # teeth, cut true to the arbor, run c TIR about its own bore. The play may
 # take at most PLAY_SHARE of the allowance; the rest is left for the seat's own
 # runout on its centres (turned between them in one setup) and for indicating
-# the seat true in the 3-jaw on the tilted head.
+# the seat true in the 3-jaw.
 TOOTH_RUNOUT_TIR_MM = min(
     float(_config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm")),
     float(_config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")),
@@ -161,7 +163,7 @@ SEAT_RUNOUT_ALLOWANCE_MM = TOOTH_RUNOUT_TIR_MM - SEAT_PLAY_TIR_MM
 # Two blank-side stations from the grip's end face: a length between them.
 _PAIR = 2.0 * _XX
 # Grip: 5/8 cold-finished bar left at stock (.623-.625 lies in .62 +/-.01),
-# the 3-jaw's and the dog's land. Its step is the jaw stop.
+# the 3-jaw's land. Its step is the jaw stop.
 GRIP_DIA = 0.62 * INCH
 GRIP_LENGTH = 0.75 * INCH
 # Standoff: Ø.50, under T030's root, from the grip's step to the shoulder;
@@ -666,31 +668,47 @@ MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
 # --- Sheet words -----------------------------------------------------------------------
 # One numbered note states the seat's matched fit and acceptance and the
 # keyseat's bonded key (rule 4: one flag note linked to every dimension of
-# the one feature; every mate by its drawing number). The seat's mates are
-# the kit sheet's setup table rows, every blank by drawing number, so the
-# note points there rather than print a range (machinist review of farm
-# 20261113T171903293Z). The key's clock and its setting are the kit's
-# fitting steps, not this sheet's.
+# the one feature). A matched pair names each mate by name and FULL drawing
+# number at the callout: a range (farm 20261113T171903293Z) and a pointer to
+# the kit sheet's list (farm 20261114T203106731Z) were each refused, and the
+# short form (T036) is only for a mate in the sheet's own parent assembly,
+# which the gears are not. So the note writes every keyed blank out, wrapped
+# at the 72 characters a note line runs to before the title block
+# (draw_dt_cone_gear_shaft's note budget). That runs the one note past rule
+# 7's four lines: its one fact is a matched-fit statement, whose mates rule 4
+# requires in full. The key's clock and its setting are the kit's fitting
+# steps, not this sheet's.
 KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
-# The kit sheet's number: a part never reads an assembly contract
-# (test_assembly_contract), so the kit's test holds it to the contract's.
-KIT_NUMBER = "MHA-DT-03-TL-05"
 KEY_BOND = "LOCTITE 638"
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
 SEAT_CLEARANCE_TEXT = "-".join(
     inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
 )
+NOTE_LINE_CHARS = 72
+_CONE_MATES = tuple(blank.number for blank in KEYED_GEARS if blank.tag.startswith("T"))
+_CRANK_MATES = tuple(
+    blank.number for blank in KEYED_GEARS if not blank.tag.startswith("T")
+)
+if len(_CONE_MATES) + len(_CRANK_MATES) != len(KEYED_GEARS) or len(_CRANK_MATES) != 1:
+    raise AssertionError("the seat's mates are the cone blanks and the 64T")
+SEAT_MATES_TEXT = (
+    f"CONE GEARS {', '.join(_CONE_MATES)} AND CRANK DRIVE GEAR {_CRANK_MATES[0]}"
+)
 SHEET_NOTES = "\n".join(
     (
-        f"{SEAT_NOTE_NUMBER}. SEAT: SLIDING FIT, MATCHED TO THE KEYED BORES LISTED ON "
-        f"{KIT_NUMBER},",
-        f"   CLEARANCE {SEAT_CLEARANCE_TEXT} IN EACH BORE;",
+        *textwrap.wrap(
+            f"{SEAT_NOTE_NUMBER}. SEAT: SLIDING FIT, MATCHED TO THE KEYED BORES OF "
+            f"{SEAT_MATES_TEXT}, CLEARANCE {SEAT_CLEARANCE_TEXT} IN EACH BORE;",
+            NOTE_LINE_CHARS,
+            subsequent_indent="   ",
+            break_on_hyphens=False,
+        ),
         f"   KEYSEAT: KEY {KEY_NUMBER} BONDED WITH {KEY_BOND}.",
     )
 )
-if len(SHEET_NOTES.splitlines()) > 4:
-    raise AssertionError("at most four note lines")
+if max(map(len, SHEET_NOTES.splitlines())) > NOTE_LINE_CHARS:
+    raise AssertionError("a note line runs into the title block")
 CENTRE_PREFIX = "<HOLE-SINK><MOD-DIAM>"
 CENTRE_SUFFIX = f" X {CENTRE_INCLUDED_ANGLE_DEG:.0f}°"
 # The title block carries the thread class (rule 2).
