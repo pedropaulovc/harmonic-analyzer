@@ -427,6 +427,18 @@ def test_pin_edge_break_retains_the_spacer_thrust_seat() -> None:
     assert "add_chamfer" not in source and "PinChamfer" not in source
 
 
+def test_cl_from_a1_is_its_printed_row_less_a1s() -> None:
+    """Blind traveler review S2: sheet 2 prints CL 3.916 and A1 1.389 from
+    the corner, so CL is 2.527 from A1 and NOTE 2 holds 2.522-2.532. The
+    model's own 2.52649 printed alone is 2.526 (2.521-2.531), which no sheet
+    states."""
+    cl = _features()["cl_tap_1"]
+    assert cl["station_nominal"] == pytest.approx(2.527 * INCH)
+    assert cl["station"] == pytest.approx([2.522 * INCH, 2.532 * INCH])
+    x, _y, _d = spec.TABLE_HOLES["CL"]
+    assert round((x - spec.PIN_HOLES["A1"][0]) / INCH, 3) == 2.526
+
+
 def test_section_reference_is_on_its_own_hidden_plane() -> None:
     """The thickness's hidden sketch keeps its own named plane, coincident
     with the Front plane (jig-r6: section A-A imported nothing from the bare
@@ -689,12 +701,17 @@ def test_every_hole_is_located_from_the_corner_and_related_to_a1() -> None:
         related = tag in carrier_table.A1_RELATED
         # The manifest's one station/height per hole is its binding location:
         # the A1 relation for NOTE 2's rows, the corner row otherwise.
-        origin = spec.PIN_HOLES["A1"] if related else corner
-        assert feature["station_nominal"] == pytest.approx(_printed(x - origin[0], places)), name
+        # NOTE 2's rows: their printed corner row less A1's, as sheet 2 reads.
+        row = carrier_table.table_location(tag)
+        a1 = carrier_table.table_location("A1") if related else (0.0, 0.0)
+        station, height = (
+            _printed(row[axis], places) - _printed(a1[axis], places) for axis in (0, 1)
+        )
+        assert feature["station_nominal"] == pytest.approx(station), name
         if tag != "B1":
             assert ("height_from" in feature) is related, name
         if tag not in ("B1", "A2", "B2"):
-            assert feature["height_nominal"] == pytest.approx(_printed(y - origin[1], places)), name
+            assert feature["height_nominal"] == pytest.approx(height), name
         assert (feature.get("parent") == "pin_hole_a1") is related, name
         # prechips Feature forbids extra keys (extra_forbidden).
         assert not any(key.startswith("a1_") or key == "station_from" for key in feature), name

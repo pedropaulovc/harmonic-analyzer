@@ -231,7 +231,7 @@ diameter_mm = 6.5278
 description = "23/64 (.3594 in) drill, 115-piece index"
 diameter_mm = 9.128125
 [tools.reamer-0376]
-description = ".3760 in HSS straight-flute chucking reamer (3/8 in over reamer)"
+description = ".001 over 3/8 (.3760) HSS straight-flute chucking reamer"
 diameter_mm = 9.5504
 [tools.jig-tap-4-40-plug]
 description = "4-40 UNC plug tap; T-handle wrench"

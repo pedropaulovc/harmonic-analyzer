@@ -342,6 +342,18 @@ _RELATION = ("_oblique_carrier_hole_table", "A1_RELATION_NOTE")
 _POSITIONS = ("station", "height")
 
 
+def _from_a1(tag: str, places: int) -> tuple[float, float]:
+    """A NOTE 2 row's X and Y from A1 (mm) as a machinist derives them from
+    sheet 2: its printed corner row less A1's. CL prints 3.916 and A1 1.389,
+    so 2.527; the model's own 2.52649 printed alone is 2.526, a band the sheet
+    never states (blind traveler review S2, 2026-11-14)."""
+    (x, y), (ax, ay) = table_location(tag), table_location("A1")
+    return (
+        _printed(x, places) - _printed(ax, places),
+        _printed(y, places) - _printed(ay, places),
+    )
+
+
 def _table_fields(
     tag: str, sources: tuple[Any, ...], places: int = _STATION_PLACES
 ) -> dict[str, tuple[Any, tuple[Any, ...]]]:
@@ -355,11 +367,11 @@ def _table_fields(
             "height": (_limits(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
             "height_nominal": (_printed(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
         }
-    x, y, _diameter = part_spec.TABLE_HOLES[tag]
+    dx, dy = _from_a1(tag, places)
     fields: dict[str, tuple[Any, tuple[Any, ...]]] = {
         "parent": ("pin_hole_a1", ("PIN_HOLES", _RELATION)),
-        "station": (_limits(x - _A1[0], places), (*sources, "PIN_HOLES", _RELATION)),
-        "station_nominal": (_printed(x - _A1[0], places), (*sources, "PIN_HOLES")),
+        "station": (_limits(dx, places), (*sources, "PIN_HOLES", _ORIGIN, _RELATION)),
+        "station_nominal": (_printed(dx, places), (*sources, "PIN_HOLES", _ORIGIN)),
     }
     if tag in ("A2", "B2"):
         fields.update({
@@ -373,8 +385,8 @@ def _table_fields(
         })
     elif tag != "B1":
         fields.update({
-            "height": (_limits(y - _A1[1], places), (*sources, "PIN_HOLES", _RELATION)),
-            "height_nominal": (_printed(y - _A1[1], places), (*sources, "PIN_HOLES")),
+            "height": (_limits(dy, places), (*sources, "PIN_HOLES", _ORIGIN, _RELATION)),
+            "height_nominal": (_printed(dy, places), (*sources, "PIN_HOLES", _ORIGIN)),
             "height_from": ("pin_hole_a1", ("PIN_HOLES", _RELATION)),
         })
     return fields
