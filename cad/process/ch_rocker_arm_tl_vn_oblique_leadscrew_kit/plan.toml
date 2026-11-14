@@ -96,7 +96,8 @@ beam = "other"
 diagram = { file = "diagrams/leadscrew-kit/receipt.svg", alt = "The feed nut as supplied: spigot, flange and body" }
 
 [[setups.operations]]
-instruction = "Check the nut as supplied; mark one screw end NEAR END (its factory chamfer stays)."
+instruction = "Screw and nut right-hand; each KP08 inner ring two set screws 120° apart (else stop). Check the nut; mark one end NEAR END."
+instruction_detailed = "Before sawing, check the screw and its nut are right-hand, and count and clock both KP08 inner rings' set screws: two on each, 120° apart. If either differs, stop and report: the flats' clock and the nut's facing hold assume both. Check the nut as supplied and mark one screw end NEAR END (its factory chamfer stays)."
 inspection = "Nut seat face to body end {{cad.nut_length_min_mm:.1f}}–{{cad.nut_length_max_mm:.1f}} (spigot excluded); flange Ø{{cad.nut_flange_dia_min_mm:.1f}}–{{cad.nut_flange_dia_max_mm:.1f}} × {{cad.nut_flange_thickness_min_mm:.1f}}–{{cad.nut_flange_thickness_max_mm:.1f}}; body Ø{{cad.nut_body_dia_min_mm:.1f}}–{{cad.nut_body_dia_max_mm:.1f}}; {{cad.csk_count:d}} holes Ø{{cad.nut_hole_dia_min_mm:.2f}}–{{cad.nut_hole_dia_max_mm:.2f}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.nut_length_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.nut_flange_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.nut_flange_thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.nut_body_dia_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.nut_hole_dia_band_mm}}" }]
 
@@ -222,7 +223,7 @@ cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
   { name = "handwheel flat, 0.40 mm pass", kind = "slot", phase = "finish", material = "stainless_304", cutter_dia_mm = "{{process.flat_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.40, radial_woc_mm = "{{process.flat_cutter_dia_mm}}", feed_per_tooth_mm = 0.0254, stations_mm = [0, "{{cad.handwheel_from_cut_mm}}"] },
 ]
-inspection = "Starts {{cad.handwheel_station_min_mm:.1f}}–{{cad.handwheel_station_max_mm:.1f}} from the NEAR END, open to the end; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
+inspection = "Starts {{cad.handwheel_station_min_mm:.1f}}–{{cad.handwheel_station_max_mm:.1f}} from the NEAR END (L − |X| − D/2 on the DRO), open to the end; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.handwheel_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }]
 
 [[setups]]

@@ -79,7 +79,9 @@ non-default member names it with a literal `configuration="<Member>"` keyword
 (for example the `FeedNut` of `ch_rocker_arm_tl_vn_oblique_leadscrew_kit`,
 whose default member is `LeadScrew`). `export_models --features` shows that
 member after the default export, names only its requirements' faces and saves
-`<part>--<member>.STEP` beside the bundle STEP, the same name as the full
+`<part>--<mesh key>.STEP` beside the bundle STEP (the member's
+`_part_configuration_exports.mesh_key`, lowercased: `FeedNut` saves
+`ch-rocker-arm-tl-vn-oblique-leadscrew-kit--feednut.STEP`), the same name as the full
 export's neutral member STEP, which `features_bound` then requires to be that
 exact copy. The manifest marks each such feature with `configuration` and
 records the member STEP and its digest under `member_steps.<Member>`; the
@@ -268,7 +270,8 @@ disjoint fields; no field is duplicated. See
 `prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
 `ch_rocker_arm_tl_oblique_end_bracket`,
 `ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
-`ch_rocker_arm_tl_oblique_pivot_block` and `ch_rocker_arm_tl_oblique_feed_block`.
+`ch_rocker_arm_tl_oblique_pivot_block`, `ch_rocker_arm_tl_oblique_feed_block` and
+`ch_rocker_arm_tl_vn_oblique_leadscrew_kit`.
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
@@ -360,7 +363,7 @@ profiles on the v49 manifests, including the new `vise_holding` check against
 post-v49 drawing: its 2X bolt holes are the 11/32 drill (`2X Ø.3438 11/32 DRILL
 THRU ALL`, +.004/0, owner ruling 2026-11-13), so its plan's drill passes
 `tool_sizing`; its plan reads the grip-corner fillet the manifest now exports
-and so needs prechips 0.11.0. The riser's plan needs prechips 0.11.0 (its
+and so needs prechips 0.11.0 (released). The riser's plan needs prechips 0.11.0 (its
 `harmonic_riser` adapter) and passes both profiles on its v49 manifest.
 prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest

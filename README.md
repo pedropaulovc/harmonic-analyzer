@@ -181,7 +181,8 @@ Opt-in `prechips:<stem>` tasks render two standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
 sheet and a `hobby` sheet with setup pictures) for each part
 in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end bracket,
-feed lever and riser; the last two need prechips 0.11.0) from its `cad/process/<stem>/plan.toml`, which reads that part's
+feed lever, riser, pivot block, feed block and leadscrew kit; all but the first
+two need prechips 0.11.0, released) from its `cad/process/<stem>/plan.toml`, which reads that part's
 exported manifest. They always use the latest prechips release from PyPI, run
 with `uv tool run` outside the project environment. While prechips stabilises,
 `build` and `release` do not run them and releases carry no travelers (owner
