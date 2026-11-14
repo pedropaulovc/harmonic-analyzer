@@ -44,7 +44,8 @@ kerf_in = 0.125                  # As the jig sheets: about 1/8 in per cut.
 cleanup_in = 0.02                # First face of each pair: just clean.
 layer_in = 0.10                  # Facing layers on the 1.36 off OUTER END.
 end_layer_in = 0.05              # Facing layers on the tall ends (Setup 4).
-# Lug notch, on edge: LUG END 2.05-2.15 past the right jaw side leaves the
+# Lug notch, on edge, TOP at the fixed jaw: LUG END 2.05-2.15 past the right
+# jaw side (the model's hand: SPINDLE END up, TOP behind) leaves the
 # cutter's edge at the 1.89 step .16-.26 clear of the jaw; 3.47 − 2.15 = 1.32
 # in stays gripped. The vise hold and the bending take the 2.15 worst case
 # (54.61 mm). A .96 spacer across the jaws (TL-22, .950-.970) fills the
@@ -229,7 +230,7 @@ title = "Face ROW SIDE and LUG END"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "On end on 1/2 in parallels, SEAT and TOP in the jaws, SPINDLE END squared to the jaw tops, centred."
+holding = "On end on 1/2 in parallels, SEAT at the fixed jaw, TOP at the moving jaw, SPINDLE END on your left, squared to the jaw tops, centred: the up end becomes ROW SIDE, on the hand the drawing has."
 diagram = { file = "diagrams/feed-block/ends.svg", alt = "Blank on end: clean one sawn end (ROW SIDE), flip, face LUG END to the overall length" }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.y_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.blank_length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_x_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -264,8 +265,8 @@ title = "Mill the lug notch"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "On edge, OUTER END down on 1/2 in parallels, SEAT at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; a {{cad.height_nominal_in:.2dot}} spacer across the jaws (TL-22) at the left jaw end."
-datum = "X0 LUG END (touched), +X into the part; Y0 SEAT = fixed jaw face, +Y toward you; Z0 SPINDLE END (touched with the cutter)."
+holding = "On edge, OUTER END down on 1/2 in parallels, TOP at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; a {{cad.height_nominal_in:.2dot}} spacer across the jaws (TL-22) at the left jaw end."
+datum = "X0 LUG END (touched), +X into the part; Y0 TOP = fixed jaw face, +Y toward you; Z0 SPINDLE END (touched with the cutter)."
 diagram = { file = "diagrams/feed-block/notch.svg", alt = "Front view, moving jaw not shown: the block on edge, LUG END past the right jaw side, the notch cut down from SPINDLE END to the lug face" }
 # The cutter works only past the jaw side: along the lug plus a cutter
 # diameter either side, across the .96 plus one diameter, down to the lug
@@ -301,8 +302,8 @@ title = "Holes from TOP"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Flat, SEAT down on 1 in parallels no thicker than 1/8, tight against the jaws (H1–H4 break out .22 from each jaw); SPINDLE END at the fixed jaw, ROW SIDE left, centred."
-datum = "X0 ROW SIDE (touched); Y0 SPINDLE END = fixed jaw face; Z0 TOP, touched off with each end mill; +Y toward you."
+holding = "Flat, SEAT down on 1 in parallels no thicker than 1/8, tight against the jaws (H1–H4 break out .22 from each jaw); SPINDLE END at the fixed jaw, ROW SIDE on your right, centred."
+datum = "X0 ROW SIDE (touched): the hole table's X runs left from it, −X on the DRO; Y0 SPINDLE END = fixed jaw face, +Y toward you; Z0 TOP, touched off with each end mill."
 diagram = { file = "diagrams/feed-block/holes.svg", alt = "Block SEAT down, SPINDLE END at the fixed jaw: pivot seat B and H1-H4 with their counterbores; section through H1 and B" }
 # Every hole sits inside the block. Longest: a jobber drill in the chuck;
 # shortest: the 5/16 in end mill in its collet. The tap tip runs deepest.
@@ -316,7 +317,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_tol_in:.3dot}}; B ±.01."
-instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
+instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
 # Stations: X from ROW SIDE. The #2 centre drill at its 3/16 in body Ø (largest cone).
 milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 3000
@@ -386,8 +387,8 @@ title = "Leadscrew clearance through the lug"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "On SPINDLE END on 1/2 in parallels, SEAT at the fixed jaw, LUG END left, centred."
-datum = "X0 LUG END (touched); Y0 SEAT = fixed jaw face; Z0 OUTER END."
+holding = "On SPINDLE END on 1/2 in parallels, SEAT at the fixed jaw, LUG END on your right, centred."
+datum = "X0 LUG END (touched): the bore's X runs left from it, −X on the DRO; Y0 SEAT = fixed jaw face; Z0 OUTER END."
 diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on SPINDLE END, SEAT at the fixed jaw: the leadscrew clearance down through the lug from OUTER END" }
 # The hole and the LUG END touch lie within the overall length; across, the
 # .96 height. The drill and end-mill tips run deepest, just past the lug's
@@ -403,8 +404,8 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot X {{cad.screw_y_nominal_in:.3dot}}, Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_mm:.2f}} mm)."
-instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SEAT, zero Y on it. Spot at X {{cad.screw_y_nominal_in:.3dot}} ({{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}}), Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_min_in:.4dot}}–{{cad.screw_z_max_in:.4dot}}, {{cad.screw_z_band_text}} from SEAT). Lock both table axes for the rest of the setup."
+instruction = "Spot X −{{cad.screw_y_nominal_in:.3dot}} (left of LUG END), Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_mm:.2f}} mm)."
+instruction_detailed = "Touch LUG END and zero X; the fixed jaw face is SEAT, zero Y on it. Spot at X −{{cad.screw_y_nominal_in:.3dot}}, left of LUG END ({{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}}), Y {{cad.screw_z_nominal_in:.4dot}} ({{cad.screw_z_min_in:.4dot}}–{{cad.screw_z_max_in:.4dot}}, {{cad.screw_z_band_text}} from SEAT). Lock both table axes for the rest of the setup."
 milling_cuts = [{ name = "leadscrew spot", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = "{{cad.length_mm}}" }]
 rpm = 3000
 feed = "hand"

@@ -206,7 +206,7 @@ title = "Face ROW SIDE and FAR SIDE"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "On end on 1/2 in parallels, SEAT and TOP in the jaws, SPINDLE END squared to the jaw tops, centred."
+holding = "On end on 1/2 in parallels, SEAT at the fixed jaw, TOP at the moving jaw, SPINDLE END on your left, squared to the jaw tops, centred: the up end becomes ROW SIDE, on the hand the drawing has."
 diagram = { file = "diagrams/pivot-block/ends.svg", alt = "Blank on end: clean one sawn end (ROW SIDE), flip, face the other to width" }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.y_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.blank_length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_x_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -241,8 +241,8 @@ title = "Holes from TOP"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Flat, SEAT down on 1 in parallels no thicker than 1/8, tight against the jaws (H1–H4 break out .22 from each jaw); SPINDLE END at the fixed jaw, ROW SIDE left, centred."
-datum = "X0 ROW SIDE (touched); Y0 SPINDLE END = fixed jaw face; Z0 TOP, touched off with each end mill; +Y toward you."
+holding = "Flat, SEAT down on 1 in parallels no thicker than 1/8, tight against the jaws (H1–H4 break out .22 from each jaw); SPINDLE END at the fixed jaw, ROW SIDE on your right, centred."
+datum = "X0 ROW SIDE (touched): the hole table's X runs left from it, −X on the DRO; Y0 SPINDLE END = fixed jaw face, +Y toward you; Z0 TOP, touched off with each end mill."
 diagram = { file = "diagrams/pivot-block/holes.svg", alt = "Block SEAT down, SPINDLE END at the fixed jaw: pivot seat B and H1-H4 with their counterbores; section through H1 and B" }
 # Every hole sits inside the block. Longest: a jobber drill in the chuck;
 # shortest: the 5/16 in end mill in its collet. The tap tip runs deepest.
@@ -256,7 +256,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_tol_in:.3dot}}; B ±.01."
-instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
+instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
 # Stations: X from ROW SIDE. The #2 centre drill at its 3/16 in body Ø (largest cone).
 milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 3000
