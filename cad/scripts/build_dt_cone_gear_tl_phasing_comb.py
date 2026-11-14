@@ -48,6 +48,7 @@ from dt_cone_gear_tl_phasing_comb_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GLOBALS,
+    GRIP_POINT,
     ISOMETRIC_VIEW_NOTE,
     MATERIAL,
     ORIGIN,
@@ -82,11 +83,19 @@ def _require_one_solid_body(adapter: Any, *, label: str) -> None:
 async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     """The closed U (``profile_points_mm``): every segment horizontal or
     vertical, the near arm's seat corner on the origin, each driving
-    dimension of ``SKETCH_DIMENSIONS`` between its two points."""
+    dimension of ``SKETCH_DIMENSIONS`` between its two points.  The spring
+    arm's end (from ``GRIP_POINT``) is collinear with the near arm's, so both
+    arms' feet stand on T036 at the seat edge's station."""
     points = profile_points_mm()
     check("create_sketch sheet profile", await adapter.create_sketch("Front"))
     lines = await add_line_chain(adapter, points)
+    check(
+        "sheet profile spring arm's end on the near arm's",
+        await adapter.add_sketch_constraint(lines[GRIP_POINT], lines[0], "collinear"),
+    )
     for index, line in enumerate(lines):
+        if index == GRIP_POINT:
+            continue
         (x0, y0), (x1, y1) = points[index], points[(index + 1) % len(points)]
         direction = "horizontal" if y0 == y1 else "vertical"
         if direction == "vertical" and x0 != x1:
