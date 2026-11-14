@@ -28,6 +28,8 @@ adapter = "harmonic_leadscrew_kit"
 screw_stock_length_mm = 600.0
 saw_allowance_mm = 3.0           # Sawn long, milled to length.
 kerf_mm = 1.0                    # Hacksaw kerf.
+rule_mm = 304.8                  # The owned 12 in combination-square rule (no tape or long rule on hand).
+saw_step_mm = 117.7              # saw piece 422.5 - rule_mm 304.8: the second step.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
 flat_cutter_dia_mm = 7.9375      # 5/16 in end mill: flat length = one crossing.
 cut_overhang_mm = 10.0           # Cut end past the right jaw side.
@@ -111,7 +113,7 @@ speed_kind = "other"
 tool = "saw"
 sizing = "other"
 instruction = "Mark {{cad.saw_piece_mm:.1f}} from the NEAR END; saw on the offcut side. Keep the offcut."
-instruction_detailed = "Measure {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with a tape or 24 in rule and mark round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
+instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark {{process.saw_step_mm:.1f}} more, round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
 feed = "hand"
 
 [[setups]]
