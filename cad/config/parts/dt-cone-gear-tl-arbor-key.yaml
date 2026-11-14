@@ -1,0 +1,16 @@
+dt-cone-gear-tl-arbor-key:
+  title: Keyed Cutting Arbor Key
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2465: the machine key's 1/16 undersized section cut short and bonded
+  # in the keyed arbor's keyseat (MHA-DT-03-TL-05 step 1). McMaster's only
+  # undersized 1/16 key stock, 98830A511, is already MHA-DT-VN-71's SKU (one
+  # SKU in two identities would force a Shared identity, AGENTS.md), so this
+  # is a made tooling part cut from such stock, e.g. that bar's offcut.
+  number: MHA-DT-03-TL-06
+  material: CARBON STEEL KEY STOCK
+  material_specification: "1/16 in square undersized carbon-steel machine key stock, height and width -.002/+.000 (e.g. the MHA-DT-VN-71 bar's offcut, McMaster-Carr 98830A511)"
+  finish: as supplied
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "cut to length from 1/16 undersized key stock; break the cut ends"

@@ -1,0 +1,19 @@
+dt-cone-gear-tl-arbor-collar:
+  title: Keyed Cutting Arbor Backing Collar
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2465: one collar between each keyed blank and the arbor nut, the
+  # largest that clears the blank's root circle (dt_cone_gear_tl_keyed_arbor_spec
+  # COLLAR_BY_GEAR). One native model, three named members by size.
+  number: MHA-DT-03-TL-04
+  material: LOW-CARBON STEEL, E.G. 12L14 CF
+  material_specification: low-carbon cold-finished steel round, 1/2, 1 and 1-3/4 in, ASTM A108 (12L14 or 1018)
+  finish: as machined
+  quantity: 3
+  default_configuration: C175
+  configuration_quantities:
+    C175: 1
+    C100: 1
+    C050: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "face to length from round bar left at stock diameter; drill the bore through with an L drill; face both ends in one chucking where possible; break edges"
