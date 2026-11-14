@@ -158,7 +158,7 @@ grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0. The riser plan needs 0.11.0 too
+need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
 (its `harmonic_riser` adapter).
 
 The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
@@ -249,7 +249,7 @@ lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
 piloted and plunged with the same 3/8 end mill with the block standing on
 SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
 and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
-(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0. No
+(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
