@@ -240,46 +240,63 @@ def test_post_mount_stations_need_their_explicit_band() -> None:
         bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM + grown)
 
 
-def test_foot_tap_stations_need_three_places() -> None:
-    """FootTapZ at the inch .X moves the north face past the end screw's
-    reach; FootTapX at .X moves the adjuster axis past the post's take-up."""
-    import build_dt_drive_train_assembly as bdt
-
-    grown = _loosened(bdt.TIP_FOOT_TAP_STATION_TOL_MM)
-    with pytest.raises(AssertionError, match="end screw embed"):
-        bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM + grown)
-    with pytest.raises(AssertionError, match="lateral error"):
-        bdt.require_tip_lateral_take_up(
-            bdt.TIP_LATERAL_ERROR_MM + grown, bdt.TIP_LATERAL_CAPACITY_MM
-        )
-
-
-def test_passage_centre_needs_three_places_for_the_lateral_take_up() -> None:
+def test_pushed_post_only_makes_the_embed_shallower() -> None:
+    """#2697: MHA-DT-00 holds MHA-DT-05 pushed toward MHA-DT-21 while it is
+    turned and tightened, so its screw clearance moves the shaft north only:
+    the shallow extreme carries all of it, the deep one none.  Booked both
+    ways, the letter M holes' clearance would bottom the screw's head."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
-    assert bdt.TIP_PASSAGE_CENTER_PLACES == 3
-    grown = block.printed_band_mm(1) - block.printed_band_mm(3)
-    with pytest.raises(AssertionError, match="lateral error"):
-        bdt.require_tip_lateral_take_up(
-            bdt.TIP_LATERAL_ERROR_MM + grown, bdt.TIP_LATERAL_CAPACITY_MM
-        )
+    band = bdt.END_SCREW_EMBED_BAND_MM
+    push = bdt.END_SCREW_POST_PUSH_MM
+    assert push == pytest.approx(bdt.POST_SCREW_FLOAT_MM)
+    low, high = bdt.END_SCREW_EMBED_WORST_MM
+    assert block.END_SCREW_EMBED - low == pytest.approx(high - block.END_SCREW_EMBED + push)
+    assert bdt.end_screw_embed_worst_mm(band, 0.0)[1] == pytest.approx(high)
+    with pytest.raises(AssertionError, match="end screw embed"):
+        bdt.end_screw_embed_worst_mm(band + push, 0.0)
+    # More clearance than the holes have drops the shallow end's thread.
+    with pytest.raises(AssertionError, match="end screw full thread"):
+        bdt.end_screw_embed_worst_mm(band, push + 0.05)
+
+
+def test_foot_tap_along_station_needs_three_places() -> None:
+    """FootTapZ at .XX drops the 5/8 end screw's shallow engagement under the
+    owner's 1.39 D (#2697: a longer screw, not a tighter band, is the room)."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
+
+    assert block.FOOT_TAP_Z_PLACES == 3
+    grown = block.printed_band_mm(2) - bdt.TIP_FOOT_TAP_Z_TOL_MM
+    with pytest.raises(AssertionError, match="end screw full thread"):
+        bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM + grown)
+
+
+def test_across_stations_print_two_places_with_room_in_the_post_turn() -> None:
+    """#2697: PassageCenter and FootTapX print .XX on the .01 grid, and the
+    post's turn on its screws still covers the tip's lateral error with a
+    further .XX band on each of them and on the platform's hold-down hole."""
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
+
+    assert (bdt.TIP_PASSAGE_CENTER_PLACES, block.FOOT_TAP_X_PLACES) == (2, 2)
+    for station in (block.BLOCK_X / 2.0, block.FOOT_TAP_X):
+        assert station / 0.254 == pytest.approx(round(station / 0.254))
+    error = bdt.TIP_LATERAL_ERROR_MM + 3.0 * block.printed_band_mm(2)
+    bdt.require_tip_lateral_take_up(error, bdt.TIP_LATERAL_CAPACITY_MM)
 
 
 def test_post_turn_takes_up_the_tip_lateral_error() -> None:
     """Turning the post on its screws covers the adjuster axis's lateral
-    error; with HoldDownX at the inch .X band it would not."""
+    error; in the 9/32 holes it replaced (#2697) the same turn would not."""
     import build_dt_drive_train_assembly as bdt
-    import dt_cone_tip_block_spec as block
 
     assert bdt.TIP_LATERAL_ERROR_MM <= bdt.TIP_LATERAL_CAPACITY_MM
-    error = (
-        bdt.TIP_LATERAL_ERROR_MM
-        - bdt.PLAT_HOLDDOWN_STATION_TOL_MM
-        + block.printed_band_mm(1)
-    )
+    old_float = bdt.POST_SCREW_FLOAT_MM - (bdt.POST_ATTACHMENT_THRU_DIA - 9 / 32 * 25.4) / 2.0
+    old_capacity = bdt.TIP_LATERAL_CAPACITY_MM * old_float / bdt.POST_SCREW_FLOAT_MM
     with pytest.raises(AssertionError, match="lateral error"):
-        bdt.require_tip_lateral_take_up(error, bdt.TIP_LATERAL_CAPACITY_MM)
+        bdt.require_tip_lateral_take_up(bdt.TIP_LATERAL_ERROR_MM, old_capacity)
 
 
 def test_matched_axis_height_lets_the_pivot_run_free_in_the_end_screw() -> None:

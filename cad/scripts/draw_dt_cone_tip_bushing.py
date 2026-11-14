@@ -48,6 +48,8 @@ from dt_cone_tip_bushing_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    END_CHAMFER,
+    END_CHAMFER_CALLOUT,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
     LENGTH_CALLOUT,
@@ -105,7 +107,10 @@ _BORE_BLOCK_BELOW_KEEP = 0.0038 - 3.0 * _ROW  # last row's baseline
 # line runs through it (draw_pd_transgear_front_bushing's RingLength).  Round
 # 2 (farm run 20261110T035403233Z): the "above" callout lane stored the
 # length's stack rows but never printed them, so every callout rides the
-# "below" lane that prints.
+# "below" lane that prints.  The chamfer's leg (#2697) stands above the
+# section's south corner, its text right of both extension lines so neither
+# runs through it (draw_pd_transgear_front_bushing's FrontChamferSize) and its
+# rows above the bore's block.
 SECTION_KEEP = {
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.030, SECTION_CENTER[1]),
     "BoreDia": (
@@ -113,11 +118,16 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + BORE_R + 0.004 - _BORE_BLOCK_BELOW_KEEP,
     ),
     "Length": (NORTH_FACE_X + 0.045, SECTION_CENTER[1] - OUTER_R - 0.022),
+    "EndChamferSize": (
+        SECTION_CENTER[0] - HALF_LENGTH + END_CHAMFER * _S + 0.004,
+        SECTION_CENTER[1] + OUTER_R + 0.028,
+    ),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "OuterDia": OUTER_DIA_CALLOUT,
     "Length": LENGTH_CALLOUT,
+    "EndChamferSize": END_CHAMFER_CALLOUT,
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)

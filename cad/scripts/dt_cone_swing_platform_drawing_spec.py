@@ -48,7 +48,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
-    "CornerSEProfile": {"CornerSERun", "CornerSERise"},
+    "CornerSEProfile": {"CornerSEStartX", "CornerSERise"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
@@ -92,7 +92,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
     "CornerSW": {"CornerSWR": 2},
-    "CornerSEProfile": {"CornerSERun": 2, "CornerSERise": 2},
+    "CornerSEProfile": {"CornerSEStartX": 2, "CornerSERise": 2},
 }
 
 

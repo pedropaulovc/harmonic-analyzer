@@ -254,10 +254,13 @@ PROFILE_KEEP = {
     "NorthEastX": _planned(0.045, 0.105),
     "NorthWestX": _planned(0.100, 0.115),
     "SouthWestX": _planned(0.104, 0.2640),
-    # Two rows over the south edge (y 0.2443): the chamfer's run from the
-    # sharp corner under the corner's own station from the pivot axis.
+    # Two rows over the south edge (y 0.2443), both from the pivot axis: the
+    # sharp corner's station, and under it the chamfer's start, 1.3 mm west of
+    # the axis on this sheet, its value just west of that short span (#2697:
+    # the start's run from the sharp corner chained two bands, machinist
+    # review of ecc864e1f).
     "SouthEastX": _planned(0.045, 0.2650),
-    "CornerSERun": _planned(0.045, 0.2590),
+    "CornerSEStartX": _planned(0.0807, 0.2590),
     # Left of the east edge and of the two rows' text, which its outside
     # arrows would otherwise cross.
     "CornerSERise": _planned(0.038, 0.2455),
@@ -322,7 +325,8 @@ SECTION_KEEP = {
 # pivot bore is too small to dimension at 1:2 beside the relief, so
 # DETAIL B enlarges the pivot-to-hole region of the hole-location plan and
 # carries HoldDownZ and HoldDownX.  C1 keyed (owner decision 2026-11-09, PR
-# #1992) moved the hole .329 south with MHA-DT-21, to .738 from the pivot:
+# #1992) moved the hole .329 south with MHA-DT-21, to .738 from the pivot
+# (.731 since #2697, 0.2 mm north: 0.3 mm on this detail's sheet):
 # the circle grew from 12 to 16 mm and the detail went from 2:1 to 3:2, so
 # its sheet circle stays the 48 mm one the layout below was measured around,
 # and its centre moved so the hole stands where it did on the sheet (8.77 mm

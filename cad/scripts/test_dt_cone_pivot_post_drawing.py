@@ -79,7 +79,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (7.14248, 11.5062, 6.0198)
+    ) == (7.493, 11.5062, 6.0198)
     assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
@@ -481,15 +481,18 @@ def test_running_bores_close_the_configured_fit_class() -> None:
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
     """Each band named once, applied to the features whose fit needs it.
 
-    The cast body, head and boss diameters and the mounting-hole stations
-    are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
-    part must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.  The one symmetric band is the collar
-    thrust face's station; the cone-axis height's capture band is the title
-    block's .XX (machinist review: an explicit ±.01 repeated it).
+    The cast head and boss diameters and the mounting-hole stations are not
+    accuracy features (cad/docs/tolerance-policy.md, "Result"), so the part
+    must not author a tolerance on them at all: the title block's general
+    grade is the whole specification.  The body's band is the same width,
+    one-sided so it stays under the cone boss ends (#2756).  The one
+    symmetric band is the collar thrust face's station; the cone-axis
+    height's capture band is the title block's .XX (machinist review: an
+    explicit ±.01 repeated it).
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("set_dimension_bilateral_tolerance(") == 3
+    assert source.count("set_dimension_bilateral_tolerance(") == 4
+    assert source.count("deviations(MAIN_BODY_DIA_BAND)") == 1
     assert source.count("set_dimension_symmetric_tolerance(") == 1
     assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == pytest.approx(0.254)
     assert "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM" not in source
@@ -852,17 +855,24 @@ def test_body_diameter_takes_the_title_block_band() -> None:
     """MHA-DT-05 machinist review (gating, rule 17): Ø1.654 printed three
     places only because the harvested 42.011 sat off the .XX grid, and its
     suffix said the band protected the mounting holes' wall.  The cast body
-    is Ø1.65 at .XX; the wall still clears the floor at that band's minimum."""
+    is Ø1.65 at .XX; the wall still clears the floor at that band's minimum.
+    #2756: the band is one-sided, down, so the body's largest radius never
+    passes the cone boss ends' least station (at +/-.01 it did)."""
     assert spec.DRAWING_PRECISION_BY_NAME["MainBodyDia"] == 2
     assert round(BLOCK_DIA / 25.4, 2) == pytest.approx(BLOCK_DIA / 25.4, abs=1e-9)
     assert "MainBodyDia" not in drawing.DIMENSION_SUFFIXES
-    assert drawing.FRONT_KEEP["MainBodyDia"] == (0.150, 0.074)
+    assert drawing.FRONT_KEEP["MainBodyDia"][0] == 0.150
     assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] == pytest.approx(
-        spec._printed_limits(BLOCK_DIA, 2)[0] / 2.0
+        (BLOCK_DIA + spec.MAIN_BODY_DIA_BAND[1]) / 2.0
         - spec._printed_limits(spec.ATTACHMENT_X, 2)[1]
         - (spec.ATTACHMENT_THRU_DIA + spec._DRILL_OVERSIZE) / 2.0
     )
     assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] >= spec.WEB_FLOOR_MM
+    assert spec.BODY_RADIUS_MAX_IN <= spec.CONE_BOSS_END_MIN_IN
+    assert round(spec._printed_limits(BLOCK_DIA, 2)[1] / 2.0 / 25.4, 3) > spec.CONE_BOSS_END_MIN_IN
+    assert drawing.BODY.fields["dia"][0] == pytest.approx(
+        [BLOCK_DIA + spec.MAIN_BODY_DIA_BAND[1], BLOCK_DIA]
+    )
 
 
 def test_one_cone_boss_diameter_counts_both_bosses() -> None:

@@ -6,7 +6,8 @@ its north face bears on the MHA-DT-39 end screw.  Dimensions live in
 
 Layout: one revolve about local +X (the MHA-DT-34 ferrule's pattern).  The
 south face is the Right Plane (x = 0), the north face is ``NorthFace`` at
-x = LENGTH, ``Axis1`` is the bore axis.  The bore's reamed band lives on its
+x = LENGTH, ``Axis1`` is the bore axis.  Both O.D. corners are broken by one
+native 45 deg chamfer feature (#2697).  The bore's reamed band lives on its
 model dimension; OD and length take the title block's .XXX.
 
 Run (SolidWorks already open)::
@@ -51,6 +52,7 @@ from dt_cone_tip_bushing_spec import (
     BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    END_CHAMFER,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
     OUTER_DIA,
@@ -63,7 +65,10 @@ MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 
 OUTER_R = OUTER_DIA / 2.0
 BORE_R = BORE_DIA / 2.0
-V_BUSHING = math.pi * (OUTER_R**2 - BORE_R**2) * LENGTH
+V_RING = math.pi * (OUTER_R**2 - BORE_R**2) * LENGTH
+# Each 45 deg O.D. break: a triangle of leg c revolved at centroid R - c/3.
+V_CHAMFERS = 2.0 * math.pi * END_CHAMFER**2 * (OUTER_R - END_CHAMFER / 3.0)
+V_BUSHING = V_RING - V_CHAMFERS
 NORTH_FACE = "NorthFace"
 
 
@@ -153,12 +158,28 @@ async def build(adapter) -> dict[str, str]:
         ("OuterDia", OUTER_DIA),
         ("BoreDia", BORE_DIA),
         ("Length", LENGTH),
+        ("EndChamferSize", END_CHAMFER),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs = await _profile(adapter)
-    await volume_check(adapter, "brass bushing", V_BUSHING, 0.005 * V_BUSHING)
+    await volume_check(adapter, "brass ring", V_RING, 0.005 * V_RING)
     await bbox_extent_check(adapter, "bushing length", "x", LENGTH)
+    # Both O.D. corners in one native 45 deg chamfer (the
+    # pd_transgear_front_bushing recipe; one pick on each face's O.D. edge).
+    check(
+        "chamfer both O.D. corners",
+        await adapter.add_chamfer(
+            END_CHAMFER, [[0.0, OUTER_R, 0.0], [LENGTH, OUTER_R, 0.0]]
+        ),
+    )
+    name_last_feature(adapter, "EndChamfer")
+    chamfer_dim = name_dimensions(adapter, "EndChamfer", ["EndChamferSize"])
+    drive_jobs.append((chamfer_dim[0], '"EndChamferSize"'))
+    await volume_check(
+        adapter, "chamfered bushing", V_BUSHING, 0.02 * V_CHAMFERS + 0.05
+    )
+    await bbox_extent_check(adapter, "chamfered bushing length", "x", LENGTH)
 
     # Mate datums: the bore axis first, so it is Axis1; then the north face,
     # driven by the length so it tracks a length edit.
@@ -188,7 +209,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "driven brass bushing (equations neutral)",
         V_BUSHING,
-        0.005 * V_BUSHING,
+        0.02 * V_CHAMFERS + 0.05,
     )
 
     await apply_material(adapter, MATERIAL)

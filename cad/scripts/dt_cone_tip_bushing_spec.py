@@ -21,6 +21,12 @@ T006's north face, is the origin plane (x = 0, the Right Plane); the north
 face, on the end screw, is at x = LENGTH (``NorthFace``).  ``Axis1`` is the
 bore axis.
 
+Both O.D. corners carry a .04 x 45 deg chamfer (#2697): the bushing stands
+over G19's teeth on the inclined cone axis, so the corner toward T006 is the
+tip's nearest point to the drum bank (``dt_cone_tip_air`` books the chamfer
+at its smallest), as the original's rounded tip collar (ch12 p.3).  Both
+ends, so the ring has no wrong way round on the pivot.
+
 PURE DATA, no SolidWorks/COM imports.
 """
 
@@ -44,6 +50,24 @@ SIZE_PLACES = tip.BUSHING_PLACES  # .XXX
 BORE_DIA = tip.BUSHING_BORE_DIA_MM  # .0615 reamer
 BORE_DIA_BAND = tip.BUSHING_BORE_BAND  # (upper, lower) +.0005/-.0000
 BORE_PLACES = 4
+
+# #2697: the 45 deg break on both O.D. corners, .XX.  Its smallest leg is
+# what dt_cone_tip_air books; at its largest each face keeps a flat annulus
+# round the bore for T006's leaves and the end screw's end.
+END_CHAMFER = 1.016  # .04
+END_CHAMFER_PLACES = 2
+END_CHAMFER_MIN = END_CHAMFER - printed_band_mm(END_CHAMFER_PLACES, unit=UNIT)
+END_CHAMFER_MAX = END_CHAMFER + printed_band_mm(END_CHAMFER_PLACES, unit=UNIT)
+END_CHAMFER_CALLOUT = "X 45\u00b0\nBOTH ENDS"
+FACE_FLAT_MIN = (
+    (OUTER_DIA - printed_band_mm(SIZE_PLACES, unit=UNIT)) / 2.0
+    - END_CHAMFER_MAX
+    - (BORE_DIA + max(BORE_DIA_BAND)) / 2.0
+)
+if FACE_FLAT_MIN < 0.5 or 2.0 * END_CHAMFER_MAX >= LENGTH:
+    raise AssertionError(
+        f"MHA-DT-38 chamfers leave a {FACE_FLAT_MIN:.3f} flat round the bore"
+    )
 
 # The pivot the bushing is pressed on: T006's own part (MHA-DT-37).  Quoted
 # only to name the mate (rule 4); the offline test checks it against the
@@ -110,6 +134,9 @@ LENGTH_CALLOUT = f"{PIVOT_NUMBER} PIVOT CLEARS\n{END_SCREW_NUMBER} HOLE FLOOR"
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BushingProfile": {"OuterDia", "BoreDia", "Length"},
+    # A native chamfer feature on both O.D. edges; its one leg prints with
+    # the 45 deg callout.
+    "EndChamfer": {"EndChamferSize"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BushingProfile": {
@@ -117,6 +144,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": BORE_PLACES,
         "Length": SIZE_PLACES,
     },
+    "EndChamfer": {"EndChamferSize": END_CHAMFER_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
