@@ -148,6 +148,7 @@ METRIC_UNIT = "mm"
 METRIC_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=METRIC_UNIT)  # 0.13
 NUT_CLEARANCE_BAND_Z = METRIC_BAND  # mm, NutCentreZ
 NUT_CLEARANCE_BAND_Y = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # NutCentreY, the title block's
+BILATERAL_DIMENSIONS = dict(pivot.BILATERAL_DIMENSIONS)  # the shared seat's band
 METRIC_DIMENSIONS = {("NutPatternReference", "NutCentreZ"): (NUT_PATTERN_PLACES, NUT_CLEARANCE_BAND_Z)}
 # The leadscrew clearance prints three places, as inch drill sizes do.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
@@ -188,7 +189,7 @@ NUT_CLOCK_REFERENCE = f"{NUMBER} SHEET {NUT_CLOCK_SHEET} {NUT_CLOCK_VIEW}"
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
 # The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
 # clearance stands 12.400 ±.13 mm over the carriage face, so the leadscrew may
-# run LEADSCREW_OFFSET_Z (.432 mm) off the clearance's axis vertically
+# run LEADSCREW_OFFSET_Z (.435 mm) off the clearance's axis vertically
 # (Codjiflo P1 on #2112); laterally the KP08s float to centre it, within the
 # clearance's own ±.005 station. The Ø.375 clears the Tr8's major at both
 # at the KP08's nominal 15 axis height, which is UNVERIFIED until the pillow
@@ -332,7 +333,8 @@ NUT_Z = (
 )
 assert 0.0 <= NUT_Z[0] and NUT_Z[1] <= BLOCK_HEIGHT
 assert LUG_Y0 <= NUT_Y[0] and NUT_Y[1] < LUG_Y1
-assert BLOCK_WIDTH / 2 - LUG_Y0 < pivot.STOCK_WIDTH
+# The 1.64 comes from the bar's 3 in width; the 3.47 overall runs along it.
+assert BLOCK_LENGTH < pivot.STOCK_WIDTH < BLOCK_WIDTH / 2 - LUG_Y0
 assert abs(NUT_MACHINE_Z - lead.SCREW_AXIS_Z) < 1e-6
 
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX)

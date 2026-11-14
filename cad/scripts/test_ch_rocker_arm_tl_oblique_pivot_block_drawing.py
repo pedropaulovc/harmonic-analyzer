@@ -472,7 +472,7 @@ def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
 _PIVOT_GENERATED_TEXT = (
     '<MOD-DIAM>.257 DRILL THRU\n'
     '5/16-18 UNC THRU\n'
-    '<HOLE-SPOT><MOD-DIAM>.375 <HOLE-DEPTH>.359\n'
+    '<HOLE-SPOT><MOD-DIAM>.375 +.004/0 <HOLE-DEPTH>.359\n'
     '  SEAT FOR TL-VN-77 SHOULDER'
 )
 
@@ -481,7 +481,7 @@ def _pivot_text_contract():
     return SimpleNamespace(
         UNIT=spec.UNIT, DRAWING_VALUES=dict(spec.DRAWING_VALUES),
         DRAWING_PRECISION_BY_NAME=dict(spec.DRAWING_PRECISION_BY_NAME),
-        PIVOT_TAP=spec.PIVOT_TAP,
+        PIVOT_TAP=spec.PIVOT_TAP, BILATERAL_DIMENSIONS=dict(spec.BILATERAL_DIMENSIONS),
     )
 
 
@@ -645,7 +645,9 @@ def _stacked_pivot_fixture(monkeypatch):
     for name, feature in (
         ('BoreDia', 'TopBoreProfile'), ('TopBoreDepth', 'TopBore'), ('TapDrillDia', 'PivotTapProfile'),
     ):
-        tolerance = SimpleNamespace(Type=0, lower=0.0, upper=0.0)
+        # The seat carries its native +.004/0 band; the depth and drill none.
+        lower, upper = spec.BILATERAL_DIMENSIONS.get((feature, name), (0.0, 0.0))
+        tolerance = SimpleNamespace(Type=2 if name == 'BoreDia' else 0, lower=lower / 1000, upper=upper / 1000)
         tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
         tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
         dimension = SimpleNamespace(FullName=f'{name}@{feature}@block.Part',
@@ -773,7 +775,7 @@ def test_generated_pivot_callout_preserves_native_sources_and_outside_route(monk
     elif fault == 'source_precision':
         tap.places = 2
     elif fault == 'source_band':
-        case.rows['BoreDia'].dimension.Tolerance.Type = 2
+        case.rows['BoreDia'].dimension.Tolerance.Type = 0
     elif fault == 'source_tokens':
         tap.texts = (*tap.texts[:4], 'CHANGED', *tap.texts[5:])
     elif fault == 'source_position':
@@ -829,7 +831,7 @@ def test_generated_note_refuses_native_sources_that_disagree_with_spec_before_in
     elif fault == 'precision':
         case.rows['TapDrillDia'].places = 2
     else:
-        case.rows['BoreDia'].dimension.Tolerance.Type = 2
+        case.rows['BoreDia'].dimension.Tolerance.Type = 0
     with pytest.raises(RuntimeError):
         case.drawing._stack_pivot_callout(case.adapter, case.plan, [], spec)
     assert not case.inserted
@@ -953,8 +955,8 @@ def test_pivot_exported_pdf_rows_gate_real_text_not_leader_extent(monkeypatch, f
     if fault == 'split_symbols':
         seat = spans.pop(2)
         spans[2:2] = [
-            replace(seat, text='.375', xmin=.197, xmax=.209),
-            replace(seat, text='.359', xmin=.212, xmax=.224),
+            replace(seat, text='.375 +.004/0', xmin=.197, xmax=.230),
+            replace(seat, text='.359', xmin=.233, xmax=.245),
         ]
     elif fault == 'unordered_display':
         texts.reverse()

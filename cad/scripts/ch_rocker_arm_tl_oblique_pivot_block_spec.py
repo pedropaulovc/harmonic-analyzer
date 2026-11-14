@@ -38,8 +38,7 @@ from _hole_spec import TAP_DRILL_MM
 from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_91290a168 import DIMS as CARRIAGE_SCREW
 from _package_units import drawing_unit
-from _printed_limits import drilled_limits
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm, printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
 UNIT = drawing_unit(
@@ -57,7 +56,9 @@ BLOCK_LENGTH = 2 * PLAN_BORE_X  # 1.64
 BLOCK_X1 = BLOCK_X0 + BLOCK_LENGTH
 BLOCK_WIDTH = 40.132  # 1.58
 BLOCK_HEIGHT = 24.384  # .96
-STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
+# OnlineMetals 1187, 1 x 3 in: the 1.64 length is milled from the 3 in width
+# and the 1.58 (TL-32: 3.47) runs along the bar (#2083).
+STOCK_THICKNESS, STOCK_WIDTH = 25.4, 76.2
 # The TL-VN-77 shoulder bottoms on the seat floor, so the 3-place depth sets
 # how high the screw stands, hence the head-to-carrier gap the assembly's
 # shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``). Shallow
@@ -69,7 +70,16 @@ BORE_DIA = 9.525  # .375
 # .375-.379, loosened from #2445's .3755-.3765 BORE. The bought shoulder
 # (.374-.375) enters at every band, and still bottoms on the square floor.
 BORE_PLACES = 3
-BORE_LIMITS = tuple(drilled_limits(BORE_DIA, BORE_PLACES, unit=UNIT))
+# The DRILLED HOLES row from _printed_tolerance: _printed_limits (the
+# manifest's reader) stays out of native closures.
+BORE_LIMITS = (
+    round(BORE_DIA - drilled_undersize_mm(unit=UNIT), 12),
+    round(BORE_DIA + drilled_oversize_mm(unit=UNIT), 12),
+)
+# The seat prints that band as its own native tolerance (+.004/0): a
+# counterbore diameter would otherwise read at the .XXX general grade
+# (.370-.380), and the shoulder's fit is line to line at .375.
+BILATERAL_DIMENSIONS = {("TopBoreProfile", "BoreDia"): (BORE_LIMITS[0] - BORE_DIA, BORE_LIMITS[1] - BORE_DIA)}
 BORE_DEPTH = 9.1186  # .359
 _shoulder_lower, _shoulder_upper = deviations(pivot_screw.SHOULDER_DIA_BAND)
 PIVOT_LOCATING_CLEARANCE_MIN = BORE_LIMITS[0] - (pivot_screw.SHOULDER_DIA + _shoulder_upper)

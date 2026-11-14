@@ -46,7 +46,7 @@ def test_identity_stock_and_common_pivot_interface():
     assert math.isclose(spec.LUG_X1-spec.LUG_X0,spec.LUG_WIDTH)
     assert spec.BLOCK_X0<spec.LUG_X0<spec.LUG_X1==spec.BLOCK_X1
     assert math.isclose(spec.BLOCK_WIDTH/2-spec.LUG_Y0,spec.PLAN_OVERALL_Y)
-    assert spec.PLAN_OVERALL_Y<pivot.STOCK_WIDTH
+    assert spec.BLOCK_LENGTH<pivot.STOCK_WIDTH<spec.PLAN_OVERALL_Y
     assert spec.LUG_Y1==-spec.BLOCK_WIDTH/2
 
 

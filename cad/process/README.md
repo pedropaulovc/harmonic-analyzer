@@ -234,7 +234,7 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
 
 The pivot block (`ch_rocker_arm_tl_oblique_pivot_block`, TL-22) and feed block
 (`ch_rocker_arm_tl_oblique_feed_block`, TL-32) plans are written fresh against
-their v49 manifests (no hand traveler): each saws its own blank from the
+the v50 sheets' manifests (no hand traveler): each saws its own blank from the
 OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`;
 TL-22 a 1.70 strip, then across to 1.70 x 1.70), faces SEAT and TOP with the
 1/2 in end mill, mills the 1.64 length (TL-32: about 1.36 in off the 3 in

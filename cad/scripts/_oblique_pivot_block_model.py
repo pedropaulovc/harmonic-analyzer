@@ -16,7 +16,8 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import (set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance,
+                                 set_dimension_symmetric_tolerance)
 from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
@@ -693,6 +694,11 @@ async def build_block_model(adapter, part) -> None:
     require_block_geometry(adapter, part)
     await volume_check(adapter,"finished block",expected,expected*0.002)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
+    # The pivot seat's DRILLED HOLES band, printed at the seat's own places.
+    for (feature_name,dimension_name),(lower,upper) in part.BILATERAL_DIMENSIONS.items():
+        set_dimension_bilateral_tolerance(adapter,feature_name,dimension_name,lower,upper,
+                                          places=part.DRAWING_PRECISION_BY_NAME[dimension_name],
+                                          display_unit=part.UNIT)
     # TL-32's Tr8/KP08 vendor-line dimensions print exact millimetres with
     # their own bands (owner ruling 4).
     for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():

@@ -236,6 +236,17 @@ def _pivot_stack_semantics(text):
     return tuple(' '.join(row.split()) for row in text.splitlines())
 
 
+def _seat_band_text(contract):
+    """The seat's native band as printed: ``+.004/0`` (a nil limit is a bare 0,
+    as the title block's DRILLED HOLES row)."""
+    lower, upper = contract.BILATERAL_DIMENSIONS[('TopBoreProfile', 'BoreDia')]
+    places = contract.DRAWING_PRECISION_BY_NAME['BoreDia']
+    if upper <= 0 or lower > 0:
+        raise RuntimeError('pivot seat band must be an upper (+) and a lower (-/0) deviation')
+    low = '0' if lower == 0 else '-' + render_number(round(-lower / MM_PER_INCH, places), 'in', places)
+    return f'+{render_number(round(upper / MM_PER_INCH, places), "in", places)}/{low}'
+
+
 def _pivot_stack_text(contract):
     """Owner-approved compact text generated from spec values/bands, never copied sizes."""
     if contract.UNIT != 'in':
@@ -248,12 +259,13 @@ def _pivot_stack_text(contract):
     # A plain .375 under DRILLED HOLES (owner ruling 2026-11-13, loosened
     # from #2445's BORE): the shoulder bottoms on its square floor. Standard
     # counterbored-hole form (rule 26, machinist review be53204cdd): the
-    # through hole and its thread, then the counterbore by symbol, then the
-    # one reason row (rule 7).
+    # through hole and its thread, then the counterbore by symbol with its
+    # own band (a counterbore otherwise reads at .XXX), then the one reason
+    # row (rule 7).
     return (
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
         f'{contract.PIVOT_TAP} UNC THRU\n'
-        f'<HOLE-SPOT><MOD-DIAM>{size("BoreDia")} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        f'<HOLE-SPOT><MOD-DIAM>{size("BoreDia")} {_seat_band_text(contract)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
         '  SEAT FOR TL-VN-77 SHOULDER'
     )
 
@@ -316,10 +328,16 @@ def _stack_pivot_callout(adapter, plan, annotations, contract, printed=None):
         if int(ann.OwnerType) != 0 or ann.IsDangling():
             raise RuntimeError(f'{name}: source is not a live drawing-view dimension')
         sources[name] = (_early_bound(display.GetDimension2(0), 'IDimension'), state)
-    # Every source prints under the title block: the seat's DRILLED HOLES row
-    # (owner ruling 2026-11-13), the depth's .XXX and the drill's DRILLED HOLES.
-    if any(sources[name][1][5][0] != 0 for name in names):
-        raise RuntimeError('pivot stacked callout: unexpected explicit seat/depth/drill tolerance')
+    # The seat carries its own DRILLED HOLES band (owner ruling 2026-11-13) as
+    # a native bilateral tolerance; the depth's .XXX and the drill's DRILLED
+    # HOLES print under the title block.
+    lower, upper = contract.BILATERAL_DIMENSIONS[('TopBoreProfile', 'BoreDia')]
+    seat_type, seat_min, seat_max = sources['BoreDia'][1][5]
+    if (seat_type != 2 or not math.isclose(seat_min * 1000, lower, rel_tol=0, abs_tol=1e-6)
+            or not math.isclose(seat_max * 1000, upper, rel_tol=0, abs_tol=1e-6)):
+        raise RuntimeError(f'pivot stacked callout: seat band {sources["BoreDia"][1][5]!r} is not the spec band')
+    if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
+        raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
 
     text = _pivot_stack_text(contract)
     expected = _pivot_stack_semantics(text)
