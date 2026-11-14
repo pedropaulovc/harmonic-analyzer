@@ -339,11 +339,13 @@ diameter_mm = 4.7625
 tool = "jig-em-half"
 material = "sus304"
 sfm = 50  # Below LMS 70 for hand feed in 304: ~400 rpm (machinist review 2026-11-14).
-# Feed authored; no sourced feed for 304.
-feed = "Hand, steady and positive; no dwell"
+# Feed authored (no sourced feed for 304): .001 in/tooth, the chip load
+# milling_deflection assumes, printed in mm/min at the rounded rpm.
+feed = "Hand, steady ≈20 mm/min (.001 in/tooth); no dwell"
 [settings.kit-flat-sus304]
 tool = "basebar-counterbore"
 material = "sus304"
 sfm = 50  # Below LMS 70 for hand feed in 304: ~600 rpm (machinist review 2026-11-14).
-# Feed authored; no sourced feed for 304.
-feed = "Hand, steady and positive; no dwell at depth"
+# Feed authored (no sourced feed for 304): .001 in/tooth, the chip load
+# milling_deflection assumes, printed in mm/min at the rounded rpm.
+feed = "Hand, steady ≈30 mm/min (.001 in/tooth); no dwell at depth"

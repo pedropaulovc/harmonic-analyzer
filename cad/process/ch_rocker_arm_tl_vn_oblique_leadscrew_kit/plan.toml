@@ -29,7 +29,6 @@ screw_stock_length_mm = 600.0
 saw_allowance_mm = 3.0           # Sawn long, milled to length.
 kerf_mm = 1.0                    # Hacksaw kerf.
 rule_mm = 304.8                  # The owned 12 in combination-square rule (no tape or long rule on hand).
-saw_step_mm = 117.7              # saw piece 422.5 - rule_mm 304.8: the second step.
 cutter_dia_mm = 12.7             # 1/2 in end mill.
 flat_cutter_dia_mm = 7.9375      # 5/16 in end mill: flat length = one crossing.
 cut_overhang_mm = 10.0           # Cut end past the right jaw side.
@@ -38,11 +37,9 @@ near_stickout_mm = 20.0          # Out of the BS-0 jaws, NEAR END flats (flats e
 wheel_stickout_mm = 16.0         # Out of the BS-0 jaws, handwheel flat (flat 0..10 from the cut end; cutter's inboard edge 9.99).
 far_stickout_mm = 42.0           # Out of the BS-0 jaws, cut-end KP08 flats (flat 26.5..34.5 from the cut end).
 mandrel_stickout_mm = 8.0        # Offcut out of the lathe jaws: under the nut's 10 mm body, so its end stays inside the nut, clear of the facing tool.
-# Deflection inputs (milling_deflection). Bindings cannot do arithmetic:
-thread_root_dia_mm = 5.5         # Tr8x2 root d3 = 8 - 2 x 1.25 (ISO 2904; not in the manifest).
-jaw_right_x_mm = 412.5           # Saw piece 422.5 - cut_overhang_mm 10, from the NEAR END.
-jaw_left_x_mm = 253.8262         # jaw_right_x_mm - 158.6738 jaw width.
-far_flat_outer_from_cut_mm = 26.484  # 419.5 - 385.016 station - 8.0 flat: the KP08 flat's edge nearest the cut end.
+# milling_deflection and the lathe mandrel: the adapter derives the vise jaw
+# stations and the cut-end flat edge; the root is not in the manifest.
+thread_root_dia_mm = 5.5         # Tr8x2 root d3 = 8 - 2 x 1.25 (ISO 2904).
 # Machine-capacity inputs (mm), as the feed-lever plan: heights above the
 # mill table; tool lengths from spindle nose to tip.
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
@@ -113,7 +110,7 @@ speed_kind = "other"
 tool = "saw"
 sizing = "other"
 instruction = "Mark {{cad.saw_piece_mm:.1f}} from the NEAR END; saw on the offcut side. Keep the offcut."
-instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark {{process.saw_step_mm:.1f}} more, round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
+instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±1) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark {{cad.saw_rule_step_mm:.1f}} more, round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
 feed = "hand"
 
 [[setups]]
@@ -128,14 +125,14 @@ diagram = { file = "diagrams/leadscrew-kit/length.svg", alt = "Top view: the scr
 envelope = { x_span_mm = ["{{cad.saw_piece_mm}}", "{{process.cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.major_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.major_dia_mm}}", along_jaws_mm = "{{cad.saw_piece_mm}}", part_height_mm = "{{cad.major_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{process.cut_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 # Stations from the NEAR END; the jaws hold from jaw_left to jaw_right.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.saw_piece_mm}}"], clamp_mm = ["{{process.jaw_left_x_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { diameter = "{{process.thread_root_dia_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.saw_piece_mm}}"], clamp_mm = ["{{cad.vise_jaw_left_mm}}", "{{cad.vise_jaw_right_mm}}"], section_mm = { diameter = "{{process.thread_root_dia_mm}}" } }
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Mill the sawn end feeding away (conventional), 0.5 mm X steps, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write L on the screw."
-instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw, clear of the parallels. Feed away (table toward you) across the sawn end, conventional, stepping X 0.5 mm a pass, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
+instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Mill the sawn end conventional (table away from you), 0.5 mm X steps, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write L on the screw."
+instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw, clear of the parallels. Feed the table away from you across the sawn end (conventional: the cutter climbs if fed the other way), stepping X 0.5 mm a pass, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
 settings = "kit-em-half-sus304"
 cut_diameter_mm = "{{process.cutter_dia_mm}}"
 milling_cuts = [
@@ -150,7 +147,7 @@ speed_kind = "other"
 tool = "files"
 sizing = "other"
 instruction = "Break the cut end ≤{{cad.end_chamfer_mm:g}}; run the nut over it."
-instruction_detailed = "File a light chamfer, no more than {{cad.end_chamfer_mm:g}}, round the cut end until the first thread is clean, then run the nut on and off the cut end by hand. The thread stays as supplied over its full length."
+instruction_detailed = "File a light chamfer, no more than {{cad.end_chamfer_mm:g}}, round the cut end until the first thread is clean, then run the nut on and off the cut end by hand. The thread stays as supplied (sheet 2: {{cad.thread}})."
 feed = "hand"
 
 [[setups]]
@@ -159,7 +156,7 @@ title = "NEAR END flats"
 machine = "PM-30MV / BS-0 dividing head"
 indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
 machine_ref = "pm-30mv"
-holding = "BS-0 on the table's left, chuck facing +X (right); clock the jaws to 2, 6 and 10 o'clock before tightening (the 120° index keeps them there). Screw through the spindle, NEAR END {{process.near_stickout_mm:g}} out of the 3-jaw, threads wrapped in paper."
+holding = "BS-0 on the table's left, chuck facing +X (right); clock the jaws to 2, 6 and 10 o'clock before tightening (the 120° index keeps them there). Screw through the spindle, NEAR END {{process.near_stickout_mm:g}} out of the 3-jaw, threads wrapped in paper; the tail hangs free out the back (about 0.15 kg: no support)."
 datum = "X0 the NEAR END face; Z0 the thread crest on top."
 diagram = { file = "diagrams/leadscrew-kit/near-flats.svg", alt = "NEAR END out of the dividing-head chuck: the two KP08 flats, 0° then 120°" }
 envelope = { x_span_mm = ["{{cad.near_kp08_centre_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
@@ -202,7 +199,7 @@ machine = "PM-30MV / BS-0 dividing head"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "BS-0 as before, jaws at 2, 6 and 10 o'clock. Screw reversed: cut end {{process.wheel_stickout_mm:g}} out of the 3-jaw, threads wrapped. Its angle to the other flats is free (sheet 2 note 1)."
-datum = "X0 the cut end face; Z0 the thread crest. Stations for L = {{cad.length_mm:.1f}}; if the L written on the screw differs, add (L − {{cad.length_mm:.1f}}) to each X."
+datum = "X0 the cut end face; Z0 the thread crest. L = the length written on the screw."
 diagram = { file = "diagrams/leadscrew-kit/wheel-flat.svg", alt = "Cut end just out of the dividing-head chuck: the open handwheel flat" }
 envelope = { x_span_mm = ["{{cad.handwheel_from_cut_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = "other"
@@ -213,8 +210,8 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 speed_kind = "spindle"
 tool = "em-flat"
 sizing = "other"
-instruction = "X = +D/2 on the cut end; cross at X −{{cad.handwheel_from_cut_mm:.2f}}, then at X 0, each at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
-instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Touch the crest, set Z0. Cross at X −{{cad.handwheel_from_cut_mm:.2f}} at both depths, then at X 0 at both depths, so the flat runs out through the end. If L is not {{cad.length_mm:.1f}}, add (L − {{cad.length_mm:.1f}}) to {{cad.handwheel_from_cut_mm:.2f}}."
+instruction = "X = +D/2 on the cut end; cross at X −(L − {{cad.handwheel_centre_mm:.2f}}), then at X 0, each at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
+instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Touch the crest, set Z0. Cross at X −(L − {{cad.handwheel_centre_mm:.2f}}) (X −{{cad.handwheel_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}) at both depths, then at X 0 at both depths, so the flat runs out through the end."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
@@ -230,7 +227,7 @@ machine = "PM-30MV / BS-0 dividing head"
 indexing = { head = "bs-0", tolerance_deg = "{{cad.clock_tolerance_deg}}", angle_deg = "{{cad.clock_deg}}" }
 machine_ref = "pm-30mv"
 holding = "BS-0 as before, jaws at 2, 6 and 10 o'clock. Screw reversed: cut end {{process.far_stickout_mm:g}} out of the 3-jaw, threads wrapped."
-datum = "X0 the cut end face; Z0 the thread crest. Stations for L = {{cad.length_mm:.1f}}; if the L written on the screw differs, add (L − {{cad.length_mm:.1f}}) to each X."
+datum = "X0 the cut end face; Z0 the thread crest. L = the length written on the screw."
 diagram = { file = "diagrams/leadscrew-kit/far-flats.svg", alt = "Cut end out of the dividing-head chuck: the two KP08 flats, 0° then 120°" }
 envelope = { x_span_mm = ["{{cad.far_kp08_from_cut_mm}}", "{{process.flat_cutter_dia_mm}}"], y_span_mm = ["{{cad.major_dia_mm}}", "{{process.flat_cutter_dia_mm}}"], work_top_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.major_radius_mm}}"], deepest_cut_mm = ["{{process.bs0_centre_height_mm}}", "{{cad.flat_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = "other"
@@ -241,14 +238,14 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
-instruction = "X = +D/2 on the cut end, then X −{{cad.far_kp08_from_cut_mm:.2f}}; touch the crest, Z0; cross to Z −{{cad.flat_depth_mm:.2f}} in two passes."
-instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Move to X −{{cad.far_kp08_from_cut_mm:.2f}}: the cutter's edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. If L is not {{cad.length_mm:.1f}}, add (L − {{cad.length_mm:.1f}}) to {{cad.far_kp08_from_cut_mm:.2f}}. Lower the knee carefully past the clocked jaws, touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}, steady feed, no dwell at depth."
+instruction = "X = +D/2 on the cut end, then X −(L − {{cad.far_kp08_centre_mm:.2f}}); touch the crest, Z0; cross to Z −{{cad.flat_depth_mm:.2f}} in two passes."
+instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Move to X −(L − {{cad.far_kp08_centre_mm:.2f}}) (X −{{cad.far_kp08_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}): the cutter's edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. Lower the knee carefully past the clocked jaws, touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}, steady feed, no dwell at depth."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
-  { name = "cut-end KP08 flat, 0.40 mm pass", kind = "slot", phase = "finish", material = "stainless_304", cutter_dia_mm = "{{process.flat_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.40, radial_woc_mm = "{{process.flat_cutter_dia_mm}}", feed_per_tooth_mm = 0.0254, stations_mm = "{{process.far_flat_outer_from_cut_mm}}" },
+  { name = "cut-end KP08 flat, 0.40 mm pass", kind = "slot", phase = "finish", material = "stainless_304", cutter_dia_mm = "{{process.flat_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.40, radial_woc_mm = "{{process.flat_cutter_dia_mm}}", feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.far_kp08_outer_from_cut_mm}}" },
 ]
-inspection = "Starts {{cad.far_kp08_station_min_mm:.1f}}–{{cad.far_kp08_station_max_mm:.1f}} from the NEAR END (L − |X| − D/2); {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
+inspection = "Starts {{cad.far_kp08_station_min_mm:.1f}}–{{cad.far_kp08_station_max_mm:.1f}} from the NEAR END (L − |X| − D/2 on the DRO); {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long; {{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.far_kp08_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_length_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }]
 
 [[setups.operations]]
@@ -256,11 +253,11 @@ speed_kind = "spindle"
 tool = "em-flat"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "Index {{cad.clock_deg:g}}° (advance the pin 8 spaces); second flat at the same X and Z. Deburr all flats."
-instruction_detailed = "Disengage the worm, pull the plunger and advance it 8 spaces on the 24-hole direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands. Cut the second flat at X −{{cad.far_kp08_from_cut_mm:.2f}}, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
+instruction_detailed = "Disengage the worm, pull the plunger and advance it 8 spaces on the 24-hole direct plate (do not count the hole it starts in), let it drop in and lock the spindle. Z0 stands. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
 settings = "kit-flat-sus304"
 cut_diameter_mm = "{{process.flat_cutter_dia_mm}}"
 milling_cuts = [
-  { name = "second cut-end KP08 flat, 0.40 mm pass", kind = "slot", phase = "finish", material = "stainless_304", cutter_dia_mm = "{{process.flat_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.40, radial_woc_mm = "{{process.flat_cutter_dia_mm}}", feed_per_tooth_mm = 0.0254, stations_mm = "{{process.far_flat_outer_from_cut_mm}}" },
+  { name = "second cut-end KP08 flat, 0.40 mm pass", kind = "slot", phase = "finish", material = "stainless_304", cutter_dia_mm = "{{process.flat_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.40, radial_woc_mm = "{{process.flat_cutter_dia_mm}}", feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.far_kp08_outer_from_cut_mm}}" },
 ]
 inspection = "{{cad.af_min_mm:.2f}}–{{cad.af_max_mm:.2f}} across flat; {{cad.flat_length_min_mm:.1f}}–{{cad.flat_length_max_mm:.1f}} long."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.af_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_length_band_mm}}" }]
@@ -271,10 +268,10 @@ title = "Face the nut spigot"
 machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Sawn offcut in the 3-jaw, {{process.mandrel_stickout_mm:g}} out; nut spun on body first until the body end seats on the jaw fronts (the facing cut tightens it); spigot out."
+holding = "Sawn offcut in the 3-jaw, factory end out, {{process.mandrel_stickout_mm:g}} out; nut spun on body first until the body end seats on the jaw fronts (the facing cut tightens it); spigot out."
 datum = "Z0 the flange seat face."
 diagram = { file = "diagrams/leadscrew-kit/nut-face.svg", alt = "The nut spun onto the threaded offcut in the lathe chuck, spigot faced off" }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.major_dia_mm}}", stock_diameter_mm = "{{cad.nut_flange_dia_mm}}", stickout_mm = "{{cad.nut_supplied_length_mm}}", minimum_diameter_mm = "{{cad.nut_spigot_dia_mm}}", support = "none" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.major_dia_mm}}", stock_diameter_mm = "{{cad.nut_flange_dia_mm}}", stickout_mm = "{{cad.nut_supplied_length_mm}}", minimum_diameter_mm = "{{process.thread_root_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -282,7 +279,7 @@ speed_kind = "spindle"
 tool = "ar"
 sizing = "other"
 instruction = "Face the spigot off flush with the seat face, light cuts. Full thread {{cad.nut_full_thread_min_mm:g}} min remains."
-instruction_detailed = "Touch the spigot end and face it off in light cuts until the cut just reaches the flange seat face (sheet 3: spigot faced flush). Lift the bore-mouth burr with a file corner, then unscrew the nut from the offcut: it must run freely. The nut keeps at least {{cad.nut_full_thread_min_mm:g}} of full thread (sheet 3)."
+instruction_detailed = "Touch the spigot end and face it off in light cuts until the cut just reaches the flange seat face (sheet 3: {{cad.nut_note}}). Lift the bore-mouth burr with a file corner, then unscrew the nut from the offcut: it must run freely. The nut keeps at least {{cad.nut_full_thread_min_mm:g}} of full thread (sheet 3)."
 # Brass on a threaded mandrel: 1000 rpm, half the PM-1127's top speed
 # (machinist review 2026-11-14: grip and wall). The plan's material_key is
 # the screw's, so the nut's speed is written here, not from a shop setting.
