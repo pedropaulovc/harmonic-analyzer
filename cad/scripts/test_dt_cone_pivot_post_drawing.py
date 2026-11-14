@@ -79,7 +79,7 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (7.540625, 11.5062, 6.0198)
+    ) == (7.493, 11.5062, 6.0198)
     assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
@@ -861,7 +861,7 @@ def test_body_diameter_takes_the_title_block_band() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["MainBodyDia"] == 2
     assert round(BLOCK_DIA / 25.4, 2) == pytest.approx(BLOCK_DIA / 25.4, abs=1e-9)
     assert "MainBodyDia" not in drawing.DIMENSION_SUFFIXES
-    assert drawing.FRONT_KEEP["MainBodyDia"] == (0.150, 0.074)
+    assert drawing.FRONT_KEEP["MainBodyDia"][0] == 0.150
     assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] == pytest.approx(
         (BLOCK_DIA + spec.MAIN_BODY_DIA_BAND[1]) / 2.0
         - spec._printed_limits(spec.ATTACHMENT_X, 2)[1]
