@@ -88,7 +88,7 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
     set_view_exploded_state,
 )
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
@@ -1216,8 +1216,8 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
             scale=JOINT_SECTION_SCALE,
             label=label,
         )
-        # A section shows its cut in solid lines only; the working front
-        # view keeps its hidden lines.
+        # A section shows its cut in solid lines only, like the working
+        # front view it is cut from.
         set_hidden_lines_removed(adapter, section)
         apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
@@ -2658,7 +2658,10 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         *WORKING_FRONT_CENTER,
         scale=SHEET_SCALE,
     )
-    set_hidden_lines_visible(adapter, front)
+    # Hidden lines removed: A-A and B-B show the joints' interiors, and both
+    # heights land on visible lines (the base's underside and the cap tops);
+    # dashed column bores here read as clutter (dfm-2340 r12: 3/3 runs).
+    set_hidden_lines_removed(adapter, front)
     # Before the dimensions and sections bind to it: the 1:8 view prints the
     # teeth/thread-free configuration, and the A-A/B-B sections follow it.
     _configure_view(adapter, front, exploded=False, label="working front")

@@ -297,13 +297,11 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
     assert f"EAR PUSHING {washer}" in on_washer
     assert steps.NORTH_BRACKET_SET_REF in on_washer
     assert spring not in on_washer
-    zeroed = _step_body("south-bracket-zeroed")
-    assert "TEST INDICATOR" in zeroed and "ZERO THE DRO" in zeroed
-    assert "OFF" in _step_body("south-bracket-slid-off")
-    assert "CLAMP IT LIGHTLY" in _step_body("south-bracket-refitted")
+    # The spring set's DRO offset counts from the step that zeroes the DRO.
+    assert "DRO" in _step_body("south-bracket-dro-zeroed")
     setting = _step_body("south-bracket-spring-set")
     assert f"SPRING SET OF {drawing.SOUTH_END.title}, SHEET 4" in setting
-    assert f"STEP {steps.step_number('south-bracket-zeroed')} ZERO" in setting
+    assert f"STEP {steps.step_number('south-bracket-dro-zeroed')} ZERO" in setting
     assert "INDICATOR READS ZERO" in setting
     assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
     callout = drawing.notes.DIMENSION_CALLOUTS[drawing.asm.SPRING_SET_DIMENSION]
@@ -335,10 +333,12 @@ def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None
         "south-washer-fitted",
         "south-bracket-on-washer",
         "south-bracket-zeroed",
+        "south-bracket-dro-zeroed",
         "south-bracket-slid-off",
         "bank-spring-checked",
         "bank-spring-fitted",
         "south-bracket-refitted",
+        "south-bracket-clamped-lightly",
         "south-bracket-spring-set",
         "south-bracket-clamped",
         "spring-back-checked",
@@ -602,6 +602,14 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     # Machinist review (PR #1605): at the upper right the letter B sat over
     # the rocker bank's stack beside the circle; the lower left is open.
     assert bracket.letter_corner == (-1, -1)
+    # PR #2702 machinist review: DETAIL C's letter stood on the bar bank's
+    # right edge; it sits farther out than the default, down and right.
+    assert keeper.letter_corner == (1, -1)
+    assert keeper.letter_offset > drawing.DETAIL_LETTER_OFFSET
+    centre, radius = (0.0, 0.0), 0.005
+    assert drawing.letter_xy(centre, radius, keeper.letter_corner, keeper.letter_offset)[0] > (
+        drawing.letter_xy(centre, radius, keeper.letter_corner)[0]
+    )
     # Each cluster member's exploded reference point projects inside its
     # circle with room for the part round it: the washer (Ø10.2), the set
     # screw above the ear apex, the hold-down over its foot hole.
@@ -1040,6 +1048,26 @@ def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
     assert y + arm_t - top_edge > 1.5
     dx, dy = drawing.PIVOT_SHAFT_BALLOON_OFFSET
     assert dy > 0.04 and 0.0 < dx < dy / 3.0
+
+
+def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper() -> None:
+    """PR #2702 machinist review: leader 2 ended among the stacked lever hubs,
+    where the shaft shows only as slivers. It lands on the south flat's
+    eye-side edge, which the shaft's withdrawal carries past the exploded
+    south keeper onto the shaft's bare run."""
+    import ch_fulcrum_shaft_spec as shaft
+
+    x, y, z = drawing.BALLOON_POINTS_MM[drawing.explode.FULCRUM_SHAFT]
+    assert y == pytest.approx(shaft.FLAT_HEIGHT)
+    assert x > 0.0 and math.hypot(x, y) == pytest.approx(shaft.SHAFT_R)
+    assert z == pytest.approx(-shaft.FLAT_PITCH / 2.0)
+    shaft_dz = drawing.exploded_offset(drawing.explode.FULCRUM_SHAFT, "south")[2]
+    keeper_dz = drawing.exploded_offset(drawing.explode.KEEPER, "south")[2]
+    point_z = z + shaft_dz
+    tip_z = -shaft.SHAFT_LENGTH / 2.0 + shaft_dz
+    keeper_outer_z = -drawing.KEEPER_Z_OFF + keeper_dz - drawing.KEEPER_LUG_HALF_T
+    assert tip_z < point_z - shaft.FLAT_LENGTH / 2.0
+    assert point_z + shaft.FLAT_LENGTH / 2.0 + 20.0 < keeper_outer_z
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:

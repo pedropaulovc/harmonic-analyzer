@@ -3301,7 +3301,46 @@ carries the two (`display`, `base_display`: `<w>x<h> px/mm=<p>`).
 counter the script echoed (`truth_cause=response:title_counter`), and the
 whole streams are the same requests once title counters are masked, every
 answer the same but for noise. The split is `noop`; `ground_truth=diverged`
-and the cause are kept, and the INFO line ends with `title_echo`.
+and the cause are kept, and the INFO line ends with `title_echo`. A
+dependent's streams are the name-bound ones (below), and its answers may also
+differ where the seat made them differ (`_com_outcome._order_only`), its
+requests still the base's throughout:
+
+- a session read (`IModelDoc2.SummaryInfo`, `ISldWorks.GetUserPreference*`);
+- a read of an object an enumeration listed (the outermost handle array it
+  descends from), when that enumeration is the base's in another order: its
+  elements' records (each element's calls, in order, on it or on what it
+  answered: member, arguments and answer, handles erased, title counters
+  masked) are the base's records permuted, and every call on or with any of
+  its objects is a read: a get, a wrap, a dispid lookup, a QueryInterface, or
+  one of the methods `_com_outcome._READ_METHODS` lists because the API
+  reference has them return a value and set nothing
+  (`IComponent2.GetPathName`, `IComponent2.GetTotalTransform`).
+
+A handle argument that names an object of such an enumeration is recorded as
+what it names, not by number (#2761): the element it descends from, by that
+element's own record, and its place among the objects that element's calls
+allocated. The same request names another element once the seat listed them
+in another order. `IInterference.Volume` answers are matched within 1e-6 of
+the larger of the two (`_com_outcome._APPROXIMATE`), here and in the `answers`
+signal below: SolidWorks computes an interference's volume to the modeller's
+tolerance, and `pd_paper_drive`'s arm-to-screw overlap read 12.285502 mm³ in
+three builds of identical geometry, 5.2e-7 apart (2026-11-14). The band is
+relative only, so a vanished interference (0) still differs at any size, and
+how many interferences there are and which components each pairs are
+compared exactly.
+
+A record that is not the base's (a name changed, a read or a question moved
+between elements) or a call that acts on an element (a selection of the first
+element is another component once the seat listed it in another order) is no
+echo. Not caught: an order-dependent pick carried only by an index into
+another enumeration the script did not read. The first same-key pairs after
+#2730 (2026-11-14, `ch_channel` and `dt_drive_train`) are such echoes: the
+title echoed into `SelectByID2` before any array was bound, then the
+interference report and the component-pattern name sets read in the seat's
+order, and two save dates. So is `pd_paper_drive`'s inert own edit that day:
+its chain classification reads each interfering component's path and
+transform.
 
 The judge names a dependent's causes more finely than a part's (only for
 `_com_outcome.DEPENDENT_KINDS`; a part's reuse and audit judgement is
@@ -3320,7 +3359,8 @@ position 1 ulp apart, then `SetPosition2` 1 ulp apart). Any other request
 difference stays `request`. The `answers` signal compares
 `IModelDoc2.ClosestDistance` by its distance only: between parallel faces any
 pair of points witnesses it (`dt_drive_train` built twice under one key: the
-same 6.882839 mm, witnesses 17.47 mm apart). A drawing whose `pdf` signal
+same 6.882839 mm, witnesses 17.47 mm apart). It compares a dependent's
+`IInterference.Volume` within 1e-6, relative (above). A drawing whose `pdf` signal
 differs gets `pdf_cause=jagged_outline` (`_com_outcome.jagged_outline`) only
 when every condition holds:
 
@@ -3348,8 +3388,9 @@ thing of each component under a seat-dependent number. Before a dependent's
 split, `_com_outcome.name_bound` binds such an array to the base's by name. It
 does so only when all of these hold:
 
-- both builds issued the request alike and were answered with the same handle
-  numbers;
+- both builds issued every request up to it, and it, alike but for title
+  counters (a title the script echoed earlier, `title_echo`'s case, does not
+  stop the walk), and it was answered with the same handle numbers;
 - the calls right after it identify every element and do nothing else: pywin32
   wraps (`GetTypeInfo`), `early_bound` QueryInterfaces, and one identity read
   per element (`*.Name2`, or `IDrawingComponent.Name` for a drawing view's

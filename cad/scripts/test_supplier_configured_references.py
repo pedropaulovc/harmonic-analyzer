@@ -339,9 +339,9 @@ def test_chain_top_roller_square_projects_over_front_roller_circle():
     assert cells["free_top"][0] == pytest.approx(roller_x)
 
 
-def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
-    from _mcmaster_9666k56 import DIA
-    from _mcmaster_9666k56_reference import (
+def test_wire_nominal_cannot_be_read_from_the_wire_lane(monkeypatch):
+    from _mcmaster_9666k142 import DIA
+    from _mcmaster_9666k142_reference import (
         SUPPLIER_REFERENCE_CONFIGURATION,
         SUPPLIER_REFERENCE_DIMENSION,
         SUPPLIER_REFERENCE_FEATURE,
@@ -354,7 +354,7 @@ def test_wire_nominal_cannot_be_read_from_the_installed_envelope(monkeypatch):
     supplier_drawing.assert_supplier_configuration_value(
         display,
         SUPPLIER_REFERENCE_CONFIGURATION,
-        0.7874,
+        0.2032,
         label="supplier wire circle",
     )
     display.native.value_mm = 0.8

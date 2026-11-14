@@ -16,7 +16,7 @@ import mg_magnifying_bracket_spec as bracket_spec
 import sh_vn_music_wire_lever_geom as wire
 import spring_force_model
 
-from mg_magnifying_wheel_geom import WIRE_RATIO
+from sh_vn_music_wire_lever_geom import BUILT_WIRE_RATIO as WIRE_RATIO
 from top_frame_plane import KNIFE_Y
 
 

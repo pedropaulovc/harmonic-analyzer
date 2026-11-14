@@ -109,7 +109,7 @@ _SHARED_MEMBERS = {
         {"InnerLink": 33, "OuterLink": 32},
     ),
     "sh-vn-music-wire": (
-        "McMaster-Carr", "9666K56", "MHA-SH-VN-56",
+        "McMaster-Carr", "9666K142", "MHA-SH-VN-56",
         {"LeverWire": 1, "PenWire": 1},
     ),
     "sh-vn-clamping-kit-hardware": (

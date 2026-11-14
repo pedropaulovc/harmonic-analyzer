@@ -7,7 +7,7 @@ straight rest run is installed geometry, not a purchase dimension.
 
 from __future__ import annotations
 
-from _mcmaster_9666k56 import DIA_IN
+from _mcmaster_9666k142 import DIA_IN
 
-# The catalogue size (.031), not the Ø0.8 mm model nominal inside its band.
+# The catalogue size (.008).
 BOM_DESCRIPTION = f"PEN WIRE 2, {f'{DIA_IN:.3f}'.removeprefix('0')} MUSIC WIRE"

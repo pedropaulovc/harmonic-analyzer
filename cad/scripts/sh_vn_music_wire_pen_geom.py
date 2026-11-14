@@ -8,7 +8,7 @@ PenWire member. Print notes remain in the separate pure drawing contract.
 from __future__ import annotations
 
 import mg_wheel_bar_geom as _wheel_bar
-from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
+from _mcmaster_9666k142 import DIA as MEMBER_DIA
 from _mg_wheel_rim_geometry import PEN_WIRE_DIA, RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_X
 from _recording_geometry import PEN_ROD_X, PEN_Z_MID
@@ -16,10 +16,12 @@ from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 
 CONFIGURATION = "PenWire"
 
-# Ø0.8 design nominal: inside the purchased 9666K56 0.031 +/-0.001 in band.
+# Ø0.8 is the WIRE LANE the rim groove was laid out for, not the wire: the
+# purchased 9666K142 wire is Ø.008 (MEMBER_DIA), modelled at that size on the
+# lane's centreline (sh_vn_music_wire_lever_geom).
 WIRE_DIA = PEN_WIRE_DIA
-if not _STOCK_DIA_MIN <= WIRE_DIA <= _STOCK_DIA_MAX:
-    raise AssertionError("pen wire Ø must lie in the 9666K56 catalogue band")
+if MEMBER_DIA > WIRE_DIA:
+    raise AssertionError("the pen wire is fatter than the lane laid out for it")
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
 # The rim groove's mid-plane IS the pen rod line: the wire hangs plumb from the

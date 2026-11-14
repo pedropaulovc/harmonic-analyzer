@@ -1522,7 +1522,7 @@ sections:
       - - Magnification
         - 5×
         - —
-        - 'text; consistent: 100/20 = 5 ✓. Model (rev 10, 2026-10-10): wire-centre ratio rim r 49.2 / drum r 9.85 = 4.995'
+        - 'text; consistent: 100/20 = 5 ✓. Model (rev 10, 2026-10-10): wire-centre ratio rim r 49.2 / drum r 9.85 = 4.995 on the Ø0.8 wire lanes; 5.12 built with the Ø.008 wire (#2398; sh_vn_music_wire_lever_geom.BUILT_WIRE_RATIO, used by error_budget)'
         - stated
         - high
       - - Spoke count
@@ -1572,11 +1572,11 @@ sections:
       that both cleared the hole and kept 30° of lever-wire wrap). TIE 2 (pen
       wire): Ø1.0 radial hole from the groove bottom at about 4:30
       (43° below 3 o'clock).
-      Effective wire-centre ratio 49.2/9.85 = 4.995.
+      Effective wire-centre ratio 49.2/9.85 = 4.995 on the Ø0.8 lanes (5.12 built, Ø.008 wire).
 
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
-      geometry — straight rest-pose Ø0.8 rods of purchased McMaster 9666K56 0.031 in
-      music wire (`sh-vn-music-wire` MHA-SH-VN-56, configuration `LeverWire`:
+      geometry — straight rest-pose Ø0.2 rods, on the Ø0.8 wire lanes' centrelines, of purchased
+      McMaster 9666K142 0.008 in music wire (`sh-vn-music-wire` MHA-SH-VN-56, configuration `LeverWire`:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
       2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;
       the hook lies in that same plane (#1559 A1), set by mg_output_fixture_geom.py;

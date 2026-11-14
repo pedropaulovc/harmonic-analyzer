@@ -176,12 +176,41 @@ DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
 # points is a witness. 2026-11-13, dt_drive_train built twice under one key:
 # 6.882839 mm both times, the witnesses 17.47 mm apart along the faces.
 _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
+# Members SolidWorks computes approximately, with the relative tolerance a
+# dependent's ``answers`` signal and :func:`_order_only`'s records compare
+# their floats within, each on the larger of the two (:func:`_approximately`).
+# The band is relative only, with no absolute part: a volume is never within
+# it of 0.0, so an interference that vanished (or appeared) still differs at
+# any size, and how many interferences there are and which components each
+# pairs are compared exactly as ever. An interference's volume is a boolean of
+# two bodies evaluated to the modeller's tolerance: 2026-11-14,
+# pd_paper_drive's pd-transgear-arm-1 against pd-vn-transgear-arm-plate-screw-1
+# read 12.285502 mm^3 in three builds of identical geometry, 5.2e-7 apart.
+_APPROXIMATE = {"IInterference.Volume": 1e-6}
 # The reads that identify a component in a dependent's array pre-pass
 # (:func:`name_bound`): a component's instance name, a drawing component's
 # name (the keys #2686's name-order sort reads).
 _IDENTITY_READ = re.compile(r"\.Name2$|^IDrawingComponent\.Name$")
 # ``_com._early_bound``'s QueryInterface, as the recorder logs it.
 _EARLY_BOUND = ("QueryInterface", "early_bound")
+# The calls a dependent's :func:`title_echo` lets touch an object of an
+# enumeration it accepts in another order (:func:`_order_only`): reads and
+# pywin32's own bookkeeping, nothing that acts on the model. A script that
+# acts on an element it picked by position acts on another component when
+# the seat enumerated in another order.
+_READ_KINDS = frozenset(
+    {conv.Kind.GET, conv.Kind.TYPEINFO, conv.Kind.IDS, conv.Kind.QI}
+)
+# Methods (``Kind.CALL``) that only read, which :func:`_order_only` lets touch
+# such an object like a property read; any other method still fails closed.
+# The API reference (skill developing-solidworks, types/IComponent2/) has
+# each return a value and set nothing: ``GetPathName`` "Gets the full path
+# name for this component"; ``GetTotalTransform`` "Combines the original
+# transform of this component with the presentation transform" into a new
+# IMathTransform. They are what _assembly's chain classification asks of each
+# interfering component (``_is_chain_link``, ``_mounted_chain_sprocket``;
+# 2026-11-14, pd_paper_drive).
+_READ_METHODS = frozenset({"IComponent2.GetPathName", "IComponent2.GetTotalTransform"})
 
 
 class Outcome(StrEnum):
@@ -334,7 +363,7 @@ def judge(
             found["judge_faults"].append({"step": "seat_path", "error": path_error})
     echo = None
     if cause == TITLE_COUNTER_CAUSE:
-        echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b))
+        echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b, kind))
         if echo_error is not None:
             found["judge_faults"].append({"step": "title_echo", "error": echo_error})
     ink = None
@@ -469,36 +498,102 @@ def name_bound(
     the same components apart, and a script that reads every component's name
     and then visits the components in name order (the sort #2686 brings) asks
     the same of each component under another number. An array is bound only
-    when, at a request both builds issued alike (``request_field``) whose
-    answers are the same handle numbers, both builds then :func:`_identify`
-    every element, each by one distinct name, the same names in both. The new
-    build is then read as if SolidWorks had enumerated in the base's order:
-    the array's answer stays as recorded (the same numbers as the base's),
-    the pre-pass is put in the base's element order, and every handle of an
-    element (the element and what its pre-pass calls allocated) is renamed,
-    in the pre-pass and in every later call, to the base's handle of the
-    component of the same name. Anything else stays positional: components
+    when, at a request both builds issued alike but for title counters
+    (``request_field`` on :func:`_counterless` arguments, so a title the
+    script echoed earlier does not end the walk: :func:`title_echo` judges the
+    echo) whose answers are the same handle numbers, both builds then
+    :func:`_identify` every element, each by one distinct name, the same names
+    in both. The new build is then read as if SolidWorks had enumerated in the
+    base's order: the array's answer stays as recorded (the same numbers as
+    the base's), the pre-pass is put in the base's element order, and every
+    handle of an element (the element and what its pre-pass calls allocated)
+    is renamed, in the pre-pass and in every later call, to the base's handle
+    of the component of the same name. Anything else stays positional: components
     visited in enumeration order (as the explode authors' ``by_name`` dicts
     are, in insertion order) still differ, a request on another component
     than the base's still diverges, and a component that is not the base's
-    by name binds nothing."""
-    a, b = conv.recipe_calls(base.calls), conv.recipe_calls(new.calls)
+    by name binds nothing.
+
+    Each call is renamed once (:class:`_Renaming`): a call is renamed by
+    every array bound before it, so the walk keeps those renames composed
+    into one and renames each call as it passes it, then the rest after the
+    walk. Renaming the whole rest at each bound array cost dt_drive_train
+    (178 541 calls, 15 arrays) 25 s of a 42 s diff on 2026-11-14."""
+    a = conv.recipe_calls(base.calls)
+    b = _Renaming(conv.recipe_calls(new.calls))
     bound = 0
     index = 0
     while index < min(len(a), len(b)):
         x, y = a[index], b[index]
-        if conv.request_field(x, y.handle, y.op, y.args) is not None:
+        if not _issued_alike(x, y):
             break
         found = _bind(a, b, index)
+        b.keep(index)
         if found is None:
             index += 1
             continue
-        b, index = found
+        rename, prepass, index = found
+        b.bind(rename, prepass)
         bound += 1
     if not bound:
         return new, 0
     inert = [call for call in new.calls if call.origin is not conv.Origin.RECIPE]
-    return replace(new, calls=[*b, *inert]), bound
+    return replace(new, calls=[*b.calls(), *inert]), bound
+
+
+def _issued_alike(x: conv.Call, y: conv.Call) -> bool:
+    """Whether ``y`` is the request ``x`` but for title counters
+    (``request_field`` on :func:`_counterless` arguments). Arguments logged
+    alike (``conv.same``) are alike under any mask, so only the member and
+    the object are left to compare."""
+    if conv.same(x.args, y.args):
+        return (x.op, x.handle) == (y.op, y.handle)
+    mine = replace(x, args=_mapped(x.args, _counterless))
+    theirs = _mapped(y.args, _counterless)
+    return conv.request_field(mine, y.handle, y.op, theirs) is None
+
+
+class _Renaming(Sequence[conv.Call]):
+    """A recipe stream as :func:`name_bound` reads it: the calls the walk
+    kept, as renamed when it passed them, then the rest renamed by every
+    rename bound so far, composed into one (recorded handle to bound one)."""
+
+    def __init__(self, calls: list[conv.Call]) -> None:
+        self._calls = calls
+        self._kept: list[conv.Call] = []
+        self._mapping: dict[int, int] = {}
+        self._read: dict[int, conv.Call] = {}
+
+    def __len__(self) -> int:
+        return len(self._calls)
+
+    def __getitem__(self, index: int) -> conv.Call:
+        if index < len(self._kept):
+            return self._kept[index]
+        if index not in self._read:
+            self._read[index] = _renamed(self._calls[index], self._mapping)
+        return self._read[index]
+
+    def keep(self, index: int) -> None:
+        """Keep the call at ``index``, the next one, as renamed now."""
+        self._kept.append(self[index])
+        self._read.pop(index, None)
+
+    def bind(self, rename: dict[int, int], prepass: list[conv.Call]) -> None:
+        """Bind ``rename`` (current handles to bound ones) after the kept
+        calls: keep ``prepass`` (as read here) renamed by it, and rename every
+        later call by it too."""
+        composed = {raw: rename.get(now, now) for raw, now in self._mapping.items()}
+        for now, bound in rename.items():
+            composed.setdefault(now, bound)
+        self._mapping = composed
+        self._read = {}
+        self._kept.extend(_renamed(call, rename) for call in prepass)
+
+    def calls(self) -> list[conv.Call]:
+        """Every call: the kept ones, the rest renamed now."""
+        rest = range(len(self._kept), len(self._calls))
+        return [*self._kept, *(self[index] for index in rest)]
 
 
 @dataclass(frozen=True)
@@ -515,11 +610,12 @@ class _Identified:
 
 
 def _bind(
-    a: list[conv.Call], b: list[conv.Call], index: int
-) -> tuple[list[conv.Call], int] | None:
-    """``b`` with the array answered at ``index`` bound to ``a``'s by name
-    (:func:`name_bound`), and where its pre-pass ends; ``None`` when it is
-    no such array, or in the same order."""
+    a: list[conv.Call], b: Sequence[conv.Call], index: int
+) -> tuple[dict[int, int], list[conv.Call], int] | None:
+    """How the array answered at ``index`` binds to ``a``'s by name
+    (:func:`name_bound`): the handles of ``b`` to rename, ``b``'s pre-pass
+    in ``a``'s element order (not yet renamed), and where it ends; ``None``
+    when it is no such array, or in the same order."""
     elements = _handle_array(a[index].result)
     if elements is None or elements != _handle_array(b[index].result):
         return None
@@ -545,9 +641,7 @@ def _bind(
     if set(rename) != set(rename.values()):
         return None
     prepass = [right.calls[of[element]][count] for element, count in left.owners]
-    renamed = [_renamed(call, rename) for call in prepass]
-    rest = [_renamed(call, rename) for call in b[left.end :]]
-    return [*b[: index + 1], *renamed, *rest], left.end
+    return rename, prepass, left.end
 
 
 def _handle_array(answer: Any) -> list[int] | None:
@@ -565,7 +659,7 @@ def _is_handle(value: Any) -> bool:
 
 
 def _identify(
-    calls: list[conv.Call], index: int, elements: list[int]
+    calls: Sequence[conv.Call], index: int, elements: list[int]
 ) -> _Identified | None:
     """The calls right after the array answered at ``index`` when they
     identify every element by name and do nothing else: each addressed to
@@ -606,7 +700,13 @@ def _identify(
 
 def _renamed(call: conv.Call, rename: dict[int, int]) -> conv.Call:
     """``call`` with every handle in ``rename`` renamed: its object, its
-    arguments and its answer."""
+    arguments and its answer (``call`` itself when it holds none)."""
+    if not rename:
+        return call
+    if call.handle not in rename and not any(
+        handle in rename for handle in _handles([call.args, call.result, call.outs])
+    ):
+        return call
     return replace(
         call,
         handle=rename.get(call.handle, call.handle),
@@ -669,24 +769,317 @@ def _title_only(a: Any, b: Any) -> bool:
     )
 
 
-def title_echo(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> bool:
+def title_echo(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], kind: str = "part"
+) -> bool:
     """Whether two recipe streams are the same requests but for the title
     counters the script echoed: as many calls, each the same member on the same
     object with the same arguments once title counters (and the provenance
     value) are masked, and every answer the same but for noise (title
     counters included). A replay serving the base's answers would have issued
     the base's requests exactly. A difference anywhere else, a request or an
-    answer, is no echo, however late in the streams."""
+    answer, is no echo, however late in the streams.
+
+    A dependent's answers (:data:`DEPENDENT_KINDS`; a part's are judged as
+    above) may also differ where the seat made them differ, its requests the
+    base's throughout (:func:`_order_only`)."""
     if len(a) != len(b):
         return False
-    for x, y in zip(a, b, strict=True):
+    differing: list[int] = []
+    for index, (x, y) in enumerate(zip(a, b, strict=True)):
         if (x.handle, x.op, x.site) != (y.handle, y.op, y.site):
             return False
-        if _exact(_mapped(x.args, _text)) != _exact(_mapped(y.args, _text)):
+        if not conv.same(x.args, y.args) and _exact(_mapped(x.args, _text)) != _exact(
+            _mapped(y.args, _text)
+        ):
             return False
-        if not _close(_answer(x), _answer(y)):
+        if not _alike(_answer(x), _answer(y)):
+            if kind not in DEPENDENT_KINDS:
+                return False
+            differing.append(index)
+    return _order_only(a, b, differing)
+
+
+def _alike(a: Any, b: Any) -> bool:
+    """:func:`_close`, without measuring two values logged alike: equal as
+    logged (``conv.same``) is close unless a float is NaN, which no
+    tolerance holds."""
+    if conv.same(a, b) and not _nan(a):
+        return True
+    return _close(a, b)
+
+
+def _nan(value: Any) -> bool:
+    """Whether a logged value holds a NaN float."""
+    if isinstance(value, list):
+        return any(_nan(item) for item in value)
+    if not isinstance(value, dict):
+        return False
+    if _is_float(value):
+        return "n" in value["f"] and math.isnan(float.fromhex(value["f"]))
+    return any(_nan(item) for item in value.values())
+
+
+def _order_only(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], differing: list[int]
+) -> bool:
+    """Whether the answers at ``differing``, to the same requests in both
+    streams, differ only as the seat made them: each is a session read
+    (:data:`_SESSION_SITE`: the clock, the application's preferences) or a
+    read of an object an enumeration listed (:func:`_elements`: the outermost
+    handle array it descends from), and every such enumeration is the base's
+    in another order. That is, its elements' records (:func:`_records`: each
+    element's calls, in order, on it or on what it answered) are the base's
+    records, permuted: whole elements moved, no read and no question moved
+    between them. Every call on or with an object of such an enumeration must
+    be a read (:data:`_READ_KINDS`, or one of :data:`_READ_METHODS`): the
+    script only collected what it read, in whatever order the seat listed it.
+
+    2026-11-14, the first same-key pairs after #2730: ch_channel's
+    interference report (the same 86 pairs, their ``IInterference.Components``
+    names read late-bound, listed in another order) and dt_drive_train's
+    component-pattern name sets (``GetComponents`` read late-bound), each with
+    two SummaryInfo dates; then pd_paper_drive's interference report, its
+    components' paths and transforms read and one volume 5.2e-7 apart. An
+    answer outside any enumeration, an element whose record is not the
+    base's, or a call that acts on an element (a pick by position acts on
+    another component when the seat enumerated in another order) is no
+    echo."""
+    if not differing:
+        return True
+    element = _elements(a)
+    roots: set[int] = set()
+    for index in differing:
+        x = a[index]
+        if _SESSION_SITE.search(x.site):
+            continue
+        found = element(x.handle)
+        if found is None:
             return False
-    return True
+        roots.add(found[0])
+    if not roots:
+        return True
+    asked: dict[tuple[int, int], list[int]] = {}
+    for index, x in enumerate(a):
+        touched = [element(handle) for handle in (x.handle, *_handles(x.args))]
+        if not any(found is not None and found[0] in roots for found in touched):
+            continue
+        if x.kind not in _READ_KINDS and not (
+            x.kind is conv.Kind.CALL and x.site in _READ_METHODS
+        ):
+            return False
+        if touched[0] is not None and touched[0][0] in roots:
+            asked.setdefault(touched[0], []).append(index)
+    base = _records(a, asked, roots, element)
+    new = _records(b, asked, roots, _elements(b))
+    if base is None or new is None:
+        return False
+    return all(_permuted(base[root], new[root]) for root in roots)
+
+
+# An element's record (:func:`_records`): its calls' entries, and apart the
+# answers of its :data:`_APPROXIMATE` calls as ``[member, answer]``.
+_Record = tuple[list[Any], list[list[Any]]]
+
+
+def _records(
+    calls: Sequence[conv.Call],
+    asked: dict[tuple[int, int], list[int]],
+    roots: set[int],
+    element: Callable[[int], tuple[int, int] | None],
+) -> dict[int, dict[int, _Record]] | None:
+    """Per enumeration in ``roots``, each element's record in ``calls``: per
+    call at its ``asked`` indices, the member, the arguments and the answer,
+    handles erased and strings normalised (:func:`_keyed`), an
+    :data:`_APPROXIMATE` answer kept apart. A handle argument naming an object
+    of such an enumeration (``element``: :func:`_elements` of ``calls``) is
+    recorded as what it names (#2761): the element it descends from, by that
+    element's own record (its entries with such arguments erased), and its
+    place among the objects that element's calls allocated. Not by number:
+    the same request names another element once the seat listed them in
+    another order. ``None`` when such an argument names an element with no
+    record."""
+    related = [
+        found
+        for indices in asked.values()
+        for index in indices
+        for found in map(element, _handles(calls[index].args))
+        if found is not None and found[0] in roots
+    ]
+    if any(found not in asked for found in related):
+        return None
+    identity = _identities(calls, asked, roots, element) if related else None
+    records: dict[int, dict[int, _Record]] = {root: {} for root in roots}
+    for (root, member), indices in asked.items():
+        entries: list[Any] = []
+        approximate: list[list[Any]] = []
+        for index in indices:
+            entry, answer = _entry(calls[index], identity)
+            entries.append(entry)
+            if answer is not None:
+                approximate.append(answer)
+        records[root][member] = (entries, approximate)
+    return records
+
+
+def _identities(
+    calls: Sequence[conv.Call],
+    asked: dict[tuple[int, int], list[int]],
+    roots: set[int],
+    element: Callable[[int], tuple[int, int] | None],
+) -> Callable[[int], list[Any] | None]:
+    """Per handle, what :func:`_records` records a handle argument as: for an
+    object of an enumeration in ``roots``, its element's own record (digest)
+    and the object's place among those the element's calls allocated (the
+    element itself first); ``None`` for any other handle, erased."""
+    own = {
+        found: hashlib.sha256(
+            _exact([_entry(calls[index], None)[0] for index in indices]).encode()
+        ).hexdigest()
+        for found, indices in asked.items()
+    }
+    place: dict[int, int] = {}
+    allocated: Counter[tuple[int, int]] = Counter()
+    for call in calls:
+        for handle in _handles([call.result, call.outs]):
+            found = element(handle)
+            if handle in place or found is None or found[0] not in roots:
+                continue
+            place[handle] = allocated[found]
+            allocated[found] += 1
+
+    def identity(handle: int) -> list[Any] | None:
+        found = element(handle)
+        if found is None or found[0] not in roots:
+            return None
+        return [own[found], place[handle]]
+
+    return identity
+
+
+def _entry(
+    call: conv.Call, identity: Callable[[int], list[Any] | None] | None
+) -> tuple[list[Any], list[Any] | None]:
+    """A call as an element's record holds it (:func:`_records`): its member,
+    arguments and answer, handles erased (but those ``identity`` names) and
+    strings normalised; an :data:`_APPROXIMATE` member's answer apart, as
+    ``[member, answer]`` with handles erased."""
+    args = call.args if identity is None else _named(call.args, identity)
+    if call.site in _APPROXIMATE:
+        return [call.site, _keyed(args)], [call.site, _erased(_answer(call))]
+    return [call.site, _keyed(args), _keyed(_answer(call))], None
+
+
+def _named(value: Any, identity: Callable[[int], list[Any] | None]) -> Any:
+    """``value`` with each handle ``identity`` names replaced by its name."""
+    if isinstance(value, list):
+        return [_named(item, identity) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if _is_handle(value):
+        name = identity(value["h"])
+        return value if name is None else {"element": name}
+    return {key: _named(item, identity) for key, item in value.items()}
+
+
+def _permuted(base: dict[int, _Record], new: dict[int, _Record]) -> bool:
+    """Whether ``new``'s element records are ``base``'s in another order:
+    per element the same entries, and the :data:`_APPROXIMATE` answers of
+    elements with the same entries paired one to one within their tolerance
+    (:func:`_unassigned`, :func:`_approximately`)."""
+    groups: dict[str, tuple[list[Any], list[Any]]] = {}
+    for side, records in enumerate((base, new)):
+        for entries, approximate in records.values():
+            groups.setdefault(_exact(entries), ([], []))[side].append(approximate)
+    return all(
+        len(xs) == len(ys) and _unassigned(xs, ys, _approximately_all) is None
+        for xs, ys in groups.values()
+    )
+
+
+def _approximately_all(x: list[list[Any]], y: list[list[Any]]) -> bool:
+    """Two elements' :data:`_APPROXIMATE` answers (``[member, answer]``, in
+    the same members' order) alike, each within its member's tolerance."""
+    return all(
+        _approximately(p, q, _APPROXIMATE[site])
+        for (site, p), (_, q) in zip(x, y, strict=True)
+    )
+
+
+def _approximately(a: Any, b: Any, tolerance: float) -> bool:
+    """Two answers (handles erased) alike within ``tolerance``, relative: the
+    same structure and normalised strings, each float within ``tolerance``
+    of the larger of the two, so 0.0 only matches 0.0. A non-finite float
+    only matches itself: an infinity the same infinity, NaN nothing."""
+    left: list[float] = []
+    right: list[float] = []
+    if not _same_shape(a, b, left, right):
+        return False
+    return all(
+        x == y
+        or (
+            math.isfinite(x)
+            and math.isfinite(y)
+            and abs(x - y) <= tolerance * max(abs(x), abs(y))
+        )
+        for x, y in zip(left, right, strict=True)
+    )
+
+
+def _elements(calls: Sequence[conv.Call]) -> Callable[[int], tuple[int, int] | None]:
+    """Per handle, the outermost handle array (:func:`_handle_array`) its
+    object descends from, as an element or through what an element's calls
+    answered: that array's index and the element's handle. ``None`` for an
+    object no array listed. Each array's elements are read once, and each
+    object's answer is kept for the objects below it."""
+    origin: dict[int, int] = {}
+    for index, call in enumerate(calls):
+        for handle in _handles([call.result, call.outs]):
+            origin.setdefault(handle, index)
+    listed: dict[int, frozenset[int]] = {}
+    found: dict[int, tuple[int, int] | None] = {}
+
+    def lists(at: int, handle: int) -> bool:
+        if at not in listed:
+            listed[at] = frozenset(_handle_array(calls[at].result) or ())
+        return handle in listed[at]
+
+    def outermost(handle: int) -> tuple[int, int] | None:
+        path: list[int] = []
+        on_path: set[int] = set()
+        current = handle
+        while current not in found and current in origin:
+            if current in on_path:
+                return _walked(calls, origin, handle, lists)
+            path.append(current)
+            on_path.add(current)
+            current = calls[origin[current]].handle
+        root = found.get(current)
+        for node in reversed(path):
+            if root is None and lists(origin[node], node):
+                root = (origin[node], node)
+            found[node] = root
+        return found.setdefault(handle, root)
+
+    return outermost
+
+
+def _walked(
+    calls: Sequence[conv.Call],
+    origin: dict[int, int],
+    handle: int,
+    lists: Callable[[int, int], bool],
+) -> tuple[int, int] | None:
+    """:func:`_elements`' answer for an object whose allocations loop back
+    (a handle first logged by an unrecorded call): walked from it alone."""
+    root, seen, current = None, set(), handle
+    while current in origin and current not in seen:
+        seen.add(current)
+        at = origin[current]
+        if lists(at, current):
+            root = (at, current)
+        current = calls[at].handle
+    return root
 
 
 def _exact(value: Any) -> str:
@@ -755,7 +1148,7 @@ def outcome(
             [(site, request) for site, request, _ in keyed[0]],
             [(site, request) for site, request, _ in keyed[1]],
         ),
-        "answers": lambda: _answers_signal(*_distance_only(keyed, a, b, kind)),
+        "answers": lambda: _answers_signal(*_distance_only(keyed, a, b, kind), kind),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
         "pdf": lambda: _pdf_signal(*inks()),
         "sidecars": lambda: _sidecar_signal(base_sidecars, new_sidecars),
@@ -1373,10 +1766,17 @@ def _quantities(
 
 def _keyed_calls(calls: Sequence[conv.Call]) -> list[tuple[str, str, str | None]]:
     """Per call: member, request key, and answer key (``None`` for an answer
-    that is no multiset signal: mass properties, the session)."""
+    that is no multiset signal: mass properties, the session). A request key
+    is made once per distinct request as logged: dt_drive_train's 178 541
+    calls make 4 416 (2026-11-14)."""
     keyed: list[tuple[str, str, str | None]] = []
+    requests: dict[str, str] = {}
     for call in calls:
-        request = json.dumps([call.op, _keyed(call.args)], separators=(",", ":"))
+        logged = json.dumps([call.op, call.args], separators=(",", ":"))
+        request = requests.get(logged)
+        if request is None:
+            request = json.dumps([call.op, _keyed(call.args)], separators=(",", ":"))
+            requests[logged] = request
         answer = None
         if not (_MASS_SITE.search(call.site) or _SESSION_SITE.search(call.site)):
             answer = json.dumps(
@@ -1443,6 +1843,7 @@ def _answers_signal(
     b: Sequence[tuple[str, str, str | None]],
     calls_a: Sequence[conv.Call],
     calls_b: Sequence[conv.Call],
+    kind: str,
 ) -> tuple[Signal, dict[str, Any] | None]:
     """The multiset of (request, answer) keys (:func:`_keyed_calls`, per call
     of ``calls_a`` and ``calls_b``; no answer key: no signal). Keys that
@@ -1450,13 +1851,14 @@ def _answers_signal(
     (their multiset intersection), and per request (member and arguments)
     the answers left over in one build must pair one-to-one with the other's
     left over to that request (:func:`_unassigned`) within float noise
-    (:func:`_answer_close`). A request with more answers left over in one
-    build (answered more often), or an answer left unpaired, is different
-    (:func:`_multiset_signal`'s detail). Pairing only the leftovers keeps
-    the work to the answers that differ, whatever the request's count; a
-    leftover that only some exactly matched answer could have absorbed stays
-    unpaired (different: the safe direction). Same after pairing: per member,
-    how many answers were paired."""
+    (:func:`_answer_close`; a dependent's :data:`_APPROXIMATE` member within
+    its tolerance, :func:`_approximately`). A request with more answers left
+    over in one build (answered more often), or an answer left unpaired, is
+    different (:func:`_multiset_signal`'s detail). Pairing only the leftovers
+    keeps the work to the answers that differ, whatever the request's count;
+    a leftover that only some exactly matched answer could have absorbed
+    stays unpaired (different: the safe direction). Same after pairing: per
+    member, how many answers were paired."""
     left = [(k, c) for k, c in zip(a, calls_a, strict=True) if k[2] is not None]
     right = [(k, c) for k, c in zip(b, calls_b, strict=True) if k[2] is not None]
     signal, detail = _multiset_signal([k for k, _ in left], [k for k, _ in right])
@@ -1473,16 +1875,28 @@ def _answers_signal(
             if wanted[key] > 0:
                 wanted[key] -= 1
                 answers[key[:2]][side].append(_erased(_answer(call)))
-    for xs, ys in answers.values():
-        if len(xs) != len(ys) or _unassigned(xs, ys, _answer_close) is not None:
+    tolerances = _APPROXIMATE if kind in DEPENDENT_KINDS else {}
+    for (member, _), (xs, ys) in answers.items():
+        close = _answer_close
+        if member in tolerances:
+            close = functools.partial(_approximately, tolerance=tolerances[member])
+        if len(xs) != len(ys) or _unassigned(xs, ys, close) is not None:
             return signal, detail
     paired: Counter[str] = Counter()
     for key, count in leftover[0].items():
         paired[key[0]] += count
     return Signal.SAME, {
-        member: f"{count} answers within {_ANSWER_ULPS} ulps of the other build's"
+        member: f"{count} answers within {_paired_within(member, tolerances)} of the "
+        "other build's"
         for member, count in sorted(paired.items())
     }
+
+
+def _paired_within(member: str, tolerances: dict[str, float]) -> str:
+    """How close :func:`_answers_signal` paired ``member``'s answers."""
+    if member in tolerances:
+        return f"{tolerances[member]:g} (relative)"
+    return f"{_ANSWER_ULPS} ulps"
 
 
 def _answer_close(a: Any, b: Any) -> bool:

@@ -14,8 +14,8 @@ from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
-from _mcmaster_9666k56 import DIA
-from _mcmaster_9666k56_reference import (
+from _mcmaster_9666k142 import DIA
+from _mcmaster_9666k142_reference import (
     SUPPLIER_DIAMETER_CALLOUT,
     SUPPLIER_DIAMETER_PRECISION,
     SUPPLIER_REFERENCE_CONFIGURATION,
@@ -33,9 +33,9 @@ from _supplier_spring_drawing import (
     reacquire_supplier_dimensions,
 )
 
-STOCK_SCALE = (20, 1)
+STOCK_SCALE = (75, 1)
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
-# Sheet metres: the circle (15.7 mm at 20:1) centred left of the title block,
+# Sheet metres: the circle (15.2 mm at 75:1) centred left of the title block,
 # its Ø text up-right on the leader, the view label under the padded outline.
 # The two-line REF (Ø, then PER SUPPLIER) hangs its shoulder under the second
 # line: at y .183 that shoulder ran across the circle's top (177.9 mm), so the
@@ -53,7 +53,7 @@ STOCK_FIELD = (0.100, 0.130, 0.260, 0.220)
 def _delete_center_marks(adapter, view) -> None:
     """Delete the template's mark on the stock circle and read none back.
 
-    Its arms scale with the 20:1 view (50 mm cross plus 8 mm extensions) and
+    Its arms scale with the 75:1 view and
     run off the sheet. The circle locates nothing; the native diameter is the
     replacement datum.
     """
@@ -115,7 +115,7 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
         raise RuntimeError("cannot position native supplier wire diameter")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     options = {
-        "label": "9666K56 supplier nominal wire diameter",
+        "label": "9666K142 supplier nominal wire diameter",
         "units": "in",
         "precision": SUPPLIER_DIAMETER_PRECISION,
         "expected_mm": DIA,

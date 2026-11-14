@@ -16,6 +16,8 @@ import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
+from _inch_fraction import inch_fraction
+from sh_vn_music_wire_lever_geom import TOGGLE_LENGTH as _TOGGLE_LENGTH
 import ch_vn_spring_hook_spec
 import fr_top_frame_spec
 from ha_harmonic_analyzer_assembly_spec import (
@@ -271,7 +273,10 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "ONE FULL TURN, TO THE RADIAL WIRE TIE HOLE IN THE MHA-MG-05 RIM.",
         "PASS THE WIRE THROUGH THE HOLE AND DRAW IT UNTIL THE MHA-PN-07 STUD "
         "HEAD TOP HANGS THE SHEET 1 DROP BELOW THE MHA-MG-08 BAR TOP.",
-        "TIE THE WIRE OFF INSIDE THE RIM AT THAT DROP.",
+        "KNOT THE WIRE INSIDE THE RIM AT THAT DROP ROUND A "
+        f"{inch_fraction(_TOGGLE_LENGTH, what='wire toggle')} LONG OFFCUT OF "
+        "THE WIRE LAID ACROSS THE HOLE.",
+        "CHECK: THE KNOT DOES NOT SLIP UNDER A LIGHT PULL BY HAND.",
         "TRIM THE TAIL.",
     ),
     # The parked, as-modelled nib: the views show it here, a feeler's gap
