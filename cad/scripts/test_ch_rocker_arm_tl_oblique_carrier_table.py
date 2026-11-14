@@ -40,7 +40,6 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
     assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert not hasattr(drawing, "SECTION_NOTE")
-    assert "_label_section_hole(adapter, section)" in inspect.getsource(drawing._pin_section)
     assert sorted(tag for tags, _note in table.NOTE_GROUPS for tag in tags) == sorted(TABLED)
     assert "HUB: 8-32 AT ASSEMBLY" in dict(table.NOTE_GROUPS)[("CL", "CR", "HUB")]
     assert table.ORIGIN_NOTE.endswith("; HUB X/Y REF")
@@ -72,15 +71,21 @@ def test_owner_pin_only_bounds_and_rounded_budget():
         name: spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
         for name, error in spec.PIN_RELATIVE_ERROR.items()
     })
-    assert spec.HUB_RADIAL_STACK == pytest.approx(.12588, abs=5e-6)
-    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.11218, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.14971, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.24419, abs=5e-6)
+    assert spec.HUB_RADIAL_STACK == pytest.approx(.14832, abs=5e-6)
+    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.13462, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.17215, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.26662, abs=5e-6)
     assert spec.PIN_RELATIVE_REMAINING == pytest.approx({
         name: half - stack for name, stack in spec.PIN_RELATIVE_STACK.items()
     })
-    assert min(spec.PIN_RELATIVE_REMAINING.values()) > 0
-    assert spec.HUB_RADIAL_STACK <= .005 * I
+    # RV-03 (owner 2026-11-13): the outer edge runs .0005 over the half band
+    # at the worst-case corner; the inner edge stays inside it.
+    assert spec.PIN_RELATIVE_OWNER_OVERRUN == pytest.approx(.0005 * I)
+    assert spec.PIN_RELATIVE_REMAINING["inner"] > 0
+    assert -spec.PIN_RELATIVE_OWNER_OVERRUN <= spec.PIN_RELATIVE_REMAINING["outer"] < 0
+    # The retired .005 PIN_RELATIVE_ALLOWANCE no longer bounds the HUB stack:
+    # the functional limit is the half band, charged with every term above.
+    assert spec.HUB_RADIAL_STACK < half
 
 
 @pytest.mark.parametrize("hub_stack_in,fits", [(.004956, True), (.0053, True), (.0061, False), (.0065, False)])
@@ -237,7 +242,7 @@ def test_size_groups_are_one_merged_note_each_with_their_count_and_flags():
     NOTE 1 or 2 govern flag them there (rule 7)."""
     notes = dict(table.NOTE_GROUPS)
     assert notes[("A1", "B1", "A2", "B2")] == (
-        "<MOD-DIAM>.3760-.3765\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
+        "<MOD-DIAM>.3760-.3770\n4X REAM THRU\nRUNNING FIT ON TL-VN-77\nSEE NOTES 1, 2"
     )
     # CL/CR are bench-drilled (2X, as sheet 1); the HUB, the same #8-32 tap
     # in the same native run, is made at assembly and says so on its own
@@ -1101,7 +1106,7 @@ def _imported(monkeypatch, places_by_name):
 def test_imported_precision_contract_is_exactly_what_the_sheet_imports():
     imported = set().union(*spec.DRAWING_DIMENSIONS.values()) - drawing.TABLE_ROW_DIMENSIONS
     assert set(drawing.IMPORTED_PRECISION) == imported
-    assert imported == set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM)
+    assert imported == set(drawing.TOP_KEEP) | set(drawing.EDGE_KEEP_MODEL_MM)
     assert all(drawing.IMPORTED_PRECISION[name] == spec.DRAWING_PRECISION_BY_NAME[name] for name in imported)
     source = inspect.getsource(drawing.build)
     assert "assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)" in source

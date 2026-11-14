@@ -146,7 +146,7 @@ Owner rulings (Pedro), recorded for the cutover:
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
 `prechips:<stem>` task: the oblique-trammel base bar, end bracket, feed
-lever, riser, pivot block, feed block and leadscrew kit. `build` and `release` do not run it, and releases carry no travelers while
+lever, riser, pivot block, feed block, leadscrew kit and carrier. `build` and `release` do not run it, and releases carry no travelers while
 prechips stabilises. Each run renders two travelers from the same plan:
 `traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
 setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
@@ -233,6 +233,20 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   fillet, not an authored radius. The saw cut at 11.85 is the finished grip
   end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
   has no second vise setup.
+
+The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
+is enrolled. It needs prechips 0.11.1 (the `harmonic_carrier` adapter with
+its `block_tolerance_in` refusal, and the `jig-carrier-*` pictures), and passes
+both profiles under `@latest` with every check enforced. The 20.5 in plate is made flat on the table, vise off,
+on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
+2026-11-05/06), placed between hole columns, as the registry note now says
+(on edge in the vise the jaws grip at most 1.77 in of the 6 in-tall bar, under
+the one-third rule). Strap toes land on the blocks. Holes run from
+the lower-left corner as sheet 2 prints them, from one DRO zero; note 2's
+relations (B1, A2, B2, CL, CR, R1-R4 from A1 and the A1-B1 line) are inspected
+before tapping by centring the DTI on a pin in each hole. The .3760-.3770 bores
+are checked .376 GO / .377 NO-GO with the owned pin-gauge set, and their
+underside edges carry the title-block break only (owner rulings 2026-11-13).
 
 The pivot block (`ch_rocker_arm_tl_oblique_pivot_block`, TL-22) and feed block
 (`ch_rocker_arm_tl_oblique_feed_block`, TL-32) plans are written fresh against

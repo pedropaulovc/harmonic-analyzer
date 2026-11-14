@@ -1954,7 +1954,7 @@ def test_rail_setting_chain_uses_the_gauge_block_set_and_closes_the_stack() -> N
     assert spec.STATION_BAND == pytest.approx(0.0005 * inch)
     assert len(spec.GAUGE_BLOCKS_TENTHS) == len(set(spec.GAUGE_BLOCKS_TENTHS)) == 81
     assert spec.CHAIN_STATION_RADIUS == pytest.approx(0.0184, abs=0.0005)
-    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1509, abs=0.0005)
+    assert spec.CHAIN_RADIAL_STACK == pytest.approx(0.1733, abs=0.0005)
     assert spec.CHAIN_RADIAL_STACK <= spec.trammel.TOP_EDGE_HALF_BAND
     assert [row[:2] for row in spec.RAIL_SETTING_ROWS] == [("4.00", "ORIGIN"), ("11.00", "S 4.00")]
     for (near, far), row in zip(spec._CHAIN_LINKS, spec.RAIL_SETTING_ROWS, strict=True):

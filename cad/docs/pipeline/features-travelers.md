@@ -271,7 +271,8 @@ disjoint fields; no field is duplicated. See
 `ch_rocker_arm_tl_oblique_end_bracket`,
 `ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
 `ch_rocker_arm_tl_oblique_pivot_block`, `ch_rocker_arm_tl_oblique_feed_block` and
-`ch_rocker_arm_tl_vn_oblique_leadscrew_kit`.
+`ch_rocker_arm_tl_vn_oblique_leadscrew_kit` and
+`ch_rocker_arm_tl_oblique_carrier`.
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
@@ -365,6 +366,8 @@ THRU ALL`, +.004/0, owner ruling 2026-11-13), so its plan's drill passes
 `tool_sizing`; its plan reads the grip-corner fillet the manifest now exports
 and so needs prechips 0.11.0 (released). The riser's plan needs prechips 0.11.0 (its
 `harmonic_riser` adapter) and passes both profiles on its v49 manifest.
+The carrier's plan needs prechips 0.11.1 (`harmonic_carrier`, released) and
+passes both profiles on its v50 manifest.
 prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.

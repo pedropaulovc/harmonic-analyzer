@@ -275,7 +275,7 @@ def test_sensitivities_match_the_brief() -> None:
     assert f"{0.1 * trammel.RADIUS_PER_SPACING:.2f}" == "0.18"
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 
-    # The carrier's REAM_SLIDE pin hole on the bought shoulder.
+    # The carrier's reamed pin hole on the bought shoulder.
     assert trammel.SHOULDER_CARRIER_CLEARANCE == pytest.approx(
         (carrier.PIN_CLEARANCE_MIN, carrier.PIN_CLEARANCE_MAX)
     )
@@ -300,9 +300,9 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     assert trammel.CARRIAGE_PLAY_RADIUS <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     budget = trammel.CARRIAGE_PLAY_RADIUS + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert budget <= half_band
-    # .020 + .112 leaves .122 here; the complete carrier stack also charges
+    # .020 + .135 leaves .099 here; the complete carrier stack also charges
     # HUB setting/rounding and the correlated pin error against that same HUB.
-    assert half_band - budget == pytest.approx(0.122, abs=5e-4)
+    assert half_band - budget == pytest.approx(0.0994, abs=5e-4)
 
 
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:

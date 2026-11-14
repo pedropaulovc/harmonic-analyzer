@@ -65,11 +65,11 @@ Error sensitivity (printed next to the bands that carry it):
   ``carrier_spec.correlated_pin_budget``. Rail alignment keeps its
   assembly-owned .0008.
 * shoulder/carrier clearance: the purchased Ø.375 shoulder (-.001/0) in the
-  carrier's .3760-.3765 REAM_SLIDE hole gives .0010-.0025 (0.025-0.064 mm)
-  diametral clearance. This can move the edge 1:1; it is not a
+  carrier's .3760-.3770 reamed hole (owner ruling 2026-11-13) gives
+  .0010-.0030 (0.025-0.076 mm) diametral clearance. This can move the edge 1:1; it is not a
   bearing-internal-play budget. The two supports' opposite radial take-up can
   change spacing by one diametral clearance, so the radius contribution is
-  ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.112 mm).
+  ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.135 mm).
   The block's locating counterbore has its own shoulder-clearance budget;
   there are no rolling bearings, press fits or mounted C3-play assumptions.
 * carriage play: lateral play of a carriage on its rail moves the pin
@@ -83,8 +83,10 @@ Error sensitivity (printed next to the bands that carry it):
   keeping the two tightest of the four kit carriages. Its radius contribution
   ``CARRIAGE_PLAY_RADIUS`` is 0.020 mm. ``carrier_spec.pin_relative_stack``
   adds it once to the HUB setting stack (already including shoulder clearance)
-  and each pass's correlated pin error: outer 0.24419, inner 0.14971 mm,
-  both inside the unchanged 0.254 mm half-band. The rail/carriage pair's
+  and each pass's correlated pin error: outer 0.26662, inner 0.17215 mm.
+  The outer edge's linear worst case is .0005 over the unchanged 0.254 mm
+  half-band; the owner accepts that overrun (2026-11-13, the carrier row's
+  machinist exception RV-03). The rail/carriage pair's
   height and width tolerances do not apply: one carriage runs on each rail,
   the selected shims set the carrier height, and the strap HUB is reamed
   in place. Z0 preload and C accuracy are not required for a passing kit
@@ -354,9 +356,9 @@ RADIUS_PER_TENTH_DEG = (
     D1 * math.cos(ALPHA) / (2.0 * math.sin(ALPHA) ** 2) * math.radians(0.1)
 )
 RADIUS_PER_SPACING = 1.0 / (2.0 * math.sin(ALPHA))  # dR/dD
-# Diametral: the .3760-.3765 REAM_SLIDE carrier hole on the bought .375 -.001/0
-# shoulder (carrier_spec PIN_CLEARANCE_MIN/MAX, .0010-.0025).
-SHOULDER_CARRIER_CLEARANCE = (0.0254, 0.0635)
+# Diametral: the .3760-.3770 carrier hole (owner ruling 2026-11-13) on the
+# bought .375 -.001/0 shoulder (carrier_spec PIN_CLEARANCE_MIN/MAX, .0010-.0030).
+SHOULDER_CARRIER_CLEARANCE = (0.0254, 0.0762)
 RADIUS_FROM_SHOULDER_CLEARANCE = (
     RADIUS_PER_SPACING * SHOULDER_CARRIER_CLEARANCE[1]
 )

@@ -12,12 +12,12 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
 * the four reamed pin holes are one Top-plane sketch: A1 from the origin, B1
   from A1 by the spacing D1, A2 from A1 and B2 from B1 by their (dX, dY)
   chains, cut through;
-* a 45 degree chamfer on each pin hole's underside edge (``PinChamfer``)
-  preserves a clean entry over the purchased spacer's thrust face; its printed leg lives in the hidden
-  ``SectionReference``, on ``SectionAPlane`` (section A-A's hidden cutting
-  plane, coincident with the Front plane: the A1-B1 pin line), which drives
-  the feature's distance and carries the finished thickness section A-A prints,
-  driven from Plate's depth;
+* the pin holes' underside edges carry only the title block's edge break
+  (owner ruling 2026-11-13: no chamfer; the purchased spacer seats on the
+  broken edge). The hidden ``SectionReference``, on ``SectionAPlane``
+  (coincident with the Front plane: the A1-B1 pin line), carries the
+  finished thickness the drawing's edge view prints, driven from Plate's
+  depth, its line on the plate's -X end face;
 * ``StationReference`` retains the unchanged hidden model baseline drivers;
   only EdgeX prints as a dimension. The drawing's native hole table reads
   the actual hole axes from A1; the tap placements stay origin-based;
@@ -64,7 +64,6 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-import _telemetry
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -107,12 +106,8 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     STATION_REFERENCE,
     STATIONS,
     THICKNESS,
-    PIN_CHAMFER,
-    PIN_CHAMFER_BAND,
     SECTION_PLANE,
     SECTION_REFERENCE,
-    STOCK_REFERENCE_DX,
-    PIN_CHAMFER_TOL_TYPE,
     UNIT,
 )
 
@@ -134,9 +129,6 @@ _UP = (0.0, 1.0, 0.0)  # the top face's outward normal (model +Y)
 _R_PIN = PIN_HOLE_DIA / 2.0
 V_PLATE = PLATE_LENGTH * PLATE_WIDTH * THICKNESS
 V_PINS = len(PIN_HOLES) * math.pi * _R_PIN**2 * THICKNESS
-# Each 45 degree chamfer removes a triangle of legs c revolved about the hole
-# axis at its centroid radius r + c/3 (pn_pen_v_block's chamfer volume).
-V_PIN_CHAMFER = len(PIN_HOLES) * math.pi * PIN_CHAMFER**2 * (_R_PIN + PIN_CHAMFER / 3.0)
 
 
 def _top(point: tuple[float, float]) -> list[float]:
@@ -381,63 +373,21 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
     SECTION_PLANE is coincident with the Front plane, model Z = 0, the A1-B1
     pin line, so section A-A cuts along it. A partial section imports a hidden
     sketch in its plane but not Plate's depth (jig-r4/r5), so this sketch
-    carries both printed values:
-
-    * one construction chord on A1's -X wall, from the chamfer's rim on the
-      underside to its foot on the bore wall (pn_pen_v_block's
-      ``_pivot_reference``): the foot from the origin (2), the run (printed)
-      and the drop = 4 dims for the line's 4 DOF. The foot follows A1 and the
-      plate; the drop and the chamfer feature follow the run;
-    * one vertical construction line through the stock in A1's +X wall,
-      STOCK_REFERENCE_DX from A1's axis: its top on the top face (a
-      horizontal-points relation to the origin) and its station from the
-      origin, vertical, and its length (printed) driven from Plate's depth.
+    carries the printed thickness: one vertical construction line on the
+    plate's -X end face: its top on the top face (a horizontal-points
+    relation to the origin) and its station from the origin driven from
+    PlateHalfLength, vertical, and its length (printed) driven from Plate's
+    depth. On the end face the drawing's edge view draws it under the
+    plate's own outline: inside the plate (A1's +X wall, for the retired
+    section A-A) it printed as a stray dashed line across the edge view
+    (machinist review, run 20261114T064216453Z-bf464d35, FIX).
     """
     feature = SECTION_REFERENCE
-    x_wall = PIN_HOLES["A1"][0] - _R_PIN
     _section_plane(adapter)
     check(f"create_sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=feature)
-    rim = to_sketch((x_wall - PIN_CHAMFER, -THICKNESS, 0.0))
-    foot = to_sketch((x_wall, -THICKNESS + PIN_CHAMFER, 0.0))
-    set_sketch_direct_db(adapter, True)
-    leg = check(feature, await adapter.add_line(*rim, *foot))
-    set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not segment.ConstructionGeometry:
-        raise RuntimeError(f"{feature}: construction flag rejected")
     dims = SketchDims()
-    await anchor_point_to_origin(
-        adapter, f"{leg}.end", *foot, f"{feature} chamfer foot on the A1 wall"
-    )
-    dims.record(
-        "PinChamferFootX",
-        '"A1X@PinHoleProfile" + "PinHoleDia@PinHoleProfile" / 2',
-    )
-    dims.record(
-        "PinChamferFootY",
-        f'"PlateThick@Plate" - "PinChamferSize@{feature}"',
-    )
-    await dimension_between(
-        adapter,
-        f"{leg}.start",
-        f"{leg}.end",
-        "horizontal_distance",
-        PIN_CHAMFER,
-        f"{feature} chamfer run",
-    )
-    dims.record("PinChamferSize")
-    await dimension_between(
-        adapter,
-        f"{leg}.start",
-        f"{leg}.end",
-        "vertical_distance",
-        PIN_CHAMFER,
-        f"{feature} chamfer drop",
-    )
-    dims.record("PinChamferDrop", f'"PinChamferSize@{feature}"')
-    x_stock = PIN_HOLES["A1"][0] + STOCK_REFERENCE_DX
+    x_stock = OUTLINE_X[0]
     top = to_sketch((x_stock, 0.0, 0.0))
     bottom = to_sketch((x_stock, -THICKNESS, 0.0))
     set_sketch_direct_db(adapter, True)
@@ -450,7 +400,7 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
     await anchor_point_to_origin(
         adapter, f"{stock}.start", *top, f"{feature} stock line on the top face"
     )
-    dims.record("StockLineX", f'"A1X@PinHoleProfile" - {STOCK_REFERENCE_DX:g}')
+    dims.record("StockLineX", '"PlateHalfLength@PlateProfile"')
     check(
         f"vertical {feature} stock line",
         await adapter.add_sketch_constraint(stock, None, "vertical"),
@@ -469,36 +419,6 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     return dims.apply(adapter, feature)
-
-
-def _pin_chamfer_min_limit(adapter) -> None:
-    """The printed chamfer leg as a single MIN limit carrying its band's
-    deviations (build_pn_pen_v_block._single_limits): the native type prints
-    the nominal, so the nominal is the floor."""
-    lower, upper = deviations(PIN_CHAMFER_BAND)
-    label = f"PinChamferSize@{SECTION_REFERENCE}"
-    _, dimension = _named_dimension(adapter, SECTION_REFERENCE, "PinChamferSize")
-    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, PIN_CHAMFER / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the floor {PIN_CHAMFER}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = PIN_CHAMFER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != PIN_CHAMFER_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {PIN_CHAMFER:g} MIN")
 
 
 def _author_outer_pin_rows(adapter) -> None:
@@ -578,23 +498,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PinHoles")
     volume = await volume_check(adapter, "pin holes", volume - V_PINS, 0.01 * V_PINS)
 
-    # --- Unchanged underside entry chamfer on every shoulder-screw bore ------
-    # The printed leg first: the hidden reference sketch that drives the
-    # feature's distance, ahead of it in the tree.
+    # --- Section A-A's hidden thickness reference ----------------------------
+    # The pin holes' underside edges carry the title block's edge break only.
     drive_jobs += await _section_reference(adapter)
-    check(
-        "chamfer pin holes",
-        await adapter.add_chamfer(
-            PIN_CHAMFER,
-            [[x - _R_PIN, -THICKNESS, -y] for x, y in PIN_HOLES.values()],
-        ),
-    )
-    name_last_feature(adapter, "PinChamfer")
-    chamfer_distance = name_dimensions(adapter, "PinChamfer", ["PinChamferDist"])[0]
-    drive_jobs.append((chamfer_distance, f'"PinChamferSize@{SECTION_REFERENCE}"'))
-    volume = await volume_check(
-        adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
-    )
 
     # --- X stations from A1 ---------------------------------------------------
     # The printed baselines first: the hidden sketch of points that drives
@@ -707,18 +613,20 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # Rule 4: the reamed pin holes; the band is millimetres, UNIT prints it
-    # in inches. The native table owns every location at the title block.
+    # in inches at the nominal's four places (+.0020/+.0010: inch tolerances
+    # carry the dimension's places, ASME Y14.5 inch practice). The native table
+    # owns every location at the title block.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",
         "PinHoleDia",
         *deviations(PIN_HOLE_BAND),
+        places=DRAWING_PRECISION["PinHoleProfile"]["PinHoleDia"],
         display_unit=UNIT,
     )
     # Owner's flagged .964 ±.002 control: unchanged geometric nominal,
     # actual native limits shifted to the printed nominal, never a draw edit.
     _author_outer_pin_rows(adapter)
-    _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

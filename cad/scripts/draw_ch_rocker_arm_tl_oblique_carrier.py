@@ -12,11 +12,11 @@ The HUB, an ordinary #8-32 tap drilled and tapped at assembly
 hole-location dimensions remain.
 
 The CARRIER sheet keeps the outline, the reamed size and its running fit,
-the native tap callouts, each naming its mate, and section A-A (3:1,
-labelled SECTION A-A, HOLE A1 and cropped to A1's slab, carrying the
-finished thickness and underside chamfer; its cutting plane a short whole
-line across A1 alone, rule 9); the shaded isometric stands
-above the title block. The HOLE TABLE sheet holds the thirteen-row table and
+the native tap callouts, each naming its mate, and the plate's edge view
+under the top view, carrying the finished thickness (the bores' underside
+edges carry the title block's break only, owner ruling 2026-11-13); the
+shaded isometric stands above the title block. The HOLE TABLE sheet holds
+the thirteen-row table and
 its tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout,
 which says it is drilled and tapped at assembly, and its position from A1 as
 two parenthesized REFERENCE dimensions.
@@ -32,10 +32,8 @@ from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    curate_dimensions,
     dimension_name,
     place_view,
-    view_name,
     visible_component_entities,
 )
 
@@ -49,12 +47,10 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_detail_projection import settle_detail_projection
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_reference_dimension,
@@ -73,14 +69,11 @@ from _oblique_carrier_hole_table import (
     create_carrier_hole_table,
     table_location,
 )
-from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_oblique_carrier_spec as part_spec
@@ -122,7 +115,7 @@ SHEET_NAMES = ("CARRIER", "HOLE TABLE", "HUB CLAMP")
 # the plate (its top now ~256 mm, the border 266.7). The corner datum rises
 # with it, and TABLE_ANCHOR with the datum.
 TABLE_VIEW_CENTER = (0.222, 0.225)
-# The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
+# The iso (~58 x 34 mm at 1:8) right of the edge view and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
 ISO_NOTE_XY = (0.356, 0.082)
@@ -138,8 +131,10 @@ _A1 = part_spec.PIN_HOLES["A1"]
 # (1:2: sheet x = 222 + X/2, y = 175 + Y/2). Only outline and native size
 # controls remain; the table owns all locations, A1's from the plate's
 # corner too, so the left end's and the -Y edge's dimensions to A1 are gone.
+# The 20.5 stands at sheet y ~100, above the edge view (EDGE_CENTER), so its
+# extension lines stop short of that view's ends.
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
-    "PlateLength": _xy(56.0, -194.4),
+    "PlateLength": _xy(56.0, -150.0),
     "PlateWidth": _xy(279.0, -8.0),
     # B9e4's complete native/PDF glyph block reaches y 164.57: the whole block
     # stands 16 sheet mm lower, its mate wrapped to two rows (x ~21..84).
@@ -165,107 +160,38 @@ PIN_FIT_CALLOUT = (
 )
 CALLOUTS_BELOW = {**part_spec.CALLOUTS_BELOW, "PinHoleDia": PIN_FIT_CALLOUT}
 
-# Section A-A along the pin line (model Z = 0), at 3:1, +Y up, its cut
-# direction SolidWorks' own, cropped to A1's slab. It is a FULL section: the
-# carrier-diag farm probe (run 20261017T063649278Z) measured that the PARTIAL
-# section through a short interior line imports nothing at all (no marked
-# dimension even from the entire model; selected SectionReference or Plate
-# through the base view: an empty array), while a full section through the
-# same line, same selection, imports PinChamferSize and StockThick. A full
-# section's line must still cross the part: through that 18 mm interior line
-# carrier r11 printed the slab uncut (unhatched, no bore), its stock
-# extension lines ~800 mm long over the iso and the title block
-# (_drawing_sections.create_section_view: a short line does not close the
-# cut). So the line runs past both plate ends: its right end (sheet x 415)
-# beyond the right lanes, its left (x 51) between the two outer left lanes.
-# A full section at 3:1 is 1.6 m wide, so a Crop2 fence keeps the cut's own
-# span (fr_nameplate's _crop_section). The finished thickness is the native
-# SectionReference StockThick dimension (driven from Plate's depth). Its dimensions
-# are imported BEFORE the crop: cropped (jig-r9, c4-r4), the same import
-# delivered PinChamferSize but not StockThick, whose stock line stands 0.5 mm
-# inside the fence's +X end and whose sketch text stands 5 mm past it.
-# Already imported, they are placed again once the cropped view is centred.
-# Carrier r11 and r13 printed the 12.0's extension lines from ~863 mm right
-# of the slab (over the title block, past the border) wherever the view and
-# its text stood, so the thickness text stands on A1's -X side and its
-# extension lines are capped (STOCK_WITNESS_MAX_M, draw_dt_pinion_cam's
-# _limit_witness_lines) to run from its dimension line to just short of the
-# slab's -X end: from that side an origin anywhere at A1's +X side, the far
-# one or the true stock line, leaves the same short pair.
-SECTION_SCALE = (3, 1)
-_SECTION_HALF = part_spec.SECTION_HALF_SPAN  # about A1's axis, model mm
-_SECTION_LINE_X = (386.0, -342.0)  # carrier X, +X end first
-SECTION_LINE_MODEL_MM = tuple((x, 0.0, 0.0) for x in _SECTION_LINE_X)
-# Owner review 2026-11-07 (rule 9): a cutting plane is one whole line joining
-# both arrows, and a section showing one hole has a short plane across that
-# hole only. The cut is made through the long line above (so it closes and
-# imports), then made partial and its drawn line shortened across A1
-# (``_shorten_section_line``); the document's line style draws it whole.
-# ±24 model mm (±12 sheet mm at 1:2): each arrow rises ~12 sheet mm and its
-# letter ~5 more, so the left one stands clear left of A2's bore (sheet -6.0
-# to -1.2 from A1's axis, 9.8 up) and both stay inside the plate's left end
-# (-17.6).
-SECTION_SHORT_HALF = 24.0
-SECTION_SHORT_X = (_A1[0] + SECTION_SHORT_HALF, _A1[0] - SECTION_SHORT_HALF)
-# swDetailingSectionViewLineStyleDisplay_StandardWithConnector.
-SECTION_LINE_STYLE = 0
-# The crop fence's corners, model mm on the cut plane: the cut's span, the
-# stock's thickness and 1 mm above and below it.
-SECTION_CROP_MODEL_MM = (
-    (_A1[0] - _SECTION_HALF, -part_spec.THICKNESS - 1.0, 0.0),
-    (_A1[0] + _SECTION_HALF, 1.0, 0.0),
-)
-# The most a cropped outline's width runs past its fence's (sheet m): the
-# measured margins, +19 to +25.6 mm (_crop_section), and room besides.
-_CROP_OUTLINE_SLACK_M = 0.040
-# Machinist review mr4: the cropped slab's square hatch ends read as the
-# part's own ends. A long-break line (thin, one Z: draw_fr_nameplate's
-# SECTION_BREAK) stands on each crop edge across the cut, past the top and
-# bottom faces by _SECTION_BREAK_OVERRUN (inside the fence's 1 mm), its Z at
-# mid-thickness, one tip each side of the edge (model mm on the cut plane).
-# At -X the thickness's witness lines stop 1.5 sheet mm short of it.
-_SECTION_BREAK_OVERRUN = 0.6
-_SECTION_BREAK_MID = -part_spec.THICKNESS / 2.0
-SECTION_BREAKS = tuple(
-    tuple(
-        (x + dx, y, 0.0)
-        for dx, y in (
-            (0.0, _SECTION_BREAK_OVERRUN),
-            (0.0, _SECTION_BREAK_MID + 1.5),
-            (1.0, _SECTION_BREAK_MID + 0.75),
-            (-1.0, _SECTION_BREAK_MID - 0.75),
-            (0.0, _SECTION_BREAK_MID - 1.5),
-            (0.0, -part_spec.THICKNESS - _SECTION_BREAK_OVERRUN),
-        )
-    )
-    for x in (_A1[0] - _SECTION_HALF, _A1[0] + _SECTION_HALF)
-)
-_SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
-# Carrier r13 (4:1) squeezed the slab between the 260.0/520.0 lanes and the
-# border, its caption cut off from it by the 520.0's extension line and the
-# chamfer text against the border. At 3:1 the band under the bottom lanes
-# (75) holds, left to right: the caption (x ~20..66), the thickness text
-# (lane x 79) and the slab (91..145 x 34..70), the chamfer text under it.
-SECTION_CENTER = (0.118, 0.052)
-_STOCK_TEXT_DX = 13.0  # A1's axis to the thickness lane, model mm (-X side)
-SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
-    "StockThick": (_A1[0] - _STOCK_TEXT_DX, -part_spec.THICKNESS / 2.0, 0.0),
-    # The chamfer leg's dimension line: 1 mm under the -X chamfer.
-    "PinChamferSize": (_A1[0] - part_spec.PIN_HOLE_DIA / 2.0, -part_spec.THICKNESS - 1.0, 0.0),
+# The plate's edge view: the *Front view (model +X right, +Y up) at the
+# sheet's 1:2, under the top view, its -X end under the top view's. It
+# carries the finished thickness, the hidden SectionReference sketch's
+# StockThick (driven from Plate's depth). Section A-A carried it until the
+# owner ruled out the underside chamfer (2026-11-13); its short cutting
+# plane never settled on the sheet (HA #2762), and the full-length plane it
+# fell back to gated machinist review (run 20261114T043253715Z-e066ab89).
+# The part keeps that sketch on its plane coincident with the Front plane,
+# parallel to this view, so neither the part nor the carrier spec and its
+# importers change. The view's 6 sheet mm band (y ~75..81) stands between
+# the title block (65.1) and the 20.5's lane (~100).
+EDGE_CENTER = (TOP_CENTER[0], 0.078)
+# The thickness's text 8 sheet mm left of the plate's -X end; its extension
+# lines start at the stock line on that end face (the part draws it there so
+# it prints under the view's outline: inside the plate it printed as a stray
+# dashed line, review run 20261114T064216453Z-bf464d35) and are capped
+# (draw_dt_pinion_cam's _limit_witness_lines) to stop 1.5 sheet mm short of
+# the end.
+_EDGE_TEXT_DX = 16.0  # model mm
+EDGE_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
+    "StockThick": (
+        part_spec.OUTLINE_X[0] - _EDGE_TEXT_DX,
+        -part_spec.THICKNESS / 2.0,
+        0.0,
+    ),
 }
-# Machinist review (3 runs FIX): with its text beside the slab, the chamfer's
-# dimension line ran back along the underside as the text's shelf. The text
-# now hangs under the slab, A1's +X side (sheet ~121..178 x 16.5..30.5,
-# its underline 3.8 mm over the inner border: review at bccedc541), on a
-# short angled OffsetText leader from that line (the text centres on it).
-SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 3.5, 0.0)
-# The thickness's extension lines from its lane (4 model mm, 12 sheet mm,
-# outside the slab's -X end) stop 1.5 sheet mm short of the slab: sheet m.
-STOCK_WITNESS_MAX_M = (
-    (_STOCK_TEXT_DX - _SECTION_HALF) * SECTION_SCALE[0] / SECTION_SCALE[1] - 1.5
-) / 1000.0
+STOCK_WITNESS_MAX_M = (_EDGE_TEXT_DX * VIEW_SCALE[0] / VIEW_SCALE[1] - 1.5) / 1000.0
+# The edge view's -X end within this of the top view's, its mid-thickness
+# within this of EDGE_CENTER's y (sheet m).
+EDGE_ALIGN_TOLERANCE_M = 1e-4
 # The imported-precision contract is the dimensions this sheet keeps
-# (TOP_KEEP and SECTION_KEEP_MODEL_MM). The hidden PinHoleProfile, tap and
+# (TOP_KEEP and EDGE_KEEP_MODEL_MM). The hidden PinHoleProfile, tap and
 # StationReference drivers keep their part-authored .XXX on the model (the
 # part build applies all of DRAWING_PRECISION), but #2151 Option B prints
 # their locations as the native hole table's .XXX rows from the plate corner
@@ -280,17 +206,8 @@ IMPORTED_PRECISION: dict[str, int] = {
     for name in sorted(names)
     if name not in TABLE_ROW_DIMENSIONS
 }
-# Top centre of the caption: left of the thickness text, level with the slab.
-# Its three rows (SECTION A-A, / HOLE A1 / SCALE 3 : 1, the old two rows'
-# ~46 mm wide, ~8.2 mm a row) stand ~20..66 x 28..52 sheet mm, in the slot
-# the A1-only note held (x 14..75, y 14..35, R4NativeEye at 43452045):
-# clear of the thickness lane (x >= 78), the slab and the bottom border.
-SECTION_CAPTION_XY = (0.043, 0.052)
-# Machinist review r7: the view's own label names the hole it cuts
-# ("SECTION A-A, HOLE A1"), replacing the separate A1-only note.
-SECTION_CAPTION_HOLE = "HOLE A1"
 # B landscape's inner border and the title block's corner (sheet m): the
-# cropped A-A and its dimensions stand inside the one, clear of the other.
+# edge view and its dimension stand inside the one, clear of the other.
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
 
@@ -425,6 +342,18 @@ _RELATION = ("_oblique_carrier_hole_table", "A1_RELATION_NOTE")
 _POSITIONS = ("station", "height")
 
 
+def _from_a1(tag: str, places: int) -> tuple[float, float]:
+    """A NOTE 2 row's X and Y from A1 (mm) as a machinist derives them from
+    sheet 2: its printed corner row less A1's. CL prints 3.916 and A1 1.389,
+    so 2.527; the model's own 2.52649 printed alone is 2.526, a band the sheet
+    never states (blind traveler review S2, 2026-11-14)."""
+    (x, y), (ax, ay) = table_location(tag), table_location("A1")
+    return (
+        _printed(x, places) - _printed(ax, places),
+        _printed(y, places) - _printed(ay, places),
+    )
+
+
 def _table_fields(
     tag: str, sources: tuple[Any, ...], places: int = _STATION_PLACES
 ) -> dict[str, tuple[Any, tuple[Any, ...]]]:
@@ -438,11 +367,11 @@ def _table_fields(
             "height": (_limits(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
             "height_nominal": (_printed(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
         }
-    x, y, _diameter = part_spec.TABLE_HOLES[tag]
+    dx, dy = _from_a1(tag, places)
     fields: dict[str, tuple[Any, tuple[Any, ...]]] = {
         "parent": ("pin_hole_a1", ("PIN_HOLES", _RELATION)),
-        "station": (_limits(x - _A1[0], places), (*sources, "PIN_HOLES", _RELATION)),
-        "station_nominal": (_printed(x - _A1[0], places), (*sources, "PIN_HOLES")),
+        "station": (_limits(dx, places), (*sources, "PIN_HOLES", _ORIGIN, _RELATION)),
+        "station_nominal": (_printed(dx, places), (*sources, "PIN_HOLES", _ORIGIN)),
     }
     if tag in ("A2", "B2"):
         fields.update({
@@ -456,8 +385,8 @@ def _table_fields(
         })
     elif tag != "B1":
         fields.update({
-            "height": (_limits(y - _A1[1], places), (*sources, "PIN_HOLES", _RELATION)),
-            "height_nominal": (_printed(y - _A1[1], places), (*sources, "PIN_HOLES")),
+            "height": (_limits(dy, places), (*sources, "PIN_HOLES", _ORIGIN, _RELATION)),
+            "height_nominal": (_printed(dy, places), (*sources, "PIN_HOLES", _ORIGIN)),
             "height_from": ("pin_hole_a1", ("PIN_HOLES", _RELATION)),
         })
     return fields
@@ -869,516 +798,124 @@ def _set_callout_texts(
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
-def _section_line_frame(
-    adapter: Any, top: Any, reported: tuple[float, ...]
-) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    """A-A's reported line ends as (the +X end, the -X end). GetLineInfo
-    answers in the view's own frame (_layout_audit), so the ends the line was
-    created through are mapped into the top view's sketch frame (and, failing
-    that, the sheet) and matched in either order."""
-    sheet = [
-        model_point_in_view(adapter, top, _metres(point), label="section A-A line end")
-        for point in SECTION_LINE_MODEL_MM
-    ]
-    sketch = _view_sketch_points(adapter, _early_bound(top, "IView"), sheet)
-    start, end = reported[:3], reported[3:]
-    for frame in (sketch, [(x, y, 0.0) for x, y in sheet]):
-        for first, second in ((start, end), (end, start)):
-            if (
-                math.dist(first[:2], frame[0][:2]) <= 1e-6
-                and math.dist(second[:2], frame[1][:2]) <= 1e-6
-            ):
-                return first, second
-    raise RuntimeError(
-        f"carrier section A-A line {reported!r} matches neither its sketch ends "
-        f"{sketch!r} nor its sheet ends {sheet!r}"
-    )
+def _edge_offset(adapter: Any, top: Any, edge: Any) -> tuple[float, float]:
+    """How far (sheet m) the edge view stands from its place: the plate's -X
+    end under the top view's, its mid-thickness on EDGE_CENTER's y."""
+    _early_bound(edge, "IView").UpdateViewDisplayGeometry()
+    x_end = part_spec.OUTLINE_X[0]
+    at = _view_mapper(adapter, edge)((x_end, -part_spec.THICKNESS / 2.0, 0.0))
+    under = _view_mapper(adapter, top)((x_end, 0.0, 0.0))[0]
+    return under - at[0], EDGE_CENTER[1] - at[1]
 
 
-def _hatch_counts(native: Any) -> tuple[int, ...]:
-    """Face hatches and IView.GetSolidHatchCount's (return, out ArraySize)
-    pair: the out parameter makes the binding return a tuple (old-base farm
-    r1 at 0102036588: int() of it raised)."""
-    native.UpdateViewDisplayGeometry()
-    solid = native.GetSolidHatchCount()
-    solid = solid if isinstance(solid, tuple) else (solid,)
-    return (int(native.GetFaceHatchCount()), *(int(value) for value in solid))
-
-
-def _section_line(section: Any) -> tuple[float, ...]:
-    """A-A's cutting line as IDrSection GetLineInfo reports it."""
-    definition = _early_bound(_early_bound(section, "IView").GetSection(), "IDrSection")
-    reported = tuple(float(value) for value in definition.GetLineInfo())
-    if len(reported) != 6 or not all(map(math.isfinite, reported)):
-        raise RuntimeError(f"carrier section A-A: unreadable cutting line {reported!r}")
-    return reported
-
-
-def _set_section_line(
-    adapter: Any, section: Any, line: tuple[float, ...], *, partial: bool, label: str
-) -> None:
-    """Draw A-A's cutting line through ``line`` (GetLineInfo's frame), partial
-    or full, and read back: the mode, the line in either direction and a cut
-    that still hatches. The partial cut spans A1 alone, so its piece count
-    may differ from the long cut's; the proof is a hatched cut face."""
-    native = _early_bound(section, "IView")
-    definition = _early_bound(native.GetSection(), "IDrSection")
-    reported = _section_line(section)
-    before = _hatch_counts(native)
-    definition.SetPartialSection(partial)  # void put: read back below
-    if not definition.SetLineInfo(double_array(list(line))):
-        raise RuntimeError(f"carrier section A-A refused its {label} cutting line")
-    rebuild_drawing(adapter, label=f"carrier section A-A {label} line")
-    if bool(definition.GetPartialSection()) != partial:
-        raise RuntimeError(f"carrier section A-A {label} line: partial is not {partial}")
-    applied = _section_line(section)
-    after = _hatch_counts(native)
-    _telemetry.info(
-        f"carrier section A-A {label} line {reported!r} -> {applied!r} (asked "
-        f"{line!r}); face/solid hatches {before} -> {after}"
-    )
-    if not any(
-        all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
-        for wanted in (line, line[3:] + line[:3])
-    ):
-        raise RuntimeError(f"carrier section A-A {label} line did not persist: {applied!r}")
-    if after[0] < 1:
-        raise RuntimeError(f"carrier section A-A lost its cut: hatches {before} -> {after}")
-
-
-def _shorten_section_line(
-    adapter: Any, top: Any, section: Any, annotations: list[Any], full: tuple[float, ...]
-) -> None:
-    """Shorten A-A's drawn line to SECTION_SHORT_X, across A1 alone (rule 9),
-    once the long line ``full`` has cut, imported and been cropped. IDrSection
-    SetLineInfo takes the frame GetLineInfo reports, so the new ends are the
-    old line interpolated at their carrier X. A full section whose line
-    stops inside the plate cuts nothing (old-base farm r2 at 6dc18abb3d: face
-    hatches 3 -> 0), so the section becomes partial first (draw_fr_nameplate's
-    A-A is a partial cut on a short line). The view moves with the line's
-    midpoint (~250 model mm here), so the shortened view jumps off the sheet
-    (farm r7, 20261108T052002860Z: the section shortened after centring
-    printed empty, its dimensions at sheet x ~750..815 mm) and is centred
-    after this (_settle_section). Read back (_set_section_line), and its
-    dimensions stay visible."""
-    plus_x, minus_x = _section_line_frame(adapter, top, full)
-    x0, x1 = _SECTION_LINE_X
-    short = tuple(
-        a + (x - x0) / (x1 - x0) * (b - a)
-        for x in SECTION_SHORT_X
-        for a, b in zip(plus_x, minus_x, strict=True)
-    )
-    _set_section_line(adapter, section, short, partial=True, label="short")
-    hidden = [
-        dimension_name(adapter, annotation)
-        for annotation in annotations
-        if int(_early_bound(annotation, "IAnnotation").Visible) != 1
-    ]
-    if hidden:
-        raise RuntimeError(f"carrier section A-A short line hid {hidden}")
-
-
-def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
-    return tuple(value / 1000.0 for value in point_mm)
-
-
-def _section_axes(
-    adapter: Any, native: Any
-) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Sheet directions of model +X and +Y (1 mm each) in section A-A, read
-    behind the projection barrier (draw_pn_pen_v_block ``_section_axes``)."""
-    native.UpdateViewDisplayGeometry()
-    x, y, z = _SECTION_ANCHOR_MM
-    origin, plus_x, plus_y = model_points_in_view(
-        adapter,
-        native,
-        (_metres((x, y, z)), _metres((x + 1.0, y, z)), _metres((x, y + 1.0, z))),
-        label="carrier section A-A axes",
-        names=("origin", "plus x", "plus y"),
-    )
-    return (
-        (plus_x[0] - origin[0], plus_x[1] - origin[1]),
-        (plus_y[0] - origin[0], plus_y[1] - origin[1]),
-    )
-
-
-def _orient_section(adapter: Any, section: Any) -> None:
-    """Turn section A-A until model +Y runs up the sheet (draw_pd_platen
-    ``_orient_section``), keeping the cut direction SolidWorks gives it: a
-    reversed section showing its far side imported nothing (jig-r4).
-    +X then reads right or left; the layout holds either way, and the log
-    says which."""
-    native = _early_bound(section, "IView")
-    right, up = _section_axes(adapter, native)
-    native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(up[1], up[0])
-    rebuild_drawing(adapter, label="carrier section turned")
-    right, up = _section_axes(adapter, native)
-    tolerance = 1e-7
-    if (
-        up[1] <= 0.0
-        or abs(up[0]) > tolerance
-        or abs(right[1]) > tolerance
-        or abs(right[0]) <= tolerance
-    ):
-        raise RuntimeError(f"carrier section A-A is not +Y up: {right=}, {up=}")
-    _telemetry.info(
-        f"carrier section A-A angle={float(native.Angle):.6f} rad, "
-        f"+X reads {'right' if right[0] > 0.0 else 'left'} (cut not reversed)"
-    )
-
-
-def _crop_section(adapter: Any, section: Any) -> None:
-    """Crop the full section A-A to SECTION_CROP_MODEL_MM, the cut's own span
-    through A1 (draw_fr_nameplate ``_crop_section``'s sequence): a rectangle
-    sketched in the view's own sketch round the projected fence corners, no
-    crop outline, so the cut face stops where the partial cut used to."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    native = _early_bound(section, "IView")
-    rebuild_drawing(adapter, label="carrier section before crop")
-    sheet_corners = model_points_in_view(
-        adapter,
-        native,
-        [_metres(point) for point in SECTION_CROP_MODEL_MM],
-        label="carrier section A-A crop corners",
-    )
-    if not ddoc.ActivateView(view_name(adapter, native)):
-        raise RuntimeError("failed to activate carrier section A-A for its crop")
-    draw.ClearSelection2(True)
-    before = tuple(float(value) for value in native.GetOutline())
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    corners = _view_sketch_points(adapter, native, sheet_corners)
-    segments = tuple(
-        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
-    )
-    if len(segments) != 4:
-        raise RuntimeError(
-            f"carrier section A-A crop fence has {len(segments)} segments"
-        )
-    for segment in segments:
-        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
-            raise RuntimeError("failed to select the carrier section A-A crop fence")
-    # Crop2(jagged, no outline, intensity) returns swCropViewErrors_e; 1 is
-    # NoError.
-    status = int(native.Crop2(False, True, 0))
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="carrier section crop")
-    native.UpdateViewDisplayGeometry()
-    outline = tuple(float(value) for value in native.GetOutline())
-    _telemetry.info(
-        f"carrier section A-A Crop2 status {status}: outline {before!r} -> "
-        f"{outline!r}, fence corners {sheet_corners!r}"
-    )
-    # The outline carries a margin past the fence (fr_nameplate r3: +19 mm on
-    # a 69 mm fence; jig-r8 here: +25.6 mm on 72 mm; old-base n1: +22 mm on
-    # 54 mm), so it is not held to the fence's width: the proof is that it
-    # contains the fence within _CROP_OUTLINE_SLACK_M, whether the cut was
-    # the full line's or, re-cropped, the short partial line's.
-    width = 2.0 * _SECTION_HALF * SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
-    fence_x = sorted(float(x) for x, _ in sheet_corners)
-    fence_y = sorted(float(y) for _, y in sheet_corners)
-    contains = (
-        outline[0] <= fence_x[0]
-        and outline[2] >= fence_x[-1]
-        and outline[1] <= fence_y[0]
-        and outline[3] >= fence_y[-1]
-    )
-    if (
-        status != 1
-        or not bool(native.IsCropped())
-        or not contains
-        or outline[2] - outline[0] > fence_x[-1] - fence_x[0] + _CROP_OUTLINE_SLACK_M
-    ):
-        raise RuntimeError(
-            f"carrier section A-A did not crop to its {width * 1000.0:.1f} mm "
-            f"fence: status {status}, outline {before!r} -> {outline!r}, "
-            f"fence corners {sheet_corners!r}"
-        )
-
-
-def _view_sketch_points(
-    adapter: Any, native: Any, sheet_points: list[tuple[float, float]]
-) -> list[tuple[float, ...]]:
-    """Sheet points (metres) in the active view's own sketch frame, through
-    its ModelToSketchTransform."""
-    sketch = _early_bound(native.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in sheet_points:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
-            "IMathPoint",
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    return points
-
-
-def _sketch_section_breaks(adapter: Any, section: Any) -> None:
-    """Draw SECTION_BREAKS into A-A's own sketch as thin lines
-    (draw_fr_nameplate ``_sketch_section_break``). AddToDB keeps sketch
-    inference from snapping the short Z segments onto the cut face's edges."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    native = _early_bound(section, "IView")
-    if not ddoc.ActivateView(view_name(adapter, native)):
-        raise RuntimeError("failed to activate carrier section A-A for its break lines")
-    draw.ClearSelection2(True)
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        for end, polyline in enumerate(SECTION_BREAKS):
-            sheet_points = model_points_in_view(
-                adapter,
-                native,
-                [_metres(point) for point in polyline],
-                label=f"carrier section A-A break line {end}",
+def _align_edge_view(adapter: Any, top: Any, edge: Any) -> None:
+    """Move the edge view under the top view (a standalone *Front view keeps
+    no projection link) and read the alignment back."""
+    native = _early_bound(edge, "IView")
+    for _attempt in range(3):
+        dx, dy = _edge_offset(adapter, top, edge)
+        if math.hypot(dx, dy) <= EDGE_ALIGN_TOLERANCE_M:
+            return
+        x, y = (float(value) for value in tuple(native.Position)[:2])
+        if not native.SetViewPosition(double_array([x + dx, y + dy]), False):
+            raise RuntimeError(
+                "failed to move the carrier edge view under the top view"
             )
-            points = _view_sketch_points(adapter, native, sheet_points)
-            for index in range(len(points) - 1):
-                if sketch_manager.CreateLine(*points[index], *points[index + 1]) is None:
-                    raise RuntimeError(
-                        f"carrier section A-A break line {end} segment {index} failed"
-                    )
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="carrier section A-A break lines")
-
-
-def _centre_section(adapter: Any, section: Any) -> None:
-    """Land the cut's centre (A1's axis at mid-thickness) on SECTION_CENTER:
-    a section's Position is its cut-plane origin, not its outline's centre
-    (draw_pn_pen_v_block ``_centre_section``)."""
-    native = _early_bound(section, "IView")
-    anchor = _metres(_SECTION_ANCHOR_MM)
-    for attempt in range(4):
-        native.UpdateViewDisplayGeometry()
-        projected = model_point_in_view(
-            adapter, native, anchor, label=f"carrier section A-A centre, pass {attempt}"
-        )
-        if math.dist(projected, SECTION_CENTER) <= 1e-4:
-            break
-        position = tuple(float(value) for value in native.Position)
-        moved = [
-            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
-        ]
-        if not native.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to re-centre carrier section A-A")
-        rebuild_drawing(adapter, label="carrier section re-centred")
-    settle_detail_projection(
-        adapter,
-        native,
-        anchor,
-        ink_xy=SECTION_CENTER,
-        tolerance_xy=(0.0005, 0.0005),
-        label="carrier section A-A",
-    )
-
-
-def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
-    return {
-        name: model_point_in_view(
-            adapter, section, _metres(point), label=f"section A-A {name} text"
-        )
-        for name, point in SECTION_KEEP_MODEL_MM.items()
-    }
-
-
-def _reposition_section_dimensions(
-    adapter: Any, section: Any, annotations: list[Any]
-) -> list[Any]:
-    """Place the dimensions imported into the uncropped section again on
-    their SECTION_KEEP_MODEL_MM points of the cropped, centred view, prove the
-    crop kept every one of them, visible, and cap the thickness's extension
-    lines (STOCK_WITNESS_MAX_M) at the slab's -X end."""
-    keep = _section_keep(adapter, section)
-    placed = curate_dimensions(adapter, annotations, reposition=keep)
-    states = {
-        dimension_name(adapter, annotation): int(
-            _early_bound(annotation, "IAnnotation").Visible
-        )
-        for annotation in placed
-    }
-    if set(states) != set(keep) or any(state != 1 for state in states.values()):
+        rebuild_drawing(adapter, label="carrier edge view aligned")
+    dx, dy = _edge_offset(adapter, top, edge)
+    if math.hypot(dx, dy) > EDGE_ALIGN_TOLERANCE_M:
         raise RuntimeError(
-            f"carrier section A-A lost dimensions to its crop: kept {states}, "
-            f"want {sorted(keep)} visible"
+            f"carrier edge view is not under the top view: off by ({dx:.6f}, {dy:.6f}) m"
         )
-    (stock,) = (a for a in placed if dimension_name(adapter, a) == "StockThick")
-    display = _early_bound(
+
+
+def _stock_display(adapter: Any, annotations: list[Any]) -> Any:
+    (stock,) = (a for a in annotations if dimension_name(adapter, a) == "StockThick")
+    return _early_bound(
         _early_bound(stock, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
     )
+
+
+def _edge_view(adapter: Any, top: Any) -> tuple[Any, list[Any]]:
+    """The plate's edge view, aligned under the top view, hidden lines
+    removed, carrying the finished thickness (StockThick) with its extension
+    lines capped short of the plate's -X end (STOCK_WITNESS_MAX_M)."""
+    edge = place_view(adapter, str(SOURCE), "*Front", *EDGE_CENTER, scale=VIEW_SCALE)
+    set_hidden_lines_removed(adapter, edge)
+    _align_edge_view(adapter, top, edge)
+    on_edge = _view_mapper(adapter, edge)
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        edge,
+        keep={name: on_edge(xyz) for name, xyz in EDGE_KEEP_MODEL_MM.items()},
+        view_label="edge view",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    display = _stock_display(adapter, annotations)
     display.MaxWitnessLineLength = STOCK_WITNESS_MAX_M
     rebuild_drawing(adapter, label="carrier stock witness cap")
-    if abs(float(display.MaxWitnessLineLength) - STOCK_WITNESS_MAX_M) > 1e-9:
-        raise RuntimeError(
-            "carrier section A-A: finished thickness witness cap did not persist"
-        )
-    return placed
+    return edge, annotations
 
 
-def _assert_section_on_sheet(adapter: Any, section: Any, annotations: list[Any]) -> None:
-    """Section A-A, cropped and hatched, with its dimensions, stands inside
-    the inner border and clear of the title block (farm r7,
-    20261108T052002860Z: shortened after centring, it printed off the sheet
-    and A-A's frame came out empty)."""
-    native = _early_bound(section, "IView")
+def _assert_edge_view(
+    adapter: Any, top: Any, edge: Any, annotations: list[Any]
+) -> None:
+    """The edge view stands under the top view; the plate it draws (its
+    projected corners, inside the view's own outline: HA #2762's section
+    disagreed there) stands inside the border, clear of the title block and
+    below the 20.5's text; its thickness is visible, on the sheet, its
+    extension lines still capped."""
+    dx, dy = _edge_offset(adapter, top, edge)
+    native = _early_bound(edge, "IView")
     native.UpdateViewDisplayGeometry()
     outline = tuple(float(value) for value in native.GetOutline())
-    hatches = _hatch_counts(native)
+    to_edge = _view_mapper(adapter, edge)
+    corners = (
+        to_edge((part_spec.OUTLINE_X[0], -part_spec.THICKNESS, 0.0)),
+        to_edge((part_spec.OUTLINE_X[1], 0.0, 0.0)),
+    )
+    plate = (
+        min(x for x, _ in corners),
+        min(y for _, y in corners),
+        max(x for x, _ in corners),
+        max(y for _, y in corners),
+    )
+    contains = (
+        outline[0] <= plate[0] + EDGE_ALIGN_TOLERANCE_M
+        and outline[1] <= plate[1] + EDGE_ALIGN_TOLERANCE_M
+        and outline[2] >= plate[2] - EDGE_ALIGN_TOLERANCE_M
+        and outline[3] >= plate[3] - EDGE_ALIGN_TOLERANCE_M
+    )
+    length_y = _view_mapper(adapter, top)(TOP_KEEP["PlateLength"])[1]
+    left, bottom, right, top_border = SHEET_INNER_BORDER
 
     def on_sheet(x0: float, y0: float, x1: float, y1: float) -> bool:
-        left, bottom, right, top = SHEET_INNER_BORDER
-        inside = left <= x0 and x1 <= right and bottom <= y0 and y1 <= top
+        inside = left <= x0 and x1 <= right and bottom <= y0 and y1 <= top_border
         return inside and not (x1 > TITLE_BLOCK[0] and y0 < TITLE_BLOCK[3])
 
-    texts = {
-        dimension_name(adapter, annotation): tuple(
-            float(value) for value in _early_bound(annotation, "IAnnotation").GetPosition()
-        )[:2]
-        for annotation in annotations
-    }
-    off = sorted(name for name, (x, y) in texts.items() if not on_sheet(x, y, x, y))
-    if not bool(native.IsCropped()) or hatches[0] < 1 or not on_sheet(*outline[:4]) or off:
-        raise RuntimeError(
-            f"carrier section A-A is not on the sheet: cropped {bool(native.IsCropped())}, "
-            f"hatches {hatches}, outline {outline!r}, dimensions off the sheet {off}, "
-            f"texts {texts!r}"
-        )
-    _telemetry.info(f"carrier section A-A outline {outline!r}, hatches {hatches}")
+    def text(annotation: Any) -> tuple[tuple[float, ...], int]:
+        native = _early_bound(annotation, "IAnnotation")
+        return tuple(float(v) for v in native.GetPosition())[:2], int(native.Visible)
 
-
-def _settle_section(adapter: Any, section: Any, annotations: list[Any]) -> list[Any]:
-    """Once its line is final: cropped (again if the line change dropped the
-    crop), centred, its dimensions and the chamfer text placed again, and
-    proven on the sheet."""
-    if not bool(_early_bound(section, "IView").IsCropped()):
-        _telemetry.warn("carrier section A-A lost its crop with its line; cropping again")
-        _crop_section(adapter, section)
-    _centre_section(adapter, section)
-    annotations = _reposition_section_dimensions(adapter, section, annotations)
-    chamfer_text = model_point_in_view(
-        adapter, section, _metres(SECTION_CHAMFER_TEXT_MODEL_MM),
-        label="section A-A chamfer text",
-    )
-    offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
-    _assert_section_on_sheet(adapter, section, annotations)
-    return annotations
-
-
-def _section_caption(section: Any) -> tuple[Any, str]:
-    """A-A's native caption note and its linked view-label fields (found as
-    ``position_section_caption`` finds it: by its label field)."""
-    captions = []
-    for raw in _early_bound(section, "IView").GetNotes() or ():
-        note = _early_bound(raw, "INote")
-        linked_text = str(note.PropertyLinkedText or "")
-        if "<VLLABEL>" in linked_text:
-            captions.append((note, linked_text))
-    if len(captions) != 1:
-        raise RuntimeError(f"expected one native section A-A caption, found {len(captions)}")
-    return captions[0]
-
-
-def section_caption_text(linked_text: str) -> str:
-    """The native caption's linked text with the hole named after its label:
-    SECTION A-A, / HOLE A1 / the scale (machinist review r7)."""
-    if linked_text.count("<VLLABEL>") != 1 or SECTION_CAPTION_HOLE in linked_text:
-        raise RuntimeError(f"unexpected section A-A caption fields: {linked_text!r}")
-    newline = "\r\n" if "\r\n" in linked_text else "\n"
-    return linked_text.replace(
-        "<VLLABEL>", f"<VLLABEL>,{newline}{SECTION_CAPTION_HOLE}", 1
-    )
-
-
-def _label_section_hole(adapter: Any, section: Any) -> None:
-    """Name A1 in A-A's own caption, keeping its native label and scale
-    fields (draw_pd_transgear_arm ``_match_pin_section_caption``)."""
-    note, linked_text = _section_caption(section)
-    labelled = section_caption_text(linked_text)
-    note.PropertyLinkedText = labelled
-    rebuild_drawing(adapter, label="carrier section A-A caption hole")
-    if str(note.PropertyLinkedText or "") != labelled:
-        raise RuntimeError("carrier section A-A caption did not take its hole")
-
-
-def _assert_section_caption(section: Any) -> None:
-    _note, linked_text = _section_caption(section)
-    if "<VLLABEL>," not in linked_text or SECTION_CAPTION_HOLE not in linked_text:
-        raise RuntimeError(f"carrier section A-A caption lost its hole: {linked_text!r}")
-
-
-def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], Any]:
-    """Full section A-A along the pin line, cropped to A1's slab, carrying the
-    finished thickness and the chamfer leg, both from SectionReference.
-
-    The hidden owner sketch lies in the cutting plane; a derived view takes it
-    from the part as it stands when cut and selects it through its base view,
-    so the section is cut and curated while the part shows it (draw_pd_platen
-    ``_floor_section``). Full, not partial: through a short interior line the
-    partial cut imported nothing (carrier-diag); the line crosses the whole
-    plate, so the cut closes (carrier r11). Curated before it is
-    cropped (the cropped import dropped StockThick), then cropped (fr_nameplate
-    A-A); then made partial and its drawn line shortened across A1 alone
-    (rule 9, ``_shorten_section_line``), still while the sketch is shown, and
-    only then centred and its dimensions placed again: shortening moves the
-    view (farm r7). Should the short partial line not settle on the sheet,
-    the full line across the plate is drawn again (still whole, rule 9) and
-    the view settled on it, with a warning. A section shows no hidden lines.
-    Its caption names the hole it cuts.
-    """
-    line = [
-        model_point_in_view(adapter, top, _metres(point), label="section A-A line")
-        for point in SECTION_LINE_MODEL_MM
-    ]
-    with hidden_sketches.part_sketches_shown(
-        adapter,
-        source_model,
-        (part_spec.SECTION_REFERENCE,),
-        label="section A-A reference",
-        base_view=top,
+    texts = {dimension_name(adapter, item): text(item) for item in annotations}
+    cap = float(_stock_display(adapter, annotations).MaxWitnessLineLength)
+    if (
+        math.hypot(dx, dy) > EDGE_ALIGN_TOLERANCE_M
+        or not contains
+        or not on_sheet(*plate)
+        or plate[3] >= length_y
+        or set(texts) != set(EDGE_KEEP_MODEL_MM)
+        or any(state != 1 or not on_sheet(*xy, *xy) for xy, state in texts.values())
+        or abs(cap - STOCK_WITNESS_MAX_M) > 1e-9
     ):
-        section = create_section_view(
-            adapter,
-            top,
-            line_start=line[0],
-            line_end=line[1],
-            view_xy=SECTION_CENTER,
-            section_label="A",
-            scale=SECTION_SCALE,
-            partial=False,
-            label="pin-hole chamfer section",
+        raise RuntimeError(
+            f"carrier edge view is not in place: offset ({dx:.6f}, {dy:.6f}) m, "
+            f"plate {plate!r} in outline {outline!r}, 20.5 text y {length_y:.4f}, "
+            f"texts {texts!r}, witness cap {cap!r}"
         )
-        _orient_section(adapter, section)
-        set_hidden_lines_removed(adapter, section)
-        annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            section,
-            keep=_section_keep(adapter, section),
-            view_label="section A-A",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
-        _crop_section(adapter, section)
-        full = _section_line(section)
-        try:
-            _shorten_section_line(adapter, top, section, annotations, full)
-            annotations = _settle_section(adapter, section, annotations)
-        except RuntimeError as error:
-            _telemetry.warn(
-                f"carrier section A-A: the short partial line did not settle ({error}); "
-                "drawing the full line across the plate"
-            )
-            _set_section_line(adapter, section, full, partial=False, label="full")
-            annotations = _settle_section(adapter, section, annotations)
-    _sketch_section_breaks(adapter, section)
-    _label_section_hole(adapter, section)
-    position_section_caption(
-        adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
+    _telemetry.info(
+        f"carrier edge view plate {plate!r}, outline {outline!r}, texts {texts!r}"
     )
-    return annotations, section
 
 
 @_telemetry.traced("drawing.carrier_hub_reference_position")
@@ -1545,14 +1082,6 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # swDetailingSectionViewLineStyleDisplay (542): A-A's short line is drawn
-    # whole from one arrow to the other (SECTION_LINE_STYLE, rule 9).
-    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, SECTION_LINE_STYLE):
-        raise RuntimeError("failed to set the whole section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != SECTION_LINE_STYLE:
-        raise RuntimeError("section cutting-line style did not persist")
-
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (top, iso):
@@ -1566,8 +1095,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section_annotations, section = _pin_section(adapter, source_model, top)
-    annotations.extend(section_annotations)
+    edge, edge_annotations = _edge_view(adapter, top)
+    annotations.extend(edge_annotations)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
     ream = [
@@ -1641,8 +1170,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("carrier sheet cannot be activated for final readback")
         try:
             _assert_ream_control(adapter, ream[0])
-            _assert_section_on_sheet(adapter, section, section_annotations)
-            _assert_section_caption(section)
+            _assert_edge_view(adapter, top, edge, edge_annotations)
         finally:
             if not sheets.ActivateSheet(previous):
                 raise RuntimeError("carrier readback could not restore the active sheet")

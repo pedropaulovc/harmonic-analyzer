@@ -162,10 +162,10 @@ kind = "protractor"
 present = false
 
 [tools.edge-finder]
-name = "Mechanical edge finder"
+name = "Mechanical edge finder, .200 in"
 kind = "edge_finder"
-present = false
-note = "The archived inventory gave only an illustrative example identity (Starrett 827A), with no possession evidence."
+present = true
+note = "Possession: logbook 2026-11-04 (\"switched to the edge finder (0.200 in, at 900 rpm)\"; its inventory entry is #2288). Make and SKU unrecorded; the archived inventory's Starrett 827A was only an illustrative identity."
 
 [tools.setting-mandrel-375]
 name = "3/8 in ground setting mandrel, long enough to pass both MHA-DT-02 pedestals"
@@ -604,7 +604,7 @@ cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 o
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its route is cad/process/ch_rocker_arm_tl_oblique_carrier/plan.toml (table-clamped, not on edge in the vise). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1371.6
 on_hand = true
@@ -698,6 +698,57 @@ section_mm = [101.6, 3.175]
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 1376 https://www.onlinemetals.com/en/buy/brass/0-125-x-4-brass-rectangle-bar-360-h02-extruded/pid/1376 read live 2026-11-12: 1/8 x 4 brass rectangle bar 360-H02, ASTM B16, 12 in $65.37"]
+
+# --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------
+
+# The carrier plan's table setups (cad/process/ch_rocker_arm_tl_oblique_carrier):
+# the plate lies flat on four of these blocks under the kit's step clamps.
+# Possession: logbook 2026-11-05 ("all five 1-2-3 blocks I have: the two new
+# Taytools blocks, and three from the makerspace") and 2026-11-06 (joined with
+# the Taytools attachment hardware).
+[fixtures.blocks-123]
+name = "1-2-3 blocks (five: two Taytools, three makerspace)"
+kind = "setup_blocks"
+present = true
+pieces = 5
+
+# Possession: logbook 2026-11-05 and 2026-11-06 ("strap clamps on step blocks
+# from the small clamping kit (Little Machine Shop 1268)"). Contents from the
+# LMS 1268 listing (Amazon B01EUF8J94, read 2026-11-13): 24 3/8-16 studs, 12
+# step blocks, 6 T-slot nuts, 6 flange nuts, 4 coupling nuts, 6 step clamps.
+[fixtures.clamping-kit-lms-1268]
+name = "LittleMachineShop 1268 clamping kit, 1/2 in T-slot"
+kind = "clamping_kit"
+make = "LittleMachineShop"
+sku = "1268"
+present = true
+use = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
+
+# The .3760 over reamer cad/scripts/_fit_ream_slide.py records as owned
+# (REAM_SLIDE: "cut by the owned over reamer (.2510, .3135, .3760)"); its
+# sizing data is cad/process/shop.toml tools.reamer-0376. The archived
+# inventory named the LMS 3066 over/under set only as a #1413 trial identity,
+# so no make or SKU is asserted here.
+[tools.reamer-0376]
+name = ".3760 in over reamer (3/8 in, REAM_SLIDE)"
+kind = "reamer"
+present = true
+use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with the owned pin-gauge set)"
+
+# Plug taps the carrier plan names besides the 8-32 (tools.taps-unc-hand).
+[tools.jig-tap-4-40-plug]
+name = "4-40 UNC plug hand tap"
+kind = "tap"
+present = true
+source = "owner 2026-11-13"
+use = "MHA-CH-06-TL-21 carrier R1-R4"
+
+[tools.jig-tap-5-16-18-plug]
+name = "5/16-18 UNC plug hand tap"
+kind = "tap"
+present = true
+source = "owner 2026-11-13"
+use = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
 
 # --- MHA-CH-06-TL-24 riser (prechips plan, #2447) ---------------------------
 
