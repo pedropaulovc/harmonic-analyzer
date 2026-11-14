@@ -243,11 +243,12 @@ in one hold: the 4X .180 holes and .31 counterbores to the .570 floor, and the
 pivot seat (F tap drill, then the LMS 6784 3/8 end mill, miked at .3750 or
 more, plunged to the flat .359 floor, .375–.379 under DRILLED HOLES, owner
 ruling 2026-11-13; then the 5/16-18 tap through). TL-32 adds the lug notch,
-standing on edge (OUTER END down, LUG END out past the jaw side, a TL-22 spacer
-at the other jaw end) so the owner's 1 in-flute 1/2 in end mill's end cuts the
+standing on edge (OUTER END down, LUG END out past the jaw side; at the other
+jaw end a spacer offcut faced with the block to its height within .001, not
+the finished TL-22) so the owner's 1 in-flute 1/2 in end mill's end cuts the
 lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
-piloted and plunged with the same 3/8 end mill with the block standing on
-SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
+piloted and plunged in .25 full-retract pecks with the same 3/8 end mill with
+the block standing on SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
 and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
 (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
