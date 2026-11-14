@@ -42,7 +42,9 @@ the last one is what differs for assemblies and drawings.
   cannot stage the models they open or redirect the output paths drawings
   build, so the fresh recording itself is compared with the nearest earlier
   recording of the stem under the same cache salt made on the same children
-  (every model opened, by its ``.execution`` token): :class:`Split`
+  (every model opened, by its ``.execution`` token; a manifest is published
+  under its children's group, :func:`children_group`, so only that group's
+  are read): :class:`Split`
   ``children_changed`` | ``noop`` | ``diverged``, ``truth_cause`` saying what
   preceded a divergence, and the outcome judged per kind (span
   ``replay.split <label>``). A no-op whose outcome differs is never an alarm:
@@ -155,11 +157,17 @@ REUSE_LOG_CHARS = 200_000
 # Bound on any evidence string carried by a span, log or cache.jsonl record.
 EVIDENCE_CHARS = 4000
 DIFFERING_LISTED = 40
-# Assemblies and drawings, mode ``shadow`` (:func:`_judge_dependent`). Their
-# lookup reads this many manifests, newest first, within LOOKUP_SECONDS: a
-# base must also have been made on the same children, which the newest
-# recordings (other branches' builds) often were not.
-DEPENDENT_MANIFESTS = 16
+# Assemblies and drawings, mode ``shadow`` (:func:`_judge_dependent`). A base
+# must also have been made on the same children, which the newest recordings
+# (other branches' builds) often were not, so their manifests are published
+# under their children's group (:func:`children_group`) and the lookup reads
+# only the group's and the ungrouped ones published before groups, at most
+# this many, newest first, within DEPENDENT_LOOKUP_SECONDS: never another
+# group's. 64 covers each stem's ungrouped manifests (36 at most, 2026-11-14:
+# assembly-ha_harmonic_analyzer, whose same-children base the 16 newest read
+# could miss) beside its group's newest; a read takes about 85 ms.
+DEPENDENT_MANIFESTS = 64
+DEPENDENT_LOOKUP_SECONDS = 10.0
 # The comparison with the base (bundle download and diff): a hard wall budget
 # off the seat. The step runs inside the leaf's doit action, after the store
 # but before the leaf's process exits and its result is reported, so on a farm
@@ -670,10 +678,24 @@ def blob_prefix(engine: str, stem: str) -> str:
     return f"{BLOB_ROOT}/{engine[:16]}/{stem}/manifest/"
 
 
-def blob_names(engine: str, stem: str, key: str) -> tuple[str, str]:
-    """``(bundle, manifest)`` sidecar names of the recording of part ``key``."""
+def blob_names(
+    engine: str, stem: str, key: str, group: str | None = None
+) -> tuple[str, str]:
+    """``(bundle, manifest)`` sidecar names of the recording of ``key``; the
+    manifest of an assembly's or drawing's under its children's ``group``
+    (:func:`children_group`), a part's directly under :func:`blob_prefix`."""
     root = f"{BLOB_ROOT}/{engine[:16]}/{stem}"
-    return f"{root}/bundle/{key}.tar", f"{blob_prefix(engine, stem)}{key}.json"
+    folder = "" if group is None else f"{group}/"
+    return f"{root}/bundle/{key}.tar", f"{blob_prefix(engine, stem)}{folder}{key}.json"
+
+
+def children_group(children: dict[str, str]) -> str:
+    """The folder an assembly's or drawing's manifest is published under:
+    its children (``Recording.children``, each model's token) digested, so a
+    lookup skips, unread, every recording made on other children
+    (:func:`find_base` ``group``)."""
+    canonical = json.dumps(children, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 def evidence_names(
@@ -852,7 +874,12 @@ def publish(recording: Recording, record: dict[str, Any], data: bytes) -> str:
     bundle_outcome = _cache.publish_sidecar(record["bundle"]["name"], data)
     if bundle_outcome != "stored":
         return bundle_outcome
-    _, manifest_name = blob_names(record["engine"], recording.name, recording.key)
+    group = (
+        None if recording.kind is BuildKind.PART else children_group(recording.children)
+    )
+    _, manifest_name = blob_names(
+        record["engine"], recording.name, recording.key, group
+    )
     return _cache.publish_sidecar(
         manifest_name, json.dumps(record, sort_keys=True).encode("utf-8")
     )
@@ -932,6 +959,9 @@ class LookupResult:
     read: int = 0
     # Manifests read that the caller could not use (find_base ``usable``).
     unusable: int = 0
+    # Manifests listed under another children group, skipped unread
+    # (find_base ``group``).
+    other_groups: int = 0
 
 
 def find_base(
@@ -943,11 +973,16 @@ def find_base(
     budget: float = LOOKUP_SECONDS,
     limit: int = LOOKUP_MANIFESTS,
     usable: Callable[[dict[str, Any]], bool] | None = None,
+    group: str | None = None,
 ) -> LookupResult:
     """One listing of ``prefix`` and at most ``limit`` manifest reads, newest
     first, inside ``budget`` seconds of wall time; past it, no base. ``salt``
     is the current cache salt (:func:`nearest`). ``usable``: only manifests
-    it accepts are candidates (the others are counted, ``unusable``)."""
+    it accepts are candidates (the others are counted, ``unusable``).
+    ``group``: an assembly's or drawing's children group
+    (:func:`children_group`): manifests listed under another group are
+    skipped unread (counted, ``other_groups``), and those under none
+    (published before groups) are read like the group's."""
     if not _cache.enabled():
         return LookupResult(Lookup.OFF)
     result = LookupResult(Lookup.NONE)
@@ -959,6 +994,14 @@ def find_base(
             (n, t) for n, t in _cache.list_sidecars(prefix) if n.endswith(".json")
         ]
         result.listed = len(listed)
+        if group is not None:
+            kept = [
+                (n, t)
+                for n, t in listed
+                if n[len(prefix) :].rpartition("/")[0] in ("", group)
+            ]
+            result.other_groups = len(listed) - len(kept)
+            listed = kept
         for name, modified in listed[:limit]:
             if time.monotonic() >= deadline:
                 return
@@ -3017,14 +3060,17 @@ def _judge_dependent(
             inputs,
             published["recording_id"],
             published["salt"],
+            budget=DEPENDENT_LOOKUP_SECONDS,
             limit=DEPENDENT_MANIFESTS,
             usable=usable,
+            group=children_group(children),
         )
         sp.set_attribute("replay.lookup", found.outcome.value)
         sp.set_attribute("replay.listed", found.listed)
         sp.set_attribute("replay.read", found.read)
         sp.set_attribute("replay.candidates", tally["candidates"])
         sp.set_attribute("replay.same_children", tally["same_children"])
+        sp.set_attribute("replay.other_children", found.other_groups)
     record.update(
         lookup=found.outcome.value,
         lookup_s=round(time.monotonic() - started, 3),
@@ -3032,9 +3078,13 @@ def _judge_dependent(
         read=found.read,
         candidates=tally["candidates"],
         same_children=tally["same_children"],
+        other_children=found.other_groups,
     )
     base = found.base
-    if base is None and (found.outcome is Lookup.BUDGET or not tally["candidates"]):
+    # Recordings listed under other children are made on other children, as
+    # surely as candidates read with other children.
+    compared = tally["candidates"] or found.other_groups
+    if base is None and (found.outcome is Lookup.BUDGET or not compared):
         _keep_evidence(recording, published, data, record)
         record["outcome"] = "no_base"
         return

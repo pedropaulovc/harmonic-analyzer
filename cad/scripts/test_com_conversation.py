@@ -3605,31 +3605,51 @@ def test_a_dependents_non_finite_volume_only_matches_itself(tmp_path, monkeypatc
     assert judged(math.nan, noisy)[0] is False
 
 
+# What a script may do to the reopened document before reading its rebuild
+# state, by each route to it: rebuild it, have the application activate it,
+# or rebuild it through the second handle ``ActiveDoc`` answers.
+_ACTS = {
+    "rebuilt": [_sw("IModelDoc2.ForceRebuild3", False, on=900)],
+    "activated": [
+        _sw("ISldWorks.ActivateDoc3", "assem", False, 0, 0, result={"h": 902}, on=1)
+    ],
+    "active_doc": [
+        _sw("ISldWorks.ActiveDoc", flags=2, result={"h": 902}, on=1),
+        _sw("IModelDoc2.ForceRebuild3", False, on=902),
+    ],
+}
+
+
 def _reopened(
     listed: conv.Conversation,
     errors: int,
     warnings: int,
-    checked: int | None = 1,
-    acted: bool = False,
+    checked: Any = 1,
+    acted: str | None = None,
     read: str = "IModelDocExtension.NeedsRebuild2",
+    raised: bool = False,
 ):
     """``listed``, then the assembly it saved reopened (``ISldWorks.OpenDoc6``
     on the application), answering the document, ``errors`` and ``warnings``;
-    its title read, then (with ``acted``) the document rebuilt, then (unless
-    ``checked`` is None) its Extension's ``read``, answering ``checked``."""
+    its title read, then (with ``acted``) one of :data:`_ACTS`, then (unless
+    ``checked`` is None) its Extension's ``read``, answering ``checked`` (and
+    with ``raised``, raising too)."""
     opened = {"t": [{"h": 900, "p": "PyIDispatch"}, errors, warnings]}
     path = "<OUT>\\sldasm\\assem.SLDASM"
     calls = [
         *listed.calls,
         _sw("ISldWorks.OpenDoc6", path, 2, 1, "", 0, 0, result=opened, on=1),
         _sw("IModelDoc2.GetTitle", result="assem", on=900),
+        *_ACTS.get(acted, []),
     ]
-    if acted:
-        calls.append(_sw("IModelDoc2.ForceRebuild3", False, on=900))
     if checked is not None:
         extension = {"h": 901, "p": "PyIDispatch"}
         calls.append(_sw("IModelDoc2.Extension", flags=2, result=extension, on=900))
-        calls.append(_sw(read, flags=2, result=checked, on=901))
+        check = _sw(read, flags=2, result=checked, on=901)
+        if raised:
+            error = {"py": {"type": "com_error", "message": "Exception occurred."}}
+            check = dataclasses.replace(check, raised=error)
+        calls.append(check)
     return conv.Conversation(_HEADER, calls, {})
 
 
@@ -3645,11 +3665,12 @@ def test_a_dependents_reopen_may_differ_only_in_the_needs_rebuild_warning(
         warnings: int,
         kind: str = "assembly",
         seat=None,
-        checked: tuple[int | None, int | None] = (1, 1),
-        acted: bool = False,
+        checked: tuple[Any, Any] = (1, 1),
+        acted: str | None = None,
         read: str = "IModelDocExtension.NeedsRebuild2",
+        raised: bool = False,
     ):
-        steps = {"acted": acted, "read": read}
+        steps = {"acted": acted, "read": read, "raised": raised}
         logs["base"] = _reopened(_seat_listed("Assem3"), 0, regen, checked[0], **steps)
         listed = _seat_listed("Assem6", **(_ANOTHER_SEAT if seat is None else seat))
         found = diff(_reopened(listed, errors, warnings, checked[1], **steps), kind)
@@ -3664,10 +3685,15 @@ def test_a_dependents_reopen_may_differ_only_in_the_needs_rebuild_warning(
     assert judged(0, 0, "drawing", checked=(None, None)) == (False, "different")
     other = "IModelDocExtension.GetWhatsWrongCount"
     assert judged(0, 0, read=other) == (False, "different")
-    # ... and it is no check when the script acted on the document first, or
-    # when the two builds read another state.
-    assert judged(0, 0, acted=True) == (False, "different")
+    # ... and it is no check when the script may have acted first, on the
+    # document by any route or on anything else (#2785), when the two builds
+    # read another state, or the read answered no count or raised, whatever it
+    # is logged answering.
+    for route in _ACTS:
+        assert judged(0, 0, acted=route) == (False, "different")
     assert judged(0, 0, checked=(1, 0)) == (False, "different")
+    assert judged(0, 0, checked=(True, True)) == (False, "different")
+    assert judged(0, 0, raised=True) == (False, "different")
     # Any other warning bit is other news of the document, and so is a load
     # error.
     assert judged(0, regen | already_open) == (False, "different")

@@ -550,14 +550,18 @@ def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
 # 8. Smaller entries still go in one request.
 _TRANSFER_CONCURRENCY = 8
 # One Put Blob up to this size (the SDK's own single-shot default); above it,
-# ``_BlobBackend.put`` stages _BLOCK_SIZE blocks under writer-unique IDs.
+# an archive or a sidecar is staged as _BLOCK_SIZE blocks under writer-unique
+# IDs (``_BlobBackend._put_blocks``).
 _SINGLE_PUT_MAX = 64 * 1024 * 1024
 _BLOCK_SIZE = 4 * 1024 * 1024
 # Sidecar blobs (publish_sidecar): the registered name prefixes -- never the
-# archives' 2-hex shards -- and a size bound (one request each). The blob of a
-# sidecar carries the cache epoch after its prefix (_sidecar_blob).
+# archives' 2-hex shards -- and a size bound, _replay_shadow.BUNDLE_LIMIT's:
+# the top-assembly drawing's recording is 115,333,120 bytes (#2750), and a
+# recording does not compress (its log and captures are gzip already; the
+# three largest stored, 28.7 to 44.6 MB, deflate by under 0.4%). The blob of
+# a sidecar carries the cache epoch after its prefix (_sidecar_blob).
 _SIDECAR_PREFIXES = ("com-replay/",)
-_SIDECAR_MAX = _SINGLE_PUT_MAX
+_SIDECAR_MAX = 512 * 1024 * 1024
 
 # Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded
 # by this size; larger local hits discard that prefix and reuse verified disk
@@ -1035,8 +1039,23 @@ class _BlobBackend:
                 **(condition if replace_etag is not None else {}),
             )
             return digest, size
+        self._put_blocks(self._name(key), blob, size, metadata, condition)
+        return digest, size
+
+    def _put_blocks(
+        self,
+        name: str,
+        blob: BinaryIO,
+        size: int,
+        metadata: dict[str, str],
+        condition: dict,
+    ) -> None:
+        """Stage ``blob`` as _BLOCK_SIZE blocks under writer-unique IDs, then
+        commit them with ``metadata`` under ``condition``: a writer whose
+        blocks interleave with another's never commits a torn blob."""
         from azure.storage.blob import BlobBlock
 
+        client = self._cc.get_blob_client(name)
         writer = secrets.token_hex(16)
         count = -(-size // _BLOCK_SIZE)
         ids = [f"{writer}{index:016d}" for index in range(count)]
@@ -1057,16 +1076,23 @@ class _BlobBackend:
             [BlobBlock(block_id=block_id) for block_id in ids],
             metadata=metadata, **condition,
         )
-        return digest, size
 
     def put_sidecar(self, name: str, data: bytes) -> None:
-        """Create-only upload of one small named blob; raises when it exists.
-        Hash, size and epoch commit with the content, as for an archive."""
+        """Create-only upload of one named blob; raises when it exists. Hash,
+        size and epoch commit with the content, as for an archive, and so
+        does the content: one request up to _SINGLE_PUT_MAX, above it staged
+        blocks committed only while the name is still missing."""
+        from azure.core import MatchConditions
+
         metadata = {
             "sidecar_sha256": hashlib.sha256(data).hexdigest(),
             "sidecar_size": str(len(data)),
             "epoch": _CACHE_EPOCH,
         }
+        if len(data) > _SINGLE_PUT_MAX:
+            condition = {"match_condition": MatchConditions.IfMissing}
+            self._put_blocks(name, io.BytesIO(data), len(data), metadata, condition)
+            return
         self._cc.get_blob_client(name).upload_blob(
             io.BytesIO(data),
             length=len(data),
