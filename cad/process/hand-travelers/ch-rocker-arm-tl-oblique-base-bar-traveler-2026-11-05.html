@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Traveler: Oblique Trammel Base Bar, MHA-CH-06-TL-20 rev v47 (2026-11-05)</title>
+<style>
+  @page { size: letter; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: #111; margin: 0; line-height: 1.3; }
+  h1 { font-size: 17pt; margin: 0 0 2px; }
+  h2 { font-size: 13pt; margin: 14px 0 6px; border-bottom: 2px solid #111; padding-bottom: 2px; }
+  h3 { font-size: 11pt; margin: 10px 0 4px; }
+  .sub { color: #444; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; }
+  th, td { border: 1px solid #777; padding: 3px 5px; vertical-align: top; text-align: left; }
+  th { background: #e9e9e9; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.fixed { table-layout: fixed; }
+  .head td { border: 1px solid #111; }
+  .warn { border: 3px solid #b00; background: #fff4f4; padding: 6px 10px; margin: 8px 0; }
+  .warn h2 { border: none; color: #b00; margin: 0 0 4px; }
+  .warn li { margin-bottom: 3px; }
+  .gate { border: 3px solid #b60; background: #fff8ec; padding: 6px 10px; margin: 8px 0; }
+  .gate h3 { color: #b60; margin: 0 0 4px; }
+  .note { border-left: 4px solid #555; background: #f4f4f4; padding: 4px 8px; margin: 6px 0; }
+  .changed { border: 2px solid #06c; background: #f2f8ff; padding: 6px 10px; margin: 8px 0; }
+  .changed h2 { border: none; color: #06c; margin: 0 0 4px; }
+  .check { width: 16px; }
+  .box { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #111; vertical-align: middle; }
+  .blank { min-width: 60px; }
+  .fill { display: inline-block; min-width: 70px; border-bottom: 1px solid #111; }
+  .op { page-break-inside: avoid; margin-bottom: 8px; }
+  .op h3 { background: #222; color: #fff; padding: 3px 6px; margin-bottom: 4px; }
+  ol, ul { margin: 2px 0 4px 20px; padding: 0; }
+  .pb { page-break-before: always; }
+  .small { font-size: 9pt; color: #444; }
+  .big { font-size: 12pt; font-weight: 600; }
+  code { font-size: 9pt; }
+  img.fig { width: 100%; max-width: 400px; display: block; margin: 4px auto; }
+  svg text { font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Traveler: Oblique Trammel Base Bar</h1>
+<div class="sub">For a beginner on the PM-30MV mill with a DRO. Read the whole sheet once before you touch the machine.</div>
+
+<table class="head">
+  <tr><th>Part</th><td>ch-rocker-arm-tl-oblique-base-bar (shop fixture for the rocker-arm jig)</td><th>Drawing no.</th><td>MHA-CH-06-TL-20, rev <b>v47</b> (released 2026-11-05)</td></tr>
+  <tr><th>Make</th><td class="big">2 bars, both identical</td><th>Material</th><td>6061-T6511 aluminium flat bar, 1/2 × 6 in, the owned OnlineMetals 1173 bar</td></tr>
+  <tr><th>Finished size</th><td><b>17.32 × 5.50 × .47 in</b>, each ±.01</td><th>Finish</th><td><b>Ra 125 µin on both big faces</b> (table and rail seats). Everything else as machined. Break edges R.010 or .010 chamfer max.</td></tr>
+  <tr><th>Machines</th><td>Saw, PM-30MV mill with DRO, 6 in vise, strap clamps</td><th>Units</th><td><b>Inch throughout. Set the DRO to inch.</b> The drawing prints the rail and bracket X stations in mm; this sheet gives them converted to inch (mm ÷ 25.4).</td></tr>
+</table>
+
+<div class="changed">
+<h2>What changed since the 2026-10-30 traveler</h2>
+<p><b>The drawing changed</b> (PR #2187 for issue #2177, #290 decimal inch, #2083 milled width):</p>
+<ul>
+  <li><b>Rail:</b> the rail now comes from the Amazon kit (HGR15 rail, MHA-CH-06-TL-VN-83). <b>8</b> rail holes at <b>15.00, 75.00 … 435.00 mm</b> (60 mm apart, ±0.08 mm = ±.003 in), was 7. Still #8-32, row still 3.50 from the zero edge.</li>
+  <li><b>Tighter sizes:</b> width 5.50 ±.01 (was ±.03); thickness .47; length 17.32.</li>
+  <li><b>Small moves:</b> near slot X .87; bracket rows .245 / .902 / 1.768 / 2.425.</li>
+</ul>
+<p><b>The process changed</b>, from the advice in the <a href="../../../logbook/entries/2026-10-30-pendant-and-roughing-base-bar-to-length.md">2026-10-30 logbook entry</a> (revised 2026-11-01; <b>not yet tried at the machine</b>). On 10-30 the bar rang standing on edge in the vise and was scrapped.</p>
+<ul>
+  <li><b>Op 20, width:</b> bar flat on the table on crosswise parallels, screw jack, straps and stops. Mill only the near edge, side of the cutter, full depth. It is no longer cut standing on edge.</li>
+  <li><b>Op 30, ends and faces:</b> in the vise, bar flat on 1-3/8 in parallels, jack under the far end. It is no longer faced with the vise off.</li>
+  <li><b>New shop rules</b> on page 2: measure first, cut to coordinates, escape drill, climb vs conventional, collet grip, power feed.</li>
+</ul>
+</div>
+
+<div class="warn">
+<h2>BEFORE YOU START</h2>
+<ul>
+  <li><b>Safety glasses on. No gloves, rings or loose sleeves near the spindle.</b> Aluminium chips are razor sharp. Clear them with a brush, never your hand, and only with the spindle stopped.</li>
+  <li><b>Escape drill, practise it dry first:</b> if it rings or grabs, press the <b>pendant stop</b> and wait until <b>all</b> motion has stopped, then <b>retract Z</b>. <b>Never back off sideways while the cutter is in the cut</b>: on 10-30 that drove it deeper.</li>
+  <li><b>Measure before every op</b> and write the allowance on this sheet (actual − target). Cut to an absolute DRO number, never by counting increments.</li>
+  <li><b>Check your rail first.</b> Lay the kit rail on a flat surface. Measure each hole from the end you'll fit flush: <b>15.00, 75.00, 135.00, 195.00, 255.00, 315.00, 375.00, 435.00 mm</b> (the rail is metric; calipers in mm), <b>each within ±0.08 mm</b>. If any hole is outside that, <b>stop and report</b>; don't drill the bar to the rail.</li>
+  <li><b>The edge you mill in Op 20 is the ZERO EDGE.</b> All the Y numbers on this sheet are measured from it. Mark it as soon as it's cut.</li>
+  <li><b>In Setup A, the face you see on top becomes the <u>bottom</u> of bar 1.</b> The counterbores go in that face. This is on purpose, so all the holes are made in one setup.</li>
+  <li><b>Drill only over open air.</b> Every hole is clear of the parallels, but look before every hole anyway.</li>
+  <li><b>The eight rail holes are the tight feature (±.003).</b> Stop exactly on the DRO number for each one.</li>
+</ul>
+</div>
+
+<h2>What you need</h2>
+<table>
+  <tr><th>Tool</th><th>Used for</th><th>Holder / status</th></tr>
+  <tr><td>Saw (the miter saw you used on 10-29, or a bandsaw), tape measure, file</td><td>cut two new blanks 17 7/16 in long (the 10-30 piece is scrapped)</td><td>—</td></tr>
+  <tr><td>1 in parallels (1/8 × 6 in, matched pair)</td><td>Op 20: crosswise under the bar</td><td>owned</td></tr>
+  <tr><td><b>HHIP 3901-0076 screw jack</b> (.90–1.18 in)</td><td>Op 20: under the middle of the bar</td><td><b>not in hand</b> (in the cart 11-01)</td></tr>
+  <tr><td><b>HHIP 3900-2125 universal work stop</b></td><td>Op 20: end stop at the right-hand end</td><td><b>not in hand</b> (in the cart 11-01). Check the 1/2 in base hole takes a 1/2-13 stud.</td></tr>
+  <tr><td>Two 1-2-3 blocks</td><td>Op 20: far-edge stops, stood 2 in tall</td><td>confirm you have a pair (Taytools pair on order)</td></tr>
+  <tr><td><b>1-3/8 in parallels</b>, matched pair</td><td>Op 30 and Setup A: lift the bar above the jaw tops</td><td><b>not owned</b>: your set stops at 1 in</td></tr>
+  <tr><td><b>HHIP 3901-0079 screw jack</b> (about 3.9–5.5 in)</td><td>Op 30 and A4: under the overhanging end</td><td><b>not owned</b></td></tr>
+  <tr><td>Clamping kit (LMS 1268): straps, studs, T-nuts, step blocks</td><td>Op 20: hold the bar on the table</td><td>owned</td></tr>
+  <tr><td>Dial test indicator and mag base</td><td>indicate the far edge (Op 20) and the vise jaw (Op 30)</td><td>as used on 10-29</td></tr>
+  <tr><td>Edge finder, .200 in tip (so the offset is <b>.100</b>)</td><td>find the zero end and zero edge</td><td>3/8 in collet</td></tr>
+  <tr><td>3/4 in end mill, 4-flute</td><td>Op 30: face both big faces</td><td>collet for its shank</td></tr>
+  <tr><td>1/2 in end mill, <b>2-flute</b>, centre cutting, flutes at least 5/8 in long</td><td>Op 20 edge, Op 30 ends, A4 length, A11 slots</td><td>1/2 in collet. 2 or 3 flutes clear aluminium chips better than the 4-flute you used on 10-30.</td></tr>
+  <tr><td>5/16 in end mill, 2-flute, centre cutting</td><td>8 counterbores, Ø.313</td><td>5/16 in collet</td></tr>
+  <tr><td>#2 centre drill</td><td>spot every hole so the drills start where they should</td><td>drill chuck</td></tr>
+  <tr><td>#29 drill (.136)</td><td>8 tap holes for the rail</td><td>drill chuck</td></tr>
+  <tr><td>#9 drill (.196)</td><td>8 screw holes for the TL-28 brackets</td><td>drill chuck</td></tr>
+  <tr><td>3/8 in drill</td><td>2 slot starter holes</td><td>drill chuck</td></tr>
+  <tr><td>8-32 plug tap and T-handle tap wrench</td><td>thread the 8 rail holes</td><td>drill chuck to start, then by hand</td></tr>
+  <tr><td>Cutting oil (CRC), tapping fluid (Tap Magic), acid brush, cigarette paper, rag</td><td>cutting; touch-offs; <b>wiping oil off collets and shanks</b></td><td>—</td></tr>
+  <tr><td>0–1 in micrometer, calipers, steel rule, dead-blow hammer, deburring tool (Noga), marker</td><td>setup, checking, deburring</td><td>—</td></tr>
+  <tr><td>For the final check: the kit rail with 8 #8-32 × 3/4 socket screws; one #8-32 × 5/8 socket screw; a 1/2-13 T-slot stud</td><td>fit tests</td><td>—</td></tr>
+</table>
+
+<h3>Speeds (LittleMachineShop chart, row "Wrought aluminum 6061-T6"; PM-30MV tops out at 3000 rpm)</h3>
+<table>
+  <tr><th>Tool</th><th>Chart speed</th><th class="num">Set spindle to</th><th>Feed</th></tr>
+  <tr><td>3/4 in end mill (facing)</td><td>165 ft/min milling</td><td class="num">840 rpm</td><td>3.3 in/min roughing, 2.4 in/min for the last pass. My choice, not from the chart.</td></tr>
+  <tr><td>1/2 in end mill</td><td>165 ft/min milling (also Machinery's Handbook 27th ed. Table 10, HSS, wrought aluminum)</td><td class="num">1250 rpm</td><td><b>Side cuts (Op 20 edge, Op 30 ends, A4): 6 in/min</b> (.0024 in per tooth), up to about 7.5 if the chips are still dust. Machinery's Handbook Table 15a gives <b>.002 in per tooth</b> for a 1/2 in HSS end mill in hardened wrought aluminum (= 5 in/min here), and Table 15c allows more on a narrow side cut (×1.5 max at a 1/5-diameter bite). But the Op 20 cut is 1/2 in deep, twice the table's deepest column, so don't push past about 7.5. 3 in/min (.0012 per tooth) made near-dust chips on the Op 20 edge: the flutes rubbed. <b>Slots (A11): 5 in/min</b>, the Table 15a .002 in per tooth, in .12 steps. On 10-30 full-width cuts chattered at 1500 rpm and were acceptable at 1000–1200 (with the 5/8 in 4-flute). If it chatters, stiffen the setup first, then drop the speed.</td></tr>
+  <tr><td>5/16 in end mill (counterbores)</td><td>165 ft/min milling</td><td class="num">2000 rpm</td><td>plunge slowly with the quill, like drilling</td></tr>
+  <tr><td>#2 centre drill, #29 drill, #9 drill</td><td>350–400 ft/min drilling (works out above 3000 rpm)</td><td class="num">3000 rpm</td><td>steady hand feed; peck every 1/8 in</td></tr>
+  <tr><td>3/8 in drill</td><td>350–400 ft/min drilling</td><td class="num">2000 rpm</td><td>slower than the chart, so a big drill stays easy to control; peck every 1/8 in</td></tr>
+  <tr><td>Edge finder</td><td>750–1500 rpm (Travers)</td><td class="num">1000 rpm</td><td>approach very slowly near the edge</td></tr>
+  <tr><td>8-32 tap</td><td colspan="3">by hand only. <b>Spindle power OFF.</b></td></tr>
+</table>
+<p class="small">Source: https://littlemachineshop.com/pages/cutting-speeds. Brush cutting oil on before every cut.</p>
+
+<!-- ============================ PAGE 2 ============================ -->
+<h2 class="pb">Shop rules for this part (logbook advice, 2026-10-30 entry; not yet tried)</h2>
+<table>
+  <tr><th style="width:22%">Topic</th><th>What to do</th></tr>
+  <tr><td><b>Axes</b></td><td>Every axis is the <b>cutter moving relative to the part</b>. Jog <b>+X</b>: the cutter moves right (the table moves left). Jog <b>+Y</b>: the cutter moves <b>away from you</b> (the table moves toward you). Jog <b>+Z</b>: the cutter moves up, away from the part. This sheet uses the same signs, so <b>Y numbers toward you are negative</b>.</td></tr>
+  <tr><td><b>Climb or conventional</b></td><td>Spindle running forward: picture the cutter's travel along the part. <b>Part on your left = conventional</b> (use this); part on your right = climb. Op 20 near edge: the cutter travels <b>right</b> (jog +X). Left-hand end: the cutter travels <b>toward you</b> (jog −Y). Right-hand end: the cutter travels <b>away</b> (jog +Y).</td></tr>
+  <tr><td><b>Plan on paper</b></td><td>Measure the stock first. Write <i>actual − target = allowance</i>, split it into rough passes plus one finish pass, and tape the sheet to the machine. On 10-30, one .150 pass was more than the whole .12 length allowance.</td></tr>
+  <tr><td><b>Collet grip</b></td><td>Wipe oil and Tap Magic off the collet and the shank. Tighten the drawbar properly. Mark the shank at the collet face with the marker, so you can see if it creeps (on 10-30 the cutter pulled 1/4 in out). Keep stick-out short.</td></tr>
+  <tr><td><b>Power feed without overrun</b></td><td>Don't use fast step jogs for long passes: they queue up and keep moving after you stop. Use an incremental MDI move in CNCjs, e.g. <code>G20 G91 G1 X18.5 F6</code>, then <code>G90</code>. <code>G20</code> makes it inches at in/min whatever mode was active. <i>Unverified against your config.</i></td></tr>
+  <tr><td><b>Laptop</b></td><td>Set screen and sleep timers to <b>Never</b> while plugged in, and turn off USB selective suspend, so the pendant doesn't drop out. <i>Unverified.</i></td></tr>
+  <tr><td><b>Edge finder zero (EL400)</b></td><td>When the tip kicks, <b>don't move that axis</b>. Use <b>Axis Set</b> (EL400 manual §7.4) to enter the spindle's position from the edge: ±.100, the sign from which side you came. <b>Never use Preset</b> (§8.1) to zero; it's for distance-to-go. Back off, touch again, and check the reading repeats.</td></tr>
+  <tr><td><b>DRO direction</b></td><td>The DRO must count the same way as the jog: jog +X → X counts up; jog +Y → Y counts up and the cutter moves away. If an axis counts the wrong way, fix it with <b>Direction</b> (EL400 manual §6.2). Don't flip the numbers on the sheet.</td></tr>
+</table>
+
+<img class="fig" src="../../../logbook/entries/figures/2026-10-30-base-bar-setups.png" alt="Base bar setups: A what went wrong on 10-30, B Op 20 width on the table against stops, C Op 30 ends and faces in the vise">
+<p class="small">Figure from the 2026-10-30 logbook entry (drawn in mm). Its panel B is this sheet's Op 20 and panel C is Op 30. The figure says "face to 12.0" mm; the print is now .47 in.</p>
+
+<!-- ============================ PAGE 3 ============================ -->
+<h2 class="pb">Op 10: Cut the blanks (saw)</h2>
+<div class="op">
+<ol>
+  <li>Cut <b>two new pieces 17 7/16 in long</b> from the 1/2 × 6 bar. The 10-30 piece is scrapped. Keep it for another oblique-jig part if it measures up, but don't use it here.</li>
+  <li>Let the Dykem dry before you scribe the line. Support the long end of the bar so it doesn't drop as the cut finishes.</li>
+  <li>File off the saw burrs. Measure each piece: length <span class="fill"></span>, width at both ends and the middle <span class="fill"></span> <span class="fill"></span> <span class="fill"></span>, thickness <span class="fill"></span>.</li>
+</ol>
+</div>
+
+<div class="gate">
+<h3>Don't start Op 20 until you have</h3>
+<span class="box"></span> the HHIP 3901-0076 screw jack &nbsp; <span class="box"></span> the HHIP 3900-2125 work stop, and its base takes a 1/2-13 stud &nbsp; <span class="box"></span> two 1-2-3 blocks &nbsp; <span class="box"></span> the escape drill practised dry
+</div>
+
+<div class="op">
+<h3>Op 20: Mill the near edge to 5.50 wide (on the table, vise off)</h3>
+<p>The bar lies flat on crosswise parallels, so the cut is low and stiff, not high above the jaws. You mill <b>only the near long edge</b>, with the side of the cutter at full depth. The far edge stays as extruded and sits against the stops.</p>
+<ol>
+  <li><b>Take the vise off.</b> Wipe the table and stone off any burrs. <b>Check the real X travel</b>: a pass needs about 18.5 in (the bar plus the cutter plus run-on at each end).</li>
+  <li><b>Parallels:</b> stand the two 1 in parallels <b>crosswise</b>, one 1 1/4–1 1/2 in in from each end of where the bar will sit. Their near ends sit <b>3/4 in back</b> from the bar's near edge, so the cutter never reaches them; they stick out about 3/4 in past the far edge.</li>
+  <li><b>Jack:</b> put the 3901-0076 under the middle, on solid table, <b>not across a T-slot</b>. Leave it low for now.</li>
+  <li>Lay the bar on the parallels. <b>Straps snug</b> on the far half, each strap over a parallel, so nothing is in the cutter's path.</li>
+  <li><b>Indicate the far edge along X.</b> The width band is only ±.01, and the new edge comes out straight along X, so any skew turns into taper. Tap the bar until the far edge reads within .002 end to end. <span class="small">(The .002 is this sheet's choice, from the print band.)</span></li>
+  <li><b>Stops:</b> clamp both 1-2-3 blocks, stood 2 in tall, against the far edge beside the parallels. At the right-hand end, set the work stop with its rod on the <b>back half</b> of the end face, so the cutter still runs off the end. Put the clamp block all the way down, rod about 1.06–1.18 in up (check it lands on the 1.00–1.50 in edge), as little rod sticking out as possible, both set screws tight. <b>Clamp each stop to the table on its own</b>; a stop that is only pushed against the bar gets shoved aside.</li>
+  <li><b>Jack just touching</b> the bar at 1.00 in: run it up by hand, never lifting the bar. Then <b>straps tight</b>. Only the straps hold the bar against the pull toward the cutter; nothing can stop it on the near side.</li>
+  <li><b>Dry run:</b> spindle off, run the whole pass in the air. Check the collet clears the straps and the work stop's column.</li>
+  <li><b>Measured width:</b> <span class="fill"></span> (ends and middle). Allowance = that − 5.500 = <span class="fill"></span>, about .50.</li>
+  <li><b>Cutter:</b> 1/2 in 2-flute, 1250 rpm. Bottom .04–.08 <b>below</b> the bar's underside (below 1.00 in); never step down in Z. Lock the head.</li>
+  <li><b>Clean-up pass:</b> bring the cutter in from the front until it just cuts, .020–.040, and run the whole length with the cutter travelling <b>right</b> (+X, conventional). After this first pass, <b>check the bar hasn't crept toward the cutter</b>.</li>
+  <li><b>Set Y from the cut:</b> without moving Y, measure the width W at both ends and the middle. <b>Axis Set Y = −(W − 5.500)</b>. Now Y 0.0000 is the finished edge.</li>
+  <li><b>Roughing:</b> step in toward Y 0, one full-length pass each, always travelling +X. Start at an <b>.080</b> radial bite at 6 in/min. If it stays quiet and the bar hasn't crept, go to <b>.120</b> (about a quarter of the cutter). Don't go past .120 in this setup: only the straps hold the bar against the pull toward the cutter. A .040 bite at full depth makes chips too thin and rubs. To go back: move <b>−Y .040</b> (out of the cut), return in X, then step in. Always approach the new Y moving +Y, so backlash is taken the same way every time.</li>
+  <li><b>Finish:</b> the last ~.020 in one pass at <b>Y 0.0000</b>. Width 5.50; anything from <b>5.49 to 5.51</b> is OK, at both ends and the middle.</li>
+  <li>Write <b>ZERO EDGE</b> on both faces next to the milled edge. Do both bars before you go on.</li>
+</ol>
+</div>
+
+<!-- ============================ PAGE 4 ============================ -->
+<div class="gate pb">
+<h3>Don't start Op 30 until you have</h3>
+<span class="box"></span> a matched pair of 1-3/8 in parallels &nbsp; <span class="box"></span> the HHIP 3901-0079 screw jack
+</div>
+
+<div class="op">
+<h3>Op 30: Square the ends, face both big faces to .47 (vise)</h3>
+<p>At 5.50 wide the bar now fits the 5¾ in vise lying flat. On 1-3/8 in parallels its top stands above the jaws: jaw tops about 4.65 in above the table (2.89 vise bed with the swivel base off, plus 1.77 jaws), bar underside about 4.26, so the cutter stays about .08 above the jaws on the last facing pass and the jaws still grip about .39. With the swivel base fitted, every height goes up by its thickness.</p>
+<ol>
+  <li><b>Put the vise back</b>, swivel base off. Before you bolt it down, <b>check Y reach</b>: the edge finder must reach 3/8 in behind the fixed jaw and 5 1/2 in in front of it (on 10-30 the table ran out about 3/16 in short of the back corner). Move the vise until it does. Then indicate the fixed jaw: under .001 along X, as on 10-29.</li>
+  <li>Wipe the vise floor, the jaws and the parallels. Bar flat, <b>ZERO EDGE against the fixed jaw</b>, on the 1-3/8 in parallels. Tighten, tap down with the dead-blow hammer, tighten again.</li>
+  <li><b>Ends (1/2 in end mill, 1250 rpm, 6 in/min):</b> slide the bar so one end is <b>just past the side of the jaws</b>. Put the 3901-0079 jack under the far end and run it up to touch at about 4.26 in. Cutter bottom .04 below the bar, clear of the parallels. Take .020 per pass until the end is clean: left-hand end, cutter travels <b>toward you</b> (−Y); right-hand end, cutter travels <b>away</b> (+Y). Do the other end the same way. <b>Leave the length .02–.04 over 17.32</b> (17 11/32 to 17 3/8 on a steel rule): A4 finishes it on the DRO.</li>
+  <li><b>Measure the thickness</b> at the four corners and the middle: <span class="fill"></span>. Allowance = that − .470 = <span class="fill"></span>, about .015 per side.</li>
+  <li><b>Face side 1 (3/4 in end mill, 840 rpm):</b> slide the bar so one half is over and beside the jaws, jack under the far end. Touch the top with a cigarette paper and <b>Axis Set Z = the measured thickness</b> (so Z 0 is the underside). Lock the head. Rough at Z = thickness − .010: passes along X, cutter travelling <b>+X</b>, stepping <b>+Y .60</b> from the near side toward the back (uncut metal on your left: conventional). Lift Z .040 to return. Then slide the bar for the other half, touch the faced half with paper to confirm Z, and repeat.</li>
+  <li><b>Finish side 1</b> at Z = measured thickness − allowance ÷ 2, 2.4 in/min, both halves. Stop if you see chatter marks.</li>
+  <li><b>Flip the bar</b>, faced side down. Wipe the parallels and the faced side; one chip ruins the seat. Re-measure, touch off, Axis Set Z, and face side 2 in two halves the same way, finishing at <b>Z = .4700</b>. Anything from <b>.46 to .48</b> is OK.</li>
+  <li><b>Ra 125 µin check (there's no roughness gauge in the shop):</b> both faces should show an even swirl, with no chatter or tearing, and a fingernail should slide across without catching.</li>
+  <li>Do both bars.</li>
+</ol>
+</div>
+
+<h2>Op 40: Mark the bar</h2>
+<div class="op">
+<ol>
+  <li>The ZERO EDGE is already marked.</li>
+  <li>Pick one end to be the <b>ZERO END</b> and write "ZERO END" there.</li>
+  <li>On one big face, write <b>"C'BORE SIDE — UP IN VISE"</b>. This face goes up in Setup A. Both faces are the same, so it doesn't matter which one you pick.</li>
+</ol>
+</div>
+
+<!-- ============================ PAGE 5 ============================ -->
+<h2 class="pb">Setup A: Mill vise. The length, all the holes and the slots are cut here, in one setup.</h2>
+<p>This is what you should see from where you stand, looking down at the vise. The <b>zero corner</b> is back-left. <b>X</b> counts up to the right from the zero end. <b>Y</b> is 0 at the zero edge (back) and goes <b>negative toward you</b>, the same way the jog goes. Every number is a DRO reading from that corner, in inches.</p>
+
+<svg viewBox="0 0 1000 450" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b00"/></marker>
+  </defs>
+  <!-- scale: 50.8 px per inch, origin (60,80) = zero corner; bar 17.32 x 5.50 -->
+  <rect x="342" y="52" width="316" height="26" fill="#bbb" stroke="#333"/>
+  <text x="500" y="45" text-anchor="middle" font-size="13">FIXED JAW (back, column side): the zero edge sits against it</text>
+  <rect x="342" y="361.4" width="316" height="26" fill="#bbb" stroke="#333"/>
+  <text x="500" y="404" text-anchor="middle" font-size="13">MOVING JAW (your side)</text>
+  <rect x="60" y="80" width="879.9" height="279.4" fill="#f2f2f2" stroke="#111" stroke-width="2"/>
+  <rect x="348" y="80" width="304" height="6.35" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <rect x="348" y="353.05" width="304" height="6.35" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <text x="500" y="101" text-anchor="middle" font-size="11" fill="#555">1-3/8 in parallel underneath (dashed)</text>
+  <text x="500" y="347" text-anchor="middle" font-size="11" fill="#555">1-3/8 in parallel underneath (dashed)</text>
+  <g fill="#fff" stroke="#000" stroke-width="1.5">
+    <circle cx="90" cy="257.8" r="4"/><circle cx="210" cy="257.8" r="4"/><circle cx="330" cy="257.8" r="4"/><circle cx="450" cy="257.8" r="4"/>
+    <circle cx="570" cy="257.8" r="4"/><circle cx="690" cy="257.8" r="4"/><circle cx="810" cy="257.8" r="4"/><circle cx="930" cy="257.8" r="4"/>
+  </g>
+  <text x="500" y="282" text-anchor="middle" font-size="12">8 rail holes, Y −3.5000: #29 drill, then tap 8-32</text>
+  <g fill="#fff" stroke="#000" stroke-width="1.2">
+    <circle cx="174" cy="92.4" r="7.9"/><circle cx="174" cy="125.8" r="7.9"/><circle cx="174" cy="169.8" r="7.9"/><circle cx="174" cy="203.2" r="7.9"/>
+    <circle cx="916" cy="92.4" r="7.9"/><circle cx="916" cy="125.8" r="7.9"/><circle cx="916" cy="169.8" r="7.9"/><circle cx="916" cy="203.2" r="7.9"/>
+  </g>
+  <g fill="#000">
+    <circle cx="174" cy="92.4" r="5"/><circle cx="174" cy="125.8" r="5"/><circle cx="174" cy="169.8" r="5"/><circle cx="174" cy="203.2" r="5"/>
+    <circle cx="916" cy="92.4" r="5"/><circle cx="916" cy="125.8" r="5"/><circle cx="916" cy="169.8" r="5"/><circle cx="916" cy="203.2" r="5"/>
+  </g>
+  <text x="190" y="150" font-size="12">4 bracket holes</text>
+  <text x="190" y="164" font-size="12">#9 drill + counterbore</text>
+  <text x="800" y="150" font-size="12">4 bracket holes</text>
+  <rect x="90.7" y="165.1" width="26.9" height="35.0" rx="13.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="122" y="214" font-size="12">slot</text>
+  <rect x="826.3" y="315.5" width="26.9" height="35.0" rx="13.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="786" y="337" font-size="12">slot</text>
+  <circle cx="60" cy="80" r="6" fill="#b00"/>
+  <text x="10" y="70" font-size="14" fill="#b00" font-weight="bold">X0 Y0</text>
+  <line x1="60" y1="80" x2="140" y2="80" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="100" y="74" font-size="13" fill="#b00" font-weight="bold">+X</text>
+  <line x1="60" y1="80" x2="60" y2="150" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="14" y="130" font-size="13" fill="#b00" font-weight="bold">−Y</text>
+  <text x="62" y="378" font-size="12">ZERO END is on the left</text>
+  <text x="500" y="440" text-anchor="middle" font-size="14" font-weight="bold">YOU STAND HERE</text>
+  <text x="940" y="378" text-anchor="end" font-size="12">about 5.7 in sticks out each side of the vise</text>
+</svg>
+<p class="small">Why it looks like a mirror image of the drawing: the drawing shows the other face. Through holes look the same from either side, and the counterbores really are on the face you're looking at ("C'BORE FAR SIDE" on the drawing).</p>
+
+<!-- ============================ PAGE 6 ============================ -->
+<h2 class="pb">Setup A operations (do them in this order for each bar)</h2>
+
+<div class="op">
+<h3>A1. Load the bar</h3>
+<ol>
+  <li>Wipe the vise floor, the jaws and both 1-3/8 in parallels. Put one parallel against each jaw. Taller parallels than the old 1 in ones keep the setup the same as Op 30 and put the underside where the 3901-0079 jack reaches it.</li>
+  <li>Lay the bar on the parallels, <b>marked face up</b>, <b>ZERO EDGE against the fixed (back) jaw</b>, <b>ZERO END on your left</b>.</li>
+  <li>Slide it sideways until about the same amount, roughly 5.7 in, sticks out each side.</li>
+  <li>Tighten the vise. Tap the bar down with the dead-blow hammer, then tighten again. If you can slide either parallel with your fingers, tap again until you can't.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A2. Check which way your DRO counts</h3>
+<ol>
+  <li>Jog <b>+X</b>: the spindle moves right over the bar, and X must count <b>up</b>. Jog <b>+Y</b>: the spindle moves <b>away from you</b>, and Y must count <b>up</b>.</li>
+  <li>If either one disagrees, fix it with <b>Direction</b> (EL400 manual §6.2). Every number below assumes the DRO and the jog agree.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A3. Set zero (edge finder, 1000 rpm)</h3>
+<ol>
+  <li><b>X zero:</b> come at the left end face from the left, at about Y −2.75. When the tip kicks, <b>Axis Set X = −.1000</b> (EL400 §7.4).</li>
+  <li><b>Y zero:</b> raise it, move to about X 4 (out in the overhang, clear of the fixed jaw), and come at the zero edge from <b>behind</b> it. When it kicks, <b>Axis Set Y = +.1000</b>.</li>
+  <li>Check: back off, touch both again, and the readings must repeat. Then go to X 0.0000, Y 0.0000: the tip should sit right over the back-left corner.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A4. Finish the length (1/2 in end mill, 1250 rpm, 6 in/min)</h3>
+<ol>
+  <li>Run the 3901-0079 jack up under the right-hand end until it just touches; don't lift the bar.</li>
+  <li>Measure the end mill across its cutting edges with calipers and call it <b>D</b>, normally .500. Your last pass is at <b>X = 17.32 + D/2</b>: <b>X 17.5700</b> for D = .500.</li>
+  <li>Cutter bottom .04 below the bar. Take .010 passes across the right end, cutter travelling <b>away from you</b> (+Y, conventional). Length 17.32; anything from <b>17.31 to 17.33</b> is OK.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A5 to A8. Spot and drill every hole (drill chuck)</h3>
+<p>Move to each X and Y below and <b>stop exactly on the number</b>. Brush on oil, peck every 1/8 in, and stop about 1/8 in past breakthrough.</p>
+<table>
+  <tr><th>Step</th><th>Tool, speed</th><th>Holes</th><th>Depth</th></tr>
+  <tr><td>A5</td><td>#2 centre drill, 3000 rpm</td><td><b>all 18 positions</b> below</td><td>until the cone is about 1/8 in across</td></tr>
+  <tr><td>A6</td><td>#29 drill, 3000 rpm</td><td>8 rail holes</td><td>through</td></tr>
+  <tr><td>A7</td><td>#9 drill, 3000 rpm</td><td>8 bracket holes</td><td>through</td></tr>
+  <tr><td>A8</td><td>3/8 in drill, 2000 rpm</td><td>2 slot starter holes</td><td>through</td></tr>
+</table>
+
+<table class="fixed">
+  <colgroup><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:13%"><col style="width:5%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:5%"></colgroup>
+  <tr><th>Rail hole</th><th class="num">X</th><th class="num">Y</th><th class="num">print X (mm)</th><th class="check">✓</th><th>Bracket hole</th><th class="num">X</th><th class="num">Y</th><th class="num">print X (mm)</th><th class="check">✓</th></tr>
+  <tr><td>R1</td><td class="num">.5906</td><td class="num">−3.5000</td><td class="num">15.00</td><td><span class="box"></span></td><td>B1</td><td class="num">2.2441</td><td class="num">−.2450</td><td class="num">57.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R2</td><td class="num">2.9528</td><td class="num">−3.5000</td><td class="num">75.00</td><td><span class="box"></span></td><td>B2</td><td class="num">2.2441</td><td class="num">−.9020</td><td class="num">57.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R3</td><td class="num">5.3150</td><td class="num">−3.5000</td><td class="num">135.00</td><td><span class="box"></span></td><td>B3</td><td class="num">2.2441</td><td class="num">−1.7680</td><td class="num">57.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R4</td><td class="num">7.6772</td><td class="num">−3.5000</td><td class="num">195.00</td><td><span class="box"></span></td><td>B4</td><td class="num">2.2441</td><td class="num">−2.4250</td><td class="num">57.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R5</td><td class="num">10.0394</td><td class="num">−3.5000</td><td class="num">255.00</td><td><span class="box"></span></td><td>B5</td><td class="num">16.8504</td><td class="num">−.2450</td><td class="num">428.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R6</td><td class="num">12.4016</td><td class="num">−3.5000</td><td class="num">315.00</td><td><span class="box"></span></td><td>B6</td><td class="num">16.8504</td><td class="num">−.9020</td><td class="num">428.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R7</td><td class="num">14.7638</td><td class="num">−3.5000</td><td class="num">375.00</td><td><span class="box"></span></td><td>B7</td><td class="num">16.8504</td><td class="num">−1.7680</td><td class="num">428.00</td><td><span class="box"></span></td></tr>
+  <tr><td>R8</td><td class="num">17.1260</td><td class="num">−3.5000</td><td class="num">435.00</td><td><span class="box"></span></td><td>B8</td><td class="num">16.8504</td><td class="num">−2.4250</td><td class="num">428.00</td><td><span class="box"></span></td></tr>
+  <tr><th>Slot starter</th><th class="num">X</th><th class="num">Y</th><th></th><th class="check">✓</th><th colspan="5"></th></tr>
+  <tr><td>S1 (left slot, middle)</td><td class="num">.8700</td><td class="num">−2.0200</td><td></td><td><span class="box"></span></td><td colspan="5" rowspan="2" class="small">R4 and R5 are the only holes between the jaws, and they sit over the open gap between the parallels. Everything else is out in the overhang. Tolerances: rail X ±.003 (±0.08 mm on the print); bracket X ±.005 (±0.13 mm); rail row and slots ±.01; bracket rows ±.005.</td></tr>
+  <tr><td>S2 (right slot, middle)</td><td class="num">15.3500</td><td class="num">−4.9800</td><td></td><td><span class="box"></span></td></tr>
+</table>
+</div>
+
+<div class="op">
+<h3>A9. Tap the 8 rail holes 8-32 (by hand, <u>spindle power OFF</u>)</h3>
+<ol>
+  <li>Switch the mill off at the switch. Put the tap in the drill chuck, go to R1, and add a drop of tapping fluid.</li>
+  <li>Lower the quill onto the tap. Keep light pressure on the quill handle and turn the chuck <b>clockwise by hand</b> about 3 turns so the thread starts straight.</li>
+  <li>Finish with the T-handle wrench: <b>one turn in, half a turn back</b>, all the way through. If it gets stiff, back out a full turn and add fluid.</li>
+  <li>Repeat for R2 to R8.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A10. Counterbore the 8 bracket holes (5/16 in end mill, 2000 rpm)</h3>
+<ol>
+  <li>Touch off the top of the bar at B1 with a cigarette paper and zero the quill depth.</li>
+  <li>Set the quill stop for <b>.189 deep</b> (.184 to .194 is OK).</li>
+  <li>At each of B1 to B8, plunge slowly to the stop with oil, then come straight up.</li>
+  <li>After B1: a #8 socket screw's head must sit <b>below</b> the surface. A steel rule laid across it mustn't rock.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A11. Mill the 2 slots (1/2 in end mill, 1250 rpm, 5 in/min)</h3>
+<p>Each slot is <b>.53</b> wide, with its two round ends <b>.16</b> apart. It takes a 1/2 in hold-down stud.</p>
+<table>
+  <tr><th>Slot</th><th class="num">Centre X</th><th class="num">End centres Y (print: rise 1.94 / 4.90 from zero edge)</th><th class="num">Finishing lap X (D = .500)</th><th class="num">Finishing lap Y</th></tr>
+  <tr><td>Left</td><td class="num">.8700</td><td class="num">−1.9400 → −2.1000</td><td class="num">.8550 and .8850</td><td class="num">−1.9250 and −2.1150</td></tr>
+  <tr><td>Right</td><td class="num">15.3500</td><td class="num">−4.9000 → −5.0600</td><td class="num">15.3350 and 15.3650</td><td class="num">−4.8850 and −5.0750</td></tr>
+</table>
+<ol>
+  <li><b>Roughing:</b> start over the starter hole. Go .12 deep and move Y from one end centre to the other and back. Repeat at .24, .36 and .49, which is .02 below the bottom of the .47 bar.</li>
+  <li><b>Finishing lap at full depth:</b> go round the rectangle in the table <b>clockwise as seen from above</b> (conventional inside a pocket).</li>
+  <li>If D isn't .500, move the lap out by (.530 − D) ÷ 2 on each side.</li>
+  <li>Check the width with calipers: <b>.52 to .54</b>. The far slot leaves a .175 wall to the as-extruded edge (toward you), so <b>don't</b> open it up more than you have to.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A12. Unload</h3>
+<p>Come at the right end from the right with the edge finder. It should read 17.4200, which is 17.32 + .100 (anything from 17.4100 to 17.4300 is OK). Lower the jack, brush off the chips and take the bar out.</p>
+</div>
+
+<div class="op">
+<h3>Op 50: Deburr (bench)</h3>
+<ol>
+  <li>Run the deburring tool <b>lightly</b> round every edge: one or two passes, R.010 or .010 chamfer max. Don't scratch the faced seats.</li>
+  <li>Run an 8-32 screw through each rail hole.</li>
+</ol>
+</div>
+
+<!-- ============================ PAGE 7 ============================ -->
+<h2 class="pb">Op 60: Check the part</h2>
+<style>.inspect td, .inspect th { padding: 2px 4px; font-size: 9pt; }</style>
+<p>Write down what you measure. If a reading is outside the OK range, don't use the bar until someone has looked at it.</p>
+<table class="fixed inspect">
+  <colgroup><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:30%"><col style="width:10%"><col style="width:10%"></colgroup>
+  <tr><th>What</th><th class="num">Drawing</th><th class="num">OK range (in)</th><th>How to check</th><th class="blank">Bar 1</th><th class="blank">Bar 2</th></tr>
+  <tr><td>Length</td><td class="num">17.32</td><td class="num">17.31 – 17.33</td><td>DRO in A12</td><td></td><td></td></tr>
+  <tr><td><b>Width</b></td><td class="num">5.50</td><td class="num">5.49 – 5.51</td><td>calipers at both ends and the middle</td><td></td><td></td></tr>
+  <tr><td><b>Thickness</b></td><td class="num">.47</td><td class="num">.46 – .48</td><td>micrometer at the 4 corners and the middle</td><td></td><td></td></tr>
+  <tr><td><b>Seat finish, both faces</b></td><td class="num">Ra 125 µin</td><td>even swirl, no chatter</td><td>look, and drag a fingernail across: it shouldn't catch</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Sits flat</td><td>table seat</td><td>no rock</td><td>on the mill table: press each corner, it mustn't rock</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Rail row from the zero edge</td><td class="num">3.50</td><td class="num">3.49 – 3.51</td><td>calipers from the edge to the near side of a hole, plus .068</td><td></td><td></td></tr>
+  <tr><td>Rail threads</td><td class="num">8-32 UNC, 8×</td><td>screw runs in by hand</td><td>an 8-32 screw turns in all the way with your fingers</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td><b>Rail fit (the real test)</b></td><td>MATCHES HGR15 RAIL MHA-CH-06-TL-VN-83</td><td>all 8 screws start by hand</td><td>Lay the kit rail on the <b>un-marked</b> face, the end you measured flush with the zero end. All 8 screws go in by hand without pushing the rail sideways.</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Bracket hole size</td><td class="num">Ø.196</td><td class="num">.196 – .200</td><td>a #8 screw drops through freely</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Bracket hole positions</td><td class="num">X 2.2441 / 16.8504 (57.00 / 428.00 mm); rows .245 / .902 / 1.768 / 2.425</td><td class="num">±.005</td><td>calipers to the hole side, plus .098</td><td></td><td></td></tr>
+  <tr><td>Counterbore</td><td class="num">Ø.313 × .189 deep</td><td class="num">Ø.308 – .318; .184 – .194 deep</td><td>calipers; a #8 head sits below the surface</td><td></td><td></td></tr>
+  <tr><td>Slot width</td><td class="num">.53</td><td class="num">.52 – .54</td><td>calipers</td><td></td><td></td></tr>
+  <tr><td>Slot end-centre spacing</td><td class="num">.16</td><td class="num">.15 – .17</td><td>slot length minus slot width (about .69 − .53)</td><td></td><td></td></tr>
+  <tr><td>Slot positions</td><td class="num">X .87 / 15.35; rise 1.94 / 4.90 to the lower end centre</td><td class="num">±.01</td><td>calipers or rule</td><td></td><td></td></tr>
+  <tr><td>Far slot wall</td><td class="num">.175</td><td class="num">at least .080</td><td>calipers from the far slot to the as-extruded edge</td><td></td><td></td></tr>
+  <tr><td>Stud fit</td><td>1/2-13 stud</td><td>slides end to end</td><td>push a 1/2-13 stud along each slot</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Edges</td><td>R.010 or .010 chamfer max</td><td>no sharp edges, no big chamfers</td><td>finger (carefully) and eye</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+</table>
+
+<div class="note">
+<b>Then make the second bar exactly the same way.</b> Don't mirror it. When the jig goes together, bar 2 is simply turned over.
+</div>
+
+<table>
+  <tr><th>Made by</th><td style="width:30%"></td><th>Date</th><td style="width:20%"></td><th>Time taken</th><td style="width:15%"></td></tr>
+  <tr><th>Problems / notes</th><td colspan="5" style="height:60px"></td></tr>
+</table>
+
+<p class="small">Hand-written traveler, 2026-11-05. It replaces the 2026-10-30 sheet. Sources: drawing MHA-CH-06-TL-20 rev v47 (release v47, <code>cd98207012</code>; base-bar sources identical on main <code>d939630173</code>) and its spec <code>cad/scripts/ch_rocker_arm_tl_oblique_base_bar_spec.py</code> (rail from the Amazon kit, PR #2187 for issue #2177; decimal inch, #290; milled width, #2083); bracket stations from <code>ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py</code>. Rail and bracket X stations print in mm; their inch DRO values are mm ÷ 25.4, rounded to .0001. The process for Op 20 and Op 30 and the shop rules come from the advice in <code>logbook/entries/2026-10-30-pendant-and-roughing-base-bar-to-length.md</code> (revised 2026-11-01), which has not been tried at the machine; its millimetre setup distances are converted to inches. Feeds: Machinery's Handbook 27th ed., Tables 10, 15a and 15c. Tool ownership comes from <code>cad/process/shop/inventory.toml</code>: the jacks and the work stop are in the cart, not in hand, and the 1-3/8 in parallels and the 3901-0079 jack aren't listed. These are my choices, not values from the print or the advice: the .002 far-edge indication, finishing the length in A4 rather than Op 30, 1-3/8 in parallels in Setup A, the facing feeds and the Ra check method. The sheet was not generated or checked by prechips.</p>
+
+</body>
+</html>
