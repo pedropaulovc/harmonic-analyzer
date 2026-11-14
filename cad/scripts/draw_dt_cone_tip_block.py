@@ -264,15 +264,30 @@ ROUND_OUT = 0.0001
 # render the shoulder ran 29.0 mm right of the callout's point, 1.2 mm past
 # I31's 27.8, and stopped 0.3 mm short of the right view's north face.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0290, 0.0078)
-# The callout's shoulder keeps the place it was proven at when a function
-# flag stood over it ("IN LINE WITH MHA-DT-05", 55.1 x 3.6 mm from its
-# upper-left corner).  #2697: the bore's location prints .34 at .XX (the
-# post's 19/64 holes leave its turn 2.8 mm past the tip's print-worst lateral
+# The bore's function, named at its callout (screen review dt-fab-4: the
+# location carries its value only, rule 4).  Its location from the -X face
+# holds the end screw, and with it T006's pivot, in line with the line
+# MHA-DT-05's journal points the shaft along; the post's turn on its screws
+# takes up the rest.  #2697: the location prints .34 at .XX (the post's
+# 19/64 holes leave that turn 2.8 mm past the tip's print-worst lateral
 # error, build_dt_drive_train_assembly TIP_LATERAL_ERROR_MM 6.76 against
-# TIP_LATERAL_CAPACITY_MM 9.59), so it holds no tight band and needs no
-# reason; machinist review of 0613bba70 read the flag as a location given in
-# words (rule 26), and it is gone.  The height is made to MHA-DT-05 (note 2).
-ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0551, 0.0)
+# TIP_LATERAL_CAPACITY_MM 9.59), so the flag states the bore's function, no
+# longer a tight band's reason.  Its height is made to the same axis (note 2).
+# Machinist review of PR 2's farm proof (rounds 1 and 2) read "LOCATES
+# MHA-DT-37 PIVOT" as a mate with no function; the v49 release review
+# (3 of 3 runs) read "ON MHA-DT-05 AXIS" as the height alone, so the flag
+# names the side-to-side alignment.
+BORE_FLAG_TEXT = f"IN LINE WITH {POST_NUMBER}"
+# The flag's ink from its upper-left corner: run 20261110T001845485Z printed
+# "CARRIES MHA-DT-39" 44.6 x 3.4 mm, 2.62 mm a glyph; BORE_FLAG_TEXT's
+# glyphs at that pitch, rounded out to 0.1 mm.
+_BORE_FLAG_GLYPH = 0.00262
+ADJUSTER_ENTRY_EXTENT = (
+    0.0,
+    0.0036,
+    math.ceil(len(BORE_FLAG_TEXT) * _BORE_FLAG_GLYPH * 1e4) / 1e4,
+    0.0,
+)
 ADJUSTER_LEADER_ANGLE = math.radians(37.0)
 ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
 ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
@@ -327,7 +342,6 @@ SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
 # above a dimension); below it, the full mate number gets its own row.
-FOOT_TAP_Z_REASON = "HOLDS MHA-DT-39\nENGAGEMENT"
 DIMENSION_CALLOUTS = {
     # The depth prints .43 at the title block's .XX (machinist review of PR
     # 2's farm proof, rules 3 and 19): a general size with no band of its own
@@ -335,15 +349,6 @@ DIMENSION_CALLOUTS = {
     # right of the plan.
     # The matched axis height (AXIS_MATCH_NOTE).
     "AxisHeight": AXIS_HEIGHT_CALLOUT,
-    # The hold-down tap's station from the north face sets where that face,
-    # and so the end screw's head, stands over MHA-DT-20's hold-down hole: at
-    # .XX the 5/8 end screw's shallow engagement
-    # (build_dt_drive_train_assembly END_SCREW_EMBED_WORST_MM) drops under the
-    # owner's 1.39 D, so the station stays .XXX and states what it holds, at
-    # its own value (rule 3).  Machinist review of 017b38ec2 and 0613bba70
-    # (3 of 3 and 2 of 3 runs) did not read a reason on the tap's hole callout
-    # as this dimension's.
-    "FootTapZ": FOOT_TAP_Z_REASON,
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
     # #2248): the locating dowel's press ream -- its depth,
     # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
@@ -355,7 +360,8 @@ DIMENSION_CALLOUTS_ABOVE = {
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
     "Width": "WITHIN MHA-DT-20 EDGE",
-    # Screen review (dt-fab-4): a location carries its value only.
+    # Screen review (dt-fab-4): a location carries its value only; the
+    # shaft-tip function moved to the bore's callout (BORE_FLAG_TEXT).
     # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
     # stands inside the Ø4.04 bore, so its lower extension line ended on no
     # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
@@ -473,23 +479,7 @@ _BOTTOM_LEFT = BOTTOM_CENTER[0] - BLOCK_X * _S / 2.0
 _BOTTOM_RIGHT = BOTTOM_CENTER[0] + BLOCK_X * _S / 2.0
 FOOT_TAP_CENTER = (_BOTTOM_LEFT + FOOT_TAP_X * _S, _bottom_y(Z_NORTH - FOOT_TAP_Z))
 FOOT_TAP_X_RISE = 0.0078
-# FootTapZ's value and reason are taller than its span, so they stand on the
-# extended dimension line over the view's north edge (as the width's stand
-# past its +X extension line), the line far enough left that the block
-# clears FootTapX's -X witness.
-FOOT_TAP_Z_EXTENT = (
-    _callout_half_width(FOOT_TAP_Z_REASON),
-    (1 + len(FOOT_TAP_Z_REASON.split("\n"))) * TEXT_ROW_HEIGHT / 2.0,
-    _callout_half_width(FOOT_TAP_Z_REASON),
-    (1 + len(FOOT_TAP_Z_REASON.split("\n"))) * TEXT_ROW_HEIGHT / 2.0,
-)
-FOOT_TAP_Z_LINE_X = (
-    _BOTTOM_LEFT
-    - _drawing_leaders.ARROW_TEXT_CLEARANCE
-    - ARROW_HALF_WIDTH
-    - ROUND_OUT
-    - FOOT_TAP_Z_EXTENT[2]
-)
+FOOT_TAP_Z_LINE_X = _BOTTOM_LEFT - 0.013
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248): the locating dowel's press ream, on the tap's line.  Machinist
 # review of round 6, #9: its station is a baseline from the -X face (the
@@ -542,7 +532,7 @@ BOTTOM_KEEP = {
     ),
     "FootTapZ": (
         FOOT_TAP_Z_LINE_X,
-        _bottom_y(Z_NORTH) + TEXT_CLEARANCE + ROUND_OUT + FOOT_TAP_Z_EXTENT[3],
+        (_bottom_y(Z_NORTH) + FOOT_TAP_CENTER[1]) / 2.0,
     ),
     "Width": (
         _BOTTOM_RIGHT
@@ -664,26 +654,42 @@ PINCH_THREAD_CALLOUT_XY = (
     + ROUND_OUT
     + PINCH_THREAD_CALLOUT_EXTENT[1],
 )
-# The hold-down tap's two lines (the tap drill and its depth, the thread and
-# its full-thread depth) plus the shoulder.  The c4c0e848a render measured
-# the three-line block it then was (a mate line under the thread's): 7.8 mm
-# over its point to the shoulder 8.35 under it, 5.8 mm a row; run
-# 20261113T092542148Z printed the thread's line 44.6 mm wide, and the
-# shoulder runs 2.8 mm past each end.  #2697: the reason left this callout
-# for the .215 it explains (DIMENSION_CALLOUTS), so the block is those two
-# lines; an estimate until a render measures it.
-FOOT_TAP_CALLOUT_EXTENT = (0.0251, 0.0049, 0.0251, 0.0055)
+# The hold-down tap's lines (the tap drill and its depth, the thread and its
+# full-thread depth, then the stack its stations set) plus the shoulder,
+# measured on the c4c0e848a render: SolidWorks centres the block on the
+# point, 7.8 mm over it to the shoulder 8.35 under it, and the last line's
+# twenty glyphs print 57.6 mm wide.  The tap's .215 from the north face sets
+# where that face, and so the end screw's head, stands over MHA-DT-20's
+# hold-down hole: at .XX the 5/8 end screw's shallow engagement
+# (build_dt_drive_train_assembly END_SCREW_EMBED_WORST_MM) drops under the
+# owner's 1.39 D, so the station stays .XXX with its reason (rule 4; machinist
+# review of PR 2's farm proof, round 2, found no function on it).  #2697: its
+# station across the block prints .30 at .XX and needs no reason, so the one
+# reason is the .XXX station's alone (the v49 release review, 3 of 3 runs,
+# read it as the across station's when both were .XXX).  Machinist review of
+# 017b38ec2 (3 of 3 runs) read "SETS MHA-DT-39 REACH" as no rule-3 function
+# for the .215, so the reason takes rule 3's form: what the station holds.
+FOOT_TAP_QUALIFIER = "HOLDS MHA-DT-39 ENGAGEMENT"
+_FOOT_TAP_GLYPH = 0.0576 / 20.0
+_FOOT_TAP_GROWTH = (len(FOOT_TAP_QUALIFIER) - 20) * _FOOT_TAP_GLYPH
+FOOT_TAP_CALLOUT_EXTENT = (
+    0.0293 + _FOOT_TAP_GROWTH / 2.0,
+    0.0086,
+    0.0293 + _FOOT_TAP_GROWTH / 2.0,
+    0.0080,
+)
 # The hold-down tap's callout stands above the bottom view, right of the
 # FootTapX value and under the front view's foot finish, so its leader drops
 # steeply (53 degrees) through the view's north edge.  With the tap 1.00
 # toward -X (2026-09-29) a callout right of the view ran 5.4 mm longer over
 # the part than the tap's shortest approach.  SolidWorks centres the block
-# on the point: the shoulder stands 1.65 mm over the north edge, as the
-# two-line block's did before it carried a mate line, and the block's left
-# end stands 8.0 mm right of the tap.
+# on the point, so the mate line (machinist review of c4c0e848a) dropped the
+# shoulder 2.8 mm onto the north edge and the 4.875's witness; 10.0 mm over
+# the edge the shoulder clears it by 1.65, as the two-line block's did, and
+# the block's left end stands 8.5 mm right of the tap.
 FOOT_TAP_CALLOUT_XY = (
-    FOOT_TAP_CENTER[0] + 0.0080 + FOOT_TAP_CALLOUT_EXTENT[0],
-    _bottom_y(Z_NORTH) + 0.00165 + FOOT_TAP_CALLOUT_EXTENT[3],
+    FOOT_TAP_CENTER[0] + 0.0373 + _FOOT_TAP_GROWTH / 2.0,
+    _bottom_y(Z_NORTH) + 0.0100,
 )
 # The locating foot's finish symbol, on the front view's foot edge (round-1
 # farm review, dt-fab-4: the seat that stands on MHA-DT-20).  The width
@@ -721,6 +727,8 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
     return (
         # The removed view's caption is its letter, centred under it.
         ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
+        # Review: named above the thread callout it describes.
+        (BORE_FLAG_TEXT, FRONT_CENTER[0] + ADJUSTER_ENTRY_DX, ADJUSTER_ENTRY_Y),
         # The ream callout's SEE NOTE 1 (round 6, #2).
         (DOWEL_NOTE, *DOWEL_NOTE_XY),
         (AXIS_MATCH_NOTE, *AXIS_MATCH_NOTE_XY),
@@ -783,8 +791,6 @@ _VALUE_EXTENTS = {
     # The locating dowel's station and its ream's banded size with rows.
     "DowelX": DOWEL_X_EXTENT,
     "DowelHoleDia": DOWEL_HOLE_EXTENT,
-    # The tap's .215 with its reason's two rows (FOOT_TAP_Z_REASON).
-    "FootTapZ": FOOT_TAP_Z_EXTENT,
     **{
         name: _value_extent(name, nominal)
         for name, nominal in (
@@ -792,6 +798,7 @@ _VALUE_EXTENTS = {
             ("PassageCenter", BLOCK_X / 2.0),
             ("Depth", BLOCK_Z),
             ("FootTapX", FOOT_TAP_X),
+            ("FootTapZ", FOOT_TAP_Z),
         )
     },
     **{
@@ -862,6 +869,7 @@ AXIS_MATCH_NOTE_EXTENT = (
 )
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
+    BORE_FLAG_TEXT: ADJUSTER_ENTRY_EXTENT,
     "VIEW B": VIEW_CAPTION_EXTENT,
     DOWEL_NOTE: DOWEL_NOTE_EXTENT,
     AXIS_MATCH_NOTE: AXIS_MATCH_NOTE_EXTENT,
@@ -1789,7 +1797,7 @@ def _states_depth(text: str, depth_mm: float) -> bool:
 def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the hold-down tap's callout reads as a blind UNC-2B tap: the
     thread's line carries its full-thread depth, the tap drill's line its
-    depth, and nothing says THRU."""
+    depth, nothing says THRU, and the thread's part ends on the mate."""
     thread_desc = f"{HOLDDOWN_THREAD.lstrip('#')} UNC"
     lines = [text for text in resolved_parts.values() if text.strip()]
     thread = [text for text in lines if thread_desc in text]
@@ -1799,8 +1807,37 @@ def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
         and len(thread) == 1
         and "2B" in thread[0]
         and _states_depth(thread[0], FOOT_THREAD_DEPTH)
+        and thread[0].rstrip().endswith(f"\n{FOOT_TAP_QUALIFIER}")
         and any(_states_depth(text, FOOT_DEPTH) for text in drill)
     )
+
+
+def _foot_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Append the mate the tap's .XXX stations locate on (rule 4) to the one
+    compartment holding the thread, under its native thread line."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected foot tap callout parts: {definitions!r}")
+    thread_parts = [part for part, text in definitions.items() if "<hw-threadclass>" in text]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"foot tap thread line is not in one callout part: {definitions!r}")
+    updated = dict(definitions)
+    part = thread_parts[0]
+    updated[part] = f"{updated[part].rstrip()}\n{FOOT_TAP_QUALIFIER}"
+    return updated
+
+
+def _set_foot_tap_callout_text(display: Any) -> None:
+    """Name the mate under the native thread line, keeping every variable."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _foot_tap_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    if persisted != updated:
+        raise RuntimeError(
+            f"foot tap mate line did not persist: definitions={persisted!r}"
+        )
 
 
 def _check_foot_tap_callout(display: Any) -> None:
@@ -2149,6 +2186,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=FOOT_TAP_CALLOUT_XY,
         label="hold-down foot tap",
     )
+    _set_foot_tap_callout_text(foot_tap_callout)
     set_hole_callout_precision(
         foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap sizes"
     )
