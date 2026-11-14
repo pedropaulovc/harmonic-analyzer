@@ -11,7 +11,7 @@ import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_washer_drawing import supplier_washer_dimensions
 import ch_rocker_arm_tl_vn_oblique_hub_washer_spec as part
@@ -62,6 +62,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        # MHA-CH-06-TL-VN-85 overruns the template's DWG. NO. cell.
+        number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),

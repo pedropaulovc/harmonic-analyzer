@@ -197,3 +197,5 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert (
         drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
     )
+    # The 18-character TL-VN Number is shrunk into the DWG. NO. cell.
+    assert "SHRINK_TO_CELL" in drawing.build.__code__.co_names
