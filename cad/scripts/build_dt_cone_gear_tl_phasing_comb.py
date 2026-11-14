@@ -49,6 +49,7 @@ from dt_cone_gear_tl_phasing_comb_spec import (
     DRAWING_PRECISION,
     GLOBALS,
     GRIP_POINT,
+    RETURN_POINT,
     ISOMETRIC_VIEW_NOTE,
     MATERIAL,
     ORIGIN,
@@ -85,16 +86,22 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     vertical, the near arm's seat corner on the origin, each driving
     dimension of ``SKETCH_DIMENSIONS`` between its two points.  The spring
     arm's end (from ``GRIP_POINT``) is collinear with the near arm's, so both
-    arms' feet stand on T036 at the seat edge's station."""
+    arms' feet stand on T036 at the seat edge's station, and the near arm's
+    edge past T006's level (from ``RETURN_POINT``) with the T030 blade's, on
+    the seat line."""
     points = profile_points_mm()
     check("create_sketch sheet profile", await adapter.create_sketch("Front"))
     lines = await add_line_chain(adapter, points)
-    check(
-        "sheet profile spring arm's end on the near arm's",
-        await adapter.add_sketch_constraint(lines[GRIP_POINT], lines[0], "collinear"),
-    )
+    collinear = {GRIP_POINT: 0, RETURN_POINT: 1}
+    for index, other in collinear.items():
+        check(
+            f"sheet profile line {index} on line {other}",
+            await adapter.add_sketch_constraint(
+                lines[index], lines[other], "collinear"
+            ),
+        )
     for index, line in enumerate(lines):
-        if index == GRIP_POINT:
+        if index in collinear:
             continue
         (x0, y0), (x1, y1) = points[index], points[(index + 1) % len(points)]
         direction = "horizontal" if y0 == y1 else "vertical"
