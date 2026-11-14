@@ -214,8 +214,8 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "On this bar's own trimmed rail, flush at ZERO END, measure the {{cad.rail_count:d}} hole centres (REF {{cad.rail_first_mm:.3f}} mm, {{cad.rail_pitch_mm:.3f}} mm pitch); remove rail. Drill {{cad.rail_range}} at measured X."
-instruction_detailed = "Before drilling: trim this bar's own HGR15 rail to the bar, flush both ends. Clamp the pair, rail end flush at ZERO END, and measure each of the {{cad.rail_count:d}} hole centres in X from ZERO END; the REF {{cad.rail_first_mm:.3f}} mm start and {{cad.rail_pitch_mm:.3f}} mm pitch only help find them. Remove the rail before drilling and tapping; keep it paired and oriented to its own bar. Drill {{cad.rail_range}} at the measured X."
+instruction = "Rail face up, own rail clamped flush at ZERO END (bar 1 turned over after). Edge finder, X0 ZERO END: record {{cad.rail_range}} X, each its counterbore's two-side midpoint."
+instruction_detailed = "Before drilling: trim this bar's own HGR15 rail to the bar, flush both ends. Put the bar in the vise rail face up: bar 1 RAIL SIDE up, so ZERO EDGE is at the front jaw (turn it C'BORE SIDE up afterwards, as held above); bar 2 is already RAIL SIDE up. Lay the rail on its seat along the rail row, end flush with ZERO END, and clamp the pair. Edge finder in the spindle: touch ZERO END and set X0 (DRO X = −tip radius). For each of the {{cad.rail_count:d}} rail holes, drop the tip into the counterbore, touch its left side and read X, touch its right side and read X; the centre is the midpoint. Write all {{cad.rail_count:d}} on the sheet. The REF {{cad.rail_first_mm:.3f}} mm start and {{cad.rail_pitch_mm:.3f}} mm pitch only help find them; never drill at REF. Remove the rail; keep it paired and oriented to its own bar. Re-find X0 on ZERO END in the drilling clamping and drill {{cad.rail_range}} at the recorded X."
 
 [[setups.operations]]
 speed_kind = "spindle"

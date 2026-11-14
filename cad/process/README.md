@@ -169,8 +169,10 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   gives their DRO positions). Facing runs full length at 850 rpm, 6.8 in/min
   (owner ruling 2026-11-11, `settings.basebar-face-6061-t6511`). The rail
   stations are REF only, never drill targets (spec; owner R4 ruling, restated
-  2026-11-11): all eight hole centres are measured on the bar's own rail,
-  trimmed flush, the rail comes off, and each hole is drilled at its measured X.
+  2026-11-11): all eight hole centres are picked up on the bar's own rail,
+  trimmed flush and clamped on the rail face, with the edge finder on the X DRO
+  (both sides of each counterbore, centre = midpoint; owner ruling 2026-11-13,
+  #2546), the rail comes off, and each hole is drilled at its recorded X.
   The 1/2 in end mill alone cuts both slots, tracing a cutter-centre
   rectangle printed per slot, and `tool_sizing` checks it against the slot
   width band less the path offset (the 3/8 in slot drill and 17/32 in
