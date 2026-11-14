@@ -48,11 +48,11 @@ vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 # Vise holds centre the bar on the jaws, both ends out over jacks: the adapter
 # binds cad.vise_centred_overhang_mm = (finished length − jaw width)/2.
-# Setup 4 jack centres (DRO X/Y), under the left- and right-end holes. Left
-# jack centre to feature edge 1.21 in (R1), 2.07 (S1), 2.15 (B2 counterbore),
-# 1.10 (front edge); right jack 0.95 (B4 counterbore), 1.52 (right end). The
-# adapter refuses a jack centre off the bar or inside a hole, counterbore or
-# slot.
+# Jack centres (DRO X/Y), set in Setup 3 under the slot entries and kept for
+# Setup 4's end holes. Left jack centre to feature edge 1.21 in (R1), 2.07
+# (S1), 2.15 (B2 counterbore), 1.10 (front edge); right jack 0.95 (B4
+# counterbore), 1.52 (right end). The adapter refuses a jack centre off the
+# bar or inside a hole, counterbore or slot.
 jack_left_x_in = 1.3
 jack_left_y_in = -4.4
 jack_right_x_in = 15.8
@@ -185,7 +185,7 @@ title = "Face, square ends, mill slots in vise"
 machine = "PM-30MV / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred, ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Screw jack under each overhang ≥1 in from the end, touch only."
+holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred, ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Jacks, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}} (X from ZERO END); kept for Setup 4."
 datum = "Z0 underside from measured thickness (slots: top face). X0 = left end squared here (ZERO END). Y0 (slots): edge-find ZERO EDGE; drawing Y becomes −Y."
 diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, top just above the jaws, jacks touching under both overhangs; 3/4 in end mill faces the full length, side 1 then side 2 after an end-for-end flip. Then the 1/2 in end mill squares the left end (ZERO END) and the right end to length in the same clamping, and the upper face is marked: bar 1 C'BORE SIDE, bar 2 RAIL SIDE." }
 # The face cutter runs past both ends; the end cutter centre runs D/2 past
@@ -222,6 +222,23 @@ milling_cuts = [
   { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
+# Each depth step starts with a slow plunge at the cutter-centre rectangle's
+# corner nearest that slot's jack (largest X; S1 .885 in, S2 15.365 in). The
+# plunge pushes down, so the jacks carry it: the beam spans jack to jack,
+# leaving out the vise between them, which only stiffens it. The traverse
+# lifts, so only the jaws hold it (the slot operation's beam).
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
+instruction = "S1–S2 entries: each step, plunge at the cutter-centre corner nearest that slot's jack."
+rpm = 1250
+feed = "slow hand plunge"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [
+  { name = "S1–S2 corner plunges", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [22.479, 390.271] },
+]
+
 # One cutter makes each slot: the adapter offsets the cutter-centre rectangle
 # e = (slot width − process.half_cutter_dia_mm)/2 from the drawing's arc-centre
 # line. The cutter actually used cuts its Ø + 2e, so its shop diameter must lie
@@ -230,10 +247,10 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
-instruction = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, ±{{cad.slot_position_tol_in:.2f}}: plunge at a cutter-centre rectangle corner, traverse it; {{process.slot_step_in:.2dot}} steps to {{cad.slot_depth_in:.2f}} deep. Makes {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} arc centres."
-instruction_detailed = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, positions ±{{cad.slot_position_tol_in:.2f}}: plunge at a corner of the cutter-centre rectangle and traverse it at each depth {{cad.slot_depths_in}} below top (light steps: the bar overhangs the jaws here). Makes {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} between arc centres."
+instruction = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, ±{{cad.slot_position_tol_in:.2f}}: after each entry, traverse the cutter-centre rectangle; {{process.slot_step_in:.2dot}} steps to {{cad.slot_depth_in:.2f}} deep; {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} arc centres."
+instruction_detailed = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, positions ±{{cad.slot_position_tol_in:.2f}}: after each entry plunge (op above), traverse the cutter-centre rectangle at each depth {{cad.slot_depths_in}} below top (light steps: the jacks only push up, so the jaws alone hold the bar down against the end mill's lift). Makes {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} between arc centres."
 settings = "basebar-slot-rough-6061-t6511"
-inspection = "DRO X, before unclamping: slot centres S1 {{cad.slot1_x_min_in:.2f}}–{{cad.slot1_x_max_in:.2f}}, S2 {{cad.slot2_x_min_in:.2f}}–{{cad.slot2_x_max_in:.2f}}."
+inspection = "DRO X: slot centres S1 {{cad.slot1_x_min_in:.2f}}–{{cad.slot1_x_max_in:.2f}}, S2 {{cad.slot2_x_min_in:.2f}}–{{cad.slot2_x_max_in:.2f}}."
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.slot1_x_band_mm}}" },
   { gauge = "mill-x-dro", band_mm = "{{cad.slot2_x_band_mm}}" },
@@ -241,7 +258,7 @@ gauge_checks = [
 # The bar is squared to length here: slot stations sit in the finished frame.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "S1–S2 depth steps", kind = "slot", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 1.27, radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = [22.098, 389.89] },
+  { name = "S1–S2 depth steps", kind = "slot", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = [22.098, 389.89] },
 ]
 
 [setups.operations.table]
@@ -254,8 +271,8 @@ title = "Drill / tap / counterbore"
 machine = "PM-30MV; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Setup 3's clamping: bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up. Jacks moved under the end holes, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}}."
-datum = "X0 ZERO END (Setup 3). Y0: edge-find ZERO EDGE; drawing Y becomes −Y. Z0 = top face."
+holding = "As Setup 3 (re-clamp alike), jacks as set; bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up."
+datum = "X0 ZERO END, re-found (rail op). Y0: edge-find ZERO EDGE; drawing Y becomes −Y. Z0 = top face."
 diagram = { file = "diagrams/holes.svg", alt = "Finished {{cad.length_in:.2f}} in bar in vise: bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up, ZERO EDGE at back fixed jaw, ZERO END left, X0 Y0 back-left; rail holes {{cad.rail_range}}, counterbored {{cad.bracket_range}} (bar 1 only), slots {{cad.slot_range}} and one jack under each overhang's holes." }
 # Hole and slot centres lie inside the finished bar. Longest: a drill in the
 # drill chuck; shortest: the 5/16 in counterbore cutter in an R8 collet.
@@ -348,7 +365,8 @@ milling_cuts = [
 speed_kind = "other"
 tool = "tap"
 sizing = "other"
-instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}; start each tap square from the spindle (tap in the chuck, spindle off), then by hand."
+instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}."
+instruction_detailed = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}: start each tap square from the spindle (tap in the drill chuck, spindle off), then finish by hand with tap fluid, backing off to clear chips."
 feed = "hand"
 
 [[setups.operations]]
