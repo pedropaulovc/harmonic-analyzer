@@ -173,9 +173,11 @@ CALLOUTS_BELOW = {**part_spec.CALLOUTS_BELOW, "PinHoleDia": PIN_FIT_CALLOUT}
 # the title block (65.1) and the 20.5's lane (~100).
 EDGE_CENTER = (TOP_CENTER[0], 0.078)
 # The thickness's text 8 sheet mm left of the plate's -X end; its extension
-# lines start at the stock line inside the plate (A1's +X wall) and are
-# capped (draw_dt_pinion_cam's _limit_witness_lines) to stop 1.5 sheet mm
-# short of that end, so they never run along the view's outline.
+# lines start at the stock line on that end face (the part draws it there so
+# it prints under the view's outline: inside the plate it printed as a stray
+# dashed line, review run 20261114T064216453Z-bf464d35) and are capped
+# (draw_dt_pinion_cam's _limit_witness_lines) to stop 1.5 sheet mm short of
+# the end.
 _EDGE_TEXT_DX = 16.0  # model mm
 EDGE_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
     "StockThick": (

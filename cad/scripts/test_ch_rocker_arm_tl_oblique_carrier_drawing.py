@@ -462,11 +462,14 @@ def test_edge_view_imports_one_hidden_sketch_and_no_body_feature() -> None:
     source = inspect.getsource(part)
     assert '"StockThick", \'"PlateThick@Plate"\'' in source
     assert "PIN_CHAMFER_REFERENCE" not in source
-    # The stock line stands in A1's +X wall, inside the plate; the text
-    # stands left of the plate's -X end and its extension lines are capped to
-    # stop 1.5 sheet mm short of it, never running along the view's outline.
-    wall = spec.PIN_HOLE_DIA / 2.0
-    assert wall + 2.0 <= spec.STOCK_REFERENCE_DX
+    # The stock line stands on the plate's -X end face, under the edge
+    # view's outline (inside the plate it printed as a stray dashed line,
+    # review run 20261114T064216453Z-bf464d35); the text stands left of that
+    # end and its extension lines are capped to stop 1.5 sheet mm short of it.
+    reference = inspect.getsource(part._section_reference)
+    assert "x_stock = OUTLINE_X[0]" in reference
+    assert 'dims.record("StockLineX", \'"PlateHalfLength@PlateProfile"\')' in reference
+    assert "STOCK_REFERENCE_DX" not in inspect.getsource(part)
     text_x = drawing.EDGE_KEEP_MODEL_MM["StockThick"][0]
     assert text_x == spec.OUTLINE_X[0] - drawing._EDGE_TEXT_DX
     assert drawing.EDGE_KEEP_MODEL_MM["StockThick"][1:] == (-spec.THICKNESS / 2.0, 0.0)

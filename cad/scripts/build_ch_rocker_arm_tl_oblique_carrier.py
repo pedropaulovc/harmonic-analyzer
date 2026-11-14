@@ -15,9 +15,9 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
 * the pin holes' underside edges carry only the title block's edge break
   (owner ruling 2026-11-13: no chamfer; the purchased spacer seats on the
   broken edge). The hidden ``SectionReference``, on ``SectionAPlane``
-  (section A-A's hidden cutting plane, coincident with the Front plane: the
-  A1-B1 pin line), carries the finished thickness section A-A prints, driven
-  from Plate's depth;
+  (coincident with the Front plane: the A1-B1 pin line), carries the
+  finished thickness the drawing's edge view prints, driven from Plate's
+  depth, its line on the plate's -X end face;
 * ``StationReference`` retains the unchanged hidden model baseline drivers;
   only EdgeX prints as a dimension. The drawing's native hole table reads
   the actual hole axes from A1; the tap placements stay origin-based;
@@ -108,7 +108,6 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     THICKNESS,
     SECTION_PLANE,
     SECTION_REFERENCE,
-    STOCK_REFERENCE_DX,
     UNIT,
 )
 
@@ -374,18 +373,21 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
     SECTION_PLANE is coincident with the Front plane, model Z = 0, the A1-B1
     pin line, so section A-A cuts along it. A partial section imports a hidden
     sketch in its plane but not Plate's depth (jig-r4/r5), so this sketch
-    carries the printed thickness: one vertical construction line through the
-    stock in A1's +X wall, STOCK_REFERENCE_DX from A1's axis: its top on the
-    top face (a horizontal-points relation to the origin) and its station
-    from the origin, vertical, and its length (printed) driven from Plate's
-    depth.
+    carries the printed thickness: one vertical construction line on the
+    plate's -X end face: its top on the top face (a horizontal-points
+    relation to the origin) and its station from the origin driven from
+    PlateHalfLength, vertical, and its length (printed) driven from Plate's
+    depth. On the end face the drawing's edge view draws it under the
+    plate's own outline: inside the plate (A1's +X wall, for the retired
+    section A-A) it printed as a stray dashed line across the edge view
+    (machinist review, run 20261114T064216453Z-bf464d35, FIX).
     """
     feature = SECTION_REFERENCE
     _section_plane(adapter)
     check(f"create_sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=feature)
     dims = SketchDims()
-    x_stock = PIN_HOLES["A1"][0] + STOCK_REFERENCE_DX
+    x_stock = OUTLINE_X[0]
     top = to_sketch((x_stock, 0.0, 0.0))
     bottom = to_sketch((x_stock, -THICKNESS, 0.0))
     set_sketch_direct_db(adapter, True)
@@ -398,7 +400,7 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
     await anchor_point_to_origin(
         adapter, f"{stock}.start", *top, f"{feature} stock line on the top face"
     )
-    dims.record("StockLineX", f'"A1X@PinHoleProfile" - {STOCK_REFERENCE_DX:g}')
+    dims.record("StockLineX", '"PlateHalfLength@PlateProfile"')
     check(
         f"vertical {feature} stock line",
         await adapter.add_sketch_constraint(stock, None, "vertical"),
