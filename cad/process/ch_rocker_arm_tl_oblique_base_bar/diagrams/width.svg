@@ -59,7 +59,7 @@
     <line x1="88" y1="{{view.front}}" x2="22" y2="{{view.front}}"/>
     <line x1="28" y1="{{view.dim_top}}" x2="28" y2="{{view.dim_bottom}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
   </g>
-  <text transform="translate(22 {{view.dim_mid}}) rotate(-90)" text-anchor="middle">{{cad.width_in:.2f}}</text>
+  <text transform="translate(22 {{view.dim_mid}}) rotate(-90)" text-anchor="middle">{{cad.width_in:.2f}} finished</text>
 
   <!-- in-figure labels -->
   <g text-anchor="middle">

@@ -763,7 +763,9 @@ _BRACKET_SOURCE = (("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BASE_BAR_HOLE
 for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
     # Stations from the spindle-end face and rows from the faced -Y side, both
     # the KP08's (exact millimetres with their own band): each pair holds
-    # TL-28's two holes inside the screws' float. Bar1 only.
+    # TL-28's two holes inside the screws' float. Bar1 only. The bands sit on
+    # the printed millimetres (47.48 ±0.13 reads 47.35-47.61), the value the
+    # machinist holds; the spec's walls already allow the off-grid rounding.
     requirement(
         f"bracket_hole_{_index}",
         kind="hole",
@@ -773,12 +775,12 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             "at": ([_x, _y, 0.0], _BRACKET_SOURCE),
             "axis": _FROM_UNDERSIDE,
             "station": (
-                limits(_x, _STATION_PLACES, _STATION_BAND),
+                limits(round(_x, _STATION_PLACES), _STATION_PLACES, _STATION_BAND),
                 (*_BRACKET_SOURCE, "BRACKET_STATION_PLACES", "BRACKET_STATION_BAND"),
             ),
             "station_nominal": (_x, _BRACKET_SOURCE),
             "height": (
-                limits(_y - part_spec.LOW_SIDE_Y, _ROW_PLACES, _ROW_BAND),
+                limits(round(_y - part_spec.LOW_SIDE_Y, _ROW_PLACES), _ROW_PLACES, _ROW_BAND),
                 (*_BRACKET_SOURCE, "LOW_SIDE_Y", "BRACKET_ROW_PLACES", "BRACKET_ROW_BAND"),
             ),
             "height_nominal": (

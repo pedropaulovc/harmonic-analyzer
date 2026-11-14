@@ -1,19 +1,23 @@
 # Source: cad/process/hand-travelers/
 # ch-rocker-arm-tl-oblique-end-bracket-traveler-2026-11-02.html (drawing v47):
-# operation order, tools, speeds, parallels, ~.2 in overhang, Y0 on the fixed
-# jaw and the INNER END / ROW EDGE datums. Holding both brackets per clamping,
-# one at each jaw end (so X0/XR and the Y0 touch in the gap between them), is
-# Pedro's 2026-11-10 ruling, not the hand sheet. The feature manifest wins
-# where they disagree: two shared-axis #8-32 holes at the KP08 stations,
-# drilled #29 through and tapped plug-then-bottoming from both faces to the
-# drawing's tip marks (v47: four #8-32 from the bar side, two #6-32 from the
-# KP08 side, plug tap to about 5/8 in).
+# operation order, tools, parallels, ~.2 in overhang, Y0 on the fixed jaw and
+# the INNER END / ROW EDGE datums. Holding both brackets per clamping, one at
+# each jaw end (so X0/XR and the Y0 touch in the gap between them), is Pedro's
+# 2026-11-10 ruling, not the hand sheet. The feature manifest wins where they
+# disagree: two shared-axis #8-32 holes at the KP08 stations, drilled #29
+# through and tapped plug-then-bottoming from both faces (v47: four #8-32 from
+# the bar side, two #6-32 from the KP08 side, plug tap to about 5/8 in). The
+# v49 sheet names the faces FRONT FACE (the KP08's, KP08 SIDE here) and BACK
+# FACE (the base bar's, BAR SIDE). 2026-11-14 blind traveler review: drill
+# fully through before tapping from the exit, one tap flag per face so the two
+# bottoming taps never meet, 1/8 in parallels, end-mill speed in the high belt
+# range, conventional cuts named by table motion.
 title = "Oblique trammel end bracket — {{process.quantity:d}} identical"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar (OnlineMetals 1165, shared with TL-26); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blanks."
-note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought. Both pieces in the vise together, one at each jaw end; each op on both before the next tool."
+note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought (reference). Both pieces in the vise together, one at each jaw end; each op on both before the next tool. All spindle work in the high belt range."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 
@@ -31,6 +35,12 @@ kerf_in = 0.125                 # Hand sheet: about 1/8 in per cut.
 # Hand sheet: Y0 touched on the fixed jaw past the part. Two-up (2026-11-10)
 # that station is in the gap between the parts.
 y_touch_x_in = 3.5
+# One tap flag per face, from the tap's tip (end of the chamfered teeth), in
+# the low half of the drawing's tip windows (BAR .433–.527, KP08 .492–.586) so
+# the bottoming taps never meet: at ±.01 the deepest pair reaches
+# .46 + .52 = .98, under the .988 minimum width.
+bar_tap_flag_in = 0.45
+kp08_tap_flag_in = 0.51
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
 # run from spindle nose to tip (holder gauge + projection). Archive values are
 # archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
@@ -50,9 +60,16 @@ half_mill_projection_max_mm = 50.0
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 spot_projection_mm = 27.0        # Archive center-drills-lms-4859 #2, drill chuck.
 tap_oal_mm = 53.975              # Archive taps-unc-hand 8-32 oal 2.125 in.
-# Hand sheet: stop as soon as the drill is through. Archive #29 has a 118°
-# point, so its tip stands (3.4544 / 2) / tan 59° below the underside.
-drill_tip_z_mm = -1.038
+# Drill tip 1.06 in below BAR SIDE: through the 1.000 part plus the #29 point
+# and .02, so the KP08-side exit is full size; (1.06 − 1.000) × 25.4 below
+# the underside, inside the 1/4 in gap between the parallels.
+drill_tip_z_mm = -1.524
+# Milling-deflection stations (mm). Setup 2: each part's outboard end sits
+# overhang_mm past its jaw side; the jaws hold the rest of the blank. Setup 3:
+# the hole row (.250 from ROW EDGE, 6.35 mm) spans the gap between the two
+# 1/8 in parallels, pinned at their centres.
+parallel_near_mm = 1.5875        # 3.175 / 2.
+parallel_far_mm = 11.1125        # 12.7 thickness − 1.5875.
 
 [[tools]]
 id = "saw"
@@ -86,6 +103,7 @@ machine = "Saw / bench"
 indexing = "none"
 envelope = "other"
 vise_hold = "other"
+beam = "other"
 diagram = { file = "diagrams/end-bracket/saw.svg", alt = "Both bracket blanks from the bar end left after the lever blank" }
 
 [[setups.operations]]
@@ -102,7 +120,7 @@ title = "Square both ends"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Both blanks flat, 1 in face up, on 1 in parallels against both jaws, one at each jaw end, outboard end ~.2 past the jaw side; then each turned end-for-end in place."
+holding = "Both blanks flat, 1 in face up, on 1 in parallels (not past the jaw sides) against both jaws, one at each jaw end, outboard end ~.2 past the jaw side; then each turned end-for-end in place."
 diagram = { file = "diagrams/end-bracket/ends.svg", alt = "Both blanks in the vise, one at each jaw end: outboard ends cleaned to INNER END, then both turned end-for-end and cut to length" }
 datum = "Each part's first squared end = its INNER END. Turned: X0 left INNER END; XR = right INNER END."
 # Two parts, one at each jaw end: the cutter centre spans the jaw width, both
@@ -112,26 +130,37 @@ envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.overhang_m
 # right jaw end. Both holds place it alike; the blank length bounds the turned
 # part (its first end is only cleaned).
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "twin_part", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+# Each part from its outboard end: the jaws hold it from the jaw side inward.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{process.overhang_mm}}", "{{cad.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.blank_thickness_mm}}" } }
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Cutter .04 below parts. Clean up both outboard ends, .02 X steps, ≤ half the allowance: left feeding toward you, right feeding away. Mark INNER END on each."
-settings = "jig-em-half-6061-t6511"
+instruction = "Cutter .04 below parts. Clean up both outboard ends, .02 X steps, ≤ half the allowance, conventional: left end table moves away, right end table moves toward you. Mark INNER END on each."
+instruction_detailed = "Touch the cutter on a part top, then down .54 (cutter .04 below the parts). Clean up both outboard ends, .02 X steps, ≤ half the allowance, conventional cuts: left end with the table moving away from you (cutter toward you), right end with the table moving toward you. Steady feed. Mark INNER END on each."
+rpm = 1500
+feed = "6 in/min"
+milling_cuts = [
+  { name = "outboard end clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1500, feed_mm_min = 152.4, stations_mm = 0 },
+]
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Turn both end-for-end, raw end ~.2 out. X0 on left INNER END; touch right INNER END, note XR. Measure cutter D; .02 passes: left end feeding toward you to X = −({{cad.length_in:.3f}} + D/2); right end feeding away to X = XR + {{cad.length_in:.3f}} + D/2."
-instruction_detailed = "Turn each part end-for-end in place, INNER END inboard, raw end ~.2 past its jaw side. Touch both INNER ENDs from the gap between the parts: X0 on the left part's, then read the right part's as XR. Measure cutter D; .02 passes: left end feeding toward you, last pass X = −({{cad.length_in:.3f}} + D/2); right end feeding away, last pass X = XR + {{cad.length_in:.3f}} + D/2."
-settings = "jig-em-half-6061-t6511"
+instruction = "Turn both end-for-end, raw end ~.2 out. X0 on left INNER END; touch right INNER END, note XR. Measure cutter D; .02 passes, conventional: left end table away, last X = −({{cad.length_in:.3f}} + D/2); right end table toward you, last X = XR + {{cad.length_in:.3f}} + D/2."
+instruction_detailed = "Turn each part end-for-end in place, INNER END inboard, raw end ~.2 past its jaw side. Touch both INNER ENDs from the gap between the parts: X0 on the left part's, then read the right part's as XR. Measure cutter D; .02 passes, conventional: left end with the table moving away from you, last pass X = −({{cad.length_in:.3f}} + D/2); right end with the table moving toward you, last pass X = XR + {{cad.length_in:.3f}} + D/2."
+rpm = 1500
+feed = "6 in/min"
 inspection = "Length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
+milling_cuts = [
+  { name = "raw end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1500, feed_mm_min = 152.4, stations_mm = 0 },
+]
 
 [[setups.operations]]
-instruction = "Each part: mark ROW EDGE on one 1 in side, BAR SIDE and KP08 SIDE on the 1/2 in faces; record its W (ROW EDGE to opposite side) mid-length."
+instruction = "Each part: file the end burrs; mark ROW EDGE on one 1 in side, BAR SIDE (drawing BACK FACE) and KP08 SIDE (drawing FRONT FACE) on the 1/2 in faces."
 
 [[setups]]
 machine_kind = "other"
@@ -139,7 +168,7 @@ title = "Drill / tap from BAR SIDE"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Both on edge, BAR SIDE up, ROW EDGE at fixed jaw, INNER END left: left part's INNER END and right part's far end ~.2 past the jaw sides. 1 in parallels pushed against both jaws leave a 1/4 in gap under the hole rows."
+holding = "Both on edge, BAR SIDE up, ROW EDGE at fixed jaw, INNER END left: left part's INNER END and right part's far end ~.2 past the jaw sides. 1 in tall, 1/8 in thick parallels against both jaws leave a 1/4 in gap under the hole rows."
 datum = "X0 left INNER END; XR = right INNER END; Y0 ROW EDGE (fixed jaw face); +Y toward you."
 diagram = { file = "diagrams/end-bracket/bar-side.svg", alt = "Both parts on edge with BAR SIDE up and ROW EDGE at the fixed jaw; section through H1" }
 # Holes on both parts and the Y0 touch in the gap between them lie within the
@@ -149,6 +178,9 @@ envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.overhang_m
 # The left part on edge, as-bought 1 in faces in the jaws, its twin at the
 # right jaw end.
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.thickness_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.width_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "twin_part", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+# The holes sit over the gap between the parallels: a beam across them (y,
+# from ROW EDGE), the part's length and height as its section.
+beam = { axis = "y", hold = "between", extent_mm = [0, "{{cad.thickness_mm}}"], supports_mm = ["{{process.parallel_near_mm}}", "{{process.parallel_far_mm}}"], section_mm = { x = "{{cad.length_mm}}", z = "{{cad.width_mm}}" } }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -158,6 +190,9 @@ instruction = "Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR +
 instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:g}}, in the gap between the parts, and zero Y there. X0 on the left INNER END; touch the right part's INNER END from the gap and note XR. Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR + X), cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
 rpm = 3000
 feed = "hand"
+milling_cuts = [
+  { name = "spot H1–H2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.969, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 6.35 },
+]
 
 [setups.operations.table]
 columns = ["Hole", "X", "Y"]
@@ -167,26 +202,29 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
-instruction = "H1–H{{cad.hole_count:d}} through on both parts, tip just through; peck .1."
+instruction = "H1–H{{cad.hole_count:d}} through on both parts to Z −1.06 below BAR SIDE (exit full size); full-retract pecks every .14 (L/D 8; a parabolic-flute #29 helps)."
 rpm = 3000
 feed = "hand"
-inspection = "Each part: stations {{cad.hole_stations_mm}} mm ±{{cad.station_tol_mm:.2f}} from its INNER END; row {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}} from ROW EDGE."
+inspection = "Each part from its INNER END: stations as tabled ±{{cad.station_tol_in:.3f}} ({{cad.hole_stations_mm}} mm ±{{cad.station_tol_mm:.2f}}); row {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}} from ROW EDGE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+milling_cuts = [
+  { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 6.35 },
+]
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "plug"
 sizing = "other"
-instruction = "Start H1–H{{cad.hole_count:d}} on both parts. Plug tip not past {{cad.bar_tip_max_in:.3f}} below BAR SIDE."
-instruction_detailed = "Tape a flag on the plug tap {{cad.bar_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns; finish with the T-handle, stopping before the flag reaches BAR SIDE."
+instruction = "Start H1–H{{cad.hole_count:d}} on both parts square from the chuck, spindle off; tap fluid. Flag the plug tap {{process.bar_tap_flag_in:.2dot}} from its tip; stop at the flag."
+instruction_detailed = "Tape a flag on the plug tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn to clear chips, and stop when the flag reaches BAR SIDE."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "bottoming"
 sizing = "other"
-instruction = "Finish H1–H{{cad.hole_count:d}} on both parts to tip mark {{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}} below BAR SIDE, measured from the physical tip."
-instruction_detailed = "Tape a flag on the bottoming tap {{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}} from its physical tip. Finish H1–H{{cad.hole_count:d}} on both parts until the flag reaches BAR SIDE."
+instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.bar_tap_flag_in:.2dot}} from its tip (end of chamfered teeth); stop at the flag."
+instruction_detailed = "Tape a flag on the bottoming tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches BAR SIDE. The flag sits in the drawing's tip window ({{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}}), low enough that the KP08-side tap never meets this thread."
 feed = "hand"
 inspection = "{{cad.thread}} full thread {{cad.bar_thread_min_in:.3f}}–{{cad.bar_thread_max_in:.3f}} from BAR SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.bar_thread_band_mm}}" }]
@@ -199,27 +237,31 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Both rolled over in place on the same parallels: KP08 SIDE up, INNER END left, ROW EDGE at moving jaw."
 diagram = { file = "diagrams/end-bracket/kp08-side.svg", alt = "Both parts rolled over with KP08 SIDE up and ROW EDGE at the moving jaw; section through H1" }
-datum = "Re-find X0 left INNER END and XR right INNER END; Y0 fixed jaw; hole row at Y = W − {{cad.row_in:.3f}}, each part's own W."
+datum = "None: line each hole up under the spindle by lowering the #29 drill shank into it, then lock the table and tap."
 # Taps only, over the drilled holes. Tap projection has no record, so the
 # shortest tool is bounded by the chuck alone and the deepest point by the
 # underside.
 envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.overhang_mm}}", "{{process.overhang_mm}}"], y_span_mm = "{{cad.thickness_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.tap_oal_mm}}"], shortest_tool_mm = "{{process.drill_chuck_gauge_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.thickness_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.width_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "twin_part", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = "other"
+
+[[setups.operations]]
+instruction = "Break each KP08-side drill exit with a hand countersink to about Ø.15 (under the .164 major): a lead for the tap."
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "plug"
 sizing = "other"
-instruction = "Start H1–H{{cad.hole_count:d}} on both parts. Plug tip not past {{cad.kp08_tip_max_in:.3f}} below KP08 SIDE."
-instruction_detailed = "Tape a flag on the plug tap {{cad.kp08_tip_max_in:.3f}} from its tip. Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns; finish with the T-handle, stopping before the flag reaches KP08 SIDE."
+instruction = "Start H1–H{{cad.hole_count:d}} on both parts square from the chuck, spindle off; tap fluid. Flag the plug tap {{process.kp08_tap_flag_in:.2dot}} from its tip; stop at the flag."
+instruction_detailed = "Tape a flag on the plug tap {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn, and stop when the flag reaches KP08 SIDE."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
 tool = "bottoming"
 sizing = "other"
-instruction = "Finish H1–H{{cad.hole_count:d}} on both parts to tip mark {{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}} below KP08 SIDE, from the physical tip."
-instruction_detailed = "Flag the bottoming tap {{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}} from its physical tip. Finish H1–H{{cad.hole_count:d}} on both parts until the flag reaches KP08 SIDE."
+instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.kp08_tap_flag_in:.2dot}} from its tip; stop at the flag."
+instruction_detailed = "Move the flag on the bottoming tap to {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches KP08 SIDE. The flag sits in the drawing's tip window ({{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}}), short of the BAR-side thread."
 feed = "hand"
 inspection = "Full thread {{cad.kp08_thread_min_in:.3f}}–{{cad.kp08_thread_max_in:.3f}} from KP08 SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.kp08_thread_band_mm}}" }]
@@ -232,8 +274,7 @@ indexing = "none"
 diagram = { file = "diagrams/end-bracket/inspect.svg", alt = "Finished bracket: hole stations from INNER END, row from ROW EDGE and both thread zones" }
 envelope = "other"
 vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. Turn a #8-32 × 3/4 socket screw into each thread from both faces."
-inspection = "Section {{cad.thickness_min_in:.3f}}–{{cad.thickness_max_in:.3f}} × {{cad.width_min_in:.3f}}–{{cad.width_max_in:.3f}} as bought; screws turn in by hand."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
+instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. Flag a #8-32 socket screw {{cad.bar_thread_min_in:.3f}} from its end: it runs in by hand from BAR SIDE to the flag; re-flag at {{cad.kp08_thread_min_in:.3f}} for KP08 SIDE. Never on into the other face's thread."
