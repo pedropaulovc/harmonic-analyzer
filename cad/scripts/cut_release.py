@@ -761,17 +761,28 @@ def stage_drawings(stage: Path) -> dict[str, str]:
 def stage_travelers(stage: Path) -> list[str]:
     """Copy each enrolled part's hobby traveler PDF to ``travelers/<slug>-traveler.pdf``.
 
-    ``release`` runs every ``prechips:<stem>`` first; the PDF is that run's
-    output, so a missing or empty one fails the cut rather than shipping a
-    bundle without a traveler.
+    The PDF is the output of ``prechips:<stem>``. A full ``doit release`` runs
+    those tasks first, but ``doit -s release`` does not, so a missing, empty or
+    stale PDF fails the cut: stale means older than the part's
+    ``features/<stem>/features.toml``, the manifest it was rendered from (the
+    same mtime refusal ``stage_comparisons`` applies to the gallery).
     """
+    from export_features import bundle_paths
+
+    out = CAD_ROOT / "out"
     destination_dir = stage / "travelers"
     staged: list[str] = []
     for stem in TRAVELER_STEMS:
-        source = traveler_pdf_path(stem, CAD_ROOT / "out")
+        source = traveler_pdf_path(stem, out)
+        rerun = f"run `doit -s prechips:{stem}`"
         if not source.is_file() or source.stat().st_size == 0:
+            raise RuntimeError(f"required traveler is missing: {source} ({rerun})")
+        manifest, _step = bundle_paths(stem, out)
+        if not manifest.is_file():
+            raise RuntimeError(f"traveler {source.name} has no feature manifest at {manifest}")
+        if source.stat().st_mtime < manifest.stat().st_mtime:
             raise RuntimeError(
-                f"required traveler is missing: {source} (run `doit prechips:{stem}`)"
+                f"traveler is stale: {source} is older than its manifest {manifest} ({rerun})"
             )
         destination_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination_dir / source.name)

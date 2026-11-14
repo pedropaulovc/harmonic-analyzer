@@ -445,7 +445,7 @@ such build:
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
-| `prechips:<stem>` (enrolled process travelers; in `release`, NOT in `build`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
+| `prechips:<stem>` (enrolled process travelers; in `build` and `release`, NOT in `build_bare`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -491,7 +491,9 @@ table and each feature's face set against that STEP; neither it nor
 
 Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end
 bracket, feed lever, riser, pivot block, feed block, leadscrew kit and carrier)
-has a `prechips:<stem>` task. `build` does not run it; `release` runs every one
+has a `prechips:<stem>` task. `build` runs every one, so each build that
+produces the drawing PDFs also produces the traveler PDFs; `build_bare` runs
+none. `release` runs every one too
 and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
 bundle (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
 carry no travelers). prechips still stays out of `uv.lock`

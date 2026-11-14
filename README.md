@@ -185,8 +185,9 @@ feed lever, riser, pivot block, feed block, leadscrew kit and carrier; all but
 the first two need prechips 0.11.0, the carrier 0.11.1, both released) from its `cad/process/<stem>/plan.toml`, which reads that part's
 exported manifest, and print the hobby sheet to `<slug>-traveler.pdf`. They
 always use the latest prechips release from PyPI, run with `uv tool run`
-outside the project environment. `build` does not run them; every release
-renders them and ships the hobby PDFs under `travelers/`. See the
+outside the project environment. `build` renders them alongside the drawing
+PDFs (`build_bare` does not); every release ships the hobby PDFs under
+`travelers/`. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References

@@ -304,8 +304,10 @@ completed
 
 ## Process travelers
 
-`build` does not run `prechips:<stem>` tasks; `release` runs every enrolled one
-and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
+`build` and `release` run every enrolled `prechips:<stem>` task, so a build
+that produces the drawing PDFs also produces the traveler PDFs; `build_bare`
+runs none. `release` ships each part's hobby sheet as
+`travelers/<slug>-traveler.pdf` in the
 bundle (owner ruling 2026-11-14). prechips is not in `uv.lock`
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)); the
 wrapper runs the latest PyPI release with `uv tool run` outside the project
@@ -1824,7 +1826,7 @@ feature leaf; shared `_drawing_common`, layout-audit, `_pdf_ink` and drawing-hel
 edits re-key all 18 enrolled feature leaves, not native part/assembly recipes.
 Full `export` waits for scoped bundles, validates them and copies their exact
 STEP bytes; its recipe consumes bundle outputs rather than draw closures
-directly. An opt-in `prechips:<stem>` depends only on its own feature leaf.
+directly. A `prechips:<stem>` traveler depends only on its own feature leaf.
 Feature leaves retain `uptodate: [False]`, so every invocation reaches the cache
 probe even if local manifest and STEP targets exist. `cache_status` reports
 individual `package:features:<stem>` keys, not an aggregate `package:features` COM key.

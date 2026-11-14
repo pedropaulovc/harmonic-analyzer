@@ -4631,10 +4631,11 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     ]
 
 
-def test_release_renders_every_traveler_and_build_none(synthetic_prechips_task):
-    """``release`` ships each enrolled part's hobby PDF (owner ruling 2026-11-14),
-    so it reaches every ``prechips`` task; ``build`` reaches none through an
-    explicit, setup or file-implied edge."""
+def test_build_and_release_render_every_traveler_build_bare_none(synthetic_prechips_task):
+    """``build`` renders each enrolled traveler beside the drawing PDFs and
+    ``release`` ships its hobby PDF (owner rulings 2026-11-14), so both reach
+    every ``prechips`` task; ``build_bare`` reaches none through an explicit,
+    setup or file-implied edge."""
     from doit.loader import load_tasks
 
     dodo, plans, _, stem, _, _, _ = synthetic_prechips_task
@@ -4656,8 +4657,9 @@ def test_release_renders_every_traveler_and_build_none(synthetic_prechips_task):
             todo.extend(owners[path] for path in task.file_dep if path in owners)
         return seen
 
-    assert not any(name.startswith("prechips") for name in closure("build"))
-    assert {f"prechips:{stem}", f"prechips:{other}"} <= closure("release")
+    assert not any(name.startswith("prechips") for name in closure("build_bare"))
+    for root in ("build", "release"):
+        assert {f"prechips:{stem}", f"prechips:{other}"} <= closure(root), root
     assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
     assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
     assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())

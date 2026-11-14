@@ -762,6 +762,21 @@ def test_release_refuses_a_missing_traveler(feature_release: Path) -> None:
     assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
 
 
+def test_release_refuses_a_traveler_older_than_its_manifest(feature_release: Path) -> None:
+    """``doit -s release`` renders no traveler, so a PDF left from an earlier run
+    beside a newer restored feature bundle must not ship."""
+    import export_features
+
+    out = cut_release.CAD_ROOT / "out"
+    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, out)
+    manifest, _step = export_features.bundle_paths(_TRAVELER_STEM, out)
+    newer = manifest.stat().st_mtime
+    os.utime(pdf, (newer - 60, newer - 60))
+    with pytest.raises(RuntimeError, match="traveler is stale"):
+        cut_release.bundle("v38")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
+
+
 @pytest.fixture
 def prepared_readme_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,

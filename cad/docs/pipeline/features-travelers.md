@@ -277,10 +277,11 @@ disjoint fields; no field is duplicated. See
 prechips is not an HA dependency while it stabilises
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
 locked prechips made every prechips release change `uv.lock`, which re-keys every
-`check:machinist_review:*`, so prechips stays out of the lock. `build` does not
-run travelers; `release` runs every enrolled one and ships its hobby sheet as a
-PDF (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
-carry none; see [Releases](#releases)). The plans, the shop file and the setup
+`check:machinist_review:*`, so prechips stays out of the lock. `build` runs every
+enrolled traveler beside the drawing PDFs and `build_bare` runs none; `release`
+runs every one and ships its hobby sheet as a PDF (owner rulings 2026-11-14,
+superseding the 2026-11-11 ruling that travelers stay out of `build` and
+releases; see [Releases](#releases)). The plans, the shop file and the setup
 pictures stay in HA.
 
 Run it for an enrolled part with:
@@ -388,16 +389,18 @@ requirements needs a prechips adapter release before its traveler passes again.
 ## Releases
 
 Releases ship every enrolled part's hobby traveler as a PDF (owner ruling
-2026-11-14). `release` depends on every `prechips:<stem>` task, so each release
-re-renders them with the then-latest prechips. `cut_release.py` copies each
+2026-11-14). A full `doit release` depends on every `prechips:<stem>` task, so
+it re-renders them with the then-latest prechips; `doit -s release` clears
+those dependencies and renders nothing. `cut_release.py` copies each
 `cad/out/travelers/<stem>/<slug>-traveler.pdf` to the bundle's
 `travelers/<slug>-traveler.pdf`, where `SHA256SUMS.txt` hashes them like every
-other staged file, and names the directory in the release
-notes. A missing or empty PDF fails the cut before anything is zipped; the HTML
-sheets do not ship. A prechips refusal, an unreachable PyPI or a missing
-browser therefore blocks the release, like any other release gate. The
-supervised farm release runs `doit -s prechips` on the submitter after
-restoring the farm outputs, before `doit -s release`
+other staged file, and names the directory in the release notes. A missing or
+empty PDF, or one older than its part's `features/<stem>/features.toml`, fails
+the cut before anything is zipped; the HTML sheets do not ship. A prechips
+refusal, an unreachable PyPI or a missing browser therefore blocks the
+release, like any other release gate. The supervised farm release runs
+`doit -s prechips` on the submitter after restoring the farm outputs, before
+`doit -s release`
 ([`DEVELOPING.md`](../../../DEVELOPING.md#supervised-farm-releases)).
 
 The publisher's only tracked-source update is `cad/config/release.yaml`

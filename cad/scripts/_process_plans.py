@@ -5,8 +5,9 @@ latest prechips release renders (``prechips_traveler.py``), with the shared
 ``cad/process/shop.toml``, into two standalone HTML travelers under
 ``cad/out/travelers/<stem>/``: the concise ``pro`` sheet and the ``hobby``
 sheet with its setup pictures. The hobby sheet is also printed to
-``<slug>-traveler.pdf`` beside them; ``release`` renders every enrolled part
-and ships those PDFs under the bundle's ``travelers/``.
+``<slug>-traveler.pdf`` beside them. ``build`` and ``release`` render every
+enrolled part (``build_bare`` none); ``release`` ships those PDFs under the
+bundle's ``travelers/``.
 """
 
 from __future__ import annotations
