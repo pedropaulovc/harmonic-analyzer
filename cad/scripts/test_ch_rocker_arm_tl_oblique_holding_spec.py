@@ -140,7 +140,8 @@ def test_screw_centres_bought_washer_and_its_offset_reaches_the_cutter_gaps() ->
     assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(
         holding.STRAP_BEARING_LAND_CONCENTRIC - holding.WASHER_OFFSET_MAX - carrier.HUB_RADIAL_STACK
     )
-    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(-0.51958, abs=5e-5)
+    # With the 2026-11-13 ream ruling's HUB stack.
+    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(-0.54202, abs=5e-5)
     # The under-head fillet can overlap the least bore by .0025 in; brass coins.
     assert holding.FILLET_BORE_OVERLAP_MAX == pytest.approx(0.0635)
     assert holding.WASHER_GAPS == pytest.approx({
