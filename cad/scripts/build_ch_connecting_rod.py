@@ -1,6 +1,6 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
-Black rod machined from 1018 low-carbon steel plate, converting each cam's
+Black rod machined from 1/4 x 2 1018 cold-finished flat, converting each cam's
 rotation into the rocker arm's see-saw: a full ring (strap) riding the
 eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
@@ -104,8 +104,9 @@ from ch_connecting_rod_spec import (
 )
 
 PART_NAME = "ch-connecting-rod"
-# AISI 1018 plate (the registry row's material_specification); SOLIDWORKS's
-# library carries it as Plain Carbon Steel -- see _appearance.apply_material.
+# AISI 1018 CF flat, 1/4 x 2 (the registry row's material_specification);
+# SOLIDWORKS's library carries it as Plain Carbon Steel -- see
+# _appearance.apply_material.
 MATERIAL = "Plain Carbon Steel"
 
 # Cam ring centre -> rocker pin, VERTICAL rod: the

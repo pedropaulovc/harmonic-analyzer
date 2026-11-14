@@ -218,7 +218,7 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # stack's length and end play between the MHA-CH-07 keepers are the channel
 # assembly's acceptance (MHA-CH-00), not this part's (machinist r1: a second
 # line here was assembly narration), and the band is accepted on RV-03.
-# The plate's .080 +/-.002 offset in the hub is a tight band, so it names
+# The plate's .091 +/-.002 offset in the hub is a tight band, so it names
 # what it serves (rule 4; ch-fab-2 r2: 3/3 runs asked for the mate, and a
 # second reason on the .118 read as narration): each bar rides its lever's
 # plate, so the offset spaces neighbouring bars in the stack
@@ -253,7 +253,7 @@ TOP_KEEP = {
     # neither line runs through the other's text.
     "HubLength": (0.075, TOP_CENTER[1] + 0.032),
     # Its value row sits under the hub length's shelf (ch-fab-2 r3: at +0.018
-    # that shelf struck the .080); its one row of words and its shelf still
+    # that shelf struck the .091); its one row of words and its shelf still
     # stand ~4 mm above its own arrows over the plate.
     "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
