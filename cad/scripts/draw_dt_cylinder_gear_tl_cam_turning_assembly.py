@@ -6,9 +6,10 @@ The kit is the fixture body (item 1, MHA-DT-12-TL-01) with its pressed stub
 (issue #2361). The gear is the workpiece: never placed in the model, drawn
 in phantom on the exploded sheet only.
 
-Sheet 1: the top view (items 4 and 5 off), the front view projected under
-it at the same 1:1 with item 1 ballooned, the shaded isometric with items
-2-5 ballooned, the BOM, the kit's one-time presses, the three fitting steps
+Sheet 1: the top view and the front view projected under it, both 1:1 with
+items 4 and 5 off, items 1 and 2 ballooned in the front view, the shaded
+isometric with items 3-5 ballooned, the BOM, the kit's one-time presses, the
+three fitting steps
 (the gear is turned CLOCKWISE in the top view onto item 3 before item 5 is
 tightened: the cut then pushes it harder onto the pin) and the checks.
 Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
@@ -35,6 +36,7 @@ import dt_cylinder_gear_tl_cam_fixture_spec as fixture
 from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     add_component_bom_balloons,
@@ -132,9 +134,12 @@ BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
 # line's end). Item 1's walked point landed where asked in every side view
 # since. Item 2 walked in the isometric landed on the washer's rim beside
 # item 4 (run 20261114T221042598Z's review), so it walks in the front view
-# at 1:1, where it stands clear above item 1; run 20261112T203156536Z's walk
-# of it at 2:1 in the right view read back on its rim line's end, the risk
-# this placement carries. The isometric draws items 3-5's rims as ellipses
+# at 1:1 with items 4 and 5 hidden there, as in the top view, so nothing
+# stands on its top end; run 20261114T225432834Z's walk landed it on that
+# end (then under the washer) and the ring put its circle on the top view's
+# Ø3.25 outline (balloon box x 96.8-107.2, y 159.7-170.2 mm), so its circle
+# is moved to STUB_BALLOON_XY, its leader left on the walked landing. The
+# isometric draws items 3-5's rims as ellipses
 # (run 20261113T085510850Z placed all four bought items there), as the fly
 # cutter's set screw does on its end-on bottom view
 # (draw_dt_cone_tip_gear_tl_cutter_assembly).
@@ -165,7 +170,7 @@ def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
 # isometric moved 14 mm right and 5 mm down (item 2's edge at about 25 mm,
 # 12 mm inside) and the front view 15 mm up (items 1 and 5 about 15 mm apart,
 # centre to centre), every view and balloon translating with its view. The
-# front view is unlabelled: a standard view under its top view. The BOM,
+# front view's caption sits under it, right of item 1's leader. The BOM,
 # steps and checks fill the right half, the steps under the BOM's two-line
 # rows (run 20261113T085510850Z printed them over rows 4 and 5 from y .214),
 # the checks under the steps and above the title block.
@@ -173,6 +178,11 @@ TOP_CENTER = (0.090, 0.200)
 FRONT_CENTER = (TOP_CENTER[0], 0.135)
 ISO_CENTER = (0.074, 0.047)
 TOP_CAPTION_XY = (0.140, 0.255)
+FRONT_CAPTION_XY = (0.095, 0.106)
+# Item 2's balloon circle: right of the stub, above item 1's face (.135) and
+# under the top view's Ø3.25 outline (y .178 at x .125), clear of both by
+# more than its 5 mm radius.
+STUB_BALLOON_XY = (0.125, 0.150)
 ISO_NOTE_XY = (0.119, 0.035)
 BOM_ANCHOR = (0.219, 0.262)
 STEPS_XY = (0.219, 0.184)
@@ -180,6 +190,7 @@ CHECKS_XY = (0.219, 0.116)
 # The view placing point: the register axis on the body's front face.
 REGISTER_FACE_MM = (0.0, 0.0, fixture.THICKNESS)
 TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
+FRONT_CAPTION = "FRONT VIEW\nITEMS 4 AND 5 OFF"
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 # Kit-frame radii and heights the exploded view and its labels use. The top
@@ -227,7 +238,10 @@ ASSEMBLY_CHECKS = "\n".join(
         "3. ITEMS 2 AND 3 DO NOT MOVE BY HAND.",
         "4. AFTER STEP 3 THE GEAR DOES NOT TURN BY HAND.",
         f"5. {fixture.FIRST_CAM_CHECK_TEXT}",
-        *fixture.FIRST_CAM_REMEDY_TEXT,
+        *(
+            f"{number}. {text}"
+            for number, text in enumerate(fixture.FIRST_CAM_REMEDY_TEXT, start=6)
+        ),
     )
 )
 if (
@@ -434,12 +448,33 @@ def _kit_view(
     return view
 
 
+def _move_stub_balloon(adapter: Any, landing: Any) -> None:
+    """Put item 2's balloon circle at STUB_BALLOON_XY, its leader still on
+    its proven landing (draw_mg_magnifier_assembly's wire balloon move)."""
+    label = "cam turning kit item 2 balloon"
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
+    anchor = annotation.GetPosition()
+    if anchor is None or len(anchor) < 2:
+        raise RuntimeError(f"{label} has no position")
+    offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
+    target = STUB_BALLOON_XY
+    if not annotation.SetPosition(target[0] + offset[0], target[1] + offset[1], 0.0):
+        raise RuntimeError(f"failed to move the {label}")
+    rebuild_drawing(adapter, label=f"move {label}")
+    moved_x, moved_y, _radius = rendered_balloon_circle(note, label=label)
+    if math.dist((moved_x, moved_y), target) > 0.0005:
+        raise RuntimeError(
+            f"{label} centred at ({moved_x * 1000.0:.1f}, {moved_y * 1000.0:.1f}) "
+            f"mm, not {tuple(value * 1000.0 for value in target)}"
+        )
+
+
 def _place_sheet(adapter: Any) -> Callable[[], None]:
     fixture_only = frozenset({BODY, STUB, CLOCK_PIN})
     top = _kit_view(adapter, "*Top", TOP_CENTER, SHEET_SCALE, fixture_only)
-    front = _kit_view(
-        adapter, "*Front", FRONT_CENTER, SHEET_SCALE, frozenset(BOM_COMPONENTS)
-    )
+    front = _kit_view(adapter, "*Front", FRONT_CENTER, SHEET_SCALE, fixture_only)
     for view, name in ((top, "*Top"), (front, "*Front")):
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=f"cam turning kit {name}")
@@ -452,9 +487,10 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
     )
     assert_full_detail_view(adapter, label="cam turning kit")
 
+    # The isometric shows every item; the top and front views hide 4 and 5.
     table = insert_bom_table(
         adapter,
-        front,
+        iso,
         anchor_xy=BOM_ANCHOR,
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
@@ -482,10 +518,14 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
             f"cam turning kit carries {len(landings)} balloons, "
             f"expected {len(BOM_COMPONENTS)}"
         )
+    _move_stub_balloon(
+        adapter, next(landing for landing in landings if landing.stem == STUB)
+    )
     for text, xy, label in (
         (ASSEMBLY_STEPS, STEPS_XY, "steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
         (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
+        (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)

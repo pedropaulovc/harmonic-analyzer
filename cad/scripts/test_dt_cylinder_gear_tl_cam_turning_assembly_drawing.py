@@ -93,9 +93,22 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     # review: a 1:1 top view over a 2:1 right view turned 90 deg).
     assert sheet.TOP_CENTER[0] == sheet.FRONT_CENTER[0]
     assert sheet.TOP_CENTER[1] > sheet.FRONT_CENTER[1]
-    for caption in (sheet.TOP_CAPTION, sheet.EXPLODED_CAPTION):
+    for caption in (sheet.TOP_CAPTION, sheet.FRONT_CAPTION, sheet.EXPLODED_CAPTION):
         assert not re.search(r"\d:\d", caption), caption
-    assert not hasattr(sheet, "FRONT_CAPTION")
+    # Both views hide items 4 and 5 and say so; the front caption sits under
+    # its view (item 1's back face at FRONT_CENTER y - THICKNESS).
+    for caption in (sheet.TOP_CAPTION, sheet.FRONT_CAPTION):
+        assert "ITEMS 4 AND 5 OFF" in caption
+    assert sheet.FRONT_CAPTION_XY[1] < sheet.FRONT_CENTER[1] - fixture.THICKNESS / 1000.0
+    # Item 2's balloon circle stands right of the stub, above item 1's face
+    # and under the top view's outline, each by more than a balloon radius.
+    x, y = sheet.STUB_BALLOON_XY
+    radius = 0.005
+    assert y - radius > sheet.FRONT_CENTER[1] + fixture.STUB_STAND / 1000.0
+    top_r = fixture.BODY_DIA / 2000.0
+    dx = x - sheet.TOP_CENTER[0]
+    assert y + radius < sheet.TOP_CENTER[1] - (top_r**2 - dx**2) ** 0.5
+    assert x - radius > sheet.TOP_CENTER[0] + fixture.DOWEL_DIA / 2000.0
     # The steps start below the BOM, the checks below the steps and end
     # above the title block (y <= .066 m at x >= .216 m).
     assert sheet.STEPS_XY[1] < sheet.BOM_ANCHOR[1] - 0.070
@@ -116,11 +129,15 @@ def test_the_register_is_set_as_a_numbered_step_at_the_budgets_tir() -> None:
     assert fixture.REGISTER_TIR_TEXT == ".0005"
     assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
     assert "INDICATED TRUE" not in sheet.FITTING_STEPS
-    # Check 5 is the check alone; its remedy follows, unnumbered.
+    # Check 5 is the check alone; each remedy action is its own numbered check.
     checks = sheet.ASSEMBLY_CHECKS.splitlines()
     five = checks.index(f"5. {fixture.FIRST_CAM_CHECK_TEXT}")
-    assert checks[five + 1 :] == list(fixture.FIRST_CAM_REMEDY_TEXT)
-    assert "REWORK ITEM 1 TO MHA-DT-12-TL-01" in " ".join(fixture.FIRST_CAM_REMEDY_TEXT)
+    assert checks[five + 1 :] == [
+        f"{number}. {text}"
+        for number, text in enumerate(fixture.FIRST_CAM_REMEDY_TEXT, start=6)
+    ]
+    assert checks[-1].startswith("8. ")
+    assert "REWORK ITEM 1 TO MHA-DT-12-TL-01" in checks[five + 2]
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
