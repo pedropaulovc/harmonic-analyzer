@@ -696,11 +696,6 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
         state.active[0] = name
 
     monkeypatch.setattr(configured, "_show_reference_configuration", show)
-    monkeypatch.setattr(
-        configured,
-        "_activate_reference_document",
-        lambda _adapter, _model, *, label: state.transitions.append("activate source"),
-    )
     monkeypatch.setattr(configured._config, "parts", lambda _stem: row)
     monkeypatch.setattr(configured, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(configured, "double_array", tuple)
@@ -1015,8 +1010,10 @@ def test_configured_sheet_holds_exactly_the_declared_source_member(
 ):
     state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
     stages = _guarded_finalize(monkeypatch, state)
+    model = state.adapter.currentModel
     seen = []
     placed = []
+    events = []
     place_view = configured.place_view
 
     def place(*args, **kwargs):
@@ -1024,15 +1021,24 @@ def test_configured_sheet_holds_exactly_the_declared_source_member(
         return place_view(*args, **kwargs)
 
     monkeypatch.setattr(configured, "place_view", place)
+    monkeypatch.setattr(
+        configured._telemetry,
+        "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
 
     def annotate(_adapter, configuration, _cells, _views):
         seen.append((configuration, state.active[0]))
         return ()
 
-    if drift is not None:
-        state.before_settle = lambda: state.active.__setitem__(
-            0, "InnerLink" if drift == "reverted" else "Default"
-        )
+    def settle():
+        # Drawing work dirties the source in memory (#2775: shown and
+        # re-blanked part sketches, imported dimension text).
+        model.GetSaveFlag = lambda: True
+        if drift is not None:
+            state.active[0] = "InnerLink" if drift == "reverted" else "Default"
+
+    state.before_settle = settle
 
     def build():
         return asyncio.run(
@@ -1051,15 +1057,33 @@ def test_configured_sheet_holds_exactly_the_declared_source_member(
         build()
         assert stages == list(_FINALIZE_STAGES)
     else:
-        with pytest.raises(RuntimeError, match="expected='OuterLink'"):
+        with pytest.raises(RuntimeError, match="expected='OuterLink'") as refused:
             build()
         assert not state.finalized
-    # Active before the first view, for every view and annotation, then the
-    # saved member again.
+        # The exit check holds the declared member too, without switching back.
+        assert "drawing lifecycle exit" in "\n".join(refused.value.__notes__)
+    # Active before the first view, for every view and annotation, and left
+    # active at exit: the dirty source is never switched back.
     assert placed == ["OuterLink"] * 8
     assert seen == [("InnerLink", "OuterLink"), ("OuterLink", "OuterLink")]
-    assert state.transitions == ["OuterLink", "activate source", "InnerLink"]
-    assert state.active == ["InnerLink"]
+    assert state.transitions == ["OuterLink"]
+    left = {None: "OuterLink", "reverted": "InnerLink", "other": "Default"}[drift]
+    assert state.active == [left]
+    names = [name for name, _ in events]
+    assert names == [
+        "drawing.reference_source_transition.before",
+        "drawing.reference_source_transition.after",
+        "drawing.reference_source_exit",
+    ]
+    before, after, exit_ = (attributes for _, attributes in events)
+    assert before == {"configuration": "InnerLink", "requested": "OuterLink", "dirty": False}
+    assert after["configuration"] == "OuterLink" and after["dirty"] is False
+    assert after["elapsed_s"] >= 0.0
+    assert exit_["configuration"] == left
+    assert exit_["expected"] == "OuterLink"
+    assert exit_["saved_configuration"] == "InnerLink"
+    assert exit_["dirty"] is True
+    assert exit_["held_s"] >= after["elapsed_s"]
 
 
 def test_configured_sheet_refuses_an_undepicted_source_member_before_opening(
