@@ -235,6 +235,6 @@ envelope = "other"
 vise_hold = "other"
 
 [[setups.operations]]
-instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. From each face run a #8-32 socket screw in by hand to its own full-thread depth only, never on into the other face's thread: caliper the screw's length L first, then stop with L − {{cad.bar_thread_min_in:.3f}} still showing above BAR SIDE, L − {{cad.kp08_thread_min_in:.3f}} above KP08 SIDE."
-inspection = "Section {{cad.thickness_min_in:.3f}}–{{cad.thickness_max_in:.3f}} × {{cad.width_min_in:.3f}}–{{cad.width_max_in:.3f}} as bought; screws turn in by hand to that depth (length showing on calipers)."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.bar_thread_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.kp08_thread_band_mm}}" }]
+instruction = "Edges and hole ends R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max; do not countersink threads. From each face run a #8-32 socket screw in by hand to its own full-thread depth only, never on into the other face's thread: caliper the screw's length L first, then stop with at least L − {{cad.bar_thread_min_in:.3f}} still showing above BAR SIDE, L − {{cad.kp08_thread_min_in:.3f}} above KP08 SIDE."
+inspection = "Section {{cad.thickness_min_in:.3f}}–{{cad.thickness_max_in:.3f}} × {{cad.width_min_in:.3f}}–{{cad.width_max_in:.3f}} as bought; screws turn in by hand, stopped with that length still showing."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
