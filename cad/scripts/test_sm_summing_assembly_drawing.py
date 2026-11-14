@@ -338,6 +338,8 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
         line for line in notes.ASSEMBLY_STEPS if notes.KNIFE_GAUGE_BAR in line
     ]
     assert notes.KNIFE_GAUGE_BAR_FEEL in bar_step and "BY HAND" in bar_step
+    # Rule 4: the matched fit names its mate by drawing number.
+    assert "MADE TO THE MHA-SM-02 BORES" in bar_step
     # No four-place size is left in the step for an instrument to read.
     assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
     record = tomllib.loads(
