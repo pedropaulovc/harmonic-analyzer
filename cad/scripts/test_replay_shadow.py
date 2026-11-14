@@ -17,6 +17,7 @@ import io
 import itertools
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1936,7 +1937,9 @@ class _Shop:
             f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
             "from pathlib import Path\n"
             "import com_replay\n"
+            "import _com_conversation\n"
             f"com_replay.REPO_ROOT = Path({str(self.root)!r})\n"
+            f"_com_conversation.OUT_ROOT = Path({str(self.out)!r})\n"
             "sys.exit(com_replay.main(sys.argv[1:]))\n",
             "utf-8",
         )
@@ -4072,7 +4075,10 @@ _ASSEMBLY_SCRIPT = (
     "    out = _paths.OUT_SLDPRT.parent\n"
     "    settings = json.loads((Path(__file__).parent / 'assembly.json').read_text())\n"
     "    app = adapter.swApp\n"
-    "    if not app.Open(str(out / 'sldprt' / 'sh-widget.SLDPRT')):\n"
+    "    model = out / 'sldprt' / 'sh-widget.SLDPRT'\n"
+    "    if not model.is_file():  # as _assembly.place_component checks\n"
+    "        raise RuntimeError(f'missing part {model}')\n"
+    "    if not app.Open(str(model)):\n"
     "        raise RuntimeError('the part is missing')\n"
     "    total = app.Add(1.5, 2.25)\n"
     "    app.SaveTo(str(out / 'sldasm' / 'sh-widget.SLDASM'))\n"
@@ -4326,6 +4332,12 @@ def test_an_inert_assembly_edit_replays_on_its_children_and_is_reused(
     assert audited.base.manifest["key"] == base.key
     assert audited.replay["verdict"] == "noop"
     assert audited.replay["solidworks_out_inputs"] == ["sldprt/sh-widget.SLDPRT"]
+    # The child the script checks for in Python is staged in the scratch root
+    # (2026-11-14, ms_measuring_stick: "missing part" after 15 requests), and
+    # is no output of the replay.
+    assert audited.replay["staged"] == {"sldprt/sh-widget.SLDPRT": _sha(_MODEL)}
+    assert "sldprt/sh-widget.SLDPRT" not in audited.replay["py_outputs"]
+    assert audited.title_echoes == 0
     assert audited.children == shop.children()
     assert audited.token == _sha(built["sh-widget.SLDASM"])
     assert audited.store is None and shop.marker(shop.key()) is None
@@ -4359,8 +4371,71 @@ def test_an_inert_assembly_edit_replays_on_its_children_and_is_reused(
     assert logged["error"] == []
 
 
+def test_an_assembly_replay_that_raises_says_why_in_its_detail_and_line(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    shop.build()
+    shop.edit(audited=False)
+    # Its token still names it, but the child is gone: nothing to stage.
+    shop.model.unlink()
+    declined = shop.attempt()
+    assert declined.value == "declined:replay_error", declined.detail
+    assert "RuntimeError: missing part " in declined.detail
+    assert "sh-widget.SLDPRT (at " in declined.detail
+    assert re.search(r"\(at build_sh_widget\.py:\d+ in build\)", declined.detail)
+    line = [
+        m
+        for m in logged["info"] + logged["warn"]
+        if m.startswith(f"[com-replay] {_ASSEMBLY_LABEL}: reuse=")
+    ][-1]
+    assert "RuntimeError: missing part " in line
+
+
+def test_a_replay_error_names_the_exception_and_its_innermost_frame():
+    traceback = (
+        "Traceback (most recent call last):\n"
+        '  File "C:\\w\\cad\\scripts\\build_x_assembly.py", line 364, in build\n'
+        "    await _place_fixed(adapter)\n"
+        '  File "/w/cad/scripts/_assembly.py", line 1390, in place_component\n'
+        "    raise RuntimeError(\n"
+        "RuntimeError: missing part C:\\o\\sldprt\\x.SLDPRT\n"
+    )
+    replay = {
+        "verdict": "error",
+        "reason": "the script raised RuntimeError after 15 served requests",
+        "script_error": {
+            "type": "RuntimeError",
+            "message": "missing part C:\\o\\sldprt\\x.SLDPRT;\n run first",
+            "traceback": traceback,
+        },
+    }
+    assert shadow.script_error(replay) == (
+        "RuntimeError: missing part C:\\o\\sldprt\\x.SLDPRT; run first "
+        "(at _assembly.py:1390 in place_component)"
+    )
+    assert shadow.shadow_of(91, replay, None, None).reason == (
+        "the script raised RuntimeError after 15 served requests; "
+        + shadow.script_error(replay)
+    )
+    assert shadow.script_error({"verdict": "noop"}) is None
+    assert shadow.script_error(
+        {"script_error": {"type": "OSError", "message": "x", "traceback": ""}}
+    ) == ("OSError: x")
+
+
 def _dependent_children_changed(shop, monkeypatch):
     shop.base(children={cache._rel(shop.model_token): "a" * 64})
+    shop.edit(audited=False)
+
+
+def _dependent_children_changed_ungrouped(shop, monkeypatch):
+    # Published before groups, so the lookup reads it: its own children
+    # still rule it out.
+    with monkeypatch.context() as legacy:
+        legacy.setattr(shadow, "children_group", lambda _children: None)
+        shop.base(children={cache._rel(shop.model_token): "a" * 64})
     shop.edit(audited=False)
 
 
@@ -4421,10 +4496,26 @@ def _dependent_inert(shop, monkeypatch):
     shop.edit(audited=False)
 
 
+def _dependent_title_echoes(shop, monkeypatch):
+    # ms_measuring_stick's replay echoed 16 (2026-11-14).
+    first = ["28 IModelDocExtension.SelectByID2", "48 ISldWorks.ActivateDoc3"]
+    _replay_assembly(monkeypatch, shop, title_echoes={"count": 16, "first": first})
+    _dependent_inert(shop, monkeypatch)
+
+
+def _dependent_echoes_unreported(shop, monkeypatch):
+    _replay_assembly(monkeypatch, shop, title_echoes=None)
+    _dependent_inert(shop, monkeypatch)
+
+
 # case: (setup, the attempt's value)
 _DEPENDENT_CASES = {
     "inert": (_dependent_inert, "audited"),
     "children_changed": (_dependent_children_changed, "declined:children_changed"),
+    "children_changed_ungrouped": (
+        _dependent_children_changed_ungrouped,
+        "declined:children_changed",
+    ),
     "children_unknown": (_dependent_children_unknown, "declined:children_unknown"),
     "stranger_opened": (_dependent_stranger_opened, "declined:unjudged_input"),
     "child_bytes_moved": (_dependent_child_bytes_moved, "declined:child_mismatch"),
@@ -4435,6 +4526,9 @@ _DEPENDENT_CASES = {
         "declined:output_set_differs",
     ),
     "revoked": (_dependent_revoked, "declined:revoked_base"),
+    # Unlike a part's, an assembly's echoed title counters are audited.
+    "title_echoes": (_dependent_title_echoes, "audited"),
+    "echoes_unreported": (_dependent_echoes_unreported, "declined:seat_state_echo"),
 }
 
 
@@ -4454,6 +4548,8 @@ def test_an_assembly_is_judged_by_its_children(
         assert "sldprt/other.SLDPRT" in reuse.detail
     [span] = spans.named("replay.reuse ")
     assert span["replay.reuse_decision"] == expected
+    if case == "title_echoes":
+        assert reuse.title_echoes == span["replay.title_echoes"] == 16
 
 
 def test_an_assembly_is_served_only_for_an_allowed_label_and_an_unaudited_key(
@@ -4477,24 +4573,54 @@ def test_an_assembly_is_served_only_for_an_allowed_label_and_an_unaudited_key(
     assert reuse.value == "reused", reuse.detail
     assert shop.native.read_bytes() == _NATIVE and reuse.token == _sha(_NATIVE)
     assert shop.marker(key, _ENGINE)["origin_key"] == base
-    # A forced refresh of the reused key revokes its origin; of the base,
-    # the base itself, recording or not.
+    shop.edit(audited=False)
+    second = shop.base()
+    # A forced refresh of the reused key revokes its origin, not the key
+    # itself, which no recording made a base.
     monkeypatch.setattr(cache, "forced_refresh", lambda label: "suspect")
     assert shop.attempt(key=key).value == "declined:forced_refresh"
-    assert shadow.revoked(_ENGINE, _ASSEMBLY_NAME, base)
-    assert not shadow.revoked(_ENGINE, _ASSEMBLY_NAME, "f" * 64)
+
+    def reason(revoked: str) -> str | None:
+        marker = cache.fetch_sidecar(
+            shadow.revoked_name(_ENGINE, _ASSEMBLY_NAME, revoked)
+        )
+        return None if marker is None else json.loads(marker)["reason"]
+
+    assert reason(base) == f"forced refresh of {key[:12]}, which was reused from it"
+    assert reason(key) is None
+    # Of a key no recording names (the refresh's own is about to be
+    # published): nothing; of a base, published under its children's group,
+    # the base.
     assert shop.attempt(key="f" * 64).value == "declined:forced_refresh"
-    assert shadow.revoked(_ENGINE, _ASSEMBLY_NAME, "f" * 64)
+    assert reason("f" * 64) is None
+    assert shop.attempt(key=second).value == "declined:forced_refresh"
+    assert reason(second) == "forced refresh of a base"
 
 
 _SAME_DISPLAY = {"view_window": [1010, 678], "px_per_mm": 3.0}
-# outcome case: (the comparison's outcome, its displays, the audit's judgement)
+_OTHER_DISPLAY = {"base": _SAME_DISPLAY, "new": {**_SAME_DISPLAY, "px_per_mm": 3.5}}
+_REQUEST = {"index": 7, "kind": "call", "field": "args"}
+# case: (the comparison's outcome, its displays, its request divergence and
+# truth cause, the audit's judgement)
 _AUDITS = {
-    "same": ("same", None, "confirmed"),
-    "different": ("different", None, "soundness_alarm"),
-    "display": (
+    "same": ("same", None, None, None, "confirmed"),
+    "different": ("different", None, None, None, "soundness_alarm"),
+    "display": ("different", _OTHER_DISPLAY, None, None, "output_nondeterminism"),
+    # The build asked otherwise than the replay accepted: no seat display
+    # explains that.
+    "display_request": (
         "different",
-        {"base": _SAME_DISPLAY, "new": {**_SAME_DISPLAY, "px_per_mm": 3.5}},
+        _OTHER_DISPLAY,
+        _REQUEST,
+        "request",
+        "soundness_alarm",
+    ),
+    # SolidWorks answered otherwise first: the seat led.
+    "display_response": (
+        "different",
+        _OTHER_DISPLAY,
+        _REQUEST,
+        "response:IModelView.GetVisibleBox",
         "output_nondeterminism",
     ),
 }
@@ -4504,7 +4630,7 @@ _AUDITS = {
 def test_an_audited_assembly_is_judged_against_the_base_it_would_have_served(
     blob, tmp_path, monkeypatch, spans, logged, case
 ):
-    outcome, display, expected = _AUDITS[case]
+    outcome, display, divergence, cause, expected = _AUDITS[case]
     shop = _AssemblyShop(tmp_path, monkeypatch)
     _replay_assembly(monkeypatch, shop)
     base = shop.base()
@@ -4513,24 +4639,24 @@ def test_an_audited_assembly_is_judged_against_the_base_it_would_have_served(
     reuse = shop.attempt()
     assert reuse.value == "audited", reuse.detail
     signals = {
-        "requests": "same",
+        "requests": "same" if divergence is None else "different",
         "answers": "same",
         "mass": outcome,
         "sidecars": outcome,
     }
-    monkeypatch.setattr(
-        shadow,
-        "_diff",
-        lambda *_a: (
-            0,
-            {
-                "request_divergence": None,
-                "outcome": outcome,
-                "outcome_signals": signals,
-                "display": display,
-            },
-        ),
-    )
+    compared: list[Any] = []
+
+    def diff(*args: Any) -> tuple[int, dict[str, Any]]:
+        compared.append(args)
+        return 0, {
+            "request_divergence": divergence,
+            "truth_cause": cause,
+            "outcome": outcome,
+            "outcome_signals": signals,
+            "display": display,
+        }
+
+    monkeypatch.setattr(shadow, "_diff", diff)
     # The build on the seat, after the audited attempt.
     recording = shadow.plan_dependent(
         shadow.BuildKind.ASSEMBLY, shop.dependent, shop.key(), reuse=reuse
@@ -4540,9 +4666,12 @@ def test_an_audited_assembly_is_judged_against_the_base_it_would_have_served(
     recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
     _stored(recording.key)
     shadow.after_build(recording, shop.deps, shop.digest)
+    # One comparison: the split's base is the audit's, which judges it again.
+    assert len(compared) == 1
     record = _events(tmp_path, "replay_shadow")[-1]
     assert (record["reuse_decision"], record["audit"]) == ("audited", expected)
-    assert record["audit_base_key"] == base and record["audit_split"] == "noop"
+    split = "noop" if divergence is None else "diverged"
+    assert record["audit_base_key"] == base and record["audit_split"] == split
     [span] = spans.named("replay.audit ")
     assert span["replay.audit"] == expected
     line = [
@@ -4557,12 +4686,98 @@ def test_an_audited_assembly_is_judged_against_the_base_it_would_have_served(
     if alarmed:
         assert errors[0].startswith(f"[com-replay] SOUNDNESS ALARM {_ASSEMBLY_LABEL}: ")
         assert record["revoked"] == "stored"
-    if case == "display":
+    if expected == "output_nondeterminism":
         assert record["audit_cause"] == "seat_display"
         assert any(
             m.startswith("[com-replay] audit output_nondeterminism")
             for m in logged["warn"]
         )
+
+
+def test_an_audit_of_another_base_than_the_splits_compares_on_the_verified_bundle(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    reuse = shop.attempt()
+    assert reuse.value == "audited" and reuse.bundle is not None, reuse.detail
+    recording = shadow.plan_dependent(
+        shadow.BuildKind.ASSEMBLY, shop.dependent, shop.key(), reuse=reuse
+    )
+    assert recording is not None
+    recording.log.write_bytes(b"log of the build")
+    compared: list[bool] = []
+
+    def diff(work: Path, *_a: Any) -> tuple[int, dict[str, Any]]:
+        compared.append((work / shadow.WORK_BASE).is_dir())
+        signals = {"requests": "same", "answers": "same", "mass": "same"}
+        return 0, {
+            "request_divergence": None,
+            "outcome": "same",
+            "outcome_signals": signals,
+        }
+
+    def downloaded(*_a: Any) -> Any:
+        raise AssertionError("the attempt verified the base's bundle already")
+
+    monkeypatch.setattr(shadow, "_diff", diff)
+    monkeypatch.setattr(shadow, "_bundle_of", downloaded)
+    record: dict[str, Any] = {}
+    split = shadow.Shadow("diverged", ground_truth="diverged", outcome="different")
+    shadow._audit_dependent(recording, _summary(), record, ("0" * 64, split))
+    assert (record["audit"], record["audit_base_key"]) == ("confirmed", base)
+    assert compared == [True]
+    # The split's own base: its comparison is the audit's, made once.
+    record = {}
+    split = shadow.Shadow("noop", ground_truth="same", outcome="same")
+    shadow._audit_dependent(recording, _summary(), record, (base, split))
+    assert record["audit"] == "confirmed" and compared == [True]
+
+
+def test_an_audited_attempt_that_no_build_judges_is_reported_unjudged(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    # The build's recorder left no recording to judge.
+    recording = shadow.plan_dependent(
+        shadow.BuildKind.ASSEMBLY, shop.dependent, shop.key(), reuse=reuse
+    )
+    assert recording is not None
+    shadow.after_build(recording, shop.deps, shop.digest)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    assert (record["audit"], record["audit_base_key"]) == ("unjudged", base)
+    assert record["audit_why"] == f"the recording's outcome {record['outcome']}"
+    line = [
+        m for m in logged["info"] if m.startswith(f"[com-replay] {_ASSEMBLY_LABEL}: ")
+    ][-1]
+    assert f" | audit=unjudged base={base[:12]}" in line
+    # A build that records nothing (dodo: a REFRESH tier).
+    shadow.audit_unjudged(reuse, "the explode tier made no recording")
+    [audit] = _events(tmp_path, "replay_audit")
+    assert audit["label"] == _ASSEMBLY_LABEL
+    assert (audit["audit"], audit["audit_base_key"]) == ("unjudged", base)
+    assert audit["audit_why"] == "the explode tier made no recording"
+    assert [s["replay.audit"] for s in spans.named("replay.audit ")] == [
+        "unjudged",
+        "unjudged",
+    ]
+    warned = f"[com-replay] audit unjudged {_ASSEMBLY_LABEL}: "
+    assert len([m for m in logged["warn"] if m.startswith(warned)]) == 2
+    # Nothing for an attempt that was not audited.
+    shadow.audit_unjudged(None, "no attempt")
+    shadow.audit_unjudged(shadow.Reuse(), "no attempt")
+    declined = dataclasses.replace(reuse, decision=shadow.ReuseDecision.DECLINED)
+    shadow.audit_unjudged(declined, "declined")
+    assert len(_events(tmp_path, "replay_audit")) == 1
 
 
 def test_every_childs_model_is_the_one_beside_its_token():
@@ -4588,10 +4803,11 @@ def test_every_childs_model_is_the_one_beside_its_token():
 
 
 def _assembly_action(
-    dodo: Any, shop: _AssemblyShop, monkeypatch: pytest.MonkeyPatch
+    dodo: Any, shop: _AssemblyShop, monkeypatch: pytest.MonkeyPatch, tier: Any = None
 ) -> tuple[list[str], list[Any]]:
     """build_or_refresh on a cache miss: the seat and build faked (the build
-    writes its own outputs), the cache and reuse real."""
+    writes its own outputs), the cache and reuse real. ``tier``: the
+    assembly's refresh tier, FULL by default."""
     order: list[str] = []
     recordings: list[Any] = []
     monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
@@ -4617,7 +4833,9 @@ def _assembly_action(
     monkeypatch.setattr(dodo, "_com_process_inputs", lambda _task: dict(_PINS))
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: order.append("sw.connect"))
     monkeypatch.setattr(
-        dodo, "_assembly_tier", lambda *_a: (dodo.RefreshTier.FULL, "target missing")
+        dodo,
+        "_assembly_tier",
+        lambda *_a: (tier or dodo.RefreshTier.FULL, "target missing"),
     )
 
     @contextlib.contextmanager
@@ -4682,3 +4900,24 @@ def test_a_reused_assembly_leaf_runs_no_com_and_an_audited_one_builds(
         "stored",
     )
     assert shop.marker(shop.key(), _ENGINE)["origin_key"] == base
+
+
+def test_an_audited_assembly_leaf_that_refreshes_reports_its_audit_unjudged(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    dodo = _load_dodo()
+    shop = _AssemblyShop(tmp_path, monkeypatch, digest=dodo.ContentChecker._digest)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    order, recordings = _assembly_action(
+        dodo, shop, monkeypatch, dodo.RefreshTier.PARTS
+    )
+    assert order == ["seat", "sw.connect", "build", "store", "observe"]
+    assert recordings == [None]
+    [record] = _events(tmp_path, "replay_reuse")
+    assert record["reuse_decision"] == "audited"
+    [audit] = _events(tmp_path, "replay_audit")
+    assert (audit["audit"], audit["audit_base_key"]) == ("unjudged", base)
+    assert audit["audit_why"] == "the parts tier made no recording"

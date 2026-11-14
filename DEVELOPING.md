@@ -3060,7 +3060,7 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 
 | span | attributes |
 | --- | --- |
-| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.marker` (the `reused/` marker's publication); a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
+| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.title_echoes` (an assembly's echoed title counters), `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.marker` (the `reused/` marker's publication); a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
 | `replay.after_build <label>` | `replay.outcome`, `replay.reuse_decision` (mode `reuse`); encloses every span below and the whole off-seat step |
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
@@ -3561,7 +3561,17 @@ assembly recordings probed 2026-11-14 (`ms_measuring_stick`, `mg_magnifier`,
 `pd_paper_drive` and `dt_drive_train` among them) name no output path outside
 the engine's redirect, no script argument and no Python read of an output the
 log did not capture (`replay_gaps`), so the engine replays an assembly
-unchanged: SolidWorks' answers for the models it opens come from the log.
+unchanged: SolidWorks' answers for the models it opens come from the log. The
+script itself, though, checks in Python that each child's model exists under
+the redirected output root (`_assembly.place_component`'s `missing part`):
+`com_replay.py replay --kind assembly` first copies every output-root file the
+log read and did not write from the output root into the scratch root
+(`staged`, each one's SHA-256; one the script leaves unchanged is no Python
+output). Without it, both proof leaves declined `replay_error` after 15
+requests (2026-11-14). A replay that raised names the exception, its message
+and its innermost frame in its detail and INFO line
+(`<type>: <message> (at <file>:<line> in <function>)`,
+`_replay_shadow.script_error`; parts too).
 
 - **Children.** The base must have been made on this build's children
   (`dodo._child_identities`: every token the same SHA-256 as now; a token
@@ -3579,6 +3589,13 @@ unchanged: SolidWorks' answers for the models it opens come from the log.
   that it did not capture (`solidworks_out_inputs`) must be a child's model,
   and must hold the bytes its token names now (`child_mismatch` otherwise);
   any other declines `unjudged_input`.
+- **Title counters.** An assembly script echoes the titles SolidWorks gives
+  the documents it makes (`Assem3` in `SelectByID2` and `ActivateDoc3`; 16
+  requests in `ms_measuring_stick`'s replay), which a build here would ask
+  with its own counters: the split's `title_echo` no-op. Unlike a part's,
+  such a replay is not declined (`seat_state_echo` only when the replay did
+  not report them); the count is the record's `title_echoes`, and the audit
+  judges the outcome.
 - **Outputs.** As for a part, but the input ledger, which dodo rewrites after
   any build and no replay writes, is left out of the comparison (`rewritten`),
   and every Python output must be the base's, byte for byte.
@@ -3598,24 +3615,34 @@ other would-be reuse is audited. Serving is the one-line change
 `DEFAULT_MODES[BuildKind.ASSEMBLY] = ReplayMode.REUSE`.
 
 **Audit** (`_replay_shadow._audit_dependent`, after the build's own split).
-The build's recording is diffed against the base the attempt chose, and the
-would-be reuse is judged as a part's replay no-op is (`noop_judgement`):
+The build's recording is compared with the base the attempt chose (the
+split's comparison when the split chose that base, else a diff on the bundle
+the attempt verified, never downloaded again), and the would-be reuse is
+judged as a part's replay no-op is (`noop_judgement`):
 
 - `confirmed`: the base's assembly;
 - `soundness_alarm`: another assembly than the base's. This is an ERROR
   (`[com-replay] SOUNDNESS ALARM assembly:<stem>: ...`), the base is revoked,
   and the INFO line carries `SOUNDNESS ALARM`.
 - `output_nondeterminism`: another output that the comparison explains by the
-  seat (a jagged crop outline, the drawing display). WARN, no revocation.
+  seat (a jagged crop outline, the drawing display), when the seat led: the
+  requests were the base's, or SolidWorks answered otherwise first (a
+  `response:` cause). Another output after a `request` divergence stays a
+  `soundness_alarm`. WARN, no revocation.
 - `seat_nondeterminism` or `seat_path_divergence`: the base's assembly,
   reached through other answers or detours of the seat; recorded, no log.
 - `noop_unexplained_divergence` or `noop_outcome_unknown`: WARN.
+- `unjudged` (`audit_why`): nothing judges the attempt, as when the leaf took
+  a REFRESH tier (`replay_audit` record from `dodo.build_or_refresh`), a peer
+  published the key first, or the build left no recording. WARN, so the
+  audited and judged counts reconcile.
 
 The record carries `audit`, `audit_cause`, `audit_split`, `audit_outcome`,
 `audit_signals`, `audit_s` and `audit_base_key` (the span `replay.audit
 <label>` the same); the INFO line carries `audit=<judgement> base=<key>`. A
-forced refresh of an assembly key revokes it as a base whether or not a
-recording of it is published, and the origin its `reused/` marker names.
+forced refresh of an assembly key revokes it as a base only when a recording
+of it is published (a manifest of the key, grouped or not), and always the
+origin its `reused/` marker names.
 
 Would-be reuses and their audits per stem:
 
@@ -3631,7 +3658,8 @@ dependencies
     | where timestamp > ago(7d) and name startswith "replay.audit assembly:"
     | extend label=tostring(customDimensions.label),
              audit=tostring(customDimensions["replay.audit"])
-    | summarize judged=count(), confirmed=countif(audit == "confirmed"),
+    | summarize judged=countif(audit != "unjudged"), unjudged=countif(audit == "unjudged"),
+                confirmed=countif(audit == "confirmed"),
                 alarms=countif(audit == "soundness_alarm") by label
 ) on label
 | order by attempts desc

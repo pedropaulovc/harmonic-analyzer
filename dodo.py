@@ -3246,6 +3246,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
         if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
             _stamp_assembly_execution(stem)
             _write_input_ledger(ledger, _ledger_inputs(file_deps))
+            _replay_shadow.audit_unjudged(reuse, "a peer published the key first")
             return
 
         current = _ledger_inputs(file_deps)
@@ -3336,6 +3337,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # Off the seat, after the publication: publish the FULL build's recording
     # and judge it against its base. Telemetry only; never raises.
     _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
+    if recording is None:
+        _replay_shadow.audit_unjudged(reuse, f"the {tier.value} tier made no recording")
     # The same archive is the explode base for this operational model. An
     # EXPLODE run started from that base, which the cache already holds.
     if not base_key or tier is RefreshTier.EXPLODE:
