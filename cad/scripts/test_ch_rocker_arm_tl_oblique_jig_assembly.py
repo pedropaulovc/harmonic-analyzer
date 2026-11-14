@@ -2767,11 +2767,12 @@ def test_feed_lug_nut_and_drilled_threads_stay_in_real_material() -> None:
     assert 0.0 <= feed_block.NUT_Z[0] < feed_block.NUT_Z[1] <= pivot_block.BLOCK_HEIGHT
     assert feed_block.LUG_Y0 <= feed_block.NUT_Y[0] < feed_block.NUT_Y[1] < feed_block.LUG_Y1
     # Rule 17: every tap-to-face wall meets the .080 target; the tap-to-
-    # clearance wall is the stated shortfall, over the .060 floor.
+    # clearance wall is the stated shortfall, the owner's .044 exception
+    # under the .060 floor (owner 2026-11-13, RV-04).
     walls = dict(feed_block.LUG_WALLS_MM)
     clearance_wall = walls.pop("taps to the leadscrew clearance")
     assert min(walls.values()) >= WALL_TARGET_MM
-    assert WALL_FLOOR_MM <= clearance_wall < WALL_TARGET_MM
+    assert feed_block.NUT_WALL_ACCEPTED_MM <= clearance_wall < WALL_FLOOR_MM
     assert fasteners.NUT_TO_FEED_BLOCK.thread_depth_mm == feed_block.LUG_WIDTH
     assert feed_nut.SCREW_TIP_REACH_MAX < feed_block.LUG_WIDTH
     block_origin, rows = spec.FEED_BLOCK_PLACEMENTS[0]

@@ -27,10 +27,10 @@ PART_STEM = SPEC.artifact_stem
 # location dimensions carry their value and band only (rule 7); the mm unit
 # is RV-02's.
 LEADSCREW_MATE = f"{part.feed_nut.NUMBER.removeprefix(part.NUMBER.rsplit('-TL-', 1)[0] + '-')} LEADSCREW"
-# The Ø.351 is bored at its ±.002 station (owner ruling 2026-11-08 (Pedro),
-# A2 option (i); the shop table holds ±.002 only for a bored or reamed hole).
+# The Ø.375 is a plain hole under DRILLED HOLES at title-block stations (owner
+# ruling 2026-11-13): no process word.
 CALLOUTS = {
-    'NutClearanceDia': {'suffix': f' {part.NUT_CLEARANCE_PROCESS} THRU', 'above': '',
+    'NutClearanceDia': {'suffix': ' THRU', 'above': '',
                         'below': f'FOR {LEADSCREW_MATE}\n{part.NUT_WALL_MIN_TEXT}'},
     'NutCentreY': {'above': '', 'below': ''},
     'NutCentreZ': {'above': '', 'below': ''},
@@ -44,7 +44,6 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
         "METRIC_DIMENSIONS",
-        "INCH_TOLERANCED_DIMENSIONS",
         ("_oblique_block_drawing", "BLOCK_CALLOUTS"),
         ("_drawing_hole_callout", "add_native_hole_callout"),
         ("ch_rocker_arm_tl_oblique_callouts", "set_callout_lengths_to_three_places"),
@@ -112,8 +111,8 @@ for _index, (_x, _y) in enumerate(part.pivot.BOLT_POINTS, start=1):
         precision={"dia": _PLACES["CarriageCounterbores3Dia"], "floor": _PLACES["CboreFloor"]},
     )
 
-# VIEW D (sheet 2): the leadscrew clearance bored at its station, Y from the
-# lug end at ±.002 and Z from the carriage face in exact millimetres (RV-02).
+# VIEW D (sheet 2): the leadscrew clearance at title-block stations, Y from
+# the lug end at .XXX and Z from the carriage face in exact millimetres (RV-02).
 _FROM_NUT_FACE = ([-1.0, 0.0, 0.0], ("__frame__",))
 requirement(
     "leadscrew_bore",
@@ -124,16 +123,14 @@ requirement(
         "at": ([part.NUT_FACE_X, part.NUT_AXIS_Y, part.NUT_AXIS_Z], ("NUT_FACE_X", "NUT_AXIS_Y", "NUT_AXIS_Z")),
         "axis": _FROM_NUT_FACE,
         "dia": (
-            limits(part.SCREW_CLEARANCE_DIA, _PLACES["NutClearanceDia"], unit=part.UNIT),
-            ("SCREW_CLEARANCE_DIA", "NUT_CLEARANCE_PROCESS"),
+            drilled_limits(part.SCREW_CLEARANCE_DIA, _PLACES["NutClearanceDia"], unit=part.UNIT),
+            ("SCREW_CLEARANCE_DIA", ("draw_ch_rocker_arm_tl_oblique_feed_block", "CALLOUTS")),
         ),
         "dia_nominal": (part.SCREW_CLEARANCE_DIA, ("SCREW_CLEARANCE_DIA",)),
-        "process": ("bore", ("NUT_CLEARANCE_PROCESS", ("draw_ch_rocker_arm_tl_oblique_feed_block", "CALLOUTS"))),
         "thru": (True, (("draw_ch_rocker_arm_tl_oblique_feed_block", "CALLOUTS"),)),
         "row": (
-            limits(part.DRAWING_VALUES["NutCentreY"], _PLACES["NutCentreY"],
-                   (part.NUT_CLEARANCE_BAND_Y, -part.NUT_CLEARANCE_BAND_Y)),
-            ("NUT_AXIS_Y", "LUG_Y0", "NUT_CLEARANCE_BAND_Y", "INCH_TOLERANCED_DIMENSIONS"),
+            limits(part.DRAWING_VALUES["NutCentreY"], _PLACES["NutCentreY"], unit=part.UNIT),
+            ("NUT_AXIS_Y", "LUG_Y0", "DRAWING_PRECISION_BY_NAME"),
         ),
         "row_nominal": (part.DRAWING_VALUES["NutCentreY"], ("NUT_AXIS_Y", "LUG_Y0")),
         "row_from": ("lug_end", ("NUT_PATTERN_PRINTED",)),

@@ -1,19 +1,20 @@
 # Source: the v49 MHA-CH-06-TL-32 sheets through the feature manifest (sizes,
 # lug, stations, rows, limits, the flat-bottomed .375 seat and its 5/16-18 tap,
-# the Ø.351 leadscrew BORE and its row and height). No hand traveler exists for
+# the Ø.375 leadscrew clearance and its row and height). No hand traveler exists for
 # this block. Route, tools, speeds, workholding and datums are authored here,
 # as for TL-22 (its plan.toml): one blank from the OnlineMetals 1187 1 x 3 in
 # bar with the 3.47 overall along the bar, both faces faced, the 1.64 length
 # milled from the 3 in width on edge (owner ruling #2083: mill to size, no
 # bandsaw rip), the sawn ends faced on end, then the lug notch with LUG END out
 # past the jaw side, the top holes in one hold (the seat a plunged 3/8 end
-# mill, as TL-22's), and the leadscrew bore with the block standing on SPINDLE
-# END. The four #4-40 nut taps are transferred through the MHA-CH-06-TL-VN-84
-# feed nut at TL-00 assembly (the sheet's note): no operation here.
+# mill, as TL-22's), and the leadscrew clearance with the block standing on
+# SPINDLE END, plunged with the same 3/8 end mill (owner ruling 2026-11-13;
+# RV-04 accepts its .044 wall to the taps). The four #4-40 nut taps are
+# transferred through the MHA-CH-06-TL-VN-84 feed nut at TL-00 assembly (the
+# sheet's note): no operation here.
 # Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
-# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650,
-# also used for the Ø.351 bore, under its 1796).
+# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
 title = "Oblique trammel feed block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -41,10 +42,12 @@ layer_in = 0.10                  # Facing layers down to size.
 notch_overhang_mm = 50.8
 spacer_length_in = 1.5
 # HA ch_rocker_arm_tl_vn_oblique_leadscrew_spec.KP08_AXIS_HEIGHT, unverified on
-# the uxcell blocks; the Ø.351 bore clears the KP08 stack by about 0.005 mm
-# (HA #2184), so both blocks are measured before the bore is cut.
+# the uxcell blocks (HA #2184). At the plunged Ø.375's least size and its
+# title-block stations the leadscrew keeps 0.31 mm of radial clearance
+# (feed spec LEADSCREW_RADIAL_CLEARANCE − LEADSCREW_OFFSET), so a KP08 more
+# than 0.30 mm off its 15.00 mm is stopped before the clearance is cut.
 kp08_axis_height_mm = 15.0
-leadscrew_margin_mm = 0.005
+leadscrew_margin_mm = 0.30
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
 # run from spindle nose to tip (holder gauge + projection). Archive values are
 # archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
@@ -71,11 +74,8 @@ drill_projection_max_mm = 112.8
 # A plug tap runs its 3-5 chamfered threads (5 × 1.411 mm pitch) and a little
 # more past SEAT before full thread reaches it; the parallels leave the gap.
 tap_tip_z_mm = -8.0
-drill_tip_z_mm = -2.54           # 5/16 drill tip ~.1 past the lug's underside.
-# Archive boring-head-lms-3662 (#1413 trial estimate): head body 60 mm below
-# the spindle nose; the 1.5 in reach bar passes the .77 lug.
-boring_head_len_mm = 60.0
-boring_bar_reach_long_mm = 38.1
+# 5/16 drill and 3/8 end mill tips ~.1 past the lug's underside.
+drill_tip_z_mm = -2.54
 
 [[tools]]
 id = "saw"
@@ -114,9 +114,9 @@ id = "drill-5-16"
 name = "5/16 drill"
 ref = "block-drill-5-16"
 [[tools]]
-id = "boring"
-name = "Boring head"
-ref = "block-boring-head"
+id = "em-3-8"
+name = "3/8 in end mill"
+ref = "block-em-3-8"
 [[tools]]
 id = "tap"
 name = "5/16-18 plug tap"
@@ -324,21 +324,22 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Leadscrew bore through the lug"
+title = "Leadscrew clearance through the lug"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "On SPINDLE END on 1/2 in parallels, SEAT at the fixed jaw, LUG END left, centred."
 datum = "X0 LUG END (touched); Y0 SEAT = fixed jaw face; Z0 OUTER END."
-diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on SPINDLE END, SEAT at the fixed jaw: the leadscrew bore down through the lug from OUTER END" }
-# The bore and the LUG END touch lie within the overall length; across, the
-# .96 height. The 5/16 drill tip runs deepest, just past the lug's underside;
-# longest: that jobber drill in the chuck; shortest: the boring head and bar.
-envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.height_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.lug_x_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.boring_head_len_mm}}", "{{process.boring_bar_reach_long_mm}}"] }
+diagram = { file = "diagrams/feed-block/lug-bore.svg", alt = "Block standing on SPINDLE END, SEAT at the fixed jaw: the leadscrew clearance down through the lug from OUTER END" }
+# The hole and the LUG END touch lie within the overall length; across, the
+# .96 height. The drill and end-mill tips run deepest, just past the lug's
+# underside; longest: that jobber drill in the chuck; shortest: an end mill
+# in its collet.
+envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.height_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.lug_x_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 
 [[setups.operations]]
-instruction = "Hold: both KP08 axis heights (base to bore centre) recorded; either off {{process.kp08_axis_height_mm:.2f}} mm, stop and report (~{{process.leadscrew_margin_mm:g}} mm leadscrew clearance)."
+instruction = "Hold: both KP08 axis heights (base to bore centre) recorded; either more than {{process.leadscrew_margin_mm:.2f}} mm off {{process.kp08_axis_height_mm:.2f}} mm, stop and report."
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -353,16 +354,16 @@ feed = "hand"
 speed_kind = "spindle"
 tool = "drill-5-16"
 sizing = "other"
-instruction = "Drill through the lug, peck .1."
+instruction = "Pilot through the lug, peck .1."
 rpm = 2000
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "boring"
-sizing = "other"
-instruction = "Bore through to Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
-instruction_detailed = "Fit the 1.5 in reach bar. The drill only roughs the hole: open it a few thousandths per pass right through the lug so the bar puts it where the table is locked, to Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
+tool = "em-3-8"
+sizing = { kind = "band", band_mm = "{{cad.screw_dia_band_mm}}" }
+instruction = "Plunge through the lug, peck; Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
+instruction_detailed = "Change to the 3/8 end mill, table still locked. Plunge it down the pilot right through the lug, pecking out the chips; its 3/8 shank follows the flutes into the hole. The cutter sizes the hole: the .375 pin passes through, the .379 does not."
 rpm = 1650
 feed = "hand"
 inspection = "Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}; {{cad.screw_y_min_in:.3dot}}–{{cad.screw_y_max_in:.3dot}} from LUG END; {{cad.screw_z_band_text}} from SEAT."

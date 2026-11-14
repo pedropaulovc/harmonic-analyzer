@@ -250,11 +250,12 @@ feed = "8 in/min"
 # its setting, jig-em-half's setting, jig-spot and basebar-counterbore (the
 # 5/16 in end mill: the counterbores). The drills are the 115-piece index
 # sizes the sheets print (#15 .180, F .257 tap drill); the 5/16 drill pilots
-# the Ø.351 leadscrew bore. jig-drill-f and jig-tap-5-16-18-plug are the
+# the Ø.375 leadscrew clearance. jig-drill-f and jig-tap-5-16-18-plug are the
 # carrier's (TL-21) records, byte-identical: keep one copy when both land.
 # block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
-# endmills-lms-6784): plunged, it cuts the seat to the title block's DRILLED
-# HOLES band and squares its floor (owner ruling 2026-11-13).
+# endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
+# TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
+# ruling 2026-11-13).
 # block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
 # flute (owner 2026-11-13), which reaches through TL-32's .96 lug notch.
 [tools.block-drill-15]
@@ -275,5 +276,3 @@ diameter_mm = 9.525
 [tools.block-em-half-long]
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
-[tools.block-boring-head]
-description = "R8 2 in boring head; carbide-tipped bar for bores from 5/16 in, square end-cutting tip"

@@ -239,14 +239,15 @@ OnlineMetals 1187 1 x 3 in bar (`cad/config/shop-equipment.toml` `[[stock]]`),
 faces SEAT and TOP, mills the 1.64 length from the 3 in width on edge (#2083),
 faces the sawn ends on end, then cuts every top hole in one hold: the 4X .180
 holes and .31 counterbores to the .570 floor, and the pivot seat (F tap drill,
-5/16 end-mill floor, boring head to .3755–.3765, as the sheet's BORE calls for;
-then the 5/16-18 tap through). TL-32 adds the lug notch, with LUG END out past
-the jaw side and a spacer at the other jaw end, and the Ø.351 leadscrew bore
-with the block standing on SPINDLE END, after an arrival check of both KP08 axis
-heights (#2184); its four #4-40 nut taps stay with the TL-00 transfer. Their
-adapters (`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips
-0.11.0. The boring head is recorded to buy (`shop-equipment.toml`
-`tools.boring-head`); the F drill and 5/16-18 plug tap share the carrier's
+then the LMS 6784 3/8 end mill plunged to the flat .359 floor, .375–.379 under
+DRILLED HOLES, owner ruling 2026-11-13; then the 5/16-18 tap through). TL-32
+adds the lug notch, with LUG END out past the jaw side, a spacer at the other
+jaw end and the owner's 1 in-flute 1/2 in end mill, and the Ø.375 leadscrew
+clearance, piloted and plunged with the same 3/8 end mill with the block
+standing on SPINDLE END, after an arrival check of both KP08 axis heights
+(#2184); its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
+(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0. No
+boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 ```text
