@@ -182,6 +182,14 @@ _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
 _IDENTITY_READ = re.compile(r"\.Name2$|^IDrawingComponent\.Name$")
 # ``_com._early_bound``'s QueryInterface, as the recorder logs it.
 _EARLY_BOUND = ("QueryInterface", "early_bound")
+# The calls a dependent's :func:`title_echo` lets touch an object of an
+# enumeration it accepts in another order (:func:`_order_only`): reads and
+# pywin32's own bookkeeping, nothing that acts on the model. A script that
+# acts on an element it picked by position acts on another component when
+# the seat enumerated in another order.
+_READ_KINDS = frozenset(
+    {conv.Kind.GET, conv.Kind.TYPEINFO, conv.Kind.IDS, conv.Kind.QI}
+)
 
 
 class Outcome(StrEnum):
@@ -334,7 +342,7 @@ def judge(
             found["judge_faults"].append({"step": "seat_path", "error": path_error})
     echo = None
     if cause == TITLE_COUNTER_CAUSE:
-        echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b))
+        echo, echo_error = _attempt(lambda: title_echo(streams.a, streams.b, kind))
         if echo_error is not None:
             found["judge_faults"].append({"step": "title_echo", "error": echo_error})
     ink = None
@@ -469,15 +477,17 @@ def name_bound(
     the same components apart, and a script that reads every component's name
     and then visits the components in name order (the sort #2686 brings) asks
     the same of each component under another number. An array is bound only
-    when, at a request both builds issued alike (``request_field``) whose
-    answers are the same handle numbers, both builds then :func:`_identify`
-    every element, each by one distinct name, the same names in both. The new
-    build is then read as if SolidWorks had enumerated in the base's order:
-    the array's answer stays as recorded (the same numbers as the base's),
-    the pre-pass is put in the base's element order, and every handle of an
-    element (the element and what its pre-pass calls allocated) is renamed,
-    in the pre-pass and in every later call, to the base's handle of the
-    component of the same name. Anything else stays positional: components
+    when, at a request both builds issued alike but for title counters
+    (``request_field`` on :func:`_counterless` arguments, so a title the
+    script echoed earlier does not end the walk: :func:`title_echo` judges the
+    echo) whose answers are the same handle numbers, both builds then
+    :func:`_identify` every element, each by one distinct name, the same names
+    in both. The new build is then read as if SolidWorks had enumerated in the
+    base's order: the array's answer stays as recorded (the same numbers as
+    the base's), the pre-pass is put in the base's element order, and every
+    handle of an element (the element and what its pre-pass calls allocated)
+    is renamed, in the pre-pass and in every later call, to the base's handle
+    of the component of the same name. Anything else stays positional: components
     visited in enumeration order (as the explode authors' ``by_name`` dicts
     are, in insertion order) still differ, a request on another component
     than the base's still diverges, and a component that is not the base's
@@ -487,7 +497,9 @@ def name_bound(
     index = 0
     while index < min(len(a), len(b)):
         x, y = a[index], b[index]
-        if conv.request_field(x, y.handle, y.op, y.args) is not None:
+        mine = replace(x, args=_mapped(x.args, _counterless))
+        theirs = _mapped(y.args, _counterless)
+        if conv.request_field(mine, y.handle, y.op, theirs) is not None:
             break
         found = _bind(a, b, index)
         if found is None:
@@ -669,24 +681,116 @@ def _title_only(a: Any, b: Any) -> bool:
     )
 
 
-def title_echo(a: Sequence[conv.Call], b: Sequence[conv.Call]) -> bool:
+def title_echo(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], kind: str = "part"
+) -> bool:
     """Whether two recipe streams are the same requests but for the title
     counters the script echoed: as many calls, each the same member on the same
     object with the same arguments once title counters (and the provenance
     value) are masked, and every answer the same but for noise (title
     counters included). A replay serving the base's answers would have issued
     the base's requests exactly. A difference anywhere else, a request or an
-    answer, is no echo, however late in the streams."""
+    answer, is no echo, however late in the streams.
+
+    A dependent's answers (:data:`DEPENDENT_KINDS`; a part's are judged as
+    above) may also differ where the seat made them differ, its requests the
+    base's throughout (:func:`_order_only`)."""
     if len(a) != len(b):
         return False
-    for x, y in zip(a, b, strict=True):
+    differing: list[int] = []
+    for index, (x, y) in enumerate(zip(a, b, strict=True)):
         if (x.handle, x.op, x.site) != (y.handle, y.op, y.site):
             return False
         if _exact(_mapped(x.args, _text)) != _exact(_mapped(y.args, _text)):
             return False
         if not _close(_answer(x), _answer(y)):
+            if kind not in DEPENDENT_KINDS:
+                return False
+            differing.append(index)
+    return _order_only(a, b, differing)
+
+
+def _order_only(
+    a: Sequence[conv.Call], b: Sequence[conv.Call], differing: list[int]
+) -> bool:
+    """Whether the answers at ``differing``, to the same requests in both
+    streams, differ only as the seat made them: each is a session read
+    (:data:`_SESSION_SITE`: the clock, the application's preferences) or a
+    read of an object an enumeration listed (:func:`_elements`: the outermost
+    handle array it descends from), and every such enumeration is the base's
+    in another order. That is, its elements' records (each element's answers,
+    in order, to every call on it or on what it answered, handles erased:
+    :func:`_keyed`) are the base's records, permuted: whole elements moved,
+    no read moved between them. Every call on or with an object of such an
+    enumeration must be a read (:data:`_READ_KINDS`): the script only
+    collected what it read, in whatever order the seat listed it.
+
+    2026-11-14, the first same-key pairs after #2730: ch_channel's
+    interference report (the same 86 pairs, their ``IInterference.Components``
+    names read late-bound, listed in another order) and dt_drive_train's
+    component-pattern name sets (``GetComponents`` read late-bound), each with
+    two SummaryInfo dates. An answer outside any enumeration, an element whose
+    record is not the base's, or a call that acts on an element (a pick by
+    position acts on another component when the seat enumerated in another
+    order) is no echo."""
+    if not differing:
+        return True
+    element = _elements(a)
+    roots: set[int] = set()
+    for index in differing:
+        x = a[index]
+        if _SESSION_SITE.search(x.site):
+            continue
+        found = element(x.handle)
+        if found is None:
             return False
-    return True
+        roots.add(found[0])
+    if not roots:
+        return True
+    records: dict[int, tuple[dict[int, list[Any]], dict[int, list[Any]]]] = {}
+    for x, y in zip(a, b, strict=True):
+        touched = [element(handle) for handle in (x.handle, *_handles(x.args))]
+        if not any(found is not None and found[0] in roots for found in touched):
+            continue
+        if x.kind not in _READ_KINDS:
+            return False
+        found = touched[0]
+        if found is None or found[0] not in roots:
+            continue
+        root, member = found
+        base, new = records.setdefault(root, ({}, {}))
+        base.setdefault(member, []).append([x.site, _keyed(_answer(x))])
+        new.setdefault(member, []).append([y.site, _keyed(_answer(y))])
+    return all(
+        Counter(map(_exact, base.values())) == Counter(map(_exact, new.values()))
+        for base, new in records.values()
+    )
+
+
+def _elements(calls: Sequence[conv.Call]) -> Callable[[int], tuple[int, int] | None]:
+    """Per handle, the outermost handle array (:func:`_handle_array`) its
+    object descends from, as an element or through what an element's calls
+    answered: that array's index and the element's handle. ``None`` for an
+    object no array listed."""
+    origin: dict[int, int] = {}
+    for index, call in enumerate(calls):
+        for handle in _handles([call.result, call.outs]):
+            origin.setdefault(handle, index)
+    found: dict[int, tuple[int, int] | None] = {}
+
+    def outermost(handle: int) -> tuple[int, int] | None:
+        if handle not in found:
+            root, seen, current = None, set(), handle
+            while current in origin and current not in seen:
+                seen.add(current)
+                at = origin[current]
+                if current in (_handle_array(calls[at].result) or ()):
+                    root = (at, current)
+                current = calls[at].handle
+            found[handle] = root
+        return found[handle]
+
+    return outermost
 
 
 def _exact(value: Any) -> str:
