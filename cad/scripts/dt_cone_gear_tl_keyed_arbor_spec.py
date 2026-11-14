@@ -668,16 +668,16 @@ MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
 # --- Sheet words -----------------------------------------------------------------------
 # One numbered note states the seat's matched fit and acceptance and the
 # keyseat's bonded key (rule 4: one flag note linked to every dimension of
-# the one feature). A matched pair names each mate by name and FULL drawing
+# the one feature). A matched pair names each mate by name and full drawing
 # number at the callout: a range (farm 20261113T171903293Z) and a pointer to
-# the kit sheet's list (farm 20261114T203106731Z) were each refused, and the
-# short form (T036) is only for a mate in the sheet's own parent assembly,
-# which the gears are not. So the note writes every keyed blank out, wrapped
-# at the 72 characters a note line runs to before the title block
-# (draw_dt_cone_gear_shaft's note budget). That runs the one note past rule
-# 7's four lines: its one fact is a matched-fit statement, whose mates rule 4
-# requires in full. The key's clock and its setting are the kit's fitting
-# steps, not this sheet's.
+# the kit sheet's list (farm 20261114T203106731Z) were each refused. The
+# seat's mates are two drawings: the cone gear, one tabulated drawing
+# MHA-DT-03 whose keyed members (T030-T120; T012-T024 keep round bores) are
+# the cone blanks, and the crank drive gear MHA-DT-07. "The keyed bores of"
+# MHA-DT-03 picks exactly those members, so the note names both drawings
+# within rule 7's four lines, each under the 72 characters a note line runs
+# to before the title block (draw_dt_cone_gear_shaft's note budget). The
+# key's clock and its setting are the kit's fitting steps, not this sheet's.
 KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
 KEY_BOND = "LOCTITE 638"
 SEAT_NOTE_NUMBER = 1
@@ -686,15 +686,14 @@ SEAT_CLEARANCE_TEXT = "-".join(
     inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
 )
 NOTE_LINE_CHARS = 72
-_CONE_MATES = tuple(blank.number for blank in KEYED_GEARS if blank.tag.startswith("T"))
-_CRANK_MATES = tuple(
-    blank.number for blank in KEYED_GEARS if not blank.tag.startswith("T")
-)
-if len(_CONE_MATES) + len(_CRANK_MATES) != len(KEYED_GEARS) or len(_CRANK_MATES) != 1:
-    raise AssertionError("the seat's mates are the cone blanks and the 64T")
-SEAT_MATES_TEXT = (
-    f"CONE GEARS {', '.join(_CONE_MATES)} AND CRANK DRIVE GEAR {_CRANK_MATES[0]}"
-)
+CONE_NUMBER = str(_config.parts("dt-cone-gear")["number"])
+CRANK_NUMBER = str(_config.parts("dt-crank-drive-gear")["number"])
+if {b.number for b in KEYED_GEARS} != {
+    *(f"{CONE_NUMBER}-T{teeth:03d}" for teeth in cone.KEYED_TEETH),
+    CRANK_NUMBER,
+}:
+    raise AssertionError("the seat's mates are MHA-DT-03's keyed members and the 64T")
+SEAT_MATES_TEXT = f"CONE GEAR {CONE_NUMBER} AND CRANK DRIVE GEAR {CRANK_NUMBER}"
 SHEET_NOTES = "\n".join(
     (
         *textwrap.wrap(
