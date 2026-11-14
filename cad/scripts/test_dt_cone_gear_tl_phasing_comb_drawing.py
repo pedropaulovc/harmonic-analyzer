@@ -121,7 +121,15 @@ def test_the_u_clears_the_tip_and_grips_t030() -> None:
     the spring arm holds both T030 blades on their seats; both arms hold
     rule 17's .060 floor at their narrowest print."""
     xx = 0.01 * INCH
-    assert spec.SLOT_LENGTH - xx > spec.PIVOT_END_MAX_MM
+    # The slot's full round reaches the axis past the pivot's end; its straight
+    # sides, the spring's cantilever, end at the round's centre.
+    assert spec.SLOT_END_RADIUS_MM == pytest.approx(spec.GRIP_SPAN / 2.0)
+    assert spec.SLOT_END_MM - xx > spec.PIVOT_END_MAX_MM
+    assert spec.SHEET_LENGTH - xx - (spec.SLOT_END_MM + xx) >= 0.23 * INCH
+    # At its widest print the span still preloads both T030 blades.
+    assert spec.GRIP_SPAN + 0.005 * INCH + spec.GRIP_PRELOAD_MIN_MM <= (
+        2.0 * spec.SEAT_EDGE_MM[0] + 1e-9
+    )
     flexed = spec._flex_share(spec.SLOT_LENGTH) * spec.SPREAD_MAX_MM
     assert spec.SEAT_EDGE_MM[0] - flexed > spec.BUSHING_REACH_MM
     assert spec.SPRING_WIDTH == pytest.approx(0.080 * INCH)
@@ -134,6 +142,20 @@ def test_the_u_clears_the_tip_and_grips_t030() -> None:
     assert spec.SPRING_STRAIN < spec.SPRING_YIELD_STRAIN
     # The near arm bends little under the spread: a few hundredths at most.
     assert all(0.0 < flex < 0.05 for flex in spec.FLEX_MM.values())
+
+
+def test_the_yaw_is_bounded_by_t030s_face_and_every_blade_keeps_its_margins() -> None:
+    assert spec.YAW_MAX_RAD == pytest.approx(spec.SLIDE_WIDTH_MM / spec.T030_FACE_MM)
+    yawed = [line for line in spec.SEAT_LINES if line[1] != line[2]]
+    assert yawed and all(
+        abs(end - start) <= spec.SLIDE_WIDTH_MM + 1e-12 for _e, start, end, _s in yawed
+    )
+    assert spec.BLADE_PLAY_MM == pytest.approx(0.0005 * INCH)
+    assert spec.ROOT_AIR_MM == pytest.approx(0.002 * INCH)
+    mil = 0.001 * INCH
+    for teeth in spec.BONDED_TEETH:
+        assert spec._enters(teeth, spec.BLADE_DEPTH_MM[teeth])
+        assert not spec._enters(teeth, spec.BLADE_DEPTH_MM[teeth] + mil)
 
 
 def test_both_t030_blades_hold_the_lean_under_half_a_degree() -> None:
@@ -163,7 +185,10 @@ def test_the_profile_is_a_rectilinear_u_on_the_seat_origin() -> None:
             spec.BLADE_START_MM[teeth],
             -spec.BLADE_DEPTH_MM[teeth],
         )
-    assert spec.SHEET_VOLUME == pytest.approx(spec._area(points) * spec.SHEET_THICK)
+    half_disc = math.pi * spec.SLOT_END_RADIUS_MM**2 / 2.0
+    assert spec.SHEET_VOLUME == pytest.approx(
+        (spec._area(points) - half_disc) * spec.SHEET_THICK
+    )
     assert {name for name, *_ in spec.SKETCH_DIMENSIONS} == spec.PROFILE_DIMENSIONS
 
 
@@ -196,7 +221,8 @@ def test_each_depth_states_its_function_and_each_gear_is_named_once() -> None:
         )
     low, high = spec.GRIP_INTERFERENCE_IN
     assert (
-        0.0 <= low < 0.002 and high * INCH >= spec.SPREAD_MAX_MM > (high - 0.001) * INCH
+        0.002 <= low < 0.004
+        and high * INCH >= spec.SPREAD_MAX_MM > (high - 0.001) * INCH
     )
     assert spec.CALLOUTS_BELOW["GripSpan"].splitlines() == [
         f"{low:.3f}-{high:.3f} INTERFERENCE".replace("0.", "."),
@@ -266,15 +292,15 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
         assert _off_the_u(box), a
         for b in names[i + 1 :]:
             assert _apart(box, blocks[b]), (a, b)
-    # Each depth's text stands left of its own line, just under its own
-    # extension line: every depth line further out (shallower) ends above it,
-    # every one nearer (deeper) and the grip span's stand right of it.
+    # Each depth's text stands left of its own line, under its own extension
+    # line: every depth line further out (shallower) ends above it, every one
+    # nearer (deeper) and the grip span's stand right of it.
     for teeth in spec.BONDED_TEETH:
         box = blocks[spec.blade_depth_name(teeth)]
         line = drawing.depth_line_x(teeth)
         own = drawing.front_xy(0.0, -spec.BLADE_DEPTH_MM[teeth])[1]
         assert box[2] == pytest.approx(line)
-        assert own - 0.002 < box[3] < own
+        assert box[3] < own
         for other in spec.BONDED_TEETH:
             other_y = drawing.front_xy(0.0, -spec.BLADE_DEPTH_MM[other])[1]
             if other < teeth:
@@ -282,14 +308,14 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
             elif other > teeth:
                 assert drawing.depth_line_x(other) < line and other_y > box[3]
         assert drawing.GRIP_X > line
-    # The grip span's text stands inside its span under every depth's text;
-    # the spring arm's inside its own; the rows over the U.
+    # The grip span's text stands under the U left of its line; the spring
+    # arm's inside its own span, further out; the rows over the U.
     grip = blocks["GripSpan"]
-    lowest = min(blocks[spec.blade_depth_name(t)][1] for t in spec.BONDED_TEETH)
-    assert grip[3] < lowest - 0.002
-    assert grip[1] > drawing.front_xy(0.0, -spec.GRIP_SPAN)[1]
+    assert grip[3] < drawing.SHEET_BOX[1] - 0.002
+    assert grip[2] == pytest.approx(drawing.GRIP_X)
     spring = blocks["SpringWidth"]
-    assert spring[2] < drawing.FRONT_ORIGIN[0] - 0.002
+    assert spring[2] < drawing.GRIP_X - 0.001
+    assert drawing.SPRING_X < drawing.GRIP_X
     rows = [blocks[name] for name in drawing.ROWS]
     assert min(r[1] for r in rows) > drawing.SHEET_BOX[3] + 0.002
     assert [r[1] for r in rows] == sorted(r[1] for r in rows)

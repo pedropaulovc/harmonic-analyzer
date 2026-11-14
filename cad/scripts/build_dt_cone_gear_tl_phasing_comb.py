@@ -43,13 +43,21 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, dimension_between, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from dt_cone_gear_tl_phasing_comb_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GLOBALS,
     GRIP_POINT,
     RETURN_POINT,
+    SLOT_END_RADIUS_MM,
+    SLOT_POINT,
     ISOMETRIC_VIEW_NOTE,
     MATERIAL,
     ORIGIN,
@@ -88,10 +96,32 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     arm's end (from ``GRIP_POINT``) is collinear with the near arm's, so both
     arms' feet stand on T036 at the seat edge's station, and the near arm's
     edge past T006's level (from ``RETURN_POINT``) with the T030 blade's, on
-    the seat line."""
+    the seat line.  The slot's closed end (from ``SLOT_POINT``) is a full
+    round, tangent to both slot sides; ``lines`` maps each other segment's
+    index to its line."""
     points = profile_points_mm()
     check("create_sketch sheet profile", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(adapter, points)
+    count = len(points)
+    order = [(SLOT_POINT + 1 + k) % count for k in range(count)]
+    chain = await add_line_chain(adapter, [points[i] for i in order], close=False)
+    lines = dict(zip(order[:-1], chain, strict=True))
+    (top_x, top_y), (low_x, low_y) = points[SLOT_POINT], points[SLOT_POINT + 1]
+    set_sketch_direct_db(adapter, True)
+    try:
+        # Counter-clockwise from the spring arm's side round to the near arm's.
+        arc = check(
+            "sheet profile slot end",
+            await adapter.add_arc(
+                top_x, top_y - SLOT_END_RADIUS_MM, low_x, low_y, top_x, top_y
+            ),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    for side in (SLOT_POINT - 1, SLOT_POINT + 1):
+        check(
+            f"sheet profile slot end tangent to line {side}",
+            await adapter.add_sketch_constraint(arc, lines[side], "tangent"),
+        )
     collinear = {GRIP_POINT: 0, RETURN_POINT: 1}
     for index, other in collinear.items():
         check(
@@ -100,7 +130,7 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
                 lines[index], lines[other], "collinear"
             ),
         )
-    for index, line in enumerate(lines):
+    for index, line in lines.items():
         if index in collinear:
             continue
         (x0, y0), (x1, y1) = points[index], points[(index + 1) % len(points)]
@@ -119,7 +149,11 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     )
 
     def ref(point: str | int) -> str:
-        return ORIGIN if point == ORIGIN else f"{lines[point]}.start"
+        if point == ORIGIN:
+            return ORIGIN
+        if point == SLOT_POINT:
+            return f"{lines[SLOT_POINT - 1]}.end"
+        return f"{lines[point]}.start"
 
     dims = SketchDims()
     for name, start, end, kind in SKETCH_DIMENSIONS:
