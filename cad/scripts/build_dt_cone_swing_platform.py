@@ -903,10 +903,14 @@ async def build(adapter) -> dict[str, str]:
 
     # South-east corner chamfer (#1038): a triangle through the sharp corner,
     # the chamfer's start on the south edge and its end on the east edge,
-    # cut through.  The two printed legs are the run along the south edge
-    # from the sharp corner and the rise square to it; the end's set-back
-    # along the taper follows from them by equation, so the triangle's east
-    # side stays on the plate's east edge.  Sketch (x, y) -> part (X, -Z).
+    # cut through.  #2697 (machinist review of ecc864e1f, 2 of 3 runs): the
+    # start stands from the pivot-bore axis, the datum every other station of
+    # this edge uses, where its run from the sharp corner chained two bands;
+    # the geometry is unchanged.  The rise is square to the south edge; the
+    # end's set-back along the taper follows by equation, so the triangle's
+    # east side stays on the plate's east edge.  Sketch (x, y) -> part (X, -Z).
+    if SE_CHAMFER_SOUTH_XZ[0] <= 0.0:
+        raise AssertionError("the chamfer's start no longer stands west of the pivot axis")
     chamfer = SketchDims()
     check("create_sketch south-east chamfer", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -921,20 +925,23 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         chamfer_lines,
         chamfer_pts,
+        anchor=1,
         label="south-east chamfer",
         dims=chamfer,
         names=[
-            "CornerSEX",
+            "CornerSEStartX",
             "CornerSEZ",
-            "CornerSERun",
             "CornerSEBack",
             "CornerSERise",
+            "CornerSEEndX",
+            "CornerSEEndZ",
         ],
         drives=[
-            '"EastHalfS"',
+            '"SeChamferRun" - "EastHalfS"',
             '"PlateLen" - "NorthOverhang"',
-            '"SeChamferRun"',
             '"SeChamferRun" - "SeChamferRise" * ( "EastHalfS" - "HalfWidthN" ) / "PlateLen"',
+            '"SeChamferRise"',
+            '"SeChamferRise" * ( "EastHalfS" - "HalfWidthN" ) / "PlateLen"',
             '"SeChamferRise"',
         ],
     )
