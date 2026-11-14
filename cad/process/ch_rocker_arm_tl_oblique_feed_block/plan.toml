@@ -29,7 +29,7 @@ title = "Oblique trammel feed block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
-stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 12 in bar (OnlineMetals 1187, shared with TL-22); {{process.quantity:d}} blank {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × {{process.blank_length_in:.2f}} in."
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 12 in bar (OnlineMetals 1187, shared with TL-22); {{process.quantity:d}} blank {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × {{process.blank_length_in:.2f}} in; 1 spacer offcut {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × {{process.spacer_height_in:.2f}} in (the notch setup's)."
 note = "Inches. Every face machined. The {{cad.nut_tap_count:d}}X {{cad.nut_thread}} nut taps are transferred at TL-00 assembly, not here."
 shop = "../shop.toml"
 material_key = "6061-t6511"
@@ -53,19 +53,19 @@ end_layer_in = 0.05              # Facing layers on the tall ends (Setup 4).
 # cutter's edge at the 1.89 step .16-.26 clear of the jaw; 3.47 − 2.15 = 1.32
 # in stays gripped. The vise hold and the bending take the 2.15 worst case
 # (54.61 mm). The left jaw end holds a spacer across the jaws, matched to the
-# block's across-jaw size there, its height: an 1187 offcut faced at the
-# block's finish Z in "Face SEAT and TOP" and within .001 of it. The
-# finished TL-22 is not the spacer (Codjiflo, #2745): its .950-.970 height is
-# unmatched, and its SEAT and TOP would take the jaw load.
+# block's across-jaw size there, its height: a 1.58 offcut of the 1187 bar
+# (3 in bar width × 1.58 sawn), faced at the block's finish Z in "Face SEAT
+# and TOP" and within .001 of it, standing 1.58 high with the 3 in along the
+# jaws. The finished TL-22 is not the spacer (Codjiflo, #2745): its .950-.970
+# height is unmatched, and its SEAT and TOP would take the jaw load.
 notch_overhang_min_in = 2.05
 notch_overhang_max_in = 2.15
 notch_overhang_mm = 54.61
-spacer_length_in = 1.58         # The spacer offcut, along the bar and the jaws.
-spacer_length_mm = 40.132        # 1.58 × 25.4.
-# The spacer's match to the block's measured height, ±.001 about the .96
-# nominal: (.96 ∓ .001) × 25.4.
-spacer_match_low_mm = 24.3586
-spacer_match_high_mm = 24.4094
+spacer_length_in = 3.0          # Notch hold: along the jaws (the bar width).
+spacer_height_in = 1.58         # Sawn from the bar; upright in the notch hold.
+spacer_height_mm = 40.132        # 1.58 × 25.4: along the jaws when faced.
+# Faced flat and centred: (40.132 − 158.6738) / 2, rounded to .01 mm.
+spacer_centred_overhang_mm = -59.27
 # Machine-capacity inputs (mm). Heights are above the mill table; tool lengths
 # run from spindle nose to tip (holder gauge + projection). Archive values are
 # archive/pre-v0.10-2026-11-08 examples/inventory/pedro-shop.toml.
@@ -165,8 +165,8 @@ beam = "other"
 speed_kind = "other"
 tool = "saw"
 sizing = "other"
-instruction = "From the 1187 bar end: one {{process.blank_length_in:.2f}} blank, waste side of the line; ≥{{process.blank_min_length_in:.2f}}. Then one {{process.spacer_length_in:.2f}} spacer offcut."
-instruction_detailed = "Square the 1187 bar end first if it is rough. Mark {{process.blank_length_in:.2f}} from the end and saw on the waste side of the line (~{{process.kerf_in:fraction}} kerf); the blank must be at least {{process.blank_min_length_in:.2f}} long. Then saw one {{process.spacer_length_in:.2f}} offcut, the notch setup's spacer; it need not be square. The rest of the bar goes to TL-22."
+instruction = "From the 1187 bar end: one {{process.blank_length_in:.2f}} blank, waste side of the line; ≥{{process.blank_min_length_in:.2f}}. Then one {{process.spacer_height_in:.2f}} spacer offcut."
+instruction_detailed = "Square the 1187 bar end first if it is rough. Mark {{process.blank_length_in:.2f}} from the end and saw on the waste side of the line (~{{process.kerf_in:fraction}} kerf); the blank must be at least {{process.blank_min_length_in:.2f}} long. Then saw one {{process.spacer_height_in:.2f}} offcut, the notch setup's spacer; it need not be square. The rest of the bar goes to TL-22."
 feed = "hand"
 
 [[setups]]
@@ -178,7 +178,11 @@ machine_ref = "pm-30mv"
 holding = "Flat on 1 in parallels, as-bought 3 in edges in the jaws, centred."
 diagram = { file = "diagrams/feed-block/faces.svg", alt = "Blank flat in the vise: clean one face (SEAT), flip, face TOP to height" }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
-vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_blank_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+# Two holds: the blank, then the spacer offcut in its place (its last op).
+vise_hold = [
+  { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_blank_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
+  { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.spacer_height_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{process.spacer_centred_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
+]
 # The whole blank lies inside the jaw span: no station bends.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = [0, "{{cad.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" } }
 
@@ -209,14 +213,16 @@ speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
 instruction = "Spacer: the offcut on the same parallels; face it at the block's finish Z, unmoved; caliper it within .001 of the block's height."
-instruction_detailed = "The spacer balances the vise in the notch setup; the finished TL-22 is not used. Leave the knee locked and the DRO Z where the block's finish pass ran. Unclamp the block and clamp the spacer offcut in its place, flat on the same parallels, its as-bought 3 in edges in the jaws; tap it down until both parallels are pinned. Take a rough pass about .010 above the finish Z, then the finish pass at the block's finish Z: the spacer comes out at the block's height over the same parallels. Caliper the block and the spacer at both ends: the spacer must be within .001 of the block. If it is thick, take another .001–.002; if it is thin, make it up with shim stock between the spacer and the moving jaw in the notch setup. Mark it SPACER."
+instruction_detailed = "The spacer balances the vise in the notch setup; the finished TL-22 is not used. Leave the head and quill locked, Z where the block's finish pass ran. Unclamp the block and clamp the spacer offcut in its place, flat on the same parallels, its as-bought 3 in edges in the jaws; tap it down until both parallels are pinned. Take a rough pass about .010 above the finish Z, then the finish pass at the block's finish Z: the spacer comes out at the block's height over the same parallels. Caliper the block and the spacer at both ends: the spacer must be within .001 of the block. If it is thick, take another .001–.002; if it is thin, make it up with shim stock between the spacer and the moving jaw in the notch setup. Mark it SPACER."
 milling_cuts = [
-  { name = "spacer rough", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{process.spacer_length_mm}}"] },
-  { name = "spacer finish", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{process.spacer_length_mm}}"] },
+  { name = "spacer rough", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{process.spacer_height_mm}}"] },
+  { name = "spacer finish", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{process.spacer_height_mm}}"] },
 ]
 settings = "block-em-half-6061-t6511"
-inspection = "Spacer within .001 of the block's height."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.spacer_match_low_mm}}", "{{process.spacer_match_high_mm}}"] }]
+# The spacer stands in the vise alone: its own section and grip.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.spacer_height_mm}}"], clamp_mm = [0, "{{process.spacer_height_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" } }
+inspection = "Spacer within .001 of the block's height, both in {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.height_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
@@ -418,7 +424,7 @@ speed_kind = "spindle"
 tool = "em-3-8"
 sizing = { kind = "band", band_mm = "{{cad.screw_dia_band_mm}}" }
 instruction = "3/8 end mill miked ≥.3750; plunge to Z −{{process.lug_bore_depth_in:.2dot}} in .25 pecks, full retract after each: Ø{{cad.screw_dia_min_in:.3dot}}–{{cad.screw_dia_max_in:.3dot}}."
-instruction_detailed = "Change to the 3/8 end mill, table still locked; it must mike .3750 or more across its flutes. Touch OUTER END with it and zero Z. Plunge it down the pilot in pecks of about .25 (Z −.25, −.50, −.75, then −{{process.lug_bore_depth_in:.2dot}}), retracting it fully out of the hole after each and brushing the chips off: its 3/8 shank follows the flutes into the hole, closing it above them, so the chips leave only on a retract. The cutter sizes the hole: the .375 pin enters full depth, the .379 does not."
+instruction_detailed = "Change to the 3/8 end mill, table still locked; it must mike .3750 or more across its flutes. Touch OUTER END with it and zero Z. Plunge it down the pilot to Z −{{process.lug_bore_depth_in:.2dot}} in pecks of about .25, retracting it fully out of the hole after each and brushing the chips off: its 3/8 shank follows the flutes into the hole, closing it above them, so the chips leave only on a retract. The cutter sizes the hole: the .375 pin enters full depth, the .379 does not."
 milling_cuts = [{ name = "leadscrew clearance", kind = "plunge", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 9.525, stations_mm = "{{cad.length_mm}}" }]
 rpm = 1650
 feed = "hand"
@@ -431,7 +437,7 @@ title = "Mill the lug notch"
 machine = "PM-30MV / 6 in vise"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "On edge, OUTER END down on 1/2 in parallels, TOP at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; the spacer (faced with the block, within .001 of its height) across the jaws at the left jaw end, faced sides against the jaws; not TL-22."
+holding = "On edge, OUTER END down on 1/2 in parallels, TOP at the fixed jaw; LUG END {{process.notch_overhang_min_in:.2f}}–{{process.notch_overhang_max_in:.2f}} past the right jaw side, measured; the spacer offcut (faced with the block, within .001 of its height) at the left jaw end, 3 in along the jaws, its faced and as-bought faces against the jaws; not TL-22."
 datum = "X0 LUG END (touched), +X into the part; Y0 TOP = fixed jaw face, +Y toward you; Z0 SPINDLE END (touched with the cutter)."
 diagram = { file = "diagrams/feed-block/notch.svg", alt = "Front view, moving jaw not shown: the block on edge, LUG END past the right jaw side, the notch cut down from SPINDLE END to the lug face" }
 # The cutter works only past the jaw side: along the lug plus a cutter
