@@ -1,7 +1,7 @@
 """TL-22: one plain shoulder-screw block on rail 2.
 
 Frame: carriage-pattern centre, bottom Z0; +X away from spindle. New
-6061 1 x 3-1/2 inch stock is shared with TL-32. No cartridge hardware.
+6061 1 x 3 inch stock is shared with TL-32. No cartridge hardware.
 The print locates every X from the -X (left) edge and every Y from the -Y
 edge, never from the frame centre or chained through the seat:
 ``PLAN_DATUM_REFERENCE`` carries those ordinates, ``BlockSideY`` the seat's Y.
@@ -15,10 +15,11 @@ three-place rounding of their exact vendor offsets from the -X and -Y edges.
 
 The seat takes the TL-VN-77 inch shoulder screw (owner ruling 2026-10-30: the
 metric shop tap becomes an extended-thread 5/16-18 precision shoulder screw): a
-.3755-.3765 seat bored flat-bottomed (#2445: the shoulder bottoms on its
-square floor, which a reamer's lead cannot finish), and a 5/16-18 tap through
-below it. The shop cuts the screw's thread to length so that its full-form
-engagement meets 1.5D and its tip stands inside the block at every band.
+.375 flat-bottomed seat under the title block's DRILLED HOLES band (owner
+ruling 2026-11-13: a jig part, loosened from #2445's .3755-.3765 BORE; the
+shoulder bottoms on its square floor), and a 5/16-18 tap through below it.
+The shop cuts the screw's thread to length so that its full-form engagement
+meets 1.5D and its tip stands inside the block at every band.
 
 The four M4 carriage screws are cut to fit at assembly (owner ruling
 2026-11-01, option A): each is cut to its own measured counterbore floor, so
@@ -37,7 +38,7 @@ from _hole_spec import TAP_DRILL_MM
 from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_91290a168 import DIMS as CARRIAGE_SCREW
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm, printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
 UNIT = drawing_unit(
@@ -55,27 +56,38 @@ BLOCK_LENGTH = 2 * PLAN_BORE_X  # 1.64
 BLOCK_X1 = BLOCK_X0 + BLOCK_LENGTH
 BLOCK_WIDTH = 40.132  # 1.58
 BLOCK_HEIGHT = 24.384  # .96
-STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
+# OnlineMetals 1187, 1 x 3 in: the 1.64 length is milled from the 3 in width
+# and the 1.58 (TL-32: 3.47) runs along the bar (#2083).
+STOCK_THICKNESS, STOCK_WIDTH = 25.4, 76.2
 # The TL-VN-77 shoulder bottoms on the seat floor, so the 3-place depth sets
 # how high the screw stands, hence the head-to-carrier gap the assembly's
 # shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``). Shallow
 # enough that the unshimmed gap is open at every band; shims, which only
 # close it, are the fitting adjustment.
 BORE_DIA = 9.525  # .375
-# Bored to a flat floor (#2445), not reamed: a .001 total band, the shop's
-# bored/turned-diameter row (drawing-guidelines "What the shop holds"), set
-# from .0005 over the shoulder's max (it still enters by hand) to the old
-# reamed .3765 top, so the locating clearance stays .0025 max.
-BORE_BAND = (0.0381, 0.0127)  # +.0015/+.0005: .3755-.3765
-BORE_PLACES = 4
+# Owner ruling 2026-11-13 (a jig part: title-block bands, simplest geometry):
+# a plain .375 flat-bottomed seat under the title block's DRILLED HOLES row,
+# .375-.379, loosened from #2445's .3755-.3765 BORE. The bought shoulder
+# (.374-.375) enters at every band, and still bottoms on the square floor.
+BORE_PLACES = 3
+# The DRILLED HOLES row from _printed_tolerance: _printed_limits (the
+# manifest's reader) stays out of native closures.
+BORE_LIMITS = (
+    round(BORE_DIA - drilled_undersize_mm(unit=UNIT), 12),
+    round(BORE_DIA + drilled_oversize_mm(unit=UNIT), 12),
+)
+# The seat prints that band as its own native tolerance (+.004/0): a
+# counterbore diameter would otherwise read at the .XXX general grade
+# (.370-.380), and the shoulder's fit is line to line at .375.
+BILATERAL_DIMENSIONS = {("TopBoreProfile", "BoreDia"): (BORE_LIMITS[0] - BORE_DIA, BORE_LIMITS[1] - BORE_DIA)}
 BORE_DEPTH = 9.1186  # .359
-_bore_lower, _bore_upper = deviations(BORE_BAND)
 _shoulder_lower, _shoulder_upper = deviations(pivot_screw.SHOULDER_DIA_BAND)
-BORE_LIMITS = (BORE_DIA + _bore_lower, BORE_DIA + _bore_upper)
 PIVOT_LOCATING_CLEARANCE_MIN = BORE_LIMITS[0] - (pivot_screw.SHOULDER_DIA + _shoulder_upper)
 PIVOT_LOCATING_CLEARANCE_MAX = BORE_LIMITS[1] - (pivot_screw.SHOULDER_DIA + _shoulder_lower)
-if PIVOT_LOCATING_CLEARANCE_MIN <= 0.0:
-    raise AssertionError("purchased pivot shoulder does not clear its block seat")
+# At the shoulder's .375 maximum in the seat's .375 minimum the fit is line to
+# line (the .375 GO pin's): it still enters, never by interference.
+if PIVOT_LOCATING_CLEARANCE_MIN < 0.0:
+    raise AssertionError("purchased pivot shoulder interferes with its block seat")
 PIVOT_TAP = pivot_screw.THREAD
 PIVOT_TAP_DRILL = TAP_DRILL_MM[PIVOT_TAP]
 PIVOT_THREAD_LENGTH = BLOCK_HEIGHT - BORE_DEPTH
@@ -221,7 +233,7 @@ PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("BlockHeight")
                            - (BORE_DEPTH + _band("TopBoreDepth")) - _CUT_MAX)
 CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
-    "BoreDia": "BORE", "TapDrillDia": "DRILL THRU",
+    "BoreDia": "FLAT BOTTOM", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
     "CarriageCounterbores3Dia": "4X COUNTERBORE FROM TOP",
 }

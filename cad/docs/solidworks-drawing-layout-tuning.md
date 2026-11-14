@@ -449,12 +449,13 @@ expanded source-caption block with a **plain, four-line spec-generated
 note**, explicitly sized to the normal **3.5 mm** note height through
 `_size_note`. The later relocation below keeps that height and all geometry guards.
 
-`_pivot_stack_text` formats the bore diameter, seat depth and tap-drill
-diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places;
-the signed upper/lower deviations come from `BORE_BAND` at `BORE_PLACES`,
-and the thread identity comes from `PIVOT_TAP`. The rows are REAM size/band/
-depth, the short TL-VN-77 locating-fit qualifier, DRILL size THRU, and the
-thread BELOW SEAT. No geometry number is copied into the recipe. Native
+`_pivot_stack_text` formats the seat diameter, seat depth and tap-drill
+diameter from `DRAWING_VALUES` at `DRAWING_PRECISION_BY_NAME` places; the
+seat's `+.004/0` band comes from `BILATERAL_DIMENSIONS` (the DRILLED HOLES row,
+set on `BoreDia` as a native bilateral tolerance), and the thread identity
+comes from `PIVOT_TAP`. The rows are DRILL size THRU, the UNC THRU thread,
+the counterbore symbol with seat size, band and depth, and the LOCATING FIT ON
+TL-VN-77 SHOULDER row (rule 4's fit name for the tight band). No geometry number is copied into the recipe. Native
 dimension-link properties, split-STACK parsing and the carrier-table
 semantic-parser dependency are removed.
 

@@ -218,15 +218,13 @@ feed = "3 in/min"
 # Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
 # Number and letter drills are the 115-piece index's (jig-drill-11-32);
 # diameter_mm and tap_drill_mm are the standard nominal sizes × 25.4: #43
-# .089 (4-40 tap drill), F .257 (5/16-18 tap drill), 23/64 .3594 (reamer
-# pilot). The .3760 reamer is the owned over reamer named in
+# .089 (4-40 tap drill), 23/64 .3594 (reamer pilot); the F drill and 5/16-18
+# plug tap are the blocks' records (tools.jig-drill-f, jig-tap-5-16-18-plug).
+# The .3760 reamer is the owned over reamer named in
 # cad/scripts/_fit_ream_slide.py (REAM_SLIDE); its cutting size is its nominal.
 [tools.jig-drill-43]
 description = "#43 (.089 in) drill, 115-piece index"
 diameter_mm = 2.2606
-[tools.jig-drill-f]
-description = "F (.257 in) drill, 115-piece index"
-diameter_mm = 6.5278
 [tools.jig-drill-23-64]
 description = "23/64 (.3594 in) drill, 115-piece index"
 diameter_mm = 9.128125
@@ -236,9 +234,6 @@ diameter_mm = 9.5504
 [tools.jig-tap-4-40-plug]
 description = "4-40 UNC plug tap; T-handle wrench"
 tap_drill_mm = 2.2606
-[tools.jig-tap-5-16-18-plug]
-description = "5/16-18 UNC plug tap; T-handle wrench"
-tap_drill_mm = 6.5278
 
 # PM-30MV Y DRO scale read as a length gauge (carrier A2/B2 rows from the
 # A1-B1 line, read over a pin with the DTI). Range: machines.pm-30mv Y travel;
@@ -273,6 +268,52 @@ description = "3/8 in 82° countersink"
 # in the PM-30MV high belt range (1400-3000 rpm) with Setups 4-5's drills, so
 # no belt change: 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
 [settings.riser-em-half-6061-t6511]
+tool = "jig-em-half"
+material = "6061-t6511"
+rpm = 1800
+feed = "8 in/min"
+
+# Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
+# and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
+# 6784 set's 1/2 in: every facing cut), jig-spot and basebar-counterbore (the
+# set's 5/16 in end mill: the counterbores). The drills are the 115-piece index
+# sizes the sheets print (#15 .180, F .257 tap drill); the 5/16 drill pilots
+# the Ø.375 leadscrew clearance. jig-drill-f and jig-tap-5-16-18-plug are the
+# carrier's (TL-21) records, byte-identical: keep one copy when both land.
+# block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
+# endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
+# TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
+# ruling 2026-11-13).
+# block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
+# flute (owner 2026-11-13), which reaches the .87 depth of TL-32's lug notch.
+[tools.block-drill-15]
+description = "#15 (.180 in) drill, 115-piece index"
+diameter_mm = 4.572
+[tools.jig-drill-f]
+description = "F (.257 in) drill, 115-piece index"
+diameter_mm = 6.5278
+[tools.block-drill-5-16]
+description = "5/16 in drill, 115-piece index"
+diameter_mm = 7.9375
+[tools.jig-tap-5-16-18-plug]
+description = "5/16-18 UNC plug tap; T-handle wrench"
+tap_drill_mm = 6.5278
+[tools.block-em-3-8]
+description = "3/8 in centre-cutting 2-flute end mill (LMS 6784 set)"
+diameter_mm = 9.525
+[tools.block-em-half-long]
+description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
+diameter_mm = 12.7
+
+# Both 1/2 in end mills (blind review 2026-11-14): 1800 rpm = 236 ft/min in
+# the PM-30MV high belt range with the drills, so no belt change; 8 in/min /
+# (1800 × 2) = .0022 in/tooth, a chip that cuts rather than rubs in 6061.
+[settings.block-em-half-long-6061-t6511]
+tool = "block-em-half-long"
+material = "6061-t6511"
+rpm = 1800
+feed = "8 in/min"
+[settings.block-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800

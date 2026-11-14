@@ -33,7 +33,6 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_types import layout_report_path
 from _drawing_view_display import set_hidden_lines_removed
-from _fit_deviations import deviations
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _drawing_metric_vendor import print_imported_metric_dimensions
@@ -133,6 +132,12 @@ FLOOR_CUT_BOTTOM_OVERRUN_MM = 16.0
 SECTION_LETTER_HEIGHTS = (.005, .0045, .004, .0035, .003)
 SECTION_LETTER_CLEARANCE = .001
 _PREF_SECTION_ARROW = {27: .0025, 28: .001, 29: .0035}
+# TL-32's lower B stood on the .87's -X extension line with those 3.5 mm
+# arrows (machinist review, farm run 20261114T004142081Z): shorter arrows
+# bring each letter toward its cutting line, and _require_letter_right_of
+# checks the lower B against that extension line.
+FEED_SECTION_ARROW_LENGTH = .0015
+SECTION_LETTER_EDGE_CLEARANCE = .0005
 _PREF_OPTION_NONE = 0
 # The 1:1 pictorial's top vertex touched the border at y .235 (review of farm
 # run 20261027T181901497Z); 7 mm lower it stays clear of B-B's 24.30 (y 175).
@@ -227,8 +232,19 @@ PIVOT_STACK_LANE = (.185, .100, .312, .130)
 
 def _pivot_stack_semantics(text):
     """Plain note rows: retain numbers, signs and precision; normalize whitespace/symbols."""
-    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>')
+    text = text.replace('Ø', '<MOD-DIAM>').replace('↧', '<HOLE-DEPTH>').replace('⌴', '<HOLE-SPOT>')
     return tuple(' '.join(row.split()) for row in text.splitlines())
+
+
+def _seat_band_text(contract):
+    """The seat's native band as printed: ``+.004/0`` (a nil limit is a bare 0,
+    as the title block's DRILLED HOLES row)."""
+    lower, upper = contract.BILATERAL_DIMENSIONS[('TopBoreProfile', 'BoreDia')]
+    places = contract.DRAWING_PRECISION_BY_NAME['BoreDia']
+    if upper <= 0 or lower > 0:
+        raise RuntimeError('pivot seat band must be an upper (+) and a lower (-/0) deviation')
+    low = '0' if lower == 0 else '-' + render_number(round(-lower / MM_PER_INCH, places), 'in', places)
+    return f'+{render_number(round(upper / MM_PER_INCH, places), "in", places)}/{low}'
 
 
 def _pivot_stack_text(contract):
@@ -240,21 +256,17 @@ def _pivot_stack_text(contract):
     def size(name):
         return render_number(round(contract.DRAWING_VALUES[name] / MM_PER_INCH, places[name]), 'in', places[name])
 
-    def signed(mm):
-        magnitude = render_number(round(abs(mm) / MM_PER_INCH, contract.BORE_PLACES), 'in', contract.BORE_PLACES)
-        return ('-' if mm < 0 else '+') + magnitude
-
-    lower, upper = deviations(contract.BORE_BAND)
-    # BORE, not REAM (#2445): the shoulder bottoms on the seat's square
-    # floor, which a reamer's 45° lead cannot reach at full diameter and a
-    # 3/8 end mill reaches only under the shoulder's size; a boring bar
-    # sizes the wall and squares the floor in one pass. Size first, then
-    # the process word (rule 26), as the sheet's 4X DRILL callout reads.
+    # A plain .375 under DRILLED HOLES (owner ruling 2026-11-13, loosened
+    # from #2445's BORE): the shoulder bottoms on its square floor. Standard
+    # counterbored-hole form (rule 26, machinist review be53204cdd): the
+    # through hole and its thread, then the counterbore by symbol with its
+    # own band (a counterbore otherwise reads at .XXX), then the fit that
+    # band makes on its mate, by rule 4's standard name (rule 7).
     return (
-        f'<MOD-DIAM>{size("BoreDia")} {signed(upper)}/{signed(lower)} BORE <HOLE-DEPTH>{size("TopBoreDepth")}\n'
-        '  LOCATING FIT, TL-VN-77 SHOULDER\n'
         f'<MOD-DIAM>{size("TapDrillDia")} DRILL THRU\n'
-        f'{contract.PIVOT_TAP} UNC TAP THRU BELOW SEAT'
+        f'{contract.PIVOT_TAP} UNC THRU\n'
+        f'<HOLE-SPOT><MOD-DIAM>{size("BoreDia")} {_seat_band_text(contract)} <HOLE-DEPTH>{size("TopBoreDepth")}\n'
+        'LOCATING FIT ON TL-VN-77 SHOULDER'
     )
 
 
@@ -265,7 +277,7 @@ def _pivot_stack_estimate(text):
     row pitch and 1 mm all-round bearing/ink padding. Symbols count as one
     glyph. At the current spec: [189,103.7]..[306.5,126] mm, 3.7 mm minimum air.
     """
-    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧')
+    glyphs = text.replace('<MOD-DIAM>', 'Ø').replace('<HOLE-DEPTH>', '↧').replace('<HOLE-SPOT>', '⌴')
     if len(glyphs.splitlines()) != 4:
         raise RuntimeError('pivot stacked callout must remain four short lines')
     box = estimate_text_box(glyphs, anchor=PIVOT_STACK_XY, height=PIVOT_NOTE_HEIGHT,
@@ -316,15 +328,14 @@ def _stack_pivot_callout(adapter, plan, annotations, contract, printed=None):
         if int(ann.OwnerType) != 0 or ann.IsDangling():
             raise RuntimeError(f'{name}: source is not a live drawing-view dimension')
         sources[name] = (_early_bound(display.GetDimension2(0), 'IDimension'), state)
-    bore_state = sources['BoreDia'][1]
-    tolerance_kind, lower, upper = bore_state[5]
-    tolerance_places = bore_state[3] if bore_state[4] == -3 else bore_state[4]
-    expected_lower, expected_upper = deviations(contract.BORE_BAND)
-    if (tolerance_kind != 2 or not all(math.isfinite(v) for v in (lower, upper))
-            or tolerance_places != contract.BORE_PLACES
-            or not math.isclose(lower * 1000, expected_lower, rel_tol=0, abs_tol=1e-6)
-            or not math.isclose(upper * 1000, expected_upper, rel_tol=0, abs_tol=1e-6)):
-        raise RuntimeError('BoreDia: native locating-fit band disagrees with the generated spec band')
+    # The seat carries its own DRILLED HOLES band (owner ruling 2026-11-13) as
+    # a native bilateral tolerance; the depth's .XXX and the drill's DRILLED
+    # HOLES print under the title block.
+    lower, upper = contract.BILATERAL_DIMENSIONS[('TopBoreProfile', 'BoreDia')]
+    seat_type, seat_min, seat_max = sources['BoreDia'][1][5]
+    if (seat_type != 2 or not math.isclose(seat_min * 1000, lower, rel_tol=0, abs_tol=1e-6)
+            or not math.isclose(seat_max * 1000, upper, rel_tol=0, abs_tol=1e-6)):
+        raise RuntimeError(f'pivot stacked callout: seat band {sources["BoreDia"][1][5]!r} is not the spec band')
     if any(sources[name][1][5][0] != 0 for name in ('TopBoreDepth', 'TapDrillDia')):
         raise RuntimeError('pivot stacked callout: unexpected explicit depth/drill tolerance')
 
@@ -528,7 +539,7 @@ def _inch_ref(mm: float) -> str:
 # (rule 7). The floor keeps the RV-01 fact, worded as RV-01's ``where``.
 _HOLES = f'{len(part.BOLT_POINTS)}X'
 BLOCK_CALLOUTS = {
-    'BoreDia': {'suffix': f' BORE <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
+    'BoreDia': {'prefix': '<HOLE-SPOT><MOD-DIAM>', 'suffix': f' <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
                 'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',
@@ -707,11 +718,12 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     _telemetry.info(f'{label}: box {extent!r}')
 
 
-def _set_section_arrows(adapter) -> None:
+def _set_section_arrows(adapter, arrow_length=None) -> None:
     """Set this document's cutting-line arrow sizes, read back, raise on
     mismatch (draw_dt_cone_gear_shaft._pin_witness_line_extension)."""
     extension = _early_bound(adapter.currentModel, 'IModelDoc2').Extension
-    for key, value in _PREF_SECTION_ARROW.items():
+    prefs = _PREF_SECTION_ARROW | ({29: arrow_length} if arrow_length is not None else {})
+    for key, value in prefs.items():
         before = float(extension.GetUserPreferenceDouble(key, _PREF_OPTION_NONE))
         ok = extension.SetUserPreferenceDouble(key, _PREF_OPTION_NONE, value)
         applied = float(extension.GetUserPreferenceDouble(key, _PREF_OPTION_NONE))
@@ -727,6 +739,20 @@ def _set_section_letter_height(adapter, dr, height: float) -> None:
     if not dr.SetTextFormat(False, text_format):
         raise RuntimeError(f'section {dr.GetLabel()!r}: letter height {height} refused')
     rebuild_drawing(adapter, label='section letter height')
+
+
+def _require_letter_right_of(view, x_min: float) -> None:
+    """The section's lower cutting-line letter must start right of ``x_min``
+    (sheet m): TL-32's lower B clear of the .87's -X extension line."""
+    cut = _early_bound(_early_bound(view, 'IView').GetSection(), 'IDrSection')
+    info = [float(v) for v in (cut.GetTextInfo() or ())]
+    if len(info) < 6:
+        raise RuntimeError(f'section {cut.GetLabel()!r}: unreadable letter positions {info!r}')
+    lower = min((info[0:3], info[3:6]), key=lambda point: point[1])
+    _telemetry.info(f'section {cut.GetLabel()!r} lower letter top-left {lower!r}, x min {x_min!r}')
+    if lower[0] < x_min:
+        raise RuntimeError(f'section {cut.GetLabel()!r}: lower letter starts at x {lower[0]!r}, '
+                           f'on or left of the extension line clearance {x_min!r}')
 
 
 def _fit_section_letters(adapter, fitted, matched, *, below_y: float) -> None:
@@ -794,7 +820,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
     # Each cutting line runs so its arrows point away from the section it
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
     # left. A-A stays short; B-B's ends use the reserved annotation lanes.
-    _set_section_arrows(adapter)
+    _set_section_arrows(adapter, FEED_SECTION_ARROW_LENGTH if is_feed else None)
     _pin_sheet_scale(adapter, SHEET_SCALE)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(part.BLOCK_X1+4,0,contract.BLOCK_HEIGHT),'pivot cut start'),
@@ -833,6 +859,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None, ca
                                   SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
+    if is_feed:
+        edge = _project(adapter,plan,(part.BLOCK_X0,-part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'-X edge foot')
+        _require_letter_right_of(floor, edge[0] + SECTION_LETTER_EDGE_CLEARANCE)
     annotations += curate_view_dimensions(adapter,floor,keep=floor_keep,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     right_keep = {}

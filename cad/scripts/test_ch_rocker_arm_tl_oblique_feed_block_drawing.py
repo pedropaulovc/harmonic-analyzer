@@ -14,7 +14,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
 FOLDER = Path(__file__).parent
@@ -46,7 +46,7 @@ def test_identity_stock_and_common_pivot_interface():
     assert math.isclose(spec.LUG_X1-spec.LUG_X0,spec.LUG_WIDTH)
     assert spec.BLOCK_X0<spec.LUG_X0<spec.LUG_X1==spec.BLOCK_X1
     assert math.isclose(spec.BLOCK_WIDTH/2-spec.LUG_Y0,spec.PLAN_OVERALL_Y)
-    assert spec.PLAN_OVERALL_Y<pivot.STOCK_WIDTH
+    assert spec.BLOCK_LENGTH<pivot.STOCK_WIDTH<spec.PLAN_OVERALL_Y
     assert spec.LUG_Y1==-spec.BLOCK_WIDTH/2
 
 
@@ -124,8 +124,10 @@ def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
     assert spec.NUT_FACE_X==spec.LUG_X1
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
-    assert math.isclose(spec.SCREW_CLEARANCE_DIA,.351*INCH)
-    assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(3,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
+    # Owner ruling 2026-11-13: a plunged 3/8 end mill under DRILLED HOLES,
+    # whose least size is its nominal.
+    assert math.isclose(spec.SCREW_CLEARANCE_DIA,.375*INCH)
+    assert spec.SCREW_CLEARANCE_DIA>lead.SCREW_MAJOR_DIA
     assert set(spec.DRAWING_DIMENSIONS)>={'NutClearanceProfile','NutPatternReference'}
     # Option B: the faced nut seats flat (no recess) and the countersunk
     # heads key it (no dowel hole).
@@ -172,16 +174,17 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert spec.NUT_HOLES_YZ[index][1]==max(z for _y,z in spec.NUT_HOLES_YZ)
 
 
-def test_clearance_is_the_smallest_three_place_drill_over_the_vertical_stack():
-    # TL-28's as-bought 1 in (±.012) and the clearance's own 12.400 ±.05 mm
-    # (owner ruling 2026-11-08, A2 option (i)) put the leadscrew up to .355 mm
-    # off the clearance's axis (Codjiflo P1 on #2112); laterally ±.002.
-    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+.05)
-    assert math.isclose(spec.LEADSCREW_OFFSET_Y,.002*INCH)
-    assert spec.LEADSCREW_RADIAL_CLEARANCE>spec.LEADSCREW_OFFSET
-    # Ø.350 would not clear the as-bought stack at the title block's bands.
+def test_clearance_clears_the_vertical_stack_at_title_block_stations():
+    # TL-28's as-bought 1 in (±.012) and the clearance's own 12.400 ±.13 mm
+    # (owner ruling 2026-11-13: title-block stations) put the leadscrew up to
+    # .435 mm off the clearance's axis (Codjiflo P1 on #2112); laterally ±.005.
     title_block=math.hypot(printed_band_mm(3,unit=spec.UNIT),.012*INCH+printed_band_mm(3,unit='mm'))
-    assert (.350*INCH-lead.SCREW_MAJOR_DIA)/2<title_block
+    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+.13)
+    assert math.isclose(spec.LEADSCREW_OFFSET_Y,.005*INCH)
+    assert math.isclose(spec.LEADSCREW_OFFSET,title_block)
+    assert spec.LEADSCREW_RADIAL_CLEARANCE>spec.LEADSCREW_OFFSET
+    # The retired Ø.351 ±.005 would not clear the stack at these stations.
+    assert (.346*INCH-lead.SCREW_MAJOR_DIA)/2<title_block
 
 
 def test_transfer_spot_enters_every_hole_and_the_heads_clear_the_nut_body():
@@ -216,11 +219,12 @@ def test_transfer_spot_enters_every_hole_and_the_heads_clear_the_nut_body():
 
 
 def test_rv04_ruling_states_the_computed_walls():
-    # The owner's ruling text carries the spec's worst-case and nominal walls:
-    # only the worst case falls under the .080 target.
+    # The owner's exception carries the spec's worst-case and nominal walls:
+    # the worst case under the .060 floor, the nominal over it (owner
+    # 2026-11-13).
     [rv04]=[e for e in _config.parts(spec.PART_NAME)['machinist_exceptions'] if e['id']=='RV-04']
     nominal_mm=feed_nut.HOLE_PCD/2-THREAD_MAJOR_MM['#4-40']/2-spec.SCREW_CLEARANCE_DIA/2
-    assert WALL_FLOOR_MM<=spec.NUT_WALL_MIN_MM<WALL_TARGET_MM<=nominal_mm
+    assert spec.NUT_WALL_ACCEPTED_MM<=spec.NUT_WALL_MIN_MM<WALL_FLOOR_MM<=nominal_mm<WALL_TARGET_MM
     def inch(mm): return f'{math.floor(mm/INCH*1000+1e-9)/1000:.3f}'.lstrip('0')
     assert f'wall {inch(spec.NUT_WALL_MIN_MM)} in ({spec.NUT_WALL_MIN_MM:.2f} mm)' in rv04['reason']
     assert f'{inch(nominal_mm)} nominal' in rv04['reason']
@@ -231,41 +235,42 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     walls=spec.LUG_WALLS_MM
     clearance=walls['taps to the leadscrew clearance']
     assert clearance==min(walls.values())==spec.NUT_WALL_MIN_MM
-    assert WALL_FLOOR_MM<=clearance<WALL_TARGET_MM
+    assert spec.NUT_WALL_ACCEPTED_MM<=clearance<WALL_FLOOR_MM
     assert all(v>=WALL_TARGET_MM for k,v in walls.items() if k!='taps to the leadscrew clearance')
     # The radial wall at the clocking limit: the offset's largest component
     # along a tap at 50° from the lug's Y axis, the tap at its least radius,
     # less rule 17's 0.3° wander over the .770 THRU tap (machinist review,
-    # farm r1 20261107T221729532Z; owner ruling 2026-11-08, A2 option (i)).
+    # farm r1 20261107T221729532Z), at title-block stations.
     a=math.radians(spec.NUT_CLOCK_DEG+spec.NUT_CLOCK_TOL_DEG)
     toward=spec.LEADSCREW_OFFSET_Y*math.cos(a)+spec.LEADSCREW_OFFSET_Z*math.sin(a)
     radius=feed_nut.HOLE_PCD/2-feed_nut.HOLE_STATION_BAND-spec.FIT_UP_RESIDUAL
-    # Bored at its ±.002 station: the size takes the title block's ±.005.
-    assert spec.NUT_CLEARANCE_PROCESS=='BORE'
-    clearance_r=(spec.SCREW_CLEARANCE_DIA+printed_band_mm(3,unit=spec.UNIT))/2
+    # The plunged Ø.375 at its DRILLED HOLES maximum (owner ruling 2026-11-13).
+    clearance_r=(spec.SCREW_CLEARANCE_DIA+drilled_oversize_mm(unit=spec.UNIT))/2
     wander=spec.LUG_WIDTH*math.tan(math.radians(.3))
     assert math.isclose(spec.NUT_TAP_WANDER,wander)
     expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r
     assert math.isclose(clearance,expected)
-    assert round(clearance/INCH,4)==.0601
-    assert spec.NUT_WALL_MIN_TEXT=='WALL .060 MIN TO TAPS'
+    assert round(clearance/INCH,4)==.0443
+    assert spec.NUT_WALL_MIN_TEXT=='WALL .044 MIN TO TAPS'
     assert spec.NUT_WALL_MIN<=clearance
-    # Negative control: at the title block's ±.005 / ±.13 mm stations the
-    # wander puts the wall under the .060 floor.
-    loose=printed_band_mm(3,unit=spec.UNIT)*math.cos(a)+(.012*INCH+.13)*math.sin(a)
-    assert radius-loose-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r<WALL_FLOOR_MM
+    # Negative control: even the retired ±.002 / ±.05 mm stations leave the
+    # Ø.375 under the .060 floor, so the exception is the size's, not the
+    # stations'.
+    tight=.002*INCH*math.cos(a)+(.012*INCH+.05)*math.sin(a)
+    assert radius-tight-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r<WALL_FLOOR_MM
 
 
 def test_view_d_prints_size_then_process_names_the_leadscrew_and_bare_locations():
     # Machinist review of the 957501d1 sheet 2: 'DRILL THRU' printed above
-    # Ø.351 (rule 26); the mate was 'LEADSCREW' and 'KP08' (rule 4); the
+    # the clearance (rule 26); the Ø.375 names no process (owner ruling
+    # 2026-11-13); the mate was 'LEADSCREW' and 'KP08' (rule 4); the
     # .515 and 12.400 mm locations carried words (rule 7). The sheet text is
     # drawing-side, over the saved model's superseded CALLOUTS_*.
     import draw_ch_rocker_arm_tl_oblique_feed_block as draw
     assert draw.LEADSCREW_MATE=='TL-VN-84 LEADSCREW'
     assert f'MHA-CH-06-{draw.LEADSCREW_MATE}'.startswith(feed_nut.NUMBER)
     assert draw.CALLOUTS=={
-        'NutClearanceDia':{'suffix':' BORE THRU','above':'',
+        'NutClearanceDia':{'suffix':' THRU','above':'',
                            'below':f'FOR TL-VN-84 LEADSCREW\n{spec.NUT_WALL_MIN_TEXT}'},
         'NutCentreY':{'above':'','below':''},
         'NutCentreZ':{'above':'','below':''},
@@ -453,14 +458,14 @@ def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_brac
 
 def test_only_the_kp08_axis_height_prints_exact_millimetres():
     # Owner ruling 4 (2026-11-01): the KP08 vendor line prints exact mm; the
-    # nut's taps print nothing (transferred). The clearance's height and
-    # lateral stations carry ±.05 mm / ±.002 (owner ruling 2026-11-08, A2
-    # option (i)), set on the saved model's dimensions.
-    assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,.05)}
-    assert spec.INCH_TOLERANCED_DIMENSIONS=={('NutPatternReference','NutCentreY'):(3,.002*INCH)}
+    # nut's taps print nothing (transferred). The clearance's height carries
+    # the title block's .XXX in millimetres, ±.13 mm, and its lateral station
+    # the title block's own ±.005 (owner ruling 2026-11-13): no inch band.
+    assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,.13)}
+    assert not hasattr(spec,'INCH_TOLERANCED_DIMENSIONS')
     import _oblique_pivot_block_model as model
     source=Path(model.__file__).read_text(encoding='utf-8')
-    assert 'getattr(part,"INCH_TOLERANCED_DIMENSIONS",{})' in source
+    assert 'INCH_TOLERANCED_DIMENSIONS' not in source
 
 
 def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
@@ -483,3 +488,20 @@ def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
     assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
     assert 156.3695 - ref_top >= 2.0
     assert 141.2195 + rise - ref_top >= 10.0
+
+
+@pytest.mark.parametrize('lower_x, clears', ((.1505, True), (.1495, False)))
+def test_feed_lower_section_letter_must_clear_the_lug_extension_line(monkeypatch, lower_x, clears):
+    """Machinist review, farm run 20261114T004142081Z: TL-32's lower B stood
+    on the .87's -X extension line; the sheet refuses a letter left of it."""
+    import _oblique_block_drawing as drawing
+
+    monkeypatch.setattr(drawing, '_early_bound', lambda obj, interface: obj)
+    section = SimpleNamespace(GetTextInfo=lambda: (.152, .259, 0.0, lower_x, .170, 0.0), GetLabel=lambda: 'B')
+    view = SimpleNamespace(GetSection=lambda: section)
+    assert drawing.FEED_SECTION_ARROW_LENGTH < drawing._PREF_SECTION_ARROW[29]
+    if clears:
+        drawing._require_letter_right_of(view, .150)
+    else:
+        with pytest.raises(RuntimeError, match='lower letter'):
+            drawing._require_letter_right_of(view, .150)

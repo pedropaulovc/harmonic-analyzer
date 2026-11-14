@@ -18,6 +18,8 @@ TRAVELER_STEMS: tuple[str, ...] = (
     "ch_rocker_arm_tl_oblique_end_bracket",
     "ch_rocker_arm_tl_oblique_feed_lever",
     "ch_rocker_arm_tl_oblique_riser",
+    "ch_rocker_arm_tl_oblique_pivot_block",
+    "ch_rocker_arm_tl_oblique_feed_block",
     "ch_rocker_arm_tl_oblique_carrier",
 )
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
