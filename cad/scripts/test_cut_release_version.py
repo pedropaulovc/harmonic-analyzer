@@ -665,13 +665,17 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 manifest = tomllib.loads(content.decode("utf-8"))
                 directory = Path(relative).parent.as_posix()
                 # The bundle carries its manifest STEP plus one STEP per
-                # configuration the part declares (export_features).
+                # configuration the part declares (export_features) and one
+                # per member whose own requirements it declares.
                 configurations = {
                     f"{directory}/{Path(manifest['step']).stem}-{name}.STEP"
                     for name in export_features.step_configurations(Path(directory).name)
                 }
+                members = {
+                    f"{directory}/{entry['step']}" for entry in manifest.get("member_steps", {}).values()
+                }
                 assert {name for name in expected if name.startswith(f"{directory}/")} == {
-                    f"{directory}/{manifest['step']}", relative, *configurations,
+                    f"{directory}/{manifest['step']}", relative, *configurations, *members,
                 }
                 adjacent = archive.read(f"{directory}/{manifest['step']}")
                 full = archive.read(f"step/{manifest['step']}")

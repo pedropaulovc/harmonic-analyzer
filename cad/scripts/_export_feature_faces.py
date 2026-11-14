@@ -238,7 +238,9 @@ def assign_feature_patches(
     return assigned
 
 
-def name_feature_faces(doc: Any, stem: str, *, reuse: bool = False) -> dict[str, list[str]]:
+def name_feature_faces(
+    doc: Any, stem: str, *, reuse: bool = False, configuration: str | None = None,
+) -> dict[str, list[str]]:
     """Name every face of ``stem``'s requirement features on the open part.
 
     Returns ``{feature: [names]}``, the exact claim :func:`step_face_sets`
@@ -246,14 +248,15 @@ def name_feature_faces(doc: Any, stem: str, *, reuse: bool = False) -> dict[str,
     a name (SolidWorks auto-names a face a mate references) fails, because
     ``SetEntityName`` refuses it and overwriting would break that reference.
     ``reuse`` (a later configuration of a part already named) accepts a face
-    that already carries exactly the name it would get.
+    that already carries exactly the name it would get.  ``configuration``
+    names the active non-default member whose own requirements are named.
     """
     import _telemetry  # noqa: PLC0415
     from _com import _bind, _com_invoke, _early_bound  # noqa: PLC0415
     from _gtol_face_read import face_geometry  # noqa: PLC0415
     from export_features import feature_selectors  # noqa: PLC0415
 
-    selectors = feature_selectors(stem)
+    selectors = feature_selectors(stem, configuration)
     if not selectors:
         raise FeatureFaceError(f"{stem}: export_features declares no feature")
     identities = frozenset(

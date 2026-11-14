@@ -16,6 +16,11 @@ importing drawings or connecting to SolidWorks.
 dict requires nonempty ``precision_sources`` naming its actual printed maps,
 callout helpers or formatter; a module docstring is not precision authority.
 
+A configured purchased part whose rework spans members declares each
+non-default member's requirements with a literal ``configuration="<Member>"``.
+Those faces are named and exported in that member's own STEP, beside the
+default member's; ``member_configurations`` reads the literals statically.
+
 Numeric ``limits`` and ``drilled_limits`` belong to ``_printed_limits`` and
 drawings import them directly. Both modules stay out of native part and assembly
 closures; native geometry guard bounds use the unchanged
@@ -49,6 +54,7 @@ class Requirement:
     precision: dict[str, int | str]
     path: Path
     call_span: tuple[int, int]
+    configuration: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.faces:
@@ -279,6 +285,24 @@ def discover_parts(scripts: Path) -> tuple[str, ...]:
     )
 
 
+def member_configurations(tree: ast.Module) -> tuple[str, ...]:
+    """The literal ``configuration=`` members a draw module's requirements name.
+
+    Static, like discovery: the graph needs the member STEPs without importing
+    the drawing. A non-literal member name is refused rather than guessed.
+    """
+    names: list[str] = []
+    for call in declaration_calls(tree, "requirement"):
+        for keyword in call.keywords:
+            if keyword.arg != "configuration":
+                continue
+            if not isinstance(keyword.value, ast.Constant) or not isinstance(keyword.value.value, str):
+                raise ValueError(f"line {call.lineno}: requirement configuration must be a literal member name")
+            if keyword.value.value not in names:
+                names.append(keyword.value.value)
+    return tuple(names)
+
+
 def _call_site(frame: Any, api: str) -> tuple[Path, tuple[int, int]]:
     if frame.f_code.co_name != "<module>":
         raise ValueError(f"{api} must be called at drawing module level")
@@ -298,19 +322,21 @@ def requirement(
     name: str, *, kind: str, faces: tuple[FaceSpec, ...],
     requirements: tuple[str, ...], fields: dict[str, tuple[Any, tuple[Source, ...]]],
     precision: dict[str, int | str] | None = None,
+    configuration: str | None = None,
 ) -> Requirement:
     """Register a requirement; return a registry descriptor for optional inspection.
 
     Registration does not make drawing print paths consume this descriptor.
     Those paths retain their printed spec/notes authority unless explicitly read
-    from the returned fields or precision.
+    from the returned fields or precision. ``configuration`` names the
+    non-default member whose faces carry the requirement.
     """
     frame = inspect.currentframe().f_back
     try:
         path, span = _call_site(frame, "requirement")
         declared = Requirement(
             name, kind, tuple(faces), tuple(requirements), fields,
-            dict(precision or {}), path, span,
+            dict(precision or {}), path, span, configuration,
         )
         registry = frame.f_globals.setdefault("_FEATURE_REQUIREMENTS", {})
         if name in registry:

@@ -784,3 +784,21 @@ kind = "countersink"
 present = false
 status = "not owned"
 use = "Riser (MHA-CH-06-TL-24) Setup 5: R1-R4 Ø.25 x 82° seats for #4-40 flat heads"
+
+# --- MHA-CH-06-TL-VN-84 kit rework (prechips plan) ---
+
+# Ownership only; the descriptions are cad/process/shop.toml tools.kit-hacksaw
+# and tools.kit-countersink-82. To buy (or to record, if the shop has one); no
+# vendor or SKU.
+[tools.kit-hacksaw]
+kind = "hacksaw"
+present = false
+status = "not owned"
+use = "Leadscrew kit (MHA-CH-06-TL-VN-84): cut the 600 mm SUS304 screw to length"
+note = "The archived inventory recorded the Starrett K145 frame and blades only as a purchase approved by Pedro on 2026-10-11, not as received."
+
+[tools.kit-countersink-82]
+kind = "countersink"
+present = false
+status = "not owned"
+use = "Leadscrew kit (MHA-CH-06-TL-VN-84) feed nut: the four countersinks beside the body, at the cutter size the sheet allows"

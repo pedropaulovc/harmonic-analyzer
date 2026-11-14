@@ -4,7 +4,8 @@ The isolated producer owns the raw labelled STEP and its adjacent manifest.
 Full export copies that STEP without rewriting it; the release-only gate
 requires byte-identical scoped and neutral copies. ``features.toml`` must
 identify its part, bind its adjacent STEP's exact raw bytes, and record that
-STEP's exact face sets per feature. Consumers derive feature
+STEP's exact face sets per feature. A member's own requirements bind that
+member's STEP (``member_steps``) the same way. Consumers derive feature
 names from the produced manifest, never reload drawing declarations. Every
 failure is loud; neither export nor the gate regenerates a missing bundle.
 """
@@ -76,7 +77,18 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
             _fail(str(manifest_path), "feature manifest has no features")
         if not all(isinstance(entry, dict) for entry in table.values()):
             _fail(str(manifest_path), "every feature must be a table")
-        features = list(table)
+        members = export_features.member_step_paths(stem, out)
+        recorded_members = manifest.get("member_steps", {})
+        if not isinstance(recorded_members, dict) or set(recorded_members) != set(members):
+            _fail(str(manifest_path), f"member_steps {sorted(recorded_members) if isinstance(recorded_members, dict) else recorded_members!r} must be {sorted(members)}")
+        scopes = {
+            cfg: [name for name, entry in table.items() if entry.get("configuration") == cfg]
+            for cfg in (None, *members)
+        }
+        stray = sorted(name for name, entry in table.items() if entry.get("configuration", None) not in scopes)
+        if stray:
+            _fail(str(manifest_path), f"features {stray} name no exported member configuration")
+        features = scopes[None]
         scoped_faces = _face_sets(step_path, step_bytes, features, digests)
         for feature, refs in scoped_faces.items():
             recorded = table[feature].get("faces")
@@ -87,6 +99,22 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
             if actual != expected:
                 _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
         pending.extend(((step_path, step_bytes), (manifest_path, manifest_bytes)))
+        # A member's own requirements bind that member's STEP, digest and faces.
+        for cfg, member_path in members.items():
+            member_bytes = _read(member_path)
+            member_digest = hashlib.sha256(member_bytes).hexdigest()
+            member_digests = f"scoped sha256 {member_digest}"
+            entry = recorded_members[cfg]
+            if not isinstance(entry, dict) or entry.get("step") != member_path.name or entry.get("step_sha256") != member_digest:
+                _fail(str(manifest_path), f"member_steps.{cfg} {entry!r} does not bind {member_path.name} ({member_digests})")
+            if not scopes[cfg]:
+                _fail(str(manifest_path), f"member {cfg} declares no feature")
+            member_faces = _face_sets(member_path, member_bytes, scopes[cfg], member_digests)
+            for feature, refs in member_faces.items():
+                recorded = table[feature].get("faces")
+                if not isinstance(recorded, list) or len(recorded) != len(refs) or set(recorded) != set(refs):
+                    _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from member STEP {refs!r} ({member_digests})")
+            pending.append((member_path, member_bytes))
         # A multi-configuration part's per-configuration STEPs label the same features.
         for cfg_path in export_features.configuration_step_paths(stem, out).values():
             cfg_bytes = _read(cfg_path)

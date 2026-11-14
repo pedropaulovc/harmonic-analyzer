@@ -39,6 +39,7 @@ import argparse
 import math
 import sys
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
 
@@ -77,6 +78,10 @@ from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_types import DRAWING_TEMPLATES
 from _drawing_view_display import _SW_HLR, set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
@@ -362,10 +367,12 @@ _NEAR_XY = (0.051, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
 # view's. The printed flat length (every KP08 flat's) stands under the
 # fence, right of the flat: the flat length's text (widest row
-# "4X FLATS FOR", about 26 mm) is wider than the flat's 24 mm at 3:1, so
+# "4X FLATS AT C, D", about 35 mm) is wider than the flat's 24 mm at 3:1, so
 # it stands right of the flat's far-end extension line, its dimension line
 # run out to it (review jbf-r17, rule 14: both extension lines crossed the
-# text), left of fence E.
+# text), left of fence E. It names both details it covers: "4X FLATS FOR"
+# on D alone left C's two flats unsized (machinist review, farm run
+# 20261113T230800068Z, 2 of 3 runs).
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.099, DETAIL_ROW_Y)
 # E: the handwheel's open flat and the cut end, its
@@ -390,7 +397,7 @@ _DE_GAP_MID_X = (
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
-FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0155
+FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0178
 FLAT_LENGTH_TEXT_GAP = 0.003
 END_DETAILS = (
     EndDetail(
@@ -479,7 +486,10 @@ def short_number(number: str) -> str:
 
 KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 FLAT_CALLOUTS = {
-    "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
+    "FlatLength": (
+        f"{FLAT_LENGTH_CALLOUT} FLATS AT {END_DETAILS[0].label}, {END_DETAILS[1].label}\n"
+        f"FOR {short_number(KP08_NUMBER)}"
+    ),
     "FlatAF": "SEE NOTE 1",
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
@@ -552,9 +562,11 @@ CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 3.5, feed_nut.LENGTH + 2.0)
 # 20261105T023247678Z: point (0.313, 0.106) printed 0.280 .. 0.345 by
 # 0.098 .. 0.114, its own line and far witness through it), so the point
 # stands right of the far witness and under the line: the block clears both
-# and the caption, over the title block.
+# and the caption, over the title block. Its widest row ("CLEARS TL-VN-56 AT
+# TRAVEL END", #2207) is four characters wider than the run's, so the point
+# stands 11.5 past the far end, not 10.5.
 FACED_LENGTH_LINE_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 2.5), feed_nut.LENGTH_MAX / 2.0)
-FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 10.5)
+FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 11.5)
 # Section F-F's native caption (SECTION F-F over SCALE 4 : 1): its box's top
 # centre. Where SolidWorks hung it (run 20261105T054045952Z: printed 0.2586 ..
 # 0.3014 by 0.0833 .. 0.0975), the faced length's leader, from its dimension
@@ -636,11 +648,17 @@ CSK_SCREW_CALLOUT = (
     f"FOR {short_number(NUT_SCREW_NUMBER)} ({feed_nut.SCREW_SKU})\n"
     f"{feed_nut.CSK_WALL_TEXT}"
 )
+# Rule 20: the faced nut's full thread, RV-03's stated shortfall, as the
+# spec's plain fact on the faced length that sets it (#2207). Rule 7: two word
+# lines, so the KP08 is named by its short number on the reason's line.
 # name -> (callout lane, text); swDimensionTextCalloutAbove 3, Below 4.
 REWORK_CALLOUTS = {
     "FlangeThick": ("above", FLANGE_THICK_CALLOUT),
     "CskDia": ("below", CSK_SCREW_CALLOUT),
-    "FacedLength": ("below", f"CLEARS KP08 AT TRAVEL END\n{KP08_NUMBER}"),
+    "FacedLength": (
+        "below",
+        f"CLEARS {short_number(KP08_NUMBER)} AT TRAVEL END\n{feed_nut.FULL_THREAD_TEXT}",
+    ),
 }
 RECEIPT_CALLOUTS = {
     "ReceiptFlangeDia": ("below", f"WITHIN {FEED_BLOCK_NUMBER}\nLUG FACE"),
@@ -709,6 +727,272 @@ SOURCE_PROPERTIES = (
     "Finish",
     "Supplier",
     "Supplier SKUs",
+)
+
+# --- Feature requirements (features.toml for the prechips traveler) ---------
+# The LeadScrew member is the bundle's saved default; the FeedNut member's
+# rework and receipt are declared for its own configuration and exported in
+# its member STEP. Bands are the sheet's: the title block's for the screw's
+# .X/.XX/° rows, the native LIMITs for the nut.
+FEATURE_SPEC_MODULE = "ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec"
+_NUT = "ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec"
+part_metadata(
+    precision_sources=("DIMENSION_PRECISION", (_NUT, "DRAWING_PRECISION")),
+)
+
+
+@dataclass(frozen=True)
+class _StationFlat(PlanarFace):
+    """A flat whose face spans screw station ``station_mm`` along +Y: the
+    clock-0 flats share one plane, so the station names one
+    (draw_sh_vn_clamping_kit_hardware's ``_CutEndCone``, along this axis)."""
+
+    station_mm: float = 0.0
+
+    def matches(self, geometry) -> bool:
+        tolerance = self.tolerance_mm / 1000.0
+        station = self.station_mm / 1000.0
+        return (
+            super().matches(geometry)
+            and len(geometry.box) == 6
+            and geometry.box[1] - tolerance <= station <= geometry.box[4] + tolerance
+        )
+
+
+def _band(name: str) -> list[float]:
+    """A screw control's acceptance limits: its nominal ± the title block's band."""
+    nominal, band, _places = DIMENSION_CONTROLS[name]
+    return [round(nominal - band, 12), round(nominal + band, 12)]
+
+
+requirement(
+    "near_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("length",),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        # The cut screw's length, end face to end face; every flat station
+        # stands from this end.
+        "length": (_band("CutLength"), ("DIMENSION_CONTROLS", "LENGTH", "LENGTH_TOLERANCE")),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "stock_length": (leadscrew.STOCK_LENGTH, ("STOCK_LENGTH",)),
+        "major_dia": (MAJOR_DIA, ("MAJOR_DIA",)),
+        "thread": (
+            THREAD_CALLOUT.replace("\n", " "),
+            (("draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit", "THREAD_CALLOUT"),),
+        ),
+        "end_chamfer": (leadscrew.END_CHAMFER, ("END_CHAMFER",)),
+    },
+    precision={"length": leadscrew.LENGTH_PLACES},
+)
+requirement(
+    "cut_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": LENGTH}, ("__frame__", "LENGTH")),
+        "length": (_band("CutLength"), ("DIMENSION_CONTROLS", "LENGTH", "LENGTH_TOLERANCE")),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "end_chamfer": (leadscrew.END_CHAMFER, ("END_CHAMFER",)),
+    },
+    precision={"length": leadscrew.LENGTH_PLACES},
+)
+_FLAT_FEATURES = {"NearKP08": "near_kp08", "FarKP08": "far_kp08", "Handwheel": "handwheel"}
+for _station, _feature in _FLAT_FEATURES.items():
+    _open = _station == leadscrew.OPEN_FLAT
+    requirement(
+        f"{_feature}_flat",
+        kind="flat",
+        faces=(
+            _StationFlat(
+                (1.0, 0.0, 0.0),
+                leadscrew.flat_offset(leadscrew.FLAT_DEPTH),
+                station_mm=FLAT_STATIONS[_station],
+            ),
+        ),
+        requirements=("station", "af", *(() if _open else ("length",))),
+        fields={
+            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+            "clock_deg": (0.0, ("__frame__",)),
+            # The flat's near edge from the near end (the printed station).
+            "station": (
+                _band(f"{_station}FlatStation"),
+                ("DIMENSION_CONTROLS", "FLAT_STARTS", "FLAT_TOLERANCE"),
+            ),
+            "station_nominal": (FLAT_STARTS[_station], ("FLAT_STARTS",)),
+            "set_screw_station": (FLAT_STATIONS[_station], ("FLAT_STATIONS",)),
+            "af": (_band("FlatAF"), ("DIMENSION_CONTROLS", "FLAT_AF", "FLAT_AF_TOLERANCE")),
+            "af_nominal": (FLAT_AF, ("FLAT_AF",)),
+            "depth_nominal": (leadscrew.FLAT_DEPTH, ("FLAT_DEPTH",)),
+            **(
+                {"runout": (True, ("OPEN_FLAT", "FLAT_RUNOUT"))}
+                if _open
+                else {
+                    "length": (
+                        _band("FlatLength"),
+                        ("DIMENSION_CONTROLS", "FLAT_LENGTH", "FLAT_LENGTH_TOLERANCE"),
+                    ),
+                    "length_nominal": (FLAT_LENGTH, ("FLAT_LENGTH",)),
+                }
+            ),
+        },
+        precision={
+            "station": leadscrew.FLAT_PLACES,
+            "af": leadscrew.FLAT_AF_PLACES,
+            **({} if _open else {"length": leadscrew.FLAT_LENGTH_PLACES}),
+        },
+    )
+for _station in leadscrew.CLOCKED_FLATS:
+    _clock = math.radians(KP08_SET_SCREW_SPACING_DEG)
+    _normal = (round(math.cos(_clock), 12), 0.0, round(math.sin(_clock), 12))
+    requirement(
+        f"{_FLAT_FEATURES[_station]}_clock_flat",
+        kind="flat",
+        faces=(
+            _StationFlat(
+                _normal,
+                leadscrew.flat_offset(leadscrew.FLAT_DEPTH),
+                station_mm=FLAT_STATIONS[_station],
+            ),
+        ),
+        requirements=("clock_deg", "af", "length"),
+        fields={
+            "normal": (list(_normal), ("__frame__", "KP08_SET_SCREW_SPACING_DEG")),
+            # From the clock-0 flat at the same station, toward +Z.
+            "clock_deg": (
+                _band(f"{_station}ClockAngle"),
+                ("DIMENSION_CONTROLS", "KP08_SET_SCREW_SPACING_DEG", "CLOCK_TOLERANCE_DEG"),
+            ),
+            "clock_deg_nominal": (KP08_SET_SCREW_SPACING_DEG, ("KP08_SET_SCREW_SPACING_DEG",)),
+            "station_nominal": (FLAT_STARTS[_station], ("FLAT_STARTS",)),
+            "set_screw_station": (FLAT_STATIONS[_station], ("FLAT_STATIONS",)),
+            "af": (
+                _band(f"{_station}ClockAF"),
+                ("DIMENSION_CONTROLS", "FLAT_AF", "FLAT_AF_TOLERANCE"),
+            ),
+            "af_nominal": (FLAT_AF, ("FLAT_AF",)),
+            "depth_nominal": (leadscrew.FLAT_DEPTH, ("FLAT_DEPTH",)),
+            "length": (
+                _band("FlatLength"),
+                ("DIMENSION_CONTROLS", "FLAT_LENGTH", "FLAT_LENGTH_TOLERANCE"),
+            ),
+            "length_nominal": (FLAT_LENGTH, ("FLAT_LENGTH",)),
+        },
+        precision={
+            "clock_deg": leadscrew.CLOCK_PLACES,
+            "af": leadscrew.FLAT_AF_PLACES,
+            "length": leadscrew.FLAT_LENGTH_PLACES,
+        },
+    )
+
+
+def _nut_limits(name: str) -> list[float]:
+    """A FeedNut native control's LIMIT, as ``[low, high]``."""
+    nominal, lower, upper, _places = feed_nut.NATIVE_CONTROLS[name]
+    return [round(nominal + lower, 12), round(nominal + upper, 12)]
+
+
+requirement(
+    "nut_seat_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("length",),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ((_NUT, "__frame__"),)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ((_NUT, "__frame__"),)),
+        # Faced: the spigot comes off flush with the flange's seat face; the
+        # length runs seat face to body end.
+        "length": (_nut_limits("FacedLength"), ((_NUT, "REWORK_CONTROLS"), (_NUT, "LENGTH_MIN"), (_NUT, "LENGTH_MAX"))),
+        "length_nominal": (feed_nut.LENGTH, ((_NUT, "LENGTH"),)),
+        "supplied_length": (feed_nut.SUPPLIED_LENGTH, ((_NUT, "SUPPLIED_LENGTH"),)),
+        "spigot_length": (feed_nut.SPIGOT_LENGTH, ((_NUT, "SPIGOT_LENGTH"),)),
+        "spigot_dia": (feed_nut.BODY_DIA, ((_NUT, "BODY_DIA"),)),
+        "full_thread_min": (feed_nut.FULL_THREAD_MIN, ((_NUT, "FULL_THREAD_MIN"),)),
+        "note": (SPIGOT_NOTE.replace("\n", " "), (("draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit", "SPIGOT_NOTE"),)),
+    },
+    precision={"length": feed_nut.REWORK_CONTROLS["FacedLength"][3]},
+    configuration="FeedNut",
+)
+requirement(
+    "nut_flange",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), feed_nut.FLANGE_THICK), CylinderFace(feed_nut.FLANGE_DIA)),
+    requirements=("thickness", "dia"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ((_NUT, "__frame__"),)),
+        "thickness": (_nut_limits("FlangeThick"), ((_NUT, "REWORK_CONTROLS"), (_NUT, "FLANGE_THICK_MIN"), (_NUT, "FLANGE_THICK_MAX"))),
+        "thickness_nominal": (feed_nut.FLANGE_THICK, ((_NUT, "FLANGE_THICK"),)),
+        # Received, not cut.
+        "dia": (_nut_limits("ReceiptFlangeDia"), ((_NUT, "RECEIPT_CONTROLS"), (_NUT, "FLANGE_DIA_MIN"), (_NUT, "FLANGE_DIA_MAX"))),
+        "dia_nominal": (feed_nut.FLANGE_DIA, ((_NUT, "FLANGE_DIA"),)),
+    },
+    precision={
+        "thickness": feed_nut.REWORK_CONTROLS["FlangeThick"][3],
+        "dia": feed_nut.RECEIPT_CONTROLS["ReceiptFlangeDia"][3],
+    },
+    configuration="FeedNut",
+)
+requirement(
+    "nut_body",
+    kind="face",
+    faces=(CylinderFace(feed_nut.BODY_DIA),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ((_NUT, "__frame__"),)),
+        # Received, not cut.
+        "dia": (_nut_limits("ReceiptBodyDia"), ((_NUT, "RECEIPT_CONTROLS"), (_NUT, "BODY_DIA_MIN"), (_NUT, "BODY_DIA_MAX"))),
+        "dia_nominal": (feed_nut.BODY_DIA, ((_NUT, "BODY_DIA"),)),
+        "length_nominal": (feed_nut.BODY_LENGTH, ((_NUT, "BODY_LENGTH"),)),
+    },
+    precision={"dia": feed_nut.RECEIPT_CONTROLS["ReceiptBodyDia"][3]},
+    configuration="FeedNut",
+)
+requirement(
+    "nut_holes",
+    kind="hole",
+    faces=(CylinderFace(feed_nut.HOLE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ((_NUT, "__frame__"),)),
+        "count": (feed_nut.SCREW_COUNT, ((_NUT, "SCREW_COUNT"),)),
+        # Received, not cut: the supplied holes the countersinks open.
+        "dia": (_nut_limits("ReceiptHoleDia"), ((_NUT, "RECEIPT_CONTROLS"), (_NUT, "HOLE_DIA_MIN"), (_NUT, "HOLE_DIA_MAX"))),
+        "dia_nominal": (feed_nut.HOLE_DIA, ((_NUT, "HOLE_DIA"),)),
+        "pcd_reference": (feed_nut.HOLE_PCD, ((_NUT, "HOLE_PCD"),)),
+        "centres": (
+            [[x, feed_nut.FLANGE_THICK, z] for x, z in feed_nut.HOLE_CENTRES],
+            ((_NUT, "HOLE_CENTRES"), (_NUT, "FLANGE_THICK")),
+        ),
+        "thru": (True, ((_NUT, "__frame__"),)),
+    },
+    precision={"dia": feed_nut.RECEIPT_CONTROLS["ReceiptHoleDia"][3]},
+    configuration="FeedNut",
+)
+requirement(
+    "nut_countersinks",
+    kind="countersink",
+    faces=(ConeFace(feed_nut.CSK_ANGLE / 2.0),),
+    requirements=("dia", "angle_deg"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ((_NUT, "__frame__"),)),
+        "count": (feed_nut.SCREW_COUNT, ((_NUT, "SCREW_COUNT"),)),
+        "dia": (_nut_limits("CskDia"), ((_NUT, "REWORK_CONTROLS"), (_NUT, "CSK_DIA_MIN"), (_NUT, "CSK_DIA_MAX"))),
+        "dia_nominal": (feed_nut.CSK_DIA, ((_NUT, "CSK_DIA"),)),
+        "angle_deg": (feed_nut.CSK_ANGLE, ((_NUT, "CSK_ANGLE"),)),
+        "cutter": (feed_nut.CSK_CUTTER_TEXT, ((_NUT, "CSK_CUTTER_TEXT"),)),
+        "cutter_dia_max": (round(feed_nut.CSK_CUTTER_DIA_MAX, 12), ((_NUT, "CSK_CUTTER_DIA_MAX"),)),
+        "centres": (
+            [[x, feed_nut.FLANGE_THICK, z] for x, z in feed_nut.HOLE_CENTRES],
+            ((_NUT, "HOLE_CENTRES"), (_NUT, "FLANGE_THICK")),
+        ),
+        "wall_note": (feed_nut.CSK_WALL_TEXT, ((_NUT, "CSK_WALL_TEXT"),)),
+    },
+    precision={"dia": feed_nut.CSK_DIA_PLACES},
+    configuration="FeedNut",
 )
 
 

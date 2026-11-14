@@ -74,6 +74,20 @@ match the producer stem. The feature source closure includes the drawing, the
 selected spec and both transitive Python dependency closures without importing
 them; config reads from those sources remain feature-leaf inputs.
 
+When a configured producer's rework spans members, a requirement for a
+non-default member names it with a literal `configuration="<Member>"` keyword
+(for example the `FeedNut` of `ch_rocker_arm_tl_vn_oblique_leadscrew_kit`,
+whose default member is `LeadScrew`). `export_models --features` shows that
+member after the default export, names only its requirements' faces and saves
+`<part>--<mesh key>.STEP` beside the bundle STEP (the member's
+`_part_configuration_exports.mesh_key`, lowercased: `FeedNut` saves
+`ch-rocker-arm-tl-vn-oblique-leadscrew-kit--feednut.STEP`), the same name as the full
+export's neutral member STEP, which `features_bound` then requires to be that
+exact copy. The manifest marks each such feature with `configuration` and
+records the member STEP and its digest under `member_steps.<Member>`; the
+feature's `faces` bind that STEP. Members are read statically from the
+keywords and must be registry members other than the default.
+
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
 `model_sources` and `precision_sources` cite the shared frame and displayed
@@ -257,6 +271,7 @@ disjoint fields; no field is duplicated. See
 `ch_rocker_arm_tl_oblique_end_bracket`,
 `ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
 `ch_rocker_arm_tl_oblique_pivot_block`, `ch_rocker_arm_tl_oblique_feed_block` and
+`ch_rocker_arm_tl_vn_oblique_leadscrew_kit` and
 `ch_rocker_arm_tl_oblique_carrier`.
 
 prechips is not an HA dependency while it stabilises. Owner ruling 2026-11-11
@@ -349,10 +364,10 @@ profiles on the v49 manifests, including the new `vise_holding` check against
 post-v49 drawing: its 2X bolt holes are the 11/32 drill (`2X Ø.3438 11/32 DRILL
 THRU ALL`, +.004/0, owner ruling 2026-11-13), so its plan's drill passes
 `tool_sizing`; its plan reads the grip-corner fillet the manifest now exports
-and so needs prechips 0.11.0. The riser's plan needs prechips 0.11.0 (its
-`harmonic_riser` adapter) and passes both profiles on its v49 manifest. The
-carrier's plan needs prechips 0.11.1 (`harmonic_carrier`) and passes both
-profiles on its v50 manifest.
+and so needs prechips 0.11.0 (released). The riser's plan needs prechips 0.11.0 (its
+`harmonic_riser` adapter) and passes both profiles on its v49 manifest.
+The carrier's plan needs prechips 0.11.1 (`harmonic_carrier`, released) and
+passes both profiles on its v50 manifest.
 prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.

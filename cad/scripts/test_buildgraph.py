@@ -3098,6 +3098,7 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     # not a synthetic aggregate spec. Keep this oracle independent of the resolver.
     member_specs = {
         "sh_vn_clamping_kit_hardware": "sh_vn_clamping_kit_hold_down_stud_spec",
+        "ch_rocker_arm_tl_vn_oblique_leadscrew_kit": "ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec",
     }
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
