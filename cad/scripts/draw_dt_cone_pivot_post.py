@@ -338,7 +338,7 @@ CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 BODY = requirement(
     "body", faces=(CylinderFace(BLOCK_DIA),),
     kind="boss", requirements=("dia", "height"), fields={
-        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"], unit=cone.UNIT), (("dt_cone_post_envelope", "BLOCK_DIA"), "UNIT")),
+        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"], cone.MAIN_BODY_DIA_BAND, unit=cone.UNIT), (("dt_cone_post_envelope", "BLOCK_DIA"), "MAIN_BODY_DIA_BAND", "UNIT")),
         "dia_nominal": (BLOCK_DIA, (("dt_cone_post_envelope", "BLOCK_DIA"),)),
         "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"], unit=cone.UNIT), ("BLOCK_HEIGHT", "UNIT")),
         "height_nominal": (cone.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
