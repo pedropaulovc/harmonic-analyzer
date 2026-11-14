@@ -290,7 +290,8 @@ machine_ref = "pm-30mv"
 holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The 1 × 3 coupon lengthwise on two parallels behind the plate, centred at X 10.25 between the back straps, under its own strap; its test hole at X 10.25, Y 5.9, between the parallels."
 datum = "X0 ZERO END, Y0 ZERO EDGE (edge finder); +X right, +Y away. HUB is not drilled here."
 diagram = { file = "diagrams/carrier/holes.svg", alt = "Plate TOP up on the blocks with one strap over each; all twelve tabled holes from X0 Y0 at the lower-left corner; HUB shown dashed, made at assembly" }
-# Hole centres lie inside the plate. Longest: the chucking reamer in the drill
+# X: the plate's hole centres. Y reaches the reamer coupon's test hole behind
+# the plate (coupon_hole_y_mm, Y 5.9). Longest: the chucking reamer in the drill
 # chuck; shortest: the centre drill. The reamer's lead runs deepest.
 envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{process.coupon_hole_y_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
 vise_hold = "other"

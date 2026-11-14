@@ -27,6 +27,7 @@ from typing import Any
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -218,13 +219,17 @@ HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam":
 # assembly's acceptance (MHA-CH-00), not this part's (machinist r1: a second
 # line here was assembly narration), and the band is accepted on RV-03.
 # The plate's .080 +/-.002 offset in the hub is a tight band, so it names
-# what it serves at the dimension (rule 4; ch-fab-2 r2: 3/3 runs asked for
-# it there, and a second reason on the .118 read as narration): each bar
-# rides its lever's plate, so the offset spaces neighbouring bars in the
-# stack (sh_vn_pivot_pin_bar_spec).
+# what it serves (rule 4; ch-fab-2 r2: 3/3 runs asked for the mate, and a
+# second reason on the .118 read as narration): each bar rides its lever's
+# plate, so the offset spaces neighbouring bars in the stack
+# (sh_vn_pivot_pin_bar_spec). The offset is a location, so its dimension
+# carries only a flag to the numbered note that names the mate (rule 7;
+# dfm-2340 r12: 2/3 runs).
+PLATE_OFFSET_NOTE_NUMBER = 1
+PLATE_OFFSET_NOTE = f"{PLATE_OFFSET_NOTE_NUMBER}. SPACES {BAR_NUMBER} BARS IN STACK."
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
-    "PlateOffset": f"SPACES {BAR_NUMBER} BARS",
+    "PlateOffset": f"SEE NOTE {PLATE_OFFSET_NOTE_NUMBER}",
     "HubLength": f"SETS PITCH OF {STATIONS}X\nSTACK ON {SHAFT_NUMBER}",
 }
 
@@ -256,6 +261,8 @@ OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
 BORE_FINISH_SYMBOL = (0.080, 0.140)
+# Lower left, below the overall length and clear of the title block.
+PLATE_OFFSET_NOTE_XY = (0.020, 0.055)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
@@ -451,6 +458,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, PLATE_OFFSET_NOTE, *PLATE_OFFSET_NOTE_XY) is None:
+        raise RuntimeError("failed to create the plate-offset note")
 
     return await finalize_drawing(
         adapter,

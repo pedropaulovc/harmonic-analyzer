@@ -39,8 +39,9 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-The base bar, end bracket and feed lever have plans, ported from the prechips
-0.10 examples; each header names its sources. Each plan's `adapter` is a prechips
+The base bar, end bracket and feed lever have plans ported from the prechips
+0.10 examples. The riser's plan is authored here, and prechips `examples/riser.toml`
+copies it. Each header names its sources. Each plan's `adapter` is a prechips
 adapter written against that part's manifest contents, so a drawing change that
 alters the manifest's requirements needs a prechips adapter release before the
 traveler passes again.
@@ -142,16 +143,35 @@ Owner rulings (Pedro), recorded for the cutover:
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with an opt-in
-`prechips:<stem>` task: the oblique-trammel base bar, end bracket and carrier. `build`
-and `release` do not run it, and releases carry no travelers while prechips
-stabilises. Each run renders two travelers from the same plan: `traveler.html`
-(`pro`, concise) and `traveler-hobby.html` (`hobby`, with the setup pictures in
-`<stem>/diagrams/`). Under prechips 0.10.1 the base bar and end bracket pass both
-on the v48 manifests. The base-bar and feed-lever plans need 0.10.1: they read
-its adapter bindings `cad.vise_centred_overhang_mm` (centred overhang from the
-CAD length and `vise_jaw_width_mm`) and `cad.overhang_mm` (from the lever's one
-`overhang_in`), and the base-bar adapter refuses a Setup 5 jack centre off the
-bar or inside a rail-hole, counterbore or slot outline.
+`prechips:<stem>` task: the oblique-trammel base bar, end bracket, feed
+lever, riser and carrier. `build` and `release` do not run it, and releases carry no travelers while
+prechips stabilises. Each run renders two travelers from the same plan:
+`traveler.html` (`pro`, concise) and `traveler-hobby.html` (`hobby`, with the
+setup pictures in `<stem>/diagrams/`). Under prechips 0.10.1 the base bar and
+end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
+need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
+(centred overhang from the CAD length and `vise_jaw_width_mm`) and
+`cad.overhang_mm` (from the lever's one `overhang_in`), and the base-bar adapter
+refuses a Setup 4 jack centre off the bar or inside a rail-hole, counterbore or
+slot outline. The feed-lever plan needs 0.11.0, which binds the lever's
+grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
+carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
+operation, `milling_cuts` per spindle operation) and pass that check enforced;
+the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
+need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0. The riser plan needs 0.11.0 too
+(its `harmonic_riser` adapter).
+
+The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
+adapter and the `milling_deflection` check. It passes both profiles, with every
+check enforced, on the v49 manifest. Setups 1–4 make the bar
+and drill the stop-pin holes P1/P2 at their printed stations. Setup 1 calipers
+the bar: Setup 2 faces it only when it is over the .25 thickness limit, from three
+straps then four, because a single strap span along the bar's length bends the
+thin bar ~.23 mm under the cutter. The other seven
+holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted them
+from the carrier and drills each at its own mark, so its table gives the REF
+X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
+recorded as not owned in `cad/config/shop-equipment.toml`.
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
@@ -160,44 +180,62 @@ hold is checked against `workholding.vise-pm-6` and the three vise limits
 balance, and a rod against an unmachined moving-jaw face). Overhang rigidity
 is not judged. All three plans pass it with HA's 5 3/4 in opening.
 
-What the 0.10 port changed on the sheets:
+What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
 
 - Base bar: bar 2 is the opposite hand of bar 1 (rail and table faces
-  swapped), so Setup 4 marks bar 1 C'BORE SIDE and bar 2 RAIL SIDE, and Setup
-  6 pictures bar 1 turned over (C'BORE SIDE down on the table, rail up) and a
-  bar 2 section. The table setups use three 1-2-3 blocks, one at mid-length
-  under the long-edge straps. Vise setups print the bar's stand-out above the
-  jaws, keep the 1-3/8 in parallels and two screw jacks (touch only; Setup 5
-  gives their DRO positions). Facing runs full length at 850 rpm, 6.8 in/min
-  (owner ruling 2026-11-11, `settings.basebar-face-6061-t6511`). The rail
+  swapped), so Setup 3 marks bar 1 C'BORE SIDE and bar 2 RAIL SIDE, and Setup
+  5 pictures bar 1 turned over (C'BORE SIDE down on the table, rail up) and a
+  bar 2 section. The edge setup uses three 1-2-3 blocks, one at mid-length,
+  and two end straps. Setup 3 faces both sides, squares both ends and mills
+  both slots in one vise clamping (2026-11-14 traveler review: the former
+  table-strapped end squaring left the ends on a 221 mm cantilever, 0.057 mm
+  under `milling_deflection`, refused); the slots take .05 depth steps on the
+  jaws' cantilever. Vise setups print the bar's stand-out above the jaws, keep
+  the 1-3/8 in parallels and two screw jacks (touch only; Setup 4 gives their
+  DRO positions and its drill and counterbore operations split by end, each
+  over its jack). Facing runs full length at 850 rpm, 6.8 in/min (owner ruling
+  2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. Setups
+  2–3 run in the low belt range and Setup 4 in the high range, so both bars
+  take one belt change. The rail
   stations are REF only, never drill targets (spec; owner R4 ruling, restated
-  2026-11-11): all eight hole centres are measured on the bar's own rail,
-  trimmed flush, the rail comes off, and each hole is drilled at its measured X.
-  The 1/2 in end mill alone cuts both slots, tracing a cutter-centre
-  rectangle printed per slot, and `tool_sizing` checks it against the slot
-  width band less the path offset (the 3/8 in slot drill and 17/32 in
-  slot-finish cutter are gone). Position checks are added: X on the DRO before
-  unclamping, rows from ZERO EDGE with calipers. The saw is the 14 in Evolution
-  metal-cutting miter saw (`tools.saw-evolution-14`, both logbook entries; no
-  blade is recorded, #2084).
+  2026-11-11): all eight hole centres are picked up on the bar's own rail,
+  trimmed flush with the angle grinder per TL-00 steps 1D–1G
+  (`tools.rail-trim-grinder`, not owned yet) and clamped on the rail face,
+  with the edge finder on the X DRO (both sides of each counterbore, centre =
+  midpoint; owner ruling 2026-11-13, #2546), the rail comes off, and each
+  hole is drilled at its recorded X. The 1/2 in end mill alone cuts both
+  slots, tracing a cutter-centre rectangle printed per slot, and `tool_sizing`
+  checks it against the slot width band less the path offset (the 3/8 in slot
+  drill and 17/32 in slot-finish cutter are gone). Position checks are added:
+  X on the DRO before unclamping, rows from ZERO EDGE with calipers. The saw
+  is the 14 in Evolution metal-cutting miter saw (`tools.saw-evolution-14`,
+  both logbook entries; no blade is recorded, #2084).
 - End bracket: both brackets share each vise clamping, one at each jaw end
   (`balance = "twin_part"`), Pedro's 2026-11-10 ruling. Each operation runs on
   both before the next tool; X0 is the left part's INNER END and XR the right
   part's. The two blanks are sawn adjacent from the same bar so their as-bought
   widths match in the jaws. This route differs from the 2026-11-02 hand sheet
-  (`hand-travelers/`), which holds and re-zeroes one bracket at a time.
-
-The feed lever's plan (`ch_rocker_arm_tl_oblique_feed_lever/plan.toml`) is held
-in the repository but not enrolled. It declares its vise holds and passes
-`vise_holding`; prechips refuses it only on `tool_sizing`: the plan's 11/32
-drill (8.73125 mm) is below the drawing's hole band (8.7376–8.8392 mm). That is
-a finding for the owner (a different drill, or a drawing change), not a check
-to opt out of; enroll the part once its plan passes.
+  (`hand-travelers/`), which holds and re-zeroes one bracket at a time. The
+  sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE.
+  The #29 drill runs to 1.06 below BAR SIDE so the KP08-side exit is full
+  size; each face's plug and bottoming taps carry one flag (BAR .45, KP08 .51
+  from the tip, in the low half of the drawing's tip windows) so the two
+  bottoming taps never meet; Setup 4 lines up on the drilled holes instead of
+  re-finding datums. The final screw check runs a flagged screw only to its
+  own face's full-thread depth, never on into the opposite face's thread.
+- Feed lever: the 2X bolt holes are the 11/32 drill, `2X Ø.3438 11/32 DRILL
+  THRU ALL`, +.004/0 (owner ruling 2026-11-13, so the traveler follows the
+  post-v49 drawing; the former 5/16 normal-fit clearance, Ø.344, put the
+  plan's 11/32 drill under its minimum), inspected with pin gauges. The grip
+  corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
+  fillet, not an authored radius. The saw cut at 11.85 is the finished grip
+  end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
+  has no second vise setup.
 
 The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
-is enrolled. It needs prechips 0.11.0 (the `harmonic_carrier` adapter and
-the `jig-carrier-*` pictures); until that is published `prechips:<stem>` fails
-for it under `@latest`. The 20.5 in plate is made flat on the table, vise off,
+is enrolled. It needs prechips 0.11.1 (the `harmonic_carrier` adapter with
+its `block_tolerance_in` refusal, and the `jig-carrier-*` pictures), and passes
+both profiles under `@latest` with every check enforced. The 20.5 in plate is made flat on the table, vise off,
 on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
 2026-11-05/06), placed between hole columns, as the registry note now says
 (on edge in the vise the jaws grip at most 1.77 in of the 6 in-tall bar, under
@@ -233,8 +271,9 @@ pass. Exit 1 means uv itself failed: no `uv`, no PyPI, or a render whose
 stderr); it is never a finding about the plan. A nonzero prechips exit from
 either is returned and removes both files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
-`turning_deflection`, `cutting_speeds`, `tool_sizing`, `indexing`,
-`gauge_capability`, `lathe_holding`, `vise_holding`, `machine_capacity`, or
+`turning_deflection`, `milling_deflection`, `cutting_speeds`, `tool_sizing`,
+`indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`,
+`machine_capacity`, or
 `hobby`'s missing setup picture). A missing plan fails only that part's task.
 A refusal is a finding about the plan or shop data; correct the source, not
 the check.

@@ -26,10 +26,13 @@ X = 0. The inner end sits at carrier Y = ``carrier.LEVER_INNER_END_Y``
 
 Holes: the stations are read from the carrier spec, never retyped (TrammelJig
 ruling 2026-10-16, on the inch grid: carrier y -.87 and -1.50); they land at
-lever X .28 and .91. Each is a native Hole Wizard 5/16 screw clearance, normal
-fit (Ø.344), THRU (fastener policy: UNC wizard holes everywhere). The screws
-locate in the carrier's threads and the lever only has to clear them, so no
-band is tighter than the title block. Rule 18 is the carrier's (its tapped
+lever X .28 and .91. Each is a native Hole Wizard 11/32 fractional drill
+(Ø.3438), THRU: owner ruling 2026-11-13 (Pedro) puts the 5/16 screw
+clearance on the drill the shop owns, the title-block DRILLED HOLES band
+(+.004/0) qualifying the drill's exact size. The former 5/16 normal-fit
+clearance (Ø.344) put that drill under its minimum. The screws locate in the
+carrier's threads and the lever only has to clear them, so no band is
+tighter than the title block. Rule 18 is the carrier's (its tapped
 plate). The two 5/16-18 SHCS heads (Ø.469 max, ASME B18.3) stand ``HEAD_GAP``
 apart on the carrier's pitch; the gap is read from the carrier stations, not
 from the lever's bands, because the clearance holes float on the screws.
@@ -48,7 +51,7 @@ from typing import Any
 
 import _config
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
-from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _hole_spec import HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
@@ -87,9 +90,13 @@ HOLE_X_PLACES = 2
 HOLE_Y_PLACES = 2
 SCREW_THREAD = "5/16-18"
 SCREW_HEAD_DIA_MAX = round(0.469 * INCH, 9)  # ASME B18.3 5/16 SHCS head
-CLEARANCE_SPEC = HoleSpec("clearance", "5/16", fit="normal")
-HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)  # .344
-HOLE_CALLOUT_PRECISION = {"hw-diam": 3}  # every Hole Wizard length prints .XXX
+# Owner ruling 2026-11-13: the 11/32 drill, printed to four places (.3438).
+# Its exact size is kept here rather than pinned in _hole_spec's shared
+# table, which every hole-wizard part reads; the build's expect_dia_mm
+# re-proves it against the wizard's own 11/32 diameter.
+CLEARANCE_SPEC = HoleSpec("drilled_fractional", "11/32")
+HOLE_DIA = round(11.0 / 32.0 * INCH, 9)  # .34375
+HOLE_CALLOUT_PRECISION = {"hw-diam": 4}  # the drill's four-place decimal
 HEAD_GAP = abs(HOLE_X[1] - HOLE_X[0]) - SCREW_HEAD_DIA_MAX
 if HEAD_GAP < 2.0:
     raise AssertionError(f"feed lever SHCS heads gap {HEAD_GAP:.2f} < 2.0")

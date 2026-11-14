@@ -1292,13 +1292,23 @@ def test_each_seat_names_its_own_mate_on_each_member() -> None:
     declared = {
         entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, STEM, "part")
     }
-    assert set(declared) == {"RV-01", "RV-02"}
+    assert set(declared) == {"RV-01", "RV-02", "RV-03"}
     shop = declared["RV-02"]
     assert shop.kind == "minor"
     assert table.removeprefix("SEATS ON ") in shop.where
     assert "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3" in (
         shop.reason
     )
+    # One number for both members by design: the sheets tell them apart by
+    # each member's caption and the bracket callout's BAR 1 ONLY line.
+    identity = declared["RV-03"]
+    assert identity.kind == "minor"
+    assert all(
+        caption in identity.where
+        for caption in spec.CONFIGURATION_DESCRIPTIONS.values()
+    )
+    assert drawing.BRACKET_CALLOUT_BELOW[-1] in identity.where
+    assert "owner may revert to dash numbers" in identity.reason
 
 
 def test_seat_symbols_and_labels_stand_above_the_end_view() -> None:

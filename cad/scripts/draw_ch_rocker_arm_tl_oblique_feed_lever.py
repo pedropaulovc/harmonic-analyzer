@@ -2,7 +2,7 @@ r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26
 
 An 11.8 x 1 x 1/2 in flat at 1:1: the top view carries the length, the stock
 width, both bolt-hole stations from the inner end, their shared row from the
-back side, the native 2X 5/16 clearance callout (``2X Ø.344 DRILL THRU ALL``:
+back side, the native 2X 11/32 drill callout (``2X Ø.3438 11/32 DRILL THRU ALL``:
 size, then process, rule 26) and the grip-end radius; the front view carries
 the stock thickness; the shaded iso rides top-right at 1:4. No datums
 (drawing-guidelines.md rule 5).
@@ -42,6 +42,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -132,9 +133,10 @@ FRONT_KEEP: dict[str, tuple[float, float, float]] = {
 HOLE_EDGE_MODEL = (HOLE_X[1] + 0.6 * _R, _H, -HOLE_Y - 0.8 * _R)
 HOLE_CALLOUT_MODEL = (70.0, _H, -_W - 22.0)
 HOLE_CALLOUT_LABEL = "feed lever bolt holes"
-# The process follows the size (rule 26): ``2X Ø.344 DRILL THRU ALL``, not
-# a prefix ahead of the count (``DRILL 2X Ø.344 THRU ALL``).
-DRILL_TEXT = " DRILL"
+# The process follows the size (rule 26), naming the drill so its exact
+# four-place decimal reads as the drill's size, not a precision (rule 3):
+# ``2X Ø.3438 11/32 DRILL THRU ALL``, as the end bracket's ``Ø.136 #29 DRILL``.
+DRILL_TEXT = " " + drill_process(part_spec.CLEARANCE_SPEC)
 _CALLOUT_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions: prefix..below
 # The simple-hole size variable: a plain drilled hole's callout carries
 # hw-diam (HOLE_CALLOUT_PRECISION); a clearance wizard's may carry
@@ -151,7 +153,6 @@ part_metadata(
 
 _UNIT = part_spec.UNIT
 (_CALLOUT_PLACES,) = set(HOLE_CALLOUT_PRECISION.values())
-_HOLE_DIA_PRINTED = round(round(part_spec.HOLE_DIA / 25.4, _CALLOUT_PLACES) * 25.4, 9)
 
 
 def _limits(model: float, places: int) -> list[float]:
@@ -209,13 +210,15 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "drill": (part_spec.CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
-            # The native callout prints the 5/16 normal-fit size to three
-            # places (.344); the band and nominal are that printed value.
+            # The native callout names the 11/32 drill and prints its four-
+            # place decimal (.3438; owner ruling 2026-11-13). The
+            # title-block drilled band qualifies the drill's exact size, as
+            # _printed_limits.drilled_limits does for a native wizard hole.
             "dia": (
-                limits(_HOLE_DIA_PRINTED, _CALLOUT_PLACES, part_spec.DRILLED_BAND),
+                limits(part_spec.HOLE_DIA, _CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("HOLE_DIA", "DRILLED_BAND", "SCREW_THREAD"),
             ),
-            "dia_nominal": (_HOLE_DIA_PRINTED, ("HOLE_DIA",)),
+            "dia_nominal": (part_spec.HOLE_DIA, ("HOLE_DIA",)),
             "thru": (True, ("CLEARANCE_SPEC",)),
             # Model X from the inner end: the carrier's lever station.
             "station": (
@@ -241,6 +244,31 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             "width": part_spec.HOLE_Y_PLACES,
         },
     )
+
+# The two grip-end plan corners (2X R.2 on the top view): vertical fillets
+# through the thickness at the grip end, one at each long side, under the
+# title block's one-place band.
+requirement(
+    "grip_corners",
+    kind="fillet",
+    faces=tuple(
+        CylinderFace(2.0 * part_spec.CORNER_R, contains_z_mm=z)
+        for z in (
+            -part_spec.CORNER_R / 2.0,
+            -(part_spec.LEVER_WIDTH - part_spec.CORNER_R / 2.0),
+        )
+    ),
+    requirements=("radius",),
+    fields={
+        "radius": (
+            _limits(part_spec.CORNER_R, part_spec.CORNER_PLACES),
+            ("CORNER_R", "CORNER_PLACES"),
+        ),
+        "radius_nominal": (part_spec.CORNER_R, ("CORNER_R",)),
+        "count": (2, ("DIMENSION_PREFIXES",)),
+    },
+    precision={"radius": part_spec.CORNER_PLACES},
+)
 
 
 def _view_mapper(adapter: Any, view: Any):
@@ -296,7 +324,7 @@ def drill_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         raise RuntimeError(
             f"{HOLE_CALLOUT_LABEL}: unexpected hole callout parts: {definitions!r}"
         )
-    if any(DRILL_TEXT.strip() in text for text in definitions.values()):
+    if any("DRILL" in text for text in definitions.values()):
         raise RuntimeError(f"{HOLE_CALLOUT_LABEL}: callout already says DRILL: {definitions!r}")
     tokens = [
         token
