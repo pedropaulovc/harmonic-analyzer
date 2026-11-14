@@ -1,0 +1,17 @@
+dt-cylinder-gear-tl-vn-cam-clamp-screw:
+  title: Cylinder Gear Cam Fixture Clamp Screw
+  # Shop fixture: the parent MHA-DT-12 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Issue #2361: threads into the MHA-DT-12-TL-VN-50 stub's 10-32 tap and clamps
+  # the gear through the -VN-53 washer.
+  number: MHA-DT-12-TL-VN-52
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A337"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, Rockwell C37, 170,000 psi; McMaster-Carr 91251A337"
+  finish: black oxide
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in

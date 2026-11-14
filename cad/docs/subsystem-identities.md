@@ -423,6 +423,11 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | new tooling part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-hub-washer` | MHA-CH-13-TL-03 |
 | new tooling vendor part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-vn-edge-clamp` | MHA-CH-13-TL-VN-50 |
 | new tooling vendor part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-vn-hub-screw` | MHA-CH-13-TL-VN-51 |
+| new tooling part (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-cam-fixture` | MHA-DT-12-TL-01 |
+| new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-vn-cam-stub` | MHA-DT-12-TL-VN-50 |
+| new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-vn-cam-clock-pin` | MHA-DT-12-TL-VN-51 |
+| new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-vn-cam-clamp-screw` | MHA-DT-12-TL-VN-52 |
+| new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-vn-cam-clamp-washer` | MHA-DT-12-TL-VN-53 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -437,6 +442,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-cutter` | MHA-DT-37-TL-00 |
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 |
 | new tooling assembly (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-fixture` | MHA-CH-13-TL-00 |
+| new tooling assembly (2026-11-12) | — | — | — | — | `dt-cylinder-gear-tl-cam-turning` | MHA-DT-12-TL-00 |
 
 ### Shared vendor families
 
@@ -641,6 +647,12 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-strap-tl-vn-hub-screw` | MHA-CH-13-TL-VN-51 | 2026-11-17 (owner ruling: "Use a 1/4-20 hub screw"): McMaster 91255A539 1/4-20 x 5/8 button head socket cap screw clamping the blank's hub through TL-03 into TL-01; never in a machine assembly or BOM |
 | added | `ch-rocker-strap-tl-fixture` | MHA-CH-13-TL-00 | 2026-11-17: tooling assembly holding TL-01, TL-02, TL-03, four TL-VN-50 and TL-VN-51, so they belong to a registered fixture kit; never in a machine assembly or BOM |
 | changed | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 | Owner ruling 2026-11-13 ("gear phasing comb is overengineered; should be cut to shape from single sheet of brass or other metal"): one .020 in shim sheet cut to shape, the stock's thickness the blades' thickness, every size at the title block (was a 3/32 in 1018 plate with blades milled thin from both faces at shop-row bands); owner, 2026-11-14 (#2734): the cone stands on its journal and the sheet is a flat U clipped over its tip, both arms on T036, a spring arm's second T030 blade holding it from leaning; .020 in half-hard C26000 brass (owner ruling 2026-11-14: ".020 half-hard brass"; OnlineMetals 1589) |
+| added | `dt-cylinder-gear-tl-cam-fixture` | MHA-DT-12-TL-01 | 2026-11-12 (#2361): steel lathe fixture held in the 4-jaw; each MHA-DT-12 gear's bore slides on a stub at the cam throw and a clock pin in its notched tooth space sets the cam phase, so the integral cam is turned on it; never in a machine assembly or BOM |
+| added | `dt-cylinder-gear-tl-vn-cam-stub` | MHA-DT-12-TL-VN-50 | McMaster 97175A344 pull-out dowel, 3/8 × 3/4, tapped 10-32, pressed in the cam fixture as its stub |
+| added | `dt-cylinder-gear-tl-vn-cam-clock-pin` | MHA-DT-12-TL-VN-51 | McMaster 23065A503 class Z gauge pin, .0375, cut to length and pressed in the cam fixture as its clock pin |
+| added | `dt-cylinder-gear-tl-vn-cam-clamp-screw` | MHA-DT-12-TL-VN-52 | McMaster 91251A337 10-32 × 5/16 socket head screw, the cam fixture's clamp into the stub's tap |
+| added | `dt-cylinder-gear-tl-vn-cam-clamp-washer` | MHA-DT-12-TL-VN-53 | McMaster 92141A011 #10 18-8 washer under the cam fixture's clamp screw |
+| added | `dt-cylinder-gear-tl-cam-turning` | MHA-DT-12-TL-00 | 2026-11-12 (#2361) tooling assembly holding the cam fixture and its bought stub, clock pin, clamp screw and washer; the gear is the workpiece and is not placed; never in a machine assembly or BOM |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |
 | added | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | 2026-11-03 Main ruling on Codjiflo P1: McMaster 98381A438 3/32 x 1/2 alloy-steel dowel x1 (ASME B18.8.2, +.0001/+.0003), the TL-27 feed nut's positive anti-rotation key, slip in the nut and pressed into the TL-32 lug; bought fixture hardware modelled for the jig assembly |

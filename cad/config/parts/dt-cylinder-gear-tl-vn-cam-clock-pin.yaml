@@ -1,0 +1,18 @@
+dt-cylinder-gear-tl-vn-cam-clock-pin:
+  title: Cylinder Gear Cam Fixture Clock Pin
+  # Shop fixture: the parent MHA-DT-12 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Issue #2361: a .0375 class Z minus gauge pin cut to length (the
+  # dt-vn-crank-hub-pin pattern: diameter as supplied, length made), pressed in
+  # the MHA-DT-12-TL-01 body; it stands in the gear's notched tooth space.
+  number: MHA-DT-12-TL-VN-51
+  stock_name: Class Z Plug Gauge
+  supplier: McMaster-Carr
+  supplier_skus: ["23065A503"]
+  material: Tool Steel
+  material_specification: "Tool steel class Z no-go plug gauge, size .0375 (-.0001/0), 2 in long, Rockwell C60, ASME B89.1.5; McMaster-Carr 23065A503"
+  finish: cut end deburred
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "gauge pin cut to length; press fit"
+  drawing_unit: in

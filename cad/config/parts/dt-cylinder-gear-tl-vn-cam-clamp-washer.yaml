@@ -1,0 +1,17 @@
+dt-cylinder-gear-tl-vn-cam-clamp-washer:
+  title: Cylinder Gear Cam Fixture Clamp Washer
+  # Shop fixture: the parent MHA-DT-12 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Issue #2361: under the -VN-52 clamp screw's head, bearing on the gear's cam
+  # face inside the cam circle.
+  number: MHA-DT-12-TL-VN-53
+  stock_name: 18-8 Stainless Steel Washer
+  supplier: McMaster-Carr
+  supplier_skus: ["92141A011"]
+  material: AISI 304
+  material_specification: "18-8 stainless steel general-purpose washer for No. 10 screw, 0.203 ID x 0.438 OD x 0.017-0.047; McMaster-Carr 92141A011"
+  finish: AS SUPPLIED
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in
