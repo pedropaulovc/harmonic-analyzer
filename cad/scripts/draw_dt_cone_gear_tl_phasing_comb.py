@@ -45,6 +45,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -145,6 +146,21 @@ def depth_block_width(teeth: int) -> float:
 
 
 FRONT_KEEP = front_keep()
+
+# Note 2's flag: SEE NOTE 2 in the pocket under the T030 blade, between the
+# south end and the first step's extension lines and above the first start
+# row, on a straight leader up to the middle of the seat edge it governs.
+# A note's position is its text's top-left corner.
+SEAT_EDGE_X = (SHEET_BOX[0], front_xy(part.BLADE_START_MM[24], 0.0)[0])
+SEAT_FLAG_TIP = ((SEAT_EDGE_X[0] + SEAT_EDGE_X[1]) / 2.0, front_xy(0.0, 0.0)[1])
+SEAT_FLAG_WIDTH = len(part.SEAT_FLAG) * CHAR_WIDTH
+SEAT_FLAG_XY = (SEAT_FLAG_TIP[0] - SEAT_FLAG_WIDTH / 2.0, SEAT_FLAG_TIP[1] - 0.016)
+SEAT_FLAG_BLOCK = (
+    SEAT_FLAG_XY[0],
+    SEAT_FLAG_XY[1] - LINE_HEIGHT,
+    SEAT_FLAG_XY[0] + SEAT_FLAG_WIDTH,
+    SEAT_FLAG_XY[1],
+)
 
 # --- Bottom view ---------------------------------------------------------------
 # The stock's thickness across the edge view, just right of the sheet's
@@ -288,6 +304,14 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
+    add_leader_note(
+        adapter,
+        part.SEAT_FLAG,
+        text_xy=SEAT_FLAG_XY,
+        attach_xy=SEAT_FLAG_TIP,
+        label="seat edge flag",
+        view=front,
+    )
     drawing.ClearSelection2(True)
     _early_bound(drawing, "IDrawingDoc").EditSheet()
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

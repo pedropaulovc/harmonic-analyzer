@@ -586,15 +586,16 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
 
 # --- Sheet words ----------------------------------------------------------------
 # Each blade's depth names its gear (rule 4) and flags note 1, its reason in
-# one line of at most six words (rule 7); note 2 names the gear the left
-# blade, the depths' datum, seats in. The thickness is the stock's, printed
-# as a reference over SHEET STOCK (pn-pen-hanger, pd-platen-clip): the
-# stock's own tolerance governs.
+# one line of at most six words (rule 7). Note 2 is flagged at the edge it
+# governs, the T030 blade's seat edge, from which the depths are taken. The
+# thickness is the stock's, printed as a reference over SHEET STOCK
+# (pn-pen-hanger, pd-platen-clip): the stock's own tolerance governs.
 NOTE_FLAG = "SEE NOTE 1"
+SEAT_FLAG = "SEE NOTE 2"
 SHEET_NOTES = "\n".join(
     (
         "1. DEPTH CLEARS ROOT OF GEAR NAMED.",
-        f"2. LEFT BLADE SEATS IN {gear_number(REFERENCE_TEETH)}.",
+        f"2. FLAGGED EDGE SEATS IN {gear_number(REFERENCE_TEETH)}.",
     )
 )
 if len(SHEET_NOTES.splitlines()) > 4:
