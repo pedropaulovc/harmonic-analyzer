@@ -3309,13 +3309,13 @@ requests still the base's throughout:
 - a session read (`IModelDoc2.SummaryInfo`, `ISldWorks.GetUserPreference*`);
 - a read of an object an enumeration listed (the outermost handle array it
   descends from), when that enumeration is the base's in another order: its
-  elements' records (each element's answers, in order, to every call on it or
-  on what it answered, handles erased) are the base's records permuted, and
-  every call on or with any of its objects is a read (a get, a wrap, a dispid
-  lookup, a QueryInterface).
+  elements' records (each element's calls, in order, on it or on what it
+  answered: member, arguments and answer, handles erased, title counters
+  masked) are the base's records permuted, and every call on or with any of
+  its objects is a read (a get, a wrap, a dispid lookup, a QueryInterface).
 
-A record that is not the base's (a name changed, a read moved between
-elements) or a call that acts on an element (a selection of the first
+A record that is not the base's (a name changed, a read or a question moved
+between elements) or a call that acts on an element (a selection of the first
 element is another component once the seat listed it in another order) is no
 echo. Not caught: an order-dependent pick carried only by an index into
 another enumeration the script did not read. The first same-key pairs after

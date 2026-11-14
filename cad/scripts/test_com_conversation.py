@@ -3361,6 +3361,7 @@ def _seat_listed(
     names: tuple[str, ...] = ("brace", "arbor", "collar"),
     aim: str = "collar",
     pick: bool = False,
+    asked: tuple[tuple[str, float], ...] = (),
     dated: str = "IModelDoc2.SummaryInfo",
     date: str = "Friday, November 13, 2026 7:01:14 PM",
 ) -> conv.Conversation:
@@ -3371,9 +3372,11 @@ def _seat_listed(
     (:func:`_assembled`); an interference report listing ``reports`` in the
     seat's order, each pair's names read late-bound (ch_channel's); a
     late-bound name set over the components in ``listed`` order (a component
-    pattern's ``before`` set, dt_drive_train's), then with ``pick`` the set's
-    first element added to the selection; then a ``dated`` read answering
-    ``date`` (by default the save date, a session read)."""
+    pattern's ``before`` set, dt_drive_train's), each element then asked the
+    ``asked`` question at its position (a parameter read, its answer), then
+    with ``pick`` the set's first element added to the selection; then a
+    ``dated`` read answering ``date`` (by default the save date, a session
+    read)."""
     calls = [
         _sw("IModelDoc2.GetTitle", result=title),
         _sw("IModelDocExtension.SelectByID2", f"{aim}@{title}", "COMPONENT", on=5),
@@ -3393,6 +3396,10 @@ def _seat_listed(
     calls.append(_sw("IAssemblyDoc.GetComponents", True, result=_handles_of(members)))
     for member, name in zip(members, listed, strict=True):
         calls += _late_name(member, name)
+    for member, (question, value) in zip(members if asked else (), asked, strict=True):
+        read = [61, 0, 2, 1, question]
+        site = "CDispatch.Parameter"
+        calls.append(conv.Call(0, member, "Invoke", read, site, result=_f(value)))
     if pick:
         first = {"h": members[0], "p": "PyIDispatch"}
         calls.append(_sw("ISelectionMgr.AddSelectionListObject", first, None, on=7))
@@ -3440,6 +3447,18 @@ def test_a_dependents_title_echo_tolerates_only_what_the_seat_reordered(
     # ... nor is an interference report pairing other components.
     paired = {**seat, "reports": (("rod-2", "pin-1"), ("rod-1", "pin-2"))}
     assert diff(_seat_listed("Assem6", **paired))["title_echo"] is False
+    # Nor is an answer moved to an element asked another question: asked by
+    # position, each component was asked something else in the other order.
+    asked = (("D1@Sketch1", 5.0), ("D2@Sketch1", 7.0), ("D3@Sketch1", 9.0))
+    logs["base"] = _seat_listed("Assem3", asked=asked)
+    moved = (("D1@Sketch1", 9.0), ("D2@Sketch1", 5.0), ("D3@Sketch1", 7.0))
+    assert diff(_seat_listed("Assem6", **seat, asked=moved))["title_echo"] is False
+    # The same question of every component, answered per component, is only
+    # the seat's order.
+    uniform = tuple(("D1@Sketch1", value) for _, value in asked)
+    logs["base"] = _seat_listed("Assem3", asked=uniform)
+    same = tuple(("D1@Sketch1", value) for _, value in moved)
+    assert diff(_seat_listed("Assem6", **seat, asked=same))["title_echo"] is True
     # Selecting the set's first element selects another component once the
     # seat listed it in another order, by the very same request...
     logs["base"] = _seat_listed("Assem3", pick=True)

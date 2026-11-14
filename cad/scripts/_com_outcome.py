@@ -718,12 +718,13 @@ def _order_only(
     (:data:`_SESSION_SITE`: the clock, the application's preferences) or a
     read of an object an enumeration listed (:func:`_elements`: the outermost
     handle array it descends from), and every such enumeration is the base's
-    in another order. That is, its elements' records (each element's answers,
-    in order, to every call on it or on what it answered, handles erased:
-    :func:`_keyed`) are the base's records, permuted: whole elements moved,
-    no read moved between them. Every call on or with an object of such an
-    enumeration must be a read (:data:`_READ_KINDS`): the script only
-    collected what it read, in whatever order the seat listed it.
+    in another order. That is, its elements' records (each element's calls,
+    in order, on it or on what it answered: member, arguments and answer,
+    handles erased and strings normalised, :func:`_keyed`) are the base's
+    records, permuted: whole elements moved, no read and no question moved
+    between them. Every call on or with an object of such an enumeration must
+    be a read (:data:`_READ_KINDS`): the script only collected what it read,
+    in whatever order the seat listed it.
 
     2026-11-14, the first same-key pairs after #2730: ch_channel's
     interference report (the same 86 pairs, their ``IInterference.Components``
@@ -759,12 +760,18 @@ def _order_only(
             continue
         root, member = found
         base, new = records.setdefault(root, ({}, {}))
-        base.setdefault(member, []).append([x.site, _keyed(_answer(x))])
-        new.setdefault(member, []).append([y.site, _keyed(_answer(y))])
+        base.setdefault(member, []).append(_asked(x))
+        new.setdefault(member, []).append(_asked(y))
     return all(
         Counter(map(_exact, base.values())) == Counter(map(_exact, new.values()))
         for base, new in records.values()
     )
+
+
+def _asked(call: conv.Call) -> list[Any]:
+    """A call as an element's record holds it (:func:`_order_only`): its
+    member, arguments and answer, handles erased and strings normalised."""
+    return [call.site, _keyed(call.args), _keyed(_answer(call))]
 
 
 def _elements(calls: Sequence[conv.Call]) -> Callable[[int], tuple[int, int] | None]:
