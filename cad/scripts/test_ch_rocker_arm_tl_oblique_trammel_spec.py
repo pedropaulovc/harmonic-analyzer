@@ -289,7 +289,7 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     the play the check admits moves the cut radius 1:1, and with the shoulder
     clearance it must stay inside half the strap's top-edge band (the hub aims
     at its middle)."""
-    assert trammel.CARRIAGE_PLAY_TIR_MAX == pytest.approx(0.0005 * trammel.INCH)
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.02
     assert trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY == 1.0
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         1.0 * trammel.CARRIAGE_PLAY_TIR_MAX
@@ -300,9 +300,9 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     assert trammel.CARRIAGE_PLAY_RADIUS <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     budget = trammel.CARRIAGE_PLAY_RADIUS + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert budget <= half_band
-    # .0127 + .1346 leaves .1067 here; the complete carrier stack also charges
+    # .020 + .135 leaves .099 here; the complete carrier stack also charges
     # HUB setting/rounding and the correlated pin error against that same HUB.
-    assert half_band - budget == pytest.approx(0.1067, abs=5e-4)
+    assert half_band - budget == pytest.approx(0.0994, abs=5e-4)
 
 
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:

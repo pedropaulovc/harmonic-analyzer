@@ -24,8 +24,7 @@ MHA-CH-06-TL-00 fit-up (its steps 1 and 14C, not this part sheet: rule 7) by
 its lateral play: the carrier rocked by hand sideways to the rail, at most
 ``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR read at the shoulder-screw head (the
 trammel spec's docstring carries the radius budget). Owner P1-A (2026-11-07,
-PR #2236 comment 4504212381) set that acceptance; the 2026-11-13 ream ruling
-tightens it to .0005 in. Of the four
+PR #2236 comment 4504212381) sets that acceptance to 0.02 mm. Of the four
 kit carriages the two tightest are kept, one per rail. If no carriage on a
 rail passes, the jig assembly's preparation step replaces the
 MHA-CH-06-TL-VN-83 kit (owner ruling 2026-11-08: no fallback carriage).

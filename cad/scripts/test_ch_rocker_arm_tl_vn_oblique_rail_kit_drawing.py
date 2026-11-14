@@ -710,7 +710,7 @@ def test_carriage_note_is_the_owner_kit_description() -> None:
     ):
         assert fact in note, fact
     assert "PIVOT" not in note
-    assert trammel.CARRIAGE_PLAY_TIR_MAX == pytest.approx(0.0005 * trammel.INCH)
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.02
     assert jig.DRAWING_NUMBER not in note
     # The item tags are the sheet's own member labels.
     assert [label.split()[0] for _, label in draw.VARIANTS] == [

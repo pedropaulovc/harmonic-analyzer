@@ -78,20 +78,19 @@ Error sensitivity (printed next to the bands that carry it):
   alpha 16.4405 deg, D 450.1, R_c 795.24 over the +/-11 deg sweep gave
   0.01 / 0.02 / 0.05 mm of play as at most 0.010 / 0.020 / 0.050 mm of
   radial error (owner, issue #2177). Owner P1-A (2026-11-07, PR #2236
-  comment 4504212381) tightened ``CARRIAGE_PLAY_TIR_MAX`` to 0.02 mm TIR at
+  comment 4504212381) tightens ``CARRIAGE_PLAY_TIR_MAX`` to 0.02 mm TIR at
   the shoulder-screw head, retaining that same sideways-rocking check and
-  keeping the two tightest of the four kit carriages. The owner's 2026-11-13
-  ream ruling (.3760-.3770 carrier bores) widens the shoulder clearance, so
-  the acceptance is .0005 in (0.0127 mm) TIR, printed exactly, with the same
-  check, and the HUB DRO setting ±.0002. Its radius contribution
-  ``CARRIAGE_PLAY_RADIUS`` is 0.0127 mm. ``carrier_spec.pin_relative_stack``
+  keeping the two tightest of the four kit carriages. Its radius contribution
+  ``CARRIAGE_PLAY_RADIUS`` is 0.020 mm. ``carrier_spec.pin_relative_stack``
   adds it once to the HUB setting stack (already including shoulder clearance)
-  and each pass's correlated pin error: outer 0.25170, inner 0.15723 mm,
-  both inside the unchanged 0.254 mm half-band. The rail/carriage pair's
+  and each pass's correlated pin error: outer 0.26662, inner 0.17215 mm.
+  The outer edge's linear worst case is .0005 over the unchanged 0.254 mm
+  half-band; the owner accepts that overrun (2026-11-13, the carrier row's
+  machinist exception RV-03). The rail/carriage pair's
   height and width tolerances do not apply: one carriage runs on each rail,
   the selected shims set the carrier height, and the strap HUB is reamed
   in place. Z0 preload and C accuracy are not required for a passing kit
-  carriage; if none on a rail meets .0005, the rail kit is replaced (owner
+  carriage; if none on a rail meets 0.02, the rail kit is replaced (owner
   ruling 2026-11-08: no fallback carriage).
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
@@ -367,9 +366,7 @@ RADIUS_FROM_SHOULDER_CLEARANCE = (
 # shoulder-screw head rocking the carrier sideways to the rail, and the cut
 # radius it can move (1:1, owner's numeric trammel check, #2177).
 # Owner P1-A, 2026-11-07: PR #2236 comment 4504212381; same inspection method.
-# Tightened from 0.02 mm to .0005 in with the 2026-11-13 ream ruling (the
-# carrier's .3760-.3770 bores; carrier_spec.pin_relative_stack).
-CARRIAGE_PLAY_TIR_MAX = 0.0005 * INCH
+CARRIAGE_PLAY_TIR_MAX = 0.02
 CARRIAGE_PLAY_RADIUS_PER_PLAY = 1.0
 CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 # The hub aims at the middle of the strap's one-sided top-edge band, so the

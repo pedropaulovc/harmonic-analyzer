@@ -317,24 +317,25 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
     assert trammel.HUB[1] - trammel.APEX_Y == pytest.approx(trammel.HUB_OFFSET)
     half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
     assert half == pytest.approx(0.010 * trammel.INCH)  # .020 one-sided profile
-    # The setting: the printed .5125, held to ±.0002 (owner ruling 2026-11-13).
+    # The setting: the printed .5125 at a .0001 DRO, held to ±.0005.
     assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5125"
-    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0002 * trammel.INCH)
+    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0005 * trammel.INCH)
     # The shift: the widest pin clearance, x 1.77 on R.
     shift = trammel.RADIUS_PER_SPACING * spec.PIN_CLEARANCE_MAX
     worst = (
         spec.HUB_OFFSET_BAND + abs(spec.HUB_OFFSET_PRINTED - trammel.HUB_OFFSET) + shift
     )
     assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
-    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.141"
+    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.148"
     assert spec.HUB_RADIAL_STACK < half
     # #2236 P1-A: the HUB setting, each pass's correlated pin error and
-    # carriage play, counted once against the same HUB, stay inside half-band.
+    # carriage play, counted once against the same HUB, stay inside half-band
+    # plus the owner's accepted .0005 overrun (RV-03, owner 2026-11-13).
     for name, error in spec.PIN_RELATIVE_ERROR.items():
         assert spec.PIN_RELATIVE_STACK[name] == pytest.approx(
             spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
         )
-        assert spec.PIN_RELATIVE_STACK[name] < half
+        assert spec.PIN_RELATIVE_STACK[name] <= half + spec.PIN_RELATIVE_OWNER_OVERRUN
 
 
 def test_table_states_each_size_group_once() -> None:

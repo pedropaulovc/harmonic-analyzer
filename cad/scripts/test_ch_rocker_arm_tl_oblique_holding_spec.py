@@ -186,8 +186,8 @@ def test_table_layer_charges_each_correlated_pin_error_once() -> None:
             - holding.WASHER_OFFSET_MAX - carrier.PIN_RELATIVE_STACK[name]
         )
     # OD .453 offset .806 mm plus .02 play, with the 2026-11-13 ream ruling's
-    # HUB stack, leaves ~0.935 outer, above the > 0 floor.
-    assert holding.WASHER_GAPS_MIN == pytest.approx({"inner": 1.53722, "outer": 0.93475}, abs=5e-5)
+    # HUB stack, leaves ~0.920 outer, above the > 0 floor.
+    assert holding.WASHER_GAPS_MIN == pytest.approx({"inner": 1.52230, "outer": 0.91983}, abs=5e-5)
     # End heads: each point's own table-row and cut displacement.
     for name in trammel.SWEEP:
         assert holding.END_HEAD_GAPS_MIN[name] == pytest.approx(min(

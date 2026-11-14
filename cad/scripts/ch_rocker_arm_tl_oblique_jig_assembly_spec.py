@@ -1461,8 +1461,7 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 # Rail setting is an assembly control, independent of the carrier's .XXX
 # hole-table locations. Owner ruling 2026-11-08 (Pedro), A3 option C, as
 # ruled: "the stack's stations S 4.00, 8.00, 12.00 and 15.00 and its hub X 0,
-# Y .5125 ±.0005 stay [hub Y now ±.0002: carrier.HUB_OFFSET_BAND, owner ream
-# ruling 2026-11-13]; each table move (origin to S 4.00 to 8.00 to 12.00 to
+# Y .5125 ±.0005 stay; each table move (origin to S 4.00 to 8.00 to 12.00 to
 # 15.00 along each rail, and the hub's Y from the origin) is made with an
 # inch gauge-block stack between a stop clamped on the table and a dial
 # indicator fixed to the machine", the shop table's "assembly gap, alignment
@@ -2164,10 +2163,10 @@ _STUD_STOCK = f"{hold_down_stud.STOCK_LENGTH} IN KIT STUD STOCK"
 HOLD_DOWN_STEPS_REFERENCE = "13A-13H"
 
 # Carriage play (#2177): owner P1-A (2026-11-07, PR #2236 comment
-# 4504212381) set trammel.CARRIAGE_PLAY_TIR_MAX, read at the shoulder-screw
-# head; the 2026-11-13 ream ruling tightens it to .0005 in, which the inch
-# sheet prints exactly at four places. The radial stack charges the printed
-# limit.
+# 4504212381) sets trammel.CARRIAGE_PLAY_TIR_MAX, 0.02 mm, read at the
+# shoulder-screw head. The inch sheet prints it converted to four places,
+# .0008 TIR (RV-06 accepts the converted value); the radial stack charges
+# the printed limit.
 CARRIAGE_PLAY_TIR_PLACES = 4
 CARRIAGE_PLAY_TIR_PRINTED = (
     round(trammel.CARRIAGE_PLAY_TIR_MAX / trammel.INCH, CARRIAGE_PLAY_TIR_PLACES) * trammel.INCH

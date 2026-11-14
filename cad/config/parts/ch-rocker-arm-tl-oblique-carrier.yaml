@@ -43,4 +43,9 @@ ch-rocker-arm-tl-oblique-carrier:
       where: "hole-table A2/B2 rows flagged NOTE 1"
       finding: "one flagged note carries the local Y .964 ±.002 control rather than a separate dimension (rules 3 and 7)"
       reason: "Owner Option B ruling 2026-11-06, Ref #2151: print exactly 'A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE'. The model owns the matching local limits, the native table owns all .XXX coordinates from A1, and this package-specific note does not establish general drawing policy or add a shop check."
+    - id: "RV-03"
+      kind: "accept"
+      where: "4X REAM THRU A1, B1, A2, B2 (.3760-.3770, running fit on the TL-VN-77 shoulder screws)"
+      finding: "with the HUB DRO setting (±.0005), the .0010-.0030 shoulder clearance, the correlated pin-location error and the .0008 TIR carriage play, the strap's outer edge reaches .0105 from the pivot at the worst-case corner, a linear sum with no RSS, against half the rocker's 0/-.020 top-edge band (.010)"
+      reason: "Owner 2026-11-13 (via coordinator): accept the .0005 overrun at the worst-case corner. The bores are what the owned .3760 over reamer cuts, checked .376 GO / .377 NO-GO with the owned pin set; the HUB setting and carriage-play acceptance are not tightened. carrier_spec.PIN_RELATIVE_OWNER_OVERRUN states the allowance at the pin_relative_stack check."
   drawing_unit: in

@@ -72,14 +72,18 @@ def test_owner_pin_only_bounds_and_rounded_budget():
         name: spec.HUB_RADIAL_STACK + error + trammel.CARRIAGE_PLAY_RADIUS
         for name, error in spec.PIN_RELATIVE_ERROR.items()
     })
-    assert spec.HUB_RADIAL_STACK == pytest.approx(.14070, abs=5e-6)
+    assert spec.HUB_RADIAL_STACK == pytest.approx(.14832, abs=5e-6)
     assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(.13462, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.15723, abs=5e-6)
-    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.25170, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["inner"] == pytest.approx(.17215, abs=5e-6)
+    assert spec.PIN_RELATIVE_STACK["outer"] == pytest.approx(.26662, abs=5e-6)
     assert spec.PIN_RELATIVE_REMAINING == pytest.approx({
         name: half - stack for name, stack in spec.PIN_RELATIVE_STACK.items()
     })
-    assert min(spec.PIN_RELATIVE_REMAINING.values()) > 0
+    # RV-03 (owner 2026-11-13): the outer edge runs .0005 over the half band
+    # at the worst-case corner; the inner edge stays inside it.
+    assert spec.PIN_RELATIVE_OWNER_OVERRUN == pytest.approx(.0005 * I)
+    assert spec.PIN_RELATIVE_REMAINING["inner"] > 0
+    assert -spec.PIN_RELATIVE_OWNER_OVERRUN <= spec.PIN_RELATIVE_REMAINING["outer"] < 0
     # The retired .005 PIN_RELATIVE_ALLOWANCE no longer bounds the HUB stack:
     # the functional limit is the half band, charged with every term above.
     assert spec.HUB_RADIAL_STACK < half
@@ -105,7 +109,7 @@ def test_carriage_play_is_charged_once_and_old_acceptance_is_rejected(monkeypatc
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
     without_play = spec.pin_relative_stack()
     for name in accepted:
-        assert accepted[name] - without_play[name] == pytest.approx(.0127)
+        assert accepted[name] - without_play[name] == pytest.approx(.02)
     # PR #2236 P1: the old .05 acceptance exceeds the unchanged .254 half-band.
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", .05)
     with pytest.raises(AssertionError, match="radial band"):
@@ -118,8 +122,8 @@ def test_station_cut_and_sweep_consumers_charge_carriage_play_once(monkeypatch, 
     cut = spec.station_cut_error(point, pass_name)
     sweep = spec.station_sweep_error(point, pass_name)
     monkeypatch.setattr(trammel, "CARRIAGE_PLAY_RADIUS", 0.0)
-    assert cut - spec.station_cut_error(point, pass_name) == pytest.approx(.0127)
-    assert sweep - spec.station_sweep_error(point, pass_name) == pytest.approx(.0127)
+    assert cut - spec.station_cut_error(point, pass_name) == pytest.approx(.02)
+    assert sweep - spec.station_sweep_error(point, pass_name) == pytest.approx(.02)
 
 
 def _circle(a, b):
