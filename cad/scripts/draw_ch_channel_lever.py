@@ -253,7 +253,7 @@ TOP_KEEP = {
     # neither line runs through the other's text.
     "HubLength": (0.075, TOP_CENTER[1] + 0.032),
     # Its value row sits under the hub length's shelf (ch-fab-2 r3: at +0.018
-    # that shelf struck the .091); its one row of words and its shelf still
+    # that shelf struck the offset value); its one row of words and its shelf still
     # stand ~4 mm above its own arrows over the plate.
     "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
