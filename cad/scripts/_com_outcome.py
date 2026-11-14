@@ -168,7 +168,7 @@ GEOMETRY: dict[str, tuple[str, ...]] = {
 # The kinds judged as dependents of other models (assemblies and drawings):
 # only telemetry, nothing of their recordings is reused, so these judgements
 # name causes more finely than a part's (:func:`truth_cause`,
-# :func:`_distance_only`, :func:`jagged_outline`, :func:`name_bound`).
+# :func:`_dependent_answers`, :func:`jagged_outline`, :func:`name_bound`).
 DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
 # Members whose answer a dependent's ``answers`` signal compares by its first
 # element only: ``IModelDoc2.ClosestDistance`` answers the distance, then a
@@ -176,6 +176,19 @@ DEPENDENT_KINDS = frozenset({"assembly", "drawing"})
 # points is a witness. 2026-11-13, dt_drive_train built twice under one key:
 # 6.882839 mm both times, the witnesses 17.47 mm apart along the faces.
 _DISTANCE_ONLY = frozenset({"IModelDoc2.ClosestDistance"})
+# Load-warning bits a dependent's :func:`title_echo` and ``answers`` signal
+# ignore, per member (:func:`_unwarned`). ``ISldWorks.OpenDoc6`` answers the
+# document, then its ``Errors`` and ``Warnings`` out-parameters, the warnings
+# a bitmask (skill developing-solidworks, enums/swFileLoadWarning_e.md).
+# ``swFileLoadWarning_NeedsRegen`` (32, "the document needs to be rebuilt")
+# on reopening the assembly the script just saved is the seat's: of 33 such
+# reopens recorded 2026-11-13..14, 30 read 32 and 3 read 0 (swmaker000005
+# and swmaker00000A after 09:47Z on the 14th, seats that had read 32), while
+# the ``IModelDocExtension.NeedsRebuild2`` the script reads right after,
+# compared exactly, was 1 in all 33. dt_drive_train built twice under one key
+# differed in that bit alone. The errors and every other warning bit stay
+# exact.
+_IGNORED_WARNINGS = {"ISldWorks.OpenDoc6": 32}
 # Members SolidWorks computes approximately, with the relative tolerance a
 # dependent's ``answers`` signal and :func:`_order_only`'s records compare
 # their floats within, each on the larger of the two (:func:`_approximately`).
@@ -782,7 +795,8 @@ def title_echo(
 
     A dependent's answers (:data:`DEPENDENT_KINDS`; a part's are judged as
     above) may also differ where the seat made them differ, its requests the
-    base's throughout (:func:`_order_only`)."""
+    base's throughout (:func:`_order_only`), and in the load warnings
+    :data:`_IGNORED_WARNINGS` names (:func:`_unwarned`)."""
     if len(a) != len(b):
         return False
     differing: list[int] = []
@@ -796,7 +810,8 @@ def title_echo(
         if not _alike(_answer(x), _answer(y)):
             if kind not in DEPENDENT_KINDS:
                 return False
-            differing.append(index)
+            if not _alike(_answer(_unwarned(x)), _answer(_unwarned(y))):
+                differing.append(index)
     return _order_only(a, b, differing)
 
 
@@ -807,6 +822,22 @@ def _alike(a: Any, b: Any) -> bool:
     if conv.same(a, b) and not _nan(a):
         return True
     return _close(a, b)
+
+
+def _unwarned(call: conv.Call) -> conv.Call:
+    """``call`` with the warning bits :data:`_IGNORED_WARNINGS` names for its
+    member cleared from its answer (the document, the errors, the warnings);
+    ``call`` itself for any other member or answer, or with none of them set."""
+    bits = _IGNORED_WARNINGS.get(call.site)
+    answer = call.result
+    if bits is None or not isinstance(answer, dict):
+        return call
+    out = answer.get("t")
+    if not isinstance(out, list) or len(out) != 3 or type(out[2]) is not int:
+        return call
+    if not out[2] & bits:
+        return call
+    return replace(call, result={**answer, "t": [*out[:2], out[2] & ~bits]})
 
 
 def _nan(value: Any) -> bool:
@@ -1148,7 +1179,9 @@ def outcome(
             [(site, request) for site, request, _ in keyed[0]],
             [(site, request) for site, request, _ in keyed[1]],
         ),
-        "answers": lambda: _answers_signal(*_distance_only(keyed, a, b, kind), kind),
+        "answers": lambda: _answers_signal(
+            *_dependent_answers(keyed, a, b, kind), kind
+        ),
         "stl": lambda: _stl_signal(base, new, base_captures, new_captures),
         "pdf": lambda: _pdf_signal(*inks()),
         "sidecars": lambda: _sidecar_signal(base_sidecars, new_sidecars),
@@ -1786,7 +1819,7 @@ def _keyed_calls(calls: Sequence[conv.Call]) -> list[tuple[str, str, str | None]
     return keyed
 
 
-def _distance_only(
+def _dependent_answers(
     keyed: tuple[list[tuple[str, str, str | None]], ...],
     a: Sequence[conv.Call],
     b: Sequence[conv.Call],
@@ -1794,7 +1827,8 @@ def _distance_only(
 ) -> tuple[Sequence[Any], ...]:
     """:func:`_answers_signal`'s arguments: for a dependent
     (:data:`DEPENDENT_KINDS`), each :data:`_DISTANCE_ONLY` answer cut to its
-    first element, the distance, and keyed again; a part's as recorded."""
+    first element, the distance, and each :data:`_IGNORED_WARNINGS` bit
+    cleared (:func:`_unwarned`), each keyed again; a part's as recorded."""
     if kind not in DEPENDENT_KINDS:
         return keyed[0], keyed[1], a, b
     (keys_a, cut_a), (keys_b, cut_b) = _cut(keyed[0], a), _cut(keyed[1], b)
@@ -1806,18 +1840,26 @@ def _cut(
 ) -> tuple[list[tuple[str, str, str | None]], list[conv.Call]]:
     kept_keys, kept_calls = list(keyed), list(calls)
     for index, call in enumerate(calls):
-        answer = call.result
-        if call.site not in _DISTANCE_ONLY or keyed[index][2] is None:
+        if keyed[index][2] is None:
             continue
-        if not isinstance(answer, dict) or not isinstance(answer.get("t"), list):
+        cut = _unwarned(_distance_cut(call))
+        if cut is call:
             continue
-        if not answer["t"]:
-            continue
-        call = replace(call, result=answer["t"][0])
-        kept_calls[index] = call
-        key = json.dumps(_keyed(_answer(call)), separators=(",", ":"))
-        kept_keys[index] = (call.site, keyed[index][1], key)
+        kept_calls[index] = cut
+        key = json.dumps(_keyed(_answer(cut)), separators=(",", ":"))
+        kept_keys[index] = (cut.site, keyed[index][1], key)
     return kept_keys, kept_calls
+
+
+def _distance_cut(call: conv.Call) -> conv.Call:
+    """A :data:`_DISTANCE_ONLY` call answering only its first element, the
+    distance; ``call`` itself for any other member or answer."""
+    answer = call.result
+    if call.site not in _DISTANCE_ONLY or not isinstance(answer, dict):
+        return call
+    if not isinstance(answer.get("t"), list) or not answer["t"]:
+        return call
+    return replace(call, result=answer["t"][0])
 
 
 def _multiset_signal(

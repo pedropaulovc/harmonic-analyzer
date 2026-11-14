@@ -3605,6 +3605,41 @@ def test_a_dependents_non_finite_volume_only_matches_itself(tmp_path, monkeypatc
     assert judged(math.nan, noisy)[0] is False
 
 
+def _reopened(listed: conv.Conversation, errors: int, warnings: int):
+    """``listed``, then the assembly it saved reopened (``ISldWorks.OpenDoc6``
+    on the application), answering the document, ``errors`` and ``warnings``."""
+    opened = {"t": [{"h": 900, "p": "PyIDispatch"}, errors, warnings]}
+    path = "<OUT>\\sldasm\\assem.SLDASM"
+    reopen = _sw("ISldWorks.OpenDoc6", path, 2, 1, "", 0, 0, result=opened, on=1)
+    return conv.Conversation(_HEADER, [*listed.calls, reopen], {})
+
+
+def test_a_dependents_reopen_may_differ_only_in_the_needs_rebuild_warning(
+    tmp_path, monkeypatch
+):
+    regen, already_open = 32, 128
+    base = _reopened(_seat_listed("Assem3"), 0, regen)
+    _, diff = _seat_diff(tmp_path, monkeypatch, base)
+
+    def judged(errors: int, warnings: int, kind: str = "assembly", seat=None):
+        listed = _seat_listed("Assem6", **(_ANOTHER_SEAT if seat is None else seat))
+        found = diff(_reopened(listed, errors, warnings), kind)
+        return found["title_echo"], found["outcome_signals"]["answers"]
+
+    # 2026-11-14, dt_drive_train built twice under one key: its saved assembly
+    # reopened with swFileLoadWarning_NeedsRegen on one seat, with none on
+    # another, and nothing else differed.
+    assert judged(0, 0) == (True, "same")
+    # Any other warning bit is other news of the document...
+    assert judged(0, regen | already_open) == (False, "different")
+    assert judged(0, already_open) == (False, "different")
+    # ... and so is a load error.
+    assert judged(1, regen) == (False, "different")
+    # A part's reopen answers stay compared whole, the bit included.
+    assert judged(0, regen, "part", seat={}) == (True, "same")
+    assert judged(0, 0, "part", seat={}) == (False, "different")
+
+
 def test_a_dependents_relational_reads_name_the_element_they_ask_about(
     tmp_path, monkeypatch
 ):
