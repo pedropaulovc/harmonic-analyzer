@@ -1259,8 +1259,10 @@ tight; for the 64T the head is tilted and there is no tail centre.
 ### Cylinder-gear cam
 
 The cam is turned last, on the fixture MHA-DT-12-TL-01. The body is gripped in the four-jaw chuck,
-indicated true once on its register diameter and left there for all 20 gears. Each gear goes on
-the fixture's Ø3/8 stub by its reamed bore, with the notched tooth space over the clock pin, is
+its Ø3.25 OD (the register) indicated to .0005 TIR with a dial test indicator once
+(MHA-DT-12-TL-00 step K3, the TIR the throw and phase budgets below assume) and left there for
+all 20 gears. Each gear goes on the fixture's Ø3/8 stub by its reamed bore, with the notched
+tooth space over the clock pin, is
 turned against the pin in the direction the cut pushes it (MHA-DT-12-TL-00 step 2) and is clamped
 by the screw in the stub's end. One screw and a Ø.0375 pin hold it, and the cut is interrupted
 until the cam cleans up, so rough each cam close to size before it goes on the fixture and take
@@ -1279,8 +1281,9 @@ harmonic's sine into its cosine (.7% of the summed amplitudes at .39°), the sam
 channels. MHA-DT-12's throw and phase bands are gear-to-gear and the fixture's common part is
 accepted (delegated ruling 2026-11-14, pending owner confirmation,
 [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923)).
-The first cam is the fixture's acceptance: its throw within MHA-DT-12's print before the other 19
-are cut, else item 1 is corrected (MHA-DT-12-TL-00 check 5). The clamp screw's .16-.25 in
+The first cam is the fixture's acceptance (MHA-DT-12-TL-00 check 5): its throw within MHA-DT-12's
+print before the other 19 are cut; if it fails, item 1 is re-indicated and checks 1 and 5
+repeated, and if it still fails item 1 is reworked to MHA-DT-12-TL-01. The clamp screw's .16-.25 in
 (0.84D-1.30D) engagement, under rule 18's 1.5D floor, is accepted by the same ruling
 (MHA-DT-12-TL-00 RV-01).
 

@@ -70,13 +70,14 @@ def test_the_kit_places_each_bought_part_on_its_hole() -> None:
     assert 0.0 < fixture.SCREW_ENGAGEMENT < fixture.DOWEL_THREAD_DEPTH_MIN
 
 
-def test_bought_items_balloon_in_the_isometric_by_walking_their_own_body() -> None:
-    # A side view draws each bought item's rims edge-on, as short lines a
-    # leader does not land on as asked (runs 20261112T203156536Z,
-    # 20261113T012650242Z, 20261113T042822797Z); the isometric draws them as
-    # ellipses. No anchor is computed: every item walks its own body.
-    assert sheet.FRONT_ITEMS == (sheet.BODY,)
-    assert set(sheet.ISO_ITEMS) == set(sheet.BOM_COMPONENTS) - {sheet.BODY}
+def test_every_item_balloons_by_walking_its_own_body() -> None:
+    # A side view draws each bought item's rims edge-on, where computed
+    # anchors failed (runs 20261113T012650242Z, 20261113T042822797Z); item 2
+    # walked in the isometric landed beside item 4 (run 20261114T221042598Z),
+    # so items 1 and 2 walk in the front view, items 3-5 in the isometric.
+    # No anchor is computed.
+    assert sheet.FRONT_ITEMS == (sheet.BODY, sheet.STUB)
+    assert set(sheet.ISO_ITEMS) == set(sheet.BOM_COMPONENTS) - set(sheet.FRONT_ITEMS)
     assert sheet.FRONT_ITEMS + sheet.ISO_ITEMS == sheet.BOM_COMPONENTS
     assert set(sheet.BALLOON_ANCHORS) == set(sheet.BOM_COMPONENTS)
     for stem, anchor in sheet.BALLOON_ANCHORS.items():
@@ -92,12 +93,34 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     # review: a 1:1 top view over a 2:1 right view turned 90 deg).
     assert sheet.TOP_CENTER[0] == sheet.FRONT_CENTER[0]
     assert sheet.TOP_CENTER[1] > sheet.FRONT_CENTER[1]
-    for caption in (sheet.TOP_CAPTION, sheet.FRONT_CAPTION, sheet.EXPLODED_CAPTION):
+    for caption in (sheet.TOP_CAPTION, sheet.EXPLODED_CAPTION):
         assert not re.search(r"\d:\d", caption), caption
-    # The steps start below the BOM and the checks below the steps.
+    assert not hasattr(sheet, "FRONT_CAPTION")
+    # The steps start below the BOM, the checks below the steps and end
+    # above the title block (y <= .066 m at x >= .216 m).
     assert sheet.STEPS_XY[1] < sheet.BOM_ANCHOR[1] - 0.070
     steps_lines = len(sheet.ASSEMBLY_STEPS.splitlines())
     assert sheet.CHECKS_XY[1] < sheet.STEPS_XY[1] - steps_lines * sheet.LINE_PITCH
+    checks_lines = len(sheet.ASSEMBLY_CHECKS.splitlines())
+    assert sheet.CHECKS_XY[1] - checks_lines * sheet.LINE_PITCH > 0.066
+
+
+def test_the_register_is_set_as_a_numbered_step_at_the_budgets_tir() -> None:
+    # The heading carried 'INDICATED TRUE' with no limit (run
+    # 20261114T221042598Z): K3 names item 1's OD, the budget's TIR and the
+    # instrument; the throw and phase budgets carry the same REGISTER_TIR.
+    k3 = sheet.KIT_STEPS[sheet.KIT_STEPS.index("K3. ") :]
+    assert f"Ø{fixture.BODY_DIA_TEXT} OD" in k3
+    assert f"{fixture.REGISTER_TIR_TEXT} TIR" in k3
+    assert "DIAL TEST INDICATOR" in k3
+    assert fixture.REGISTER_TIR_TEXT == ".0005"
+    assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
+    assert "INDICATED TRUE" not in sheet.FITTING_STEPS
+    # Check 5 is the check alone; its remedy follows, unnumbered.
+    checks = sheet.ASSEMBLY_CHECKS.splitlines()
+    five = checks.index(f"5. {fixture.FIRST_CAM_CHECK_TEXT}")
+    assert checks[five + 1 :] == list(fixture.FIRST_CAM_REMEDY_TEXT)
+    assert "REWORK ITEM 1 TO MHA-DT-12-TL-01" in " ".join(fixture.FIRST_CAM_REMEDY_TEXT)
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
@@ -163,8 +186,7 @@ def test_the_sheet_states_the_engagement_value_and_the_runout_window() -> None:
     low, high = (float(value) for value in fixture.STUB_RUNOUT_TEXT.split(" TO "))
     assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
     # The first cam accepts the fixture (delegated ruling 2026-11-14).
-    for line in fixture.FIRST_CAM_CHECK_TEXT:
-        assert line in sheet.ASSEMBLY_CHECKS
+    assert f"5. {fixture.FIRST_CAM_CHECK_TEXT}" in sheet.ASSEMBLY_CHECKS
 
 
 def test_the_short_screw_engagement_is_a_delegated_rule_18_exception() -> None:

@@ -123,22 +123,24 @@ BOM_DESCRIPTIONS = {
 BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     stem: (stem, None) for stem in BOM_COMPONENTS
 }
-# Item 1 balloons in the front view, items 2-5 in the shaded isometric. A
-# side view sees every round item's rims edge-on, each drawn as one line
-# across the item's axis, and on a short line no anchor holds: run
-# 20261112T203156536Z walked item 2 to its top rim 1.42 mm (sheet) in from
-# the line's end and the leader read back on the end (_assert_leader_lands,
-# limit 0.2 mm); frozen points on those rims then probed as no edge at all
-# (run 20261113T012650242Z, item 5's head top; run 20261113T042822797Z,
-# item 2's top rim .025 short of the line's end). Item 1's walked rim point
-# on its long rim line landed where asked (runs 20261112T203156536Z and
-# 20261113T085510850Z, then in the right view). The isometric draws every
-# bought item's rims as ellipses, so each walks its own body there (run
-# 20261113T085510850Z placed all four), as the fly cutter's set screw does
-# on its end-on bottom view (draw_dt_cone_tip_gear_tl_cutter_assembly).
+# Items 1 and 2 balloon in the front view, items 3-5 in the shaded
+# isometric, each walking its own body (no computed anchor). A side view
+# sees every round item's rims edge-on, each drawn as one line across the
+# item's axis, and on a short line no computed anchor held: frozen points
+# on those rims probed as no edge at all (run 20261113T012650242Z, item 5's
+# head top; run 20261113T042822797Z, item 2's top rim .025 short of the
+# line's end). Item 1's walked point landed where asked in every side view
+# since. Item 2 walked in the isometric landed on the washer's rim beside
+# item 4 (run 20261114T221042598Z's review), so it walks in the front view
+# at 1:1, where it stands clear above item 1; run 20261112T203156536Z's walk
+# of it at 2:1 in the right view read back on its rim line's end, the risk
+# this placement carries. The isometric draws items 3-5's rims as ellipses
+# (run 20261113T085510850Z placed all four bought items there), as the fly
+# cutter's set screw does on its end-on bottom view
+# (draw_dt_cone_tip_gear_tl_cutter_assembly).
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
-FRONT_ITEMS = (BODY,)
-ISO_ITEMS = (STUB, CLOCK_PIN, WASHER, SCREW_STEM)
+FRONT_ITEMS = (BODY, STUB)
+ISO_ITEMS = (CLOCK_PIN, WASHER, SCREW_STEM)
 if FRONT_ITEMS + ISO_ITEMS != BOM_COMPONENTS:
     raise AssertionError("every BOM row is ballooned once")
 BALLOON_MARGIN = 0.012
@@ -163,22 +165,21 @@ def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
 # isometric moved 14 mm right and 5 mm down (item 2's edge at about 25 mm,
 # 12 mm inside) and the front view 15 mm up (items 1 and 5 about 15 mm apart,
 # centre to centre), every view and balloon translating with its view. The
-# BOM, steps and checks fill the right half, the steps under the BOM's
-# two-line rows (run 20261113T085510850Z printed them over rows 4 and 5
-# from y .214).
+# front view is unlabelled: a standard view under its top view. The BOM,
+# steps and checks fill the right half, the steps under the BOM's two-line
+# rows (run 20261113T085510850Z printed them over rows 4 and 5 from y .214),
+# the checks under the steps and above the title block.
 TOP_CENTER = (0.090, 0.200)
 FRONT_CENTER = (TOP_CENTER[0], 0.135)
 ISO_CENTER = (0.074, 0.047)
 TOP_CAPTION_XY = (0.140, 0.255)
-FRONT_CAPTION_XY = (0.150, 0.115)
 ISO_NOTE_XY = (0.119, 0.035)
 BOM_ANCHOR = (0.219, 0.262)
 STEPS_XY = (0.219, 0.184)
-CHECKS_XY = (0.219, 0.112)
+CHECKS_XY = (0.219, 0.116)
 # The view placing point: the register axis on the body's front face.
 REGISTER_FACE_MM = (0.0, 0.0, fixture.THICKNESS)
 TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
-FRONT_CAPTION = "FRONT VIEW"
 ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 # Kit-frame radii and heights the exploded view and its labels use. The top
@@ -197,14 +198,17 @@ KIT_STEPS = "\n".join(
         f"    TAPPED END OUT, UNTIL IT STANDS {fixture.STUB_STAND_TEXT} ABOVE THE FACE",
         "    (CALIPER DEPTH ROD).",
         "K2. PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
+        "K3. GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT; INDICATE ITS "
+        f"Ø{fixture.BODY_DIA_TEXT} OD",
+        f"    TO {fixture.REGISTER_TIR_TEXT} TIR WITH A DIAL TEST INDICATOR. "
+        "IT STAYS FOR ALL 20 GEARS.",
     )
 )
 # At most three fitting steps; the turning direction before clamping is
 # CUT_TURNS_GEAR_CLOCKWISE's (spec).
 FITTING_STEPS = "\n".join(
     (
-        "FITTING STEPS (ONE GEAR AT A TIME; ITEM 1 STAYS IN THE 4-JAW,",
-        "ITS REGISTER INDICATED TRUE)",
+        "FITTING STEPS (ONE GEAR AT A TIME, ITEM 1 SET BY K3)",
         "1. SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1,",
         "   ITS NOTCHED TOOTH SPACE OVER ITEM 3 (SHEET 2).",
         "2. TURN THE GEAR CLOCKWISE IN THE TOP VIEW UNTIL THE NOTCHED",
@@ -217,13 +221,13 @@ ASSEMBLY_STEPS = f"{KIT_STEPS}\n{FITTING_STEPS}"
 ASSEMBLY_CHECKS = "\n".join(
     (
         "CHECKS",
-        "1. WITH ITEM 1'S REGISTER TRUE, A 1 IN DIAL INDICATOR ON ITEM 2",
+        "1. WITH ITEM 1 SET BY K3, A 1 IN DIAL INDICATOR ON ITEM 2",
         f"   READS {fixture.STUB_RUNOUT_TEXT} TIR.",
         "2. A GEAR'S NOTCHED SPACE ENTERS ITEM 3 WITH THE GEAR FLAT ON ITEM 1.",
         "3. ITEMS 2 AND 3 DO NOT MOVE BY HAND.",
         "4. AFTER STEP 3 THE GEAR DOES NOT TURN BY HAND.",
-        f"5. {fixture.FIRST_CAM_CHECK_TEXT[0]}",
-        f"   {fixture.FIRST_CAM_CHECK_TEXT[1]}.",
+        f"5. {fixture.FIRST_CAM_CHECK_TEXT}",
+        *fixture.FIRST_CAM_REMEDY_TEXT,
     )
 )
 if (
@@ -482,7 +486,6 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
         (ASSEMBLY_STEPS, STEPS_XY, "steps"),
         (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
         (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
-        (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)

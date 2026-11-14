@@ -642,11 +642,18 @@ STUB_STAND_TEXT = f"{inch_text(STUB_STAND, 2)} ±{inch_text(STUB_STAND_BAND, 2)}
 # RV-01 on MHA-DT-12-TL-00, cad/config/assemblies).
 SCREW_ENGAGEMENT_TEXT = f"{inch_text(SCREW_ENGAGEMENT_MIN_PRINTED * INCH, 2)} MIN"
 # The first cam is the fixture's acceptance: its throw within the gear's
-# print before the other 19 are cut (delegated ruling 2026-11-14).
-FIRST_CAM_CHECK_TEXT = (
-    "FIRST CAM'S THROW WITHIN MHA-DT-12'S PRINT BEFORE CUTTING THE OTHER 19;",
-    "ELSE CORRECT ITEM 1",
+# print before the other 19 are cut (delegated ruling 2026-11-14). The check
+# and its remedy are separate lines on the sheet.
+FIRST_CAM_CHECK_TEXT = "THE FIRST CAM'S THROW IS WITHIN MHA-DT-12'S PRINT."
+FIRST_CAM_REMEDY_TEXT = (
+    "IF CHECK 5 FAILS, RE-INDICATE ITEM 1 (K3) AND REPEAT CHECKS 1 AND 5;",
+    "IF IT STILL FAILS, REWORK ITEM 1 TO MHA-DT-12-TL-01. CUT THE OTHER 19",
+    "ONLY AFTER CHECK 5 PASSES.",
 )
+# The register's set-up: item 1's OD (its sheet's Ø3.25) indicated to the
+# REGISTER_TIR the throw and phase budgets carry, with a dial test indicator.
+BODY_DIA_TEXT = inch_text(BODY_DIA, 2)
+REGISTER_TIR_TEXT = inch_text(REGISTER_TIR, 4)
 # The stub's runout with the register true: twice its station, +/- twice
 # the station band, read on the 1 in dial indicator.
 STUB_RUNOUT_TIR = 2.0 * STUB_OFFSET
