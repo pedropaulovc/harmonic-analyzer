@@ -681,6 +681,13 @@ def test_controls_print_at_the_title_block_rows() -> None:
     assert spec.FLAT_LENGTH_CALLOUT == "4X"
     assert set(draw.FLAT_CALLOUTS) == {"FlatLength", "FlatAF"}
     assert draw.FLAT_CALLOUTS["FlatLength"].startswith(f"{spec.FLAT_LENGTH_CALLOUT} ")
+    # The 4X names both details whose flats it sizes: on D alone it left C's
+    # two flats unsized (machinist review, farm run 20261113T230800068Z).
+    assert draw.FLAT_CALLOUTS["FlatLength"].splitlines() == [
+        "4X FLATS AT C, D",
+        f"FOR {draw.short_number(draw.KP08_NUMBER)}",
+    ]
+    assert [detail.label for detail in draw.END_DETAILS[:2]] == ["C", "D"]
     # Each section's across-flat covers both of its station's flats (one per
     # KP08 set screw); detail E's links note 1, which gives the flats' free
     # angle between stations, set at a numbered TL-00 step (owner ruling via

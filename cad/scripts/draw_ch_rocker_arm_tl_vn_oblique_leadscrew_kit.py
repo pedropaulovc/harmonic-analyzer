@@ -367,10 +367,12 @@ _NEAR_XY = (0.051, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
 # view's. The printed flat length (every KP08 flat's) stands under the
 # fence, right of the flat: the flat length's text (widest row
-# "4X FLATS FOR", about 26 mm) is wider than the flat's 24 mm at 3:1, so
+# "4X FLATS AT C, D", about 35 mm) is wider than the flat's 24 mm at 3:1, so
 # it stands right of the flat's far-end extension line, its dimension line
 # run out to it (review jbf-r17, rule 14: both extension lines crossed the
-# text), left of fence E.
+# text), left of fence E. It names both details it covers: "4X FLATS FOR"
+# on D alone left C's two flats unsized (machinist review, farm run
+# 20261113T230800068Z, 2 of 3 runs).
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.099, DETAIL_ROW_Y)
 # E: the handwheel's open flat and the cut end, its
@@ -395,7 +397,7 @@ _DE_GAP_MID_X = (
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
-FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0155
+FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0178
 FLAT_LENGTH_TEXT_GAP = 0.003
 END_DETAILS = (
     EndDetail(
@@ -484,7 +486,10 @@ def short_number(number: str) -> str:
 
 KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 FLAT_CALLOUTS = {
-    "FlatLength": f"{FLAT_LENGTH_CALLOUT} FLATS FOR\n{short_number(KP08_NUMBER)}",
+    "FlatLength": (
+        f"{FLAT_LENGTH_CALLOUT} FLATS AT {END_DETAILS[0].label}, {END_DETAILS[1].label}\n"
+        f"FOR {short_number(KP08_NUMBER)}"
+    ),
     "FlatAF": "SEE NOTE 1",
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
