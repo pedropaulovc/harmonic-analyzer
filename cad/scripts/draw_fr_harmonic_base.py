@@ -2974,3 +2974,4 @@ if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
     sys.exit(run_build(build))
+# proof drawing audit: comment-only edit, pass 4
