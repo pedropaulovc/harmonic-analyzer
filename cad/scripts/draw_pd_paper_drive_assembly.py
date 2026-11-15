@@ -4053,6 +4053,7 @@ def _pivot_sheet_points(
     )
 
 
+# #2824 proof variant c (comment only).
 def _centre_pivot_view(
     adapter: Any, view: Any, target: tuple[float, float], *, label: str
 ) -> tuple[Any, tuple[float, float], tuple[float, float]]:
