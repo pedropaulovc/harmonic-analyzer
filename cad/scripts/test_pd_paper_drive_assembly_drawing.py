@@ -1689,7 +1689,7 @@ def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None
 def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> None:
     faced = _step_body("collar-rear-faced-to-fit")
     assert (
-        f"WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
+        f"IN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "COLLAR ON THE SHAFT, ITS PIN ON THE D-FLAT" in seated
@@ -2437,7 +2437,37 @@ def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
         assert "SOLDER" not in text and "BACKER" not in text
     rework = _step_body("loaded-rack-geometry-checked")
     assert f"SLACKEN THE {_number('pd-platen-bottom-guide')} BOTTOM GUIDE" in rework
-    assert "HEIGHT GAUGE" in rework
+    # Machinist review r8: the re-set names its reference and band (3B's
+    # crest drop) and the level the mesh gate assumes.
+    assert f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)}" in rework
+    level = f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER"
+    assert level in rework
+
+
+def test_every_screwed_or_staked_setting_has_a_holding_check() -> None:
+    """Machinist review r8 and a run of this sheet for #2824 (rule 23): the
+    guide locks, the refitted plate screws, the staked pivot screw and the
+    hook each get a bench check after they are tightened or staked, with a
+    remedy, as 2M, 3N and 4C already had."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    locks = texts["guide-locks-set"]
+    assert locks[3] == "CHECK: PUSHED FIRMLY BY HAND, NO LOCK MOVES ON ITS GUIDE."
+    assert locks[4].startswith("IF ONE MOVES, FIT NEW ")
+    plate = texts["arm-plate-screws-cut"]
+    assert plate[-1] == "CHECK AND REMEDY AS 13T-13U."
+    pivot = texts["hanger-pivoted"]
+    assert pivot[8].startswith("PLATEN SLID CLEAR, STAKE THE TAP MOUTH")
+    assert "HEX KEY TO LOOSEN, THE SCREW HOLDS" in pivot[9]
+    assert "THE ARM STILL FALLS FREELY" in pivot[10]
+    assert pivot[11] == "IF BOTH CHECKS PASS, SKIP 15N-15R."
+    assert "UNSCREW" in pivot[12] and "THROUGH ITS STAKES" in pivot[12]
+    assert pivot[15].startswith("REPEAT FROM 15A WITH A NEW ")
+    assert "STAKING FRESH METAL AT 15J" in pivot[15]
+    accepted = texts["fitup-accepted"]
+    assert "ARM UNLATCHED, DO 15N-15R." in " ".join(accepted)
+    hook = texts["hook-pin-hole-match-drilled"]
+    assert hook[5] == "TIGHTEN THE HOOK SCREWS."
+    assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
