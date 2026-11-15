@@ -64,6 +64,8 @@ from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
     _anchor_model_points,
+    _resolve_section_visibility_view,
+    _section_visibility_identity,
     _shown_instances,
     _view_component_leaves,
     _view_explode_offsets,
@@ -3837,17 +3839,34 @@ def _view_outline(view: Any) -> Box:
 
 def _shift_view(
     adapter: Any, view: Any, delta: tuple[float, float], *, label: str
-) -> None:
-    """Move a drawing view by a sheet-space delta and read the move back."""
+) -> Any:
+    """Move a drawing view by a sheet-space delta, read the move back and
+    return the view handle to use from here on.
+
+    A section's pre-move wrapper is stale after the rebuild on SOLIDWORKS
+    34.4.0 (cad/docs/solidworks-drawing-layout-tuning.md, "section wrapper
+    lifetime"): walking the hanger pivot section's components through it
+    never reached a leaf until the 900 s watchdog killed the build (#2824).
+    A section is re-resolved by its proven identity; other views keep theirs.
+    """
     view = _early_bound(view, "IView")
+    section = None
+    if int(view.Type) == 2:  # swDrawingSectionView
+        app = _early_bound(adapter.swApp, "ISldWorks")
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        section = _section_visibility_identity(app, model, view, label=label)
     before = tuple(float(value) for value in view.Position)
     target = (before[0] + delta[0], before[1] + delta[1])
     if not view.SetViewPosition(double_array(list(target)), False):
         raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
     adapter.currentModel.EditRebuild3()
+    if section is not None:
+        model, view = _resolve_section_visibility_view(app, section, label=label)
+        adapter.currentModel = model
     after = tuple(float(value) for value in view.Position)
     if math.dist(after, target) > 1e-6:
         raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
+    return view
 
 
 def _set_view_scale(
@@ -4036,17 +4055,18 @@ def _pivot_sheet_points(
 
 def _centre_pivot_view(
     adapter: Any, view: Any, target: tuple[float, float], *, label: str
-) -> tuple[tuple[float, float], tuple[float, float]]:
+) -> tuple[Any, tuple[float, float], tuple[float, float]]:
     """Shift ``view`` until the pivot stack's midpoint sits on ``target``;
-    return the sheet points of the screw's head top and the bar's front
-    face on its axis, read after the shift."""
+    return the view handle to use from here on (see ``_shift_view``) and the
+    sheet points of the screw's head top and the bar's front face on its
+    axis, read after the shift."""
     points = (
         PIVOT_VIEW_CENTRE_MM,
         (0.0, pivot_screw.HEAD_H, 0.0),
         (0.0, PIVOT_FRONT_FACE_Y, 0.0),
     )
     centre = _pivot_sheet_points(adapter, view, points, label=label)[0]
-    _shift_view(
+    view = _shift_view(
         adapter,
         view,
         (target[0] - centre[0], target[1] - centre[1]),
@@ -4055,7 +4075,7 @@ def _centre_pivot_view(
     centre, head, front = _pivot_sheet_points(adapter, view, points, label=label)
     if math.dist(centre, target) > 1e-4:
         raise RuntimeError(f"{label}: centre sits at {centre!r}, not {target!r}")
-    return head, front
+    return view, head, front
 
 
 def _check_axis_down_the_sheet(
@@ -4228,7 +4248,7 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
     )
     apply_view_configuration(adapter, locator, label=label)
     locator = set_drawing_view_instance_visibility(adapter, locator, PIVOT_VIEW_INSTANCES, mode="show", label=label)
-    head, front = _centre_pivot_view(
+    locator, head, front = _centre_pivot_view(
         adapter, locator, PIVOT_LOCATOR_CENTER, label=label
     )
     # The cutting line is drawn vertically through the circle's centre: the
@@ -4250,7 +4270,7 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
         label=section_label,
     )
     section = set_drawing_view_instance_visibility(adapter, section, PIVOT_VIEW_INSTANCES, mode="show", label=section_label)
-    head, front = _centre_pivot_view(
+    section, head, front = _centre_pivot_view(
         adapter, section, PIVOT_SECTION_CENTER, label=section_label
     )
     # The balloon columns stand left and right of a vertical axis (farm run

@@ -6161,3 +6161,72 @@ def test_number_binding_does_not_fabricate_a_canonical_number_for_bad_native_dat
             scene.adapter, table, drawing._source_family_counts(scene.model),
             configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
         )
+
+
+class _MovableView:
+    def __init__(self, view_type, position=(0.1, 0.2)):
+        self.Type = view_type
+        self.Position = position
+
+    def SetViewPosition(self, target, _redraw):
+        self.Position = tuple(target)
+        return True
+
+
+@pytest.mark.parametrize("view_type", (2, 7), ids=("section", "named"))
+def test_shift_view_hands_back_a_fresh_section_after_the_move_rebuild(monkeypatch, view_type):
+    # Issue #2824: walking a moved section through its pre-move wrapper never
+    # reached a leaf. The section is re-resolved after the rebuild; any
+    # other view keeps its handle.
+    events = []
+    stale = _MovableView(view_type)
+    fresh = _MovableView(view_type, position=(0.15, 0.25))
+    fresh_model = SimpleNamespace(EditRebuild3=lambda: True)
+    adapter = SimpleNamespace(
+        swApp=object(),
+        currentModel=SimpleNamespace(EditRebuild3=lambda: events.append("rebuild") or True),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(drawing, "double_array", list)
+
+    def identity(_app, model, view, *, label):
+        assert (model, view, label) == (adapter.currentModel, stale, "pivot centre")
+        events.append("identity")
+        return "pivot section identity"
+
+    def resolve(_app, section, *, label):
+        assert (section, label) == ("pivot section identity", "pivot centre")
+        events.append("resolve")
+        return fresh_model, fresh
+
+    monkeypatch.setattr(drawing, "_section_visibility_identity", identity)
+    monkeypatch.setattr(drawing, "_resolve_section_visibility_view", resolve)
+
+    moved = drawing._shift_view(adapter, stale, (0.05, 0.05), label="pivot centre")
+
+    if view_type == 2:
+        assert events == ["identity", "rebuild", "resolve"]
+        assert moved is fresh and adapter.currentModel is fresh_model
+    else:
+        assert events == ["rebuild"]
+        assert moved is stale
+    assert moved.Position == pytest.approx((0.15, 0.25))
+
+
+def test_centre_pivot_view_reads_and_returns_the_view_handed_back_by_the_move(monkeypatch):
+    stale, fresh = object(), object()
+    read_from = []
+    target = drawing.PIVOT_SECTION_CENTER
+
+    def sheet_points(_adapter, view, points, *, label):
+        read_from.append(view)
+        centre = (0.0, 0.0) if view is stale else target
+        return [centre, (1.0, 2.0), (1.0, 3.0)][: len(points)]
+
+    monkeypatch.setattr(drawing, "_pivot_sheet_points", sheet_points)
+    monkeypatch.setattr(drawing, "_shift_view", lambda _adapter, view, _delta, **_: fresh)
+
+    view, head, front = drawing._centre_pivot_view(object(), stale, target, label="pivot")
+
+    assert read_from == [stale, fresh]
+    assert view is fresh and (head, front) == ((1.0, 2.0), (1.0, 3.0))
