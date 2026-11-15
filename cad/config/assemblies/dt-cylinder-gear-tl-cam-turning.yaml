@@ -20,6 +20,6 @@ drawing_unit: in
 machinist_exceptions:
   - id: "RV-01"
     kind: "minor"
-    where: "sheet 1, fitting step 15: ITEM 5 ENGAGES ITEM 2'S FULL THREAD .12 MIN (item 5, the 10-32 x 5/16 SHCS MHA-DT-12-TL-VN-52, in item 2's tap, MHA-DT-12-TL-VN-50)"
+    where: "sheet 2, fitting step 18: ITEM 5 ENGAGES ITEM 2'S FULL THREAD .12 MIN (item 5, the 10-32 x 5/16 SHCS MHA-DT-12-TL-VN-52, in item 2's tap, MHA-DT-12-TL-VN-50)"
     finding: "full-thread engagement .12-.21 in (0.63D-1.10D of the 10-32, the screw's chamfered point and the tap's mouth deducted) is under rule 18's 1.5D floor"
     reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation; owner review on https://github.com/pedropaulovc/harmonic-analyzer/issues/2144. Follows the owner precedent dt-drive-train DT-07 (owner ruling 2026-11-09 via PR #1992: the MHA-DT-39 end screw at 1.39D of full thread, under rule 18's 1.5D, where the stack fixes the screw's reach). Here the screw only holds a brass gear against a light finishing cut, the clock pin taking the cut's torque (https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6888052094). The pull-out dowel's tap is .255 deep at least and the gear, washer and stub stand fix the screw's reach, so a longer screw bottoms in the tap; step 15 prints the least full thread as the value only. Accepts this one joint's .12-.21 (0.63D-1.10D) full-thread engagement, no other joint or value."

@@ -54,20 +54,25 @@ def test_the_throw_is_set_on_the_stub_and_held_to_the_gears_print() -> None:
     # The stub's printed station is the gear's printed throw on the .0001 grid.
     assert spec.STUB_OFFSET == pytest.approx(round(gear.ECCENTRICITY / INCH, 4) * INCH)
     assert abs(spec.STUB_OFFSET - gear.ECCENTRICITY) < 0.0001 * INCH
-    # The jaws set the stub's TIR, so the station's +/-.002 is not in the
-    # throw: the window, half the reading and the bore's float are, worst case,
-    # inside MHA-DT-12's absolute +/-.0020 (owner ruling 2026-11-08).
+    # The jaws set the stub against the gauge-block stack, so the station's
+    # +/-.002 is not in the throw: half the gap's error and the bore's float
+    # are, worst case, inside MHA-DT-12's absolute +/-.0020 (owner ruling
+    # 2026-11-08).
     assert spec.THROW_PER_PART_MAX_MM == spec.BORE_FLOAT
     assert spec.THROW_ERROR_MAX_MM == pytest.approx(
         spec.THROW_SET_MAX_MM + spec.THROW_PER_PART_MAX_MM
     )
     assert spec.THROW_ERROR_MAX_MM <= gear.ECCENTRICITY_TOLERANCE_MM
     assert spec.POSITION_BAND > gear.ECCENTRICITY_TOLERANCE_MM - spec.BORE_FLOAT
-    for tir in (spec.THROW_TIR_LOW, spec.THROW_TIR_HIGH):
-        for nominal in (gear.ECCENTRICITY, spec.STUB_OFFSET):
-            error = abs(tir / 2.0 - nominal) + spec.THROW_TIR_READING / 2.0
-            assert error + spec.BORE_FLOAT <= gear.ECCENTRICITY_TOLERANCE_MM
-    for name in ("THROW_FIXED_MAX_MM", "FIRST_CAM_CHECK_TEXT", "STUB_RUNOUT_TEXT"):
+    for nominal in (gear.ECCENTRICITY, spec.STUB_OFFSET):
+        error = abs(spec.THROW_STACK / 2.0 - nominal) + spec.THROW_GAP_ERROR_MAX / 2.0
+        assert error + spec.BORE_FLOAT <= gear.ECCENTRICITY_TOLERANCE_MM
+    for name in (
+        "THROW_FIXED_MAX_MM",
+        "FIRST_CAM_CHECK_TEXT",
+        "STUB_RUNOUT_TEXT",
+        "THROW_TIR_TEXT",
+    ):
         assert not hasattr(spec, name), name
 
 

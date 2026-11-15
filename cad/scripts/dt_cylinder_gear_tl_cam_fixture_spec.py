@@ -10,8 +10,9 @@ the fixture and repeat over 20 gears without indicating each one.
 
 The fixture is one made part, a round steel body gripped in the lathe's
 4-jaw, its turned register (the OD) indicated true, then the throw SET by the
-two jaws in line with the stub until an indicator on the stub reads twice the
-gear's throw (``THROW_TIR_LOW`` to ``THROW_TIR_HIGH``), and left in the chuck
+two jaws in line with the stub until a wrung gauge-block stack of twice the
+gear's throw (``THROW_STACK``) fills the gap the stub leaves a zeroed test
+indicator in half a turn, and left in the chuck
 for all 20 gears. Its front face carries, all bought
 (``dt_cylinder_gear_tl_vn_cam_*``, the MHA-DT-12-TL-00 kit):
 
@@ -42,21 +43,28 @@ the register round in the jaws. The body still weighs under 3 lb.
 Frame (the SolidWorks model): the register axis, which is the lathe axis
 once indicated, is model Z through the origin. The back face (Z0) faces the
 chuck; the front face (Z = THICKNESS) seats the gear's back face. The stub
-stands on -Y so the cam lobe points +Y, as on the gear; the clock pin stands
-1.5 deg counter-clockwise of the +Y line seen from +Z (the tailstock), the
-gear's own NOTCH_PHASE_DEG. Every number of the gear is imported from
+stands on -Y so the cam lobe points +Y, as on the gear. The clock pin is
+clocked about the stub (the gear's bore axis), counter-clockwise of the +Y
+line through it seen from +Z (the tailstock), by ``PIN_PHASE_DEG``: the
+gear's own NOTCH_PHASE_DEG plus the seated half-play
+(``SEATED_HALF_PLAY_DEG``), about 1.69 deg, so a gear turned onto the pin
+seats its notch on the phase. Every number of the gear is imported from
 ``dt_cylinder_gear_spec``.
 
 Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
 .3402 +/-.0020 and cam phase 1.5 +/-.25 deg; every gear is held to that print
 (owner ruling 2026-11-08, #2144 item 8.2).
 
-* Throw is set, not cut to a number: the stub's TIR on the 1 in dial
-  indicator is brought inside ``THROW_TIR_LOW``-``THROW_TIR_HIGH`` by the jaws
-  in line with it, so the stub hole's station and the register's indication
-  drop out. What is left is the setting window and the indicator's reading
-  (``THROW_SET_MAX_MM``) plus each gear's bore floating on the stub
-  (``BORE_FLOAT``); ``THROW_ERROR_MAX_MM`` is asserted inside the print.
+* Throw is set, not cut to a number: a dial test indicator is zeroed on the
+  stub where the stub stands nearest it, the chuck is turned half a turn, and
+  the jaws in line with the stub are moved until the shop's gauge blocks
+  wrung to twice the throw (``THROW_STACK``) read zero within
+  ``THROW_READING_BAND`` between the stub and the stylus. The indicator
+  reads only near its zero, so its error over travel is not in the throw,
+  and the stub hole's station and the register's indication drop out. What
+  is left is ``THROW_GAP_TERMS`` (``THROW_SET_MAX_MM``) plus each gear's
+  bore floating on the stub (``BORE_FLOAT``); ``THROW_ERROR_MAX_MM`` is
+  asserted inside the print.
 * Phase is not set: the pin hole and stub hole stations (+/-.002 each), the
   register's indication and the jaw pair's line put a fixed error of up to
   ``PHASE_FIXED_WORST_DEG`` (.47 deg) on all 20 gears, and each gear adds its
@@ -65,7 +73,7 @@ Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
   and is recorded, not asserted: open on #2361. A reading of the phase on the
   set fixture was weighed and rejected: its baseline is the .34 throw, so a
   .001 reading moves the phase about .17 deg (``PHASE_PER_THOU_READING_DEG``).
-  Every gear seats on the same flank of the pin (TL-00 step 14), so the pin
+  Every gear seats on the same flank of the pin (TL-00 step 17), so the pin
   stands its mean half-play (``SEATED_HALF_PLAY_DEG``, .19 deg)
   counter-clockwise of the phase and a nominal fixture's common error is nil.
 
@@ -214,47 +222,52 @@ if STUB_RETENTION_MARGIN < 1.5:
 # The register's indicated runout (TIR) in the 4-jaw: .001 with a dial test
 # indicator (run 20261114T231845023Z's review: .0005 was tighter than the
 # shop's runout row). It places the cross axis for phase; along item 2's
-# line the jaw pair in line with it then moves item 1 until the 1 in dial
-# indicator on item 2 reads twice the throw. That reading is the throw, so
-# the stub hole's station drops out of it.
+# line the jaw pair in line with it then moves item 1 until item 2 stands
+# the throw off the lathe axis, so the stub hole's station drops out.
 REGISTER_TIR = 0.001 * INCH
 REGISTER_OFFSET = REGISTER_TIR / 2.0
-# The 1 in dial indicator's division: the archived record gives no
-# resolution; a 1 in travel dial indicator reads .001 a division (an
-# ASSUMPTION). Each end of the TIR read to half a division.
-THROW_INDICATOR_DIVISION = 0.001 * INCH
-THROW_TIR_READING = THROW_INDICATOR_DIVISION
+# The throw is read as a gap, not as a travel. Item 2 orbits the lathe axis,
+# so in half a turn it stands twice the throw farther from an indicator
+# zeroed on it at its nearest; the shop's gauge blocks wrung to that length
+# (cad/config/shop-equipment.toml gauges.gauge-blocks-mitutoyo, the 81-piece
+# inch set: .1001-.1009 by .0001, .101-.149 by .001, .050-.950 by .050) must
+# bring the indicator back to zero. A 1 in dial indicator swept over the .68
+# is not used: its error over that many turns of its hand is not known to
+# the shop, and item 2 orbits off its plunger (Codjiflo, #2712).
+THROW_STACK_BLOCKS_IN = (0.1004, 0.130, 0.450)
+THROW_STACK = sum(THROW_STACK_BLOCKS_IN) * INCH
+if abs(THROW_STACK - 2.0 * STUB_OFFSET) > 1e-9:
+    raise AssertionError("the gauge-block stack is not twice the printed throw")
+# The dial test indicator's division (cad/process/shop.toml gauges.dti,
+# resolution_mm .0127, range .030 in).
+THROW_INDICATOR_DIVISION = 0.0005 * INCH
+# The check's band on the gap: two divisions either side of zero.
+THROW_READING_BAND = 0.001 * INCH
+# Every error in the gap, worst case, each added to the next:
+# * band: the check's own window.
+# * reading: half a division at the zero and half at the check. Both are
+#   read at the same place on the dial, so the indicator's error over its
+#   travel and its cosine error are not in the gap.
+# * turn-back: the zero is taken where the reading turns back as the chuck
+#   is rocked (item 2 nearest), the check where it turns back as the chuck
+#   and the stack are rocked (item 2 farthest, stack square). A turn-back is
+#   found until the reading no longer moves, half a division; three of them
+#   (about 2 deg of chuck each: e(1 - cos 2.2 deg) = .00025).
+# * stack: three shop-grade blocks, each within about .00002 (ASME B89.1.9
+#   grade AS-2 limit deviation up to 1 in); .00003 a block charged with its
+#   wring (an ASSUMPTION: the set's grade certificate is not recorded).
+THROW_GAP_TERMS = {
+    "band": THROW_READING_BAND,
+    "reading": THROW_INDICATOR_DIVISION,
+    "turn-back": 3 * THROW_INDICATOR_DIVISION / 2.0,
+    "stack": len(THROW_STACK_BLOCKS_IN) * 0.00003 * INCH,
+}
+THROW_GAP_ERROR_MAX = sum(THROW_GAP_TERMS.values())
 THROW_PER_PART_MAX_MM = BORE_FLOAT
-# What the setting may use: the print's band less the gear's float on the
-# stub and half the TIR's reading error, about both the model's throw and
-# the printed .3402; the window then snaps inward to whole divisions.
-_THROW_SET_ALLOWANCE = THROW_TOLERANCE - THROW_PER_PART_MAX_MM - THROW_TIR_READING / 2
-_THROW_NOMINALS = (THROW, STUB_OFFSET)
-_DIV_IN = THROW_INDICATOR_DIVISION / INCH
-THROW_TIR_LOW = (
-    math.ceil(
-        round(2.0 * (max(_THROW_NOMINALS) - _THROW_SET_ALLOWANCE) / INCH / _DIV_IN, 6)
-    )
-    * _DIV_IN
-    * INCH
-)
-THROW_TIR_HIGH = (
-    math.floor(
-        round(2.0 * (min(_THROW_NOMINALS) + _THROW_SET_ALLOWANCE) / INCH / _DIV_IN, 6)
-    )
-    * _DIV_IN
-    * INCH
-)
-if THROW_TIR_HIGH <= THROW_TIR_LOW:
-    raise AssertionError("the throw window closes on the indicator's divisions")
-THROW_SET_MAX_MM = (
-    max(
-        abs(tir / 2.0 - n)
-        for tir in (THROW_TIR_LOW, THROW_TIR_HIGH)
-        for n in _THROW_NOMINALS
-    )
-    + THROW_TIR_READING / 2.0
-)
+# The gap is twice the throw, so half its error is the setting's; the stack
+# is twice the printed .3402, .00004 off the model's throw.
+THROW_SET_MAX_MM = THROW_GAP_ERROR_MAX / 2.0 + abs(STUB_OFFSET - THROW)
+# .00117 gap + .00004 rounding + .00070 float = .00191 in +/-.0020: .00009 left.
 THROW_ERROR_MAX_MM = THROW_SET_MAX_MM + THROW_PER_PART_MAX_MM
 if THROW_ERROR_MAX_MM > THROW_TOLERANCE:
     raise AssertionError("a gear's throw can leave MHA-DT-12's printed band")
@@ -274,7 +287,7 @@ _THREAD_FLOAT = 0.002 * INCH  # 10-32 2B/3A pitch-diameter float, radial
 _WASHER_FLOAT = (WASHER_ID - SCREW.major_dia) / 2.0
 _WASHER_OD_MAX = WASHER_OD + 0.005 * INCH  # commercial washer, no band given
 _WASHER_OD_MIN = WASHER_OD - 0.005 * INCH
-_STUB_FROM_AXIS_MAX = THROW_TIR_HIGH / 2.0 + THROW_TIR_READING / 2.0
+_STUB_FROM_AXIS_MAX = (THROW_STACK + THROW_GAP_ERROR_MAX) / 2.0
 CLAMP_REACH_MAX = (
     _STUB_FROM_AXIS_MAX + _THREAD_FLOAT + _WASHER_FLOAT + _WASHER_OD_MAX / 2.0
 )
@@ -491,7 +504,7 @@ def _play_table(pin_dia: float) -> tuple[tuple[tuple[float, float], ...], ...]:
 
 
 # Every gear seats on the counter-clockwise flank of its notched space: TL-00
-# step 14 turns it clockwise (seen from the tailstock) onto the pin and
+# step 17 turns it clockwise (seen from the tailstock) onto the pin and
 # the cut pushes it the same way (``CUT_TURNS_GEAR_CLOCKWISE``), so the
 # space's centre stands one half-play clockwise of the pin (side -1). The pin
 # is clocked that mean half-play counter-clockwise of the notch phase, so a
@@ -731,6 +744,13 @@ SCREW_ENGAGEMENT_TEXT = f"{inch_text(SCREW_ENGAGEMENT_MIN_PRINTED * INCH, 2)} MI
 # REGISTER_TIR the phase budget carries, with a dial test indicator.
 BODY_DIA_TEXT = inch_text(BODY_DIA, 2)
 REGISTER_TIR_TEXT = inch_text(REGISTER_TIR, 3)
-# The throw setting: item 2's TIR on the 1 in dial indicator, the window in
-# whole divisions.
-THROW_TIR_TEXT = f"{inch_text(THROW_TIR_LOW, 3)} TO {inch_text(THROW_TIR_HIGH, 3)}"
+# The throw setting: the wrung stack's blocks, and the check's band on the
+# dial test indicator.
+THROW_STACK_TEXT = (
+    ", ".join(
+        inch_text(b * INCH, 4 if b < 0.101 else 3) for b in THROW_STACK_BLOCKS_IN[:-1]
+    )
+    + f" AND {inch_text(THROW_STACK_BLOCKS_IN[-1] * INCH, 3)}"
+)
+THROW_STACK_TOTAL_TEXT = inch_text(THROW_STACK, 4)
+THROW_READING_BAND_TEXT = inch_text(THROW_READING_BAND, 3)

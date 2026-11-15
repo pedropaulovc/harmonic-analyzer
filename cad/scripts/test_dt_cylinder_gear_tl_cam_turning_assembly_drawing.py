@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -114,9 +116,24 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     # The steps start below the BOM and end above the title block (y <= .066
     # m at x >= .216 m).
     assert sheet.STEPS_XY[1] < sheet.BOM_ANCHOR[1] - 0.070
-    lines = sheet.ASSEMBLY_STEPS.splitlines()
+    lines = sheet.ONCE_STEPS.splitlines()
     assert sheet.STEPS_XY[1] - len(lines) * sheet.LINE_PITCH > 0.066
     assert max(map(len, lines)) <= sheet.STEP_WIDTH
+    # The steps for each gear stand on sheet 2 under its caption and above
+    # the exploded view (item 5's head at about y .185), left of the labels.
+    each = sheet.GEAR_STEPS.splitlines()
+    assert (
+        sheet.ONCE_STEPS.splitlines()[1:] + each[1:]
+        == (sheet.ASSEMBLY_STEPS.splitlines()[1:])
+    )
+    assert each[1].startswith(f"{sheet.FIRST_GEAR_STEP}. ")
+    assert "SHEET 2" in lines[0] and "SHEET 1" in each[0]
+    assert sheet.GEAR_STEPS_XY[1] <= sheet.CAPTION_XY[1] - 2 * sheet.LINE_PITCH
+    assert sheet.GEAR_STEPS_XY[1] - len(each) * sheet.LINE_PITCH > 0.195
+    assert (
+        sheet.GEAR_STEPS_XY[0] + max(map(len, each)) * sheet.CHAR_WIDTH
+        < sheet.LABEL_COLUMN_X - 0.010
+    )
 
 
 def _step(number: int) -> str:
@@ -153,22 +170,33 @@ def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
     assert "CURE" not in sheet.ASSEMBLY_STEPS
     assert fixture.STUB_STAND_TEXT in _step(1)
     # The register set-up, then the throw set on item 2, its check and remedy.
-    indicate = _step(sheet.THROW_STEP - 1)
+    indicate = _step(sheet.THROW_ZERO_STEP - 2)
     assert f"Ø{fixture.BODY_DIA_TEXT} OD" in indicate
     assert f"{fixture.REGISTER_TIR_TEXT} TIR" in indicate
     assert "DIAL TEST INDICATOR" in indicate
-    setting = _step(sheet.THROW_STEP)
-    assert "PAIR OF JAWS IN LINE WITH ITEM 2" in setting
-    assert "1 IN DIAL INDICATOR ON ITEM 2" in setting
-    assert f"{fixture.THROW_TIR_TEXT} TIR" in setting
-    assert sheet.THROW_CHECK_STEP == sheet.THROW_STEP + 1
+    # The throw is read as a gap near the test indicator's zero, not swept
+    # (Codjiflo, #2712): the indicator set on item 2 and zeroed where item 2
+    # stands nearest, half a turn, the wrung stack, the check, the remedy.
+    placing = _step(sheet.THROW_ZERO_STEP - 1)
+    assert "DIAL TEST INDICATOR" in placing and "ITEM 2" in placing
+    zero = _step(sheet.THROW_ZERO_STEP)
+    assert "ZERO THE INDICATOR" in zero and "TURNS BACK" in zero
+    assert "HALF A TURN" in _step(sheet.THROW_ZERO_STEP + 1)
+    stack = _step(sheet.THROW_CHECK_STEP - 1)
+    assert "GAUGE BLOCKS" in stack and fixture.THROW_STACK_TEXT in stack
+    assert f"({fixture.THROW_STACK_TOTAL_TEXT})" in stack
+    assert sheet.THROW_CHECK_STEP == sheet.THROW_ZERO_STEP + 3
     check = _step(sheet.THROW_CHECK_STEP)
-    assert check.startswith("CHECK: ") and fixture.THROW_TIR_TEXT in check
-    # The remedy's exit is the same adjustment, no rework of item 1.
-    assert _step(sheet.THROW_CHECK_STEP + 1) == (
-        f"IF STEP {sheet.THROW_CHECK_STEP} FAILS, REPEAT STEPS {sheet.THROW_STEP} "
-        f"AND {sheet.THROW_CHECK_STEP}."
-    )
+    assert check.startswith("CHECK: ")
+    assert f"WITHIN {fixture.THROW_READING_BAND_TEXT} OF ZERO" in check
+    assert "1 IN DIAL INDICATOR" not in sheet.ASSEMBLY_STEPS
+    assert " TIR" not in "".join(sheet.STEPS[sheet.THROW_ZERO_STEP - 1 :])
+    # The remedy's exit is the same adjustment, no rework of item 1; it
+    # leaves all four jaws tight and returns to the zero.
+    remedy = _step(sheet.THROW_CHECK_STEP + 1)
+    assert remedy.startswith(f"IF STEP {sheet.THROW_CHECK_STEP} FAILS, ")
+    assert "PAIR IN LINE WITH ITEM 2" in remedy and "TIGHTEN THE OTHER" in remedy
+    assert remedy.endswith(f"REPEAT FROM STEP {sheet.THROW_ZERO_STEP}.")
     assert "REWORK" not in sheet.ASSEMBLY_STEPS
     assert "FIRST CAM" not in sheet.ASSEMBLY_STEPS
     # Each gear: slide on, check; turn onto the pin, clamp, check, last.
@@ -183,21 +211,43 @@ def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
     assert "SNUG BY HAND" in gear_steps[3] and "BY ITS SHORT ARM" in gear_steps[3]
     assert "TORQUE" not in sheet.ASSEMBLY_STEPS and "FIRMLY" not in sheet.ASSEMBLY_STEPS
     assert gear_steps[-1] == "CHECK: THE GEAR DOES NOT TURN BY HAND."
-    assert len(sheet.STEPS) == 16
+    assert len(sheet.STEPS) == 19
 
 
 def test_the_throw_window_keeps_every_gear_inside_its_print() -> None:
-    # Twice the printed .3402, snapped inward to the 1 in indicator's .001
-    # divisions: .679 TO .681, so the throw is set, not cut to a number.
-    assert fixture.THROW_TIR_TEXT == ".679 TO .681"
-    low, high = (float(value) for value in fixture.THROW_TIR_TEXT.split(" TO "))
-    assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
-    # Setting window, half the TIR's reading and the bore float, worst case.
+    # The stack is twice the printed .3402 in blocks the shop's 81-piece
+    # inch set holds, so the throw is set, not cut to a number.
+    blocks = fixture.THROW_STACK_BLOCKS_IN
+    assert sum(blocks) * 25.4 == pytest.approx(2.0 * fixture.STUB_OFFSET)
+    in_set = (
+        [round(0.1001 + 0.0001 * i, 4) for i in range(9)]
+        + [round(0.101 + 0.001 * i, 4) for i in range(49)]
+        + [round(0.050 + 0.050 * i, 4) for i in range(19)]
+        + [1.0, 2.0, 3.0, 4.0]
+    )
+    assert len(in_set) == 81 and len(set(blocks)) == len(blocks)
+    assert all(round(block, 4) in in_set for block in blocks)
+    cad = Path(__file__).parents[1]
+    shop = tomllib.loads((cad / "config" / "shop-equipment.toml").read_text("utf-8"))
+    assert shop["gauges"]["gauge-blocks-mitutoyo"]["kind"] == "gauge_block_set"
+    dti = tomllib.loads((cad / "process" / "shop.toml").read_text("utf-8"))["gauges"][
+        "dti"
+    ]
+    assert fixture.THROW_INDICATOR_DIVISION == pytest.approx(dti["resolution_mm"])
+    # The check reads inside the test indicator's range, at its zero.
+    assert fixture.THROW_GAP_ERROR_MAX < (dti["range_mm"][1] - dti["range_mm"][0]) / 2.0
+    # Every term of the gap is charged; half of it and the bore float land
+    # on the throw, worst case, inside the print.
+    terms = fixture.THROW_GAP_TERMS
+    assert set(terms) == {"band", "reading", "turn-back", "stack"}
+    assert all(value > 0.0 for value in terms.values())
+    assert terms["band"] == fixture.THROW_READING_BAND
+    assert terms["reading"] >= fixture.THROW_INDICATOR_DIVISION
+    assert fixture.THROW_SET_MAX_MM >= sum(terms.values()) / 2.0
     assert fixture.THROW_ERROR_MAX_MM == pytest.approx(
         fixture.THROW_SET_MAX_MM + fixture.BORE_FLOAT
     )
     assert fixture.THROW_ERROR_MAX_MM <= fixture.THROW_TOLERANCE
-    assert fixture.THROW_ERROR_MAX_MM / 25.4 == pytest.approx(0.0019, abs=1e-6)
     assert fixture.REGISTER_TIR_TEXT == ".001"
     assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
 
@@ -250,7 +300,7 @@ def test_the_sheet_states_the_engagement_value_only() -> None:
         for number, step in enumerate(sheet.STEPS, start=1)
         if fixture.SCREW_ENGAGEMENT_TEXT in step
     )
-    assert engage == 15
+    assert engage == 18
 
 
 def test_the_short_screw_engagement_is_a_delegated_minor_rule_18_exception() -> None:
@@ -265,7 +315,7 @@ def test_the_short_screw_engagement_is_a_delegated_minor_rule_18_exception() -> 
     entry = entries["RV-01"]
     assert entry.kind == "minor"
     assert "rule 18" in entry.finding
-    assert "step 15" in entry.where
+    assert "step 18" in entry.where
     assert fixture.SCREW_ENGAGEMENT_TEXT in entry.where
     assert ".12-.21" in entry.finding and "0.63D-1.10D" in entry.finding
     assert entry.reason.startswith(

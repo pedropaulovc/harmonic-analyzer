@@ -238,24 +238,31 @@ _KIT: tuple[str, ...] = (
     "LEAVE IT THERE FOR ALL 20 GEARS.",
     f"INDICATE ITEM 1'S Ø{fixture.BODY_DIA_TEXT} OD TO {fixture.REGISTER_TIR_TEXT} "
     "TIR WITH A DIAL TEST INDICATOR.",
-    "MOVING ONLY THE PAIR OF JAWS IN LINE WITH ITEM 2, SET A 1 IN DIAL "
-    f"INDICATOR ON ITEM 2 TO READ {fixture.THROW_TIR_TEXT} TIR.",
+    "SET A DIAL TEST INDICATOR ON THE SIDE OF ITEM 2, AT CENTRE HEIGHT, WITH "
+    "ITEM 2 TURNED TOWARD IT.",
+    "ROCK THE CHUCK; ZERO THE INDICATOR WHERE ITS READING TURNS BACK.",
 )
-THROW_STEP = len(_KIT)
+THROW_ZERO_STEP = len(_KIT)
 _KIT += (
-    f"CHECK: WITH ALL FOUR JAWS TIGHT, ITEM 2 READS {fixture.THROW_TIR_TEXT} TIR.",
+    "TURN THE CHUCK HALF A TURN.",
+    f"HOLD WRUNG GAUGE BLOCKS {fixture.THROW_STACK_TEXT} "
+    f"({fixture.THROW_STACK_TOTAL_TEXT}) BETWEEN ITEM 2 AND THE INDICATOR'S STYLUS.",
+    "CHECK: ROCKING THE CHUCK AND THE BLOCKS, THE READING TURNS BACK WITHIN "
+    f"{fixture.THROW_READING_BAND_TEXT} OF ZERO.",
 )
 THROW_CHECK_STEP = len(_KIT)
+# Moving the pair leaves all four jaws tight, so the check that follows is
+# the check of the fixture as it is left.
 _KIT += (
-    f"IF STEP {THROW_CHECK_STEP} FAILS, REPEAT STEPS {THROW_STEP} AND "
-    f"{THROW_CHECK_STEP}.",
+    f"IF STEP {THROW_CHECK_STEP} FAILS, LOOSEN ONE JAW OF THE PAIR IN LINE WITH "
+    f"ITEM 2, TIGHTEN THE OTHER, AND REPEAT FROM STEP {THROW_ZERO_STEP}.",
 )
 _GEAR: tuple[str, ...] = (
     "SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1, ITS NOTCHED "
-    "TOOTH SPACE OVER ITEM 3 (SHEET 2).",
+    "TOOTH SPACE OVER ITEM 3.",
     "CHECK: THE GEAR LIES FLAT ON ITEM 1 WITH ITEM 3 IN ITS NOTCHED SPACE.",
-    "TURN THE GEAR CLOCKWISE IN THE TOP VIEW UNTIL ITS NOTCHED SPACE STOPS ON "
-    "ITEM 3, AND HOLD IT THERE.",
+    "TURN THE GEAR CLOCKWISE IN THE TOP VIEW (SHEET 1) UNTIL ITS NOTCHED SPACE "
+    "STOPS ON ITEM 3, AND HOLD IT THERE.",
     "FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2; TIGHTEN SNUG BY HAND, 5/32 HEX KEY "
     f"BY ITS SHORT ARM. ITEM 5 ENGAGES ITEM 2'S FULL THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
     "CHECK: THE GEAR DOES NOT TURN BY HAND.",
@@ -277,10 +284,25 @@ def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(lines)
 
 
-STEPS_HEADING = (
-    f"FITTING STEPS (1-{len(_KIT)} ONCE; {FIRST_GEAR_STEP}-{len(STEPS)} FOR EACH GEAR)"
+# One numbered sequence on two sheets: the steps done once under sheet 1's
+# BOM, the steps for each gear beside sheet 2's exploded view, which shows
+# them (the whole sequence is six lines too long for sheet 1).
+_LINES = _numbered(STEPS)
+_SPLIT = next(
+    i for i, line in enumerate(_LINES) if line.startswith(f"{FIRST_GEAR_STEP}. ")
 )
-ASSEMBLY_STEPS = "\n".join((STEPS_HEADING, *_numbered(STEPS)))
+ONCE_HEADING = (
+    f"FITTING STEPS 1-{len(_KIT)}, DONE ONCE "
+    f"(STEPS {FIRST_GEAR_STEP}-{len(STEPS)}, FOR EACH GEAR, ON SHEET 2)"
+)
+GEAR_HEADING = (
+    f"FITTING STEPS {FIRST_GEAR_STEP}-{len(STEPS)}, FOR EACH GEAR "
+    f"(STEPS 1-{len(_KIT)} ON SHEET 1)"
+)
+ONCE_STEPS = "\n".join((ONCE_HEADING, *_LINES[:_SPLIT]))
+GEAR_STEPS = "\n".join((GEAR_HEADING, *_LINES[_SPLIT:]))
+# The sequence whole, as the package checks read it.
+ASSEMBLY_STEPS = "\n".join((ONCE_HEADING, *_LINES))
 if not fixture.CUT_TURNS_GEAR_CLOCKWISE or not any(
     "CLOCKWISE IN THE TOP VIEW" in step for step in _GEAR
 ):
@@ -380,7 +402,7 @@ WASHER_LABEL = "ITEM 4"
 STUB_LABEL = "ITEM 2, TAPPED END OUT"
 PIN_LABEL = "ITEM 3, IN THE GEAR'S\nNOTCHED TOOTH SPACE"
 BODY_LABEL = "ITEM 1, IN THE 4-JAW"
-EXPLODED_CAPTION = "EXPLODED RIGHT VIEW - FITTING STEPS ON SHEET 1"
+EXPLODED_CAPTION = "EXPLODED RIGHT VIEW"
 LABEL_TIPS: dict[str, Point3] = {
     SCREW_LABEL: _yz((SCREW_SEAT_Y + SCREW_TOP_Y) / 2.0, AXIS_Z - SCREW.head_dia / 2.0),
     WASHER_LABEL: _yz((WASHER_Y0 + WASHER_TOP) / 2.0, AXIS_Z - fixture.WASHER_OD / 2.0),
@@ -391,9 +413,11 @@ LABEL_TIPS: dict[str, Point3] = {
 }
 # Sheet metres: every label stands in one column right of the view, its
 # rows in the tips' top-to-bottom order, at least a label's height apart;
-# the caption top-left, clear of the view.
+# the caption top-left, the steps for each gear under it, both above the
+# view (item 5's head stands at about y .185, run 20261115T062946929Z).
 LABEL_COLUMN_X = 0.300
 CAPTION_XY = (0.030, 0.255)
+GEAR_STEPS_XY = (0.030, 0.244)
 LABEL_GAP = 0.006
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
@@ -558,7 +582,7 @@ def _place_sheet(adapter: Any) -> Callable[[], None]:
         adapter, next(landing for landing in landings if landing.stem == STUB)
     )
     for text, xy, label in (
-        (ASSEMBLY_STEPS, STEPS_XY, "steps"),
+        (ONCE_STEPS, STEPS_XY, "steps done once"),
         (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
         (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
@@ -696,6 +720,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         )
     _activate_sheet(adapter, SHEET_NAMES[1])
     _add_note(adapter, EXPLODED_CAPTION, positions[EXPLODED_CAPTION], label="caption")
+    _add_note(adapter, GEAR_STEPS, GEAR_STEPS_XY, label="steps for each gear")
     return lambda: assert_lines("settled")
 
 

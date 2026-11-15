@@ -1261,15 +1261,25 @@ tight; for the 64T the head is tilted and there is no tail centre.
 The cam is turned last, on the fixture MHA-DT-12-TL-01. The body is gripped in the four-jaw chuck
 with the stub in line with one pair of jaws, its Ø3.25 OD (the register) indicated to .001 TIR
 with a dial test indicator (MHA-DT-12-TL-00 step 8), and left there for all 20 gears. The throw
-is then set, not cut to a number: moving only the pair of jaws in line with the stub, a 1 in dial
-indicator on the stub is brought to read .679 to .681 TIR, twice the gear's .3402 (step 9),
-checked with all four jaws tight (step 10), and if it fails the same adjustment is repeated
-(step 11). The window, half the indicator's reading and each gear's bore float on the stub
-(.0007) total .0019 in worst case, inside MHA-DT-12's ±.0020; the stub hole's ±.002 station drops
-out. Each gear goes on the stub by its reamed bore, with the notched tooth space over the clock
-pin, is turned against the pin in the direction the cut pushes it (step 14) and is clamped by the
+is then set, not cut to a number, and read as a gap near a dial test indicator's zero rather than
+as .68 of travel on a dial indicator (whose error over that travel the shop does not know, and
+which the orbiting stub would leave). The test indicator is set on the side of the stub (step 9)
+and zeroed where the stub stands nearest it, found by rocking the chuck until the reading turns
+back (step 10). The chuck is turned half a turn (step 11), which puts the stub twice the throw
+farther away, and the shop's gauge blocks .1004, .130 and .450 wrung to .6804 are held between
+the stub and the stylus (step 12). Rocking the chuck and the blocks, the reading must turn back
+within .001 of zero (step 13); if not, one jaw of the pair in line with the stub is loosened and
+the other tightened, and the work repeats from the zero (step 14), which leaves all four jaws
+tight at the check. The gap's errors, each added to the next, are the check's .001, a division
+of reading (.0005), three turn-backs of half a division (.00075) and the stack (.00009): .00234,
+half of it on the throw. With the stack's .00004 rounding and each gear's bore float on the stub
+(.0007) that is .0019 in worst case, inside MHA-DT-12's ±.0020; the stub hole's ±.002 station
+drops out. Steps 1 to 14 are on sheet 1 and are done once; steps 15 to 19, for each gear, are on
+sheet 2 beside the exploded view. Each gear goes on the stub by its reamed bore, with the notched
+tooth space over the clock pin, is turned against the pin in the direction the cut pushes it
+(step 17) and is clamped by the
 screw in the stub's end, tightened snug by hand with a 5/32 hex key turned by its short arm
-(step 15). One screw and a Ø.0375 pin hold it, and the cut is interrupted until the cam cleans
+(step 18). One screw and a Ø.0375 pin hold it, and the cut is interrupted until the cam cleans
 up, so rough each cam close to size before it goes on the fixture and take light finishing cuts
 there.
 
