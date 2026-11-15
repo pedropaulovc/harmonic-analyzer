@@ -222,14 +222,35 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "SPROCKET SUPPLIED WITH MHA-PD-00 (LABELLED ON SHEET 3) FLAT ON THE "
         "BASE DECK WHERE SHEET 2 SHOWS IT.",
     ),
+    # The clamp arcs close round a plumb round column, so MHA-MG-08 has two
+    # freedoms there: its height along the column (the sheet 1 dimension)
+    # and its heading about it. Level is not one of them. The pen hangs from
+    # the bar (step "pen-hung"), so the heading swings the MHA-MG-05 wheel
+    # and the pen together and moves neither the pen wire on the rim nor the
+    # pen rod in its guides. It moves the MHA-MG-10 drum off the lever wire's
+    # plane, which MHA-MG-01 fixes from MHA-SM-03 (sh_vn_music_wire_lever_geom
+    # option A1: the hook and the drum share one depth), and the pen carriage
+    # toward or away from the paper (pn_pen_carriage_geom: the rigid carriage
+    # rides its stand-off off the paper, and no other setting moves it). Both
+    # are laid out on the bar's front face parallel to the paper plane: the
+    # pen-rod line is set off the paper, and the wheel plane and the drum lane
+    # derive from it. So the heading sub-step sets that datum against the
+    # MHA-PD-02 platen face, which the paper-drive step has already placed.
+    # Sight alone cannot hold the carriage's stand-off on a bar this long, and
+    # the carriage's printed worst case leaves the heading nothing, so the
+    # heading is the fit-up adjustment that covers that stack (rule 19). Its
+    # acceptance is where the stack closes: once the nib is on the paper
+    # ("nib-on-paper"), only the nib touches it, else the bar turns away from
+    # the paper. Check 8 accepts the drum.
     "magnifier-bar-clamped": (
         "MAGNIFIER BAR: CLOSE THE MHA-SH-01/MHA-SH-02 CLAMP ARCS SUPPLIED WITH "
-        "MHA-MG-00 ROUND THE LEFT FRONT COLUMN (FRONT VIEW), WHEEL TOWARD THE "
-        "PEN ROD, BOTH MHA-SH-VN-53 CLAMP SCREWS LOOSE.",
+        "MHA-MG-00 ROUND THE LEFT FRONT COLUMN, THE MHA-MG-08 BAR RUNNING TO "
+        "THE RIGHT (FRONT VIEW), BOTH MHA-SH-VN-53 CLAMP SCREWS LOOSE.",
         "SET THE MHA-MG-08 BAR TOP TO ITS HEIGHT ABOVE THE RAISED DECK TOP "
         "(SHEET 1), READ WITH A RULE FROM THE DECK TOP.",
-        "TURN THE BAR ON THE COLUMN UNTIL A DIGITAL ANGLE GAUGE ALONG ITS TOP "
-        f"READS {LEVEL_ACCEPTANCE}.",
+        "TURN THE BAR ON THE COLUMN UNTIL, SEEN FROM ABOVE, ITS FRONT FACE RUNS "
+        "PARALLEL TO THE MHA-PD-02 PLATEN FACE. THIS IS A FIRST SETTING; "
+        f"{_n('nib-on-paper')}E IS ITS ACCEPTANCE.",
         "TIGHTEN BOTH CLAMP SCREWS EVENLY.",
         "CHECK: UNDER FIRM HAND PRESSURE THE BAR DOES NOT SLIP OR TURN ON THE "
         "COLUMN.",
@@ -246,8 +267,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         # (mg_magnifying_bracket_arm_check). Setting and tightening are
         # separate sub-steps, and a hold check with its remedy follows, as
         # every other retention on these sheets does (rule 22; review of
-        # the pd DETAIL rename). Each takes one printed line, so the step
-        # still ends sheet 4's second column.
+        # the pd DETAIL rename). Each takes one printed line.
         "ROTATE MHA-MG-01 NOSE DOWN UNTIL BOTH SCREWS BEAR.",
         "TIGHTEN BOTH SCREWS.",
         "CHECK: FIRM HAND PRESSURE DOES NOT MOVE MHA-MG-01.",
@@ -295,6 +315,12 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "THE PAPER.",
         "TIGHTEN THE THUMB SCREW FINGER-TIGHT.",
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
+        "CHECK: ONLY THE NIB TOUCHES THE PAPER.",
+        "IF ANY OTHER PART OF MHA-PN-00 TOUCHES, SLACKEN BOTH MHA-SH-VN-53 "
+        "CLAMP SCREWS, TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER UNTIL IT "
+        f"CLEARS, AND REPEAT {_n('magnifier-bar-clamped')}B, "
+        f"{_n('magnifier-bar-clamped')}D-{_n('magnifier-bar-clamped')}E AND "
+        f"{_n('nib-set')}A-{_n('nib-on-paper')}E.",
     ),
     "stick-parked": (
         "MEASURING STICK: PARK MHA-MS-00 ON THE MHA-FR-01 AS-CAST TOP BETWEEN "

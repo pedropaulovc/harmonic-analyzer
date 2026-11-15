@@ -265,6 +265,40 @@ def test_bar_height_names_the_raised_deck_it_runs_from() -> None:
     )
 
 
+def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
+    """Machinist review run 20261115T023412590Z (r3): the clamp arcs close
+    round a plumb column, so turning the bar on it cannot level it. The turn
+    sets the bar's heading, laid out parallel to the paper plane, against the
+    platen the paper-drive step has already placed. The heading carries the
+    pen carriage's paper stand-off (Codjiflo on 2b645fc), so it is accepted
+    where that stack closes, with the nib on the paper, and the remedy turns
+    the bar. No part goes unnumbered."""
+    import _config
+
+    lines = notes.step_lines("magnifier-bar-clamped")
+    text = " ".join(lines)
+    assert "LEVEL" not in text and "GAUGE" not in text
+    platen = _config.parts("pd-platen")["number"]
+    (turn,) = (line for line in lines if "TURN THE BAR ON THE COLUMN" in line)
+    assert f"PARALLEL TO THE {platen} PLATEN FACE" in turn
+    assert steps.SEQUENCE.index("paper-drive-built") < steps.SEQUENCE.index(
+        "magnifier-bar-clamped"
+    )
+    nib = notes.step_lines("nib-on-paper")
+    check = next(i for i, line in enumerate(nib) if "ONLY THE NIB TOUCHES" in line)
+    assert nib[check].split(". ", 1)[1].startswith("CHECK:")
+    # 8C is a first setting; the nib check is its stated acceptance (machinist
+    # review run 20261115T044005360Z, r1/r2).
+    acceptance = notes.sub_step("nib-on-paper", check)
+    assert f"FIRST SETTING; {acceptance} IS ITS ACCEPTANCE" in turn
+    remedy = nib[check + 1].split(". ", 1)[1]
+    bar = steps.step_number("magnifier-bar-clamped")
+    assert remedy.startswith("IF ")
+    assert "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER" in remedy
+    assert f"REPEAT {bar}B, {bar}D-{bar}E AND " in remedy
+    assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
+
+
 def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
     """Machinist review r1/r2 on 5bca52e13: the paper drive's spare sprocket
     lies loose on the deck (sheet 2) and beside item 7 (sheet 3) with no
