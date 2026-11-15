@@ -2,7 +2,7 @@
 
 Geometry comes only from the part specs: the 15T:150T 48DP PA20 reducer
 (MHA-PD knob shaft on the MHA-PD-06 disc) and the 12T 32DP PA20 feed pinion
-(MHA-PD-10) on the purchased 32DP PA20 rack (MHA-PD-05). Each mesh is
+(MHA-PD-10) on the purchased 32DP PA20 rack (MHA-PD-26). Each mesh is
 checked at its assembled (datum) state over every manufactured profile
 corner the spec prints (tip band x translation band): contact ratio at the
 minimum outside diameters, positive backlash at the tight extreme, root
@@ -49,7 +49,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import math
 
-import pd_platen_rack_spec as rack
+import pd_feed_rack_spec as rack
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed
 import pd_transgear_knob_shaft_spec as knob

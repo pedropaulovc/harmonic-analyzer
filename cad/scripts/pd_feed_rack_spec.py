@@ -30,8 +30,17 @@ from typing import NamedTuple
 
 import _config
 import _gear_quality as quality
-from _hole_spec import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _hole_spec import (
+    DRILL_POINT_H,
+    TAP_DRILL_MM,
+    THREAD_MAJOR_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+)
+import _mcmaster_91794a055 as _screw
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _package_units import drawing_unit
+from _inch_wall_limits import WALL_FLOOR_MM
 
 import pd_transgear_feed_pinion_spec as FEED
 from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
@@ -76,6 +85,9 @@ PURCHASED_RACK_HEIGHT_MIN_MM = (
 PURCHASED_RACK_FACE_WIDTH_MAX_MM = (
     PURCHASED_RACK_FACE_WIDTH_IN + PURCHASED_RACK_SECTION_ROOM_IN
 ) * MM_PER_IN
+PURCHASED_RACK_FACE_WIDTH_MIN_MM = (
+    PURCHASED_RACK_FACE_WIDTH_IN - PURCHASED_RACK_SECTION_ROOM_IN
+) * MM_PER_IN
 if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
     raise AssertionError("purchased rack pitch/PA no longer match the feed sleeve")
 
@@ -102,22 +114,98 @@ TOOTH_CENTRE_PHASE_X = FIRST_GAP_X - PITCH / 2.0
 # --- Placement under the rail (owner ruling 2026-11-13, #2410) --------------
 # The strip's front face stands this far behind the platen's back face (the
 # rail's platen-mating face), so the 12T's full-depth teeth cover the strip's
-# whole face. It is clamped there at MHA-PD-00 against a rule, so the stacks
-# pay this band either way (FRONT_SET_BAND).
+# whole face; its ends lie flush with the rail's (and so the platen's). It is
+# set there against a rule when the rail's holes are struck from its taps at
+# MHA-PD-00 (FRONT_SET_BAND); the screws then return it to that place.
 FRONT_BEHIND_PLATEN = 1.0  # ~.04
 FRONT_SET_BAND = 0.25
 
-# --- Rack-screw taps -------------------------------------------------------
-# Four #0-80 taps in the strip's flat top, transferred through the rail's
-# four holes at MHA-PD-00 (the strip is slid along under the rail until a
-# tooth stands under the first hole). Each stands over a TOOTH: over a tooth
-# space the drill would break through the space's root. The full thread is
-# .122 deep, so a full-length stock screw never bottoms on the rail's thinnest
-# floor (pd_platen_bottom_guide_spec); the drill runs .008 past it for the
-# bottoming tap's lead. The tap drill is the native #0-80 table's.
+# --- Rack-screw taps (drawing-guidelines.md rules 17, 18, 20) ----------------
+# Four #0-80 taps in the strip's flat top, each on a TOOTH centre (over a
+# tooth space the drill would break through the space's root), 22 rack
+# pitches apart: whole teeth, so the spacing is the rack's, printed REF.
+# The strip is drilled and tapped on its own; the MHA-PD-27 rail's four holes
+# are then struck from these taps at MHA-PD-00 with a transfer screw, so the
+# taps' places along the strip need no fit to the rail (delegated ruling
+# 2026-11-14 (Main), pending owner confirmation, #2410).
 TAP_SIZE = "#0-80"
-TAP_THREAD_DEPTH = 0.122 * MM_PER_IN
-TAP_DRILL_DEPTH = 0.130 * MM_PER_IN
+TAP_PITCH = MM_PER_IN / 80.0
+TAP_MAJOR_DIA = THREAD_MAJOR_MM[TAP_SIZE]
+TAP_PLACES = 3
+TAP_BAND = printed_band_mm(TAP_PLACES, unit=UNIT)
+# A bottoming tap's full thread stops 1 to 1.5 pitches short of the drill's
+# shoulder (rule 18's 1.5 pitches).
+TAP_LEAD_LIMITS = (TAP_PITCH, 1.5 * TAP_PITCH)
+# The four taps' target stations along the platen: centred on the platen's
+# centre (its middle guide hole), +-11 and +-33 pitches from it (owner ruling
+# 2026-11-13). The cut ends' tooth phase is not controlled, so each tap
+# stands on the tooth centre nearest its station, within half a pitch; the
+# rail's holes follow the taps wherever they fall, and each clears every rail
+# tap by >= 19 mm (pd_platen_bottom_guide_spec asserts it).
+TAP_STATION_PITCHES = (-33, -11, 11, 33)
+TAP_STATION_X = tuple(
+    GUIDE_HOLE_X[len(GUIDE_HOLE_X) // 2] + n * PITCH for n in TAP_STATION_PITCHES
+)
+TAP_TOOTH_INDEX = tuple(
+    round((x - TOOTH_CENTRE_PHASE_X) / PITCH) for x in TAP_STATION_X
+)
+TAP_X = tuple(TOOTH_CENTRE_PHASE_X + k * PITCH for k in TAP_TOOTH_INDEX)
+TAP_STATION_SLIP_MAX = PITCH / 2.0
+if any(
+    abs(x - station) > TAP_STATION_SLIP_MAX
+    for x, station in zip(TAP_X, TAP_STATION_X, strict=True)
+):
+    raise AssertionError("a rack tap is more than half a pitch off its station")
+TAP_SPACING_PITCHES = TAP_TOOTH_INDEX[1] - TAP_TOOTH_INDEX[0]
+TAP_SPACING = TAP_SPACING_PITCHES * PITCH
+# On the strip's centreline, located from its front face at the .XXX band.
+TAP_Z = RACK_THICKNESS / 2.0
+# Each tap sits on its own tooth centre to the .XXX band along the strip.
+TAP_TOOTH_OFFSET_MAX = TAP_BAND
+
+
+def tooth_width_at_depth_mm(depth_from_top_mm: float, strip_height_mm: float) -> float:
+    """A tooth's width along X this far below the strip's flat top.
+
+    The teeth are cut from the crest side, so a shorter strip has less solid
+    above its roots; past the root line the tooth narrows along its flanks.
+    """
+    below_root = depth_from_top_mm - (strip_height_mm - ADDENDUM - DEDENDUM)
+    return PITCH / 2.0 + 2.0 * DEDENDUM * TAN_PA - 2.0 * below_root * TAN_PA
+
+
+def _deepest_inside_tooth_mm(width_mm: float, strip_height_mm: float) -> float:
+    """The deepest a centred-to-band ``width_mm`` feature stays in the tooth."""
+    root_depth = strip_height_mm - ADDENDUM - DEDENDUM
+    full = PITCH / 2.0 + 2.0 * DEDENDUM * TAN_PA
+    return root_depth + (full - width_mm - 2.0 * TAP_TOOTH_OFFSET_MAX) / (2.0 * TAN_PA)
+
+
+def _floor_in(value_mm: float) -> float:
+    return math.floor(round(value_mm / MM_PER_IN * 1000.0, 6)) / 1000.0 * MM_PER_IN
+
+
+def _ceil_in(value_mm: float) -> float:
+    return math.ceil(round(value_mm / MM_PER_IN * 1000.0, 6)) / 1000.0 * MM_PER_IN
+
+
+# The depths, from the strip's flat top, each at the .XXX band. Sized at the
+# strip's least height (the receiving room) so the tap drill (Ø at its
+# drilled-hole oversize) and the deepest full thread (the drill's deepest
+# shoulder less the tap's least lead) both stay inside the tooth at the
+# station band, every corner.
+_TAP_DRILL_DIA_MAX = TAP_DRILL_MM[TAP_SIZE] + drilled_oversize_mm(unit=UNIT)
+_DRILL_DEPTH_MAX = min(
+    _deepest_inside_tooth_mm(_TAP_DRILL_DIA_MAX, PURCHASED_RACK_HEIGHT_MIN_MM),
+    _deepest_inside_tooth_mm(TAP_MAJOR_DIA, PURCHASED_RACK_HEIGHT_MIN_MM)
+    + TAP_LEAD_LIMITS[0],
+)
+TAP_DRILL_DEPTH = _floor_in(_DRILL_DEPTH_MAX - TAP_BAND)  # .129
+# The printed full thread: what the bottoming tap reaches from the drill's
+# nominal shoulder, so its lower limit is met at the drill's.
+TAP_THREAD_DEPTH = _floor_in(TAP_DRILL_DEPTH - TAP_LEAD_LIMITS[1])  # .110
+TAP_THREAD_DEPTH_MIN = TAP_THREAD_DEPTH - TAP_BAND
+TAP_THREAD_DEPTH_MAX = TAP_DRILL_DEPTH + TAP_BAND - TAP_LEAD_LIMITS[0]
 TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     TAP_SIZE,
@@ -127,66 +215,130 @@ TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": TAP_THREAD_DEPTH},
 )
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
-TAP_MAJOR_DIA = THREAD_MAJOR_MM[TAP_SIZE]
-# The taps' stations on the platen: a whole number of rack pitches apart,
-# centred on the platen's centre (its middle guide hole), each 22 pitches from
-# the next (owner ruling 2026-11-13: centre +-11p and +-33p from the platen's
-# left edge). Every station clears every existing rail tap by >= 19 mm
-# (pd_platen_bottom_guide_spec asserts it).
-TAP_STATION_PITCHES = (-33, -11, 11, 33)
-TAP_STATION_X = tuple(
-    GUIDE_HOLE_X[len(GUIDE_HOLE_X) // 2] + n * PITCH for n in TAP_STATION_PITCHES
-)
-# The strip's offset along the platen that puts a tooth centre under the
-# first station: the least shift from flush (the strip slides under the rail
-# at MHA-PD-00, so its ends are not set flush with the platen's).
-STRIP_X_OFFSET = math.remainder(TAP_STATION_X[0] - TOOTH_CENTRE_PHASE_X, PITCH)
-# The taps on the strip, from its -X cut end: tooth centres, whole pitches.
-TAP_TOOTH_INDEX = tuple(
-    round((x - STRIP_X_OFFSET - TOOTH_CENTRE_PHASE_X) / PITCH) for x in TAP_STATION_X
-)
-TAP_X = tuple(TOOTH_CENTRE_PHASE_X + k * PITCH for k in TAP_TOOTH_INDEX)
-TAP_Z = RACK_THICKNESS / 2.0  # on the strip's centreline
-
-
-def tooth_width_at_depth_mm(depth_from_top_mm: float, strip_height_mm: float) -> float:
-    """A tooth's width along X this far below the strip's flat top.
-
-    The teeth are cut from the crest side, so a shorter strip has less solid
-    above its roots; below the root line the tooth narrows along its flanks.
-    """
-    below_root = depth_from_top_mm - (strip_height_mm - ADDENDUM - DEDENDUM)
-    return PITCH / 2.0 + 2.0 * DEDENDUM * TAN_PA - 2.0 * below_root * TAN_PA
+if TAP_THREAD_DEPTH_MIN > TAP_DRILL_DEPTH - TAP_BAND - TAP_LEAD_LIMITS[1] + 1e-9:
+    raise AssertionError("the rack tap's full thread cannot reach its printed minimum")
 
 
 def tap_tooth_margins_mm(
     strip_height_mm: float = PURCHASED_RACK_HEIGHT_MIN_MM,
+    offset_mm: float = TAP_TOOTH_OFFSET_MAX,
+    *,
+    drill_depth_mm: float = TAP_DRILL_DEPTH + TAP_BAND,
+    thread_depth_mm: float = TAP_THREAD_DEPTH_MAX,
+    drill_dia_mm: float = _TAP_DRILL_DIA_MAX,
 ) -> dict[str, float]:
-    """The metal each side of a centred tap's drill and thread major inside
-    its tooth; negative breaks into the tooth space."""
+    """The metal on the near side of a tap's drill and thread major inside
+    its tooth, ``offset_mm`` off the tooth centre; negative breaks into the
+    tooth space. The defaults are the worst corner."""
     return {
         "drill": (
-            tooth_width_at_depth_mm(TAP_DRILL_DEPTH, strip_height_mm) - TAP_DRILL_DIA
+            tooth_width_at_depth_mm(drill_depth_mm, strip_height_mm) - drill_dia_mm
         )
-        / 2.0,
+        / 2.0
+        - offset_mm,
         "thread": (
-            tooth_width_at_depth_mm(TAP_THREAD_DEPTH, strip_height_mm) - TAP_MAJOR_DIA
+            tooth_width_at_depth_mm(thread_depth_mm, strip_height_mm) - TAP_MAJOR_DIA
         )
-        / 2.0,
+        / 2.0
+        - offset_mm,
         # The 118-degree point narrows faster than the tooth does, so its cone
         # stays in metal once the shoulder does; its tip stays under the crest.
         "point_to_crest": strip_height_mm
-        - (TAP_DRILL_DEPTH + TAP_DRILL_DIA / 2.0 * DRILL_POINT_H),
+        - (drill_depth_mm + drill_dia_mm / 2.0 * DRILL_POINT_H),
     }
 
 
 TAP_TOOTH_MARGINS_MM = tap_tooth_margins_mm()
-if min(TAP_TOOTH_MARGINS_MM.values()) <= 0.0:
+# Nominal: the 3/16 strip, the tap on its tooth centre, nominal depths.
+TAP_TOOTH_MARGINS_NOMINAL_MM = tap_tooth_margins_mm(
+    RACK_HEIGHT,
+    0.0,
+    drill_depth_mm=TAP_DRILL_DEPTH,
+    thread_depth_mm=TAP_THREAD_DEPTH,
+    drill_dia_mm=TAP_DRILL_MM[TAP_SIZE],
+)
+if min(TAP_TOOTH_MARGINS_MM.values()) < 0.0:
     raise AssertionError(f"a #0-80 rack tap breaks out of its tooth: {TAP_TOOTH_MARGINS_MM}")
-if any(abs((x - TOOTH_CENTRE_PHASE_X) / PITCH - k) > 1e-9 for x, k in zip(TAP_X, TAP_TOOTH_INDEX, strict=True)):
+# The tooth-root wall at the worst corner (RV-03): the deepest thread grazes
+# the root fillet, which lies below the 12T's working depth.
+TAP_TOOTH_WALL_MIN = min(TAP_TOOTH_MARGINS_MM["drill"], TAP_TOOTH_MARGINS_MM["thread"])
+TAP_TOOTH_WALL_NOMINAL = min(
+    TAP_TOOTH_MARGINS_NOMINAL_MM["drill"], TAP_TOOTH_MARGINS_NOMINAL_MM["thread"]
+)
+# The tap's wall to the strip's front and back faces (RV-03): the least face
+# width, the thread major and the tap's .XXX place from the front face.
+TAP_FACE_WALL_MIN = (
+    PURCHASED_RACK_FACE_WIDTH_MIN_MM - TAP_MAJOR_DIA
+) / 2.0 - TAP_BAND
+TAP_FACE_WALL_NOMINAL = (RACK_THICKNESS - TAP_MAJOR_DIA) / 2.0
+if TAP_FACE_WALL_MIN <= 0.0:
+    raise AssertionError("a #0-80 rack tap breaks out of the strip's face")
+# Rule 20's stated wall, floored to .001 in.
+TAP_FACE_WALL_STATEMENT = (
+    f"TAPS: WALL {f'{_floor_in(TAP_FACE_WALL_MIN) / MM_PER_IN:.3f}'.removeprefix('0')} "
+    "MIN TO FRONT AND BACK FACES."
+)
+if any(
+    abs((x - TOOTH_CENTRE_PHASE_X) / PITCH - k) > 1e-9
+    for x, k in zip(TAP_X, TAP_TOOTH_INDEX, strict=True)
+):
     raise AssertionError("a rack tap is off a tooth centre")
+if len({b - a for a, b in zip(TAP_TOOTH_INDEX, TAP_TOOTH_INDEX[1:])}) != 1:
+    raise AssertionError("the rack taps are not equally spaced in whole teeth")
 if not all(0.0 < x < BAR_LENGTH for x in TAP_X):
     raise AssertionError("a rack tap is off the strip")
+
+# --- The rack screws' engagement (rule 18; RV-02) ----------------------------
+# Four stock 91794A055 #0-80 x 1/4 fillisters, untrimmed (owner ruling
+# 2026-11-13), their heads on the floor of the MHA-PD-27 rail's counterbores.
+# The floor (rail underside to counterbore floor, .XXX) is the least that
+# keeps the longest stock screw on the thinnest floor at or above the least
+# full thread, so no tip ever reaches the tap's lead.
+SCREW_LENGTH = _screw.SHANK_LEN
+SCREW_LENGTH_MIN = SCREW_LENGTH - 0.03 * MM_PER_IN  # ASME B18.6.3 length band
+SCREW_FIRST_THREAD_LOSS = _screw.PITCH
+SCREW_FLOOR = _ceil_in(SCREW_LENGTH - TAP_THREAD_DEPTH_MIN + TAP_BAND)  # .150
+SCREW_FLOOR_BAND = TAP_BAND
+SCREW_TIP_REACH_MAX = SCREW_LENGTH - (SCREW_FLOOR - SCREW_FLOOR_BAND)
+if SCREW_TIP_REACH_MAX > TAP_THREAD_DEPTH_MIN + 1e-9:
+    raise AssertionError("the longest rack screw can reach its tap's lead")
+# Full-thread engagement: shortest stock on the thickest floor, the screw's
+# first thread lost; nominal: the catalogue length on the nominal floor.
+ENGAGEMENT_WORST = (
+    SCREW_LENGTH_MIN - (SCREW_FLOOR + SCREW_FLOOR_BAND) - SCREW_FIRST_THREAD_LOSS
+)
+ENGAGEMENT_NOMINAL = SCREW_LENGTH - SCREW_FLOOR - SCREW_FIRST_THREAD_LOSS
+ENGAGEMENT_WORST_D = ENGAGEMENT_WORST / TAP_MAJOR_DIA
+ENGAGEMENT_NOMINAL_D = ENGAGEMENT_NOMINAL / TAP_MAJOR_DIA
+ENGAGEMENT_TARGET_D = 1.5
+if ENGAGEMENT_WORST <= 0.0:
+    raise AssertionError("the rack screws have no full-thread engagement")
+# Rule 20's stated fact, floored (never rounded up): .001 in and .01D.
+ENGAGEMENT_CALLOUT_MIN = _floor_in(ENGAGEMENT_WORST) / MM_PER_IN
+ENGAGEMENT_CALLOUT_D = math.floor(round(ENGAGEMENT_WORST_D * 100.0, 6)) / 100.0
+ENGAGEMENT_STATEMENT = (
+    f"ENGAGEMENT {f'{ENGAGEMENT_CALLOUT_MIN:.3f}'.removeprefix('0')} MIN "
+    f"({ENGAGEMENT_CALLOUT_D:.2f}D)"
+)
+
+
+def _require_minor(exception_id: str, what: str) -> None:
+    """Refuse a shortfall the registry row does not declare as a ``minor``
+    (sm_gooseneck_spring_joint.owner_minor)."""
+    declared = _config.parts("pd-feed-rack").get("machinist_exceptions") or ()
+    if not any(
+        isinstance(entry, dict)
+        and entry.get("id") == exception_id
+        and entry.get("kind") == "minor"
+        for entry in declared
+    ):
+        raise AssertionError(f"pd-feed-rack: no minor {exception_id} declares the {what}")
+
+
+if ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
+    _require_minor("RV-02", "rack-screw engagement under 1.5D")
+if min(TAP_FACE_WALL_MIN, TAP_TOOTH_WALL_MIN) < WALL_FLOOR_MM:
+    _require_minor("RV-03", "rack-tap walls under the .060 floor")
 
 
 def half_width(y: float) -> float:
@@ -721,15 +873,31 @@ GAP_AREA = (half_width(ROOT_Y) + half_width(RACK_HEIGHT)) * (RACK_HEIGHT - ROOT_
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Length", "RackHeight"},
     "Bar": {"RackDepth"},
+    "TapStations": {
+        "TapStart",
+        "TapStation2",
+        "TapStation3",
+        "TapStation4",
+        "TapFromFront",
+    },
 }
 # The cut length serves no fit but bounds the operating window
 # (paper_drive_rack_travel), so it prints .XX. The purchased 3/16 strip's
 # height and face width print their exact decimals as plain references
 # (#2694, #2147): the receiving geometry has room for any ordinary strip.
+# Each tap stands on its own tooth centre, so its stations along the strip
+# are the rack's (whole pitches from the first tap, which stands on the
+# tooth nearest TapStart): references. The tap's place across the strip
+# is drilled to the title block's .XXX.
 _PLACES = {
     "Length": 2,
     "RackDepth": 4,
     "RackHeight": 4,
+    "TapStart": TAP_PLACES,
+    "TapStation2": TAP_PLACES,
+    "TapStation3": TAP_PLACES,
+    "TapStation4": TAP_PLACES,
+    "TapFromFront": TAP_PLACES,
 }
 DRAWING_PRECISION = {
     feature: {name: _PLACES[name] for name in names}
@@ -740,11 +908,25 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-DRAWING_REFERENCE_DIMENSIONS = frozenset({"RackDepth", "RackHeight"})
+DRAWING_REFERENCE_DIMENSIONS = frozenset(
+    {"RackDepth", "RackHeight", "TapStart", "TapStation2", "TapStation3", "TapStation4"}
+)
 DRAWING_NOMINALS_MM = {
     "Length": BAR_LENGTH,
     "RackDepth": RACK_THICKNESS,
     "RackHeight": RACK_HEIGHT,
+    "TapStart": TAP_X[0],
+    "TapStation2": TAP_X[1] - TAP_X[0],
+    "TapStation3": TAP_X[2] - TAP_X[0],
+    "TapStation4": TAP_X[3] - TAP_X[0],
+    "TapFromFront": TAP_Z,
+}
+# The tap callout's drill Ø and both depths print .XXX, the band the tooth
+# and engagement stacks above are paid at.
+TAP_CALLOUT_PRECISION = {
+    "hw-tapdrldia": TAP_PLACES,
+    "hw-threaddepth": TAP_PLACES,
+    "hw-tapdrldepth": TAP_PLACES,
 }
 
 

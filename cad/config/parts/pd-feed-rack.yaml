@@ -16,13 +16,24 @@ pd-feed-rack:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock, cut to the platen's 10.62 in; four #0-80 taps in its flat top transferred through the MHA-PD-27 rail at MHA-PD-00, each over a tooth"
+  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock: cut to the platen's 10.62 in, then drill and tap four #0-80 holes in its flat top, each on a tooth centre; the MHA-PD-27 rail's four screw holes are struck from these taps at MHA-PD-00"
   drawing_unit: in
   installation_notes: |-
-    CUT TO 10.62 IN; TAPS TRANSFERRED FROM MHA-PD-27 AT ASSEMBLY.
+    CUT TO 10.62 IN; TAP ON TOOTH CENTRES.
+    SET MESH AT ASSEMBLY.
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the sheet carrying only the two incoming stock sizes and the purchased-rack line"
       finding: "pitch-accuracy limits missing on the purchased rack (rule 12)"
       reason: "pitch accuracy is the catalogue part own; the assembly checks the running mesh over the whole engaged window (owner-accepted; carried over from the retired MHA-PD-05, the same purchased strip)"
+    - id: "RV-02"
+      kind: "minor"
+      where: "bottom view, the four #0-80 taps' callout: ENGAGEMENT .052 MIN (0.87D)"
+      finding: "rack-screw full-thread engagement .052 in (0.87D) worst, below rule 18's 1.5D (and below 1.0D)"
+      reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation (#2410): prefer a little under 1.5D to trimming; the screws only hold a brass strip against a pen-weight feed load. Owner ruling 2026-11-13: four stock 91794A055 #0-80 x 1/4 fillisters, untrimmed. Worst case, every band at its corner: the shortest stock screw (1/4 less the .03 length band) on the thickest .150 counterbore floor of MHA-PD-27 (+.005), its first thread lost, leaves .0525 (0.87D); nominal (catalogue length, .150 floor) .0875 (1.46D). The tooth caps the full thread: on the shortest strip the tap's .129 drill and .110 full thread (each +.005) and its .005 station off the tooth centre stay inside the tooth, and the floor is the least that keeps the longest screw on the thinnest floor above the least full thread (pd_feed_rack_spec.ENGAGEMENT_WORST)."
+    - id: "RV-03"
+      kind: "minor"
+      where: "the four #0-80 taps: WALL .055 MIN TO FRONT AND BACK FACES, and inside the tooth at the deepest thread"
+      finding: "tap walls below rule 17's .060 floor: .055 to the strip's faces, about .000 to the tooth-root fillet at the worst corner"
+      reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation (#2410): a #0-80 tap in a 3/16 strip. To the front and back faces: .055 worst (the strip's least face width with its receiving room, the .060 major, the tap .005 off the centreline), .063 centred on a 3/16 strip. Inside the tooth: the depths are sized so the deepest drill and full thread on the shortest strip, the tap .005 off its tooth centre, just stay in metal (about .000, the thread may graze the root fillet); .011 nominal. The root fillet lies below the working depth (the 12T's tips never reach it), so the graze does not touch the mesh."

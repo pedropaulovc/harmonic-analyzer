@@ -1,4 +1,4 @@
-"""Finite cut-end operating window for the purchased MHA-PD-05 rack.
+"""Finite cut-end operating window for the purchased MHA-PD-26 rack.
 
 The feed pinion's contact path, projected on the rack, comes from the
 closed-form mesh check (paper_drive_mesh_check). This contract clips that
@@ -25,7 +25,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_deviations,
 )
-import pd_platen_rack_spec as rack
+import pd_feed_rack_spec as rack
 
 OPERATING_LIMIT_PLACES = 2
 OPERATING_DATUM_TEXT = "FROM ACTUAL RACK -X CUT END TO FEED STUD AXIS, TOWARD +X"

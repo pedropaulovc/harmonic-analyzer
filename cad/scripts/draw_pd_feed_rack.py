@@ -1,22 +1,25 @@
-r"""Manufacturing print for the composite platen rack, MHA-PD-05.
+r"""Manufacturing print for the MHA-PD-26 feed rack.
 
-The long front/top group is aligned at 1:1. A 4:1 VIEW A, lettered with its
-viewing arrow on the front view's right end, defines the stepped brass
-section and soft-solder seam in solid lines. The standard shaded-with-edges
+The long front/bottom group is aligned at 1:1: the bottom view looks at the
+strip's flat top and its four #0-80 taps, located on tooth centres. A 4:1
+VIEW A, lettered with its viewing arrow on the front view's right end,
+defines the purchased square section. The standard shaded-with-edges
 isometric supplements those views. All sizes and decimal places come from
-the saved part and its pure-data spec; the solder and flush-end requirements
-stand at leaders on the features they control (rule 7). The sheet prints
-decimal inch (the part's ``drawing_unit: in``).
+the saved part and its pure-data spec; the taps carry one native Hole
+Wizard callout. The sheet prints decimal inch (the part's
+``drawing_unit: in``).
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
+import _telemetry
 from _check import check
 from _com import _early_bound
 from _machinist_review_mode import MachinistReviewMode
@@ -28,32 +31,46 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from pd_platen_rack_spec import (
-    BACKER_HEIGHT,
-    BAR_HEIGHT,
+from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
+from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+from pd_feed_rack_spec import (
     BAR_LENGTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
-    RACK_Z0,
+    ENGAGEMENT_STATEMENT,
+    RACK_HEIGHT,
+    TAP_CALLOUT_PRECISION,
+    TAP_DRILL_DEPTH,
+    TAP_DRILL_DIA,
+    TAP_FACE_WALL_STATEMENT,
+    TAP_SPEC,
+    TAP_THREAD_DEPTH,
 )
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    place_view,
+    remove_notes_matching,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
-SPEC = DRAWINGS_BY_NAME["pd_platen_rack"]
+SPEC = DRAWINGS_BY_NAME["pd_feed_rack"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
@@ -63,56 +80,108 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.190, 0.185)
-TOP_CENTER = (FRONT_CENTER[0], 0.230)
+FRONT_CENTER = (0.190, 0.205)
+# Third-angle: the view of the flat top (local -Y) stands under the front.
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.180)
 END_CENTER = (0.355, 0.120)
 END_SCALE = (4, 1)
-ISO_CENTER = (0.155, 0.115)
+ISO_CENTER = (0.160, 0.108)
 ISO_SCALE = (1, 2)
+_LEFT_END_X = FRONT_CENTER[0] - BAR_LENGTH / 2000.0
 FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0], 0.205),
-    # Left of the left end: the right end carries VIEW A's arrow.
-    "OverallHeight": (0.038, FRONT_CENTER[1]),
+    "Length": (FRONT_CENTER[0], 0.225),
+}
+# The tap stations run under the bottom view, the first two on one line
+# (TapStart ends where TapStation2 begins), the longer two stepped below;
+# the tap's place across the strip stands left of the first tap.
+BOTTOM_KEEP = {
+    "TapStart": (_LEFT_END_X + 0.026, 0.170),
+    "TapStation2": (_LEFT_END_X + 0.080, 0.170),
+    "TapStation3": (_LEFT_END_X + 0.107, 0.164),
+    "TapStation4": (_LEFT_END_X + 0.134, 0.158),
+    "TapFromFront": (_LEFT_END_X + 0.044, 0.192),
 }
 END_KEEP = {
-    "BackerDepth": (END_CENTER[0], 0.082),
     "RackDepth": (END_CENTER[0], 0.156),
     # Right of the rack's outline, inside the border.
     "RackHeight": (0.3925, 0.135),
-    "RackInset": (0.375, 0.095),
-    "SeamHeight": (0.321, 0.112),
 }
 GEAR_DATA_XY = (0.020, 0.254)
-# Under the isometric's label (y ~0.077, run 9 touched its first line), left
-# of the title block (x 0.216) and above the border.
+# Under the isometric's label, left of the title block (x 0.216) and above
+# the border.
 NOTES_XY = (0.020, 0.064)
-# Rule 7: the one part fact the views cannot carry; the mesh is set by the
-# MHA-PD-00 assembly steps, not on this part sheet.
-NOTES_TEXT = "END TOOTH PHASE NOT CONTROLLED."
+# Rule 7: the part facts the views cannot carry; the mesh is set by the
+# MHA-PD-00 assembly steps, not on this part sheet. Rule 20: the taps' wall
+# to the strip's faces (RV-03).
+NOTES_TEXT = (
+    "END TOOTH PHASE NOT CONTROLLED.\n"
+    f"{TAP_FACE_WALL_STATEMENT}\n"
+    "REMOVE ANY TAP BURR BROKEN THROUGH INTO A TOOTH SPACE."
+)
+# The tap callout stands right of the bottom view's right end, above VIEW A,
+# its leader on the fourth tap.
+TAP_CALLOUT_XY = (0.330, 0.192)
+# Rule 7/20: where the four taps stand, and their engagement (RV-02).
+TAP_CALLOUT_BELOW = f"ON TOOTH CENTRES\n{ENGAGEMENT_STATEMENT}"
+TAPPED_HOLE_NOTE = "Tapped Hole"
 # Rule 9: the enlarged end view is VIEW A, its viewing arrow on the front
 # view's right end face, approaching from the right (third-angle right view).
 VIEW_LETTER = "A"
 VIEW_LETTER_HEIGHT = 0.005
 VIEW_ARROW_RUN = 0.012
 END_CAPTION = f"VIEW {VIEW_LETTER}\nSCALE {END_SCALE[0]}:{END_SCALE[1]}"
-# Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
-# dimension line (y ~0.0795) and the title block top (y 0.066); left-anchored.
+# Centred under the 4:1 end view (axis x ~0.355), above the title block top
+# (y 0.066); left-anchored.
 END_NOTE_XY = (0.343, 0.077)
 ISO_NOTE_XY = (0.104, 0.077)
-# Rule 7 (flag it where it applies): the soft-solder joint is called out at
-# its seam's corner beside the rack on VIEW A, the flush ends at the front
-# view's right end.  Each text stands up-left of its tip, clear of the views:
-# the solder note right of the isometric and under VIEW A's top dimension,
-# the flush note under the front view, left of its right end.
 NOTE_HEIGHT = 0.0025
-SOLDER_NOTE = "SOFT-SOLDER RACK TO BACKER\n(TIN-LEAD OR LEAD-FREE)"
-SOLDER_NOTE_XY = (0.250, 0.150)
-FLUSH_NOTE = "RACK AND BACKER ENDS FLUSH,\nBOTH ENDS"
-FLUSH_NOTE_XY = (0.240, 0.174)
+
+
+def _require_saved_taps(model: Any) -> None:
+    """Require the saved native taps' size, class, blind end, drill Ø and
+    both depths."""
+    feature = _early_bound(model, "IPartDoc").FeatureByName("RackTaps")
+    if feature is None:
+        raise RuntimeError("saved feed rack has no native RackTaps")
+    feature = _early_bound(feature, "IFeature")
+    if str(feature.GetTypeName2()) != "HoleWzd":
+        raise RuntimeError("saved feed rack RackTaps is not a native Hole Wizard tap")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError("saved feed rack RackTaps has no hole definition")
+    definition = _early_bound(definition, "IWizardHoleFeatureData2")
+    if str(definition.FastenerSize).strip() != TAP_SPEC.size:
+        raise RuntimeError("saved feed rack RackTaps has the wrong thread size")
+    _verify_tap_metadata(definition, TAP_SPEC, "saved feed rack RackTaps")
+    for member, expected, what in (
+        ("TapDrillDiameter", TAP_DRILL_DIA, "tap drill"),
+        ("TapDrillDepth", TAP_DRILL_DEPTH, "tap drill depth"),
+        ("ThreadDepth", TAP_THREAD_DEPTH, "thread depth"),
+    ):
+        value = float(getattr(definition, member)) * 1000.0
+        if not math.isfinite(value) or abs(value - expected) > DIAMETER_TOLERANCE_MM:
+            raise RuntimeError(f"saved feed rack {what} {value:.3f} != {expected:.3f} mm")
+
+
+@_telemetry.traced("drawing.hole_callout_below")
+def _set_tap_callout_below(display: Any, text: str) -> None:
+    """Write ``text`` under the native tap callout and read it back
+    (draw_sm_gooseneck_end_plug._set_tap_callout_below)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "feed rack tap callout rows or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
 
 
 def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Retain native controls and purchased-stock/composite reference sizes."""
+    """Retain native controls and purchased-stock and tap-station reference sizes."""
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     found: set[str] = set()
     for raw in annotations:
@@ -134,7 +203,7 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         # swTolNONE = 0: fabricated .XX controls use the title block. Bought
-        # sizes and their composite height keep part-authored parentheses.
+        # sizes and the rack's tap stations keep part-authored parentheses.
         # Every size here is equation-owned, and an equation-owned dimension
         # reads DrivenState 1, never 2 (build_dt_cone_gear_shaft's station
         # ownership gate); "not a driven reference" is IsReference() False.
@@ -156,11 +225,11 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"rack sheet is missing sizes {sorted(missing)}")
 
 
-def _add_sheet_notes(adapter: Any, front: Any, end: Any) -> None:
-    """VIEW A's arrow and caption, the leadered requirements and the note."""
+def _add_sheet_notes(adapter: Any, front: Any) -> None:
+    """VIEW A's arrow and caption and the sheet note."""
     mm = 1.0 / 1000.0
     tip = model_point_in_view(
-        adapter, front, (BAR_LENGTH * mm, BAR_HEIGHT / 2.0 * mm, 0.0),
+        adapter, front, (BAR_LENGTH * mm, RACK_HEIGHT / 2.0 * mm, 0.0),
         label="VIEW A arrow tip",
     )
     add_leader_note(
@@ -168,22 +237,6 @@ def _add_sheet_notes(adapter: Any, front: Any, end: Any) -> None:
         text_xy=(tip[0] + VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2.0),
         attach_xy=tip, view=front, height=VIEW_LETTER_HEIGHT,
         label=f"view {VIEW_LETTER} viewing arrow",
-    )
-    seam = model_point_in_view(
-        adapter, end, (BAR_LENGTH * mm, BACKER_HEIGHT * mm, RACK_Z0 * mm),
-        label="rack/backer seam corner",
-    )
-    add_leader_note(
-        adapter, SOLDER_NOTE, text_xy=SOLDER_NOTE_XY, attach_xy=seam, view=end,
-        height=NOTE_HEIGHT, label="soft-solder joint note",
-    )
-    end_face = model_point_in_view(
-        adapter, front, (BAR_LENGTH * mm, BACKER_HEIGHT / 2.0 * mm, 0.0),
-        label="right end face",
-    )
-    add_leader_note(
-        adapter, FLUSH_NOTE, text_xy=FLUSH_NOTE_XY, attach_xy=end_face, view=front,
-        height=NOTE_HEIGHT, label="flush ends note",
     )
     # The free notes belong to the sheet, not the last view a leader used.
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -201,7 +254,8 @@ def _add_sheet_notes(adapter: Any, front: Any, end: Any) -> None:
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open platen rack source", await adapter.open_model(str(SOURCE)))
+    check("open feed rack source", await adapter.open_model(str(SOURCE)))
+    _require_saved_taps(adapter.currentModel)
     read_required_properties(
         adapter.currentModel,
         (
@@ -234,18 +288,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Platen Rack and Backer Manufacturing Drawing",
+            0: "Feed Rack Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "composite platen rack; stepped section; soft-soldered joint",
+            3: "feed rack; purchased brass rack strip; four #0-80 taps",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=END_SCALE)
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, top, end):
+    # The taps are fully defined by their native callout (rule 9).
+    for view in (front, bottom, end):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -258,26 +313,49 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         *curate_view_dimensions(
             adapter,
+            bottom,
+            keep=BOTTOM_KEEP,
+            view_label="rack bottom",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
             end,
             keep=END_KEEP,
             view_label="rack enlarged end",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    # Showing EndStockProfile prints the section's real stock outline and seam;
-    # it remains hidden in the source part and in the isometric/assembly views.
+    # The four taps, natively called out on the bottom view: the title
+    # block's THREADS row owns the 2B class (rule 2), the drill and both
+    # depths print .XXX, and their place and engagement print below.
+    tap_callout = add_native_hole_callout(
+        adapter,
+        bottom,
+        edge=visible_circle_edge(adapter, bottom, TAP_DRILL_DIA),
+        callout_xy=TAP_CALLOUT_XY,
+        label=f"feed rack {TAP_SPEC.size} taps",
+    )
+    omit_title_block_thread_class(tap_callout, label="feed rack taps")
+    set_hole_callout_precision(tap_callout, TAP_CALLOUT_PRECISION, label="feed rack taps")
+    _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
+    rebuild_drawing(adapter, label="feed rack tap callout")
     for property_name, position in (
         ("Gear Data", GEAR_DATA_XY),
         ("Isometric View Note", ISO_NOTE_XY),
     ):
         add_property_linked_note(adapter, property_name, *position, char_height=NOTE_HEIGHT)
-    _add_sheet_notes(adapter, front, end)
-    for view in (front, top, end):
+    _add_sheet_notes(adapter, front)
+    # SolidWorks pins its own "Tapped Hole" note beside a tap's native callout;
+    # the callout already states the thread.
+    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
+    for view in (front, bottom, end):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Platen Rack and Backer Manufacturing Drawing",
+        pdf_title="Feed Rack Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(lambda: _assert_native_dimensions(adapter, annotations),),

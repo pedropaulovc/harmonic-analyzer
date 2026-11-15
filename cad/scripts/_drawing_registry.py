@@ -22,6 +22,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_platen_bottom_guide",
+        part="pd_platen_bottom_guide",
+        artifact_stem="pd-platen-bottom-guide",
+        script_name="draw_pd_platen_bottom_guide.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_platen",
         part="pd_platen",
         artifact_stem="pd-platen",
@@ -660,10 +667,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pd_platen_rack",
-        part="pd_platen_rack",
-        artifact_stem="pd-platen-rack",
-        script_name="draw_pd_platen_rack.py",
+        name="pd_feed_rack",
+        part="pd_feed_rack",
+        artifact_stem="pd-feed-rack",
+        script_name="draw_pd_feed_rack.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
