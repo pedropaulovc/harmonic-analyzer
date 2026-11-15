@@ -156,11 +156,11 @@ SLOT_WIDTH_BAND = (0.0508, 0.0)
 # rides the mill's travel, not the joint.  The cutter's side push across a
 # standing plate is the largest load the bond ever sees (it pries the butt
 # open), so each plate is packed solid on both faces up to just below its
-# slot and the slots are taken in light passes (note 2 prints the cure and
-# the packing): the plate bears on the packing, not the bond.  Deep enough
-# that the printed reach and slot depth and the strap's stock band, with the
-# corner radius at its printed MAX below, still keep the rod's back corners
-# off the slot-corner fillets (guarded below).
+# slot and the slots are taken in light passes (the part's `process` record;
+# note 2 prints the cure): the plate bears on the packing, not the bond.
+# Deep enough that the printed reach and slot depth and the strap's stock
+# band, with the corner radius at its printed MAX below, still keep the
+# rod's back corners off the slot-corner fillets (guarded below).
 PLATE_REACH = 24.638  # .97
 SLOT_DEPTH = 10.668  # .42
 PLATE_FRONT_Z = round(STRAP_Z[0] - PLATE_REACH, 6)
@@ -401,16 +401,17 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 # the upper) and carries the bond's prep and its bench acceptance (rule 23:
 # one note may carry the degrease, apply and cure rules; the joint is made
 # on this part, no assembly step makes it).  Note 2 is the slots'
-# requirement after the cure, with the plates packed so the cutter does not
-# pry the butt (above), and the rod's free fall as its acceptance (the shop
-# reaches two .002-band slots in line across a bonded joint by cutting both
-# after the cure, drawing-guidelines.md "What the shop holds", #2435).
+# requirement after the cure, with the rod's free fall as its acceptance
+# (rule 7: the plates' support while slotting is method, so it lives in the
+# part's `process` record, above; the shop reaches two .002-band slots in
+# line across a bonded joint by cutting both after the cure,
+# drawing-guidelines.md "What the shop holds", #2435).
 DRAWING_NOTES = "\n".join(
     (
-        f"{BOND_NOTE}. TWO GUIDE PLATES ALIKE, BONDED (LOCTITE 638) TO DEGREASED STRAP FRONT,",
-        "   LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS; NEITHER MOVES BY HAND.",
-        f"{SLOTS_NOTE}. SLOTS CUT AFTER 24 H CURE WITH PLATES PACKED SOLID, IN LINE: PEN ROD",
-        f"   {PEN_ROD_NUMBER} SLIDES FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
+        f"{BOND_NOTE}. TWO GUIDE PLATES ALIKE, BONDED (LOCTITE 638) TO STRAP FRONT, BOTH FACES",
+        "   DEGREASED; LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS; NEITHER MOVES BY HAND.",
+        f"{SLOTS_NOTE}. CUT SLOTS AFTER 24 H CURE, BOTH IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES",
+        "   FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
 # The upper plate's bond station across the strap (rule 10: a location is a

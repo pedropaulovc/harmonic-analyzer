@@ -9,7 +9,7 @@ pn-pen-hanger:
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel); guide plates bonded to the strap (LOCTITE 638); slots cut once the bond has cured, each plate packed solid on both faces up to just below its slot and the slots taken in light passes, so the cutter pushes the plate into the packing and never pries it off the bond; blackened last"
+  process: "machined (steel); guide plates bonded to the strap (LOCTITE 638); slots cut after the 24 h cure with each plate held between parallels or packing blocks on both faces, up to just below its slot, and the slots taken in light passes, so the cutter pushes the plate into the packing and never pries it off the bond; blackened last"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
