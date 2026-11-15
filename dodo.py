@@ -2598,6 +2598,7 @@ def _cached_drawing_action(stem: str) -> None:
             _resolved(spec.outputs["slddrw"]),
             functools.partial(_com_process_inputs, label),
             lambda: _drawing_dependent(stem),
+            source_kind=_replay_shadow.BuildKind(spec.source_kind),
         ),
     )
 

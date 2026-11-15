@@ -1167,18 +1167,24 @@ the base archive's bytes but the layout report, which may differ only by its
 audit's wall seconds (`summary.collect_s`/`total_s`, `layout_alike`). A served
 drawing (`dodo._reuse_drawing`) installs the base's sheet, PDF, PNG and
 layout report and stores them under the key (`_store_outputs`, as a build);
-no drawing label is in `DEPENDENT_SERVE_LABELS`, so every drawing's would-be
-reuse is audited. The attempt runs before the seat and serves nothing (about
-8 to 12 s per part-drawing miss, natively); `DRAWING_AUDIT_ONE_IN` (1: every
-key) samples it by key hash, the rest declining `unsampled` before any
+no drawing label is in `DEPENDENT_SERVE_LABELS`, so every part drawing's
+would-be reuse is audited. The attempt runs before the seat and serves nothing
+(about 8 to 12 s per part-drawing miss, natively); `DRAWING_AUDIT_ONE_IN` (1:
+every key) samples it by key hash, the rest declining `unsampled` before any
 lookup. An audit whose PDFs, with the base's request multiset and text, differ
-only by path pieces at most `_com_outcome.SUB_RESOLUTION_INK_MM` (0.127 mm)
-long reads `output_nondeterminism` (`sub_resolution_ink`) when the seat led,
-and revokes nothing. Assembly sheets stay audit-only: their builds do not
-repeat (the seat's component order, ray-hit order and title counters), so no
-audit can confirm their base. `DEFAULT_MODES[BuildKind.DRAWING] =
-ReplayMode.SHADOW` stops drawing replays fleet-wide; locally
-`HARMONIC_COM_REPLAY=drawing=shadow`. See DEVELOPING.md "Drawing reuse".
+only by ink moved at most `_com_outcome.SUB_RESOLUTION_INK_MM` (0.127 mm: each
+piece drawn on one side only lies that close to a piece of the same stroke on
+the other; a bound on how far ink moved, not on piece length, which let small
+circles move anywhere) reads `output_nondeterminism` (`sub_resolution_ink`)
+when the seat led, and revokes nothing. An assembly sheet (registry
+`source_kind` `assembly`, passed as `DependentBuild.source_kind`) declines
+`assembly_sheet` before any hash, lookup or replay, served or not: its builds
+do not repeat (the seat's component order, ray-hit order and title counters),
+so the 14 to 16 s replay could never confirm a base, and natively it alarmed
+and revoked on noise (2026-11-15 passes 2 and 3). Its post-build split is
+unchanged. `DEFAULT_MODES[BuildKind.DRAWING] = ReplayMode.SHADOW` stops
+drawing replays fleet-wide; locally `HARMONIC_COM_REPLAY=drawing=shadow`. See
+DEVELOPING.md "Drawing reuse".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

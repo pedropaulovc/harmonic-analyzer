@@ -3222,7 +3222,7 @@ drawing's own closure changes and its children do not, how often does the new
 source issue the identical COM conversation? These recordings answer it, and
 they are the bases of assembly and drawing reuse ("Assembly reuse" and
 "Drawing reuse" below): an assembly's served for four labels and audited for
-the rest, a drawing's audited.
+the rest, a part drawing's audited, an assembly sheet's not attempted.
 
 **What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
 including the fallback after a failed EXPLODE) and every drawing build
@@ -3299,7 +3299,7 @@ is never an alarm there (a would-be reuse's audit, below, can be); its
 | `noop_judgement` | meaning |
 | --- | --- |
 | `confirmed` | the base's assembly or drawing |
-| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `sub_resolution_ink` when only by path pieces too short to print (below), else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
+| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `sub_resolution_ink` when only by ink moved too little to print (below), else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
 | `unexplained_output_divergence` | another output, though SolidWorks answered alike: nothing recorded explains it; WARN |
 | `noop_outcome_unknown` | a signal absent, or no comparison |
 
@@ -3427,24 +3427,36 @@ every condition holds:
 
 - the same PDFs, each with the same number of pages and the same page sizes;
 - the same text runs on every page;
-- every path piece one side draws and the other does not is at most
-  `_com_outcome.SUB_RESOLUTION_INK_MM` long: 0.127 mm (0.005 in), 1.5 pixels
-  at 300 dpi and under the thinnest printed line weight.
+- every path piece one side draws and the other does not lies within
+  `_com_outcome.SUB_RESOLUTION_INK_MM` of a piece of the same stroke (width,
+  colour, dash, fill) that the other side draws on that page: both its ends
+  within that distance of the other piece's segment, which puts the whole
+  piece there. The bound is 0.127 mm (0.005 in): 1.5 pixels at 300 dpi and
+  under the thinnest printed line weight.
+
+The bound is on how far ink moved, not on how long a piece is: `_pdf_ink` cuts
+every Bezier into 32 pieces, so a whole circle up to 5 mm across is pieces
+shorter than 0.127 mm, and a bound on length let it appear, vanish or move
+anywhere (#2804 review). Here a circle that is new, gone or moved by more than
+the bound keeps the whole difference. The other side's pieces are looked up in
+1 mm cells: 0.5 to 0.6 s for a five-page assembly sheet of 17,000 to 51,000
+pieces a page.
 
 On 2026-11-15 the native audits of two assembly sheets raised SOUNDNESS
 ALARMs that were the seat's, not the replay's. `mg_magnifier_assembly`
 issued the base's 32,014 requests in another order: the seat enumerated the
 components otherwise, a `GetExtremePoint` one ulp off reordered the ray hits,
-and the balloon pick took another edge through the same anchor point. Its
-PDFs differ by 32 pieces, longest 0.080 mm, with no pixel differing at
-300 dpi. `fr_frame_assembly` (26,770 requests, a title counter first) differs
-by 7, longest 0.092 mm, 2 pixels. The text was the same on every page.
+and the balloon pick took another edge through the same anchor point. Its ink
+moved by at most 0.054 mm, with no pixel differing at 300 dpi.
+`fr_frame_assembly` (26,770 requests, a title counter first) moved by at most
+0.018 mm, 2 pixels. The text was the same on every page.
 `pd_paper_drive_assembly`, also with the base's request multiset, drew a
-cosmetic thread's texture otherwise, longest piece 0.537 mm and visible: it
+cosmetic thread's texture otherwise, ink moved by up to 0.92 mm and visible: it
 keeps its whole difference. Those three were the only ones of the 23
 same-children comparisons of assembly sheets in the 10 days before to issue
 the base's request multiset. What remains possible is a real edit that
-issues the same requests and moves no text and no ink by more than 0.127 mm.
+issues the same requests and changes no text and no stroke, and moves no ink
+by more than 0.127 mm.
 
 The recorder numbers handles in allocation order, so the elements of an array
 answer such as `IAssemblyDoc.GetComponents` are numbered in the seat's
@@ -3731,8 +3743,9 @@ source that placed a view elsewhere, diverged at that view
 no-ops: `fr_harmonic_base`'s model, which only SolidWorks opens, staged as a
 stub; the other three's, which their Python also reads, copied; no stub
 read. No drawing label is served:
-`DEPENDENT_SERVE_LABELS` names assemblies only, so every drawing's would-be
-reuse is audited, in `reuse` too.
+`DEPENDENT_SERVE_LABELS` names assemblies only, so every part drawing's
+would-be reuse is audited, in `reuse` too; an assembly sheet makes no attempt
+(below).
 
 **Cost.** An audited attempt serves nothing, and runs before the seat: on a
 farm worker the seat waits for it. Natively (2026-11-15) its replay took
@@ -3745,20 +3758,26 @@ samples one key in that many, by the key's hash, of a drawing whose label is
 not served; the rest decline `unsampled` before any lookup and pay nothing.
 Sampling is a change of that one number; `drawing=shadow` stops the attempts.
 
-**Assembly sheets are audit-only.** A sheet that draws an assembly
-(`mg_magnifier_assembly`, `fr_frame_assembly`) is audited and is never to be
-served, because its builds do not repeat. Each build asks for the components
-in the order the seat enumerates them, picks ray hits in the order they come
-back, and echoes the session's title counters. In the 10 days to 2026-11-15,
-all 23 same-children comparisons of assembly sheets diverged in their
-requests. The three that issued the base's request multiset still drew other
-PDFs: two by sub-resolution ink (above), and `pd_paper_drive_assembly` by a
-visible cosmetic-thread texture. Their audit can name such a difference the
-seat's (`output_nondeterminism`), but it cannot confirm the base, so a reuse
-would serve a sheet that this seat may draw otherwise. The native audits of
-`mg_magnifier_assembly` and `fr_frame_assembly` that raised SOUNDNESS ALARMs
-on 2026-11-15 now read `output_nondeterminism` with
-`audit_cause=sub_resolution_ink` and revoke nothing. Part sheets, whose
+**Assembly sheets are not attempted.** A sheet that draws an assembly (its
+registry row's `source_kind` is `assembly`, which dodo passes as
+`DependentBuild.source_kind`) declines `assembly_sheet` before any hash,
+lookup or replay, served label or not, so it pays no pre-seat replay (14 to
+16 s per miss natively) and raises no alarm on its own build noise. Its
+builds do not repeat. Each build asks for the components in the order the
+seat enumerates them, picks ray hits in the order they come back, and echoes
+the session's title counters. In the 10 days to 2026-11-15, all 23
+same-children comparisons of assembly sheets diverged in their requests. The
+three that issued the base's request multiset still drew other PDFs: two by
+sub-resolution ink (above), and `pd_paper_drive_assembly` by a visible
+cosmetic-thread texture. The native audits bear it out. On pass 2
+(2026-11-15) `mg_magnifier_assembly` and `fr_frame_assembly` raised SOUNDNESS
+ALARMs and revoked their bases on noise alone. On pass 3, with
+`sub_resolution_ink`, `mg_magnifier_assembly` read `output_nondeterminism`,
+but `fr_frame_assembly` (the base's requests, a title counter first) moved ink
+by 0.3 to 0.5 mm, past the bound, and revoked its base again. An audit can
+name such noise at best, never confirm the base, so a reuse would serve a
+sheet the seat may draw otherwise. The split after the build still compares
+an assembly sheet's recording with its base, as before. Part sheets, whose
 native audits read `confirmed`, are the candidates for serving.
 
 Would-be reuses and their audits per stem (assemblies and drawings):

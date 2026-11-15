@@ -3374,6 +3374,12 @@ def test_a_drawing_dependent_names_its_script_argument_and_model(monkeypatch, tm
     specs = {
         spec.source_kind: (name, spec) for name, spec in dodo.DRAWINGS_BY_NAME.items()
     }
+    built: list[shadow.DependentBuild] = []
+    monkeypatch.setattr(
+        dodo,
+        "_cached_com_action",
+        lambda *_a, dependent, **_k: built.append(dependent("k" * 64)),
+    )
     for kind in ("part", "assembly"):
         name, spec = specs[kind]
         dependent = dodo._drawing_dependent(name)
@@ -3383,6 +3389,9 @@ def test_a_drawing_dependent_names_its_script_argument_and_model(monkeypatch, tm
             spec.script.resolve(),
             (spec.artifact_stem,),
         )
+        # The leaf's attempt knows the kind of model drawn from the registry.
+        dodo._cached_drawing_action(name)
+        assert built.pop().source_kind is shadow.BuildKind(kind)
         if kind == "part":
             assert dependent.children == {f".{spec.part}.part": "missing"}
         else:
@@ -5423,6 +5432,42 @@ def test_an_unserved_drawing_attempts_for_one_key_in_its_sample(
     with shadow.reuse_attempt(shop.assembly()) as served:
         pass
     assert served.value == "audited" and unsampled in replayed
+
+
+def test_an_assembly_sheet_declines_before_any_lookup(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    replayed = _replay_drawing(monkeypatch, shop)
+    shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    sheet = dataclasses.replace(shop.assembly(), source_kind=shadow.BuildKind.ASSEMBLY)
+    drawing = dataclasses.replace(shop.assembly(), source_kind=shadow.BuildKind.PART)
+
+    def refused(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("an assembly sheet hashes, looks up and replays nothing")
+
+    # Served or not: its real builds do not repeat.
+    for served in (frozenset(), frozenset({_DRAWING_LABEL})):
+        with monkeypatch.context() as gate:
+            gate.setattr(shadow, "DEPENDENT_SERVE_LABELS", served)
+            gate.setattr(shadow, "_current_inputs", refused)
+            gate.setattr(shadow, "find_base", refused)
+            with shadow.reuse_attempt(sheet) as reuse:
+                pass
+        assert reuse.value == "declined:assembly_sheet" and reuse.base is None
+        assert reuse.detail == (
+            'its real builds do not repeat; see DEVELOPING.md "Drawing reuse"'
+        )
+        assert replayed == []
+        # A part's drawing goes on to its checks.
+        with monkeypatch.context() as gate:
+            gate.setattr(shadow, "DEPENDENT_SERVE_LABELS", served)
+            with shadow.reuse_attempt(drawing) as reuse:
+                pass
+        assert reuse.value == "audited", reuse.detail
+        assert replayed.pop() == drawing.key
 
 
 # case: (the comparison's truth cause, its pdf_cause, the audit's judgement),

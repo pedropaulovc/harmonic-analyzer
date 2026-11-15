@@ -58,7 +58,8 @@ last one is what differs for assemblies and drawings.
   paths and passes its argument). ``reuse`` serves only the labels in
   :data:`DEPENDENT_SERVE_LABELS`, auditing one key in
   :data:`DEPENDENT_AUDIT_ONE_IN`; every other would-be reuse is audited (an
-  unserved drawing's for one key in :data:`DRAWING_AUDIT_ONE_IN`). An
+  unserved drawing's for one key in :data:`DRAWING_AUDIT_ONE_IN`), but for a
+  drawing of an assembly, which never attempts (``assembly_sheet``). An
   audited one is compared with its base after the build
   (:func:`_audit_dependent`): another assembly or drawing than the base's is
   a soundness alarm that revokes the base.
@@ -1700,6 +1701,10 @@ class Decline(StrEnum):
     """Why a build was not reused (the first check that failed)."""
 
     FORCED_REFRESH = "forced_refresh"
+    # A drawing of an assembly (DependentBuild.source_kind), before any
+    # lookup: its real builds do not repeat (the seat's component order, ray
+    # hits and title counters), so no audit can confirm a base.
+    ASSEMBLY_SHEET = "assembly_sheet"
     # A drawing key outside the one in DRAWING_AUDIT_ONE_IN that attempts:
     # nothing looked up, nothing replayed.
     UNSAMPLED = "unsampled"
@@ -1896,6 +1901,9 @@ class DependentBuild:
     native: Path
     environment: Callable[[], dict[str, str | None]]
     describe: Callable[[], Dependent]
+    # A drawing's: the kind of model it draws (its registry row's
+    # ``source_kind``, from dodo); None for an assembly build.
+    source_kind: BuildKind | None = None
     rewritten: tuple[Path, ...] = ()
 
     @property
@@ -2351,13 +2359,20 @@ def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
     after any build (``part.rewritten``) are no replay's. In mode ``reuse`` a
     would-be reuse is served only for a label in
     :data:`DEPENDENT_SERVE_LABELS` and not one key in
-    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited. A drawing whose
-    label is not served attempts for one key in :data:`DRAWING_AUDIT_ONE_IN`
-    only (``unsampled`` otherwise, before any lookup)."""
+    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited. A drawing of an
+    assembly (``part.source_kind``) declines ``assembly_sheet``, and a drawing
+    whose label is not served attempts for one key in
+    :data:`DRAWING_AUDIT_ONE_IN` only (``unsampled`` otherwise), both before
+    any lookup."""
     deadline = time.monotonic() + REUSE_SECONDS
     if revoke_refreshed(part):
         raise Declined(
             Decline.FORCED_REFRESH, "a forced cache refresh builds on the seat"
+        )
+    if part.kind is BuildKind.DRAWING and part.source_kind is BuildKind.ASSEMBLY:
+        raise Declined(
+            Decline.ASSEMBLY_SHEET,
+            'its real builds do not repeat; see DEVELOPING.md "Drawing reuse"',
         )
     if (
         part.kind is BuildKind.DRAWING

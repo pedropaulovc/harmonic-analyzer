@@ -3063,39 +3063,88 @@ def test_a_drawings_jagged_outline_drawn_again_is_its_own_cause(tmp_path, monkey
     assert _com_outcome.judge(*_pair(base, drawn(again, view)))["pdf_cause"] is None
 
 
+def _circle(x: float, y: float, r: float = 2.0) -> str:
+    """A circle of radius ``r`` points about (``x``, ``y``) as a PDF draws one:
+    four cubic Beziers, which _pdf_ink cuts into 32 pieces each."""
+    k = 0.5523 * r
+    return (
+        f"{x + r:g} {y:g} m {x + r:g} {y + k:g} {x + k:g} {y + r:g} {x:g} {y + r:g} c "
+        f"{x - k:g} {y + r:g} {x - r:g} {y + k:g} {x - r:g} {y:g} c "
+        f"{x - r:g} {y - k:g} {x - k:g} {y - r:g} {x:g} {y - r:g} c "
+        f"{x + k:g} {y - r:g} {x + r:g} {y - k:g} {x + r:g} {y:g} c S "
+    )
+
+
 def test_a_drawings_sub_resolution_ink_is_its_own_cause(tmp_path):
-    # mg_magnifier_assembly, 2026-11-15: the base's requests and text, and a
-    # few pieces under 0.1 mm drawn otherwise. A point is 0.353 mm: 0.35 pt is
-    # 0.123 mm, under SUB_RESOLUTION_INK_MM; 0.37 pt, 0.131 mm, is past it.
+    # mg_magnifier_assembly, 2026-11-15: the base's requests and text, and ink
+    # moved under 0.06 mm. A point is 0.353 mm: 0.35 pt is 0.123 mm, under
+    # SUB_RESOLUTION_INK_MM; 0.37 pt, 0.131 mm, is past it.
     assert _com_outcome.SUB_RESOLUTION_INK_MM == 0.127
     sheet = "pdf/mg-magnifier-assembly.PDF"
     built = itertools.count()
 
-    def drawn(end: float, text: str = "DRAWING", calls: Any = ()) -> tuple[Any, Path]:
-        pdf = _sheet_pdf(f"20 20 m 280 20 l S 200 50 m {end:g} 50 l S", text=text)
+    def drawn(ink: str, text: str = "DRAWING", calls: Any = ()) -> tuple[Any, Path]:
+        pdf = _sheet_pdf("20 20 m 280 20 l S " + ink, text=text)
         found, root = _captured_pdfs(tmp_path / str(next(built)), (sheet, pdf))
         found.calls = list(calls)
         return found, root
 
-    def judged(a: tuple[Any, Path], b: tuple[Any, Path]) -> dict[str, Any]:
-        return _com_outcome.judge(*_pair(a, b), kind="drawing")
+    def line(dy: float = 0.0, width: str = "") -> str:
+        return f"{width}200 {50 + dy:g} m 230 {50 + dy:g} l S "
 
-    base = drawn(200.2)
-    found = judged(base, drawn(200.35))
+    def cause(a: tuple[Any, Path], b: tuple[Any, Path]) -> str | None:
+        return _com_outcome.judge(*_pair(a, b), kind="drawing")["pdf_cause"]
+
+    base = drawn(line() + _circle(100, 60))
+    shifted = drawn(line(0.35) + _circle(100.35, 60))
+    found = _com_outcome.judge(*_pair(base, shifted), kind="drawing")
     assert found["outcome_signals"]["pdf"] == "different"
     assert found["outcome_signals"]["requests"] == "same"
     assert found["pdf_cause"] == _com_outcome.SUB_RESOLUTION_INK_CAUSE
     assert found["judge_faults"] == []
-    # A longer piece, any text, or other requests keep the difference whole.
-    assert judged(base, drawn(200.37))["pdf_cause"] is None
-    assert judged(base, drawn(200.35, text="DRAWN"))["pdf_cause"] is None
+    # Each of the circle's pieces is shorter than the bound (#2804 review: a
+    # bound on each piece passed it anywhere); its displacement is what counts.
+    [[_, _, pieces]] = _com_outcome.pdf_inks(*base)[sheet]
+    arcs = [p for p in pieces if p[0][1] > 50 * _PT * 1.1]
+    assert len(arcs) == 128
+    assert all(math.dist(*_com_outcome._piece_ends(p)) < 0.127e-3 for p in arcs)
+    # Ink drawn over the middle of a long piece, far from its ends, moved
+    # nothing.
+    over = drawn(line() + "214 50.2 m 216 50.2 l S " + _circle(100, 60))
+    assert cause(base, over) == _com_outcome.SUB_RESOLUTION_INK_CAUSE
+    # Ink moved farther, a circle moved, gone or new, a piece with one end on
+    # other ink (either end) or in line past its end, a stroke drawn wider in
+    # place or two strokes swapping widths, any text, or other requests keep
+    # the difference whole.
+    assert cause(base, drawn(line(0.37) + _circle(100, 60))) is None
+    assert cause(base, drawn(line() + _circle(100.37, 60))) is None
+    assert cause(base, drawn(line() + _circle(120, 60))) is None
+    assert cause(base, drawn(line())) is None
+    assert cause(drawn(line()), base) is None
+    for stub in ("215 52.5 m 215 50.1 l S ", "215 50.1 m 215 52.5 l S "):
+        assert cause(base, drawn(line() + stub + _circle(100, 60))) is None
+    assert (
+        cause(base, drawn(line() + "231 50 m 233 50 l S " + _circle(100, 60))) is None
+    )
+    assert cause(base, drawn(line(width="2 w ") + "1 w " + _circle(100, 60))) is None
+    second = "200 70 m 230 70 l S "
+    thin_thick = drawn(line() + "2 w " + second + "1 w " + _circle(100, 60))
+    thick_thin = drawn(line(width="2 w ") + "1 w " + second + _circle(100, 60))
+    assert cause(thin_thick, thick_thin) is None
+    assert cause(base, drawn(line(0.35) + _circle(100, 60), text="DRAWN")) is None
     asked = [_sw("IModelDoc2.EditRebuild3")], [_sw("IModelDoc2.ForceRebuild3", False)]
-    other = judged(drawn(200.2, calls=asked[0]), drawn(200.35, calls=asked[1]))
+    ink = line(0.35) + _circle(100, 60)
+    other = _com_outcome.judge(
+        *_pair(
+            drawn(line() + _circle(100, 60), calls=asked[0]), drawn(ink, calls=asked[1])
+        ),
+        kind="drawing",
+    )
     assert other["outcome_signals"]["requests"] == "different"
     assert other["pdf_cause"] is None
     # The same PDFs with the same pages and page sizes, and a difference.
     [[size, text, pieces]] = _com_outcome.pdf_inks(*base)[sheet]
-    [[_, _, moved]] = _com_outcome.pdf_inks(*drawn(200.35))[sheet]
+    [[_, _, moved]] = _com_outcome.pdf_inks(*shifted)[sheet]
     fine = _com_outcome.sub_resolution_ink
     assert fine({sheet: [(size, text, pieces)]}, {sheet: [(size, text, moved)]})
     assert not fine({sheet: [(size, text, pieces)]}, {sheet: [(size, text, pieces)]})
