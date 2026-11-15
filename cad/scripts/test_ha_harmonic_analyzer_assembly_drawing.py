@@ -265,6 +265,25 @@ def test_bar_height_names_the_raised_deck_it_runs_from() -> None:
     )
 
 
+def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
+    """Machinist review run 20261115T023412590Z (r3): the clamp arcs close
+    round a plumb column, so turning the bar on it cannot level it. The turn
+    sets the bar's heading, laid out parallel to the paper plane, against the
+    platen the paper-drive step has already placed; no part goes unnumbered."""
+    import _config
+
+    lines = notes.step_lines("magnifier-bar-clamped")
+    text = " ".join(lines)
+    assert "LEVEL" not in text and "GAUGE" not in text
+    platen = _config.parts("pd-platen")["number"]
+    (turn,) = (line for line in lines if "TURN THE BAR ON THE COLUMN" in line)
+    assert f"PARALLEL TO THE {platen} PLATEN FACE" in turn
+    assert steps.SEQUENCE.index("paper-drive-built") < steps.SEQUENCE.index(
+        "magnifier-bar-clamped"
+    )
+    assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
+
+
 def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
     """Machinist review r1/r2 on 5bca52e13: the paper drive's spare sprocket
     lies loose on the deck (sheet 2) and beside item 7 (sheet 3) with no

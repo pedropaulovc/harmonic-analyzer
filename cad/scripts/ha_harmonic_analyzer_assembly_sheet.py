@@ -222,14 +222,29 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "SPROCKET SUPPLIED WITH MHA-PD-00 (LABELLED ON SHEET 3) FLAT ON THE "
         "BASE DECK WHERE SHEET 2 SHOWS IT.",
     ),
+    # The clamp arcs close round a plumb round column, so MHA-MG-08 has two
+    # freedoms there: its height along the column (the sheet 1 dimension)
+    # and its heading about it. Level is not one of them. The pen hangs from
+    # the bar (step "pen-hung"), so the heading swings the MHA-MG-05 wheel
+    # and the pen together and moves neither the pen wire on the rim nor the
+    # pen rod in its guides. It moves the MHA-MG-10 drum off the lever wire's
+    # plane, which MHA-MG-01 fixes from MHA-SM-03 (sh_vn_music_wire_lever_geom
+    # option A1: the hook and the drum share one depth), and the pen carriage
+    # toward or away from the paper (pn_pen_carriage_geom: the rigid carriage
+    # rides its stand-off off the paper, and no other setting moves it). Both
+    # are laid out on the bar's front face parallel to the paper plane: the
+    # pen-rod line is set off the paper, and the wheel plane and the drum lane
+    # derive from it. So the heading sub-step sets that datum against the
+    # MHA-PD-02 platen face, which the paper-drive step has already placed;
+    # checks 6 and 8 prove the function once the wires and the pen are on.
     "magnifier-bar-clamped": (
         "MAGNIFIER BAR: CLOSE THE MHA-SH-01/MHA-SH-02 CLAMP ARCS SUPPLIED WITH "
-        "MHA-MG-00 ROUND THE LEFT FRONT COLUMN (FRONT VIEW), WHEEL TOWARD THE "
-        "PEN ROD, BOTH MHA-SH-VN-53 CLAMP SCREWS LOOSE.",
+        "MHA-MG-00 ROUND THE LEFT FRONT COLUMN, THE MHA-MG-08 BAR RUNNING TO "
+        "THE RIGHT (FRONT VIEW), BOTH MHA-SH-VN-53 CLAMP SCREWS LOOSE.",
         "SET THE MHA-MG-08 BAR TOP TO ITS HEIGHT ABOVE THE RAISED DECK TOP "
         "(SHEET 1), READ WITH A RULE FROM THE DECK TOP.",
-        "TURN THE BAR ON THE COLUMN UNTIL A DIGITAL ANGLE GAUGE ALONG ITS TOP "
-        f"READS {LEVEL_ACCEPTANCE}.",
+        "TURN THE BAR ON THE COLUMN UNTIL, SEEN FROM ABOVE, ITS FRONT FACE RUNS "
+        "PARALLEL TO THE MHA-PD-02 PLATEN FACE.",
         "TIGHTEN BOTH CLAMP SCREWS EVENLY.",
         "CHECK: UNDER FIRM HAND PRESSURE THE BAR DOES NOT SLIP OR TURN ON THE "
         "COLUMN.",
