@@ -4,16 +4,18 @@ The SLDPRT remains authoritative.  This recipe supplies the views, places the
 part's marked dimensions and links the notes; sheet/template and export
 behaviour lives in ``_drawing_common``.
 
-The gooseneck is a 1/2 in 4130-N tube bent R3.0, its arm end sawn and faced
-to length after the bend (owner rulings 2026-10-27, #1951; 2026-11-08
-(Pedro), #2315).  The end plug bonded into that end is its own part and sheet
-(MHA-SM-05), and the leg carries no sleeve.  The sheet carries, at 1:3, the
-ELEVATION (``*Front``): the leg length (foot to the bend's entry tangent) and
-the reference arm straight (the bend's exit tangent to the faced arm end) on
-the tube's axes, from the part's hidden ``StationReference``; the bend's
-centreline radius; the tube's reference stock Ø with its wall; the overall
-reach (faced arm end to the leg's outer side) and the reference overall
-height, from the part's hidden ``OverallReference``.  The bend's acceptance
+The gooseneck is a 1/2 in 4130-N tube bent R3.0 on a simple form, both ends
+sawn and faced after the bend (owner rulings 2026-10-27, #1951; 2026-11-08
+(Pedro), #2315; 2026-11-14 (Pedro), #2401).  The end plug bonded into the
+arm end is its own part and sheet (MHA-SM-05), and the leg carries no
+sleeve.  The sheet carries, at 1:3, the ELEVATION (``*Front``): the
+reference leg length (foot to the bend's entry tangent) and arm straight
+(the bend's exit tangent to the faced arm end) on the tube's axes, from the
+part's hidden ``StationReference``; the bend's reference centreline radius;
+the tube's reference stock Ø with its wall; and where the two ends finish,
+the overall reach (faced arm end to the leg's outer side) and overall height
+(foot face to the arm's top), from the part's hidden ``OverallReference``.
+The bend's acceptance
 stands at its own leader on the bend.  The isometric is at 1:4.  The sheet
 prints decimal inch (#290, the registry row's drawing_unit).
 
@@ -157,9 +159,10 @@ if set(FRONT_KEEP) != {
 # The bend's acceptance is short, so it prints at its own leader on the bend,
 # not as a numbered note in the corner (drawing-guidelines.md rule 7, "flag
 # it where it applies"; machinist review of the v49 release, acd9e8f84d: note
-# 1 stood alone with no flag at the R3.0 callout).  Two rows, ~39 mm wide at
-# ~2.62 mm a glyph (farm run 20261112T194827228Z), left of the faced arm end
-# and just under the arm: the block ends 4.7 mm left of the arm end and its
+# 1 stood alone with no flag at the R3.0 callout).  One row since #2401
+# dropped the ovality limit, ~21 mm wide at ~2.62 mm a glyph (farm run
+# 20261112T194827228Z), left of the faced arm end and just under the arm:
+# the block still ends ~4.7 mm left of the arm end and its
 # top 5.5 mm under the arm's inner edge, far over the tube Ø's text.  Its
 # leader runs right, under the arm, to the bend's inner arc 55° up from the
 # leg, so it stays well above the bend's centre: the R3.0 dimension's line
@@ -170,14 +173,14 @@ if set(FRONT_KEEP) != {
 # leader now says.  The elevation is a projected principal view at the
 # sheet's scale, so it carries no label (drawing-guidelines.md rule 9).  The
 # isometric's note sits under it, over the title block.
-BEND_ACCEPTANCE = "OVALITY 5% MAX,\nNO KINKS"
+BEND_ACCEPTANCE = "NO KINKS"
 _BEND_INNER_R = BEND_R - _TUBE_R
 _BEND_TIP_ANGLE = math.radians(55.0)
 BEND_NOTE_TIP = (
     _front_x(-BEND_R + _BEND_INNER_R * math.cos(_BEND_TIP_ANGLE)),
     _front_y(LEG_TOP + _BEND_INNER_R * math.sin(_BEND_TIP_ANGLE)),
 )
-BEND_NOTE_XY = (ARM_END_X - 0.044, _front_y(ARM_Y - _TUBE_R) - 0.0055)
+BEND_NOTE_XY = (ARM_END_X - 0.026, _front_y(ARM_Y - _TUBE_R) - 0.0055)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.085)
 
 
