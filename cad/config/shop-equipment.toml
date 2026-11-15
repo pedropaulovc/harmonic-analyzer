@@ -852,7 +852,7 @@ name = "Gooseneck bend form, shop-made"
 kind = "bend_form"
 present = false
 shop_made = true
-purchase = "Make from any scrap the shop has (hardwood, 6061 or steel plate, about 1 in thick): a disc or segment about 6 in across with a groove round its edge that the 1/2 in tube sits in, and a pin or bolt beside the groove to hold the tube's tail. Fill the tube with dry sand and plug both ends before bending; pull the leg round the form by hand."
+purchase = "Make from any scrap the shop has (hardwood, 6061 or steel plate, about 1 in thick): a disc or segment about 6 in across with a snug half-round groove round its edge that the 1/2 in tube sits in, a pin or bolt beside the groove to hold the tube's tail, and a short block grooved the same to press the tube into the form as it wraps. Pull the leg round the form by hand; no sand or filler: the groove holds the tube round."
 note = "Workholding for the one MHA-SM-01 bend (sm-gooseneck.yaml process). Try it on the spare tube first (the 36 in stock row). The sheet controls only where the tube's two ends finish (overall height and reach, both ends sawn and faced after the bend) and NO KINKS at the bend; the R3.0 is a reference."
 pieces = 1
 

@@ -348,10 +348,9 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     part_length = developed + 2.0 * geom.MM_PER_IN
     assert row["length_mm"] == pytest.approx(36.0 * geom.MM_PER_IN)
     assert row["length_mm"] - 3.175 - part_length >= 10.0 * geom.MM_PER_IN
-    # The form it is bent on is a shop record with no toleranced size.
+    # The form it is bent on is a shop record, made in the shop, not bought.
     form = equipment["fixtures"]["sm-gooseneck-bend-form"]
     assert form["shop_made"] and not form["present"]
-    assert "sand" in form["purchase"].lower()
 
 
 def test_sheet_is_the_elevation_and_isometric_only() -> None:
