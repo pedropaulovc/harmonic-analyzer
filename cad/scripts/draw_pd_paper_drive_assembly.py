@@ -4041,6 +4041,67 @@ def _place_bom_sheet(
     return landings, table, items, pieces, bom_snapshot
 
 
+def _trace_section_tree(adapter: Any, view: Any, *, label: str) -> None:
+    """#2824 diagnostic: walk the section's drawing-component tree with a
+    cap; print its shape, and on runaway dump the deepest path and raise."""
+    from _component_order import drawing_components_by_name
+    from _drawing_balloons import _drawing_component_children
+
+    out = sys.__stderr__
+
+    def native(dc: Any) -> str:
+        try:
+            comp = dc.Component
+            return "None" if comp is None else str(comp.Name2)
+        except Exception as error:  # noqa: BLE001 - diagnostic
+            return f"<{type(error).__name__}>"
+
+    root = view.RootDrawingComponent2(False)
+    root_name = str(getattr(root, "Name", "?"))
+    top = drawing_components_by_name(_drawing_component_children(root))
+    pending = [(name, child, (name,), (child,)) for name, child in reversed(top)]
+    nodes = leaves = max_depth = 0
+    while pending:
+        name, dc, path, objs = pending.pop()
+        nodes += 1
+        max_depth = max(max_depth, len(path))
+        children = drawing_components_by_name(_drawing_component_children(dc))
+        if nodes > 3000 or len(path) > 14:
+            print(
+                f"[tree-trace #2824] {label}: RUNAWAY nodes={nodes} depth={len(path)} "
+                f"pending={len(pending)} root={root_name!r} top={[n for n, _ in top][:20]!r}",
+                file=out, flush=True,
+            )
+            app = adapter.swApp
+            for depth, (pname, pdc) in enumerate(zip(path, objs)):
+                kids = drawing_components_by_name(_drawing_component_children(pdc))
+                same = [
+                    j for j in range(depth)
+                    if path[j] == pname or app.IsSame(objs[j], pdc) == 1
+                ]
+                print(
+                    f"[tree-trace #2824]   d{depth} {pname!r} native={native(pdc)!r} "
+                    f"kids={len(kids)} {[k for k, _ in kids][:8]!r} same_as={same!r}",
+                    file=out, flush=True,
+                )
+            raise RuntimeError(
+                f"{label}: #2824 runaway drawing-component tree "
+                f"(nodes={nodes}, depth={len(path)}, path={list(path)[:6]!r})"
+            )
+        if not children:
+            leaves += 1
+            continue
+        pending.extend(
+            (child_name, child, path + (child_name,), objs + (child,))
+            for child_name, child in reversed(children)
+        )
+    print(
+        f"[tree-trace #2824] {label}: ok nodes={nodes} leaves={leaves} depth={max_depth} "
+        f"root={root_name!r} top={[n for n, _ in top][:20]!r}",
+        file=out, flush=True,
+    )
+
+
 def _pivot_sheet_points(
     adapter: Any,
     view: Any,
@@ -4049,6 +4110,8 @@ def _pivot_sheet_points(
     label: str,
 ) -> list[tuple[float, float]]:
     """Sheet points of ``points_mm``, in the pivot screw's part frame (mm)."""
+    if "section" in label:
+        _trace_section_tree(adapter, view, label=label)
     leaf = _shown_instances(
         _view_component_leaves(adapter, view, label=label),
         "pd-vn-transgear-pivot-screw",
