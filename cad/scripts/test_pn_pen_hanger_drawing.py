@@ -436,7 +436,7 @@ def test_each_numbered_note_is_flagged_from_its_feature() -> None:
         for line in spec.DRAWING_NOTES.splitlines()
         if line[:1].isdigit()
     ]
-    assert numbers == [spec.BRAZE_NOTE, spec.SLOTS_NOTE]
+    assert numbers == [spec.BOND_NOTE, spec.SLOTS_NOTE]
     flagged = {
         int(row.removeprefix("SEE NOTE "))
         for callout in spec.DIMENSION_CALLOUTS.values()
@@ -445,14 +445,14 @@ def test_each_numbered_note_is_flagged_from_its_feature() -> None:
     }
     assert flagged == set(numbers)
     assert spec.DIMENSION_CALLOUTS["SlotWidth"].endswith(f"SEE NOTE {spec.SLOTS_NOTE}")
-    # Note 1 (the braze) at the plates' stock in the front view; a location
+    # Note 1 (the bond) at the plates' stock in the front view; a location
     # dimension (the upper plate's drop) carries only its value (rule 7).
-    braze = {
+    bond = {
         name
         for name, callout in spec.DIMENSION_CALLOUTS.items()
-        if f"SEE NOTE {spec.BRAZE_NOTE}" in callout.splitlines()
+        if f"SEE NOTE {spec.BOND_NOTE}" in callout.splitlines()
     }
-    assert braze == {"PlateThick"}
+    assert bond == {"PlateThick"}
     assert "UpperPlateDrop" not in spec.DIMENSION_CALLOUTS
     for name in spec.DIMENSION_CALLOUTS:
         assert name in draw.FRONT_KEEP or name in draw.SECTION_KEEP, name

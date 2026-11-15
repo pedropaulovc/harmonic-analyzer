@@ -4,8 +4,8 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
 The black tapered strap bolted to the wheel support bar that guides the pen
 rod: a 1/8 flat strap tapering .63 -> .48 wide, lying on the bar's front
 face and running 6.69 down from the bar top to just above the platen, with two
-open U guide plates of the same bar brazed across its front face, both slots
-cut after brazing.  Each plate's
+open U guide plates of the same bar bonded across its front face, both slots
+cut after bonding.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
 slots and lifts straight out of them; the slot sides are the rod's only
 lateral guide, and the slot's two milled bottom corners carry a radius.  The
@@ -109,7 +109,7 @@ async def _volume(adapter) -> float:
 
 
 async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> None:
-    """The upper plate's braze station across the strap (pn_pen_hanger_spec
+    """The upper plate's bond station across the strap (pn_pen_hanger_spec
     UPPER_PLATE_OVERHANG): a construction line along the plate's back edge,
     from the tapered strap's edge at the plate's top face to the plate's +x
     back corner, its length driven.  Section A-A prints it from the strap's

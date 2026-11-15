@@ -98,8 +98,15 @@ if PLATEN_TOP_CLEARANCE < PLATEN_TOP_CLEARANCE_MIN:
         f"(< {PLATEN_TOP_CLEARANCE_MIN})"
     )
 
-# --- Two open U guide plates, brazed across the strap front: plain blanks of
-# the strap's 1/8 flat (printed as a reference), slotted after brazing.
+# --- Two open U guide plates, bonded across the strap front with LOCTITE 638
+# (owner ruling 2026-11-14, #2435: no torch, no solder, no braze): plain
+# blanks of the strap's 1/8 flat (printed as a reference), each plate's
+# faced end clamped square on the strap's cold-finished face, so the bond
+# line is metal to metal, far inside 638's 0.25 mm gap (TDS May 2024).  The
+# slots are cut after the bond has cured 24 h (about 90% of full strength on
+# steel, TDS cure-vs-substrate), and the part is blackened last: 638 is
+# rated to 180 C and keeps about 60% of its strength at the hot bath's 141 C
+# (TDS hot strength), so the slot walls take the finish too.
 # Each plate is a web: its thinnest supplied bar keeps rule 17's .080 target.
 GUIDE_PLATE_T = FLAT_BAR_T
 GUIDE_PLATE_T_STOCK_RANGE = FLAT_BAR_T_RANGE
@@ -108,7 +115,7 @@ if not GUIDE_PLATE_T_STOCK_RANGE[0] < GUIDE_PLATE_T < GUIDE_PLATE_T_STOCK_RANGE[
 if GUIDE_PLATE_T_STOCK_RANGE[0] < WALL_TARGET_MM:
     raise AssertionError("the thinnest supplied guide plate is under the rule 17 target")
 # The upper plate's top face below the strap top (printed): the plates'
-# pitch follows from it, the rise and the gauge (photo ~42 mm).
+# pitch follows from it, the rise and the plate stock (photo ~42 mm).
 UPPER_PLATE_DROP = 127.0  # 5.00
 GUIDE_PLATE_YS = (STRAP_BOT_Y, -(UPPER_PLATE_DROP + GUIDE_PLATE_T))  # bottom faces
 GUIDE_PITCH = GUIDE_PLATE_YS[1] - GUIDE_PLATE_YS[0]  # lower to upper bottom face
@@ -141,14 +148,19 @@ SLOT_WIDTH = 5.08  # .200
 # (GUIDE_TILT_MAX).
 SLOT_WIDTH_BAND = (0.0508, 0.0)
 # The plate's reach (strap front to plate front) and its slot depth, both
-# printed from the plate's free end.  The slots are cut after brazing, both in
-# one setup (note 2): with the strap's back face on the mill table the cutter
-# stands square to the strap and one feed along it slots both plates, so the
-# two slots are in line however the braze left the plates, and the .002 slot
-# band rides the mill's travel, not the joint.  Deep enough that the printed
-# reach and slot depth and the strap's stock band, with the corner radius at
-# its printed MAX below, still keep the rod's back corners off the
-# slot-corner fillets (guarded below).
+# printed from the plate's free end.  The slots are required in line after
+# the bond cures (note 2); the shop reaches that by cutting both in one
+# setup: with the strap's back face on the mill table the cutter stands
+# square to the strap and one feed along it slots both plates, so the two
+# slots are in line however the bond left the plates, and the .002 slot band
+# rides the mill's travel, not the joint.  The cutter's side push across a
+# standing plate is the largest load the bond ever sees (it pries the butt
+# open), so each plate is packed solid on both faces up to just below its
+# slot and the slots are taken in light passes (the part's `process` record;
+# note 2 prints the cure): the plate bears on the packing, not the bond.
+# Deep enough that the printed reach and slot depth and the strap's stock
+# band, with the corner radius at its printed MAX below, still keep the
+# rod's back corners off the slot-corner fillets (guarded below).
 PLATE_REACH = 24.638  # .97
 SLOT_DEPTH = 10.668  # .42
 PLATE_FRONT_Z = round(STRAP_Z[0] - PLATE_REACH, 6)
@@ -252,7 +264,7 @@ if NUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
 # thickness.
 # Section A-A just above the upper plate, looking down onto it: its U
 # outline (the slot depth and the reach both from the plate's free end), the
-# plate's overhang past the strap's edge (its braze station across the
+# plate's overhang past the strap's edge (its bond station across the
 # strap), the slot-corner radius and the strap stock thickness (the lower
 # plate is identical and flush with the strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -362,10 +374,10 @@ if SCREW_HOLE_WALL_MIN < WALL_TARGET_MM:
 # Every tight band names its mate on the dimension it governs.  The two
 # numbered notes are flagged from the features they govern (rule 7: SEE NOTE
 # n puts the note at the callout; a location dimension carries only its
-# value and band): note 1, the plates' braze to the strap front, from the
+# value and band): note 1, the plates' bond to the strap front, from the
 # plates' stock callout in the front view; note 2, the slots cut together,
 # from the slot width.  Rule 7: at most two lines of words under a value.
-BRAZE_NOTE = 1
+BOND_NOTE = 1
 SLOTS_NOTE = 2
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
@@ -375,7 +387,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     # machined size: printed as a reference (parenthesised) with the stock
     # named under it.
     "StrapThick": "1/8 CF FLAT",
-    "PlateThick": f"1/8 CF FLAT\nSEE NOTE {BRAZE_NOTE}",
+    "PlateThick": f"1/8 CF FLAT\nSEE NOTE {BOND_NOTE}",
 }
 # Model dimensions the sheet parenthesises as reference (the stock governs).
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
@@ -386,19 +398,23 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 }
 
 # Note 1 makes the lower plate the upper one's twin (section A-A draws only
-# the upper).  Note 2 is the slots' requirement after the braze, with the
-# rod's free fall as its acceptance (rule 7: geometry, not method; the shop
-# reaches two .002-band slots in line across a brazed joint by cutting both
-# after brazing, drawing-guidelines.md "What the shop holds", #2435).
+# the upper) and carries the bond's prep and its bench acceptance (rule 23:
+# one note may carry the degrease, apply and cure rules; the joint is made
+# on this part, no assembly step makes it).  Note 2 is the slots'
+# requirement after the cure, with the rod's free fall as its acceptance
+# (rule 7: the plates' support while slotting is method, so it lives in the
+# part's `process` record, above; the shop reaches two .002-band slots in
+# line across a bonded joint by cutting both after the cure,
+# drawing-guidelines.md "What the shop holds", #2435).
 DRAWING_NOTES = "\n".join(
     (
-        f"{BRAZE_NOTE}. TWO GUIDE PLATES ALIKE, BRAZED (BAg-7) TO STRAP FRONT;",
-        "   LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS.",
-        f"{SLOTS_NOTE}. SLOTS IN LINE AFTER BRAZING: PEN ROD {PEN_ROD_NUMBER} SLIDES",
+        f"{BOND_NOTE}. TWO GUIDE PLATES ALIKE, BONDED (LOCTITE 638) TO STRAP FRONT, BOTH FACES",
+        "   DEGREASED; LOWER PLATE FLUSH WITH STRAP END AND BOTH CORNERS; NEITHER MOVES BY HAND.",
+        f"{SLOTS_NOTE}. CUT SLOTS AFTER 24 H CURE, BOTH IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES",
         "   FREELY THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
-# The upper plate's braze station across the strap (rule 10: a location is a
+# The upper plate's bond station across the strap (rule 10: a location is a
 # dimension, not the centreline alone): its +x edge past the tapered strap's
 # edge at the plate's top face, a model dimension (build_pn_pen_hanger's
 # construction line in the upper guide profile) that section A-A prints at
