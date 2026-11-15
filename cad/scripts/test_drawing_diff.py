@@ -630,3 +630,30 @@ def test_cli_writes_json_facts_and_renderer_releases_input_files(
     # immediately after generation; no native PDFium handle retains the input.
     source.unlink()
     assert not source.exists()
+
+
+_CARRY_PAIRS = Path(__file__).resolve().parent / "testdata" / "review-carry"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "unchanged", "reason"),
+    [
+        ("stamp-v48.pdf", "stamp-v49.pdf", True, None),
+        ("jitter-a.pdf", "jitter-b.pdf", True, None),
+        ("edit-a.pdf", "edit-b.pdf", False, "page 1: printed characters changed"),
+    ],
+)
+def test_compare_drawings_applies_the_release_page_rule_to_real_builds(
+    old: str, new: str, unchanged: bool, reason: str | None
+) -> None:
+    result = diff.compare_drawings(_CARRY_PAIRS / old, _CARRY_PAIRS / new)
+    assert (result["unchanged"], result["reason"]) == (unchanged, reason)
+    assert result["pages"][0]["pixels_differing"] > 0
+
+
+def test_compare_drawings_treats_an_added_page_as_a_different_sheet(tmp_path: Path) -> None:
+    old = _pdf(tmp_path / "old.pdf", [_square(20, 20)])
+    new = _pdf(tmp_path / "new.pdf", [_square(20, 20), _square(20, 20)])
+    result = diff.compare_drawings(old, new)
+    assert not result["unchanged"]
+    assert result["reason"] == "1 pages, now 2"

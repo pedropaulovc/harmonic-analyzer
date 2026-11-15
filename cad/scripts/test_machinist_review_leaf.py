@@ -1541,6 +1541,97 @@ def test_carry_scope_excludes_the_pdf_and_moves_with_other_review_inputs(inputs)
     assert dodo._machinist_review_context("probe", profile) != context
 
 
+# Real build PDFs (testdata/review-carry): dt_pinion_handle's v48 release sheet
+# and the v49 sheet that differs from it only in the BUILD/REV value; two builds
+# of dt_cone_gear_tl_phasing_comb whose ink differs by 52 pixels, all within
+# 1 px; two builds of pd_transgear_drive_collar whose pin callout and note 2
+# were reworded.
+_CARRY_PAIRS = Path(__file__).resolve().parent / "testdata" / "review-carry"
+
+
+def _reviewed_index(monkeypatch, entries):
+    """``_review_carry`` over a cache index holding ``entries`` (sidecar name
+    to bytes, newest first)."""
+    import _review_carry
+
+    monkeypatch.setattr(
+        _review_carry._cache, "list_sidecars",
+        lambda prefix: [(name, 0.0) for name in entries if name.startswith(prefix)],
+    )
+    monkeypatch.setattr(_review_carry._cache, "fetch_sidecar", entries.get)
+    return _review_carry
+
+
+def test_carry_skips_other_sheets_and_unreadable_entries_for_a_stamp_only_rebuild(
+    monkeypatch,
+):
+    import hashlib
+    import _review_carry
+
+    v48 = (_CARRY_PAIRS / "stamp-v48.pdf").read_bytes()
+    name = lambda key: _review_carry.entry_name("dt_pinion_handle", "ctx", key)  # noqa: E731
+    rc = _reviewed_index(monkeypatch, {
+        name("e" * 64): (_CARRY_PAIRS / "edit-a.pdf").read_bytes(),
+        name("f" * 64): b"not a PDF",
+        name("d" * 64): v48,
+        _review_carry.entry_name("dt_pinion_handle", "other", "9" * 64): v48,
+    })
+    carry = rc.find("dt_pinion_handle", "ctx", _CARRY_PAIRS / "stamp-v49.pdf")
+    assert carry.review_key == "d" * 64
+    assert carry.pdf_sha256 == hashlib.sha256(v48).hexdigest()
+    [page] = carry.comparison["pages"]
+    assert (page["old_stamp"], page["new_stamp"]) == (["v48", "v48"], ["v49", "v49"])
+
+
+def test_carry_takes_a_sheet_whose_ink_moved_within_one_pixel(monkeypatch):
+    import _pdf_ink_digest
+    import _review_carry
+
+    before, after = _CARRY_PAIRS / "jitter-a.pdf", _CARRY_PAIRS / "jitter-b.pdf"
+    # The ink key misses this pair; only the carry reuses its verdict.
+    assert _pdf_ink_digest.pdf_ink_digest(before) != _pdf_ink_digest.pdf_ink_digest(after)
+    entry = _review_carry.entry_name("phasing_comb", "ctx", "d" * 64)
+    rc = _reviewed_index(monkeypatch, {entry: before.read_bytes()})
+    carry = rc.find("phasing_comb", "ctx", after)
+    assert carry.review_key == "d" * 64
+    assert carry.comparison["pages"][0]["pixels_differing"] == 52
+
+
+@pytest.mark.parametrize("entry", [None, "edit-a.pdf"])
+def test_carry_reviews_afresh_without_a_reviewed_sheet_that_prints_the_same(
+    monkeypatch, entry
+):
+    import _review_carry
+
+    entries = {}
+    if entry:
+        name = _review_carry.entry_name("drive_collar", "ctx", "d" * 64)
+        entries[name] = (_CARRY_PAIRS / entry).read_bytes()
+    rc = _reviewed_index(monkeypatch, entries)
+    assert rc.find("drive_collar", "ctx", _CARRY_PAIRS / "edit-b.pdf") is None
+
+
+@pytest.mark.parametrize("listed", [False, True])
+def test_indexing_uploads_a_reviewed_pdf_only_once(monkeypatch, listed):
+    import _review_carry
+
+    pdf = _CARRY_PAIRS / "stamp-v49.pdf"
+    name = _review_carry.entry_name("dt_pinion_handle", "ctx", "d" * 64)
+    published = []
+    monkeypatch.setattr(_review_carry._cache, "writable", lambda: True)
+    monkeypatch.setattr(
+        _review_carry._cache, "list_sidecars",
+        lambda prefix: [(name, 0.0)] if listed and name.startswith(prefix) else [],
+    )
+    monkeypatch.setattr(
+        _review_carry._cache, "publish_sidecar",
+        lambda entry, data: published.append((entry, data)) or "stored",
+    )
+    outcome = _review_carry.index("dt_pinion_handle", "ctx", "d" * 64, pdf)
+    assert outcome == ("exists" if listed else "stored")
+    assert published == ([] if listed else [(name, pdf.read_bytes())])
+
+
 
 @pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mode):

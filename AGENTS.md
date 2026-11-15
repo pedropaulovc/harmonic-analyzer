@@ -1247,7 +1247,12 @@ font-subset tags, and reuses its verdict, `SHIP` or `FIX`; one changed pixel or
 character reviews the sheet again. A verdict published under the earlier
 byte-digest key is adopted under the ink key for the same PDF bytes instead of
 being rolled again (`review_adopted_byte_key` in `cache.jsonl`; removed under
-#2811 once a full build of main records none).
+#2811 once a full build of main records none). On a remaining miss a reviewed
+PDF of the same drawing under the same non-PDF inputs that prints the same
+sheet under the release drawing diff's page rule (`_drawing_diff`: BUILD/REV
+values masked, characters equal, ink within 1 px or 68 grey levels) carries its
+verdict (`_review_carry`, `carried.json`, `review_carried` in `cache.jsonl`);
+any other difference reviews the sheet again.
 For Claude this key describes the hashed SDK-first/API-pool, OMP-fallback routing
 policy, not a transport preselected from mutable quota state. The canonical
 cached report preserves each attempt's actual transport and routes; adopters

@@ -60,11 +60,15 @@ def entry_name(stem: str, context: str, review_key: str) -> str:
 
 def index(stem: str, context: str, review_key: str, pdf: Path) -> str:
     """Record ``pdf`` as reviewed under ``review_key``: create-only, so a
-    second writer of the same entry leaves the first one's bytes. Returns
-    :func:`_artifact_cache.publish_sidecar`'s outcome."""
+    second writer of the same entry leaves the first one's bytes. Every cache
+    hit offers its PDF again, so an entry already listed is not uploaded.
+    Returns :func:`_artifact_cache.publish_sidecar`'s outcome, or ``exists``."""
     if not _cache.writable():
         return "skip" if _cache.enabled() else "off"
-    return _cache.publish_sidecar(entry_name(stem, context, review_key), pdf.read_bytes())
+    name = entry_name(stem, context, review_key)
+    if any(listed == name for listed, _modified in _cache.list_sidecars(name)):
+        return "exists"
+    return _cache.publish_sidecar(name, pdf.read_bytes())
 
 
 def find(stem: str, context: str, pdf: Path) -> Carry | None:
@@ -86,7 +90,7 @@ def find(stem: str, context: str, pdf: Path) -> Carry | None:
             reviewed.write_bytes(data)
             try:
                 comparison = _drawing_diff.compare_drawings(reviewed, pdf)
-            except ValueError:
+            except (OSError, ValueError):
                 continue
             if comparison["unchanged"]:
                 return Carry(review_key, hashlib.sha256(data).hexdigest(), comparison)
