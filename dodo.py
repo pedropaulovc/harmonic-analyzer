@@ -69,6 +69,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import contextlib
+import datetime
 import functools
 import hashlib
 import math
@@ -651,7 +652,7 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("prechips:"):
         return "prechips-traveler"
-    if label.startswith("check:machinist_review:"):
+    if label.startswith(("check:machinist_review:", "review_sweep:")):
         return "check-machinist-review"
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
@@ -4008,13 +4009,15 @@ def _index_reviewed_pdf(
         _telemetry.warn(f"{label}: reviewed PDF not indexed for carry-forward: {error}")
 
 
-def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
+def _machinist_review_command(
+    stem: str, profile: ReviewProfile, report_dir: Path | None = None
+) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
         "--kind", spec.source_kind, "--force", "--runs", "3",
-        "--report-dir", str(_machinist_review_dir(stem)),
+        "--report-dir", str(report_dir or _machinist_review_dir(stem)),
         "--reviewer", profile.backend, "--model", profile.model,
         "--effort", profile.effort,
         "--judge-reviewer", profile.judge_backend, "--judge-model", profile.judge_model,
@@ -4022,8 +4025,8 @@ def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
     ]
 
 
-def _read_machinist_aggregate(stem: str) -> dict[str, Any]:
-    path = _machinist_review_dir(stem) / f"{stem}.aggregate.json"
+def _read_machinist_aggregate(stem: str, directory: Path | None = None) -> dict[str, Any]:
+    path = (directory or _machinist_review_dir(stem)) / f"{stem}.aggregate.json"
     aggregate = json.loads(path.read_text(encoding="utf-8"))
     if (
         not isinstance(aggregate, dict)
@@ -4071,6 +4074,25 @@ def _cached_machinist_review_action(
     reports: no transcripts or source snapshots are pruned from the payload.
     Provider/runner errors never publish and never leave a freshness stamp.
     """
+    # An invalid profile does no work, not even taking the leaf's lock.
+    validate_review_profile(profile)
+    with _machinist_review_lock(stem):
+        _machinist_review_leaf(stem, mode, profile)
+
+
+def _machinist_review_lock(stem: str) -> FileLock:
+    """Serializes the leaf of one drawing across processes: a review sweep of
+    the sheet runs the same leaf on the same report directory (#2714)."""
+    directory = _machinist_review_dir(stem)
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    return FileLock(str(directory.with_name(f".{stem}.lock")))
+
+
+def _machinist_review_leaf(
+    stem: str, mode: MachinistReviewMode, profile: ReviewProfile
+) -> tuple[str, dict[str, Any]]:
+    """:func:`_cached_machinist_review_action` without its lock; returns the
+    review key and the aggregate whose policy it evaluated."""
     # Validate direct action callers too, before removing stamps or probing.
     # Do not reselect defaults: this snapshot also owns the task's freshness.
     validate_review_profile(profile)
@@ -4089,11 +4111,9 @@ def _cached_machinist_review_action(
                 shutil.rmtree(directory)
             probed = _probe_cache(key, [directory], label, probe)
         except (OSError, _cache.RestoreLocked) as error:
-            _evaluate_machinist_review(
-                stem, mode,
-                {"verdict": "ERROR", "gating_count": 0, "error": str(error)},
-            )
-            return
+            aggregate = {"verdict": "ERROR", "gating_count": 0, "error": str(error)}
+            _evaluate_machinist_review(stem, mode, aggregate)
+            return key, aggregate
     try:
         if probed == "miss" and _cache.forced_refresh(label) is None:
             if _adopt_byte_keyed_review(
@@ -4136,6 +4156,7 @@ def _cached_machinist_review_action(
     _evaluate_machinist_review(stem, mode, aggregate)
     if aggregate["verdict"] != "ERROR" and aggregate.get("error") is None:
         _write_stamp(label, str(stamp))
+    return key, aggregate
 
 
 @functools.cache
@@ -4182,6 +4203,248 @@ def _machinist_review_tasks():
     profile = _machinist_review_profile()
     for stem, mode in _reviewed_drawings():
         yield _machinist_review_task(stem, mode, profile)
+
+
+# --- Non-blocking machinist-review sweep (#2714) ---------------------------
+# How old, in days, a review of a sheet's current ink may be before the sweep
+# reviews that ink again; HARMONIC_REVIEW_SWEEP_DAYS overrides it.
+_REVIEW_SWEEP_DAYS = 30
+# This invocation's start: the summary reports only sheets swept since, so a
+# record left by an earlier sweep never re-emits its findings.
+_REVIEW_SWEEP_INVOKED = datetime.datetime.now(datetime.UTC).replace(microsecond=0)
+
+
+def _review_sweep_dir() -> Path:
+    return (REPORTS / "review-sweep").resolve()
+
+
+def _review_sweep_days() -> int | None:
+    """``HARMONIC_REVIEW_SWEEP_DAYS``: a positive whole number of days, or
+    ``all`` (None: every selected sheet is reviewed)."""
+    raw = os.environ.get("HARMONIC_REVIEW_SWEEP_DAYS", "").strip() or str(_REVIEW_SWEEP_DAYS)
+    if raw == "all":
+        return None
+    if raw.isdecimal() and int(raw) > 0:
+        return int(raw)
+    raise ValueError(
+        "HARMONIC_REVIEW_SWEEP_DAYS must be a positive whole number of days or "
+        f"'all', not {raw!r}"
+    )
+
+
+def _reviewed_at(aggregate: dict[str, Any]) -> datetime.datetime | None:
+    try:
+        moment = datetime.datetime.fromisoformat(str(aggregate.get("reviewed_at")))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=datetime.UTC)
+
+
+def _review_sweep_verdict(aggregate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "verdict": aggregate["verdict"],
+        "gating_count": aggregate["gating_count"],
+        "reviewed_at": aggregate.get("reviewed_at"),
+        "error": aggregate.get("error"),
+        "gating": [
+            {key: item.get(key) for key in ("category", "where", "issue", "fix", "run_count")}
+            for item in aggregate.get("confirmed", [])
+            if isinstance(item, dict) and item.get("gating")
+        ],
+    }
+
+
+def _review_sweep_action(stem: str, profile: ReviewProfile) -> None:
+    """Sweep one sheet and record the outcome; never fails the invocation.
+
+    First the build's own review leaf runs in LEARN: it restores, adopts or
+    carries the sheet's verdict, or reviews an unreviewed ink and stores it
+    under its key exactly as a build would. A sheet whose verdict is then a
+    review of this ink no older than the sweep's age limit is done. Any other
+    (carried, older, or ``all``) is reviewed again into the sweep's own report
+    directory; that review never replaces the cached verdict, so a build's
+    verdict changes only when its ink does.
+    """
+    import _review_carry
+
+    days = _review_sweep_days()
+    started = datetime.datetime.now(datetime.UTC).replace(microsecond=0)
+    record: dict[str, Any] = {
+        "stem": stem,
+        "kind": DRAWINGS_BY_NAME[stem].source_kind,
+        "swept_at": started.isoformat(),
+        "days": "all" if days is None else days,
+    }
+    label = f"review_sweep:{stem}"
+    try:
+        with _machinist_review_lock(stem):
+            record["review_key"], evaluated = _machinist_review_leaf(
+                stem, MachinistReviewMode.LEARN, profile
+            )
+            if evaluated["verdict"] == "ERROR" or evaluated.get("error") is not None:
+                raise ValueError(
+                    f"review leaf: {evaluated.get('error') or 'ERROR verdict'}"
+                )
+            cached = _read_machinist_aggregate(stem)
+            carried = (_machinist_review_dir(stem) / _review_carry.CARRIED_FILE).exists()
+        record["cached"] = {**_review_sweep_verdict(cached), "carried": carried}
+        reviewed_at = _reviewed_at(cached)
+        if not carried and reviewed_at is not None and reviewed_at >= started:
+            record["action"] = "reviewed"
+        elif (
+            not carried and reviewed_at is not None and days is not None
+            and started - reviewed_at <= datetime.timedelta(days=days)
+        ):
+            record["action"] = "fresh"
+        else:
+            report_dir = _review_sweep_dir() / stem
+            shutil.rmtree(report_dir, ignore_errors=True)
+            with _telemetry.span(f"task {label}", label=label, service=_stage_name(label)):
+                code = _run_subprocess(
+                    _machinist_review_command(stem, profile, report_dir),
+                    label, log_stem=f"review-sweep-{stem}",
+                    task=f"check:machinist_review:{stem}",
+                )
+            review = _read_machinist_aggregate(stem, report_dir)
+            # The build leaf's own consistency check.
+            if code not in (0, 1) or (code and review["verdict"] == "SHIP"):
+                raise ValueError(f"review command exited {code}")
+            record["action"] = "re-reviewed"
+            record["sweep"] = _review_sweep_verdict(review)
+            if review["verdict"] == "ERROR" or review.get("error") is not None:
+                record["error"] = f"review error: {review.get('error') or 'ERROR verdict'}"
+    except Exception as error:  # noqa: BLE001 -- the sweep never fails a build
+        record["error"] = f"{type(error).__name__}: {error}"
+        _telemetry.warn(f"review_sweep:{stem}: {record['error']}")
+    records = _review_sweep_dir() / "records"
+    records.mkdir(parents=True, exist_ok=True)
+    (records / f"{stem}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+
+def _review_sweep_finding(record: dict[str, Any]) -> dict[str, Any] | None:
+    """The fresh review of this sweep with gating findings, if any: the
+    sweep's own review, or the leaf's when it reviewed the ink just now."""
+    review = record.get("sweep") or (record["cached"] if record.get("action") == "reviewed" else None)
+    if review and review["verdict"] == "FIX" and review["gating"]:
+        return review
+    return None
+
+
+def _review_sweep_cell(text: Any) -> str:
+    """Reviewer text as one Markdown table cell."""
+    return " ".join(str(text).split()).replace("|", "\\|")
+
+
+def _review_sweep_issue(record: dict[str, Any], review: dict[str, Any]) -> str:
+    """A GitHub issue draft for one sheet's gating findings."""
+    stem, cached = record["stem"], record["cached"]
+    rows = "\n".join(
+        f"| {number} | "
+        + " | ".join(
+            _review_sweep_cell(item[key])
+            for key in ("category", "where", "issue", "fix", "run_count")
+        )
+        + " |"
+        for number, item in enumerate(review["gating"], start=1)
+    )
+    return (
+        f"# {stem}: machinist-review sweep findings ({record['swept_at'][:10]})\n\n"
+        f"The sweep of {record['swept_at']} returned FIX for `{stem}` ({record['kind']}) "
+        f"with {len(review['gating'])} gating finding(s). The build's cached verdict for "
+        f"this ink is {cached['verdict']} (reviewed {cached['reviewed_at']}"
+        f"{', carried' if cached['carried'] else ''}); the sweep did not replace it.\n\n"
+        "Confirm every finding against the sheet before filing and delete the ones "
+        "the sheet refutes.\n\n"
+        "| # | category | where | finding | suggested fix | runs |\n"
+        "|---|---|---|---|---|---|\n"
+        f"{rows}\n\n"
+        f"Review key `{record['review_key']}`; reports "
+        f"`cad/out/reports/review-sweep/{stem}/` (or `machinist-review/{stem}/`).\n"
+    )
+
+
+def _write_review_sweep_summary() -> None:
+    """Rewrite ``summary.{json,md}`` and ``issues/<stem>.md`` from the sheet
+    records of this invocation, deleting older ones (a doit teardown: it runs
+    in the main process after all tasks, once per swept sheet, and is
+    idempotent)."""
+    sweep = _review_sweep_dir()
+    records = []
+    for path in sorted((sweep / "records").glob("*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if datetime.datetime.fromisoformat(record["swept_at"]) >= _REVIEW_SWEEP_INVOKED:
+            records.append(record)
+        else:
+            path.unlink()
+    issues = sweep / "issues"
+    shutil.rmtree(issues, ignore_errors=True)
+    issues.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Machinist-review sweep", "",
+        "| sheet | action | cached verdict | sweep verdict | gating | issue draft | error |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for record in records:
+        cached, sweep_review = record.get("cached"), record.get("sweep")
+        review = _review_sweep_finding(record)
+        draft = ""
+        if review is not None:
+            draft = f"issues/{record['stem']}.md"
+            (sweep / draft).write_text(_review_sweep_issue(record, review), encoding="utf-8")
+        record["issue_draft"] = draft or None
+        cached_text = (
+            f"{cached['verdict']} {cached['reviewed_at']}{' carried' if cached['carried'] else ''}"
+            if cached else ""
+        )
+        lines.append(
+            f"| {record['stem']} | {record.get('action', 'error')} | {cached_text} | "
+            f"{sweep_review['verdict'] if sweep_review else ''} | "
+            f"{len(review['gating']) if review else ''} | {draft} | {record.get('error') or ''} |"
+        )
+    counts = {
+        "sheets": len(records),
+        **{
+            action: sum(record.get("action") == action for record in records)
+            for action in ("fresh", "reviewed", "re-reviewed")
+        },
+        "errors": sum("error" in record for record in records),
+        "issue_drafts": sum(bool(record["issue_draft"]) for record in records),
+    }
+    lines[1:1] = ["", ", ".join(f"{name} {count}" for name, count in counts.items())]
+    (sweep / "summary.json").write_text(
+        json.dumps({"counts": counts, "sheets": records}, indent=2) + "\n", encoding="utf-8"
+    )
+    (sweep / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def task_review_sweep():
+    """Opt-in machinist-review sweep that never blocks a build (#2714).
+
+    Not in ``build`` or ``release``. ``review_sweep`` sweeps every reviewed
+    drawing, ``review_sweep:<stem>`` one. A sheet whose cached verdict is a
+    review of its current ink no older than ``HARMONIC_REVIEW_SWEEP_DAYS``
+    days (default 30; ``all`` sweeps every sheet) is skipped. A sheet with no
+    verdict is reviewed by the build's own leaf and stored under its key, so a
+    later build reuses it; any other is reviewed into
+    ``cad/out/reports/review-sweep/<stem>/`` without replacing the cached
+    verdict. FIX, findings and review errors never fail the invocation:
+    ``review-sweep/summary.md`` lists them and ``issues/<stem>.md`` drafts one
+    issue per sheet (DEVELOPING.md, "Machinist-review sweep")."""
+    profile = _machinist_review_profile()
+    for stem, _mode in _reviewed_drawings():
+        yield _review_sweep_task(stem, profile)
+
+
+def _review_sweep_task(stem: str, profile: ReviewProfile) -> dict[str, Any]:
+    return {
+        "name": stem,
+        "task_dep": [f"drawing:{stem}"],
+        "uptodate": [False],
+        "actions": [(_review_sweep_action, [stem, profile])],
+        "teardown": [(_write_review_sweep_summary,)],
+        "verbosity": 2,
+    }
+
 
 
 def _executed_closure(cmd: list[str]) -> set[str]:
@@ -5593,7 +5856,7 @@ def task_build_bare():
 
 _CANONICAL_FAMILIES = (
     "part", "assembly", "drawing", "verify_soundness", "verify", "check",
-    "prechips", "package",
+    "prechips", "package", "review_sweep",
 )
 
 
@@ -5620,6 +5883,8 @@ def _canonical_subtask_names(family: str) -> list[str]:
         from export_features import SUPPORTED_PARTS
 
         return [*(f"features:{stem}" for stem in SUPPORTED_PARTS), "features", "release"]
+    if family == "review_sweep":
+        return [stem for stem, _mode in _reviewed_drawings()]
     raise ValueError(f"unknown canonical task family: {family}")
 
 
@@ -5714,6 +5979,8 @@ def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
             return _package_features_task()
         if subname == "release":
             return _package_release_task()
+    if family == "review_sweep" and subname in dict(_reviewed_drawings()):
+        return _review_sweep_task(subname, _machinist_review_profile())
     raise ValueError(f"unknown canonical task: {family}:{subname}")
 
 
