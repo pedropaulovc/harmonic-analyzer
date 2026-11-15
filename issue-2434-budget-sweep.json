@@ -1,0 +1,74 @@
+{
+ "0.25": {
+  "station_setting": {
+   "mae": 0.06257962870516792,
+   "rms": 0.08099120794263838,
+   "p99_max": 0.3512290334410514,
+   "allowable_tolerance": 0.1997455123757826
+  },
+  "combined": {
+   "mae": 0.18741349609568805,
+   "rms": 0.24198831632009885,
+   "p99_max": 0.9535117369045442
+  },
+  "total_mae": 0.47483257284114067,
+  "total_mae_as_built": 0.7711185357323147,
+  "pair_worst": 1.577118152688951,
+  "violations": []
+ },
+ "0.5": {
+  "station_setting": {
+   "mae": 0.12515536073767064,
+   "rms": 0.16197812643181617,
+   "p99_max": 0.7020533751813081,
+   "allowable_tolerance": 0.199751731389283
+  },
+  "combined": {
+   "mae": 0.2173250453888421,
+   "rms": 0.27965802124629846,
+   "p99_max": 1.1335916021809418
+  },
+  "total_mae": 0.4875916306130603,
+  "total_mae_as_built": 0.7838775935042344,
+  "pair_worst": 1.6767146708468381,
+  "violations": []
+ },
+ "0.75": {
+  "station_setting": {
+   "mae": 0.18772891653980392,
+   "rms": 0.2429633580204074,
+   "p99_max": 1.0530438867452345,
+   "allowable_tolerance": 0.19975612010762828
+  },
+  "combined": {
+   "mae": 0.25900413063041244,
+   "rms": 0.3331336033950676,
+   "p99_max": 1.346204287097816
+  },
+  "total_mae": 0.5078121294424359,
+  "total_mae_as_built": 0.8040980923336098,
+  "pair_worst": 1.8258567292285883,
+  "violations": []
+ },
+ "1.0": {
+  "station_setting": {
+   "mae": 0.25029934574083007,
+   "rms": 0.3239460025728714,
+   "p99_max": 1.4058082779426109,
+   "allowable_tolerance": 0.19976080980959493
+  },
+  "combined": {
+   "mae": 0.30770769240115126,
+   "rms": 0.39606004366124,
+   "p99_max": 1.6367111653322035
+  },
+  "total_mae": 0.5346385208263572,
+  "total_mae_as_built": 0.8309244837175311,
+  "pair_worst": 2.0143297321426568,
+  "violations": [
+   "scatter MAE 0.308 > 0.3",
+   "scatter p99 max 1.637 > 1.5",
+   "pair expected worst coefficient 2.014 > 2.0 (joint draw; per-source scatter 1.592, reading 0.796, stall 0.715, index 0.150; residual max 0.050; p99 3.234; conservative envelope 3.035)"
+  ]
+ }
+}
