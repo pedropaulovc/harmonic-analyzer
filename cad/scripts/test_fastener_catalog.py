@@ -50,7 +50,7 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-collar-flat-pin": (("90145A414",), "MHA-PD-VN-70", 1),
     "pd-vn-transgear-hub-key-pin": (("98381A416",), "MHA-PD-VN-69", 1),
     "pd-vn-transgear-knob-cup-pin": (("98296A031",), "MHA-PD-VN-62", 1),
-    "pd-vn-transgear-disc-screw": (("91794A055",), "MHA-PD-VN-55", 3),
+    "sh-vn-fillister-screw-91794a055": (("91794A055",), "MHA-SH-VN-59", 7),
     "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),
     "pd-vn-transgear-pivot-screw": (("90325A174",), "MHA-PD-VN-57", 1),
     "pd-vn-transgear-retaining-ring": (("97431A240",), "MHA-PD-VN-61", 1),
@@ -121,6 +121,10 @@ _SHARED_MEMBERS = {
         "McMaster-Carr", "90145A299", "MHA-SH-VN-58",
         {"RodPin": 20, "BarPin": 20},
     ),
+    "sh-vn-fillister-screw-91794a055": (
+        "McMaster-Carr", "91794A055", "MHA-SH-VN-59",
+        {"DiscScrew": 3, "RackScrew": 4},
+    ),
 }
 
 _SHARED_PROPERTIES = {
@@ -160,6 +164,10 @@ _SHARED_PROPERTIES = {
     "sh-vn-pivot-pin": (
         "18-8 Stainless Steel",
         "passivated, as supplied", "machined_block", None,
+    ),
+    "sh-vn-fillister-screw-91794a055": (
+        "18-8 stainless steel",
+        "plain", "machined_block", "fastener_clearance",
     ),
 }
 

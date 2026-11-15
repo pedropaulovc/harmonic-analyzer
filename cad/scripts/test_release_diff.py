@@ -65,8 +65,19 @@ KITS = [
     }),
 ]
 FAMILIES = GROUPS + KITS
-# Families allocated with no prior native identity (#2339): no prior stem pairs.
-INTRODUCED = [("sh-vn-pivot-pin", "MHA-SH-VN-58", "RodPin", ("RodPin", "BarPin"))]
+# Families allocated with no prior native identity (#2339, #2410): no prior
+# stem pairs; the identities they replaced stay retired reservations.
+INTRODUCED = [
+    ("sh-vn-pivot-pin", "MHA-SH-VN-58", "RodPin", ("RodPin", "BarPin")),
+    (
+        "sh-vn-fillister-screw-91794a055", "MHA-SH-VN-59", "DiscScrew",
+        ("DiscScrew", "RackScrew"),
+    ),
+]
+INTRODUCED_RETIRED = {
+    "sh-vn-pivot-pin": ("ch-rod-pivot-pin", "MHA-CH-10"),
+    "sh-vn-fillister-screw-91794a055": ("pd-vn-transgear-disc-screw", "MHA-PD-VN-55"),
+}
 NAMED_FAMILIES = [family for family in FAMILIES if family[2] != "Default"]
 
 
@@ -159,30 +170,32 @@ def test_a_configured_kit_member_needs_its_declared_family(tmp_path):
         load_identity_map(_kit_map(tmp_path, drop_kits), HISTORICAL_IDENTITY_MAP)
 
 
-def test_an_introduced_family_has_members_but_no_prior_alias(tmp_path):
-    """#2339: the bought pivot pin is a configured family allocated with no
-    prior native identity; its bare stem selects its members, nothing else."""
+@pytest.mark.parametrize("stem,number,neutral,members", INTRODUCED)
+def test_an_introduced_family_has_members_but_no_prior_alias(
+    tmp_path, stem, number, neutral, members,
+):
+    """#2339, #2410: a bought configured family allocated with no prior native
+    identity; its bare stem selects its members, nothing else."""
     mapping = load_identity_map()
-    [(stem, number, neutral, members)] = INTRODUCED
     group = mapping.configured_families[stem]
     assert (group["number"], group["neutral_export_configuration"]) == (number, neutral)
     assert tuple(group["configurations"]) == members
     assert stem not in mapping.aliases
-    assert canonical_keys("sh-vn-pivot-pin", mapping) == ("sh-vn-pivot-pin--rodpin",)
-    assert canonical_keys("sh-vn-pivot-pin", mapping, drawing=True) == (
-        "sh-vn-pivot-pin--rodpin", "sh-vn-pivot-pin--barpin",
-    )
-    # The retired shop pins stay reservations, not aliases of the members.
-    assert canonical_keys("ch-rod-pivot-pin", mapping) == ("ch-rod-pivot-pin",)
+    keys = tuple(f"{stem}--{member.lower()}" for member in members)
+    assert canonical_keys(stem, mapping) == keys[:1]
+    assert canonical_keys(stem, mapping, drawing=True) == keys
+    # The retired identities stay reservations, not aliases of the members.
+    retired, retired_number = INTRODUCED_RETIRED[stem]
+    assert canonical_keys(retired, mapping) == (retired,)
 
     def claim_a_prior_number(payload):
         row = next(row for row in payload["parts_and_assemblies"]
-                   if row["old_stem"] == "sh-vn-pivot-pin")
-        row["new_identities"][0]["prior_number"] = "MHA-CH-10"
+                   if row["old_stem"] == stem)
+        row["new_identities"][0]["prior_number"] = retired_number
 
     def repeat_a_member(payload):
         row = next(row for row in payload["parts_and_assemblies"]
-                   if row["old_stem"] == "sh-vn-pivot-pin")
+                   if row["old_stem"] == stem)
         row["new_identities"][1]["configuration"] = row["new_identities"][0]["configuration"]
 
     for mutate in (claim_a_prior_number, repeat_a_member):

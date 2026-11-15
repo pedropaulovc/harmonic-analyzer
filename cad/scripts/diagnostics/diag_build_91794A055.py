@@ -1,7 +1,7 @@
 r"""McMaster 91794A055 -- 18-8 stainless slotted fillister screw, #0-80 x 1/4
-(MHA-PD-VN-55, the transgear disc screws).
+(MHA-SH-VN-59: the transgear disc screws and the feed-rack screws).
 
-Every number is imported from ``transgear_disc_screw_spec`` (catalogue and
+Every number is imported from ``pd_transgear_disc_screw_spec`` (catalogue and
 the laws read off the vendor model, each with its dump source); none is
 typed here.  The vendor file ``cad/references/mcmaster/91794A055.SLDPRT``
 (SHA-256 3b7b3ee38a51864b0c9d495e44ade30c80816d4b5498b8801211b8edb82676dc,
@@ -37,7 +37,7 @@ vendor origin sits mid-overall (axis z, head +z) and its profile lies on
 the Right Plane, so vendor +y is replica +x.
 
 Cut to fit (optional, ``cut_length`` with ``cut_end_break``; R9-47): a
-screw cut at assembly, as MHA-PD-VN-55's are, is drawn as installed, in the
+screw cut at assembly, as the MHA-SH-VN-59 DiscScrew members are, is drawn as installed, in the
 ``diag_mcmaster_oval`` idiom.  Revolve1 ends the shank at y = -cut_length
 with a 45 deg break of radial leg ``cut_end_break`` in place of the factory
 0.75 P tip chamfer, and ``revolved_volume`` follows the cut.  Everything
@@ -87,7 +87,7 @@ from _mcmaster_91794a055 import (  # noqa: E402
     SHANK_LEN,
     SKU,
 )
-from pd_vn_transgear_disc_screw_spec import (  # noqa: E402
+from pd_transgear_disc_screw_spec import (  # noqa: E402
     CUTTER_CENTRE_PAST_TIP,
     CUTTER_TOP_W,
     DOME_H,

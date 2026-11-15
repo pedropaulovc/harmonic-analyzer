@@ -1062,7 +1062,8 @@ expect(PD, "pd-transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **
 for i, (x, y) in enumerate(p.DISC_SCREW_XY):
     expect(
         PD,
-        f"pd-vn-transgear-disc-screw-{i + 1}",
+        # DiscScrew members follow the four RackScrew instances.
+        f"sh-vn-fillister-screw-91794a055-{len(p.RACK_TAP_X) + i + 1}",
         [x, y, p.DISC_SCREW_Z0],
         p.ROT_X_NEG90,
         f"disc screw {i + 1}",

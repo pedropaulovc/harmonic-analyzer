@@ -5,7 +5,7 @@ replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
 48DP stock #1/reference-135 master. It does not touch the rack: the finite
 stock #7/reference-14 knob pinion drives it 15:150.
 Its Ø.501 bore clears the brass hub's Ø.498 spigot (the disc is set central
-at assembly), and three #0-80 fillister screws (MHA-PD-VN-55) clamp it to
+at assembly), and three #0-80 fillister screws (MHA-SH-VN-59 DiscScrew) clamp it to
 that hub's flange (MHA-PD-17).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
@@ -91,7 +91,7 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_X_FACTOR,
     BOLT_CIRCLE_Y_FACTOR,
 )
-from pd_vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
+from pd_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 
 PART_NAME = "pd-rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass

@@ -5,7 +5,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The one
 authority for what two parts cut and must agree on: the brass hub's flange
 (MHA-PD-17, ``transgear_disc_hub_spec``) carries the #51 (.067) clearance
 holes and the reducer disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps;
-the three 91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø.75
+the three 91794A055 fillister screws (MHA-SH-VN-59 DiscScrew) join them on a Ø.75
 circle, which keeps the disc's taps clear of its Ø.501 bore at the worst
 case (``rack_pinion_spec`` checks the web; the heads stand clear of the hub
 body).  The hub's rear spigot passes the disc's bore and seats on
@@ -41,7 +41,7 @@ UNIT = drawing_unit(
 
 
 SCREW_THREAD = "#0-80"
-# MHA-PD-VN-55, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
+# MHA-SH-VN-59 DiscScrew, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
 SCREW_COUNT = 3
 SCREW_ANGLES_DEG = (0.0, 120.0, 240.0)
 # The flange's drilled clearance hole the disc's taps are spotted through:

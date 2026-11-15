@@ -687,7 +687,7 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
         _config.parts(stem)["number"]
         for stem in (
             "pd-transgear-feed-pinion",
-            "pd-vn-transgear-disc-screw",
+            "sh-vn-fillister-screw-91794a055",
             "pd-vn-transgear-hub-key-pin",
             "pd-rack-pinion",
             "pd-transgear-drive-collar",

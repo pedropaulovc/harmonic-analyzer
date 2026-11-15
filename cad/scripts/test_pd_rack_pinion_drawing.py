@@ -19,7 +19,7 @@ import pd_rack_pinion_callouts as callouts
 import pd_rack_pinion_spec as spec
 import pd_transgear_feed_pinion_spec as feed_spec
 import pd_transgear_disc_hub_geometry as hub_geometry
-import pd_vn_transgear_disc_screw_spec as disc_screw
+import pd_transgear_disc_screw_spec as disc_screw
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
@@ -83,7 +83,7 @@ def test_taps_sit_on_the_flange_bolt_circle() -> None:
 
 
 def test_disc_screw_engages_at_least_one_and_a_half_diameters_worst_case() -> None:
-    """R9-47: the MHA-PD-VN-55 tips are cut to fit inside the rear face, so the
+    """R9-47: the MHA-SH-VN-59 DiscScrew tips are cut to fit inside the rear face, so the
     joint (judged in transgear_disc_screw_spec) spends the tap's losses here."""
     assert spec.TAP_SPEC.size == hub_geometry.SCREW_THREAD == "#0-80"
     assert disc_screw.ENGAGEMENT_WORST_D >= spec.ENGAGEMENT_FLOOR_D == 1.5
@@ -117,7 +117,7 @@ def test_the_tap_mouths_lose_only_their_breaks_counted_from_the_drill() -> None:
 
 
 def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:
-    """The 3/64 (1.191) tap drill for the MHA-PD-VN-55 #0-80 UNF-2B disc taps,
+    """The 3/64 (1.191) tap drill for the MHA-SH-VN-59 DiscScrew #0-80 UNF-2B disc taps,
     against ASME B1.1's 2B table: minor 0.0465..0.0514 in, and the
     tap-drill rule %thread = (major - drill) / (1.299038 P)."""
     inch = 25.4

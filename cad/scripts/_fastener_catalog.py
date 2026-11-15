@@ -315,8 +315,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "90145A414",
         material="AISI 304",
     ),
-    "pd-vn-transgear-disc-screw": _stock(
-        "pd-vn-transgear-disc-screw",
+    # #2410: one SKU, DiscScrew (cut to fit) and RackScrew (stock) members.
+    "sh-vn-fillister-screw-91794a055": _stock(
+        "sh-vn-fillister-screw-91794a055",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
         "91794A055",
         material="AISI 304",

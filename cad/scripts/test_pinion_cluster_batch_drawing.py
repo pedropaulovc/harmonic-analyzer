@@ -742,8 +742,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             )
             * _annulus_limit(2.413, 2.3876, 0.381),
             **_expected_numbered_pairs(
-                "pd-vn-transgear-disc-screw",
-                range(1, 4),
+                # The DiscScrew members follow the four RackScrew instances.
+                "sh-vn-fillister-screw-91794a055",
+                range(5, 8),
                 "pd-rack-pinion",
                 1.524,
                 1.191,
