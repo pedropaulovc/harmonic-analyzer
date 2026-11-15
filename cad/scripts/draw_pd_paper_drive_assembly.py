@@ -4041,6 +4041,7 @@ def _place_bom_sheet(
     return landings, table, items, pieces, bom_snapshot
 
 
+# #2824 trace variant b (comment only).
 def _trace_section_tree(adapter: Any, view: Any, *, label: str) -> None:
     """#2824 diagnostic: walk the section's drawing-component tree with a
     cap; print its shape, and on runaway dump the deepest path and raise."""
