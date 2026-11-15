@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import tomllib
 
 import pytest
 
@@ -14,11 +15,27 @@ import dt_cylinder_gear_spec as gear
 import dt_cylinder_gear_tl_cam_fixture_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _paths import CAD_ROOT
 from _drawing_types import DrawingLayout
 from _inch_wall_limits import WALL_TARGET_MM
 
 INCH = 25.4
 KIT = "dt_cylinder_gear_tl_cam_turning"
+
+
+def test_each_press_ream_has_a_reamer_to_buy_that_cuts_inside_its_band() -> None:
+    tools = tomllib.loads(
+        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+    )["tools"]
+    for key, (dia, (lower, upper)) in {
+        "reamer-3740": (spec.STUB_HOLE_DIA, spec.STUB_HOLE_DEVIATIONS),
+        "reamer-0365": (spec.PIN_HOLE_DIA, spec.PIN_HOLE_DEVIATIONS),
+    }.items():
+        record = tools[key]
+        assert record["present"] is False and record["status"] == "not owned: to buy"
+        assert "read live 2026-11-14" in record["purchase"]
+        low, high = record["dia_in"]
+        assert (dia + lower) / INCH - 1e-9 <= low < high <= (dia + upper) / INCH + 1e-9
 
 
 def test_registry_row_is_tooling_in_inch() -> None:

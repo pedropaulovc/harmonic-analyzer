@@ -496,6 +496,35 @@ present = false
 purchase = "One TTC 06-002-550 .2550 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; ANSI B94.2 cutting band .2551-.2555, inside the bore's .2550-.2560 band."
 note = "Cuts both MHA-CH-07 keepers' Ø.2550 +.0010/.0000 REAM THRU bores in 1018, each keeper on its own: a slip fit on the Ø.2500 h ground MHA-CH-04 shaft that also covers both keepers' bore-height bands, each bore's tilt and the rail seats (ch_fulcrum_keeper_spec.BORE_ALIGNMENT_ALLOWANCE_MM). Pin-check the first bore."
 
+# MHA-DT-12-TL-01 (cam turning fixture, #2361) press reams, both REAM_H7's
+# +.0005/0: the stub hole for the 97175A344 pull-out dowel (+.0001/+.0003 over
+# 3/8, so .0006-.0013 interference) and the clock pin's blind hole for the
+# .0375 minus gauge pin. To purchase: not owned; SKU and price read live on
+# each vendor page 2026-11-14 (McMaster's .0365 is not listed; KBC's is).
+[tools.reamer-3740]
+name = "Alvord-Polk .3740 in (3/8 undersized) HSS straight-flute chucking reamer"
+kind = "reamer"
+make = "Alvord-Polk Tool"
+sku = "3087A55"
+source = "https://www.mcmaster.com/3087A55/"
+present = false
+status = "not owned: to buy"
+purchase = "McMaster-Carr 3087A55, $40.24 (listing read live 2026-11-14); catalogue cutting band 0 to +.0002, .3740-.3742, inside the hole's .3740-.3745 band."
+use = "MHA-DT-12-TL-01 stub hole, Ø.3740 +.0005/0 REAM THRU, press fit on TL-VN-50"
+dia_in = [0.3740, 0.3742]
+
+[tools.reamer-0365]
+name = "KBC USA .0365 in HSS straight-flute chucking reamer"
+kind = "reamer"
+make = "KBC - USA"
+sku = "5-018-0365"
+source = "https://www.kbctools.com/itemdetail/5-018-0365"
+present = false
+status = "not owned: to buy"
+purchase = "KBC 5-018-0365, $32.80, 4 in stock (listing read live 2026-11-14); catalogue cutting band +.0002/-.0000, .0365-.0367, inside the hole's .0365-.0370 band."
+use = "MHA-DT-12-TL-01 clock-pin hole, Ø.0365 +.0005/0 REAM .20 deep, press fit on TL-VN-51"
+dia_in = [0.0365, 0.0367]
+
 # Screw-slotting saw for the MHA-DT-12 (dt-cylinder-gear) alignment notch, x20
 # (#2364). The sheet prints the kerf .016 MAX: wider, it cuts the flanks of the
 # two teeth beside it (dt_cylinder_gear_spec.NOTCH_WIDTH). The 1/32 in saw the
