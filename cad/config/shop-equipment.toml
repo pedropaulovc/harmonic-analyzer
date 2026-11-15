@@ -833,7 +833,7 @@ on_hand = false
 cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
 
 # MHA-SM-01 gooseneck tube (owner rulings 2026-10-27 (Pedro), #1951; 2026-11-08, #2315;
-# 2026-11-14, #2401: a 36 in cut, leaving about 12 in for a trial bend).
+# 2026-11-14, #2401: a 36 in cut, leaving about 11 in for a trial bend).
 [[stock]]
 form = "round_tube"
 material = "4130-N seamless alloy steel tube"

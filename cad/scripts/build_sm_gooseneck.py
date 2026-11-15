@@ -740,6 +740,7 @@ async def build(adapter) -> dict[str, str]:
         "OverallReference",
         "OverallHeight",
         OVERALL_HEIGHT_TOLERANCE_MM,
+        places=DRAWING_PRECISION["OverallReference"]["OverallHeight"],
         display_unit=part_drawing_unit(PART_NAME),
     )
     # The reference sketches own printed dimensions and only reference lines:
