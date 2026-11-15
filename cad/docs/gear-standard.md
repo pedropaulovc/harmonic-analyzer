@@ -125,8 +125,11 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   every pair to lie between the two pairs that hold the line; the holds are
   wherever the binds fall near each end, and a gear past a hold rides the
   line's extension, higher by its slope times the overhang. Whether that may
-  let a gear come loose is the open owner question on #2584; no allowance is
-  booked for it. Check 4N stops easing at the first free run, an
+  let a gear come loose was asked on #2584: owner ruling 2026-11-14 (Pedro,
+  option A) accepts it and states it on MHA-DT-00 check 4R (no bind, no skip,
+  end-gear shake accepted). The stack's contact ratio ≥ 1 holds for pairs
+  between the holds; an end-side gear past a hold may run below it. No
+  allowance is booked for it. Check 4N stops easing at the first free run, an
   observable stop; the ease is neither printed nor measured, and no number is
   booked for it (delegated ruling 2026-11-12, Main, following the owner's
   direction of 2026-11-11 on #2416; owner review
@@ -253,7 +256,7 @@ from MHA-DT-00 check 4 (CONE SWING SET):
 1. Ease the arbor-pedestal screws until the pedestals move under light taps.
 2. Hold the cone set swung in at the first bind and tap each pedestal in or
    out until the gears at its end just bind, so the arbor lies on a bind near
-   each end (a gear past a hold: owner question #2584). Tighten the pedestal
+   each end (a gear past a hold may run loose: accepted, #2584). Tighten the pedestal
    screws.
 3. Swing out, swing in until a gear just binds, ease out in small steps until
    four crank turns run free, hold it there, and lock MHA-DT-VN-51.

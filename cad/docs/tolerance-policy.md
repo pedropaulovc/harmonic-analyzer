@@ -126,8 +126,9 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   no pair runs tighter than its own first bind (backlash ≥ 0 at the tightest
   gear). Gated: nominal contact ratio ≥ 1.0 at the loosest centre a feel set
   leaves the cone: the highest first bind of any pair (taking every pair to
-  lie between the two holds; a gear past a hold is the open owner question on
-  #2584), opened by both gears'
+  lie between the two holds; an end-side gear past a hold may run below it,
+  accepted by owner ruling 2026-11-14 on #2584 and stated on MHA-DT-00 check
+  4R), opened by both gears'
   running runout. No number is booked for the ease out of the bind (check 4N;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing

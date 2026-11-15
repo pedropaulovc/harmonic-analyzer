@@ -2135,8 +2135,10 @@ CHECKS = _note_text(
         # the gears do not bind (cone_set_stack).  The set is first swung in
         # until a gear just binds and held there, a stated pose (#2587); each
         # pedestal is then tapped either way until the gears at its end just
-        # bind, so the arbor lies on a bind near each end (a gear past a hold
-        # is the open owner question on #2584).  The swing then comes in
+        # bind, so the arbor lies on a bind near each end.  A gear past a hold
+        # rides the line's extension and may run below contact ratio 1; owner
+        # ruling 2026-11-14 (Pedro, #2584, option A): accepted and stated in
+        # 4R as end-gear shake, with no bind and no skip.  The swing then comes in
         # to the first bind and eases out in small steps to the first free
         # run, an observable stop that bounds the loosest centre
         # (cone_set_stack.SET_OFFSET_MAX_MM, #2585).  The pedestals may move
@@ -2168,7 +2170,7 @@ CHECKS = _note_text(
         "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
         "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
-        f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND.",
+        f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: NO BIND OR SKIP, ACCEPT END-GEAR SHAKE.",
         # Rubric sample round 9 (rule 22): the check, its remedy, the hold and
         # the redo are one step each.
         "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE.",
