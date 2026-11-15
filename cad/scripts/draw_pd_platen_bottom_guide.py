@@ -91,7 +91,12 @@ ISO_NOTE_XY = (0.3245, 0.180)
 _LEFT_X = FRONT_CENTER[0] - GUIDE_LENGTH / 2000.0
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], 0.080),
-    "Height": (0.354, FRONT_CENTER[1]),
+    # The value and its two-line reason (~17.5 mm) are taller than the .624
+    # height (15.9 mm): between the extension lines the lower one struck the
+    # last line (r5), so the text stands below the rail's bottom extension
+    # line, the dimension line carried down to it, right of the length's
+    # extension line and left of the right view.
+    "Height": (0.354, 0.099),
     # The lock taps' stations stack under the view, the row left of it.
     "LockTap1X": (_LEFT_X + LOCK_TAP_X[0] / 2000.0, 0.104),
     "LockTap2X": (_LEFT_X + LOCK_TAP_X[1] / 2000.0, 0.098),

@@ -43,16 +43,17 @@ ITEM = "#0-80 x 1/4 FILLISTER HEAD SLOTTED SCREW"
 CUT_STEP = 16
 # The stock-length witness stands left of the screw (its start is -HEAD_DIA),
 # so its dimension and AS-SUPPLIED STOCK LENGTH print there; the head height
-# takes the right (machinist review, r3). The qualifier is ~61 mm wide and
-# centred on its 6 mm lane ran ~14 mm onto the shank (r4), so the dimension
-# moves 24 mm further left: the text ends ~7 mm short of the shank, the
-# extension lines carried out.
+# takes the right (machinist review, r3). The qualifier is ~61 mm wide: centred
+# on its 6 mm lane it ran onto the shank (r4), 24 mm further left its final H
+# still crossed the witness line itself (r5), so the dimension moves 30 mm
+# left: the text ends ~5 mm short of the witness, the extension lines carried
+# out.
 SIDES = {
     **supplier.SUPPLIER_REFERENCE_SIDES,
     "SupplierStockLength": "left",
     "SupplierHeadHeight": "right",
 }
-STOCK_LENGTH_SHIFT_M = 0.024
+STOCK_LENGTH_SHIFT_M = 0.030
 GENERAL_TEXT = (
     f"PURCHASED PART, VIEWS AS SUPPLIED. DISC SCREWS CUT PER MHA-PD-00 STEP {CUT_STEP}."
 )

@@ -191,6 +191,12 @@ def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
     height_x = drawing.FRONT_KEEP["Height"][0]
     assert rail_end < height_x - half_text
     assert height_x + half_text < right_left
+    # Value plus reason (~5.9 mm a line) is taller than the rail, so the text
+    # stands wholly below its bottom extension line (r5).
+    height_y = drawing.FRONT_KEEP["Height"][1]
+    half_block = 0.0059 * (1 + len(drawing.HEIGHT_CALLOUT.splitlines())) / 2.0
+    assert spec.GUIDE_HEIGHT / 1000.0 < 2.0 * half_block
+    assert height_y + half_block < drawing.FRONT_CENTER[1] - spec.GUIDE_HEIGHT / 2000.0
     # The depth's text is wider than the right view, so it stands left of the
     # view's left extension line, right of the top view's end, above the
     # front view's top (r4: centred, both extension lines struck it).
