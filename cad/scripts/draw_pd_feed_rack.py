@@ -35,7 +35,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
@@ -54,13 +54,13 @@ from pd_feed_rack_spec import (
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
+    DRAWING_SYMMETRIC_BANDS_MM,
     ENGAGEMENT_STATEMENT,
     RACK_HEIGHT,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_FACE_WALL_STATEMENT,
-    TAP_SPACING_PITCHES,
     TAP_SPEC,
     TAP_THREAD_DEPTH,
 )
@@ -117,22 +117,15 @@ NOTES_XY = (0.020, 0.064)
 # MHA-PD-00 assembly steps, not on this part sheet. Rule 20: the taps' walls
 # to the strip's faces and to the tooth root (RV-03).
 NOTES_TEXT = f"END TOOTH PHASE NOT CONTROLLED.\n{TAP_FACE_WALL_STATEMENT}"
-# The tap callout (~69 x 26 mm, centred here) stands right of the bottom
+# The tap callout (~69 x 21 mm, centred here) stands right of the bottom
 # view's right end (x 324.8) and above VIEW A, its leader on the fourth tap.
 # At (0.330, 0.192) its top came 1.9 mm under VIEW A's letter and the audit
-# read them as one block (r6), so it sits wholly right of the bottom view and
-# lower, its centre dropped a further half row for the tooth-count line (r7):
-# its top ~6 mm under the letter, clear of the border.
-TAP_CALLOUT_XY = (0.365, 0.185)
-# Rule 7/20/26: where the four taps stand, as tooth counts the builder steps
-# off (machinist review r7: the REF decimals alone left the pattern to a
-# sentence), and their engagement (RV-02).
-TAP_CALLOUT_BELOW = (
-    f"ON TOOTH CENTRES,\n{TAP_SPACING_PITCHES} TEETH APART\n{ENGAGEMENT_STATEMENT}"
-)
-# The cut ends' tooth phase is not controlled, so the first tap takes the
-# tooth centre nearest its REF station from the cut end, printed under it.
-TAP_START_CALLOUT = "NEAREST\nTOOTH CENTRE"
+# read them as one block (r6), so it sits 4 mm lower, wholly right of the
+# bottom view: its top ~6 mm under the letter, clear of the border.
+TAP_CALLOUT_XY = (0.365, 0.188)
+# Rule 7/20: the taps stand on tooth centres, and their engagement (RV-02);
+# their places along the strip are the stations' dimensions (rule 26).
+TAP_CALLOUT_BELOW = f"ON TOOTH CENTRES\n{ENGAGEMENT_STATEMENT}"
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # Rule 9: the enlarged end view is VIEW A, its viewing arrow on the front
 # view's right end face, approaching from the right (third-angle right view).
@@ -194,7 +187,8 @@ def _set_tap_callout_below(display: Any, text: str) -> None:
 
 
 def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Retain native controls and purchased-stock and tap-station reference sizes."""
+    """Retain native controls, the first tap station's band and the
+    purchased-stock reference sizes."""
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     found: set[str] = set()
     for raw in annotations:
@@ -215,19 +209,26 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         )
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        # swTolNONE = 0: fabricated .XX controls use the title block. Bought
-        # sizes and the rack's tap stations keep part-authored parentheses.
+        # swTolNONE = 0: fabricated .XXX controls use the title block; the
+        # first tap station carries its part-authored half-pitch window
+        # (swTolSYMMETRIC = 4). Bought sizes keep part-authored parentheses.
         # Every size here is equation-owned, and an equation-owned dimension
         # reads DrivenState 1, never 2 (build_dt_cone_gear_shaft's station
         # ownership gate); "not a driven reference" is IsReference() False.
         tolerance_type = int(tolerance.Type)
         is_reference = bool(dimension.IsReference())
-        if tolerance_type != 0 or is_reference:
+        band = DRAWING_SYMMETRIC_BANDS_MM.get(name)
+        if tolerance_type != (0 if band is None else 4) or is_reference:
             raise RuntimeError(
                 f"rack size {name!r} lost its native tolerance state "
                 f"(tolerance type {tolerance_type}, IsReference {is_reference}, "
                 f"DrivenState {int(dimension.DrivenState)})"
             )
+        if (
+            band is not None
+            and abs(float(tolerance.GetMaxValue()) * 1000.0 - band) > 1e-6
+        ):
+            raise RuntimeError(f"rack size {name!r} lost its {band:.4f} mm half-band")
         reference = name in DRAWING_REFERENCE_DIMENSIONS
         if bool(display.ShowParenthesis) != reference:
             raise RuntimeError(f"rack size {name!r} has wrong reference state")
@@ -368,7 +369,6 @@ async def build(adapter: Any) -> dict[str, str]:
     omit_title_block_thread_class(tap_callout, label="feed rack taps")
     set_hole_callout_precision(tap_callout, TAP_CALLOUT_PRECISION, label="feed rack taps")
     _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
-    set_dimension_callouts(adapter, annotations, {"TapStart": TAP_START_CALLOUT})
     rebuild_drawing(adapter, label="feed rack tap callout")
     for property_name, position in (
         ("Gear Data", GEAR_DATA_XY),

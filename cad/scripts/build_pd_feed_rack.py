@@ -67,6 +67,7 @@ from _sketch import (
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _document_units import apply_package_model_units
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _named_views import name_octant_views
 from _drawing_marks import (
     apply_drawing_properties,
@@ -82,6 +83,7 @@ from pd_feed_rack_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_DIMENSIONS,
+    DRAWING_SYMMETRIC_BANDS_MM,
     ENLARGED_END_VIEW_NOTE,
     FIRST_GAP_X,
     GAP_AREA,
@@ -302,6 +304,17 @@ async def build(adapter) -> dict[str, str]:
                 raise RuntimeError(
                     f"{dimension_name}: stock/composite reference did not persist"
                 )
+    # The first tap's half-pitch window from the cut end (machinist review
+    # r8): the tap takes the one tooth centre inside it.
+    for dimension_name, band in DRAWING_SYMMETRIC_BANDS_MM.items():
+        set_dimension_symmetric_tolerance(
+            adapter,
+            "TapStations",
+            dimension_name,
+            band,
+            places=DRAWING_PRECISION["TapStations"][dimension_name],
+            display_unit=part_drawing_unit(PART_NAME),
+        )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

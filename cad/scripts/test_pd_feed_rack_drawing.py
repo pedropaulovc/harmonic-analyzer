@@ -85,15 +85,23 @@ def test_taps_stand_on_tooth_centres_at_the_ruled_platen_stations() -> None:
     assert builder.TAP_X is spec.TAP_X and builder.TAP_SPEC is spec.TAP_SPEC
 
 
-def test_the_sheet_locates_the_taps_by_tooth_counts() -> None:
-    # Machinist review r7 (rule 26): the REF decimals alone left the pattern
-    # to a sentence; the builder steps off whole teeth from the first tap,
-    # which takes the tooth centre nearest its REF station.
-    assert spec.TAP_SPACING_PITCHES == 22
-    lines = drawing.TAP_CALLOUT_BELOW.splitlines()
-    assert lines[:2] == ["ON TOOTH CENTRES,", "22 TEETH APART"]
-    assert drawing.TAP_START_CALLOUT.replace("\n", " ") == "NEAREST TOOTH CENTRE"
-    assert "TapStart" in spec.DRAWING_REFERENCE_DIMENSIONS
+def test_the_tap_stations_are_controlling_dimensions() -> None:
+    # Machinist review r7, r8 (rule 26): a location is a dimension, not a
+    # sentence. The first tap's station carries half a pitch, so exactly one
+    # tooth centre lies in its window; the others are whole pitches from it
+    # on the title block's .XXX, as each tap stands on its tooth centre.
+    band = spec.TAP_START_BAND
+    assert band <= spec.PITCH / 2.0 < band + 0.001 * 25.4
+    assert drawing.DRAWING_SYMMETRIC_BANDS_MM == {"TapStart": band}
+    assert builder.DRAWING_SYMMETRIC_BANDS_MM is spec.DRAWING_SYMMETRIC_BANDS_MM
+    assert spec.TAP_TOOTH_OFFSET_MAX == spec.TAP_BAND
+    for index, pitches in ((2, 22), (3, 44), (4, 66)):
+        nominal = spec.DRAWING_NOMINALS_MM[f"TapStation{index}"]
+        assert nominal == pytest.approx(pitches * spec.PITCH)
+        assert f"{nominal / 25.4:.3f}" == f"{2.160 * pitches / 22:.3f}"
+    assert drawing.TAP_CALLOUT_BELOW.splitlines()[0] == "ON TOOTH CENTRES"
+    # Rule 7: no more than two lines of words under the callout.
+    assert len(drawing.TAP_CALLOUT_BELOW.splitlines()) == 2
 
 
 def test_tap_depths_stay_in_the_tooth_at_every_band_corner() -> None:
@@ -170,13 +178,13 @@ def test_sheet_sizes_have_native_controls_and_stock_references() -> None:
     assert builder.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert marked == spec.DRAWING_PRECISION_BY_NAME.keys()
-    # The cut length and the tap's place across the strip are controls; the
-    # purchased sizes and the rack's own tooth stations are references.
-    assert {"Length", "TapFromFront"}.isdisjoint(spec.DRAWING_REFERENCE_DIMENSIONS)
-    assert {"RackDepth", "RackHeight"} <= spec.DRAWING_REFERENCE_DIMENSIONS
-    assert {
-        name for name in spec.DRAWING_DIMENSIONS["TapStations"] if name != "TapFromFront"
-    } <= spec.DRAWING_REFERENCE_DIMENSIONS
+    # The cut length, the tap stations and the tap's place across the strip
+    # are controls; the purchased sizes are references.
+    assert spec.DRAWING_DIMENSIONS["TapStations"].isdisjoint(
+        spec.DRAWING_REFERENCE_DIMENSIONS
+    )
+    assert "Length" not in spec.DRAWING_REFERENCE_DIMENSIONS
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"RackDepth", "RackHeight"}
     assert spec.DRAWING_NOMINALS_MM["TapStation4"] == pytest.approx(66 * spec.PITCH)
     assert drawing.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS

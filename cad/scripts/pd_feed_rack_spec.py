@@ -918,10 +918,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (paper_drive_rack_travel), so it prints .XX. The purchased 3/16 strip's
 # height and face width print their exact decimals as plain references
 # (#2694, #2147): the receiving geometry has room for any ordinary strip.
-# Each tap stands on its own tooth centre, so its stations along the strip
-# are the rack's (whole pitches from the first tap, which stands on the
-# tooth nearest TapStart): references. The tap's place across the strip
-# is drilled to the title block's .XXX.
+# Each tap stands on its own tooth centre to the .XXX band. The cut ends'
+# tooth phase is not controlled, so the first tap's station from the cut end
+# carries half a pitch, floored to .001 so that only one tooth centre lies in
+# it; the other three are whole pitches from the first tap, printed .XXX on
+# the title block's band (machinist review r7, r8: rule 26, a location is a
+# dimension, not a sentence). The tap's place across the strip is drilled to
+# the title block's .XXX.
 _PLACES = {
     "Length": 2,
     "RackDepth": 4,
@@ -941,9 +944,11 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-DRAWING_REFERENCE_DIMENSIONS = frozenset(
-    {"RackDepth", "RackHeight", "TapStart", "TapStation2", "TapStation3", "TapStation4"}
-)
+TAP_START_BAND = _floor_in(TAP_STATION_SLIP_MAX)
+# The sizes the builder tolerances itself (swTolSYMMETRIC); every other
+# printed size takes the title block's band or prints as a reference.
+DRAWING_SYMMETRIC_BANDS_MM = {"TapStart": TAP_START_BAND}
+DRAWING_REFERENCE_DIMENSIONS = frozenset({"RackDepth", "RackHeight"})
 DRAWING_NOMINALS_MM = {
     "Length": BAR_LENGTH,
     "RackDepth": RACK_THICKNESS,
