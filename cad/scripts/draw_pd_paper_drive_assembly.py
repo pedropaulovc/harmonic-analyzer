@@ -2416,8 +2416,10 @@ def _step_text(
             "BREAK THE CUT EDGE "
             f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)}.",
             "REFIT THE SAME SCREWS IN THE SAME HOLES, TIGHT.",
-            f"CHECK AND REMEDY AS {s('arm-plate-fitted', 17)}-"
-            f"{s('arm-plate-fitted', 18)}.",
+            # A check and its remedy are separate steps (rule 22; r10).
+            "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT.",
+            f"IF IT SHAKES OR SHOWS DAYLIGHT, DO {s('arm-plate-fitted', 18)} AND "
+            f"REPEAT {s('arm-plate-screws-cut', 4)}.",
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
         # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The

@@ -2454,7 +2454,8 @@ def test_every_screwed_or_staked_setting_has_a_holding_check() -> None:
     assert locks[3] == "CHECK: PUSHED FIRMLY BY HAND, NO LOCK MOVES ON ITS GUIDE."
     assert locks[4].startswith("IF ONE MOVES, FIT NEW ")
     plate = texts["arm-plate-screws-cut"]
-    assert plate[-1] == "CHECK AND REMEDY AS 13T-13U."
+    assert plate[4] == "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT."
+    assert plate[5] == "IF IT SHAKES OR SHOWS DAYLIGHT, DO 13U AND REPEAT 14E."
     pivot = texts["hanger-pivoted"]
     assert pivot[8].startswith("PLATEN SLID CLEAR, STAKE THE TAP MOUTH")
     assert "HEX KEY TO LOOSEN, THE SCREW HOLDS" in pivot[9]
