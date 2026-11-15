@@ -562,7 +562,7 @@ def test_sheet_text_names_the_right_parts() -> None:
         "pd-transgear-pin": spec.PIN_NUMBER,
         "pd-transgear-disc-hub": spec.HUB_NUMBER,
         "pd-rack-pinion": spec.DISC_NUMBER,
-        "pd-platen-rack": spec.RACK_NUMBER,
+        "pd-feed-rack": spec.RACK_NUMBER,
     }
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem

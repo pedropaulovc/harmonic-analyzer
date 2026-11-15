@@ -14,7 +14,7 @@ dimensions, beside the step that sets it; sheet 11 prints the chain fit-up
 (CONTRACT-paper-drive.md §13.2). Sheet 12 carries the complete native BOM,
 split horizontally into two pieces at measured row heights, and an assembly
 reference. The BOM identifies the current inch
-reducer, finite stock-form integral pinions and rack/backer; sheet 1 gives the
+reducer, finite stock-form integral pinions and purchased feed rack; sheet 1 gives the
 selected chain ratio's reference paper travel. Gear cutting data stays on the
 gear sheets. The chain fit-up includes the actual loaded collar/disc overlap
 inspection with the trial platen removed and the operating latch pose held;
@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+from fractions import Fraction
 import json
 import math
 import sys
@@ -128,6 +129,9 @@ import pd_paper_drive_knob_setting_spec as knob_setting
 import pd_paper_drive_cluster_float_spec as cluster_float
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
+import pd_platen_bottom_guide_spec as bottom_guide
+import pd_feed_rack_spec as feed_rack
+import pd_feed_rack_screw_spec as rack_screw
 import pd_platen_spec as platen
 import pd_guide_lock_spec as guide_lock
 import pd_support_bar_spec as support_bar
@@ -143,7 +147,7 @@ import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
-import pd_vn_transgear_disc_screw_spec as disc_screw
+import pd_transgear_disc_screw_spec as disc_screw
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
@@ -477,7 +481,7 @@ CLUSTER_STEMS = frozenset(
         "pd-rack-pinion",
         "pd-transgear-disc-hub",
         "pd-vn-transgear-hub-key-pin",
-        "pd-vn-transgear-disc-screw",
+        explode.DISC_SCREW,
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
         "pd-vn-transgear-cluster-shim",
@@ -906,8 +910,12 @@ BOM_PART_NUMBERS = {
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back")["number"],
     "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["number"],
     "pd-platen": _config.parts("pd-platen")["number"],
-    "pd-platen-rack": _config.parts("pd-platen-rack")["number"],
+    "pd-feed-rack": _config.parts("pd-feed-rack")["number"],
+    "pd-platen-bottom-guide": _config.parts("pd-platen-bottom-guide")["number"],
     "pd-platen-guide": _config.parts("pd-platen-guide")["number"],
+    "sh-vn-fillister-screw-91794a055--RackScrew": _config.parts(
+        "sh-vn-fillister-screw-91794a055"
+    )["number"],
     "pd-guide-lock": _config.parts("pd-guide-lock")["number"],
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
@@ -939,7 +947,9 @@ BOM_PART_NUMBERS = {
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
     "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")["number"],
     "pd-rack-pinion": _config.parts("pd-rack-pinion")["number"],
-    "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["number"],
+    "sh-vn-fillister-screw-91794a055--DiscScrew": _config.parts(
+        "sh-vn-fillister-screw-91794a055"
+    )["number"],
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
     "pd-transgear-drive-collar": _config.parts("pd-transgear-drive-collar")["number"],
     "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")["number"],
@@ -962,8 +972,12 @@ BOM_COMPONENT_IDENTITIES.update(
         "sh-vn-brass-fillister-screw": ("sh-vn-brass-fillister-screw", "Default"),
         "sh-vn-clamp-screw": ("sh-vn-clamp-screw", "Default"),
         "sh-vn-fillister-screw-90280a108": ("sh-vn-fillister-screw-90280a108", "Default"),
+        explode.RACK_SCREW: (rack_screw.STEM, rack_screw.CONFIGURATION),
+        explode.DISC_SCREW: (disc_screw.STEM, disc_screw.CONFIGURATION),
     }
 )
+if set(BOM_COMPONENT_IDENTITIES) != set(BOM_PART_NUMBERS):
+    raise AssertionError("each shared fillister member is its own BOM row")
 # A purchased part's registry SKU, printed in its description.
 _SKU = {
     "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["supplier_skus"][0],
@@ -987,7 +1001,6 @@ _SKU = {
     "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")[
         "supplier_skus"
     ][0],
-    "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
     "pd-vn-transgear-hub-key-pin": _config.parts("pd-vn-transgear-hub-key-pin")[
         "supplier_skus"
     ][0],
@@ -1007,19 +1020,19 @@ _SKU = {
         0
     ],
 }
-# Assembly-specific wording stays here. Shared chain descriptions follow the
-# native member spec, whose model-owned BOM text can override a written cell.
+# Assembly-specific wording stays here. Shared chain and fillister
+# descriptions follow the native member spec, whose model-owned BOM text can
+# override a written cell.
 BOM_DESCRIPTIONS = {
     "pd-support-bar": "PAPER-DRIVE SUPPORT BAR",
     "sh-column-clamp-front": "COLUMN CLAMP, FRONT",
     "sh-column-clamp-back": "COLUMN CLAMP, BACK",
     "sh-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-clamp-screw']}",
     "pd-platen": "PLATEN",
-    "pd-platen-rack": (
-        f"PLATEN RACK + BACKER, {feed_pinion.DIAMETRAL_PITCH:g}DP "
-        f"PA{feed_pinion.PRESSURE_ANGLE_DEG:g}"
-    ),
-    "pd-platen-guide": "PLATEN GUIDE",
+    "pd-feed-rack": f"FEED RACK, {feed_rack.DP:g}DP PA{feed_rack.PA_DEG:g}",
+    "pd-platen-bottom-guide": "PLATEN BOTTOM GUIDE",
+    "pd-platen-guide": "PLATEN TOP GUIDE",
+    explode.RACK_SCREW: rack_screw.BOM_DESCRIPTION,
     "pd-guide-lock": "PLATEN GUIDE LOCK",
     "pd-platen-clip": "PLATEN PAPER CLIP",
     "pd-platen-paper": "PLATEN PAPER",
@@ -1081,9 +1094,7 @@ BOM_DESCRIPTIONS = {
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
         f"PA{disc.PRESSURE_ANGLE_DEG:g}"
     ),
-    "pd-vn-transgear-disc-screw": (
-        f"{disc_screw.THREAD} FILLISTER SCREW, MCMASTER {_SKU['pd-vn-transgear-disc-screw']}"
-    ),
+    explode.DISC_SCREW: disc_screw.BOM_DESCRIPTION,
     "pd-transgear-knob-shaft": (
         f"KNOB SHAFT, STOCK {knob_shaft.TEETH}T "
         f"{knob_shaft.DIAMETRAL_PITCH:g}DP PA{knob_shaft.PRESSURE_ANGLE_DEG:g}"
@@ -1139,7 +1150,7 @@ TRANSGEAR_QUANTITIES = {
     # fitted count).
     "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
-    "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
+    explode.DISC_SCREW: hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
     "pd-vn-transgear-knob-drive-pin": len(seat_geometry.PIN_HOLE_ANGLES_DEG),
@@ -1150,6 +1161,23 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-cup": 1,
     "pd-vn-transgear-knob-cup-pin": 1,
 }
+# The platen group's shared-member row: one rack screw in each feed-rack tap.
+PLATEN_QUANTITIES = {explode.RACK_SCREW: len(feed_rack.TAP_X)}
+
+
+# The builder names each instance ``<file stem>-<n>`` in placement order and
+# proves the shared fillister's names as it places them: the platen's
+# RackScrews first, then the transgear's DiscScrews after them.
+_FIRST_INSTANCE = {explode.DISC_SCREW: PLATEN_QUANTITIES[explode.RACK_SCREW] + 1}
+
+
+def row_instance_names(key: str, count: int) -> tuple[str, ...]:
+    """The native names of BOM row ``key``'s first ``count`` instances."""
+    first = _FIRST_INSTANCE.get(key, 1)
+    stem = BOM_COMPONENT_IDENTITIES[key][0]
+    return tuple(f"{stem}-{index}" for index in range(first, first + count))
+
+
 # One assembled inner or outer link spans one pitch. The chain is cut with an
 # inner link at each end, and the connecting link closes the loop as its last
 # outer link.
@@ -1180,18 +1208,18 @@ if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
 # The transgear views draw the mounted knob wheel and the stacked shims; the
 # crank wheel, the spare T18 and the spare shims in its bore are sheet 1's.
-TRANSGEAR_INSTANCES = frozenset(
-    f"{stem}-{index}"
-    for stem, count in TRANSGEAR_QUANTITIES.items()
-    for index in range(
-        1,
+TRANSGEAR_INSTANCE_ROWS = {
+    name: key
+    for key, count in TRANSGEAR_QUANTITIES.items()
+    for name in row_instance_names(
+        key,
         {
             "pd-transgear-removable": 1,
             "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
-        }.get(stem, count)
-        + 1,
+        }.get(key, count),
     )
-)
+}
+TRANSGEAR_INSTANCES = frozenset(TRANSGEAR_INSTANCE_ROWS)
 # Sheet 2's isometric cannot reach these families' ink. Farm run
 # 20261001T051043622Z found none for the feed sleeve: its extreme-point picks
 # missed, and its gear edges exceeded the fallback's edge budget. The rear
@@ -1237,8 +1265,8 @@ if ISO_SECTION_ONLY_STEMS & explode.TRANSGEAR_SHOWN_STEMS:
     raise AssertionError("a family the explode shows is ballooned there, not by the section")
 TRANSGEAR_EXPLODED_INSTANCES = frozenset(
     name
-    for name in TRANSGEAR_INSTANCES
-    if name.rsplit("-", 1)[0] in explode.TRANSGEAR_SHOWN_STEMS
+    for name, key in TRANSGEAR_INSTANCE_ROWS.items()
+    if key in explode.TRANSGEAR_SHOWN_STEMS
 )
 if explode.KNOB_WHEEL_INSTANCE not in TRANSGEAR_EXPLODED_INSTANCES:
     raise AssertionError("the explode moves the mounted knob wheel it shows")
@@ -1318,7 +1346,7 @@ def exploded_group_instances(group: ExplodedGroup) -> frozenset[str]:
     return frozenset(
         name
         for name in TRANSGEAR_EXPLODED_INSTANCES
-        if name.rsplit("-", 1)[0] in group.stems
+        if TRANSGEAR_INSTANCE_ROWS[name] in group.stems
     )
 
 
@@ -1524,49 +1552,72 @@ ASSEMBLED_BALLOON_ANCHORS = {
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 4's exploded view balloons every family it shows. The builder places
-# each lock station's top plate, then its bottom plate, so pd-guide-lock-1 is
-# the first station's top plate: exploded, it still stands behind the bar, and
-# the default (lowest-named) landing put balloon 8 on the bar's lower edge
-# (machinist review of run 20261024T082548908Z-cf4349b5). The bottom plate
-# hangs free under the bar.
+# each lock station's top plate (on the top guide), then its bottom plate
+# (on the bottom guide), so pd-guide-lock-1 is the first station's top plate:
+# exploded, it still stands behind the bar, and the default (lowest-named)
+# landing put balloon 8 on the bar's lower edge (machinist review of run
+# 20261024T082548908Z-cf4349b5). Every lock rises with the top guide, so the
+# bottom plate, pd-guide-lock-2, hangs free under the bar.
 PLATEN_GUIDE_LOCK_INSTANCE = "pd-guide-lock-2"
-# The guides: the builder places the bottom rail first, so pd-platen-guide-1
-# exploded still stands behind the platen, only its end showing past the
-# platen's edge, where the default landing put balloon 7 beside the bar's
-# front clamp screw, its leader through that head and onto balloon 4's
-# arrowhead (machinist review of the final-head run 20261101T135807943Z).
-# The top rail, -2, explodes clear above the platen; its balloon lands on
-# its top edge on the platen-mating face (part frame: x along the rail,
-# y = height, z = 0), mid-span between the A4 and A5 screw stations and
-# clear of both lock stations' plates and screws.
-PLATEN_GUIDE_INSTANCE = "pd-platen-guide-2"
+# The top guide: with MHA-PD-27 the bottom rail (#2410), MHA-PD-11 has one
+# instance, pd-platen-guide-1. Its earlier default landing, on the bottom
+# rail's end behind the platen, put balloon 7 beside the bar's front clamp
+# screw, its leader through that head and onto balloon 4's arrowhead
+# (machinist review of the final-head run 20261101T135807943Z). It explodes
+# clear above the platen; its balloon lands on its top edge on the
+# platen-mating face (part frame: x along the rail, y = height, z = 0),
+# mid-span between the A4 and A5 screw stations and clear of both lock
+# stations' plates and screws.
+PLATEN_GUIDE_INSTANCE = "pd-platen-guide-1"
 PLATEN_GUIDE_BALLOON_POINT_MM = (110.0, platen_guide.GUIDE_HEIGHT, 0.0)
 # The paper and the platen: the default landings put balloon 10 on the
 # paper's corner where it meets a clip and the platen, and balloon 5 on the
 # platen's bottom corner beside balloon 6's arrow on the rack end (machinist
 # review of run 20261111T044441656Z). Each lands mid-span on an edge of its
-# own face, clear of the clips at the ends and of the rack's ends: the
-# paper on its top edge (part frame: x along the sheet, y = height, the
-# sketch plane z = 0), the platen on its front face's bottom edge (front face
-# z = 0; the rack is soldered behind it), each off the other's span.
+# own face, clear of the clips at the ends: the paper on its top edge (part
+# frame: x along the sheet, y = height, the sketch plane z = 0), the platen
+# on its front face's bottom edge (front face z = 0), each off the other's
+# span.
 PLATEN_PAPER_BALLOON_POINT_MM = (0.6 * RECORDING_PAPER_WIDTH_MM, RECORDING_PAPER_HEIGHT_MM, 0.0)
 PLATEN_BALLOON_POINT_MM = (0.4 * platen.PLATE_WIDTH, 0.0, 0.0)
-PLATEN_BALLOON_ANCHORS = {
-    stem: BalloonAnchor(instance=PLATEN_GUIDE_LOCK_INSTANCE)
-    if stem == "pd-guide-lock"
-    else BalloonAnchor(
+# The bottom guide, the rack and the rack screws hang below the platen
+# (explode.PLATEN_STEPS), nothing in front of or above them, each ballooned
+# on drawn ink and spread along the platen's width so their leaders come in
+# from below in the order they stand, apart from the platen's (0.4 of its
+# width from its crank-side edge). The bottom guide on its top face's front
+# edge (part frame: x along the rail, y = height from the underside, front
+# face z = 0), mid-span between its 3rd and 4th rack-screw counterbores,
+# which its Ry180 pose puts 0.30 of the width from the crank-side edge. The
+# rack on its flat top's edge (part frame: x along the strip from its
+# crank-side end, flat top y = 0, z = 0 on a long face), mid-span between its
+# 3rd and 4th taps, 0.70 of the width along. Between them, the 3rd rack screw
+# (on the 3rd tap, 0.60 along) by its own body: its head and shank stand clear
+# above the guide.
+BOTTOM_GUIDE_BALLOON_POINT_MM = (
+    (bottom_guide.SCREW_HOLE_X[2] + bottom_guide.SCREW_HOLE_X[3]) / 2.0,
+    bottom_guide.GUIDE_HEIGHT,
+    0.0,
+)
+FEED_RACK_BALLOON_POINT_MM = ((feed_rack.TAP_X[2] + feed_rack.TAP_X[3]) / 2.0, 0.0, 0.0)
+PLATEN_RACK_SCREW_INSTANCE = row_instance_names(
+    explode.RACK_SCREW, PLATEN_QUANTITIES[explode.RACK_SCREW]
+)[2]
+_PLATEN_PLACED_ANCHORS = {
+    "pd-guide-lock": BalloonAnchor(instance=PLATEN_GUIDE_LOCK_INSTANCE),
+    "pd-platen-guide": BalloonAnchor(
         point_mm=PLATEN_GUIDE_BALLOON_POINT_MM, instance=PLATEN_GUIDE_INSTANCE
-    )
-    if stem == "pd-platen-guide"
-    else BalloonAnchor(point_mm=PLATEN_PAPER_BALLOON_POINT_MM)
-    if stem == "pd-platen-paper"
-    else BalloonAnchor(point_mm=PLATEN_BALLOON_POINT_MM)
-    if stem == "pd-platen"
-    else BalloonAnchor()
-    for stem in explode.SHOWN_STEMS
+    ),
+    "pd-platen-paper": BalloonAnchor(point_mm=PLATEN_PAPER_BALLOON_POINT_MM),
+    "pd-platen": BalloonAnchor(point_mm=PLATEN_BALLOON_POINT_MM),
+    "pd-platen-bottom-guide": BalloonAnchor(point_mm=BOTTOM_GUIDE_BALLOON_POINT_MM),
+    "pd-feed-rack": BalloonAnchor(point_mm=FEED_RACK_BALLOON_POINT_MM),
+    explode.RACK_SCREW: BalloonAnchor(instance=PLATEN_RACK_SCREW_INSTANCE),
 }
-if not {"pd-platen", "pd-platen-paper"} <= set(PLATEN_BALLOON_ANCHORS):
-    raise AssertionError("sheet 4 shows the platen and the paper")
+PLATEN_BALLOON_ANCHORS = {
+    stem: _PLATEN_PLACED_ANCHORS.get(stem, BalloonAnchor()) for stem in explode.SHOWN_STEMS
+}
+if not set(_PLATEN_PLACED_ANCHORS) <= set(PLATEN_BALLOON_ANCHORS):
+    raise AssertionError("sheet 4 shows every family it places a balloon on")
 
 
 def _in_item_order(
@@ -1792,15 +1843,21 @@ def reducer_dial_check(held: str, indicator: str = "THE TEST INDICATOR") -> str:
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
 CLIP_SCREWS = len(platen.SOCKET_XY)
+# The rack screws, one in each of the feed rack's taps.
+RACK_SCREWS = PLATEN_QUANTITIES[explode.RACK_SCREW]
 # Each guide's row of taps along its length: the platen-screw taps, tapped to
-# MHA-PD-11's print (owner ruling 2026-11-08 (Pedro), #2144 item 2.3: the
-# screws float in MHA-PD-02's holes, so nothing is spotted through the
-# platen), alternate with the 4 lock taps, so the lock taps are the 2nd, 4th,
-# 6th and 8th from either end (build_pd_platen_guide HOLE_X and
-# SCREW_STATION_X; the test checks the order). The steps count them in
-# plain words: the A1-A9 tags live only on MHA-PD-11 (machinist review
-# round 4, rule 22).
+# MHA-PD-11's print on the top guide (owner ruling 2026-11-08 (Pedro), #2144
+# item 2.3: the screws float in MHA-PD-02's holes, so nothing is spotted
+# through the platen), alternate with the 4 lock taps, so the lock taps are
+# the 2nd, 4th, 6th and 8th from either end (build_pd_platen_guide HOLE_X and
+# SCREW_STATION_X; the test checks the order). MHA-PD-27 keeps the same
+# stations. The steps count them in plain words: the A1-A9 tags live only on
+# MHA-PD-11 (machinist review round 4, rule 22).
 GUIDE_TAPS_IN_ROW = 9
+# The bottom guide's platen-screw taps follow the rack's crest set, so they
+# are spotted through MHA-PD-02's lower row (delegated ruling 2026-11-14
+# (Main), #2410) with the largest 64ths transfer punch that enters its holes.
+GUIDE_SPOT_PUNCH = Fraction(math.floor(platen.GUIDE_HOLE_DIA / 25.4 * 64.0), 64)
 
 
 # The engaged-feed window, measured from the rack's -X cut end. Machine X is
@@ -1949,7 +2006,6 @@ def _step_text(
     held_back = f"{knob_short} HELD BACK ON ITS SEAT"
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
-    guides = len(platen.GUIDE_HOLE_Y)
     clock = steps.inch_text(
         steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 3), 3
     )
@@ -2019,23 +2075,50 @@ def _step_text(
             "IF IT SLIPS, SLACKEN ALL FOUR SCREWS AND REPEAT "
             f"{s('bar-clamped', 1)}-{s('bar-clamped', 3)}.",
         ),
-        "rack-soldered": (
-            f"CLAMP THE {n['pd-platen-rack']} RACK TO THE {n['pd-platen']} "
-            "PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE PLATEN'S, CRESTS "
-            f"{steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE, SET WITH A HEIGHT "
-            "GAUGE.",
-            "SOFT-SOLDER THE RACK TO THE PLATEN (60/40 TIN-LEAD, ROSIN FLUX).",
+        # Owner rulings 2026-11-13 (#2410): the bare purchased strip, screwed
+        # by its flat top to MHA-PD-27's underside with stock RackScrews from
+        # the guide's top; the guide's four holes are struck from the strip's
+        # taps (delegated ruling 2026-11-14 (Main)), the strip's front face
+        # set behind the guide's front face against a rule.
+        "rack-screwed": (
+            f"MAKE {RACK_SCREWS} POINTED {feed_rack.TAP_SIZE} TRANSFER SCREWS: FILE "
+            f"THE HEAD OFF A SPARE {n[explode.RACK_SCREW]} SCREW AND FILE THAT END "
+            "TO A POINT.",
+            f"SCREW A TRANSFER SCREW INTO EACH OF THE {n['pd-feed-rack']} RACK'S "
+            f"{RACK_SCREWS} TAPS, ITS POINT JUST PROUD OF THE RACK'S FLAT TOP.",
+            f"CLAMP THE RACK, TEETH DOWN, TO THE {n['pd-platen-bottom-guide']} "
+            "BOTTOM GUIDE'S UNDERSIDE, ENDS FLUSH, ITS FRONT FACE "
+            f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S FRONT FACE, SET "
+            f"AGAINST A RULE, SQUEEZING TO STRIKE THE {RACK_SCREWS} MARKS.",
+            "UNCLAMP AND REMOVE THE TRANSFER SCREWS.",
+            "DRILL AND COUNTERBORE THE GUIDE AT EACH MARK PER "
+            f"{n['pd-platen-bottom-guide']}.",
+            f"SCREW THE RACK ON WITH THE {RACK_SCREWS} {n[explode.RACK_SCREW]} "
+            "SCREWS FROM THE GUIDE TOP, ENDS FLUSH, ITS FRONT FACE "
+            f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S, SET AGAINST A RULE.",
+            f"TIGHTEN THE {RACK_SCREWS} RACK SCREWS.",
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
-            "DOES NOT SHIFT ON THE PLATEN.",
-            "CHECK: SIGHTED ALONG THE RACK, THE TEETH ARE STRAIGHT AND NO SOLDER "
-            "LIES IN THE GAPS.",
-            "IF EITHER CHECK FAILS, UNSOLDER, CLEAN AND REPEAT "
-            f"{s('rack-soldered', 0)}-{s('rack-soldered', 3)}.",
+            "DOES NOT SHIFT ON THE GUIDE.",
+            f"IF IT SHIFTS, REPEAT {s('rack-screwed', 5)}-{s('rack-screwed', 7)} "
+            f"WITH NEW {n[explode.RACK_SCREW]} SCREWS.",
         ),
+        # The top guide's taps are tapped to MHA-PD-11's print; the bottom
+        # guide's are spotted through the platen with the rack's crests set
+        # (GUIDE_SPOT_PUNCH), then it is set again at the same crests.
         "guides-screwed": (
-            f"CLAMP THE {guides} {n['pd-platen-guide']} GUIDES TO THE PLATEN BACK, "
-            "ENDS FLUSH WITH THE PLATEN ENDS, EACH ON ITS ROW OF "
+            f"CLAMP THE {n['pd-platen-guide']} TOP GUIDE TO THE {n['pd-platen']} "
+            "PLATEN'S BACK, ENDS FLUSH WITH THE PLATEN ENDS, ON THE UPPER ROW OF "
             f"\u00d8{steps.inch_text(platen.GUIDE_HOLE_DIA, 3)} PLATEN HOLES.",
+            f"CLAMP THE {n['pd-platen-bottom-guide']} BOTTOM GUIDE, RACK ON, TO THE "
+            "PLATEN BACK, ENDS FLUSH WITH THE PLATEN ENDS, THE RACK'S CRESTS "
+            f"{steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE AT BOTH ENDS, "
+            "SET WITH A HEIGHT GAUGE.",
+            "SPOT THE BOTTOM GUIDE THROUGH THE LOWER ROW OF PLATEN HOLES WITH A "
+            f"{GUIDE_SPOT_PUNCH.numerator}/{GUIDE_SPOT_PUNCH.denominator} TRANSFER "
+            "PUNCH.",
+            "UNCLAMP THE BOTTOM GUIDE.",
+            f"DRILL AND TAP EACH SPOT PER {n['pd-platen-bottom-guide']}.",
+            f"CLAMP THE BOTTOM GUIDE AGAIN PER {s('guides-screwed', 1)}.",
             f"SCREW THE GUIDES ON WITH {GUIDE_SCREWS} "
             f"{n['sh-vn-brass-fillister-screw']} SCREWS FROM THE PLATEN FRONT, "
             "HEADS IN THE COUNTERBORES.",
@@ -2045,8 +2128,12 @@ def _step_text(
             "UNCLAMP THE GUIDES.",
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, NEITHER GUIDE MOVES ON "
             "THE PLATEN.",
-            f"IF ONE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND REPEAT "
-            f"{s('guides-screwed', 0)}-{s('guides-screwed', 5)} FOR IT.",
+            f"IF THE TOP GUIDE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND "
+            f"REPEAT {s('guides-screwed', 0)} AND {s('guides-screwed', 6)}-"
+            f"{s('guides-screwed', 11)} FOR IT.",
+            f"IF THE BOTTOM GUIDE MOVES, MAKE A NEW {n['pd-platen-bottom-guide']} "
+            f"GUIDE, MOVE THE RACK TO IT PER STEP {steps.step_number('rack-screwed')} "
+            f"AND REPEAT {s('guides-screwed', 1)}-{s('guides-screwed', 11)} FOR IT.",
         ),
         "clips-fitted": (
             f"SCREW THE {n['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
@@ -2096,11 +2183,14 @@ def _step_text(
             f"IF THE GAP IS {lock_gap} AT EVERY LOCK, GO TO STEP "
             f"{steps.step_number(after_lock_seats)}.",
             f"IF A GAP IS UNDER {lock_gap_min}, REPLACE THAT GUIDE AND REPEAT FROM "
-            f"STEP {steps.step_number('guides-screwed')}.",
+            f"STEP {steps.step_number('guides-screwed')} FOR THE "
+            f"{n['pd-platen-guide']} TOP GUIDE, FROM STEP "
+            f"{steps.step_number('rack-screwed')} FOR THE "
+            f"{n['pd-platen-bottom-guide']} BOTTOM GUIDE.",
             f"IF A GAP IS OVER {lock_gap_max}, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
-            f"FACE THE {n['pd-platen-guide']} GUIDE'S BACK FACE UNDER EACH LOCK "
-            f"THAT READ OVER {lock_gap_max} BY ITS GAP LESS {lock_gap_target}.",
+            "FACE THE GUIDE'S BACK FACE UNDER EACH LOCK THAT READ OVER "
+            f"{lock_gap_max} BY ITS GAP LESS {lock_gap_target}.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
             f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}.",
         ),
@@ -2197,7 +2287,7 @@ def _step_text(
             # it is centred again (codjiflo P3 on 593f4ee).
             "SLIDE THE HUB AND DISC AS ONE OFF A "
             f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-            f"WITH THE {n['pd-vn-transgear-disc-screw']} SCREWS SLACKENED, REPEAT "
+            f"WITH THE {n[explode.DISC_SCREW]} SCREWS SLACKENED, REPEAT "
             f"{s('disc-cluster-assembled', 3)}-{s('disc-cluster-assembled', 4)}, "
             f"{s('disc-taps-transferred', 0)}-"
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
@@ -2367,12 +2457,12 @@ def _step_text(
             f"DRILL EACH SPOT {TAP_0_80_DRILL_TEXT} THRU THE DISC.",
             f"TAP EACH HOLE {disc_screw.THREAD} THRU.",
             f"FIX THE DISC WITH {hub_geometry.SCREW_COUNT} "
-            f"{n['pd-vn-transgear-disc-screw']} SCREWS.",
+            f"{n[explode.DISC_SCREW]} SCREWS.",
             "REMOVE THE CLAMPS.",
             "REFIT THE SLEEVE, HUB AND DISC ON THE MANDREL AND TAILSTOCK AS "
             f"{s('disc-taps-transferred', 1)}.",
             f"CHECK: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
-            f"IF NOT, SLACKEN THE {n['pd-vn-transgear-disc-screw']} SCREWS AND REPEAT "
+            f"IF NOT, SLACKEN THE {n[explode.DISC_SCREW]} SCREWS AND REPEAT "
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
@@ -2381,12 +2471,12 @@ def _step_text(
             # machinist review round 6, accept PD-00-disc-hub-shear-clamp).
             "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
             "NOT TURN THE DISC ON THE HUB.",
-            f"IF IT TURNS, FIT NEW {n['pd-vn-transgear-disc-screw']} SCREWS AND "
+            f"IF IT TURNS, FIT NEW {n[explode.DISC_SCREW]} SCREWS AND "
             f"REPEAT {s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 14)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
         "disc-screws-cut": (
-            f"CUT THE {n['pd-vn-transgear-disc-screw']} TIPS "
+            f"CUT THE {n[explode.DISC_SCREW]} TIPS "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE DISC REAR FACE.",
         ),
         "oil-hole-drilled": (
@@ -2517,7 +2607,7 @@ def _step_text(
         # mesh coming loose (codjiflo P2 on 2f5bac993, P3 on da9bf7c5e).
         "hanger-meshed": (
             f"SWING THE ARM UP UNTIL THE {n['pd-transgear-feed-pinion']} TEETH ARE "
-            f"FULLY ENGAGED IN THE {n['pd-platen-rack']} RACK WITHOUT BINDING.",
+            f"FULLY ENGAGED IN THE {n['pd-feed-rack']} RACK WITHOUT BINDING.",
             "CLAMP THE ARM TO THE BAR.",
             "RUN THE PLATEN THROUGH THE ENGAGED FEED, "
             f"{engaged_feed_text(operating_domain)}, STOPPING SHORT OF BOTH ENDS.",
@@ -2531,7 +2621,7 @@ def _step_text(
             "CHECK: KNOB HELD, PUSHED FIRMLY BY HAND EACH WAY AT BOTH ENDS AND THE "
             "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             "IF IT SKIPS, INSPECT THE "
-            f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-platen-rack']} RACK "
+            f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-feed-rack']} RACK "
             "TO THEIR SHEETS.",
             "IF IT SKIPPED, REPLACE ANY PART FOUND OUTSIDE AND REPEAT FROM "
             f"{s('hanger-meshed', 0)}.",
@@ -2572,26 +2662,29 @@ def _step_text(
             # mesh is set again by feel on a new hook. A feel set always lands
             # at the run's tight-spot bind, so with every part inside its sheet
             # the remedy takes out the one term the fitter controls, the crest
-            # drift, by re-soldering the rack level; that the loop then ends is
-            # steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen comes off
-            # for the rework as in lock-seats-faced (codjiflo P3 on 6c847adb0).
+            # drift, by setting the bottom guide again with the rack level
+            # (its screws float in the platen's holes); that the loop then
+            # ends is steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen
+            # comes off for the rework as in lock-seats-faced (codjiflo P3 on
+            # 6c847adb0).
             # Machinist review r8 (59eb13ee2): a pass exit first, so a builder
             # whose checks all passed does not read on into the rework.
             "IF EVERY CHECK PASSES, GO TO STEP "
             f"{steps.step_number('fitup-pose-set')}.",
             f"IF A CHECK FAILS, INSPECT THE {n['pd-transgear-feed-pinion']} TEETH "
-            f"AND THE {n['pd-platen-rack']} RACK TO THEIR SHEETS.",
+            f"AND THE {n['pd-feed-rack']} RACK TO THEIR SHEETS.",
             "AFTER INSPECTING THEM, CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, "
-            "THE RACK AND GUIDES DO NOT MOVE ON THE PLATEN.",
+            "THE RACK DOES NOT MOVE ON ITS GUIDE NOR THE GUIDES ON THE PLATEN.",
             f"AFTER CHECKING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
             "REPLACE ANY PART FOUND OUTSIDE OR LOOSE, PER ITS STEP "
-            f"({steps.step_number('rack-soldered')} OR "
+            f"({steps.step_number('rack-screwed')} OR "
             f"{steps.step_number('guides-screwed')}).",
-            "IF NONE WAS FOUND, RE-SOLDER THE RACK PER STEP "
-            f"{steps.step_number('rack-soldered')}, ITS CRESTS READING THE SAME AT "
-            "BOTH ENDS.",
+            f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
+            "GUIDE'S SCREWS AND SET IT AGAIN, THE RACK'S CRESTS READING THE SAME AT "
+            "BOTH ENDS ON THE HEIGHT GAUGE.",
+            "WITH THE GUIDE SET AGAIN, TIGHTEN ITS SCREWS.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)}.",
@@ -2653,7 +2746,7 @@ def _step_text(
             # cut again (codjiflo P2 on 27438d7).
             f"REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')} WITH A NEW "
-            f"{n['pd-rack-pinion']} DISC AND NEW {n['pd-vn-transgear-disc-screw']} "
+            f"{n['pd-rack-pinion']} DISC AND NEW {n[explode.DISC_SCREW]} "
             f"SCREWS ON THE SAME HUB, ITS PIN LEFT IN AND RIDING THE FLAT, THEN STEPS "
             f"{steps.step_number('disc-screws-cut')}, "
             f"{steps.step_number('disc-cluster-hung')}-"
@@ -3206,7 +3299,9 @@ def _source_family_counts(model: Any) -> Counter[str]:
         )
     wrong = {
         stem: counts[stem]
-        for stem, quantity in {**TRANSGEAR_QUANTITIES, **CHAIN_QUANTITIES}.items()
+        for stem, quantity in {
+            **TRANSGEAR_QUANTITIES, **CHAIN_QUANTITIES, **PLATEN_QUANTITIES
+        }.items()
         if counts[stem] != quantity
     }
     if wrong:

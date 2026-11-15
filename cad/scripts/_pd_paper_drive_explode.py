@@ -16,18 +16,19 @@ from __future__ import annotations
 
 import math
 import sys
-from pathlib import Path
 from typing import Any, NamedTuple
 
 import _component_order
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
+from _component_references import component_identity
 from _simplified_names import simplified_name
 from pd_paper_drive_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
+    member_family,
     plan_explode,
 )
 
@@ -154,9 +155,7 @@ def create_paper_drive_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(f"{view_name}: duplicate component identities")
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}
     instances = [
-        Instance(
-            name=name, stem=Path(str(component.GetPathName() or "")).stem.casefold()
-        )
+        Instance(name=name, stem=member_family(*component_identity(component)))
         for name, component in by_name.items()
     ]
     try:
