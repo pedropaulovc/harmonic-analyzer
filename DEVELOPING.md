@@ -129,13 +129,22 @@ only the AST, rejects other value forms, and reruns verdict consumption when the
 mode changes without re-keying the review. `FIX` is stored before enforcement;
 provider/runner errors are never cached or freshness-stamped. An explicitly forced
 refresh that produces no cacheable verdict fails even in LEARN mode, without
-caching the error. Review keys hash the PDF, package exceptions, review code/import
+caching the error. Review keys hash the PDF's ink, package exceptions, review code/import
 closure, the selected kind's reviewer/severity prompts, shared reviewer/judge
 prompts/schemas, shared drawing guidelines and the effective reviewer and judge
 selections below, not the registry, enforcement declaration, or recipe-skipped
 infrastructure such as telemetry. Build leaves always pass `--force`, so bypassed
 PDF-diff implementation, identity-pairing inputs, and the precheck prompt/schema
 do not invalidate their review cache.
+
+The PDF's ink is `_pdf_ink_digest.pdf_ink_digest`: every page's size, printed
+characters and 144 dpi grayscale PDFium raster, with no tolerance. Two exports
+of an unchanged drawing differ in export time, document `/ID` and font-subset
+tags only, so a rebuild that prints the same sheet keeps its verdict, `SHIP`
+or `FIX`, and one changed pixel or character reviews it again (#2714). On an
+ink-key miss the leaf first adopts a verdict published under the earlier
+byte-digest key for the same PDF bytes (`review_adopted_byte_key` in
+`cache.jsonl`; removed under #2811), so the change itself rolls no reviewer.
 
 Both review CLIs use a **120-second** sheets MCP startup budget, capped by the
 per-attempt timeout. The runner sets Claude's `MCP_TIMEOUT` (milliseconds) and
