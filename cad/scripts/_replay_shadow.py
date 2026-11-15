@@ -57,7 +57,8 @@ last one is what differs for assemblies and drawings.
   (:func:`_prepare_dependent`; a drawing's replay redirects its own output
   paths and passes its argument). ``reuse`` serves only the labels in
   :data:`DEPENDENT_SERVE_LABELS`, auditing one key in
-  :data:`DEPENDENT_AUDIT_ONE_IN`; every other would-be reuse is audited. An
+  :data:`DEPENDENT_AUDIT_ONE_IN`; every other would-be reuse is audited (an
+  unserved drawing's for one key in :data:`DRAWING_AUDIT_ONE_IN`). An
   audited one is compared with its base after the build
   (:func:`_audit_dependent`): another assembly or drawing than the base's is
   a soundness alarm that revokes the base.
@@ -176,6 +177,11 @@ DEPENDENT_SERVE_LABELS = frozenset(
     }
 )
 DEPENDENT_AUDIT_ONE_IN = 4
+# A drawing whose label is not served attempts its would-be reuse, and so is
+# audited, for one key in this many (by the key's hash, as audited()); the
+# rest decline ``unsampled`` before any lookup and build at no replay cost
+# (:func:`_prepare_dependent`). 1: every key, until the audit evidence is in.
+DRAWING_AUDIT_ONE_IN = 1
 REUSE_NAME = "reuse.json"
 # Bound on the pre-build replay's own log kept for the recording directory.
 REUSE_LOG_CHARS = 200_000
@@ -266,7 +272,13 @@ class BuildKind(StrEnum):
 # served only for a label in DEPENDENT_SERVE_LABELS, and audited otherwise:
 # back to ``audit`` stops serving every one of them. A drawing's reuse ships
 # audited: serving one is a change of its default to ``reuse`` (and its label
-# in DEPENDENT_SERVE_LABELS).
+# in DEPENDENT_SERVE_LABELS). Its cost, for no serve: every sampled drawing
+# miss (DRAWING_AUDIT_ONE_IN, now every one) replays its base before the seat,
+# about 8 to 12 s for a part drawing whose build takes 50 to 130 s (native,
+# 2026-11-15: fr_harmonic_base 11.97 s against 130.7 s, dt_cone_pivot_post
+# 7.8 s against 48.5 s), the whole attempt bounded by DEPENDENT_LOOKUP_SECONDS
+# and REUSE_SECONDS. A larger DRAWING_AUDIT_ONE_IN samples it;
+# ``drawing=shadow`` stops it.
 DEFAULT_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
     BuildKind.ASSEMBLY: ReplayMode.REUSE,
@@ -1222,7 +1234,7 @@ class Shadow:
     # (``com_replay.py diff`` ``display``: ``base``, ``new``).
     display: dict[str, Any] | None = None
     # A drawing's PDF difference explained by the judge (_com_outcome.judge
-    # ``pdf_cause``: ``jagged_outline`` or ``None``).
+    # ``pdf_cause``: ``jagged_outline``, ``sub_resolution_ink`` or ``None``).
     pdf_cause: str | None = None
     # How many component arrays the comparison bound to the base's by name
     # (``com_replay.py diff`` ``name_bound`` ``arrays``; ``None``: none).
@@ -1688,6 +1700,9 @@ class Decline(StrEnum):
     """Why a build was not reused (the first check that failed)."""
 
     FORCED_REFRESH = "forced_refresh"
+    # A drawing key outside the one in DRAWING_AUDIT_ONE_IN that attempts:
+    # nothing looked up, nothing replayed.
+    UNSAMPLED = "unsampled"
     INPUTS_MOVED = "inputs_moved"
     NO_BASE = "no_base"
     # Recordings of the stem exist, but none is a real build's bound to the
@@ -2336,11 +2351,22 @@ def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
     after any build (``part.rewritten``) are no replay's. In mode ``reuse`` a
     would-be reuse is served only for a label in
     :data:`DEPENDENT_SERVE_LABELS` and not one key in
-    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited."""
+    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited. A drawing whose
+    label is not served attempts for one key in :data:`DRAWING_AUDIT_ONE_IN`
+    only (``unsampled`` otherwise, before any lookup)."""
     deadline = time.monotonic() + REUSE_SECONDS
     if revoke_refreshed(part):
         raise Declined(
             Decline.FORCED_REFRESH, "a forced cache refresh builds on the seat"
+        )
+    if (
+        part.kind is BuildKind.DRAWING
+        and part.label not in DEPENDENT_SERVE_LABELS
+        and not audited(part.key, DRAWING_AUDIT_ONE_IN)
+    ):
+        raise Declined(
+            Decline.UNSAMPLED,
+            f"one drawing key in {DRAWING_AUDIT_ONE_IN} is audited, not this one",
         )
     reuse.inputs = _current_inputs(part)
     described = part.describe()
@@ -3488,6 +3514,12 @@ class OutputCause(StrEnum):
     # (_com_outcome.JAGGED_OUTLINE_CAUSE, the judge's ``pdf_cause``; pinned by
     # test): SolidWorks breaks such an outline along a random wiggle each time.
     JAGGED_OUTLINE = "jagged_outline"
+    # The drawing's PDFs, for the base's request multiset, differ only by path
+    # pieces too short to print apart, the text the same
+    # (_com_outcome.SUB_RESOLUTION_INK_CAUSE, the judge's ``pdf_cause``;
+    # pinned by test). 2026-11-15: mg_magnifier_assembly and
+    # fr_frame_assembly, at most 0.092 mm, from the seat's component order.
+    SUB_RESOLUTION_INK = "sub_resolution_ink"
     # The drawing display the sheet picks hit-tested in (com_replay._display:
     # view window or px/mm), as the two recordings' answers report it.
     SEAT_DISPLAY = "seat_display"
@@ -3500,16 +3532,16 @@ def _output_judgement(
 ) -> tuple[OutputJudgement | None, OutputCause | None]:
     """The judgement of a NOOP split (``None`` for any other) and, for an
     output nondeterminism, its cause: a PDF that differs only by a jagged
-    outline first, then the display, which explains answers that differ
-    with it."""
+    outline or by sub-resolution ink first, then the display, which explains
+    answers that differ with it."""
     if shadow.verdict != Split.NOOP:
         return None, None
     if shadow.outcome == "same":
         return OutputJudgement.CONFIRMED, None
     if shadow.outcome != "different":
         return OutputJudgement.OUTCOME_UNKNOWN, None
-    if shadow.pdf_cause == OutputCause.JAGGED_OUTLINE:
-        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.JAGGED_OUTLINE
+    if shadow.pdf_cause in (OutputCause.JAGGED_OUTLINE, OutputCause.SUB_RESOLUTION_INK):
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause(shadow.pdf_cause)
     if display is not None and base_display is not None and display != base_display:
         return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.SEAT_DISPLAY
     if shadow.outcome_signals.get("answers") == "different":
@@ -3752,6 +3784,8 @@ def _judge_dependent(
         seat = "SolidWorks answered some request otherwise"
         if cause is OutputCause.JAGGED_OUTLINE:
             seat = "SolidWorks broke a jagged crop outline along another wiggle"
+        if cause is OutputCause.SUB_RESOLUTION_INK:
+            seat = "the PDFs differ only by path pieces too short to print apart"
         if cause is OutputCause.SEAT_DISPLAY:
             seat = (
                 f"the base's display {fields['base_display']}, this build's "
@@ -3914,8 +3948,8 @@ def _audit_judgement(
     """An audited would-be reuse judged as a part's replay no-op is
     (:attr:`Shadow.noop_judgement`, on this build's comparison with the base
     the attempt chose), but another output the comparison explains by the
-    seat (a jagged crop outline, the drawing display) is an
-    :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`, never an alarm, when the
+    seat (a jagged crop outline, sub-resolution ink, the drawing display) is
+    an :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`, never an alarm, when the
     seat led: the requests were the base's, or SolidWorks answered otherwise
     first (a ``response:`` cause). A comparison that judged nothing is
     ``noop_outcome_unknown``."""
@@ -3932,7 +3966,11 @@ def _audit_judgement(
         return judgement, None
     display = compared.display or {}
     _, cause = _output_judgement(judged, display.get("new"), display.get("base"))
-    if cause in (OutputCause.JAGGED_OUTLINE, OutputCause.SEAT_DISPLAY):
+    if cause in (
+        OutputCause.JAGGED_OUTLINE,
+        OutputCause.SUB_RESOLUTION_INK,
+        OutputCause.SEAT_DISPLAY,
+    ):
         return OutputJudgement.OUTPUT_NONDETERMINISM, cause
     return judgement, None
 

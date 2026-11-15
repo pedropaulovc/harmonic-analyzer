@@ -148,6 +148,19 @@ _VIEW_MOVES = frozenset(
         "IView.UseSheetScale",
     }
 )
+# A drawing's PDF difference with the base's requests that is only path
+# pieces too short to print apart, the text the same
+# (:func:`sub_resolution_ink`): the judgement's ``pdf_cause``.
+SUB_RESOLUTION_INK_CAUSE = "sub_resolution_ink"
+# The longest path piece (mm) a sub-resolution ink difference may draw on one
+# side only: 0.005 in, 1.5 px at 300 dpi and under the thinnest printed line
+# weight. 2026-11-15, three assembly sheets that issued their base's request
+# multiset: mg_magnifier_assembly (32 pieces, longest 0.080 mm, no pixel
+# differing at 300 dpi) and fr_frame_assembly (7 pieces, longest 0.092 mm, 2
+# pixels) are the seat's component order and a 1-ulp GetExtremePoint picking
+# another edge through one point; pd_paper_drive_assembly's longest, 0.537 mm,
+# is a cosmetic thread's texture drawn otherwise, visibly, and stays out.
+SUB_RESOLUTION_INK_MM = 0.127
 # The signals of :func:`outcome` per kind of build: a drawing holds no mass
 # property and writes no STL; an assembly writes no STL, and the outputs Python
 # writes beside it (its geometry proof, DOF manifest, BOM) are compared as
@@ -339,8 +352,9 @@ def judge(
     raised is told from one absent from both logs. ``title_echo``
     (:func:`title_echo`, ``None`` when not judged) is judged only for a
     :data:`TITLE_COUNTER_CAUSE`; ``pdf_cause`` (:data:`JAGGED_OUTLINE_CAUSE`
-    when :func:`jagged_outline`, else ``None``) only for a ``different``
-    ``pdf`` signal."""
+    when :func:`jagged_outline`, else :data:`SUB_RESOLUTION_INK_CAUSE` when
+    the ``requests`` signal is ``same`` and :func:`sub_resolution_ink`, else
+    ``None``) only for a ``different`` ``pdf`` signal."""
     streams, streams_error = _attempt(lambda: _streams(base, new))
     inks = _read_once(base, new, base_captures, new_captures)
     cause, cause_error = (None, streams_error)
@@ -398,6 +412,12 @@ def judge(
             found["judge_faults"].append({"step": "pdf_cause", "error": ink_error})
         if jagged:
             ink = JAGGED_OUTLINE_CAUSE
+        elif signals.get("requests") == Signal.SAME.value:
+            fine, fine_error = _attempt(lambda: sub_resolution_ink(*inks()))
+            if fine_error is not None:
+                found["judge_faults"].append({"step": "pdf_cause", "error": fine_error})
+            if fine:
+                ink = SUB_RESOLUTION_INK_CAUSE
     return {
         "truth_cause": cause,
         **found,
@@ -2136,7 +2156,8 @@ def pdf_inks(
     """Per PDF path the build had SolidWorks write, its last write's
     :func:`_pdf_ink`; ``None`` when a capture is missing or not the bytes
     the log describes. Read once per judgement: :func:`judge` hands both
-    builds' to the ``pdf`` signal and to :func:`jagged_outline`."""
+    builds' to the ``pdf`` signal, :func:`jagged_outline` and
+    :func:`sub_resolution_ink`."""
     found = _last_writes(conversation, captures, _PDF_SUFFIX)
     if found is None:
         return None
@@ -2275,6 +2296,37 @@ def jagged_outline(
                 return False
             rewiggled = True
     return rewiggled
+
+
+def sub_resolution_ink(a: dict[str, Any] | None, b: dict[str, Any] | None) -> bool:
+    """Whether two drawings' PDFs (``a``, ``b``: :func:`pdf_inks`) differ
+    only by path pieces too short to print apart: the same PDFs, each with
+    the same number of pages, page by page the same size and text runs, and
+    every path piece one of them draws and the other does not at most
+    :data:`SUB_RESOLUTION_INK_MM` long. Any doubt is False."""
+    if not a or not b or a.keys() != b.keys():
+        return False
+    differs = False
+    for rel in sorted(a):
+        x, y = a[rel], b[rel]
+        if isinstance(x, str) or isinstance(y, str) or len(x) != len(y):
+            return False
+        for page_a, page_b in zip(x, y, strict=True):
+            if page_a[0] != page_b[0]:  # size
+                return False
+            if page_a[1] != page_b[1]:  # text runs
+                return False
+            left, right = Counter(page_a[2]), Counter(page_b[2])
+            pieces = [*(left - right).elements(), *(right - left).elements()]
+            if any(_piece_mm(piece) > SUB_RESOLUTION_INK_MM for piece in pieces):
+                return False
+            differs = differs or bool(pieces)
+    return differs
+
+
+def _piece_mm(piece: tuple[Any, ...]) -> float:
+    """A path piece's length (:func:`_pdf_ink`'s, sheet metres) in mm."""
+    return math.dist(*_piece_ends(piece)) * 1000.0
 
 
 def _jagged_boxes(calls: Sequence[conv.Call]) -> list[tuple[float, ...]]:

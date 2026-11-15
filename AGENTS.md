@@ -1166,11 +1166,19 @@ engine or recipe change, so no drawing re-keys. Every Python output must be
 the base archive's bytes but the layout report, which may differ only by its
 audit's wall seconds (`summary.collect_s`/`total_s`, `layout_alike`). A served
 drawing (`dodo._reuse_drawing`) installs the base's sheet, PDF, PNG and
-layout report and stores them under the key; no drawing label is in
-`DEPENDENT_SERVE_LABELS`, so every drawing's would-be reuse is audited.
-`DEFAULT_MODES[BuildKind.DRAWING] = ReplayMode.SHADOW` stops drawing replays
-fleet-wide; locally `HARMONIC_COM_REPLAY=drawing=shadow`. See DEVELOPING.md
-"Drawing reuse".
+layout report and stores them under the key (`_store_outputs`, as a build);
+no drawing label is in `DEPENDENT_SERVE_LABELS`, so every drawing's would-be
+reuse is audited. The attempt runs before the seat and serves nothing (about
+8 to 12 s per part-drawing miss, natively); `DRAWING_AUDIT_ONE_IN` (1: every
+key) samples it by key hash, the rest declining `unsampled` before any
+lookup. An audit whose PDFs, with the base's request multiset and text, differ
+only by path pieces at most `_com_outcome.SUB_RESOLUTION_INK_MM` (0.127 mm)
+long reads `output_nondeterminism` (`sub_resolution_ink`) when the seat led,
+and revokes nothing. Assembly sheets stay audit-only: their builds do not
+repeat (the seat's component order, ray-hit order and title counters), so no
+audit can confirm their base. `DEFAULT_MODES[BuildKind.DRAWING] =
+ReplayMode.SHADOW` stops drawing replays fleet-wide; locally
+`HARMONIC_COM_REPLAY=drawing=shadow`. See DEVELOPING.md "Drawing reuse".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

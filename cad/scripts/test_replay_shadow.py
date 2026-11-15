@@ -3835,6 +3835,16 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| output_nondeterminism cause=jagged_outline",
         ),
         (
+            # Named before the answers: the ink difference cannot print.
+            dataclasses.replace(
+                _noop("different", answers="different", pdf="different"),
+                pdf_cause=_com_outcome.SUB_RESOLUTION_INK_CAUSE,
+            ),
+            (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
+            "output_nondeterminism",
+            "| output_nondeterminism cause=sub_resolution_ink",
+        ),
+        (
             _noop("different", answers="different", pdf="different"),
             (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
             "output_nondeterminism",
@@ -3853,7 +3863,14 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| title_echo",
         ),
     ],
-    ids=["seat_display", "jagged_outline", "answers", "unexplained", "title_echo"],
+    ids=[
+        "seat_display",
+        "jagged_outline",
+        "sub_resolution_ink",
+        "answers",
+        "unexplained",
+        "title_echo",
+    ],
 )
 def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
     blob, tmp_path, monkeypatch, spans, logged, found, displays, judgement, line_end
@@ -3882,10 +3899,16 @@ def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
         assert "this build's 1010x598 px/mm=2.098" in warned
     if record["output_cause"] == "jagged_outline":
         assert "(jagged_outline: SolidWorks broke a jagged crop outline" in warned
+    if record["output_cause"] == "sub_resolution_ink":
+        assert "(sub_resolution_ink: the PDFs differ only by path pieces" in warned
 
 
 def test_a_dependents_diff_judgements_reach_its_split(blob, tmp_path, monkeypatch):
     assert shadow.OutputCause.JAGGED_OUTLINE.value == _com_outcome.JAGGED_OUTLINE_CAUSE
+    assert (
+        shadow.OutputCause.SUB_RESOLUTION_INK.value
+        == _com_outcome.SUB_RESOLUTION_INK_CAUSE
+    )
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
     recording = _planned(_drawing(tmp_path / "draw.py"), "k" * 64)
     recording.log.write_bytes(b"log")
@@ -5328,6 +5351,151 @@ def test_a_drawing_replay_redirects_the_paths_drawing_types_names(
 
     assert (VALUE, seen) == (2, ["late_module"]) and finder not in sys.meta_path
     monkeypatch.delitem(sys.modules, "late_module")
+
+
+def _replay_drawing(monkeypatch: pytest.MonkeyPatch, shop: _DrawingShop) -> list[str]:
+    """_replay_assembly with the synthetic drawing base's outputs."""
+    return _replay_assembly(
+        monkeypatch,
+        shop,
+        com_outputs={f"slddrw/{_ARTIFACT}.SLDDRW": _sha(_NATIVE)},
+        py_outputs={
+            f"pdf/{_ARTIFACT}.pdf": _sha(b"pdf"),
+            f"png/{_ARTIFACT}_drawing.png": _sha(b"png"),
+            f"reports/layout-audit/{_ARTIFACT}.json": _sha(_PY),
+        },
+    )
+
+
+@pytest.mark.parametrize("one_in", [1, 3])
+def test_an_unserved_drawing_attempts_for_one_key_in_its_sample(
+    blob, tmp_path, monkeypatch, spans, logged, one_in
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    replayed = _replay_drawing(monkeypatch, shop)
+    shop.base()
+    assert shadow.DRAWING_AUDIT_ONE_IN == 1  # shipped: every key, for evidence
+    monkeypatch.setattr(shadow, "DRAWING_AUDIT_ONE_IN", one_in)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    text = shop.script.read_text("utf-8")
+    # Two keys of each kind the sample can draw (at 1, every key attempts).
+    wanted = {True: 2, False: 0 if one_in == 1 else 2}
+    decisions: dict[str, str] = {}
+    sources: dict[str, str] = {}
+
+    def drawn(sampled: bool) -> int:
+        return sum(shadow.audited(k, one_in) is sampled for k in decisions)
+
+    for n in itertools.count():
+        if all(drawn(sampled) >= count for sampled, count in wanted.items()):
+            break
+        shop.script.write_text(f"{text}# edit {n}\n", "utf-8")
+        key = shop.key()
+        sources[key] = f"{text}# edit {n}\n"
+        sampled = shadow.audited(key, one_in)
+        if drawn(sampled) >= wanted[sampled]:
+            continue
+        attempt = shop.attempt()
+        decisions[key] = attempt.value
+        if not sampled:
+            # Declined before any lookup: nothing looked up, nothing replayed.
+            assert attempt.base is None and key not in replayed
+            assert (
+                attempt.detail
+                == f"one drawing key in {one_in} is audited, not this one"
+            )
+    assert decisions == {
+        key: "audited" if shadow.audited(key, one_in) else "declined:unsampled"
+        for key in decisions
+    }
+    assert sorted(replayed) == sorted(k for k, v in decisions.items() if v == "audited")
+    if one_in == 1:
+        return
+    unsampled = next(k for k, v in decisions.items() if v == "declined:unsampled")
+    shop.script.write_text(sources[unsampled], "utf-8")
+    # Nor is an assembly's attempt: it goes on to its own checks.
+    assembly = dataclasses.replace(shop.assembly(), kind=shadow.BuildKind.ASSEMBLY)
+    with shadow.reuse_attempt(assembly) as other:
+        pass
+    assert other.value not in ("declined:unsampled", None)
+    # A served drawing label is sampled by DEPENDENT_AUDIT_ONE_IN alone.
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_DRAWING_LABEL}))
+    with shadow.reuse_attempt(shop.assembly()) as served:
+        pass
+    assert served.value == "audited" and unsampled in replayed
+
+
+# case: (the comparison's truth cause, its pdf_cause, the audit's judgement),
+# each a build SolidWorks steered off the base's request order but not its
+# request multiset.
+_DRAWING_AUDITS = {
+    # mg_magnifier_assembly, 2026-11-15: a 1-ulp GetExtremePoint first, then
+    # PDFs that differ only by path pieces too short to print apart.
+    "sub_resolution": (
+        "response:IBody2.GetExtremePoint",
+        _com_outcome.SUB_RESOLUTION_INK_CAUSE,
+        "output_nondeterminism",
+    ),
+    # The same ink after the build asked otherwise first: no seat explains it.
+    "sub_resolution_request": (
+        "request",
+        _com_outcome.SUB_RESOLUTION_INK_CAUSE,
+        "soundness_alarm",
+    ),
+    # pd_paper_drive_assembly: a piece long enough to print (0.537 mm).
+    "visible": ("response:IBody2.GetExtremePoint", None, "soundness_alarm"),
+}
+
+
+@pytest.mark.parametrize("case", _DRAWING_AUDITS)
+def test_an_audited_drawing_whose_ink_differs_below_resolution_revokes_nothing(
+    blob, tmp_path, monkeypatch, spans, logged, case
+):
+    cause, ink, expected = _DRAWING_AUDITS[case]
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    _replay_drawing(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    found = {
+        "request_divergence": _REQUEST,
+        "truth_cause": cause,
+        "outcome": "different",
+        "outcome_signals": {
+            "requests": "same",
+            "answers": "different",
+            "pdf": "different",
+        },
+        "pdf_cause": ink,
+        "display": {"base": _SAME_DISPLAY, "new": _SAME_DISPLAY},
+    }
+    monkeypatch.setattr(shadow, "_diff", lambda *_a: (0, found))
+    recording = shadow.plan_dependent(
+        shadow.BuildKind.DRAWING, shop.dependent, shop.key(), reuse=reuse
+    )
+    assert recording is not None
+    recording.log.write_bytes(b"log of the build")
+    recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    _stored(recording.key)
+    shadow.after_build(recording, shop.deps, shop.digest)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    alarmed = expected == "soundness_alarm"
+    assert (record["audit"], record["audit_cause"]) == (
+        expected,
+        None if alarmed else ink,
+    )
+    assert shadow.revoked(_ENGINE, _DRAWING_NAME, base) is alarmed
+    assert len([m for m in logged["error"] if "SOUNDNESS ALARM" in m]) == alarmed
+    warned = [
+        m
+        for m in logged["warn"]
+        if m.startswith("[com-replay] audit output_nondeterminism")
+    ]
+    assert len(warned) == (not alarmed)
+    if not alarmed:
+        assert f" against this build ({ink}): " in warned[0]
 
 
 def test_a_reused_drawing_leaf_runs_no_com_and_an_audited_one_builds(

@@ -3063,6 +3063,54 @@ def test_a_drawings_jagged_outline_drawn_again_is_its_own_cause(tmp_path, monkey
     assert _com_outcome.judge(*_pair(base, drawn(again, view)))["pdf_cause"] is None
 
 
+def test_a_drawings_sub_resolution_ink_is_its_own_cause(tmp_path):
+    # mg_magnifier_assembly, 2026-11-15: the base's requests and text, and a
+    # few pieces under 0.1 mm drawn otherwise. A point is 0.353 mm: 0.35 pt is
+    # 0.123 mm, under SUB_RESOLUTION_INK_MM; 0.37 pt, 0.131 mm, is past it.
+    assert _com_outcome.SUB_RESOLUTION_INK_MM == 0.127
+    sheet = "pdf/mg-magnifier-assembly.PDF"
+    built = itertools.count()
+
+    def drawn(end: float, text: str = "DRAWING", calls: Any = ()) -> tuple[Any, Path]:
+        pdf = _sheet_pdf(f"20 20 m 280 20 l S 200 50 m {end:g} 50 l S", text=text)
+        found, root = _captured_pdfs(tmp_path / str(next(built)), (sheet, pdf))
+        found.calls = list(calls)
+        return found, root
+
+    def judged(a: tuple[Any, Path], b: tuple[Any, Path]) -> dict[str, Any]:
+        return _com_outcome.judge(*_pair(a, b), kind="drawing")
+
+    base = drawn(200.2)
+    found = judged(base, drawn(200.35))
+    assert found["outcome_signals"]["pdf"] == "different"
+    assert found["outcome_signals"]["requests"] == "same"
+    assert found["pdf_cause"] == _com_outcome.SUB_RESOLUTION_INK_CAUSE
+    assert found["judge_faults"] == []
+    # A longer piece, any text, or other requests keep the difference whole.
+    assert judged(base, drawn(200.37))["pdf_cause"] is None
+    assert judged(base, drawn(200.35, text="DRAWN"))["pdf_cause"] is None
+    asked = [_sw("IModelDoc2.EditRebuild3")], [_sw("IModelDoc2.ForceRebuild3", False)]
+    other = judged(drawn(200.2, calls=asked[0]), drawn(200.35, calls=asked[1]))
+    assert other["outcome_signals"]["requests"] == "different"
+    assert other["pdf_cause"] is None
+    # The same PDFs with the same pages and page sizes, and a difference.
+    [[size, text, pieces]] = _com_outcome.pdf_inks(*base)[sheet]
+    [[_, _, moved]] = _com_outcome.pdf_inks(*drawn(200.35))[sheet]
+    fine = _com_outcome.sub_resolution_ink
+    assert fine({sheet: [(size, text, pieces)]}, {sheet: [(size, text, moved)]})
+    assert not fine({sheet: [(size, text, pieces)]}, {sheet: [(size, text, pieces)]})
+    wider = (size[0] + 0.001, size[1])
+    assert not fine({sheet: [(size, text, pieces)]}, {sheet: [(wider, text, moved)]})
+    # A page more, after a page that alone would pass.
+    pages = [(size, text, moved), (size, text, moved)]
+    assert not fine({sheet: [(size, text, pieces)]}, {sheet: pages})
+    assert not fine(
+        {sheet: [(size, text, pieces)]}, {"pdf/other.PDF": [(size, text, moved)]}
+    )
+    assert not fine({sheet: "bytes:0"}, {sheet: "bytes:1"})
+    assert not fine(None, {sheet: [(size, text, moved)]})
+
+
 def _pair(a: tuple[Any, Path], b: tuple[Any, Path]) -> tuple[Any, ...]:
     """:func:`_com_outcome.judge`'s positional arguments for two drawn
     sheets, with no request divergence."""

@@ -2525,15 +2525,7 @@ def _cached_com_action(
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
-    with _telemetry.span(
-        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
-    ) as store:
-        _tag_cache_key(store, key)
-        outcome = _cache.store(key, outputs, label)
-        store.set_attribute("cache", outcome)
-        _cache.require_refresh_store(label, outcome)
-    if outcome == "lost":
-        _adopt_canonical(key, outputs, label)
+    _store_outputs(label, key, outputs)
     _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
     if recording is None:
         _replay_shadow.audit_unjudged(reuse, "the build made no recording")
@@ -2545,7 +2537,7 @@ def _reuse_drawing(
     """:func:`_reuse_assembly` for a drawing: install the base's verified archive
     (the sheet, PDF, PNG and layout report) as a HIT restores one, publish the
     ``reused/`` marker naming the base, then store under ``key`` as a build does
-    (a lost store adopts the winner's). A drawing has no ``.execution`` token and
+    (:func:`_store_outputs`). A drawing has no ``.execution`` token and
     a reuse publishes no recording. False: a step before the store failed (WARN;
     declined ``fault``), and the caller builds on the seat."""
     with _telemetry.span(
@@ -2561,16 +2553,24 @@ def _reuse_drawing(
             sp.set_attribute("cache", "reuse_failed")
             reuse.fall_through(reuse.phase, exc)
             return False
+    reuse.finish(_store_outputs(label, key, outputs))
+    return True
+
+
+def _store_outputs(label: str, key: str, outputs: list[Path]) -> str:
+    """Publish a COM leaf's outputs under ``key`` (span ``cache.store``), built or
+    reused: a forced refresh must store (``_cache.require_refresh_store``), and a
+    lost store adopts the winner's canonical outputs. Returns the outcome."""
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, key)
         outcome = _cache.store(key, outputs, label)
         store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
     if outcome == "lost":
         _adopt_canonical(key, outputs, label)
-    reuse.finish(outcome)
-    return True
+    return outcome
 
 
 @_farm.leaf_action

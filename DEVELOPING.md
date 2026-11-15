@@ -2423,9 +2423,9 @@ component after the failure. `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the
 same requests, and requires an unnamed component to fail closed.
 
-Gates are not recorded; FULL assembly builds and drawings are, and an
-assembly's or drawing's would-be reuse is audited ("Assemblies and drawings"
-below). Nothing under
+Gates are not recorded; FULL assembly builds and drawings are. An assembly's
+would-be reuse is served for four labels and audited for the rest; a
+drawing's is audited ("Assemblies and drawings" below). Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
 input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 `_com_outcome.py`, `com_replay.py`) are in no recipe closure
@@ -3067,7 +3067,7 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read`; an assembly or drawing also `replay.candidates` and `replay.same_children` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
-| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.name_bound` (arrays bound by name, when any), `replay.output_nondeterminism`, `replay.output_cause` (`jagged_outline`/`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
+| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.name_bound` (arrays bound by name, when any), `replay.output_nondeterminism`, `replay.output_cause` (`jagged_outline`/`sub_resolution_ink`/`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
 | `replay.evidence <label>` | an assembly's or drawing's evidence copy ("Evidence copies"): `replay.evidence` (`stored`/`exists`/`skip`/`off`/`error`) |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
@@ -3299,7 +3299,7 @@ is never an alarm there (a would-be reuse's audit, below, can be); its
 | `noop_judgement` | meaning |
 | --- | --- |
 | `confirmed` | the base's assembly or drawing |
-| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
+| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `sub_resolution_ink` when only by path pieces too short to print (below), else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
 | `unexplained_output_divergence` | another output, though SolidWorks answered alike: nothing recorded explains it; WARN |
 | `noop_outcome_unknown` | a signal absent, or no comparison |
 
@@ -3420,6 +3420,32 @@ drawing's other sheets are bounded by it too. What remains possible is a real
 edit that re-routes a line of the same stroke, inside such a view, between the
 same two unchanged points.
 
+A drawing whose `pdf` signal differs, whose `requests` signal is `same` (the
+base's request multiset) and whose ink is no jagged outline gets
+`pdf_cause=sub_resolution_ink` (`_com_outcome.sub_resolution_ink`) only when
+every condition holds:
+
+- the same PDFs, each with the same number of pages and the same page sizes;
+- the same text runs on every page;
+- every path piece one side draws and the other does not is at most
+  `_com_outcome.SUB_RESOLUTION_INK_MM` long: 0.127 mm (0.005 in), 1.5 pixels
+  at 300 dpi and under the thinnest printed line weight.
+
+On 2026-11-15 the native audits of two assembly sheets raised SOUNDNESS
+ALARMs that were the seat's, not the replay's. `mg_magnifier_assembly`
+issued the base's 32,014 requests in another order: the seat enumerated the
+components otherwise, a `GetExtremePoint` one ulp off reordered the ray hits,
+and the balloon pick took another edge through the same anchor point. Its
+PDFs differ by 32 pieces, longest 0.080 mm, with no pixel differing at
+300 dpi. `fr_frame_assembly` (26,770 requests, a title counter first) differs
+by 7, longest 0.092 mm, 2 pixels. The text was the same on every page.
+`pd_paper_drive_assembly`, also with the base's request multiset, drew a
+cosmetic thread's texture otherwise, longest piece 0.537 mm and visible: it
+keeps its whole difference. Those three were the only ones of the 23
+same-children comparisons of assembly sheets in the 10 days before to issue
+the base's request multiset. What remains possible is a real edit that
+issues the same requests and moves no text and no ink by more than 0.127 mm.
+
 The recorder numbers handles in allocation order, so the elements of an array
 answer such as `IAssemblyDoc.GetComponents` are numbered in the seat's
 enumeration order. A script that reads every component's name and then visits
@@ -3536,6 +3562,7 @@ dependencies
             title_echo=countif(echo),
             seat_display=countif(nondeterminism == "seat_display"),
             jagged_outline=countif(nondeterminism == "jagged_outline"),
+            sub_resolution_ink=countif(nondeterminism == "sub_resolution_ink"),
             answers=countif(nondeterminism == "answers"),
             unexplained_output=countif(unexplained)
             by kind, label
@@ -3578,7 +3605,13 @@ so a replay copies no large part of `cad/out` inside the reuse deadline
 the child check below reads instead of hashing `cad/out` again; a stub or
 copy the script leaves unchanged is no Python output, and a Python read of a
 stub (`stub_reads`), whose bytes the replay never judged, declines
-`unjudged_input`. Without staging, both proof leaves declined `replay_error`
+`unjudged_input`. The split follows the base's recorded `reads`, which the
+recorder observes only inside the build window (`build(adapter)`), while the
+replay observes the whole script, import time and `run_build` before the
+window included: a model the script's Python reads only outside the window
+is staged as a stub, and its attempt declines (`unjudged_input` on the stub
+read, or `replay_error` on the empty bytes), never serves; before #2799 it
+was copied and could. Without staging, both proof leaves declined `replay_error`
 after 15 requests (2026-11-14). A replay that raised names the exception, its message
 and its innermost frame in its detail and INFO line
 (`<type>: <message> (at <file>:<line> in <function>)`,
@@ -3635,10 +3668,10 @@ judged as a part's replay no-op is (`noop_judgement`):
   (`[com-replay] SOUNDNESS ALARM assembly:<stem>: ...`), the base is revoked,
   and the INFO line carries `SOUNDNESS ALARM`.
 - `output_nondeterminism`: another output that the comparison explains by the
-  seat (a jagged crop outline, the drawing display), when the seat led: the
-  requests were the base's, or SolidWorks answered otherwise first (a
-  `response:` cause). Another output after a `request` divergence stays a
-  `soundness_alarm`. WARN, no revocation.
+  seat (a jagged crop outline, sub-resolution ink, the drawing display), when
+  the seat led: the requests were the base's, or SolidWorks answered
+  otherwise first (a `response:` cause). Another output after a `request`
+  divergence stays a `soundness_alarm`. WARN, no revocation.
 - `seat_nondeterminism` or `seat_path_divergence`: the base's assembly,
   reached through other answers or detours of the seat; recorded, no log.
 - `noop_unexplained_divergence` or `noop_outcome_unknown`: WARN.
@@ -3676,7 +3709,9 @@ change to the engine or to any recipe, so no drawing re-keys:
   (`_redirect_drawing`). The output root itself also encodes as `<OUT>`, so a
   model a script names there is the request its recording made. Any write
   that still escapes is refused by the replay's guard (`sandbox`).
-- **Its model.** The model drawn is staged as an assembly's children are.
+- **Its model.** The model drawn is staged as an assembly's children are, with
+  the same limit: a model the drawing's Python reads only outside the
+  recorded window is a stub, and the attempt declines.
 
 Every Python output must be the base archive's byte for byte, but the layout
 report, which Python writes with the audit's own wall seconds
@@ -3698,6 +3733,33 @@ stub; the other three's, which their Python also reads, copied; no stub
 read. No drawing label is served:
 `DEPENDENT_SERVE_LABELS` names assemblies only, so every drawing's would-be
 reuse is audited, in `reuse` too.
+
+**Cost.** An audited attempt serves nothing, and runs before the seat: on a
+farm worker the seat waits for it. Natively (2026-11-15) its replay took
+11.97 s for `fr_harmonic_base`, whose build took 130.7 s, and 7.8 s for
+`dt_cone_pivot_post` (48.5 s): about 8 to 12 s per part-drawing miss, the
+whole attempt bounded by `DEPENDENT_LOOKUP_SECONDS` (10 s) and
+`REUSE_SECONDS` (120 s). Both audits read `confirmed`. Every key is audited
+while the evidence is gathered: `_replay_shadow.DRAWING_AUDIT_ONE_IN` (1)
+samples one key in that many, by the key's hash, of a drawing whose label is
+not served; the rest decline `unsampled` before any lookup and pay nothing.
+Sampling is a change of that one number; `drawing=shadow` stops the attempts.
+
+**Assembly sheets are audit-only.** A sheet that draws an assembly
+(`mg_magnifier_assembly`, `fr_frame_assembly`) is audited and is never to be
+served, because its builds do not repeat. Each build asks for the components
+in the order the seat enumerates them, picks ray hits in the order they come
+back, and echoes the session's title counters. In the 10 days to 2026-11-15,
+all 23 same-children comparisons of assembly sheets diverged in their
+requests. The three that issued the base's request multiset still drew other
+PDFs: two by sub-resolution ink (above), and `pd_paper_drive_assembly` by a
+visible cosmetic-thread texture. Their audit can name such a difference the
+seat's (`output_nondeterminism`), but it cannot confirm the base, so a reuse
+would serve a sheet that this seat may draw otherwise. The native audits of
+`mg_magnifier_assembly` and `fr_frame_assembly` that raised SOUNDNESS ALARMs
+on 2026-11-15 now read `output_nondeterminism` with
+`audit_cause=sub_resolution_ink` and revoke nothing. Part sheets, whose
+native audits read `confirmed`, are the candidates for serving.
 
 Would-be reuses and their audits per stem (assemblies and drawings):
 
