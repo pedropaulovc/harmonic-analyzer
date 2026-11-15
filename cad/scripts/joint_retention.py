@@ -789,7 +789,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
         "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which runs into the hanger nut and jam nut in pen.SLDASM) + the reamed .1865 axle-pin press bore
-        "pn_pen_hanger",  # #8 close-clearance strap hole for the hanger screw; slots and brazed plates, no thread
+        "pn_pen_hanger",  # #8 close-clearance strap hole for the hanger screw; slots and bonded plates, no thread
     }
 )
 

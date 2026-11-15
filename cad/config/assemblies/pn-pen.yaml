@@ -71,3 +71,8 @@ machinist_exceptions:
     where: "DETAIL D and the steps and AS SHIPPED note that set the MHA-PN-VN-51 knurled thumb screw FINGER-TIGHT in the stirrup's bottom-rail tap, its tip clamping the marker grip into the V, with no lock and no thread locker"
     finding: "the #4-40 knurled thumb screw riding the reciprocating carriage is a threaded joint under reversing nib drag with no lock (rule 23)"
     reason: "Owner ruling 2026-11-01: MHA-PN-VN-51 knurled thumb screw is an operator adjustment, slackened at every marker change; no lock (as U-MHA-PN-VN-52). Recorded as U-MHA-PN-VN-51-no-lock (joint_retention.py pn-pen/thumb-screw-in-stirrup)"
+  - id: "RV-03"
+    kind: "accept"
+    where: "the MHA-PN-02 pen hanger strap hung from the one MHA-PN-VN-50 #8-32 screw through the MHA-MG-08 wheel bar, its squareness to the bar top held by the nut and jam nut clamp only, with no dowel, tongue, step or second screw (steps 7 to 7F, DETAIL B)"
+    finding: "a one-screw part whose turning about its screw would change a setting (the pen rod square to the bar top) has no locating feature (rule 23, static clamp)"
+    reason: "Owner ruling 2026-11-14 (Pedro), #1185 option A: accept the strap on its single screw as drawn, as on the original; the book's photographs (ch21, ch30) show the original black strap hanging from one slotted screw near its top. This accepts no other joint, lock or package departure. (owner-accepted)"

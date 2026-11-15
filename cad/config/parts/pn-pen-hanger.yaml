@@ -9,7 +9,7 @@ pn-pen-hanger:
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel); guide plates silver-brazed to the strap"
+  process: "machined (steel); guide plates bonded to the strap (LOCTITE 638)"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
@@ -17,3 +17,8 @@ pn-pen-hanger:
       where: "the hanger-screw #8 close-clearance hole's native Hole Wizard callout only: its hw-diam variable's decimal places, written as 3 at drawing time from draw_pn_pen_hanger.SCREW_HOLE_CALLOUT_PRECISION through _drawing_hole_callout.set_hole_callout_precision (ICalloutLengthVariable.Precision)"
       finding: "a drawing script writes hole callout precision at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2: drawing-side ICalloutLengthVariable precision is the established merged pattern. Native experiment run 20261102T230110877Z: part-authored Hole Wizard precision did not reach the callout (read -1, the document default). Owner review #2144. This accepts no other precision, band, callout or package departure."
+    - id: "RV-02"
+      kind: "accept"
+      where: "note 1 only: the two guide plates' faced ends bonded with LOCTITE 638 across the strap front (a flat metal-to-metal joint clamped square), slotted after the bond and blackened last"
+      finding: "a sheet-to-metal joint held by an anaerobic retaining compound on a flat face, not one of rule 23's counted means (braze, soft solder on a shear lap, retaining compound for a tube in a sleeve)"
+      reason: "Owner ruling 2026-11-14 (Pedro), #2435: the joint filler is 'loctite': no torch, no solder, no braze. LOCTITE 638 is the shop's owned grade; the joint is metal to metal far inside its 0.25 mm gap, it is rated to 180 C so the part takes the hot black-oxide bath after slotting (TDS May 2024), and the load is a marker's drag. This accepts no other joint, band, callout or package departure. (owner-accepted)"

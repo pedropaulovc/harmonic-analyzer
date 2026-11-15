@@ -8,7 +8,7 @@ live in ``_drawing_dimension_import``; places and bands are authored on the
 part.
 
 The pen hanger is a black tapered steel strap (1/8 flat, .63 -> .48 wide,
-6.69 tall; decimal-inch sheet) with two open U guide plates brazed across its
+6.69 tall; decimal-inch sheet) with two open U guide plates bonded across its
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
@@ -18,7 +18,7 @@ centreline both slots share; section A-A (2:1) cuts the strap just above the
 upper plate and looks down onto its U, carrying the slot (its depth and the
 plate's reach both from the plate's free end), its corner radius, the strap's
 bar-stock thickness (a reference) and the plate's overhang past the strap's
-edge (its braze station across the strap); the shaded isometric (1:1) fills
+edge (its bond station across the strap); the shaded isometric (1:1) fills
 the right of the sheet.
 
 Run with SolidWorks open::
@@ -291,7 +291,7 @@ _VALUE_ABOVE_LINE = 0.0027
 # above its line (the 20261013T234201871Z block centre stood 10.5 mm above
 # with two callout rows under the value).
 _BANDED_VALUE_ABOVE_LINE = 0.005
-# The overhang (rule 10: the upper plate's braze station across the strap),
+# The overhang (rule 10: the upper plate's bond station across the strap),
 # from the strap's cut corner to the plate's +x back corner: its row 6 mm
 # above the strap back face; its value left of the plate edge's extension
 # line (the 3 mm span holds no text), as the arm width's sits.  The plate
