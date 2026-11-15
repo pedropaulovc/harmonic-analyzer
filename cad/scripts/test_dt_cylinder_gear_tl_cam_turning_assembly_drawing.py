@@ -152,44 +152,54 @@ def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
     assert "LOCTITE" not in sheet.ASSEMBLY_STEPS
     assert "CURE" not in sheet.ASSEMBLY_STEPS
     assert fixture.STUB_STAND_TEXT in _step(1)
-    # The register set-up, then its check.
-    indicate = _step(sheet.INDICATE_STEP)
+    # The register set-up, then the throw set on item 2, its check and remedy.
+    indicate = _step(sheet.THROW_STEP - 1)
     assert f"Ø{fixture.BODY_DIA_TEXT} OD" in indicate
     assert f"{fixture.REGISTER_TIR_TEXT} TIR" in indicate
     assert "DIAL TEST INDICATOR" in indicate
-    assert sheet.RUNOUT_STEP == sheet.INDICATE_STEP + 1
-    assert _step(sheet.RUNOUT_STEP).startswith("CHECK: ")
-    assert fixture.STUB_RUNOUT_TEXT in _step(sheet.RUNOUT_STEP)
-    # Each gear: slide on, check; turn onto the pin, clamp, check.
-    gear_steps = sheet.STEPS[sheet.FIRST_GEAR_STEP - 1 : sheet.FIRST_CAM_STEP - 1]
+    setting = _step(sheet.THROW_STEP)
+    assert "PAIR OF JAWS IN LINE WITH ITEM 2" in setting
+    assert "1 IN DIAL INDICATOR ON ITEM 2" in setting
+    assert f"{fixture.THROW_TIR_TEXT} TIR" in setting
+    assert sheet.THROW_CHECK_STEP == sheet.THROW_STEP + 1
+    check = _step(sheet.THROW_CHECK_STEP)
+    assert check.startswith("CHECK: ") and fixture.THROW_TIR_TEXT in check
+    # The remedy's exit is the same adjustment, no rework of item 1.
+    assert _step(sheet.THROW_CHECK_STEP + 1) == (
+        f"IF STEP {sheet.THROW_CHECK_STEP} FAILS, REPEAT STEPS {sheet.THROW_STEP} "
+        f"AND {sheet.THROW_CHECK_STEP}."
+    )
+    assert "REWORK" not in sheet.ASSEMBLY_STEPS
+    assert "FIRST CAM" not in sheet.ASSEMBLY_STEPS
+    # Each gear: slide on, check; turn onto the pin, clamp, check, last.
+    gear_steps = sheet.STEPS[sheet.FIRST_GEAR_STEP - 1 :]
+    assert sheet.FIRST_GEAR_STEP == sheet.THROW_CHECK_STEP + 2
     assert gear_steps[0].startswith("SLIDE THE GEAR")
     assert gear_steps[1].startswith("CHECK: ")
     turning = [i for i, step in enumerate(gear_steps) if "CLOCKWISE" in step]
     tighten = [i for i, step in enumerate(gear_steps) if "TIGHTEN" in step]
     assert fixture.CUT_TURNS_GEAR_CLOCKWISE
     assert turning == [2] and "TOP VIEW" in gear_steps[2] and tighten == [3]
+    assert "SNUG BY HAND" in gear_steps[3] and "BY ITS SHORT ARM" in gear_steps[3]
+    assert "TORQUE" not in sheet.ASSEMBLY_STEPS and "FIRMLY" not in sheet.ASSEMBLY_STEPS
     assert gear_steps[-1] == "CHECK: THE GEAR DOES NOT TURN BY HAND."
-    # The first cam's check, then one action per remedy step, last of all.
-    first_cam = sheet.STEPS[sheet.FIRST_CAM_STEP - 1 :]
-    assert first_cam[0] == f"CHECK: ONCE TURNED, {fixture.FIRST_CAM_CHECK_TEXT}"
-    assert first_cam[1].startswith(f"IF STEP {sheet.FIRST_CAM_STEP} FAILS, RE-INDICATE")
-    assert f"(STEP {sheet.INDICATE_STEP})" in first_cam[1]
-    assert first_cam[2] == (
-        f"IF STEP {sheet.FIRST_CAM_STEP} STILL FAILS, REWORK ITEM 1 TO "
-        f"{fixture.PART_NUMBER}."
+    assert len(sheet.STEPS) == 16
+
+
+def test_the_throw_window_keeps_every_gear_inside_its_print() -> None:
+    # Twice the printed .3402, snapped inward to the 1 in indicator's .001
+    # divisions: .679 TO .681, so the throw is set, not cut to a number.
+    assert fixture.THROW_TIR_TEXT == ".679 TO .681"
+    low, high = (float(value) for value in fixture.THROW_TIR_TEXT.split(" TO "))
+    assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
+    # Setting window, half the TIR's reading and the bore float, worst case.
+    assert fixture.THROW_ERROR_MAX_MM == pytest.approx(
+        fixture.THROW_SET_MAX_MM + fixture.BORE_FLOAT
     )
-    assert first_cam[3].startswith("CUT THE OTHER 19 GEARS ONLY AFTER STEP")
-    assert len(first_cam) == 4
-
-
-def test_the_register_tir_is_the_budgets_and_a_4_jaw_setting() -> None:
-    # .001: no tighter than the shop's runout row (run 20261114T231845023Z's
-    # review); the throw and phase budgets and the runout window carry it.
+    assert fixture.THROW_ERROR_MAX_MM <= fixture.THROW_TOLERANCE
+    assert fixture.THROW_ERROR_MAX_MM / 25.4 == pytest.approx(0.0019, abs=1e-6)
     assert fixture.REGISTER_TIR_TEXT == ".001"
     assert fixture.REGISTER_OFFSET == fixture.REGISTER_TIR / 2.0
-    low, high = (float(value) for value in fixture.STUB_RUNOUT_TEXT.split(" TO "))
-    band = 2.0 * (fixture.POSITION_BAND + fixture.REGISTER_OFFSET) / 25.4
-    assert high - low == pytest.approx(2.0 * band, abs=1e-4)
 
 
 def test_only_the_two_presses_and_the_screw_thread_may_overlap() -> None:
@@ -230,22 +240,20 @@ def test_every_step_is_at_most_three_printed_lines() -> None:
     assert len(steps) == len(sheet.STEPS) and all(len(step) <= 3 for step in steps)
 
 
-def test_the_sheet_states_the_engagement_value_and_the_runout_window() -> None:
+def test_the_sheet_states_the_engagement_value_only() -> None:
     # The value only: the reviewer objected to pointing at rule 18's floor.
     assert fixture.SCREW_ENGAGEMENT_TEXT in sheet.ASSEMBLY_STEPS
     assert "1.5D" not in sheet.ASSEMBLY_STEPS
-    low, high = (float(value) for value in fixture.STUB_RUNOUT_TEXT.split(" TO "))
-    assert low < 2.0 * fixture.STUB_OFFSET / 25.4 < high
     # The exception names the step that prints the engagement.
     engage = next(
         number
         for number, step in enumerate(sheet.STEPS, start=1)
         if fixture.SCREW_ENGAGEMENT_TEXT in step
     )
-    assert engage == 13
+    assert engage == 15
 
 
-def test_the_short_screw_engagement_is_a_delegated_rule_18_exception() -> None:
+def test_the_short_screw_engagement_is_a_delegated_minor_rule_18_exception() -> None:
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
@@ -255,22 +263,28 @@ def test_the_short_screw_engagement_is_a_delegated_rule_18_exception() -> None:
         for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
     }
     entry = entries["RV-01"]
-    assert entry.kind == "accept"
+    assert entry.kind == "minor"
     assert "rule 18" in entry.finding
+    assert "step 15" in entry.where
     assert fixture.SCREW_ENGAGEMENT_TEXT in entry.where
+    assert ".12-.21" in entry.finding and "0.63D-1.10D" in entry.finding
     assert entry.reason.startswith(
-        "Delegated ruling 2026-11-14 (Main), pending owner confirmation: the screw "
-        "only holds a brass gear against a light finishing cut"
+        "Delegated ruling 2026-11-14 (Main), pending owner confirmation"
     )
-    assert (
-        "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923"
-        in entry.reason
-    )
+    assert "DT-07" in entry.reason and "1.39D" in entry.reason
+    assert "owner ruling 2026-11-09" in entry.reason
+    assert "only holds a brass gear against a light finishing cut" in entry.reason
+    for link in (
+        "https://github.com/pedropaulovc/harmonic-analyzer/issues/2144",
+        "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6888052094",
+    ):
+        assert link in entry.reason
+    assert "6843970923" not in entry.reason
 
 
 def test_the_top_view_carries_no_part_dimensions() -> None:
     # The throw and pin station are item 1's geometry, printed on its sheet;
-    # check 1 accepts the throw by indicator (run 20261113T204849556Z).
+    # the throw is set on item 2 by indicator (run 20261113T204849556Z).
     for name in ("REFERENCE_DIMENSIONS", "REFERENCE_PLACES", "_reference_dimensions"):
         assert not hasattr(sheet, name), name
 

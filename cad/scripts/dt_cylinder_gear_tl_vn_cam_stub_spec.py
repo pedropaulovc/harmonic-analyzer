@@ -3,7 +3,7 @@ r"""MHA-DT-12-TL-VN-50 cam fixture stub: McMaster 97175A344 pull-out dowel.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure. Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the MHA-DT-12-TL-00 kit can place it: pressed through the MHA-DT-12-TL-01
-body's .3745 ream at the cam throw, tapped end out. Each cylinder gear's
+body's .3740 ream at the cam throw, tapped end out. Each cylinder gear's
 Ø.3760 bore slides on its standing end, and the -VN-52 clamp screw threads
 into its 10-32 tap. The press, the stand-out and the engagement are the
 fixture's (``dt_cylinder_gear_tl_cam_fixture_spec``).

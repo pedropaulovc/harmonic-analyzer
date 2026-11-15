@@ -9,8 +9,10 @@ turned last, on this fixture, so throw and cam-to-notch phase are set once in
 the fixture and repeat over 20 gears without indicating each one.
 
 The fixture is one made part, a round steel body gripped in the lathe's
-4-jaw and indicated true once on its turned register (the OD), then left in
-the chuck for all 20 gears. Its front face carries, all bought
+4-jaw, its turned register (the OD) indicated true, then the throw SET by the
+two jaws in line with the stub until an indicator on the stub reads twice the
+gear's throw (``THROW_TIR_LOW`` to ``THROW_TIR_HIGH``), and left in the chuck
+for all 20 gears. Its front face carries, all bought
 (``dt_cylinder_gear_tl_vn_cam_*``, the MHA-DT-12-TL-00 kit):
 
 * the stub, a 3/8 pull-out dowel pressed in a reamed hole set off the
@@ -45,36 +47,30 @@ stands on -Y so the cam lobe points +Y, as on the gear; the clock pin stands
 gear's own NOTCH_PHASE_DEG. Every number of the gear is imported from
 ``dt_cylinder_gear_spec``.
 
-Accuracy (this module asserts only what is true). Each error is split into
-(a) terms fixed in the fixture and so the same on all 20 gears (the stub and
-pin hole stations, the register's indication, the printed stations'
-rounding) and (b) per-gear terms (the gear's bore clearance on the stub,
-the gear's tooth form within its own bands): (b) is asserted inside the
-gear's printed band for the fixture's worst as-made state; (a) is common to
-all 20 gears and accepted, the total recorded.
+Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
+.3402 +/-.0020 and cam phase 1.5 +/-.25 deg; every gear is held to that print
+(owner ruling 2026-11-08, #2144 item 8.2).
 
-* Throw: (a) ``THROW_FIXED_MAX_MM`` .0025, (b) ``THROW_PER_PART_MAX_MM``
-  .0007 inside the print's gear-to-gear +/-.0020, total .0032. A common
-  throw error is a uniform gain on every channel.
-* Phase: (a) ``PHASE_FIXED_WORST_DEG`` .43 deg, (b)
-  ``PHASE_PER_PART_WORST_DEG`` .13 deg inside the print's gear-to-gear
-  +/-.25 deg, total ``PHASE_TOTAL_WORST_DEG`` .64 deg. Every gear seats on
-  the same flank of the pin (TL-00 step 12), so the pin stands its mean
-  half-play (``SEATED_HALF_PLAY_DEG``, .19 deg) counter-clockwise of the
-  phase and a nominal fixture's common error is nil. A common phase error
-  phi0 is NOT a uniform gain: every channel draws cos(k theta + phi0), the
-  same angle in each gear's own turn, and zeroing (MHA-DT-00 check 5) sets
-  the notches, not the lobes, so nothing in the machine removes it.
+* Throw is set, not cut to a number: the stub's TIR on the 1 in dial
+  indicator is brought inside ``THROW_TIR_LOW``-``THROW_TIR_HIGH`` by the jaws
+  in line with it, so the stub hole's station and the register's indication
+  drop out. What is left is the setting window and the indicator's reading
+  (``THROW_SET_MAX_MM``) plus each gear's bore floating on the stub
+  (``BORE_FLOAT``); ``THROW_ERROR_MAX_MM`` is asserted inside the print.
+* Phase is not set: the pin hole and stub hole stations (+/-.002 each), the
+  register's indication and the jaw pair's line put a fixed error of up to
+  ``PHASE_FIXED_WORST_DEG`` (.47 deg) on all 20 gears, and each gear adds its
+  bore float and tooth form (``PHASE_PER_PART_WORST_DEG``, .13 deg). The
+  total, ``PHASE_TOTAL_WORST_DEG`` (.68 deg), exceeds the print's +/-.25 deg
+  and is recorded, not asserted: open on #2361. A reading of the phase on the
+  set fixture was weighed and rejected: its baseline is the .34 throw, so a
+  .001 reading moves the phase about .17 deg (``PHASE_PER_THOU_READING_DEG``).
+  Every gear seats on the same flank of the pin (TL-00 step 14), so the pin
+  stands its mean half-play (``SEATED_HALF_PLAY_DEG``, .19 deg)
+  counter-clockwise of the phase and a nominal fixture's common error is nil.
 
 The hole stations carry the shop table's +/-.002 for a reamed hole from its
-datum and nothing tighter: one tool made once, cut to a number. MHA-DT-12's
-1.5 +/-.25 deg and .3402 +/-.0020 are gear-to-gear bands, and the fixture's
-common part (a) is accepted (delegated ruling 2026-11-14 (Main), pending
-owner confirmation:
-https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-6843970923).
-The first cam's throw is accepted within MHA-DT-12's print before the other
-19 are cut (``FIRST_CAM_CHECK_TEXT``). The TL-00 checks accept the as-made
-stub runout and the pin's seat in a gear.
+datum and nothing tighter: one tool made once, cut to a number.
 """
 
 from __future__ import annotations
@@ -162,9 +158,10 @@ STUB_OFFSET = round(THROW / INCH, POSITION_PLACES) * INCH
 # a reamed hole up to 6 in from its datum, the narrowest band cut to a number.
 POSITION_BAND = 0.002 * INCH
 POSITION_DEVIATIONS = (-POSITION_BAND, POSITION_BAND)
-# Press ream for the 97175A344 dowel (+.0001/+.0003 over 3/8): the .3745
-# reamer, REAM_H7's +.0005/0.
-STUB_HOLE_DIA = 0.3745 * INCH
+# Press ream for the 97175A344 dowel (+.0001/+.0003 over 3/8): the .3740
+# (3/8 undersize) reamer, REAM_H7's +.0005/0, so .0006-.0013 interference:
+# the least press holds the clamp screw's pull (``STUB_RETENTION_MARGIN``).
+STUB_HOLE_DIA = 0.3740 * INCH
 STUB_HOLE_DEVIATIONS = REAM_H7[::-1]  # (lower, upper)
 HOLE_PLACES = 4
 DOWEL_DIA_MIN = DOWEL_DIA + DOWEL_DIA_BAND_IN[0] * INCH
@@ -174,7 +171,7 @@ STUB_PRESS_INTERFERENCE = (
     DOWEL_DIA_MAX - (STUB_HOLE_DIA + REAM_H7[1]),
 )
 if min(STUB_PRESS_INTERFERENCE) <= 0.0:
-    raise AssertionError("the stub dowel loses its press in the .3745 ream")
+    raise AssertionError("the stub dowel loses its press in the .3740 ream")
 # The dowel stands this far above the front face (set when pressed, TL-00).
 STUB_STAND = 0.24 * INCH
 STUB_STAND_BAND = _XX
@@ -187,40 +184,89 @@ BORE_FLOAT = STUB_CLEARANCE[1] / 2.0  # radial, any direction
 if STUB_STAND + STUB_STAND_BAND >= GEAR_THICKNESS_MIN:
     raise AssertionError("the stub stands proud of the gear's cam face")
 
-# The clamp pulls the pressed dowel out of the body; its press (steel in
-# steel, the least interference, Lamé for a pin in a large body) holds more
-# than a firm hand-tightened 10-32 (about 10 in-lbf, nut factor .2).
+# The clamp pulls the pressed dowel out of the body. TL-00 has item 5
+# tightened snug by hand with the 5/32 hex key held by its SHORT arm, so the
+# torque is that arm times a finger force. The short arm of a 5/32 key is
+# .750-.938 long (ASME B18.3, Unbrako Socket Products Engineering Guide
+# p. 32, https://unbrako.com/docs/engguide.pdf, read 2026-11-14); the finger
+# force at its end, 15 lbf, is an ASSUMPTION, not measured. Preload from
+# T = K D P with K = .20, as-received steel screw into steel (the same guide,
+# p. 62). The press (steel in steel, the least interference, Lamé for a pin
+# in a large body) holds that preload.
 _STEEL_E_PSI = 30.0e6
 _FRICTION = 0.15
-CLAMP_TORQUE_IN_LBF = 10.0
-CLAMP_PRELOAD_LBF = CLAMP_TORQUE_IN_LBF / (0.2 * SCREW.major_dia / INCH)
+KEY_SHORT_ARM_MAX_IN = 0.938
+FINGER_FORCE_LBF = 15.0  # assumption
+NUT_FACTOR = 0.20
+CLAMP_TORQUE_IN_LBF = FINGER_FORCE_LBF * KEY_SHORT_ARM_MAX_IN
+CLAMP_PRELOAD_LBF = CLAMP_TORQUE_IN_LBF / (NUT_FACTOR * SCREW.major_dia / INCH)
 _PRESS_PSI = (
     _STEEL_E_PSI * (STUB_PRESS_INTERFERENCE[0] / INCH) / (2.0 * DOWEL_DIA / INCH)
 )
 STUB_RETENTION_LBF = (
     _FRICTION * _PRESS_PSI * math.pi * (DOWEL_DIA / INCH) * (STUB_PRESS_DEPTH / INCH)
 )
-if STUB_RETENTION_LBF <= CLAMP_PRELOAD_LBF:
+STUB_RETENTION_MARGIN = STUB_RETENTION_LBF / CLAMP_PRELOAD_LBF
+if STUB_RETENTION_MARGIN < 1.5:
     raise AssertionError("the clamp screw can pull the stub out of the body")
 
-# --- Throw, worst case ------------------------------------------------------------
-# The register's indicated runout (TIR) in the 4-jaw: .001, a setting a
-# 4-jaw reaches with a dial test indicator and no tighter than check 1 needs
-# (run 20261114T231845023Z's review: .0005 was tighter than the shop's
-# runout row). The register axis then sits within half of it of the lathe
-# axis; the throw and phase budgets below carry that offset.
+# --- Throw: set by the jaws, read on the stub -----------------------------------
+# The register's indicated runout (TIR) in the 4-jaw: .001 with a dial test
+# indicator (run 20261114T231845023Z's review: .0005 was tighter than the
+# shop's runout row). It places the cross axis for phase; along item 2's
+# line the jaw pair in line with it then moves item 1 until the 1 in dial
+# indicator on item 2 reads twice the throw. That reading is the throw, so
+# the stub hole's station drops out of it.
 REGISTER_TIR = 0.001 * INCH
 REGISTER_OFFSET = REGISTER_TIR / 2.0
-# Fixed in the fixture, so the same on all 20 gears: the stub's station and
-# the register's indication. Per gear: the gear's bore floating on the stub.
-THROW_FIXED_MAX_MM = abs(STUB_OFFSET - THROW) + POSITION_BAND + REGISTER_OFFSET
+# The 1 in dial indicator's division: the archived record gives no
+# resolution; a 1 in travel dial indicator reads .001 a division (an
+# ASSUMPTION). Each end of the TIR read to half a division.
+THROW_INDICATOR_DIVISION = 0.001 * INCH
+THROW_TIR_READING = THROW_INDICATOR_DIVISION
 THROW_PER_PART_MAX_MM = BORE_FLOAT
-if THROW_PER_PART_MAX_MM > THROW_TOLERANCE:
-    raise AssertionError("the 20 gears' throw scatter exceeds the printed band")
-# Recorded, not asserted: the fixed part is common to all 20 gears and
-# accepted (module docstring, delegated ruling 2026-11-14); the print's band
-# is gear-to-gear, which THROW_PER_PART_MAX_MM is asserted against.
-THROW_ERROR_MAX_MM = THROW_FIXED_MAX_MM + THROW_PER_PART_MAX_MM
+# What the setting may use: the print's band less the gear's float on the
+# stub and half the TIR's reading error, about both the model's throw and
+# the printed .3402; the window then snaps inward to whole divisions.
+_THROW_SET_ALLOWANCE = THROW_TOLERANCE - THROW_PER_PART_MAX_MM - THROW_TIR_READING / 2
+_THROW_NOMINALS = (THROW, STUB_OFFSET)
+_DIV_IN = THROW_INDICATOR_DIVISION / INCH
+THROW_TIR_LOW = (
+    math.ceil(
+        round(2.0 * (max(_THROW_NOMINALS) - _THROW_SET_ALLOWANCE) / INCH / _DIV_IN, 6)
+    )
+    * _DIV_IN
+    * INCH
+)
+THROW_TIR_HIGH = (
+    math.floor(
+        round(2.0 * (min(_THROW_NOMINALS) + _THROW_SET_ALLOWANCE) / INCH / _DIV_IN, 6)
+    )
+    * _DIV_IN
+    * INCH
+)
+if THROW_TIR_HIGH <= THROW_TIR_LOW:
+    raise AssertionError("the throw window closes on the indicator's divisions")
+THROW_SET_MAX_MM = (
+    max(
+        abs(tir / 2.0 - n)
+        for tir in (THROW_TIR_LOW, THROW_TIR_HIGH)
+        for n in _THROW_NOMINALS
+    )
+    + THROW_TIR_READING / 2.0
+)
+THROW_ERROR_MAX_MM = THROW_SET_MAX_MM + THROW_PER_PART_MAX_MM
+if THROW_ERROR_MAX_MM > THROW_TOLERANCE:
+    raise AssertionError("a gear's throw can leave MHA-DT-12's printed band")
+# The jaw pair moves item 1 along its own line; item 2 stands in that line by
+# eye, within JAW_LINE_ERROR_DEG (an ASSUMPTION), so the move it needs (the
+# stub's station error, the register's offset and the .0001 rounding) puts a
+# little of itself across the throw line, a phase term.
+JAW_LINE_ERROR_DEG = 5.0
+THROW_CORRECTION_MAX = abs(STUB_OFFSET - THROW) + POSITION_BAND + REGISTER_OFFSET
+AXIS_LATERAL = REGISTER_OFFSET + THROW_CORRECTION_MAX * math.sin(
+    math.radians(JAW_LINE_ERROR_DEG)
+)
 
 # --- Clamp: one 10-32 SHCS into the dowel's tap, a #10 washer on the cam face --------
 # The screw centres in the dowel's thread; the washer floats on the screw.
@@ -228,7 +274,7 @@ _THREAD_FLOAT = 0.002 * INCH  # 10-32 2B/3A pitch-diameter float, radial
 _WASHER_FLOAT = (WASHER_ID - SCREW.major_dia) / 2.0
 _WASHER_OD_MAX = WASHER_OD + 0.005 * INCH  # commercial washer, no band given
 _WASHER_OD_MIN = WASHER_OD - 0.005 * INCH
-_STUB_FROM_AXIS_MAX = STUB_OFFSET + POSITION_BAND + REGISTER_OFFSET
+_STUB_FROM_AXIS_MAX = THROW_TIR_HIGH / 2.0 + THROW_TIR_READING / 2.0
 CLAMP_REACH_MAX = (
     _STUB_FROM_AXIS_MAX + _THREAD_FLOAT + _WASHER_FLOAT + _WASHER_OD_MAX / 2.0
 )
@@ -252,10 +298,29 @@ WASHER_BEARING_MIN = (
 )
 if WASHER_BEARING_MIN <= 0.0:
     raise AssertionError("the washer falls into the gear's bore")
-# Engagement of the 5/16 screw in the dowel's full thread, from the washer
-# on the cam face: never past the .255 full-thread depth (it would jam in the
-# tap's lead), and its least value printed alone: .16-.25 (0.84D-1.30D) is
-# under rule 18's 1.5D floor, accepted as MHA-DT-12-TL-00 RV-01.
+# The washer's ring on the brass: the washer's least OD over the largest
+# bore and its edge break (off-centre, the ring keeps that area). C360-H02
+# yield 17 ksi (OnlineMetals #1500 listing, as
+# ch_rocker_arm_tl_oblique_jig_assembly_spec._BRASS_YIELD_MPA). At the
+# short-arm grip's preload the margin is about 1.1; the ring yields at
+# about 400 lbf, 15 in-lbf on the key (``WASHER_YIELD_TORQUE_IN_LBF``).
+BRASS_YIELD_PSI = 17_000.0
+WASHER_BEARING_AREA_IN2 = (
+    math.pi
+    / 4.0
+    * ((_WASHER_OD_MIN / INCH) ** 2 - ((GEAR_BORE_MAX + 2.0 * _EDGE_BREAK) / INCH) ** 2)
+)
+WASHER_BEARING_PSI = CLAMP_PRELOAD_LBF / WASHER_BEARING_AREA_IN2
+WASHER_BEARING_MARGIN = BRASS_YIELD_PSI / WASHER_BEARING_PSI
+WASHER_YIELD_PRELOAD_LBF = BRASS_YIELD_PSI * WASHER_BEARING_AREA_IN2
+WASHER_YIELD_TORQUE_IN_LBF = (
+    WASHER_YIELD_PRELOAD_LBF * NUT_FACTOR * SCREW.major_dia / INCH
+)
+if WASHER_BEARING_MARGIN < 1.0:
+    raise AssertionError("the clamp washer yields the gear's brass")
+# Overlap of the 5/16 screw with the dowel's thread, from the washer on the
+# cam face: never past the .255 full-thread depth (it would jam in the tap's
+# lead).
 SCREW_ENGAGEMENT_MAX = (
     STUB_STAND + STUB_STAND_BAND - (GEAR_THICKNESS_MIN + WASHER_THICKNESS_MIN)
 ) + SCREW.length
@@ -268,9 +333,25 @@ SCREW_ENGAGEMENT_MIN = (
 )
 if SCREW_ENGAGEMENT_MAX >= DOWEL_THREAD_DEPTH_MIN:
     raise AssertionError("the clamp screw bottoms in the dowel's tap")
-if SCREW_ENGAGEMENT_MIN <= 2.0 * SCREW.pitch:
+# Full thread only (rule 18): the overlap less the screw's chamfered point,
+# which runs slightly below the thread root (ASME B18.3, Unbrako guide p. 13),
+# one external thread height 0.61343P (ASME B1.1) at 45 deg; and less the
+# dowel's tap mouth, taken as a 90 deg countersink to the major diameter, one
+# internal thread depth 0.54127P (ASME B1.1; the catalogue gives no mouth
+# form, so an ASSUMPTION). The least full thread, .12 (0.63D), is printed
+# alone; .12-.21 (0.63D-1.10D) is under rule 18's 1.5D floor, the exception
+# MHA-DT-12-TL-00 RV-01 (cad/config/assemblies).
+SCREW_POINT_INCOMPLETE = 0.61343 * SCREW.pitch
+TAP_MOUTH_INCOMPLETE = 0.54127 * SCREW.pitch
+SCREW_FULL_THREAD_MIN = (
+    SCREW_ENGAGEMENT_MIN - SCREW_POINT_INCOMPLETE - TAP_MOUTH_INCOMPLETE
+)
+SCREW_FULL_THREAD_MAX = (
+    SCREW_ENGAGEMENT_MAX - SCREW_POINT_INCOMPLETE - TAP_MOUTH_INCOMPLETE
+)
+if SCREW_FULL_THREAD_MIN <= 2.0 * SCREW.pitch:
     raise AssertionError("the clamp screw barely catches the dowel's thread")
-SCREW_ENGAGEMENT_MIN_PRINTED = math.floor(SCREW_ENGAGEMENT_MIN / INCH * 100.0) / 100.0
+SCREW_ENGAGEMENT_MIN_PRINTED = math.floor(SCREW_FULL_THREAD_MIN / INCH * 100.0) / 100.0
 SCREW_ENGAGEMENT_DIAMETERS = SCREW_ENGAGEMENT_MIN_PRINTED * INCH / DOWEL_THREAD_MAJOR
 
 
@@ -410,7 +491,7 @@ def _play_table(pin_dia: float) -> tuple[tuple[tuple[float, float], ...], ...]:
 
 
 # Every gear seats on the counter-clockwise flank of its notched space: TL-00
-# fitting step 2 turns it clockwise (seen from the tailstock) onto the pin and
+# step 14 turns it clockwise (seen from the tailstock) onto the pin and
 # the cut pushes it the same way (``CUT_TURNS_GEAR_CLOCKWISE``), so the
 # space's centre stands one half-play clockwise of the pin (side -1). The pin
 # is clocked that mean half-play counter-clockwise of the notch phase, so a
@@ -481,7 +562,7 @@ def phase_budget_deg() -> dict[str, float]:
                     for ax, ay in _DIRECTIONS[::4]:
                         stub = (sbx * POSITION_BAND, sby * POSITION_BAND)
                         pin = (spx * POSITION_BAND, spy * POSITION_BAND)
-                        axis = (REGISTER_OFFSET * ax, REGISTER_OFFSET * ay)
+                        axis = (AXIS_LATERAL * ax, REGISTER_OFFSET * ay)
                         gx, gy = stub[0], -STUB_OFFSET + stub[1]
                         px, py = PIN_X + pin[0], PIN_Y + pin[1]
                         fixed = max(
@@ -507,10 +588,12 @@ PHASE_FIXED_WORST_DEG = _BUDGET["fixed"]  # (a), common to all 20 gears
 PHASE_PER_PART_WORST_DEG = _BUDGET["per_part"]  # (b), gear-to-gear scatter
 if PHASE_PER_PART_WORST_DEG > PHASE_TOLERANCE_DEG:
     raise AssertionError("the 20 gears' phase scatter exceeds the printed band")
-# Recorded, not asserted: (a) is common to all 20 gears and accepted (module
-# docstring, delegated ruling 2026-11-14); the print's +/-.25 deg is
-# gear-to-gear, which PHASE_PER_PART_WORST_DEG is asserted against.
+# Recorded, not asserted: the total exceeds the print's +/-.25 deg; phase is
+# not set on the fixture and is open on #2361 (module docstring).
 PHASE_TOTAL_WORST_DEG = _BUDGET["total"]
+# A reading that would set phase on the fixture finds the throw line through
+# the stub, whose baseline is the throw: .001 read wrong turns it this much.
+PHASE_PER_THOU_READING_DEG = math.degrees(0.001 * INCH / STUB_OFFSET)
 
 
 # --- The kit (MHA-DT-12-TL-00): each component's place in the kit frame, mm ---
@@ -641,23 +724,13 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 # --- Kit sheet facts (MHA-DT-12-TL-00), worded here so the sheet only places them --
 # The stub's set stand-out, read with the caliper's depth rod.
 STUB_STAND_TEXT = f"{inch_text(STUB_STAND, 2)} ±{inch_text(STUB_STAND_BAND, 2)}"
-# The clamp screw's least engagement, the value only (rule 18 exception
-# RV-01 on MHA-DT-12-TL-00, cad/config/assemblies).
+# The clamp screw's least full-thread engagement, the value only (rule 18
+# exception RV-01 on MHA-DT-12-TL-00, cad/config/assemblies).
 SCREW_ENGAGEMENT_TEXT = f"{inch_text(SCREW_ENGAGEMENT_MIN_PRINTED * INCH, 2)} MIN"
-# The first cam is the fixture's acceptance: its throw within the gear's
-# print before the other 19 are cut (delegated ruling 2026-11-14). The kit
-# sheet numbers it and its one-action remedy steps in its one sequence.
-FIRST_CAM_CHECK_TEXT = "THE FIRST CAM'S THROW IS WITHIN MHA-DT-12'S PRINT."
 # The register's set-up: item 1's OD (its sheet's Ø3.25) indicated to the
-# REGISTER_TIR the throw and phase budgets carry, with a dial test indicator.
+# REGISTER_TIR the phase budget carries, with a dial test indicator.
 BODY_DIA_TEXT = inch_text(BODY_DIA, 2)
 REGISTER_TIR_TEXT = inch_text(REGISTER_TIR, 3)
-# The stub's runout with the register set: twice its distance from the lathe
-# axis, so twice its station +/- twice (the station band plus the register's
-# offset), read on the 1 in dial indicator.
-STUB_RUNOUT_TIR = 2.0 * STUB_OFFSET
-_STUB_RUNOUT_BAND = 2.0 * (POSITION_BAND + REGISTER_OFFSET)
-STUB_RUNOUT_TEXT = (
-    f"{inch_text(STUB_RUNOUT_TIR - _STUB_RUNOUT_BAND, 4)} TO "
-    f"{inch_text(STUB_RUNOUT_TIR + _STUB_RUNOUT_BAND, 4)}"
-)
+# The throw setting: item 2's TIR on the 1 in dial indicator, the window in
+# whole divisions.
+THROW_TIR_TEXT = f"{inch_text(THROW_TIR_LOW, 3)} TO {inch_text(THROW_TIR_HIGH, 3)}"

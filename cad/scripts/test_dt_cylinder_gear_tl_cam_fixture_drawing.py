@@ -33,19 +33,25 @@ def test_registry_row_is_tooling_in_inch() -> None:
     assert drawing.SPEC is entry
 
 
-def test_the_stub_sets_the_gears_printed_throw() -> None:
+def test_the_throw_is_set_on_the_stub_and_held_to_the_gears_print() -> None:
     # The stub's printed station is the gear's printed throw on the .0001 grid.
     assert spec.STUB_OFFSET == pytest.approx(round(gear.ECCENTRICITY / INCH, 4) * INCH)
     assert abs(spec.STUB_OFFSET - gear.ECCENTRICITY) < 0.0001 * INCH
-    # Per gear (the bore's float on the stub) inside the gear's band; the
-    # fixed part (station and indication) is the same on all 20 gears.
-    assert 0.0 < spec.THROW_PER_PART_MAX_MM <= gear.ECCENTRICITY_TOLERANCE_MM
-    assert spec.THROW_FIXED_MAX_MM == pytest.approx(
-        abs(spec.STUB_OFFSET - spec.THROW) + spec.POSITION_BAND + spec.REGISTER_OFFSET
-    )
+    # The jaws set the stub's TIR, so the station's +/-.002 is not in the
+    # throw: the window, half the reading and the bore's float are, worst case,
+    # inside MHA-DT-12's absolute +/-.0020 (owner ruling 2026-11-08).
+    assert spec.THROW_PER_PART_MAX_MM == spec.BORE_FLOAT
     assert spec.THROW_ERROR_MAX_MM == pytest.approx(
-        spec.THROW_FIXED_MAX_MM + spec.THROW_PER_PART_MAX_MM
+        spec.THROW_SET_MAX_MM + spec.THROW_PER_PART_MAX_MM
     )
+    assert spec.THROW_ERROR_MAX_MM <= gear.ECCENTRICITY_TOLERANCE_MM
+    assert spec.POSITION_BAND > gear.ECCENTRICITY_TOLERANCE_MM - spec.BORE_FLOAT
+    for tir in (spec.THROW_TIR_LOW, spec.THROW_TIR_HIGH):
+        for nominal in (gear.ECCENTRICITY, spec.STUB_OFFSET):
+            error = abs(tir / 2.0 - nominal) + spec.THROW_TIR_READING / 2.0
+            assert error + spec.BORE_FLOAT <= gear.ECCENTRICITY_TOLERANCE_MM
+    for name in ("THROW_FIXED_MAX_MM", "FIRST_CAM_CHECK_TEXT", "STUB_RUNOUT_TEXT"):
+        assert not hasattr(spec, name), name
 
 
 def test_the_stations_are_cut_to_the_shop_row_and_no_tighter() -> None:
@@ -77,15 +83,18 @@ def test_the_clock_pin_stands_at_the_notch_phase() -> None:
                 assert play is not None and play > 0.0
 
 
-def test_phase_budget_splits_fixed_and_per_part_terms() -> None:
-    # (b): gear-to-gear scatter on the worst fixture, inside the printed band.
+def test_phase_is_recorded_open_not_asserted() -> None:
+    # Per gear: the bore's float and tooth form, inside the band on its own.
     assert 0.0 < spec.PHASE_PER_PART_WORST_DEG <= gear.CAM_PHASE_TOLERANCE_DEG
-    # (a): common to all 20 gears, from the hole stations and the indication.
-    assert spec.PHASE_FIXED_WORST_DEG > 0.0
-    # Recorded, not asserted against the gear-to-gear band: accepted
-    # (delegated ruling 2026-11-14).
-    assert spec.PHASE_TOTAL_WORST_DEG >= spec.PHASE_PER_PART_WORST_DEG
-    assert spec.PHASE_TOTAL_WORST_DEG >= spec.PHASE_FIXED_WORST_DEG
+    # Fixed: the hole stations, the register and the jaw pair's line. The
+    # total exceeds the print (open on #2361); a reading on the fixture would
+    # move the phase .17 deg per .001 read, too coarse to set it.
+    assert spec.PHASE_FIXED_WORST_DEG == pytest.approx(0.466, abs=0.001)
+    assert spec.PHASE_TOTAL_WORST_DEG == pytest.approx(0.677, abs=0.001)
+    assert spec.PHASE_TOTAL_WORST_DEG > gear.CAM_PHASE_TOLERANCE_DEG
+    assert spec.PHASE_PER_THOU_READING_DEG == pytest.approx(0.168, abs=0.001)
+    assert "delegated" not in (spec.__doc__ or "").lower()
+    assert "gear-to-gear" not in (spec.__doc__ or "")
 
 
 def test_every_gear_seats_on_one_flank_so_the_play_is_not_scatter() -> None:
@@ -105,7 +114,23 @@ def test_both_pins_press_and_the_gear_slides_on_the_stub() -> None:
     assert min(spec.STUB_PRESS_INTERFERENCE) > 0.0
     assert min(spec.PIN_PRESS_INTERFERENCE) > 0.0
     assert spec.STUB_CLEARANCE[0] > 0.0
-    assert spec.STUB_RETENTION_LBF > spec.CLAMP_PRELOAD_LBF
+    # The .3740 ream: .0006 least interference.
+    assert spec.STUB_PRESS_INTERFERENCE[0] / INCH == pytest.approx(0.0006, abs=1e-7)
+
+
+def test_the_short_arm_grip_neither_pulls_the_stub_nor_yields_the_brass() -> None:
+    # Torque = the 5/32 key's longest short arm (.938, ASME B18.3) x an
+    # assumed 15 lbf at its end; preload by T = K D P, K .20.
+    assert spec.CLAMP_TORQUE_IN_LBF == pytest.approx(15.0 * 0.938)
+    assert spec.CLAMP_PRELOAD_LBF == pytest.approx(
+        spec.CLAMP_TORQUE_IN_LBF / (0.20 * 0.190), rel=1e-6
+    )
+    assert spec.STUB_RETENTION_MARGIN == pytest.approx(5.84, abs=0.01)
+    # The washer's ring on the gear's C360 (17 ksi): margin pinned as
+    # computed, and the torque at which the ring yields.
+    assert spec.WASHER_BEARING_MARGIN == pytest.approx(1.09, abs=0.01)
+    assert spec.WASHER_YIELD_PRELOAD_LBF == pytest.approx(404, abs=1)
+    assert spec.WASHER_YIELD_TORQUE_IN_LBF == pytest.approx(15.4, abs=0.1)
 
 
 def test_the_clamp_stays_out_of_the_tools_sweep_and_seats_the_gear() -> None:
@@ -116,14 +141,18 @@ def test_the_clamp_stays_out_of_the_tools_sweep_and_seats_the_gear() -> None:
     assert not spec.cut_turns_gear_clockwise(spec.THROW)
 
 
-def test_the_screw_engagement_shortfall_is_real_and_bounded() -> None:
+def test_the_screw_engagement_counts_full_thread_only() -> None:
     assert spec.SCREW_ENGAGEMENT_MAX < spec.DOWEL_THREAD_DEPTH_MIN
-    assert spec.SCREW_ENGAGEMENT_MIN_PRINTED * INCH <= spec.SCREW_ENGAGEMENT_MIN
+    # The screw point and the tap mouth each cost about one thread height.
+    lost = spec.SCREW_ENGAGEMENT_MIN - spec.SCREW_FULL_THREAD_MIN
+    assert lost == pytest.approx((0.61343 + 0.54127) * spec.SCREW.pitch)
+    assert spec.SCREW_ENGAGEMENT_MIN_PRINTED * INCH <= spec.SCREW_FULL_THREAD_MIN
     # Under rule 18's 1.5D floor at both ends, the range MHA-DT-12-TL-00
-    # RV-01 accepts (.16-.25, 0.84D-1.30D); the kit sheet prints the value only.
-    assert spec.SCREW_ENGAGEMENT_DIAMETERS < 1.5
-    assert spec.SCREW_ENGAGEMENT_MAX / spec.DOWEL_THREAD_MAJOR < 1.5
-    assert spec.SCREW_ENGAGEMENT_TEXT == ".16 MIN"
+    # RV-01 accepts (.12-.21, 0.63D-1.10D); the kit sheet prints the value only.
+    assert round(spec.SCREW_FULL_THREAD_MAX / INCH, 2) == 0.21
+    assert round(spec.SCREW_ENGAGEMENT_DIAMETERS, 2) == 0.63
+    assert int(spec.SCREW_FULL_THREAD_MAX / spec.DOWEL_THREAD_MAJOR * 100) == 110
+    assert spec.SCREW_ENGAGEMENT_TEXT == ".12 MIN"
 
 
 def test_pins_stand_inside_the_gear_and_the_body_carries_the_gear() -> None:

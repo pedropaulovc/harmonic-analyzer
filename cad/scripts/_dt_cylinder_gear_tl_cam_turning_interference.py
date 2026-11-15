@@ -2,7 +2,7 @@
 
 MHA-DT-12-TL-00 (``build_dt_cylinder_gear_tl_cam_turning_assembly``). Its
 nominal solids overlap in exactly three intended fits: the stub dowel
-pressed through the body's .3745 ream, the clock pin pressed to the floor of
+pressed through the body's .3740 ream, the clock pin pressed to the floor of
 the body's .0365 ream, and the clamp screw's thread in the stub's 10-32 tap
 (modelled at the tap drill). Every other overlap is a defect. Only this
 kit's builder and ``verify_soundness:dt_cylinder_gear_tl_cam_turning`` fold

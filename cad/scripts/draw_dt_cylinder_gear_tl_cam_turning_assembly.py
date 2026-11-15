@@ -8,10 +8,11 @@ in phantom on the exploded sheet only.
 
 Sheet 1: the top view and the front view projected under it, both 1:1 with
 items 4 and 5 off, items 1 and 2 ballooned in the front view, the shaded
-isometric with items 3-5 ballooned, the BOM, the kit's one-time presses, the
-three fitting steps
-(the gear is turned CLOCKWISE in the top view onto item 3 before item 5 is
-tightened: the cut then pushes it harder onto the pin) and the checks.
+isometric with items 3-5 ballooned, the BOM and one numbered sequence: the
+kit's one-time presses, the register and throw set-up with its check and
+remedy, then the steps for each gear (the gear is turned CLOCKWISE in the top
+view onto item 3 before item 5 is tightened: the cut then pushes it harder
+onto the pin).
 Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
 off the stub's axis in fitting order. Numbers come from
 ``dt_cylinder_gear_tl_cam_fixture_spec``; this recipe never edits the source
@@ -171,10 +172,10 @@ def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
 # isometric moved 14 mm right and 5 mm down (item 2's edge at about 25 mm,
 # 12 mm inside) and the front view 15 mm up (items 1 and 5 about 15 mm apart,
 # centre to centre), every view and balloon translating with its view. The
-# front view's caption sits under it, right of item 1's leader. The BOM,
-# steps and checks fill the right half, the steps under the BOM's two-line
-# rows (run 20261113T085510850Z printed them over rows 4 and 5 from y .214),
-# the checks under the steps and above the title block.
+# front view's caption sits under it, right of item 1's leader. The BOM and
+# the one numbered sequence fill the right half, the steps under the BOM's
+# two-line rows (run 20261113T085510850Z printed them over rows 4 and 5 from
+# y .214) and above the title block.
 TOP_CENTER = (0.090, 0.200)
 FRONT_CENTER = (TOP_CENTER[0], 0.135)
 ISO_CENTER = (0.074, 0.047)
@@ -195,8 +196,8 @@ ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
 
 # Kit-frame radii and heights the exploded view and its labels use. The top
 # view carries no dimensions: the throw and pin station are item 1's own
-# geometry, printed on its sheet, and the stub's runout step accepts the
-# throw by indicator (run 20261113T204849556Z's review: over-specification).
+# geometry, printed on its sheet, and the throw is set on item 2 by indicator
+# (run 20261113T204849556Z's review: over-specification).
 _R = fixture.BODY_DIA / 2.0
 _STUB_R = fixture.DOWEL_DIA / 2.0
 _STUB_TOP = fixture.THICKNESS + fixture.STUB_STAND
@@ -204,13 +205,14 @@ _PIN_TOP = fixture.THICKNESS + fixture.PIN_STAND
 
 # One numbered sequence (rule 22; the arbor kit's dt_cone_gear_tl_arbor_
 # assembly_spec): the kit's one-time presses and set-up, then the steps for
-# each gear, then the first cam's acceptance and its remedy, each check
-# straight after the work it verifies (run 20261114T231845023Z's review: a
-# separate CHECKS block was out of step with K1-K3 and fitting 1-3). Each
-# press has its slip-fit branch (rule 23): a press that slides in by hand
-# means item 1's ream misses its callout's press fit, so item 1 is rejected
-# and the kit restarted (run 20261114T234325728Z's review: a fallback bond
-# lacked rule 23's bonded-joint items). The turning direction before
+# each gear, each check straight after the work it verifies (run
+# 20261114T231845023Z's review: a separate CHECKS block was out of step with
+# the work). Each press has its slip-fit branch (rule 23): a press that
+# slides in by hand means item 1's ream misses its callout's press fit, so
+# item 1 is rejected and the kit restarted (run 20261114T234325728Z's review:
+# a fallback bond lacked rule 23's bonded-joint items). The throw is set on
+# item 2 before any gear goes on, by the jaws in line with it, and its remedy
+# is the same adjustment: no rework loop. The turning direction before
 # clamping is CUT_TURNS_GEAR_CLOCKWISE's (spec).
 
 
@@ -232,35 +234,34 @@ _KIT: tuple[str, ...] = (
     "PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
     _slip_reject(3, fixture.CLOCK_PIN_NUMBER),
     "CHECK: ITEM 3 DOES NOT MOVE BY HAND.",
-    "GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT; LEAVE IT THERE FOR ALL 20 GEARS.",
+    "GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT AND IN LINE WITH ONE PAIR OF JAWS; "
+    "LEAVE IT THERE FOR ALL 20 GEARS.",
     f"INDICATE ITEM 1'S Ø{fixture.BODY_DIA_TEXT} OD TO {fixture.REGISTER_TIR_TEXT} "
     "TIR WITH A DIAL TEST INDICATOR.",
+    "MOVING ONLY THE PAIR OF JAWS IN LINE WITH ITEM 2, SET A 1 IN DIAL "
+    f"INDICATOR ON ITEM 2 TO READ {fixture.THROW_TIR_TEXT} TIR.",
 )
-INDICATE_STEP = len(_KIT)
+THROW_STEP = len(_KIT)
 _KIT += (
-    f"CHECK: A 1 IN DIAL INDICATOR ON ITEM 2 READS {fixture.STUB_RUNOUT_TEXT} TIR.",
+    f"CHECK: WITH ALL FOUR JAWS TIGHT, ITEM 2 READS {fixture.THROW_TIR_TEXT} TIR.",
 )
-RUNOUT_STEP = len(_KIT)
+THROW_CHECK_STEP = len(_KIT)
+_KIT += (
+    f"IF STEP {THROW_CHECK_STEP} FAILS, REPEAT STEPS {THROW_STEP} AND "
+    f"{THROW_CHECK_STEP}.",
+)
 _GEAR: tuple[str, ...] = (
     "SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1, ITS NOTCHED "
     "TOOTH SPACE OVER ITEM 3 (SHEET 2).",
     "CHECK: THE GEAR LIES FLAT ON ITEM 1 WITH ITEM 3 IN ITS NOTCHED SPACE.",
     "TURN THE GEAR CLOCKWISE IN THE TOP VIEW UNTIL ITS NOTCHED SPACE STOPS ON "
     "ITEM 3, AND HOLD IT THERE.",
-    "FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2 AND TIGHTEN FIRMLY (5/32 KEY); "
-    f"ITEM 5 ENGAGES ITEM 2'S THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
+    "FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2; TIGHTEN SNUG BY HAND, 5/32 HEX KEY "
+    f"BY ITS SHORT ARM. ITEM 5 ENGAGES ITEM 2'S FULL THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
     "CHECK: THE GEAR DOES NOT TURN BY HAND.",
 )
 FIRST_GEAR_STEP = len(_KIT) + 1
-FIRST_CAM_STEP = len(_KIT) + len(_GEAR) + 1
-_FIRST_CAM: tuple[str, ...] = (
-    f"CHECK: ONCE TURNED, {fixture.FIRST_CAM_CHECK_TEXT}",
-    f"IF STEP {FIRST_CAM_STEP} FAILS, RE-INDICATE ITEM 1 (STEP {INDICATE_STEP}); "
-    f"REPEAT STEPS {RUNOUT_STEP} AND {FIRST_CAM_STEP}.",
-    f"IF STEP {FIRST_CAM_STEP} STILL FAILS, REWORK ITEM 1 TO {fixture.PART_NUMBER}.",
-    f"CUT THE OTHER 19 GEARS ONLY AFTER STEP {FIRST_CAM_STEP} PASSES.",
-)
-STEPS: tuple[str, ...] = (*_KIT, *_GEAR, *_FIRST_CAM)
+STEPS: tuple[str, ...] = (*_KIT, *_GEAR)
 # Characters a printed line: about 2.45 mm each from x .219 (run
 # 20261113T171903296Z's render), 78 ending some 8 mm inside the right border.
 STEP_WIDTH = 78
@@ -277,8 +278,7 @@ def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
 
 
 STEPS_HEADING = (
-    f"FITTING STEPS (1-{RUNOUT_STEP} ONCE; {FIRST_GEAR_STEP}-{FIRST_CAM_STEP - 1} "
-    f"FOR EACH GEAR; {FIRST_CAM_STEP}-{len(STEPS)} ON THE FIRST CAM)"
+    f"FITTING STEPS (1-{len(_KIT)} ONCE; {FIRST_GEAR_STEP}-{len(STEPS)} FOR EACH GEAR)"
 )
 ASSEMBLY_STEPS = "\n".join((STEPS_HEADING, *_numbered(STEPS)))
 if not fixture.CUT_TURNS_GEAR_CLOCKWISE or not any(
