@@ -21,18 +21,22 @@
     code is the build's, and the summary's ``faults`` mark the recording
     unusable.
 
-``replay <script> --log P --seat-log P --scratch DIR --result P [--kind K] [--base-outputs DIR] [--capture-dir DIR]``
+``replay <script> --log P --seat-log P --scratch DIR --result P [--kind K] [--base-outputs DIR] [--capture-dir DIR] [-- ARG...]``
     Run the script with SolidWorks absent, serving the log: no live COM, no
     write outside DIR (bar the temporary and telemetry directories), no
     connection beyond loopback, no OTLP export. ``--seat-log`` is a recording
     made on the seat the replay stands for (the shadow passes the build's own;
     a reuse attempt, which stands for the base's seat, the base's): a
     SolidWorks revision other than the log's refuses the replay
-    (``input_mismatch``). ``--kind assembly`` or ``drawing`` first copies
-    into DIR the output-root files the recording read that it did not write
-    (the models SolidWorks opened, those the script's Python read), from the
-    output root: ``staged``, each one's SHA-256, none of them a
-    ``py_outputs`` entry unless the script changed it. ``--base-outputs``
+    (``input_mismatch``). ``--kind assembly`` or ``drawing`` first stages
+    into DIR the output-root files the recording read that it did not write:
+    a copy of each the script's Python read, an empty stub of each model only
+    SolidWorks opened (``staged``, each output-root file's SHA-256; a Python
+    read of a stub: ``stub_reads``), none of them a ``py_outputs`` entry
+    unless the script changed it. ``--kind drawing``
+    also moves the paths ``_drawing_types`` names under the output root (the
+    model, the sheet, PDF, PNG and layout report) into DIR. ``ARG...`` are
+    the script's own arguments, as for ``record``. ``--base-outputs``
     compares the Python-written outputs with that output root, file by file.
     The result also names the repository files the build script's own
     execution imported or opened for reading, never the engine's
@@ -69,6 +73,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import gzip
+import hashlib
 import json
 import math
 import os
@@ -88,9 +93,10 @@ _NOT_INPUTS = (".venv", "cad/out")
 # Bound on the requests a ``title_echoes`` result lists (all are counted).
 _ECHOES_LISTED = 10
 # The output-root subdirectories the engine's replay redirects into its
-# scratch root (_com_conversation.redirect_outputs; pinned by test). A build
-# naming any other output-root path (a drawing's slddrw/ and pdf/) cannot be
-# replayed inside the sandbox as the engine stands.
+# scratch root (_com_conversation.redirect_outputs; pinned by test). A
+# drawing names others (slddrw/, pdf/, reports/layout-audit/) through
+# ``_drawing_types``, which ``replay --kind drawing`` redirects itself
+# (:func:`_drawing_outputs`).
 _REDIRECTED = ("sldprt", "sldasm", "png", "stl")
 # Bound on the paths each ``replay_gaps`` list names (all are counted).
 _GAPS_LISTED = 10
@@ -134,7 +140,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Python caller capture per recorded call (default: the engine's)",
     )
 
-    replay = sub.add_parser("replay", help="replay a log with SolidWorks absent")
+    replay = sub.add_parser(
+        "replay",
+        help="replay a log with SolidWorks absent",
+        epilog="ARG... after the first -- are the script's own arguments.",
+    )
     replay.add_argument("script", type=Path)
     replay.add_argument("--log", type=Path, required=True)
     replay.add_argument(
@@ -148,7 +158,8 @@ def _parser() -> argparse.ArgumentParser:
         "--kind",
         choices=("part", "assembly", "drawing"),
         default="part",
-        help="what the build makes (an assembly's or drawing's inputs are staged)",
+        help="what the build makes (an assembly's or drawing's inputs are "
+        "staged, a drawing's own output paths redirected)",
     )
     replay.add_argument("--result", type=Path, required=True)
     replay.add_argument(
@@ -179,7 +190,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _arguments(argv: list[str]) -> argparse.Namespace:
     """``argv`` parsed: this driver's own arguments before the first ``--``,
-    the recorded script's after it (``record``'s ``argv``). They are split
+    the recorded or replayed script's after it (``argv``). They are split
     here rather than by argparse, whose handling of a ``*`` positional after
     another one depends on the Python patch release: before 3.12.7 (CPython
     gh-59317) it binds the positional to ``[]`` with the script's path and
@@ -190,8 +201,8 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         own, scripts = argv[:at], argv[at + 1 :]
     parser = _parser()
     args = parser.parse_args(own)
-    if args.command != "record" and scripts:
-        parser.error(f"only record passes arguments to a script: {scripts}")
+    if args.command not in ("record", "replay") and scripts:
+        parser.error(f"only record and replay pass arguments to a script: {scripts}")
     args.argv = scripts
     return args
 
@@ -361,10 +372,12 @@ def _replay_gaps(trailer: dict[str, Any], argv: list[str]) -> dict[str, Any]:
     lacks, measured on the recording (each list: its ``count`` and the
     ``first`` :data:`_GAPS_LISTED` paths, relative to the output root).
 
-    ``argv``: how many arguments the script ran with (the replay passes
-    none). ``out_paths``: every output-root path the log's COM arguments name;
+    ``argv``: how many arguments the script ran with (the engine's replay
+    passes none; the driver's passes them after ``--``). ``out_paths``: every
+    output-root path the log's COM arguments name;
     ``out_paths_unredirected``: those outside :data:`_REDIRECTED`, which
-    SolidWorks would write or read outside the replay's scratch root.
+    SolidWorks would write or read outside the engine's scratch root (a
+    drawing's own the driver redirects, :func:`_drawing_outputs`).
     ``out_inputs``: named output-root files the log did not capture as
     written (the models it opened, which a replay would have to stage at their
     recorded bytes); ``out_inputs_unredirected`` likewise. ``python_out_reads``:
@@ -560,20 +573,38 @@ def _keep_argv(conversation: Any, argv: list[str]) -> Iterator[None]:
         conversation.run_script = run_script
 
 
+class _Staging(Enum):
+    """How :func:`_staged_inputs` puts one output-root file in the scratch root."""
+
+    COPY = "copy"  # the script's Python read it: its bytes
+    STUB = "stub"  # SolidWorks alone opened it, and SolidWorks is absent
+
+
+# What a stub holds (_Staging.STUB): nothing.
+_STUB_SHA256 = hashlib.sha256(b"").hexdigest()
+
+
 @contextlib.contextmanager
 def _staged_inputs(
-    conversation: Any, kind: str, inputs: Any, staged: dict[str, str]
+    conversation: Any,
+    kind: str,
+    inputs: Any,
+    staged: dict[str, str],
+    stubs: set[str],
 ) -> Iterator[None]:
     """An assembly's or drawing's replay with the output-root files its
     recording read in the scratch root, where the build's redirected paths
-    (``_paths.OUT_*``) look for them: ``inputs()``, the models SolidWorks
-    opened and the files the script's Python read, none of them the log's
-    captured outputs, copied from the output root once the engine has made
-    the scratch root (``staged``: each one's SHA-256). SolidWorks is absent,
-    but the script's own checks are not: without them, one that checks a
-    child exists before placing it (``_assembly.place_component``) raises.
-    The copies are the current children, whose bytes a reuse attempt then
-    requires to be the ones their tokens name. A part's replay is left as it
+    (``_paths.OUT_*``) look for them, once the engine has made the scratch
+    root: ``inputs()``, each with its :class:`_Staging`, none of them the
+    log's captured outputs. SolidWorks is absent, but the script's own checks
+    are not: without them, one that checks a child exists before placing it
+    (``_assembly.place_component``) raises. A file the script's Python read
+    is copied; a model only SolidWorks opened, whose answers come from the
+    log, is an empty stub (no copy of a large part of the output root inside
+    the reuse deadline; a Python read of one is the result's ``stub_reads``).
+    ``staged``: each output-root file's SHA-256, hashed once, whose bytes a
+    reuse attempt then requires to be the ones their tokens name; ``stubs``:
+    those the scratch root holds as stubs. A part's replay is left as it
     is."""
     if kind == "part":
         yield
@@ -582,12 +613,17 @@ def _staged_inputs(
 
     def staging(out_root: Path) -> None:
         redirect(out_root)
-        for relative in inputs():
+        for relative, how in inputs():
             source = real / relative
             if not source.is_file():
                 continue
             target = out_root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
+            if how is _Staging.STUB:
+                target.touch()
+                staged[relative] = conversation.sha256_file(source)
+                stubs.add(relative)
+                continue
             shutil.copyfile(source, target)
             staged[relative] = conversation.sha256_file(target)
 
@@ -596,6 +632,102 @@ def _staged_inputs(
         yield
     finally:
         conversation.redirect_outputs = redirect
+
+
+class _AfterImport:
+    """A meta-path finder that runs ``then`` on module ``name`` right after its
+    import executes it, once, before any importer binds its names: the import
+    stays its importer's own (the recipe's, which ``python_files`` notes)."""
+
+    def __init__(self, name: str, then: Any) -> None:
+        self.name, self.then = name, then
+
+    def find_spec(self, fullname: str, path: Any, target: Any = None) -> Any:
+        if fullname != self.name:
+            return None
+        sys.meta_path.remove(self)
+        import importlib.machinery
+
+        spec = importlib.machinery.PathFinder.find_spec(fullname, path)
+        if spec is None or spec.loader is None:
+            return spec
+        execute, then = spec.loader.exec_module, self.then
+
+        def exec_module(module: types.ModuleType) -> None:
+            execute(module)
+            then(module)
+
+        spec.loader.exec_module = exec_module  # type: ignore[method-assign]
+        return spec
+
+
+def _redirect_drawing(module: Any, scratch: Path) -> None:
+    """``_drawing_types``' output-root paths (``DrawingSpec.source``, the
+    staged model the drawing documents; ``DrawingSpec.outputs``;
+    ``LAYOUT_REPORT_DIR``) under ``scratch`` instead, as ``redirect_outputs``
+    does ``_paths.OUT_*``."""
+    real = module.CAD_ROOT / "out"
+    source, outputs = module.DrawingSpec.source, module.DrawingSpec.outputs
+
+    def moved(path: Path) -> Path:
+        return scratch / path.relative_to(real)
+
+    module.DrawingSpec.source = property(lambda spec: moved(source.fget(spec)))
+    module.DrawingSpec.outputs = property(
+        lambda spec: {name: moved(path) for name, path in outputs.fget(spec).items()}
+    )
+    module.LAYOUT_REPORT_DIR = moved(module.LAYOUT_REPORT_DIR)
+
+
+@contextlib.contextmanager
+def _drawing_outputs(conversation: Any, kind: str) -> Iterator[None]:
+    """A drawing replayed in the scratch root without a change to the engine
+    or to any recipe. A drawing names its model, sheet, PDF, PNG and layout
+    report under the output root through ``_drawing_types``, outside the
+    engine's redirect (:data:`_REDIRECTED`): once the scratch root is made
+    (and staged, :func:`_staged_inputs`), and once the recipe's own import
+    has executed ``_drawing_types``, its paths move under the scratch root
+    (:func:`_redirect_drawing`). The output root itself also encodes as
+    ``<OUT>``, after the scratch root, which lies under it: a model a script
+    names there (``_paths.CAD_ROOT``) is the request its recording made. A
+    write that still escapes is refused by the replay's guard, as any write
+    outside the scratch root is: a refusal, never a stale output."""
+    if kind != "drawing":
+        yield
+        return
+    roots, redirect = conversation.Roots, conversation.redirect_outputs
+    real = conversation.OUT_ROOT
+
+    class OutputRoots(roots):  # type: ignore[misc, valid-type]
+        def __post_init__(self) -> None:
+            super().__post_init__()
+            if Path(self.out) == real:
+                return
+            own = self._subs  # type: ignore[attr-defined]
+            also = roots(real, self.repo)._subs[:2]  # type: ignore[attr-defined]
+            object.__setattr__(self, "_subs", (*own[:2], *also, *own[2:]))
+
+    def redirect_drawing(out_root: Path) -> None:
+        redirect(out_root)
+        module = sys.modules.get("_drawing_types")
+        if module is not None:
+            _redirect_drawing(module, out_root)
+            return
+        sys.meta_path.insert(
+            0,
+            _AfterImport(
+                "_drawing_types", lambda found: _redirect_drawing(found, out_root)
+            ),
+        )
+
+    conversation.Roots, conversation.redirect_outputs = OutputRoots, redirect_drawing
+    try:
+        yield
+    finally:
+        conversation.Roots, conversation.redirect_outputs = roots, redirect
+        sys.meta_path[:] = [
+            finder for finder in sys.meta_path if not isinstance(finder, _AfterImport)
+        ]
 
 
 def _record(args: argparse.Namespace, script: Path) -> int:
@@ -755,14 +887,24 @@ def main(argv: list[str] | None = None) -> int:
 
     conversation.load = keeping
     staged: dict[str, str] = {}
+    stubs: set[str] = set()
 
-    def recorded_inputs() -> list[str]:
+    def recorded_inputs() -> list[tuple[str, _Staging]]:
         trailer = loaded[log_path].trailer
         reads = {str(entry[0]) for entry in trailer.get("reads") or [] if entry}
-        return sorted((set(_out_paths(trailer)) | reads) - _captured(trailer))
+        named = (set(_out_paths(trailer)) | reads) - _captured(trailer)
+        python = {rel.casefold() for rel in reads}
+        return [
+            (rel, _Staging.COPY if rel.casefold() in python else _Staging.STUB)
+            for rel in sorted(named)
+        ]
 
     try:
-        with _staged_inputs(conversation, args.kind, recorded_inputs, staged):
+        with (
+            _keep_argv(conversation, args.argv),
+            _staged_inputs(conversation, args.kind, recorded_inputs, staged, stubs),
+            _drawing_outputs(conversation, args.kind),
+        ):
             result = conversation.replay_build(
                 script,
                 log_path,
@@ -782,9 +924,17 @@ def main(argv: list[str] | None = None) -> int:
         replayed["py_outputs"] = {
             relative: digest
             for relative, digest in result.py_outputs.items()
-            if staged.get(relative) != digest
+            if (_STUB_SHA256 if relative in stubs else staged.get(relative)) != digest
         }
         replayed["staged"] = staged
+        stubbed = {rel.casefold() for rel in stubs}
+        replayed["stub_reads"] = sorted(
+            {
+                str(entry[0])
+                for entry in result.details.get("reads") or []
+                if entry and str(entry[0]).casefold() in stubbed
+            }
+        )
     _write_json(
         args.result,
         {

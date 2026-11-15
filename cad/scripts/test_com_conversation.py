@@ -3840,9 +3840,13 @@ def test_a_scripts_arguments_are_everything_after_the_first_double_dash():
     found = parse([*record, "--out-root", "O", "--", "--flag", "--", "x"])
     assert (found.out_root, found.argv) == (Path("O"), ["--flag", "--", "x"])
     # argparse never sees a script argument, so no patch release of it binds
-    # one: a bare one is the driver's error, and only record passes any.
+    # one: a bare one is the driver's error, and only record and replay (a
+    # drawing's reuse attempt) pass any.
     with pytest.raises(SystemExit):
         parse([*record, "sh_widget"])
+    replay = ["replay", "draw_x.py", "--log", "L", "--seat-log", "L"]
+    replayed = parse([*replay, "--scratch", "S", "--result", "R", "--", "sh_widget"])
+    assert (replayed.command, replayed.argv) == ("replay", ["sh_widget"])
     assert parse(["diff", "a", "b", "--"]).argv == []
     with pytest.raises(SystemExit):
         parse(["diff", "a", "b", "--", "sh_widget"])

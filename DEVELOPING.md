@@ -2423,8 +2423,9 @@ component after the failure. `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the
 same requests, and requires an unnamed component to fail closed.
 
-Gates are not recorded; FULL assembly builds and drawings are, and nothing of
-theirs is reused ("Assemblies and drawings" below). Nothing under
+Gates are not recorded; FULL assembly builds and drawings are, and an
+assembly's or drawing's would-be reuse is audited ("Assemblies and drawings"
+below). Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
 input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 `_com_outcome.py`, `com_replay.py`) are in no recipe closure
@@ -2437,9 +2438,9 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 comma-separated items, each a mode for every kind (`shadow`) or for one kind
 (`part=`, `assembly=` or `drawing=`), a later item winning: `shadow,drawing=off`
 shadows parts and assemblies and leaves drawings unrecorded. Unset or empty is
-`_replay_shadow.DEFAULT_MODES`: parts `reuse`, assemblies `audit`, drawings
-`shadow`. A drawing never runs above `shadow` (`audit` and `reuse` shadow it).
-The modes, for a part (an assembly's: "Assembly reuse" below):
+`_replay_shadow.DEFAULT_MODES`: parts and assemblies `reuse`, drawings
+`audit`. The modes, for a part (an assembly's or drawing's: "Assembly reuse"
+and "Drawing reuse" below):
 
 | value | effect |
 | --- | --- |
@@ -3218,14 +3219,14 @@ Measured 2026-11-09..12, assemblies cost 34 seat-hours and drawings 35, and
 changed. Keying them on their children's content instead saves about 1%. The
 question part reuse answered for parts is open for them: when an assembly's or
 drawing's own closure changes and its children do not, how often does the new
-source issue the identical COM conversation? These recordings answer it. A
-drawing's are telemetry only: every output, exit code and cache key is an
-unrecorded build's. An assembly's are also the bases of assembly reuse
-("Assembly reuse" below), served for four labels and audited for the rest.
+source issue the identical COM conversation? These recordings answer it, and
+they are the bases of assembly and drawing reuse ("Assembly reuse" and
+"Drawing reuse" below): an assembly's served for four labels and audited for
+the rest, a drawing's audited.
 
 **What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
 including the fallback after a failed EXPLODE) and every drawing build
-(`_cached_drawing_action`, through `_cached_com_action(recorded=...)`) run
+(`_cached_drawing_action`, through `_cached_com_action(dependent=...)`) run
 under the same driver as a part, planned by `_replay_shadow.plan_dependent`,
 which describes the build (script, argument, children, sidecars) only once the
 mode and cache role call for a recording; a description that raises builds
@@ -3291,8 +3292,9 @@ budget spent), is the record outcome `no_base`. The outcome is judged per kind
 `sidecars` (byte for byte); a
 drawing on `requests`, `answers` and `pdf`, the ink of every PDF SolidWorks
 wrote (text runs and path pieces per page, coordinates to 1 um), never its
-bytes, which carry the export's date. Nothing of these kinds is reused, so a
-`noop` is never an alarm; its `noop_judgement` (`OutputJudgement`) is one of:
+bytes, which carry the export's date. The split judges no reuse, so a `noop`
+is never an alarm there (a would-be reuse's audit, below, can be); its
+`noop_judgement` (`OutputJudgement`) is one of:
 
 | `noop_judgement` | meaning |
 | --- | --- |
@@ -3478,7 +3480,11 @@ and sidecars, a drawing's PDF ink. A `noop` never has a seat path; a
 `out_inputs` (named output-root files the log did not capture as written: the
 models it opened, which a replay would have to stage at their recorded bytes)
 and `python_out_reads` (output-root files the script's own Python read, an
-upper bound). Their counts size a second engine identity for these kinds.
+upper bound). They measure the engine's replay alone: the driver's
+`--kind` replay closes the first three for assemblies and drawings (it passes
+the argument, moves `_drawing_types`' paths and stages the models; "Assembly
+reuse" and "Drawing reuse" below), and the reuse attempt's own checks judge
+the rest.
 
 **Bounds and cost.** Every recording name fits the farm's path budget with 32
 characters to spare (`test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit`);
@@ -3564,11 +3570,16 @@ log did not capture (`replay_gaps`), so the engine replays an assembly
 unchanged: SolidWorks' answers for the models it opens come from the log. The
 script itself, though, checks in Python that each child's model exists under
 the redirected output root (`_assembly.place_component`'s `missing part`):
-`com_replay.py replay --kind assembly` first copies every output-root file the
-log read and did not write from the output root into the scratch root
-(`staged`, each one's SHA-256; one the script leaves unchanged is no Python
-output). Without it, both proof leaves declined `replay_error` after 15
-requests (2026-11-14). A replay that raised names the exception, its message
+`com_replay.py replay --kind assembly` first stages every output-root file the
+log read and did not write into the scratch root: a copy of each the
+script's Python read, and an empty stub of each model only SolidWorks opened,
+so a replay copies no large part of `cad/out` inside the reuse deadline
+(#2799). `staged` holds each output-root file's SHA-256, hashed once, which
+the child check below reads instead of hashing `cad/out` again; a stub or
+copy the script leaves unchanged is no Python output, and a Python read of a
+stub (`stub_reads`), whose bytes the replay never judged, declines
+`unjudged_input`. Without staging, both proof leaves declined `replay_error`
+after 15 requests (2026-11-14). A replay that raised names the exception, its message
 and its innermost frame in its detail and INFO line
 (`<type>: <message> (at <file>:<line> in <function>)`,
 `_replay_shadow.script_error`; parts too).
@@ -3587,8 +3598,8 @@ and its innermost frame in its detail and INFO line
   declines `unjudged_input`.
 - **What SolidWorks opens.** Every output-root file the replay's log names
   that it did not capture (`solidworks_out_inputs`) must be a child's model,
-  and must hold the bytes its token names now (`child_mismatch` otherwise);
-  any other declines `unjudged_input`.
+  and must hold the bytes its token names now, as the replay staged it
+  (`staged`; `child_mismatch` otherwise); any other declines `unjudged_input`.
 - **Title counters.** An assembly script echoes the titles SolidWorks gives
   the documents it makes (`Assem3` in `SelectByID2` and `ActivateDoc3`; 16
   requests in `ms_measuring_stick`'s replay), which a build here would ask
@@ -3644,18 +3655,64 @@ of it is published (its manifest read by name, under its children's group or
 none; a read the cache cannot answer fails the revocation in a WARN, never
 reads as unpublished), and always the origin its `reused/` marker names.
 
-Would-be reuses and their audits per stem:
+#### Drawing reuse
+
+A drawing build reuses as an assembly does, through `_cached_com_action`'s
+`dependent` (a `DependentBuild` from `_cached_drawing_action`; its `native` is
+the sheet, it has no `.execution` token and no rewritten output). Its children
+are the model it draws: a part's token, or an assembly's and, transitively,
+its parts'. Three things the engine's replay lacks for a drawing the driver
+supplies (`com_replay.py replay --kind drawing -- <artifact stem>`), with no
+change to the engine or to any recipe, so no drawing re-keys:
+
+- **Its argument.** The artifact stem is passed after `--`, as `record` passes
+  it (`_keep_argv`); `_replay_command` takes it from the build's `Dependent`.
+- **Its paths.** `_drawing_types` names the model drawn, the sheet, PDF, PNG
+  and layout report under the output root, outside the engine's redirect of
+  `_paths.OUT_*`. Once the engine makes the scratch root, and once the
+  recipe's own import has executed `_drawing_types` (`_AfterImport`, before
+  any importer binds a name of it), `DrawingSpec.source`,
+  `DrawingSpec.outputs` and `LAYOUT_REPORT_DIR` move under it
+  (`_redirect_drawing`). The output root itself also encodes as `<OUT>`, so a
+  model a script names there is the request its recording made. Any write
+  that still escapes is refused by the replay's guard (`sandbox`).
+- **Its model.** The model drawn is staged as an assembly's children are.
+
+Every Python output must be the base archive's byte for byte, but the layout
+report, which Python writes with the audit's own wall seconds
+(`summary.collect_s`, `summary.total_s`): it must be the archive's JSON once
+both are set aside (`_replay_shadow.layout_alike`, on the bytes the replay
+wrote, kept in `Reuse.kept`). A served drawing installs the base's sheet, PDF,
+PNG and layout report (`dodo._reuse_drawing`): the base's PDF bytes, so a
+machinist review keyed on them is the base's. Replayed offline on 2026-11-14
+against this source, the bases of `fr_harmonic_base` (36,332 requests),
+`dt_cone_pivot_post` (15,926), `mg_magnifier_assembly` (32,014) and
+`fr_frame_assembly` (26,770, 12 echoed title counters) were no-ops whose
+sheet, PDF and PNG were the archives' bytes and whose layout reports differed
+by their timing alone; `dt_cone_gear_tl_indexing_assembly`'s, recorded on a
+source that placed a view elsewhere, diverged at that view
+(`CreateDrawViewFromModelView3`). The four stems' newest bases (recorded
+2026-11-14/15), replayed on 7080305d9f with this staging, were the same
+no-ops: `fr_harmonic_base`'s model, which only SolidWorks opens, staged as a
+stub; the other three's, which their Python also reads, copied; no stub
+read. No drawing label is served:
+`DEPENDENT_SERVE_LABELS` names assemblies only, so every drawing's would-be
+reuse is audited, in `reuse` too.
+
+Would-be reuses and their audits per stem (assemblies and drawings):
 
 ```kusto
 dependencies
-| where timestamp > ago(7d) and name startswith "replay.reuse assembly:"
+| where timestamp > ago(7d)
+    and (name startswith "replay.reuse assembly:" or name startswith "replay.reuse drawing:")
 | extend label=tostring(customDimensions.label),
          decision=tostring(customDimensions["replay.reuse_decision"])
 | summarize attempts=count(), audited=countif(decision == "audited"),
             reused=countif(decision == "reused") by label
 | join kind=leftouter (
     dependencies
-    | where timestamp > ago(7d) and name startswith "replay.audit assembly:"
+    | where timestamp > ago(7d)
+        and (name startswith "replay.audit assembly:" or name startswith "replay.audit drawing:")
     | extend label=tostring(customDimensions.label),
              audit=tostring(customDimensions["replay.audit"])
     | summarize judged=countif(audit != "unjudged"), unjudged=countif(audit == "unjudged"),
