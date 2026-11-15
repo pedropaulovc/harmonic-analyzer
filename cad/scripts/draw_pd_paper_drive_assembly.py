@@ -4042,6 +4042,7 @@ class _StallProbe:
 
     def __init__(self, label: str) -> None:
         import threading
+        # variant c: another key for a concurrent run (never merge)
 
         self.label = label
         self.main = threading.main_thread().ident
