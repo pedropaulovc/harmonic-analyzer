@@ -115,14 +115,13 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 # --- The sheet ----------------------------------------------------------------
-# .020 in shim stock as bought. The registry row names the stock (one line
-# there changes it): 1095 blue-tempered spring steel (McMaster-Carr 9014K143,
-# ASTM A684 / SAE AMS5122, +/-.001 in, read 2026-11-14), or half-hard C26000
-# brass (9011K111, ASTM B36, +/-.002 in, read 2026-11-13). The proof takes
-# the wider +/-.002 so either stock serves. Of the stock gauges .015, .020
-# and .025, .020 is the one whose worst phase stays inside the booked bond
-# clock: thinner leaves more play in every space, and .025 binds in T030's
-# space at a depth that its tolerance moves by several times as much.
+# .020 in half-hard C26000 brass sheet as bought (owner ruling 2026-11-14,
+# #2734: ".020 half-hard brass"; OnlineMetals 1589, 12 x 12 in, read by Main
+# 2026-11-14). No thickness tolerance is published for it; ASTM B36 allows
+# +/-.0015 at .020, and the proof takes +/-.002. Of the stock gauges .015,
+# .020 and .025, .020 is the one whose worst phase stays inside the booked
+# bond clock: thinner leaves more play in every space, and .025 binds in
+# T030's space at a depth that its tolerance moves by several times as much.
 SHEET_THICK = 0.020 * INCH
 SHEET_THICK_TOLERANCE_MM = 0.002 * INCH
 SHEET_LIMITS_MM = (
@@ -132,15 +131,20 @@ SHEET_LIMITS_MM = (
 )
 # The model's material follows the row (see _appearance.apply_material).
 MATERIAL = "Brass" if "BRASS" in str(_ROW["material"]).upper() else "Plain Carbon Steel"
-# The spring arm is sized on the weaker stock's nominal bending strain:
-# half-hard C26000 yields at Rp0.2 >= 270 MPa (Wieland M30, H02) on a 110 GPa
-# modulus (16,000 ksi, Copper Development Association C26000), both read
-# 2026-11-14; hardened 1095 at about 230 ksi tensile (Precision Brand AMS 5122
-# certificate) on about twice the modulus bends several times as far. No root
-# factor is applied (the root is a full round 3.5 arm widths across): on the
-# 1095 the row names the margin is several-fold, on brass it is a fraction of
-# a percent, so brass waits on the owner's material ruling (#2734).
+# The spring arm opens in its own plane as a cantilever off the bridge. It is
+# sized on half-hard C26000's guaranteed 0.2 % proof stress, Rp0.2 >= 270 MPa
+# (Wieland M30, H02), on a 110 GPa modulus (16,000 ksi, Copper Development
+# Association C26000), both read 2026-11-14; OnlineMetals states 52 ksi
+# (359 MPa) typical for its 1589 sheet. At the full round where the arm
+# meets the bridge (its radius about three arm widths, on one side only) the
+# root strain is taken SPRING_ROOT_KT times the beam figure, and that peak is
+# held to SPRING_STRAIN_SHARE of the guaranteed yield strain: about 0.6 of
+# the typical. Judgement, no standard: enough that a burr, a nick or the
+# cold-working of a sawn edge at the root does not take the arm past yield.
 SPRING_YIELD_STRAIN = 270.0 / 110_000.0
+SPRING_ROOT_KT = 1.2
+SPRING_STRAIN_SHARE = 0.8
+SPRING_ALLOWED_STRAIN = SPRING_STRAIN_SHARE * SPRING_YIELD_STRAIN / SPRING_ROOT_KT
 
 
 # --- Gear radii, read from the family's tooth layer ---------------------------
@@ -431,13 +435,13 @@ GRIP_SPAN = inch_grid_mm(
 if GRIP_SPAN + _XXX + GRIP_PRELOAD_MIN_MM > 2.0 * SEAT_EDGE_MM[0] + 1e-9:
     raise AssertionError("the U's span must grip T030 at every limit")
 SPREAD_MAX_MM = 2.0 * SEAT_EDGE_MM[1] - (GRIP_SPAN - _XXX)
-# The far arm (.XX wide) is the spring, at rule 17's .080 wall target so its
-# narrowest print holds the .060 floor; the U's overall height (.XX) leaves
-# the near arm about .25 over the seat line, a grip for the fingers, and the
-# bridge is as wide.
-SPRING_WIDTH = 0.08 * INCH
-if SPRING_WIDTH - _XX < 0.060 * INCH - 1e-9:
-    raise AssertionError("the spring arm's narrowest print is under rule 17's floor")
+# The far arm (.XX wide) is the spring, its narrowest print at rule 17's
+# .080 wall target (machinist review r16's advisory: at .08 it was .07); the
+# U's overall height (.XX) leaves the near arm about .25 over the seat line,
+# a grip for the fingers, and the bridge is as wide.
+SPRING_WIDTH = 0.09 * INCH
+if SPRING_WIDTH - _XX < 0.080 * INCH - 1e-9:
+    raise AssertionError("the spring arm's narrowest print is under rule 17's target")
 SHEET_HEIGHT = inch_grid_mm(0.25 * INCH + GRIP_SPAN + SPRING_WIDTH, 2, math.ceil)
 ARM_WIDTH = SHEET_HEIGHT - GRIP_SPAN - SPRING_WIDTH
 # Its narrowest print: the height's, the span's and the spring's bands.
@@ -450,9 +454,9 @@ INSTALL_LIFT_MM = BUSHING_REACH_MM - min(
 )
 INSTALL_SPREAD_MM = INSTALL_LIFT_MM + SPREAD_MAX_MM
 # Opened that far as a cantilever from the bridge the spring's root strains
-# 1.5 * width * spread / length^2; the slot is long enough to keep that under
-# SPRING_YIELD_STRAIN at its widest and shortest print, and in any case clears
-# the pivot's end.
+# 1.5 * width * spread / length^2; the slot is long enough to keep that,
+# times the root's factor, inside SPRING_ALLOWED_STRAIN at its widest and
+# shortest print, and in any case clears the pivot's end.
 # The slot's closed end is a full round (a drilled hole the slot's sides are
 # sawn to), so the spring arm runs into the bridge with no sharp root.
 # SLOT_LENGTH (.XX) runs to the round's centre, where its straight sides end:
@@ -460,7 +464,7 @@ INSTALL_SPREAD_MM = INSTALL_LIFT_MM + SPREAD_MAX_MM
 # axis SLOT_END_RADIUS_MM further, clear of the pivot's end.
 SLOT_END_RADIUS_MM = GRIP_SPAN / 2.0
 SPRING_LENGTH_MIN_MM = math.sqrt(
-    1.5 * (SPRING_WIDTH + _XX) * INSTALL_SPREAD_MM / SPRING_YIELD_STRAIN
+    1.5 * (SPRING_WIDTH + _XX) * INSTALL_SPREAD_MM / SPRING_ALLOWED_STRAIN
 )
 SLOT_LENGTH = inch_grid_mm(
     max(PIVOT_END_MAX_MM - SLOT_END_RADIUS_MM, SPRING_LENGTH_MIN_MM) + _XX,
@@ -471,8 +475,8 @@ SLOT_END_MM = SLOT_LENGTH + SLOT_END_RADIUS_MM
 SPRING_STRAIN = (
     1.5 * (SPRING_WIDTH + _XX) * INSTALL_SPREAD_MM / (SLOT_LENGTH - _XX) ** 2
 )
-if SPRING_STRAIN >= SPRING_YIELD_STRAIN:
-    raise AssertionError(f"the spring arm yields opening ({SPRING_STRAIN:.5f})")
+if SPRING_STRAIN > SPRING_ALLOWED_STRAIN:
+    raise AssertionError(f"the spring arm's root strains {SPRING_STRAIN:.5f} opening")
 # The bridge is at least .25 wide past the round, as the near arm about.
 SHEET_LENGTH = inch_grid_mm(SLOT_END_MM + 0.25 * INCH, 2, math.ceil)
 # The far arm's edge stands over every bonded gear's tips on its seat.

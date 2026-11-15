@@ -26,16 +26,15 @@ def test_registry_row_is_sheet_tooling_in_inch_its_stock_a_one_line_change() -> 
     assert row["drawing_unit"] == "in"
     assert int(row["quantity"]) == 1
     # Owner ruling 2026-11-13: one sheet, cut to shape, at the stock's
-    # thickness; no thin-wall exception is left to carry. The stock is 1095
-    # spring steel by default (pending the owner) and brass a drop-in: the
-    # row names it and the model's material follows.
+    # thickness; no thin-wall exception is left to carry. Owner ruling
+    # 2026-11-14 (#2734): ".020 half-hard brass", from OnlineMetals 1589.
     assert ".020 in" in row["material_specification"]
-    assert "1095" in row["material"]
-    assert spec.MATERIAL == "Plain Carbon Steel"
+    assert "OnlineMetals 1589" in row["material_specification"]
+    assert row["material"] == "C26000 BRASS, HALF-HARD"
+    assert spec.MATERIAL == "Brass"
     assert "machinist_exceptions" not in row
     assert "mill" not in row["process"]
     assert spec.SHEET_THICK == pytest.approx(0.020 * INCH)
-    # The proof takes brass's wider +/-.002 so either stock serves.
     assert spec.SHEET_THICK_TOLERANCE_MM == pytest.approx(0.002 * INCH)
     assert "MATERIAL" not in vars(part) or part.MATERIAL == spec.MATERIAL
     assert "apply_material(adapter, MATERIAL)" in inspect.getsource(part.build)
@@ -154,14 +153,21 @@ def test_the_u_clears_the_tip_and_grips_t030() -> None:
     )
     flexed = spec._flex_share(spec.SLOT_LENGTH) * spec.SPREAD_MAX_MM
     assert spec.SEAT_EDGE_MM[0] - flexed > spec.BUSHING_REACH_MM
-    assert spec.SPRING_WIDTH == pytest.approx(0.080 * INCH)
-    assert spec.SPRING_WIDTH - xx >= 0.060 * INCH - 1e-9
+    # Rule 17's .080 target at the spring's narrowest print (r16 advisory).
+    assert spec.SPRING_WIDTH == pytest.approx(0.090 * INCH)
+    assert spec.SPRING_WIDTH - xx >= 0.080 * INCH - 1e-9
     assert spec.ARM_WIDTH_MIN_MM > 0.2 * INCH
     assert spec.GRIP_SPAN + 0.005 * INCH <= 2.0 * spec.SEAT_EDGE_MM[0]
     assert 0.0 < spec.SPREAD_MAX_MM < 1.0
-    # Opened to pass MHA-DT-38, the spring arm stays elastic in either stock.
+    # Opened to pass MHA-DT-38, the brass spring arm's root, at its widest
+    # and shortest print and with the root's factor counted, stays at or
+    # under 0.8 of the guaranteed yield strain.
     assert spec.INSTALL_SPREAD_MM > spec.SPREAD_MAX_MM
-    assert spec.SPRING_STRAIN < spec.SPRING_YIELD_STRAIN
+    beam = 1.5 * (spec.SPRING_WIDTH + xx) * spec.INSTALL_SPREAD_MM
+    peak = 1.2 * beam / (spec.SLOT_LENGTH - xx) ** 2
+    assert peak <= 0.8 * 270.0 / 110_000.0
+    # No longer than the .01 grid needs.
+    assert 1.2 * beam / (spec.SLOT_LENGTH - 2 * xx) ** 2 > 0.8 * 270.0 / 110_000.0
     # The near arm bends little under the spread: a few hundredths at most.
     assert all(0.0 < flex < 0.05 for flex in spec.FLEX_MM.values())
 

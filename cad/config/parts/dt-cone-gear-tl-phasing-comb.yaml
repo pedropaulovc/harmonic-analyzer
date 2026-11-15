@@ -9,16 +9,13 @@ dt-cone-gear-tl-phasing-comb:
   # space of it; owner ruling 2026-11-13: cut to shape from a single sheet of
   # brass or other metal; owner, 2026-11-14 (#2734): the cone stands up and
   # the comb is a flat U clipped over its tip. Never in the drive-train BOM.
-  # Stock: .020 1095 blue-tempered spring steel (McMaster-Carr 9014K143, 6 x
-  # 12 in sheet, $22.72, read 2026-11-14), pending owner confirmation (default
-  # taken on a timeout, #2734). Brass is a drop-in: material
-  # "C26000 BRASS, HALF-HARD" and material_specification "C26000 half-hard
-  # brass shim stock, .020 in +/-.002 in, ASTM B36" (McMaster-Carr 9011K111);
-  # the spec proves the spring arm on brass and picks the model's material
-  # from this row.
+  # Stock: owner ruling 2026-11-14 (#2734): ".020 half-hard brass", from
+  # OnlineMetals 1589, C260 H02 brass sheet, .020 x 12 x 12 in, $42.82
+  # (read live 2026-11-14; 52 ksi yield and HRB 70 as the page states).
+  # McMaster-Carr 9011K111 (ASTM B36) is the alternative source.
   number: MHA-DT-03-TL-02
-  material: 1095 SPRING STEEL, BLUE-TEMPERED
-  material_specification: 1095 blue-tempered spring steel shim stock, .020 in +/-.001 in, ASTM A684, SAE AMS5122
+  material: C26000 BRASS, HALF-HARD
+  material_specification: C26000 half-hard (H02) brass sheet, .020 in, ASTM B36 (OnlineMetals 1589)
   finish: as cut
   quantity: 1
   tolerance_class: machined_block

@@ -65,10 +65,11 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 2.94 x .89 U whose shallowest step is .045: 3:1 keeps every step and the
-# .020 stock legible and leaves the depths' words room on its left.
-SHEET_SCALE = (3.0, 1.0)
-VIEW_SCALE = (3, 1)
+# A 3.64 x .90 U whose shallowest step is .045: at 3:1 the brass U's longer
+# slot ran it into the right border, so 2:1, the next standard scale, which
+# still shows every step and leaves the depths' words room on its left.
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = (2, 1)
 RATIO = VIEW_SCALE[0] / VIEW_SCALE[1]
 ISO_SCALE = (1, 2)
 # The model origin (the near arm's south end on the seat line) on the sheet;
