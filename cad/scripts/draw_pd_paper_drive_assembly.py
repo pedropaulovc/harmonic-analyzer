@@ -4133,6 +4133,7 @@ def _pivot_sheet_points(
     )
 
 
+# #2824 census variant 2 (comment only).
 def _census_live_components(*, label: str) -> None:
     """#2824 diagnostic, no COM calls: live COM wrappers by type, and who
     holds the drawing/native component ones."""
