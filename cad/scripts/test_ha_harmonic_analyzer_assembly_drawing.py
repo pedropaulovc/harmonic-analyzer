@@ -287,6 +287,10 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     nib = notes.step_lines("nib-on-paper")
     check = next(i for i, line in enumerate(nib) if "ONLY THE NIB TOUCHES" in line)
     assert nib[check].split(". ", 1)[1].startswith("CHECK:")
+    # 8C is a first setting; the nib check is its stated acceptance (machinist
+    # review run 20261115T044005360Z, r1/r2).
+    acceptance = notes.sub_step("nib-on-paper", check)
+    assert f"FIRST SETTING; {acceptance} IS ITS ACCEPTANCE" in turn
     remedy = nib[check + 1].split(". ", 1)[1]
     bar = steps.step_number("magnifier-bar-clamped")
     assert remedy.startswith("IF ")

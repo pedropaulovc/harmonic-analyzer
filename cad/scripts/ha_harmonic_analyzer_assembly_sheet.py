@@ -249,7 +249,8 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "SET THE MHA-MG-08 BAR TOP TO ITS HEIGHT ABOVE THE RAISED DECK TOP "
         "(SHEET 1), READ WITH A RULE FROM THE DECK TOP.",
         "TURN THE BAR ON THE COLUMN UNTIL, SEEN FROM ABOVE, ITS FRONT FACE RUNS "
-        "PARALLEL TO THE MHA-PD-02 PLATEN FACE.",
+        "PARALLEL TO THE MHA-PD-02 PLATEN FACE. THIS IS A FIRST SETTING; "
+        f"{_n('nib-on-paper')}E IS ITS ACCEPTANCE.",
         "TIGHTEN BOTH CLAMP SCREWS EVENLY.",
         "CHECK: UNDER FIRM HAND PRESSURE THE BAR DOES NOT SLIP OR TURN ON THE "
         "COLUMN.",
@@ -266,8 +267,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         # (mg_magnifying_bracket_arm_check). Setting and tightening are
         # separate sub-steps, and a hold check with its remedy follows, as
         # every other retention on these sheets does (rule 22; review of
-        # the pd DETAIL rename). Each takes one printed line, so the step
-        # still ends sheet 4's second column.
+        # the pd DETAIL rename). Each takes one printed line.
         "ROTATE MHA-MG-01 NOSE DOWN UNTIL BOTH SCREWS BEAR.",
         "TIGHTEN BOTH SCREWS.",
         "CHECK: FIRM HAND PRESSURE DOES NOT MOVE MHA-MG-01.",
