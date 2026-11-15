@@ -99,7 +99,9 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     # its view (item 1's back face at FRONT_CENTER y - THICKNESS).
     for caption in (sheet.TOP_CAPTION, sheet.FRONT_CAPTION):
         assert "ITEMS 4 AND 5 OFF" in caption
-    assert sheet.FRONT_CAPTION_XY[1] < sheet.FRONT_CENTER[1] - fixture.THICKNESS / 1000.0
+    assert (
+        sheet.FRONT_CAPTION_XY[1] < sheet.FRONT_CENTER[1] - fixture.THICKNESS / 1000.0
+    )
     # Item 2's balloon circle stands right of the stub, above item 1's face
     # and under the top view's outline, each by more than a balloon radius.
     x, y = sheet.STUB_BALLOON_XY
@@ -249,7 +251,8 @@ def test_the_short_screw_engagement_is_a_delegated_rule_18_exception() -> None:
 
     name = "dt_cylinder_gear_tl_cam_turning_assembly"
     entries = {
-        entry.id: entry for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
     }
     entry = entries["RV-01"]
     assert entry.kind == "accept"
