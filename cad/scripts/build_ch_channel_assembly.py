@@ -2506,3 +2506,4 @@ async def build(adapter) -> dict[str, str]:
 if __name__ == "__main__":
     sys.exit(run_build(build))
 # proof 2808: comment-only edit, pass A
+# pass B
