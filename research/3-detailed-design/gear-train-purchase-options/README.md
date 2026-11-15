@@ -62,7 +62,11 @@ they rotate together". The design's 1/16 key (owner decision C1 keyed,
 All three exclude the C67500 rod for T006 to T024 (5/8 in, about 6 in),
 which every mill found sells by quotation only.
 
-Recommendation: **A**. It is the cheapest, it keeps the original's
+**Owner ruling 2026-11-14 (Pedro, #2356): "A: make every gear as designed
+($2,379)".** The purchase list below is to buy; nothing is ordered. Check the
+shelf for a 1 in R8 arbor and a 3/4 in R8 collet before buying either.
+
+The recommendation was **A**. It is the cheapest, it keeps the original's
 appearance, and every purchase that replaces a made gear costs more than the
 cutter it saves (the four #3-range cones cost $279.03 to buy against a
 $126.48 cutter). Route C's master gear is optional: the sheets already accept

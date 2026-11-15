@@ -456,8 +456,10 @@ teeth = 72
 # "Cutter plan"): eleven stock 20-degree involute form cutters cover every
 # gear but T006, whose form tool is shop-made (MHA-DT-37-TL-01). Nothing here
 # is owned. Every SKU and price below was read live on its vendor page on
-# 2026-11-12, before shipping and tax; the purchase itself is the owner's
-# decision on #2356 (the catalogue-gear alternative is costed there). The
+# 2026-11-12, before shipping and tax. Owner ruling 2026-11-14 (#2356):
+# route A, make every gear as designed, so every row here is to buy; nothing
+# is ordered yet, and the shelf is checked first for a 1 in R8 arbor and a
+# 3/4 in R8 collet. The
 # 48DP cutters have a 7/8 in hole and the 24DP and 32DP ones a 1 in hole, so
 # the kit needs both arbors. McMaster's 48DP cutters are 14-1/2 degree only
 # and do not suit this train.
@@ -468,7 +470,7 @@ make = "TTC"
 source = "https://www.travers.com/product/ttc-10-289-482-involute-style-gear-cutter-10-289-482"
 purchase = "Travers 10-289-481 to -488, eight cutters, $977.47 in all (listings read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 diametral_pitch = 48
 pressure_angle_deg = 20.0
 bore_in = 0.875
@@ -490,7 +492,7 @@ make = "TTC"
 source = "https://www.travers.com/product/ttc-10-289-242-involute-style-gear-cutter-10-289-242"
 purchase = "Travers 10-289-242 and 10-289-247, $137.59 each (listings read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 diametral_pitch = 24
 pressure_angle_deg = 20.0
 bore_in = 1.0
@@ -506,7 +508,7 @@ make = "TTC"
 source = "https://www.travers.com/product/ttc-10-289-328-involute-style-gear-cutter-10-289-328"
 purchase = "Travers 10-289-328, $126.48 (listing read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 diametral_pitch = 32
 pressure_angle_deg = 20.0
 bore_in = 1.0
@@ -526,7 +528,7 @@ sku = "3900-0162"
 source = "https://shoptoolusa.com/7-8-arbor-x-3-4-straight-shank-stub-mill-arbor-3900-0162/"
 purchase = "shoptoolusa 3900-0162, $69.03, in stock (listing read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 use = "the eight 48DP cutters"
 bore_in = 0.875
 
@@ -541,7 +543,7 @@ sku = "67-600-016"
 source = "https://www.travers.com/product/ttc-67-600-016-spacer-type-milling-machine-arbor-67-600-016"
 purchase = "Travers 67-600-016, $76.05, 18 in stock (listing read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 use = "the 24DP and 32DP cutters"
 bore_in = 1.0
 
@@ -558,7 +560,7 @@ sku = "3153A12"
 source = "https://www.mcmaster.com/3153A12/"
 purchase = "McMaster-Carr 3153A12, $100.33 (listing read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 use = "1/16 keyways, MHA-DT-03 T030-T120 and MHA-DT-07"
 width_in = [0.0625, 0.0635]
 length_of_cut_in = [0.203125, 1.125]
@@ -571,7 +573,7 @@ sku = "3151A109"
 source = "https://www.mcmaster.com/3151A109/"
 purchase = "McMaster-Carr 3151A109, $23.85 (listing read live 2026-11-12)"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 use = "guides the 1/16-A broach in the Ø.375 bores"
 bore_in = 0.375
 
@@ -591,7 +593,7 @@ sku = "2802A81"
 source = "https://www.mcmaster.com/2802A81/"
 purchase = "McMaster-Carr 2802A81, $36.05 each (listing read live 2026-11-12); buy two"
 present = false
-status = "not owned: to buy (owner decision pending, #2356)"
+status = "not owned: to buy (route A, owner ruling 2026-11-14, #2356)"
 use = "MHA-DT-04 land-1 keyseat"
 flutes = 2
 dia_in = [0.0625, 0.0645]
@@ -788,8 +790,8 @@ length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
 
-# Gear blanks (#2356): the make route's bar, not ordered (owner decision
-# pending on #2356). Lengths: each blank's length plus .14 in to part and
+# Gear blanks (#2356): the make route's bar, to buy, not ordered (route A,
+# owner ruling 2026-11-14). Lengths: each blank's length plus .14 in to part and
 # face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,
 # catalogue nominals; prices read live 2026-11-12, $439.04 for the six
 # brass bars. The pd-rack-pinion disc's bar has its own row (#2412).
