@@ -1997,6 +1997,72 @@ def test_sweep_records_a_failed_review_instead_of_failing(action, sweep, monkeyp
     assert "reviewer unavailable" in sheet["error"]
 
 
+@pytest.mark.parametrize("outcome", ["error verdict", "exit 1 with SHIP"])
+def test_sweep_counts_an_inconsistent_or_failed_review_as_an_error(
+    action, sweep, monkeypatch, outcome
+):
+    dodo = action.dodo
+    sweep.state["cached_at"] = _days_ago(dodo, 45)
+    sweep.state["sweep_verdict"] = "ERROR" if outcome == "error verdict" else "SHIP"
+    if outcome == "exit 1 with SHIP":
+        review = dodo._run_subprocess
+        monkeypatch.setattr(dodo, "_run_subprocess", lambda *a, **k: review(*a, **k) or 1)
+    summary = sweep.swept()
+    assert summary["sheets"][0]["error"]
+    assert summary["counts"]["errors"] == 1
+    assert summary["counts"]["issue_drafts"] == 0
+
+
+def test_sweep_reports_only_this_invocation_and_drops_older_records(action, sweep):
+    dodo = action.dodo
+    records = dodo._review_sweep_dir() / "records"
+    records.mkdir(parents=True)
+    stale = records / "earlier.json"
+    stale.write_text(json.dumps({
+        "stem": "earlier", "swept_at": "2026-01-01T00:00:00+00:00", "action": "re-reviewed",
+        "cached": {"verdict": "SHIP", "reviewed_at": None, "carried": False, "gating": []},
+        "sweep": {"verdict": "FIX", "gating": [{"category": "c", "where": "w", "issue": "i",
+                                               "fix": "f", "run_count": 2}]},
+        "review_key": "k", "kind": "part",
+    }), encoding="utf-8")
+    sweep.state["cached_at"] = _days_ago(dodo, 3)
+    summary = sweep.swept()
+    assert [sheet["stem"] for sheet in summary["sheets"]] == ["probe"]
+    assert not stale.exists()
+    assert not (dodo._review_sweep_dir() / "issues" / "earlier.md").exists()
+
+
+def test_sweep_keys_the_sheet_once_and_shares_the_leaf_lock(action, sweep, monkeypatch):
+    dodo = action.dodo
+    keys, locks = [], []
+    key_of = dodo._machinist_review_cache_key
+    lock_of = dodo._machinist_review_lock
+    monkeypatch.setattr(
+        dodo, "_machinist_review_cache_key", lambda *a, **k: keys.append(a) or key_of(*a, **k)
+    )
+    monkeypatch.setattr(
+        dodo, "_machinist_review_lock", lambda stem: locks.append(stem) or lock_of(stem)
+    )
+    sweep.state["cached_at"] = _days_ago(dodo, 3)
+    sheet = sweep.swept()["sheets"][0]
+    assert len(keys) == 1
+    assert sheet["review_key"] == "a" * 64
+    dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
+    assert locks == ["probe", "probe"]
+
+
+def test_issue_draft_cells_keep_reviewer_text_on_one_row(dodo):
+    assert dodo._review_sweep_cell("Ø6 | 0.05\n  then ream") == "Ø6 \\| 0.05 then ream"
+
+
+def test_review_sweep_is_a_canonical_task_family(dodo):
+    stem = dodo._reviewed_drawings()[0][0]
+    group, child = dodo.canonical_tasks(["review_sweep", f"review_sweep:{stem}"])
+    assert f"review_sweep:{stem}" in group.task_dep
+    assert child.name == f"review_sweep:{stem}"
+    assert child.actions[0].py_callable is dodo._review_sweep_action
+
+
 @pytest.mark.parametrize("value", ["0", "-3", "week"])
 def test_sweep_refuses_a_malformed_age_limit(action, monkeypatch, value):
     monkeypatch.setenv("HARMONIC_REVIEW_SWEEP_DAYS", value)

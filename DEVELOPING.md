@@ -267,7 +267,10 @@ verdict, an older review, or `all`) the sheet is `re-reviewed` into
 `cad/out/reports/review-sweep/<stem>/`. Expect about 2 minutes and $2.40 per
 review. A teardown writes `review-sweep/summary.{md,json}` and one issue
 draft, `review-sweep/issues/<stem>.md`, for each sheet whose fresh review
-returned FIX with gating findings.
+returned FIX with gating findings. The summary and drafts cover only the
+sheets swept by that invocation; older records are deleted. A sweep and a
+build's `check:machinist_review:<stem>` selected together take turns on a
+per-drawing lock, so they never pay for the same review twice.
 
 To file the drafts, one issue per sheet:
 
