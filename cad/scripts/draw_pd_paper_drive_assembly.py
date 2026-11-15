@@ -2322,19 +2322,6 @@ def _step_text(
             "PLATEN SLID CLEAR, STAKE THE TAP MOUTH AT THE BAR FRONT ONTO THE TIP "
             f"AT {PIVOT_STAKE_POINTS_TEXT}, NOTHING PROUD OF THE FACE "
             f"({PIVOT_VIEW_REF}).",
-            # Rule 23 bench acceptance for the stake (machinist review of
-            # 39171c020b, #2826): it holds the screw from backing out, and the
-            # arm must still swing on the shoulder. A failure unscrews through
-            # the stakes and renews screw and spacer on fresh metal, as 33T-33W.
-            "CHECK: GRIPPED BY HAND AT ITS HEAD, THE SCREW DOES NOT TURN.",
-            "CHECK: RAISED AND RELEASED, THE ARM STILL FALLS FREELY.",
-            f"IF {s('hanger-pivoted', 9)} OR {s('hanger-pivoted', 10)} FAILS, "
-            f"{pivot_unscrewed[0]}",
-            pivot_unscrewed[1],
-            pivot_tap_chased,
-            f"REPEAT {s('hanger-pivoted', 0)}-{s('hanger-pivoted', 10)} WITH A NEW "
-            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
-            f"{n['pd-transgear-pivot-spacer']} SPACER, {fresh_stake}.",
         ),
         "disc-cluster-assembled": (
             f"PRESS THE {hub_pin} PIN INTO THE {n['pd-transgear-disc-hub']} HUB'S "

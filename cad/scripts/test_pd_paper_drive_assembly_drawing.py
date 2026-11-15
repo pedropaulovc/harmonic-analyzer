@@ -1301,32 +1301,6 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", _unit_step_notes().fitup_steps)
 
 
-def test_the_pivot_stake_has_a_bench_acceptance_and_a_fresh_metal_remedy() -> None:
-    # Rule 23 (machinist review of 39171c020b): the stake is accepted on the
-    # bench straight after it is made, and a failure renews the screw and
-    # spacer on fresh metal, as the fit-up's own pivot remedy does.
-    texts = drawing._step_text(operating_domain=_unit_operating_domain())["hanger-pivoted"]
-    stake = next(i for i, text in enumerate(texts) if text.startswith("PLATEN SLID CLEAR, STAKE"))
-    assert drawing.sub_step("hanger-pivoted", stake) == drawing.sub_step("hanger-pivoted", 8)
-    after = [" ".join(text.split()) for text in texts[stake + 1:]]
-    assert after[:2] == [
-        "CHECK: GRIPPED BY HAND AT ITS HEAD, THE SCREW DOES NOT TURN.",
-        "CHECK: RAISED AND RELEASED, THE ARM STILL FALLS FREELY.",
-    ]
-    checks = [drawing.sub_step("hanger-pivoted", stake + offset) for offset in (1, 2)]
-    assert after[2].startswith(f"IF {checks[0]} OR {checks[1]} FAILS, PLATEN SLID CLEAR, UNSCREW")
-    assert "THROUGH ITS STAKES" in after[2]
-    assert after[3] == "LIFT THE ARM OFF."
-    assert after[4].startswith("RE-CHASE THE") and "PIVOT TAP" in after[4]
-    assert after[5] == (
-        f"REPEAT {drawing.sub_step('hanger-pivoted', 0)}-{checks[1]} WITH A NEW "
-        f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
-        f"{_number('pd-transgear-pivot-spacer')} SPACER, STAKING FRESH METAL AT "
-        f"{drawing.sub_step('hanger-pivoted', stake)}."
-    )
-    assert len(after) == 6
-
-
 def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     """§13.2 (8): the seated chain offset, cup-set knob float and minimum
     collar-disc air use their owning specs; R9-71 leaves no head play."""
