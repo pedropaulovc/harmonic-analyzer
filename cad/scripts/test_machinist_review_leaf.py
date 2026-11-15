@@ -2013,6 +2013,22 @@ def test_sweep_counts_an_inconsistent_or_failed_review_as_an_error(
     assert summary["counts"]["issue_drafts"] == 0
 
 
+@pytest.mark.parametrize("outcome", ["error verdict", "exit 1 with SHIP"])
+def test_sweep_counts_a_failed_review_by_the_leaf_as_an_error(
+    action, sweep, monkeypatch, outcome
+):
+    dodo = action.dodo
+    sweep.state["sweep_verdict"] = "ERROR" if outcome == "error verdict" else "SHIP"
+    if outcome == "exit 1 with SHIP":
+        review = dodo._run_subprocess
+        monkeypatch.setattr(dodo, "_run_subprocess", lambda *a, **k: review(*a, **k) or 1)
+    summary = sweep.swept()
+    sheet = summary["sheets"][0]
+    assert sheet["error"].startswith("ValueError: review leaf:")
+    assert summary["counts"]["errors"] == 1
+    assert summary["counts"]["reviewed"] == 0
+
+
 def test_sweep_reports_only_this_invocation_and_drops_older_records(action, sweep):
     dodo = action.dodo
     records = dodo._review_sweep_dir() / "records"

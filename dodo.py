@@ -3999,9 +3999,9 @@ def _machinist_review_lock(stem: str) -> FileLock:
 
 def _machinist_review_leaf(
     stem: str, mode: MachinistReviewMode, profile: ReviewProfile
-) -> str:
+) -> tuple[str, dict[str, Any]]:
     """:func:`_cached_machinist_review_action` without its lock; returns the
-    review key."""
+    review key and the aggregate whose policy it evaluated."""
     # Validate direct action callers too, before removing stamps or probing.
     # Do not reselect defaults: this snapshot also owns the task's freshness.
     validate_review_profile(profile)
@@ -4020,11 +4020,9 @@ def _machinist_review_leaf(
                 shutil.rmtree(directory)
             probed = _probe_cache(key, [directory], label, probe)
         except (OSError, _cache.RestoreLocked) as error:
-            _evaluate_machinist_review(
-                stem, mode,
-                {"verdict": "ERROR", "gating_count": 0, "error": str(error)},
-            )
-            return key
+            aggregate = {"verdict": "ERROR", "gating_count": 0, "error": str(error)}
+            _evaluate_machinist_review(stem, mode, aggregate)
+            return key, aggregate
     try:
         if probed == "miss" and _cache.forced_refresh(label) is None:
             if _adopt_byte_keyed_review(
@@ -4067,7 +4065,7 @@ def _machinist_review_leaf(
     _evaluate_machinist_review(stem, mode, aggregate)
     if aggregate["verdict"] != "ERROR" and aggregate.get("error") is None:
         _write_stamp(label, str(stamp))
-    return key
+    return key, aggregate
 
 
 @functools.cache
@@ -4189,9 +4187,13 @@ def _review_sweep_action(stem: str, profile: ReviewProfile) -> None:
     label = f"review_sweep:{stem}"
     try:
         with _machinist_review_lock(stem):
-            record["review_key"] = _machinist_review_leaf(
+            record["review_key"], evaluated = _machinist_review_leaf(
                 stem, MachinistReviewMode.LEARN, profile
             )
+            if evaluated["verdict"] == "ERROR" or evaluated.get("error") is not None:
+                raise ValueError(
+                    f"review leaf: {evaluated.get('error') or 'ERROR verdict'}"
+                )
             cached = _read_machinist_aggregate(stem)
             carried = (_machinist_review_dir(stem) / _review_carry.CARRIED_FILE).exists()
         record["cached"] = {**_review_sweep_verdict(cached), "carried": carried}
