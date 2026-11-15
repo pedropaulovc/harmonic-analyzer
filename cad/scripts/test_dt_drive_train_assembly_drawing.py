@@ -1319,10 +1319,23 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table[-2] == "GEAR 0-2 = MHA-DT-12 FROM THE FRONT, GEAR 0 ON MHA-DT-26."
     # Steps 1S and 2B's comb is a shop tool with no BOM row: the key names it
     # and defines the BLADE the steps cite (machinist review of bd81283964).
-    assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, ONE BLADE IN A TOOTH SPACE PER GEAR."
-    for head in ("1S", "2B"):
-        step = drawing.CONE_CRANK_STEPS[drawing.CONE_CRANK_STEPS.index(f"{head}. ") :]
-        assert step.startswith(f"{head}. ENGAGE MHA-DT-03-TL-02 AT ONCE, T030'S BLADE")
+    assert table[-1] == "MHA-DT-03-TL-02 = PHASING COMB, A BLADE IN A TOOTH SPACE OF EACH GEAR."
+    # Owner, 2026-11-14 (#2734): the comb is a U clipped over the tip of the
+    # cone standing on its journal, both arms on T036.
+    steps = " ".join(drawing.CONE_CRANK_STEPS.split())
+    assert steps[steps.index("1S. ") :].startswith(
+        "1S. CLIP MHA-DT-03-TL-02 OVER THE TIP, MHA-DT-04 STANDING ON ITS"
+        " JOURNAL, BOTH ARMS ON T036, T030'S BLADE BESIDE THE KEY."
+    )
+    # Round 2 waxes the blades again: its wet joints sit beside them.
+    assert steps[steps.index("2B. ") :].startswith(
+        "2B. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
+        " ON T036, T030'S BLADE BESIDE THE KEY."
+    )
+    for head in ("1V", "2E"):
+        step = steps[steps.index(f"{head}. ") :]
+        assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
+    assert "MHA-DT-03-TL-02 BLADES WITH" in steps
 
 
 def test_bom_split_keeps_the_first_column_no_taller() -> None:

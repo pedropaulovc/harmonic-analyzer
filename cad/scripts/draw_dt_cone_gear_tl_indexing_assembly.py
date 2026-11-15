@@ -89,13 +89,14 @@ SHEET_INNER_BORDER = (
 )
 
 # Sheet metres. The plate face and edge sit top-left at full size, item 2
-# under item 1 at its kit pose; the isometric sits below them, clear of the
-# title block (x >= 0.216 m, y <= 0.066 m); the BOM and the notes fill the
-# right half above it.
+# under item 1 at its kit pose; the isometric sits below them, right of item
+# 2's balloon (below item 2's south end) and clear of the title block
+# (x >= 0.216 m, y <= 0.066 m); the BOM and the notes fill the right half
+# above it.
 FRONT_CENTER = (0.085, 0.190)
 RIGHT_CENTER = (0.170, 0.190)
-ISO_CENTER = (0.085, 0.080)
-ISO_NOTE_XY = (0.050, 0.046)
+ISO_CENTER = (0.150, 0.070)
+ISO_NOTE_XY = (0.120, 0.038)
 # The BOM's template columns print 196.6 mm wide (farm r2 layout audit), so
 # its left edge sits close enough to the views to end inside the right border.
 BOM_ANCHOR = (0.219, 0.262)
@@ -120,7 +121,15 @@ BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     PLATE: (PLATE, None),
     COMB: (COMB, None),
 }
-BALLOON_ANCHORS = {PLATE: BalloonAnchor(), COMB: BalloonAnchor()}
+# Item 2's balloon attaches to the south end of its spring arm, on its face
+# toward the viewer: the balloon then rings out below and left of the comb,
+# clear of its outline, not across its north end.
+BALLOON_ANCHORS = {
+    PLATE: BalloonAnchor(),
+    COMB: BalloonAnchor(
+        point_mm=(0.0, -(comb.GRIP_SPAN + comb.SPRING_WIDTH / 2.0), comb.SHEET_THICK)
+    ),
+}
 # The kit-frame model point (mm) every view is placed by: the plate's centre.
 PLATE_CENTER_MM = (0.0, 0.0, plate.THICKNESS / 2.0)
 # Item 2 has no fitting here: the drive train's bonding step engages it. It
