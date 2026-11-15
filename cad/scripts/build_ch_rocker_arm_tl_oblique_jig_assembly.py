@@ -816,3 +816,4 @@ async def build(adapter) -> dict[str, str]:
 
 if __name__ == "__main__":
     sys.exit(run_build(build))
+# proof serve: comment-only edit, pass 3a
