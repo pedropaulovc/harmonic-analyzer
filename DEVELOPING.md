@@ -3221,7 +3221,7 @@ drawing's own closure changes and its children do not, how often does the new
 source issue the identical COM conversation? These recordings answer it. A
 drawing's are telemetry only: every output, exit code and cache key is an
 unrecorded build's. An assembly's are also the bases of assembly reuse
-("Assembly reuse" below), which ships audited.
+("Assembly reuse" below), served for four labels and audited for the rest.
 
 **What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
 including the fallback after a failed EXPLODE) and every drawing build
@@ -3606,13 +3606,12 @@ and its innermost frame in its detail and INFO line
   recipe differ) and stores under the key. A reuse publishes no recording and
   no explode-base alias; a missing alias only forgoes a later EXPLODE tier.
 
-The assembly mode ships as `audit`: every would-be reuse (`audited`) builds on
-the seat. Mode `reuse` serves only the labels in
-`_replay_shadow.DEPENDENT_SERVE_LABELS` (the measuring stick, the magnifier
-and the two shop fixtures), and audits one of their keys in
-`DEPENDENT_AUDIT_ONE_IN` (4), chosen by the key's hash as for parts. Every
-other would-be reuse is audited. Serving is the one-line change
-`DEFAULT_MODES[BuildKind.ASSEMBLY] = ReplayMode.REUSE`.
+The assembly mode is `reuse` (`DEFAULT_MODES[BuildKind.ASSEMBLY]`), serving
+only the labels in `_replay_shadow.DEPENDENT_SERVE_LABELS` (the measuring
+stick, the magnifier and the two shop fixtures), and auditing one of their
+keys in `DEPENDENT_AUDIT_ONE_IN` (4), chosen by the key's hash as for parts.
+Every other would-be reuse is audited (`audited`: it builds on the seat).
+Back to `ReplayMode.AUDIT` stops serving all of them.
 
 **Audit** (`_replay_shadow._audit_dependent`, after the build's own split).
 The build's recording is compared with the base the attempt chose (the
