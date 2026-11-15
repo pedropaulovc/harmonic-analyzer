@@ -292,6 +292,15 @@ _HIGHEST_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.DRAWING: ReplayMode.REUSE,
 }
 _UNKNOWN_MODES: set[str] = set()
+# Builds that run unrecorded in every mode (#2824). With the COM recorder on,
+# a PD-00 build whose hanger pivot section SOLIDWORKS 34.4.0 generated as a
+# separate SectionAssembly came back from the section's move rebuild
+# self-referential: every drawing component's owner was the root assembly and
+# its children the whole list, itself included, so the component walk never
+# ended and the 900 s COM watchdog killed the leaf (6 of 6 recorded
+# SectionAssembly builds; 4 of 4 unrecorded ones passed). A stopgap until the
+# recorder no longer perturbs that section.
+UNRECORDED_LABELS: frozenset[str] = frozenset({"drawing:pd_paper_drive_assembly"})
 
 
 def mode(kind: BuildKind = BuildKind.PART) -> ReplayMode:
@@ -670,6 +679,12 @@ def plan_dependent(
             f"[com-replay] {kind.value}: describing the build for its recording "
             f"failed ({exc!r}); building unrecorded",
             label=kind.value,
+        )
+        return None
+    if dependent.label in UNRECORDED_LABELS:
+        _telemetry.info(
+            f"[com-replay] {dependent.label}: building unrecorded (UNRECORDED_LABELS, #2824)",
+            label=dependent.label,
         )
         return None
     directory = _fresh_directory(

@@ -1101,7 +1101,8 @@ from that commit; locally `HARMONIC_COM_REPLAY=part=shadow`. See DEVELOPING.md
 drawing builds that run under `rw` are recorded through the same driver and
 engine (`_replay_shadow.plan_dependent`; a drawing keeps its artifact-stem
 argument, also in the exit-92 unrecorded re-run); REFRESH tiers and gates are
-not. Both kinds attempt a reuse before the build (below; per kind:
+not, nor are the labels in `_replay_shadow.UNRECORDED_LABELS` (PD-00, #2824).
+Both kinds attempt a reuse before the build (below; per kind:
 `HARMONIC_COM_REPLAY=drawing=off`). After the store, off the seat, the fresh
 recording is diffed against the nearest earlier recording of the stem under
 the same cache salt made on the same children (every opened model's

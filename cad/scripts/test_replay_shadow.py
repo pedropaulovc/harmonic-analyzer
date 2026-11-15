@@ -3286,6 +3286,35 @@ def test_a_drawing_recording_keeps_its_argument_and_a_name_of_its_own(
     assert len(logged["warn"]) == 1 and "building unrecorded" in logged["warn"][0]
 
 
+@pytest.mark.parametrize("value", [None, "shadow", "record", "drawing=reuse"])
+def test_an_unrecorded_label_builds_unrecorded_in_every_mode(
+    blob, tmp_path, monkeypatch, logged, value
+):
+    # #2824: PD-00 runs as it did before recording existed, whatever the mode;
+    # a drawing of another stem in the same mode still records.
+    if value is None:
+        monkeypatch.delenv(shadow.MODE_ENV, raising=False)
+    else:
+        monkeypatch.setenv(shadow.MODE_ENV, value)
+    assert shadow.UNRECORDED_LABELS == {"drawing:pd_paper_drive_assembly"}
+    stem = "pd_paper_drive_assembly"
+    excluded = shadow.Dependent(
+        shadow.BuildKind.DRAWING,
+        stem,
+        tmp_path / f"draw_{stem}.py",
+        (stem,),
+        {_CHILD: "a" * 64},
+    )
+    assert _planned(excluded, "k" * 64) is None
+    assert logged["info"] == [
+        "[com-replay] drawing:pd_paper_drive_assembly: building unrecorded "
+        "(UNRECORDED_LABELS, #2824)"
+    ]
+    assert not (shadow.RECORDINGS / f"drawing-{stem}").exists()
+    assert _planned(_drawing(tmp_path / f"draw_{_STEM}.py"), "k" * 64) is not None
+    assert logged["warn"] == []
+
+
 def test_a_drawing_rerun_after_a_recorder_fault_keeps_its_argument(
     blob, tmp_path, monkeypatch, logged
 ):
