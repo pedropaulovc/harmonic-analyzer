@@ -304,8 +304,8 @@ async def build(adapter) -> dict[str, str]:
                 raise RuntimeError(
                     f"{dimension_name}: stock/composite reference did not persist"
                 )
-    # The first tap's half-pitch window from the cut end (machinist review
-    # r8): the tap takes the one tooth centre inside it.
+    # The first tap's window from the cut end (machinist review r8, r9): the
+    # builder drills the tooth centre inside it.
     for dimension_name, band in DRAWING_SYMMETRIC_BANDS_MM.items():
         set_dimension_symmetric_tolerance(
             adapter,

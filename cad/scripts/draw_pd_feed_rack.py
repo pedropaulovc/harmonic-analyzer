@@ -210,7 +210,7 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         # swTolNONE = 0: fabricated .XXX controls use the title block; the
-        # first tap station carries its part-authored half-pitch window
+        # first tap station carries its part-authored window
         # (swTolSYMMETRIC = 4). Bought sizes keep part-authored parentheses.
         # Every size here is equation-owned, and an equation-owned dimension
         # reads DrivenState 1, never 2 (build_dt_cone_gear_shaft's station

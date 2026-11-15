@@ -157,12 +157,20 @@ TAP_TOOTH_INDEX = tuple(
     round((x - TOOTH_CENTRE_PHASE_X) / PITCH) for x in TAP_STATION_X
 )
 TAP_X = tuple(TOOTH_CENTRE_PHASE_X + k * PITCH for k in TAP_TOOTH_INDEX)
-TAP_STATION_SLIP_MAX = PITCH / 2.0
 if any(
-    abs(x - station) > TAP_STATION_SLIP_MAX
+    abs(x - station) > PITCH / 2.0
     for x, station in zip(TAP_X, TAP_STATION_X, strict=True)
 ):
     raise AssertionError("a rack tap is more than half a pitch off its station")
+# The first tap's printed window about its place from the cut end, a plain
+# inch step just over half a pitch (machinist review r9, rule 4): the builder
+# drills the tooth centre inside it, the others whole pitches from it, so a
+# tap stands at most this far from its CAD place, the slip the MHA-PD-27
+# hole-to-tap walls pay.
+TAP_START_BAND = 0.050 * MM_PER_IN
+if TAP_START_BAND < PITCH / 2.0:
+    raise AssertionError("the first tap's window holds no tooth centre at some phase")
+TAP_STATION_SLIP_MAX = TAP_START_BAND
 TAP_SPACING_PITCHES = TAP_TOOTH_INDEX[1] - TAP_TOOTH_INDEX[0]
 TAP_SPACING = TAP_SPACING_PITCHES * PITCH
 # On the strip's centreline, located from its front face at the .XXX band.
@@ -920,16 +928,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (#2694, #2147): the receiving geometry has room for any ordinary strip.
 # Each tap stands on its own tooth centre to the .XXX band. The cut ends'
 # tooth phase is not controlled, so the first tap's station from the cut end
-# carries half a pitch, floored to .001 so that only one tooth centre lies in
-# it; the other three are whole pitches from the first tap, printed .XXX on
-# the title block's band (machinist review r7, r8: rule 26, a location is a
-# dimension, not a sentence). The tap's place across the strip is drilled to
-# the title block's .XXX.
+# prints .XX with its plain-step window (TAP_START_BAND), inside which the
+# builder drills a tooth centre; the other three are whole pitches from the
+# first tap, printed .XXX on the title block's band (machinist review r7-r9:
+# rule 26, a location is a dimension, not a sentence; rule 4, a plain inch
+# step). The tap's place across the strip is drilled to the title block's .XXX.
 _PLACES = {
     "Length": 2,
     "RackDepth": 4,
     "RackHeight": 4,
-    "TapStart": TAP_PLACES,
+    "TapStart": 2,
     "TapStation2": TAP_PLACES,
     "TapStation3": TAP_PLACES,
     "TapStation4": TAP_PLACES,
@@ -944,7 +952,6 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-TAP_START_BAND = _floor_in(TAP_STATION_SLIP_MAX)
 # The sizes the builder tolerances itself (swTolSYMMETRIC); every other
 # printed size takes the title block's band or prints as a reference.
 DRAWING_SYMMETRIC_BANDS_MM = {"TapStart": TAP_START_BAND}

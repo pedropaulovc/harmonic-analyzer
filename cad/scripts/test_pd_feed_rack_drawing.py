@@ -86,12 +86,15 @@ def test_taps_stand_on_tooth_centres_at_the_ruled_platen_stations() -> None:
 
 
 def test_the_tap_stations_are_controlling_dimensions() -> None:
-    # Machinist review r7, r8 (rule 26): a location is a dimension, not a
-    # sentence. The first tap's station carries half a pitch, so exactly one
-    # tooth centre lies in its window; the others are whole pitches from it
-    # on the title block's .XXX, as each tap stands on its tooth centre.
+    # Machinist review r7-r9 (rules 26, 4): a location is a dimension, not a
+    # sentence, and an explicit band is a plain inch step. The first tap's
+    # station prints .XX with a window just over half a pitch, so a tooth
+    # centre always lies in it; the others are whole pitches from it on the
+    # title block's .XXX, as each tap stands on its tooth centre.
     band = spec.TAP_START_BAND
-    assert band <= spec.PITCH / 2.0 < band + 0.001 * 25.4
+    assert band == pytest.approx(0.050 * 25.4)
+    assert spec.PITCH / 2.0 <= band and spec.DRAWING_PRECISION_BY_NAME["TapStart"] == 2
+    assert spec.TAP_STATION_SLIP_MAX == band
     assert drawing.DRAWING_SYMMETRIC_BANDS_MM == {"TapStart": band}
     assert builder.DRAWING_SYMMETRIC_BANDS_MM is spec.DRAWING_SYMMETRIC_BANDS_MM
     assert spec.TAP_TOOTH_OFFSET_MAX == spec.TAP_BAND
