@@ -403,8 +403,9 @@ def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
         drawing.BOM_PART_NUMBERS["pd-vn-chain-connecting-link"],
     ):
         assert text in note.replace("\n", " "), text
-    assert drawing.BOM_SHEET_CAPTION.endswith(note)
+    assert f"\n{note}\n" in drawing.BOM_SHEET_CAPTION
     assert drawing.BOM_SHEET_CAPTION.startswith(drawing.BOM_REFERENCE_CAPTION)
+    assert drawing.BOM_SHEET_CAPTION.endswith(drawing.BOM_EXPENDABLES_NOTE)
     # The caption hangs right of the reference view, above the border and
     # left of the title block (rows of at most 36 characters).
     rows = drawing.BOM_SHEET_CAPTION.split("\n")
@@ -412,6 +413,21 @@ def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
     x, y = drawing.BOM_REFERENCE_CAPTION_XY
     assert x > drawing.BOM_REFERENCE_LIMITS[2]
     assert y - len(rows) * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+
+
+def test_bom_sheet_lists_what_the_steps_use_up() -> None:
+    """Machinist review r3, r5 (rule 22): the four spare rack screws cut into
+    transfer screws and the #4-40 transfer screws are named with their counts
+    and steps on the BOM sheet."""
+    note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
+    assert f"{drawing.RACK_SCREWS} MORE {_number(explode.RACK_SCREW)}" in note
+    assert f"{drawing.sub_step('rack-screwed', 0)} MAKES THEM TRANSFER SCREWS" in note
+    assert f"{drawing.sub_step('platen-hung', 0)} USES 8 #4-40 TRANSFER SCREWS" in note
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    rack = " ".join(texts["rack-screwed"][:3])
+    assert f"SPARE {_number(explode.RACK_SCREW)}" in rack and "TRANSFER SCREWS" in rack
+    hung = _step_body("platen-hung")
+    assert "2ND, 4TH, 6TH AND 8TH OF EACH" in hung and "#4-40 TRANSFER SCREW" in hung
 
 
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
@@ -2357,18 +2373,20 @@ def test_the_rack_is_screwed_to_its_guide_before_the_guide_is_set_by_its_crests(
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     rack = texts["rack-screwed"]
     struck = next(i for i, text in enumerate(rack) if "STRIKE" in text)
+    clamped = struck - 1
+    assert rack[clamped].startswith("CLAMP THE RACK")
     screwed = next(
         i for i, text in enumerate(rack)
         if text.startswith("SCREW THE RACK ON") and _number(explode.RACK_SCREW) in text
     )
     assert struck < screwed
-    for index in (struck, screwed):
+    for index in (clamped, screwed):
         assert "ENDS FLUSH" in rack[index]
         assert steps.RACK_FRONT_SET_TEXT in rack[index]
         assert "RULE" in rack[index]
-    assert _number("pd-platen-bottom-guide") in rack[struck]
+    assert _number("pd-platen-bottom-guide") in rack[clamped]
     # The transfer screws are made from spare rack screws in the step.
-    assert "FILE" in " ".join(rack[:struck])
+    assert "FILE" in " ".join(rack[:clamped])
     # The guide is set by the crests before its taps are transferred and
     # again before it is screwed on.
     guides = texts["guides-screwed"]

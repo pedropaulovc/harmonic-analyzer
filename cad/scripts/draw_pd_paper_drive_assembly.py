@@ -1203,7 +1203,6 @@ BOM_CHAIN_ORDER_NOTE = (
     f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS;\n"
     f"{BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} CLOSES THE LOOP."
 )
-BOM_SHEET_CAPTION = f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}"
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
 # The transgear views draw the mounted knob wheel and the stacked shims; the
@@ -1889,6 +1888,22 @@ def sub_step(key: str, index: int) -> str:
     return f"{steps.step_number(key)}{SUB_STEP_LETTERS[index]}"
 
 
+# Rule 22 (machinist review r3, r5): the BOM sheet states what the steps use
+# up beyond the BOM rows: four more MHA-SH-VN-59, cut into the rack's transfer
+# screws, and the #4-40 transfer screws, a bought shop tool, four in each
+# guide's lock taps when the locks are struck.
+LOCK_TRANSFER_SCREWS = 4 * 2
+BOM_EXPENDABLES_NOTE = (
+    f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}:\n"
+    f"{sub_step('rack-screwed', 0)} MAKES THEM TRANSFER SCREWS.\n"
+    f"{sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS} #4-40 TRANSFER\n"
+    "SCREWS, A SHOP TOOL."
+)
+BOM_SHEET_CAPTION = (
+    f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}\n{BOM_EXPENDABLES_NOTE}"
+)
+
+
 # The #4-40 taps spotted through a mating part at assembly: the tap drill
 # the shop's chart names for the thread.
 TAP_4_40_DRILL = "#43"
@@ -2082,25 +2097,28 @@ def _step_text(
         # the guide's top; the guide's four holes are struck from the strip's
         # taps (delegated ruling 2026-11-14 (Main)), the strip's front face
         # set behind the guide's front face against a rule.
+        # One action per sub-step (rule 22; machinist review r3, r5).
         "rack-screwed": (
             f"SCREW A SPARE {n[explode.RACK_SCREW]} SCREW INTO EACH OF THE "
             f"{n['pd-feed-rack']} RACK'S {RACK_SCREWS} TAPS UNTIL IT STOPS.",
-            "CUT EACH SCREW OFF 1/32 PROUD OF THE RACK'S FLAT TOP AND FILE THE "
-            "CUT END TO A POINT: THESE ARE THE TRANSFER SCREWS.",
+            "CUT EACH SCREW OFF .03 PROUD OF THE RACK'S FLAT TOP.",
+            "FILE EACH CUT END TO A POINT: THESE ARE THE TRANSFER SCREWS.",
             f"CLAMP THE RACK, TEETH DOWN, TO THE {n['pd-platen-bottom-guide']} "
             "BOTTOM GUIDE'S UNDERSIDE, ENDS FLUSH, ITS FRONT FACE "
             f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S FRONT FACE, SET "
-            f"AGAINST A RULE, SQUEEZING TO STRIKE THE {RACK_SCREWS} MARKS.",
-            "UNCLAMP AND UNSCREW THE TRANSFER SCREWS WITH PLIERS.",
-            "DRILL AND COUNTERBORE THE GUIDE AT EACH MARK PER "
-            f"{n['pd-platen-bottom-guide']}.",
+            "AGAINST A RULE.",
+            f"SQUEEZE THE CLAMPS TO STRIKE THE {RACK_SCREWS} MARKS.",
+            "UNCLAMP THE RACK.",
+            "UNSCREW THE TRANSFER SCREWS WITH PLIERS.",
+            f"DRILL THE GUIDE AT EACH MARK PER {n['pd-platen-bottom-guide']}.",
+            f"COUNTERBORE EACH HOLE PER {n['pd-platen-bottom-guide']}.",
             f"SCREW THE RACK ON WITH THE {RACK_SCREWS} {n[explode.RACK_SCREW]} "
             "SCREWS FROM THE GUIDE TOP, ENDS FLUSH, ITS FRONT FACE "
             f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S, SET AGAINST A RULE.",
             f"TIGHTEN THE {RACK_SCREWS} RACK SCREWS.",
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
             "DOES NOT SHIFT ON THE GUIDE.",
-            f"IF IT SHIFTS, REPEAT {s('rack-screwed', 5)}-{s('rack-screwed', 7)} "
+            f"IF IT SHIFTS, REPEAT {s('rack-screwed', 9)}-{s('rack-screwed', 11)} "
             f"WITH NEW {n[explode.RACK_SCREW]} SCREWS.",
         ),
         # The top guide's taps are tapped to MHA-PD-11's print; the bottom
@@ -2118,7 +2136,8 @@ def _step_text(
             f"{GUIDE_SPOT_PUNCH.numerator}/{GUIDE_SPOT_PUNCH.denominator} TRANSFER "
             "PUNCH.",
             "UNCLAMP THE BOTTOM GUIDE.",
-            f"DRILL AND TAP EACH SPOT PER {n['pd-platen-bottom-guide']}.",
+            f"DRILL EACH SPOT PER {n['pd-platen-bottom-guide']}.",
+            f"TAP EACH HOLE PER {n['pd-platen-bottom-guide']}.",
             f"CLAMP THE BOTTOM GUIDE AGAIN PER {s('guides-screwed', 1)}.",
             f"SCREW THE GUIDES ON WITH {GUIDE_SCREWS} "
             f"{n['sh-vn-brass-fillister-screw']} SCREWS FROM THE PLATEN FRONT, "
@@ -2130,11 +2149,11 @@ def _step_text(
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS, NEITHER GUIDE MOVES ON "
             "THE PLATEN.",
             f"IF THE TOP GUIDE MOVES, MAKE A NEW {n['pd-platen-guide']} GUIDE AND "
-            f"REPEAT {s('guides-screwed', 0)} AND {s('guides-screwed', 6)}-"
-            f"{s('guides-screwed', 11)} FOR IT.",
+            f"REPEAT {s('guides-screwed', 0)} AND {s('guides-screwed', 7)}-"
+            f"{s('guides-screwed', 12)} FOR IT.",
             f"IF THE BOTTOM GUIDE MOVES, MAKE A NEW {n['pd-platen-bottom-guide']} "
             f"GUIDE, MOVE THE RACK TO IT PER STEP {steps.step_number('rack-screwed')} "
-            f"AND REPEAT {s('guides-screwed', 1)}-{s('guides-screwed', 11)} FOR IT.",
+            f"AND REPEAT {s('guides-screwed', 1)}-{s('guides-screwed', 12)} FOR IT.",
         ),
         "clips-fitted": (
             f"SCREW THE {n['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
@@ -2683,8 +2702,9 @@ def _step_text(
             f"({steps.step_number('rack-screwed')} OR "
             f"{steps.step_number('guides-screwed')}).",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
-            "GUIDE'S SCREWS AND SET IT AGAIN, THE RACK'S CRESTS READING THE SAME AT "
-            "BOTH ENDS ON THE HEIGHT GAUGE.",
+            "GUIDE'S SCREWS.",
+            "WITH THE SCREWS SLACK, SET THE GUIDE AGAIN, THE RACK'S CRESTS READING "
+            "THE SAME AT BOTH ENDS ON THE HEIGHT GAUGE.",
             "WITH THE GUIDE SET AGAIN, TIGHTEN ITS SCREWS.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 2)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
