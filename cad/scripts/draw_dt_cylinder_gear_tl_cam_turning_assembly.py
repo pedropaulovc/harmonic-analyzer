@@ -252,10 +252,11 @@ _KIT += (
 )
 THROW_CHECK_STEP = len(_KIT)
 # Moving the pair leaves all four jaws tight, so the check that follows is
-# the check of the fixture as it is left.
+# the check of the fixture as it is left. The repeat starts where item 2 is
+# turned back toward the indicator, not at the zero (Codjiflo, #2712).
 _KIT += (
     f"IF STEP {THROW_CHECK_STEP} FAILS, LOOSEN ONE JAW OF THE PAIR IN LINE WITH "
-    f"ITEM 2, TIGHTEN THE OTHER, AND REPEAT FROM STEP {THROW_ZERO_STEP}.",
+    f"ITEM 2, TIGHTEN THE OTHER, AND REPEAT FROM STEP {THROW_ZERO_STEP - 1}.",
 )
 _GEAR: tuple[str, ...] = (
     "SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1, ITS NOTCHED "

@@ -1269,7 +1269,7 @@ back (step 10). The chuck is turned half a turn (step 11), which puts the stub t
 farther away, and the shop's gauge blocks .1004, .130 and .450 wrung to .6804 are held between
 the stub and the stylus (step 12). Rocking the chuck and the blocks, the reading must turn back
 within .001 of zero (step 13); if not, one jaw of the pair in line with the stub is loosened and
-the other tightened, and the work repeats from the zero (step 14), which leaves all four jaws
+the other tightened, and the work repeats from step 9 (step 14), which leaves all four jaws
 tight at the check. The gap's errors, each added to the next, are the check's .001, a division
 of reading (.0005), three turn-backs of half a division (.00075) and the stack (.00009): .00234,
 half of it on the throw. With the stack's .00004 rounding and each gear's bore float on the stub

@@ -196,7 +196,8 @@ def test_one_sequence_each_check_follows_the_work_it_verifies() -> None:
     remedy = _step(sheet.THROW_CHECK_STEP + 1)
     assert remedy.startswith(f"IF STEP {sheet.THROW_CHECK_STEP} FAILS, ")
     assert "PAIR IN LINE WITH ITEM 2" in remedy and "TIGHTEN THE OTHER" in remedy
-    assert remedy.endswith(f"REPEAT FROM STEP {sheet.THROW_ZERO_STEP}.")
+    assert remedy.endswith(f"REPEAT FROM STEP {sheet.THROW_ZERO_STEP - 1}.")
+    assert "TURNED TOWARD IT" in placing
     assert "REWORK" not in sheet.ASSEMBLY_STEPS
     assert "FIRST CAM" not in sheet.ASSEMBLY_STEPS
     # Each gear: slide on, check; turn onto the pin, clamp, check, last.
