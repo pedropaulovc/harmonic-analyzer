@@ -241,6 +241,46 @@ preserving ordinary cache provenance; it creates no runtime config file and does
 not affect part, assembly, drawing or other CAD keys/freshness. Unset the six
 variables above to restore defaults on the next build process.
 
+### Machinist-review sweep
+
+A cached verdict stands until the sheet's ink changes, so a review that was
+lenient once is never asked again. The opt-in `review_sweep` task (#2714)
+reviews older sheets again without blocking anything. It is not in `build` or
+`release`, never fails the invocation, and never replaces a cached verdict:
+
+```powershell
+$env:HARMONIC_REVIEW_SWEEP_DAYS = '30'   # default; a whole number of days, or 'all'
+pwsh -NoProfile -File scripts/farm-run.ps1 -PoolHome C:/src/solidworks-pool `
+  -DisplayName 'review sweep' -LeafTimeout 150 `
+  -Targets 'review_sweep:dt_pinion_cam,review_sweep:sm_summing_assembly'
+```
+
+`review_sweep` sweeps every drawing that opts in; `review_sweep:<stem>` sweeps
+one. Each sheet first runs the build's own review leaf in LEARN. The leaf
+restores, adopts or carries the verdict, or reviews a sheet that has none and
+stores that verdict under its key, as a build would. If the verdict is a
+review of this ink no older than `HARMONIC_REVIEW_SWEEP_DAYS`, the sheet is
+`fresh`; if the leaf just reviewed it, it is `reviewed`. Otherwise (a carried
+verdict, an older review, or `all`) the sheet is `re-reviewed` into
+`cad/out/reports/review-sweep/<stem>/`. Expect about 2 minutes and $2.40 per
+review. A teardown writes `review-sweep/summary.{md,json}` and one issue
+draft, `review-sweep/issues/<stem>.md`, for each sheet whose fresh review
+returned FIX with gating findings.
+
+To file the drafts, one issue per sheet:
+
+1. Read each finding against the sheet (`cad/out/pdf/<dashed stem>.pdf`) and
+   delete from the draft every finding the sheet refutes; skip the sheet when
+   none remain.
+2. Look for an open issue first:
+   `gh issue list --state open --label kind:dfm --search "<stem> in:title"`.
+3. If one covers the sheet, add the remaining findings to it as a comment
+   (`gh issue comment <N> --body-file <draft>`). Otherwise
+   `gh issue create --label kind:dfm --title "<stem>: machinist-review sweep findings" --body-file <draft>`.
+
+The sweep's own review does not change the build's verdict. To act on a
+finding, change the sheet: the new ink is reviewed by the next build.
+
 ## Holistic review telemetry
 
 Each aggregate emits one completed `machinist_review.precheck` child span before

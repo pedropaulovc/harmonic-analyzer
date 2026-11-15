@@ -1256,6 +1256,9 @@ verdict (`_review_carry`, `carry/provenance.json`, `review_carried` in
 owner's 2026-11-14 ruling on #2714, and the comparator's documented limits
 apply to verdict reuse: an edit within 1 px or 68 grey levels that changes no
 character carries the earlier verdict.
+The opt-in `review_sweep` task (DEVELOPING.md, "Machinist-review sweep")
+reviews older sheets again without replacing a verdict or failing; it is never
+part of `build` or `release`.
 For Claude this key describes the hashed SDK-first/API-pool, OMP-fallback routing
 policy, not a transport preselected from mutable quota state. The canonical
 cached report preserves each attempt's actual transport and routes; adopters
