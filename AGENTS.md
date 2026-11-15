@@ -1246,7 +1246,8 @@ that prints the same sheet differs only in export time, document `/ID` and
 font-subset tags, and reuses its verdict, `SHIP` or `FIX`; one changed pixel or
 character reviews the sheet again. A verdict published under the earlier
 byte-digest key is adopted under the ink key for the same PDF bytes instead of
-being rolled again.
+being rolled again (`review_adopted_byte_key` in `cache.jsonl`; removed under
+#2811 once a full build of main records none).
 For Claude this key describes the hashed SDK-first/API-pool, OMP-fallback routing
 policy, not a transport preselected from mutable quota state. The canonical
 cached report preserves each attempt's actual transport and routes; adopters

@@ -3774,8 +3774,10 @@ def _adopt_byte_keyed_review(
     """Republish under ``key`` the verdict these exact PDF bytes already have.
 
     Every review published before the ink key is stored under its byte key.
-    Without this, the first build after the change would review every sheet
-    again on ink that has a verdict. Remove once main's sheets are re-published.
+    Without this the first build after the change would review every reviewed
+    sheet again (about 290 reviews, $700 and, at 7% FIX per roll on unchanged
+    ink, about 20 new FIX). Remove it under #2811 once a full build of main
+    records no ``review_adopted_byte_key`` event.
     """
     legacy = _machinist_review_byte_key(stem, profile)
     if legacy == key:
@@ -3786,19 +3788,37 @@ def _adopt_byte_keyed_review(
     except _cache.RestoreLocked as error:
         # The same drawing error policy as a locked probe of the ink key.
         raise OSError(str(error)) from error
-    outcome = _cache.store(key, [directory], label)
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE,
+    ) as store:
+        _tag_cache_key(store, key)
+        store.set_attribute("adopted_from", legacy)
+        outcome = _cache.store(key, [directory], label)
+        store.set_attribute("cache", outcome)
     if outcome == "lost":
-        # Another build published this ink first; its reports are canonical.
+        _adopt_canonical_review(stem, key, directory, label)
+    _cache.record_event(
+        "review_adopted_byte_key", label, key, byte_key=legacy, store=outcome
+    )
+    return True
+
+
+def _adopt_canonical_review(
+    stem: str, key: str, directory: Path, label: str
+) -> dict[str, Any]:
+    """Replace this leaf's reports with those another build published under
+    ``key`` first, and read their verdict. LEARN may soften a review verdict,
+    never a failure to adopt the winning evidence: every failure is fatal."""
+    try:
         shutil.rmtree(directory)
         if not _cache.restore(key, [directory], label):
             raise RuntimeError(
                 f"{label}: lost cache publication but canonical reports "
                 "could not be restored"
             )
-    _cache.record_event(
-        "review_adopted_byte_key", label, key, byte_key=legacy, store=outcome
-    )
-    return True
+        return _read_machinist_aggregate(stem)
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"{label}: could not adopt canonical reports: {error}") from error
 
 
 def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
@@ -3916,19 +3936,7 @@ def _cached_machinist_review_action(
                     store.set_attribute("cache", outcome)
                     _cache.require_refresh_store(label, outcome)
                 if outcome == "lost":
-                    try:
-                        shutil.rmtree(directory)
-                        if not _cache.restore(key, [directory], label):
-                            raise RuntimeError(
-                                f"{label}: lost cache publication but canonical reports "
-                                "could not be restored"
-                            )
-                        aggregate = _read_machinist_aggregate(stem)
-                    except (OSError, ValueError) as error:
-                        # LEARN may soften a review verdict, never failed adoption.
-                        raise RuntimeError(
-                            f"{label}: could not adopt canonical reports: {error}"
-                        ) from error
+                    aggregate = _adopt_canonical_review(stem, key, directory, label)
         else:
             aggregate = _read_machinist_aggregate(stem)
     except (OSError, ValueError) as error:

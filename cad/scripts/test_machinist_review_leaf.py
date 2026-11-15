@@ -1522,21 +1522,28 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     assert cache.last_stored_key("check:machinist_review:probe") is None
 
 
+@pytest.mark.parametrize("published", ["reviewed", "byte-key"])
 @pytest.mark.parametrize("failure", ["missing", "locked", "cleanup", "invalid-aggregate"])
-def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, failure):
+def test_failed_review_adoption_is_fatal_even_in_learn(
+    action, monkeypatch, failure, published
+):
     dodo = action.dodo
     directory = dodo._machinist_review_dir("probe")
     monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
     byte_key = dodo._machinist_review_byte_key("probe", action.profile)
 
     def restore(key, outputs, label):
         assert outputs == [directory]
         if key == byte_key:
-            return False  # nothing was published under the byte key
+            if published == "reviewed":
+                return False  # nothing was published under the byte key
+            _write_aggregate(directory, "SHIP")
+            return True
         if failure == "locked":
             raise dodo._cache.RestoreLocked(label, key, PermissionError("locked"))
         if failure == "invalid-aggregate":
-            directory.mkdir()
+            directory.mkdir(exist_ok=True)
             (directory / "probe.aggregate.json").write_text("{}", encoding="utf-8")
             return True
         return False
