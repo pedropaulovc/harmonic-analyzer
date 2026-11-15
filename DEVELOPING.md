@@ -2542,7 +2542,8 @@ mode, a stopgap for a build the recorder harms. It holds only
 PD-00's hanger pivot section as a separate `SectionAssembly`, a recorded build
 came back from the section's move rebuild with a self-referential component
 tree, and the walk never ended. That happened in 6 of 6 recorded builds,
-while 4 of 4 unrecorded ones passed. The section's reuse attempt still runs.
+while 4 of 4 unrecorded ones passed. The build's reuse attempt still runs (PD-00
+declines it at once as `assembly_sheet`, before any replay).
 Like the switch, the set moves no cache key.
 
 ### Failure handling
