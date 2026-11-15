@@ -143,23 +143,29 @@ def test_assembly_couples_the_free_mounted_wheels_at_their_tooth_diameters(
     # about each wheel's own axis.  The certified free DOF is that crank.
     assert removable.CRANK_CONFIG != removable.KNOB_CONFIG
     seat = stub_seat(monkeypatch, assembly)
-    seat.place_component.side_effect = (
-        lambda _adapter, part, *_args, **_kwargs:
-        f"{part}-{seat.place_component.call_count}"
-    )
+    # SolidWorks numbers instances per component file.
+    placed_names: list[str] = []
+    per_part: dict[str, int] = {}
+
+    def place(_adapter, part, *_args, **_kwargs):
+        per_part[part] = per_part.get(part, 0) + 1
+        placed_names.append(f"{part}-{per_part[part]}")
+        return placed_names[-1]
+
+    seat.place_component.side_effect = place
     seat.component_transform.return_value = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
     adapter = offline_adapter()
     asyncio.run(assembly.build(adapter))
 
     wheels = {}
-    for index, placed in enumerate(seat.place_component.call_args_list, 1):
+    for placed, name in zip(seat.place_component.call_args_list, placed_names):
         if placed.args[1] != "pd-transgear-removable":
             continue
         configuration = placed.kwargs.get("configuration")
         if configuration in (removable.CRANK_CONFIG, removable.KNOB_CONFIG):
             assert configuration not in wheels
             assert placed.kwargs["ground"] is False
-            wheels[configuration] = f"pd-transgear-removable-{index}"
+            wheels[configuration] = name
     crank, knob = wheels[removable.CRANK_CONFIG], wheels[removable.KNOB_CONFIG]
 
     adapter.insert_belt_chain.assert_awaited_once()

@@ -25,7 +25,9 @@ import _config
 from _package_units import drawing_unit
 
 PART_STEM = "sh-vn-fillister-screw-91794a055"
-UNIT = drawing_unit(f"parts/{PART_STEM}", _config.parts(PART_STEM))
+UNIT = drawing_unit(
+    f"parts/{PART_STEM}", _config.parts("sh-vn-fillister-screw-91794a055")
+)
 
 DISC_SCREW_CONFIGURATION = "DiscScrew"
 RACK_SCREW_CONFIGURATION = "RackScrew"
