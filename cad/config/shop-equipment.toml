@@ -837,7 +837,7 @@ cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmon
 [[stock]]
 form = "round_tube"
 material = "4130-N seamless alloy steel tube"
-note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 36 in cut (owner ruling 2026-11-14, #2401). Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail (#2315), both ends sawn and faced after the bend: 23.6 in; the rest, about 12 in, is a trial bend on the form (fixtures.sm-gooseneck-bend-form). Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
+note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 36 in cut (owner ruling 2026-11-14, #2401). Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail at the arm end (#2315) and ~1 in at the foot, both ends sawn and faced after the bend: 24.6 in; the rest, about 11 in, is a trial bend on the form (fixtures.sm-gooseneck-bend-form). Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
 od_mm = 12.7
 wall_mm = 1.651
 length_mm = 914.4

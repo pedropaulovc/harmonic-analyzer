@@ -56,6 +56,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -79,6 +80,7 @@ from sm_gooseneck_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    OVERALL_HEIGHT_TOLERANCE_MM,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
@@ -171,19 +173,18 @@ def _author_reference_dimensions(adapter) -> None:
     carries a callout below (the tube's stock wall, the bend's "TUBE
     CENTERLINE") would read its callout as reference too (machinist review
     of 6b67c9516).  Those bracket only their value with a "(" prefix and ")"
-    suffix: the Ø carries SolidWorks' own "<MOD-DIAM>" token, since a custom
-    prefix replaces the Ø glyph, and the radius keeps whatever prefix its
-    display already carries behind the "(" so its R glyph stays
-    (draw_dt_crank_handle._style_radius)."""
+    suffix.  A custom prefix replaces SolidWorks' own glyph, so each carries
+    it: the Ø as SolidWorks' "<MOD-DIAM>" token, the radius as the letter R
+    (pd_guide_lock's "4X R", farm run 20261012T061737079Z printed "4X 1.8"
+    without it)."""
+    open_parens = {"TubeOdReference": "(<MOD-DIAM>", "BendPath": "(R"}
     for feature, names in REFERENCE_DIMENSIONS.items():
         resolved = _named_dimensions(adapter, feature, set(names))
         for name in names:
             display, _dimension = resolved[name]
             if name in DIMENSION_CALLOUTS.get(feature, {}):
                 existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
-                open_paren = (
-                    "(<MOD-DIAM>" if feature == "TubeOdReference" else "(" + existing
-                )
+                open_paren = open_parens[feature]
                 display.SetText(1, open_paren)
                 display.SetText(2, ")")  # swDimensionTextSuffix
                 applied = (str(display.GetText(1)), str(display.GetText(2)))
@@ -732,6 +733,15 @@ async def build(adapter) -> dict[str, str]:
     # its wall callout, so _author_reference_dimensions writes its
     # "(<MOD-DIAM>" prefix.
     _author_reference_dimensions(adapter)
+    # The foot's loose band (spec OVERALL_HEIGHT_TOLERANCE_MM), native on the
+    # overall height's source dimension; the .XX row would hold it to ±.01.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "OverallReference",
+        "OverallHeight",
+        OVERALL_HEIGHT_TOLERANCE_MM,
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.

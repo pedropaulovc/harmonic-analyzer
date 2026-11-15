@@ -128,7 +128,7 @@ BEND_TANGENT_Y = _front_y(LEG_TOP)
 # edge by 3.6 mm (farm run 20261107T102825912Z: "TO TUBE CENTERLINE" centred
 # 19 mm right ran under the arc) and ends 8 mm short of the overall height's
 # line, its bottom row over the leg length's upper extension line.
-# The reference overall height (foot face to the arm's top) stands outermost
+# The overall height (foot face to the arm's top, ±.10) stands outermost
 # on the leg's right, beyond the leg length (its text ended at x 0.310 in farm
 # run 20261101T004958072Z) and short of the title block's left edge, so its
 # foot extension line stays off the title block; its text at the view's

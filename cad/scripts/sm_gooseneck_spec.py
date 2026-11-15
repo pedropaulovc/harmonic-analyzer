@@ -17,9 +17,10 @@ Owner ruling 2026-11-14 (Pedro), #2401: "Loosen first ... make the radius
 reference ... bend on a simple form"; "no need to check only where the
 tube's two ends finish matters".  Every size is a native model dimension on
 the elevation.  The two that govern are where the ends finish, both to real
-faces at the title block: the overall height (foot face to the arm's top)
-and the overall reach (faced arm end to the leg's outer side); the leg and
-arm stay square to each other at the title block's implied 90°.  The bend's
+faces: the overall height (foot face to the arm's top, ±.10: the leg slides
+in its hub, so the foot needs little) and the overall reach (faced arm end
+to the leg's outer side, the title block's .XX); the leg and arm stay square
+to each other at the title block's implied 90°.  The bend's
 centreline radius, the leg length and arm straight (each to a bend tangent),
 and the tube's stock Ø are references.  The one note is the bend's
 acceptance, NO KINKS.
@@ -131,12 +132,20 @@ TUBE_OD_REF_Y = round(geom.LEG_TOP - geom.LEG_LENGTH / 4.0, 1)
 TUBE_OD_REF_SPAN = 20.0
 # Inch places (#290).  The leg length and bend radius are references at
 # their one-place sizes.  The overall reach sets the faced arm end, the
-# spring eye's station less the end plug's head, and the overall height the
-# faced foot: both at the title block's .XX (the snapped leg puts the height
-# at 19.650, a one-place tie), as is the arm straight.  The stock Ø (REF)
-# prints at its three-place size.
+# spring eye's station less the end plug's head: the title block's .XX.  The
+# overall height prints at two places only because the snapped leg puts it
+# at 19.650, a one-place tie; its band is OVERALL_HEIGHT_TOLERANCE_MM, not the
+# .XX row's.  The arm straight (REF) prints at two places, the stock Ø (REF)
+# at its three-place size.
 ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius"})
 THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef"})
+# The foot only has to leave the straight leg spanning MHA-FR-02's hub bore
+# (build_sm_summing_assembly._assert_gooseneck_leg_spans_hub_bore): at the
+# settled setting the leg runs 5.36 in below the bore and its bend tangent
+# 9.3 in above it, so neither the foot's finish nor a hand bend's springback
+# comes near it.  The foot is held to ±.10, the band the leg's .X length
+# carried before #2401 (codjiflo on PR #2809: .XX ±.01 served no function).
+OVERALL_HEIGHT_TOLERANCE_MM = 0.10 * geom.MM_PER_IN
 
 
 def places(name: str) -> int:

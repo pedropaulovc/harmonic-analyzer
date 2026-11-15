@@ -235,9 +235,12 @@ def test_references_and_the_governing_end_sizes() -> None:
     referenced = set().union(*spec.REFERENCE_DIMENSIONS.values())
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked - referenced == {"OverallHeight", "OverallReach"}
-    # Both governing sizes sit at the title block's .XX row.
-    assert spec.DRAWING_PRECISION_BY_NAME["OverallHeight"] == 2
+    # The reach sits at the title block's .XX row.  The height prints at two
+    # places (a one-place tie) but the foot only has to leave the leg
+    # spanning the hub, so its own band is looser than the .XX row's.
     assert spec.DRAWING_PRECISION_BY_NAME["OverallReach"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallHeight"] == 2
+    assert spec.OVERALL_HEIGHT_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
     # The tube Ø's reference line runs on the leg, below the bend tangent.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
@@ -271,9 +274,9 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
     tube = displays["TubeOdRef"]
     assert (tube.GetText(1), tube.GetText(2)) == ("(<MOD-DIAM>", ")")
     assert not tube.ShowParenthesis
-    # The radius keeps its own prefix (its R glyph) behind the "(".
+    # A custom prefix replaces SolidWorks' own R, so the radius carries it.
     radius = displays["BendRadius"]
-    assert (radius.GetText(1), radius.GetText(2)) == ("(", ")")
+    assert (radius.GetText(1), radius.GetText(2)) == ("(R", ")")
     assert not radius.ShowParenthesis
     for name in ("ArmStraight", "LegLength"):
         assert displays[name].ShowParenthesis
@@ -342,10 +345,12 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     assert row["od_mm"] == pytest.approx(geom.TUBE_DIA)
     assert row["wall_mm"] == pytest.approx(geom.WALL_T)
     # Leg, the bend's centreline arc and the arm straight, plus the owner's
-    # ~2 in tail (#2315), inside the supplier's -1/8 in cut tolerance, and
-    # about 12 in left over for a trial bend (owner ruling 2026-11-14, #2401).
+    # ~2 in tail at the arm end (#2315) and ~1 in to face the foot (both ends
+    # are faced after the bend, #2401), inside the supplier's -1/8 in cut
+    # tolerance, and about 11 in left over for a trial bend (owner ruling
+    # 2026-11-14, #2401).
     developed = geom.LEG_LENGTH + math.pi / 2.0 * geom.BEND_R + geom.TUBE_STRAIGHT
-    part_length = developed + 2.0 * geom.MM_PER_IN
+    part_length = developed + 3.0 * geom.MM_PER_IN
     assert row["length_mm"] == pytest.approx(36.0 * geom.MM_PER_IN)
     assert row["length_mm"] - 3.175 - part_length >= 10.0 * geom.MM_PER_IN
     # The form it is bent on is a shop record, made in the shop, not bought.
