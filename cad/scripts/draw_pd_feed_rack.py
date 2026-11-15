@@ -133,6 +133,9 @@ END_CAPTION = f"VIEW {VIEW_LETTER}\nSCALE {END_SCALE[0]}:{END_SCALE[1]}"
 END_NOTE_XY = (0.343, 0.077)
 ISO_NOTE_XY = (0.104, 0.077)
 NOTE_HEIGHT = 0.0025
+# swDisplayMode_e.swSHADED; the getter may read it or swSHADED_EDGES (7).
+_SW_SHADED = 3
+_SHADED_MODES = (3, 7)
 
 
 def _require_saved_taps(model: Any) -> None:
@@ -249,6 +252,15 @@ def _add_sheet_notes(adapter: Any, front: Any) -> None:
             raise RuntimeError(f"failed to insert the {label}")
 
 
+def _set_shaded_with_edges(view: Any) -> None:
+    """Put ``view`` in precise Shaded With Edges and read the mode back."""
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayMode4(False, _SW_SHADED, False, True, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode not in _SHADED_MODES or not bool(bound.GetDisplayEdgesInShadedMode()):
+        raise RuntimeError(f"feed rack isometric did not go Shaded With Edges ({mode})")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -297,10 +309,8 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=END_SCALE)
     # The built-in isometric looks from +Y, the teeth, and hides the four taps
-    # that open on the flat top (-Y); with no thread in sight its cosmetic
-    # threads read draft quality and finalize refuses the shaded view (r2-r4).
-    # The FRONT-BOTTOM-RIGHT octant the part names shows the tapped flat
-    # (draw_dt_pinion_cam).
+    # that open on the flat top (-Y); the FRONT-BOTTOM-RIGHT octant the part
+    # names shows the tapped flat (draw_dt_pinion_cam).
     iso = place_view(
         adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=ISO_SCALE
     )
@@ -353,17 +363,25 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         add_property_linked_note(adapter, property_name, *position, char_height=NOTE_HEIGHT)
     _add_sheet_notes(adapter, front)
-    # The shaded isometric's taps need their cosmetic threads imported for
-    # finalize's precise Shaded With Edges (cosmetic_threads read False
-    # without it, r2 and r3), before the cleanup below so any label the
-    # import pins is counted then (draw_dt_cone_tip_gear_tl_cutter_bar).
-    import_cosmetic_threads(adapter, iso)
-    # SolidWorks pins its own "Tapped Hole" note beside a tap's native callout;
-    # the callout already states the thread.
-    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
-    _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
+    # Every view, the isometric included, through HLR once more: an annotation
+    # attached after placement can leave a view's edge set unregenerated.
     for view in (front, bottom, end, iso):
         set_hidden_lines_removed(adapter, view)
+    # On this part every SetDisplayMode4 leaves the views' cosmetic threads at
+    # draft quality and only the cosmetic-thread import's rebuild lifts them to
+    # precise (farm probe 959ae11: True after the import, False again after
+    # the HLR loop and after a shaded transition, on the octant and the
+    # standard isometric alike; r2-r5 failed finalize on it). So the isometric
+    # goes Shaded With Edges first and the import follows; finalize's own
+    # SetDisplayMode4 then finds the mode already set and leaves the threads.
+    _set_shaded_with_edges(iso)
+    import_cosmetic_threads(adapter, iso)
+    # SolidWorks pins its own "Tapped Hole" note beside a tap's native callout
+    # (and the import may pin one); the callout already states the thread.
+    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
+    if not bool(_early_bound(iso, "IView").GetCThreadQuality()):
+        raise RuntimeError("feed rack isometric: cosmetic threads still draft quality")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
