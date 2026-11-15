@@ -32,12 +32,15 @@ from pd_transgear_feed_pinion_spec import (
     BORE_DIAMETRAL_CLEARANCE,
     HUB_NUMBER,
     PIN_NUMBER,
-    RACK_NUMBER,
     TEETH,
     TOOTHSPACE_GAUGE_DIA_MM,
     TOOTH_SPACE_RUNOUT_TIR_MM,
 )
 from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
+
+# The screwed feed rack (#2410).  It lives here, not in the spec, so naming
+# it re-keys only this sheet; the spec's RACK_NUMBER is the retired strip's.
+RACK_NUMBER = "MHA-PD-26"
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow

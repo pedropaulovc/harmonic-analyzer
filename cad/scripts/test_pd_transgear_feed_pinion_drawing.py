@@ -147,7 +147,7 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     ]
     sheet = "\n".join(texts)
     assert "DIA CLR" not in sheet and not re.search(r"\bCLR\b", sheet)
-    assert f"MATES WITH:  PLATEN RACK {spec.RACK_NUMBER}" in drawing.GEAR_DATA_NOTE
+    assert f"MATES WITH:  FEED RACK {callouts.RACK_NUMBER}" in drawing.GEAR_DATA_NOTE
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
@@ -372,7 +372,7 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     assert max(len(line) for line in lines) <= 70
     # Short names, printed under the value, so the text stands left of VIEW
     # C's rear face; the rack's number prints where its width is covered.
-    assert spec.RACK_NUMBER in callouts.FULL_DEPTH_CALLOUT
+    assert callouts.RACK_NUMBER in callouts.FULL_DEPTH_CALLOUT
     assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
     # Their witnesses run along the floor of the gap facing the outside
     # view: model 195°, a gap centre (gap centres at 15° + k·30°).
@@ -562,7 +562,7 @@ def test_sheet_text_names_the_right_parts() -> None:
         "pd-transgear-pin": spec.PIN_NUMBER,
         "pd-transgear-disc-hub": spec.HUB_NUMBER,
         "pd-rack-pinion": spec.DISC_NUMBER,
-        "pd-feed-rack": spec.RACK_NUMBER,
+        "pd-feed-rack": callouts.RACK_NUMBER,
     }
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem
@@ -1063,7 +1063,7 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
             f"#{spec.CUTTER_NUMBER}, "
             f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
-        ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
+        ("MATES WITH", f"FEED RACK {callouts.RACK_NUMBER}"),
     ):
         assert f"{label}:  {value}" in drawing.GEAR_DATA_NOTE
     # The span prints once, on the end view with its limits.

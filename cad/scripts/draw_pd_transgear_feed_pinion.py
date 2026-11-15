@@ -94,7 +94,6 @@ from pd_transgear_feed_pinion_spec import (
     OVERALL_LENGTH,
     PITCH_DIA,
     PRESSURE_ANGLE_DEG,
-    RACK_NUMBER,
     RADIAL_SETTING,
     SURFACE_FINISHES,
     TEETH,
@@ -488,7 +487,7 @@ GEAR_DATA_ROWS = (
     ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-    ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
+    ("MATES WITH", f"FEED RACK {callouts.RACK_NUMBER}"),
     # Three short lines keep the block left of the bore's callout.
     (
         "SPAN MATCHED FIT",
