@@ -2536,6 +2536,15 @@ it) and launch from that commit; because the module is in no recipe closure, no
 cache key moves. On one machine, `HARMONIC_COM_REPLAY=shadow` (or
 `part=shadow`) does the same for local builds.
 
+`_replay_shadow.UNRECORDED_LABELS` names builds that run unrecorded in every
+mode, a stopgap for a build the recorder harms. It holds only
+`drawing:pd_paper_drive_assembly` (#2824). When SOLIDWORKS 34.4.0 generates
+PD-00's hanger pivot section as a separate `SectionAssembly`, a recorded build
+came back from the section's move rebuild with a self-referential component
+tree, and the walk never ended. That happened in 6 of 6 recorded builds,
+while 4 of 4 unrecorded ones passed. The section's reuse attempt still runs.
+Like the switch, the set moves no cache key.
+
 ### Failure handling
 
 A failure of the recorder's own code (never the script's or SolidWorks') is
