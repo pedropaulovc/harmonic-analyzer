@@ -2336,9 +2336,10 @@ would be pure cost. In the default mode, `reuse`, a part whose key misses is
 first replayed, with SolidWorks absent, against the nearest earlier real
 build's recording bound to its archive; when that proves the current source
 issues the same conversation, the earlier archive becomes this key's outputs
-and no COM runs ("Reuse" below). Every other build is recorded and judged
-exactly as in `shadow` mode, where nothing is reused: every output, exit code
-and cache key is what an unrecorded build produces.
+and no COM runs ("Reuse" below; assemblies: "Assembly reuse"). Every other
+build is recorded and judged exactly as in `shadow` mode, where nothing is
+reused: every output, exit code and cache key is what an unrecorded build
+produces.
 
 ### What is recorded
 
@@ -2436,13 +2437,14 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 comma-separated items, each a mode for every kind (`shadow`) or for one kind
 (`part=`, `assembly=` or `drawing=`), a later item winning: `shadow,drawing=off`
 shadows parts and assemblies and leaves drawings unrecorded. Unset or empty is
-`_replay_shadow.DEFAULT_MODES`: parts `reuse`, assemblies and drawings `shadow`.
-An assembly or drawing never runs above `shadow` (`reuse` shadows them). The
-modes, for a part:
+`_replay_shadow.DEFAULT_MODES`: parts `reuse`, assemblies `audit`, drawings
+`shadow`. A drawing never runs above `shadow` (`audit` and `reuse` shadow it).
+The modes, for a part (an assembly's: "Assembly reuse" below):
 
 | value | effect |
 | --- | --- |
 | `reuse` (default, also unset or empty) | before the seat, try to reuse a real build's bound archive ("Reuse" below); otherwise as `shadow` |
+| `audit` | as `reuse`, but every key is audited: the attempt runs through its decision, and a would-be reuse builds on the seat and is judged against its base (a soundness alarm still revokes it); nothing is reused |
 | `shadow` | record, publish, then evaluate a shadow replay; nothing is reused (a forced refresh still revokes what it replaces) |
 | `record` | record and publish; no lookup or replay (a forced refresh still revokes what it replaces) |
 | `off` | the kill switch: the build runs the command it ran before recording existed, and the engine is never imported |
@@ -3058,7 +3060,7 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 
 | span | attributes |
 | --- | --- |
-| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.marker` (the `reused/` marker's publication); a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
+| `replay.reuse <label>` | mode `reuse`, before the seat: `replay.reuse_decision` (`reused`/`audited`/`declined:<reason>`), `replay.decline`, `replay.detail`, `replay.phase` (faults only), `replay.lookup`/`listed`/`read`/`unusable`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.verdict`, `replay.served`, `replay.recorded`, `replay.<phase>_s` (`lookup`, `bundle`, `replay`, `archive`, `verify`, `publish`), `replay.bundle_bytes`, `replay.title_echoes` (an assembly's echoed title counters), `replay.archive_bytes`, `replay.token`, `replay.store`, `replay.marker` (the `reused/` marker's publication); a reuse's `task <label>` span (`cache=reuse`, `com=none`) is inside it |
 | `replay.after_build <label>` | `replay.outcome`, `replay.reuse_decision` (mode `reuse`); encloses every span below and the whole off-seat step |
 | `replay.record_overhead <label>` | `replay.engine_s`, `replay.escape_audit_s`, `replay.window_s`, `replay.overhead_pct`, `replay.recipe_requests`, `replay.inert_calls`, `replay.capture_stored_bytes` |
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
@@ -3216,9 +3218,10 @@ Measured 2026-11-09..12, assemblies cost 34 seat-hours and drawings 35, and
 changed. Keying them on their children's content instead saves about 1%. The
 question part reuse answered for parts is open for them: when an assembly's or
 drawing's own closure changes and its children do not, how often does the new
-source issue the identical COM conversation? These recordings answer it. They
-are telemetry only: every output, exit code and cache key is an unrecorded
-build's, and nothing is ever reused.
+source issue the identical COM conversation? These recordings answer it. A
+drawing's are telemetry only: every output, exit code and cache key is an
+unrecorded build's. An assembly's are also the bases of assembly reuse
+("Assembly reuse" below), which ships audited.
 
 **What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
 including the fallback after a failed EXPLODE) and every drawing build
@@ -3546,6 +3549,121 @@ dependencies
 | summarize builds=count(), p50_seat_s=percentile(seat_s, 50),
             p95_seat_s=percentile(seat_s, 95), p50_pct=percentile(pct, 50),
             p95_pct=percentile(pct, 95) by kind
+```
+
+#### Assembly reuse
+
+A FULL assembly build reuses as a part does ("Reuse" above), with the checks
+that its children require (`_replay_shadow._prepare_dependent`, called by
+`reuse_attempt` with a `DependentBuild` from `build_or_refresh` on a cache
+miss, before the seat; a stem with a `POST_ASSEMBLY` hook never tries). The
+assembly recordings probed 2026-11-14 (`ms_measuring_stick`, `mg_magnifier`,
+`pd_paper_drive` and `dt_drive_train` among them) name no output path outside
+the engine's redirect, no script argument and no Python read of an output the
+log did not capture (`replay_gaps`), so the engine replays an assembly
+unchanged: SolidWorks' answers for the models it opens come from the log. The
+script itself, though, checks in Python that each child's model exists under
+the redirected output root (`_assembly.place_component`'s `missing part`):
+`com_replay.py replay --kind assembly` first copies every output-root file the
+log read and did not write from the output root into the scratch root
+(`staged`, each one's SHA-256; one the script leaves unchanged is no Python
+output). Without it, both proof leaves declined `replay_error` after 15
+requests (2026-11-14). A replay that raised names the exception, its message
+and its innermost frame in its detail and INFO line
+(`<type>: <message> (at <file>:<line> in <function>)`,
+`_replay_shadow.script_error`; parts too).
+
+- **Children.** The base must have been made on this build's children
+  (`dodo._child_identities`: every token the same SHA-256 as now; a token
+  that holds none declines `children_unknown`; bound recordings of the stem
+  none of which were made on these children decline `children_changed`).
+  Each child's model is the file beside its token (`<dir>/.<name>.execution`
+  beside `<dir>/<name>.SLDPRT`, `.SLDASM` under `sldasm`; pinned for every
+  stem by test).
+- **Differing inputs.** A child's model among the key inputs is a SolidWorks
+  document whose digest is its recipe's, not its bytes': where it differs from
+  the base's, the equal token judges it, so it is neither `seat_inputs`' nor
+  `unexecuted_inputs`' refusal. Any other differing SolidWorks document still
+  declines `unjudged_input`.
+- **What SolidWorks opens.** Every output-root file the replay's log names
+  that it did not capture (`solidworks_out_inputs`) must be a child's model,
+  and must hold the bytes its token names now (`child_mismatch` otherwise);
+  any other declines `unjudged_input`.
+- **Title counters.** An assembly script echoes the titles SolidWorks gives
+  the documents it makes (`Assem3` in `SelectByID2` and `ActivateDoc3`; 16
+  requests in `ms_measuring_stick`'s replay), which a build here would ask
+  with its own counters: the split's `title_echo` no-op. Unlike a part's,
+  such a replay is not declined (`seat_state_echo` only when the replay did
+  not report them); the count is the record's `title_echoes`, and the audit
+  judges the outcome.
+- **Outputs.** As for a part, but the input ledger, which dodo rewrites after
+  any build and no replay writes, is left out of the comparison (`rewritten`),
+  and every Python output must be the base's, byte for byte.
+- **Serving.** `dodo._reuse_assembly` installs the archive, re-stamps the
+  `.execution` token (which must be the base's), publishes the `reused/`
+  marker, then rewrites the input ledger from the current inputs (a failure
+  before that leaves the base's ledger, so the next tier decision sees the
+  recipe differ) and stores under the key. A reuse publishes no recording and
+  no explode-base alias; a missing alias only forgoes a later EXPLODE tier.
+
+The assembly mode ships as `audit`: every would-be reuse (`audited`) builds on
+the seat. Mode `reuse` serves only the labels in
+`_replay_shadow.DEPENDENT_SERVE_LABELS` (the measuring stick, the magnifier
+and the two shop fixtures), and audits one of their keys in
+`DEPENDENT_AUDIT_ONE_IN` (4), chosen by the key's hash as for parts. Every
+other would-be reuse is audited. Serving is the one-line change
+`DEFAULT_MODES[BuildKind.ASSEMBLY] = ReplayMode.REUSE`.
+
+**Audit** (`_replay_shadow._audit_dependent`, after the build's own split).
+The build's recording is compared with the base the attempt chose (the
+split's comparison when the split chose that base, else a diff on the bundle
+the attempt verified, never downloaded again), and the would-be reuse is
+judged as a part's replay no-op is (`noop_judgement`):
+
+- `confirmed`: the base's assembly;
+- `soundness_alarm`: another assembly than the base's. This is an ERROR
+  (`[com-replay] SOUNDNESS ALARM assembly:<stem>: ...`), the base is revoked,
+  and the INFO line carries `SOUNDNESS ALARM`.
+- `output_nondeterminism`: another output that the comparison explains by the
+  seat (a jagged crop outline, the drawing display), when the seat led: the
+  requests were the base's, or SolidWorks answered otherwise first (a
+  `response:` cause). Another output after a `request` divergence stays a
+  `soundness_alarm`. WARN, no revocation.
+- `seat_nondeterminism` or `seat_path_divergence`: the base's assembly,
+  reached through other answers or detours of the seat; recorded, no log.
+- `noop_unexplained_divergence` or `noop_outcome_unknown`: WARN.
+- `unjudged` (`audit_why`): nothing judges the attempt, as when the leaf took
+  a REFRESH tier (`replay_audit` record from `dodo.build_or_refresh`), a peer
+  published the key first, or the build left no recording. WARN, so the
+  audited and judged counts reconcile.
+
+The record carries `audit`, `audit_cause`, `audit_split`, `audit_outcome`,
+`audit_signals`, `audit_s` and `audit_base_key` (the span `replay.audit
+<label>` the same); the INFO line carries `audit=<judgement> base=<key>`. A
+forced refresh of an assembly key revokes it as a base only when a recording
+of it is published (its manifest read by name, under its children's group or
+none; a read the cache cannot answer fails the revocation in a WARN, never
+reads as unpublished), and always the origin its `reused/` marker names.
+
+Would-be reuses and their audits per stem:
+
+```kusto
+dependencies
+| where timestamp > ago(7d) and name startswith "replay.reuse assembly:"
+| extend label=tostring(customDimensions.label),
+         decision=tostring(customDimensions["replay.reuse_decision"])
+| summarize attempts=count(), audited=countif(decision == "audited"),
+            reused=countif(decision == "reused") by label
+| join kind=leftouter (
+    dependencies
+    | where timestamp > ago(7d) and name startswith "replay.audit assembly:"
+    | extend label=tostring(customDimensions.label),
+             audit=tostring(customDimensions["replay.audit"])
+    | summarize judged=countif(audit != "unjudged"), unjudged=countif(audit == "unjudged"),
+                confirmed=countif(audit == "confirmed"),
+                alarms=countif(audit == "soundness_alarm") by label
+) on label
+| order by attempts desc
 ```
 
 ## Native projected geometric-control zones

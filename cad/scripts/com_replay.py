@@ -21,22 +21,27 @@
     code is the build's, and the summary's ``faults`` mark the recording
     unusable.
 
-``replay <script> --log P --seat-log P --scratch DIR --result P [--base-outputs DIR] [--capture-dir DIR]``
+``replay <script> --log P --seat-log P --scratch DIR --result P [--kind K] [--base-outputs DIR] [--capture-dir DIR]``
     Run the script with SolidWorks absent, serving the log: no live COM, no
     write outside DIR (bar the temporary and telemetry directories), no
     connection beyond loopback, no OTLP export. ``--seat-log`` is a recording
     made on the seat the replay stands for (the shadow passes the build's own;
     a reuse attempt, which stands for the base's seat, the base's): a
     SolidWorks revision other than the log's refuses the replay
-    (``input_mismatch``). ``--base-outputs`` compares the Python-written
-    outputs with that output root, file by file. The result also names the
-    repository files the build script's own execution imported or opened for
-    reading, never the engine's (``python_files``); those the log's COM
-    arguments name, which SolidWorks opens itself (``solidworks_inputs``;
-    output-root paths that are not the log's captured outputs:
-    ``solidworks_out_inputs``); and the log's recipe requests that carry a
-    document title counter (``title_echoes``). Exits 0 for a no-op verdict,
-    91 for any other verdict, 1 for an infrastructure failure.
+    (``input_mismatch``). ``--kind assembly`` or ``drawing`` first copies
+    into DIR the output-root files the recording read that it did not write
+    (the models SolidWorks opened, those the script's Python read), from the
+    output root: ``staged``, each one's SHA-256, none of them a
+    ``py_outputs`` entry unless the script changed it. ``--base-outputs``
+    compares the Python-written outputs with that output root, file by file.
+    The result also names the repository files the build script's own
+    execution imported or opened for reading, never the engine's
+    (``python_files``); those the log's COM arguments name, which SolidWorks
+    opens itself (``solidworks_inputs``; output-root paths that are not the
+    log's captured outputs: ``solidworks_out_inputs``); and the log's recipe
+    requests that carry a document title counter (``title_echoes``). Exits 0
+    for a no-op verdict, 91 for any other verdict, 1 for an infrastructure
+    failure.
 
 ``diff <a> <b> [--result P] [--kind K] [--base-sidecars DIR] [--new-sidecars DIR]``
     Request divergence and per-member response differences between two logs
@@ -67,6 +72,7 @@ import gzip
 import json
 import math
 import os
+import shutil
 import sys
 import types
 from collections.abc import Iterator
@@ -138,6 +144,12 @@ def _parser() -> argparse.ArgumentParser:
         help="a recording made on the seat the replay stands for (its revision)",
     )
     replay.add_argument("--scratch", type=Path, required=True)
+    replay.add_argument(
+        "--kind",
+        choices=("part", "assembly", "drawing"),
+        default="part",
+        help="what the build makes (an assembly's or drawing's inputs are staged)",
+    )
     replay.add_argument("--result", type=Path, required=True)
     replay.add_argument(
         "--base-outputs",
@@ -548,6 +560,44 @@ def _keep_argv(conversation: Any, argv: list[str]) -> Iterator[None]:
         conversation.run_script = run_script
 
 
+@contextlib.contextmanager
+def _staged_inputs(
+    conversation: Any, kind: str, inputs: Any, staged: dict[str, str]
+) -> Iterator[None]:
+    """An assembly's or drawing's replay with the output-root files its
+    recording read in the scratch root, where the build's redirected paths
+    (``_paths.OUT_*``) look for them: ``inputs()``, the models SolidWorks
+    opened and the files the script's Python read, none of them the log's
+    captured outputs, copied from the output root once the engine has made
+    the scratch root (``staged``: each one's SHA-256). SolidWorks is absent,
+    but the script's own checks are not: without them, one that checks a
+    child exists before placing it (``_assembly.place_component``) raises.
+    The copies are the current children, whose bytes a reuse attempt then
+    requires to be the ones their tokens name. A part's replay is left as it
+    is."""
+    if kind == "part":
+        yield
+        return
+    redirect, real = conversation.redirect_outputs, conversation.OUT_ROOT
+
+    def staging(out_root: Path) -> None:
+        redirect(out_root)
+        for relative in inputs():
+            source = real / relative
+            if not source.is_file():
+                continue
+            target = out_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            staged[relative] = conversation.sha256_file(target)
+
+    conversation.redirect_outputs = staging
+    try:
+        yield
+    finally:
+        conversation.redirect_outputs = redirect
+
+
 def _record(args: argparse.Namespace, script: Path) -> int:
     # _telemetry is imported only once the build is over: until the script
     # imports it, this process is the build process, timed and labelled as one.
@@ -704,24 +754,41 @@ def main(argv: list[str] | None = None) -> int:
         return found
 
     conversation.load = keeping
+    staged: dict[str, str] = {}
+
+    def recorded_inputs() -> list[str]:
+        trailer = loaded[log_path].trailer
+        reads = {str(entry[0]) for entry in trailer.get("reads") or [] if entry}
+        return sorted((set(_out_paths(trailer)) | reads) - _captured(trailer))
+
     try:
-        result = conversation.replay_build(
-            script,
-            log_path,
-            args.scratch.resolve(),
-            args.base_outputs.resolve() if args.base_outputs else None,
-            capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
-            seat_log=args.seat_log.resolve(),
-        )
+        with _staged_inputs(conversation, args.kind, recorded_inputs, staged):
+            result = conversation.replay_build(
+                script,
+                log_path,
+                args.scratch.resolve(),
+                args.base_outputs.resolve() if args.base_outputs else None,
+                capture_dir=args.capture_dir.resolve() if args.capture_dir else None,
+                seat_log=args.seat_log.resolve(),
+            )
     finally:
         conversation.load = load
     files = python_files()
     log = loaded[log_path]
     solidworks_inputs, solidworks_out_inputs = _solidworks_inputs(log)
+    replayed = result.to_json()
+    if staged:
+        # A staged input the script left as it was is no output of its.
+        replayed["py_outputs"] = {
+            relative: digest
+            for relative, digest in result.py_outputs.items()
+            if staged.get(relative) != digest
+        }
+        replayed["staged"] = staged
     _write_json(
         args.result,
         {
-            **result.to_json(),
+            **replayed,
             "python_files": files,
             "solidworks_inputs": solidworks_inputs,
             "solidworks_out_inputs": solidworks_out_inputs,
