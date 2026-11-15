@@ -1433,6 +1433,259 @@ def test_forced_refresh_does_not_adopt_the_byte_keyed_verdict(action, monkeypatc
     assert action.calls["run"] == 1
 
 
+@pytest.fixture
+def carry(action, monkeypatch):
+    """A cache with one reviewed PDF of probe, published under ``reviewed``."""
+    import _review_carry
+
+    dodo = action.dodo
+    state = {"found": True, "verdict": "FIX", "carried_archive": False}
+    restored, events, indexed = [], [], []
+    reviewed = "b" * 64
+
+    def find(stem, context, pdf):
+        assert (stem, pdf) == ("probe", dodo.DRAWINGS_BY_NAME["probe"].outputs["pdf"])
+        assert context == dodo._machinist_review_context("probe", action.profile)
+        if not state["found"]:
+            return None
+        pages = [{"page": 1, "old_stamp": ["v49"], "new_stamp": ["v50"], "pixels_differing": 12}]
+        return _review_carry.Carry(reviewed, "c" * 64, {"unchanged": True, "reason": None, "pages": pages})
+
+    def restore(key, outputs, _label):
+        restored.append(key)
+        if key != reviewed:
+            return False
+        _write_aggregate(outputs[0], state["verdict"])
+        if state["carried_archive"]:
+            carried = outputs[0] / _review_carry.CARRIED_FILE
+            carried.parent.mkdir(parents=True, exist_ok=True)
+            carried.write_text("{}", encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(_review_carry, "find", find)
+    monkeypatch.setattr(
+        _review_carry, "index",
+        lambda stem, context, key, pdf: indexed.append((stem, context, key)) or "stored",
+    )
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._cache, "record_event",
+        lambda event, label, key, **extra: events.append((event, key, extra)),
+    )
+    return SimpleNamespace(
+        state=state, restored=restored, events=events, indexed=indexed, reviewed=reviewed
+    )
+
+
+@pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
+def test_sheet_printing_a_reviewed_sheet_carries_its_verdict(action, carry, verdict):
+    import _review_carry
+
+    dodo = action.dodo
+    carry.state["verdict"] = verdict
+    dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
+    assert carry.restored == [byte_key, carry.reviewed]
+    assert action.calls["run"] == 0
+    assert action.calls["store"] == 1
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
+    record = json.loads(
+        (dodo._machinist_review_dir("probe") / _review_carry.CARRIED_FILE).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert record["carried_from"]["review_key"] == carry.reviewed
+    assert record["carried_from"]["pdf_sha256"] == "c" * 64
+    assert record["carried_from"]["verdict"] == verdict
+    assert record["difference"][0]["new_stamp"] == ["v50"]
+    assert [event for event, _key, _extra in carry.events] == ["review_carried"]
+    assert carry.events[0][2]["from_key"] == carry.reviewed
+    # A carried verdict is never offered to later carries.
+    assert carry.indexed == []
+    # machinist_review.load_reviews reads every top-level *.json as a review:
+    # the provenance stays out of that glob.
+    reports = dodo._machinist_review_dir("probe").glob("*.json")
+    assert [path.name for path in reports] == ["probe.aggregate.json"]
+
+
+def test_lost_carry_adopts_the_winner_without_claiming_a_carry(action, carry, monkeypatch):
+    dodo = action.dodo
+    adopted = []
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(
+        dodo, "_adopt_canonical_review",
+        lambda stem, key, directory, label: adopted.append(key) or {"verdict": "SHIP"},
+    )
+    dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
+    assert adopted == ["a" * 64]
+    assert carry.events == []
+    assert action.calls["run"] == 0
+
+
+def test_a_carry_search_that_fails_reviews_afresh(action, carry, monkeypatch):
+    import _review_carry
+
+    def unwritable(*_args):
+        raise OSError("no scratch space")
+
+    monkeypatch.setattr(_review_carry, "find", unwritable)
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.events == []
+
+
+def test_sheet_without_a_matching_reviewed_sheet_is_reviewed(action, carry):
+    carry.state["found"] = False
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.indexed == [(
+        "probe", action.dodo._machinist_review_context("probe", action.profile), "a" * 64,
+    )]
+
+
+def test_a_verdict_that_was_itself_carried_is_not_carried_again(action, carry):
+    carry.state["carried_archive"] = True
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.events == []
+
+
+def test_reviewed_verdict_hit_is_indexed_for_later_carries(action, carry):
+    action.state["hit"] = True
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 0
+    assert [key for _stem, _context, key in carry.indexed] == ["a" * 64]
+
+
+def test_carry_scope_excludes_the_pdf_and_moves_with_other_review_inputs(inputs):
+    dodo = inputs.module
+    profile = dodo._machinist_review_profile()
+    context = dodo._machinist_review_context("probe", profile)
+    inputs.pdf.write_bytes(b"another PDF")
+    assert dodo._machinist_review_context("probe", profile) == context
+    inputs.exception.write_text("probe: {waived: true}\n", encoding="utf-8")
+    assert dodo._machinist_review_context("probe", profile) != context
+
+
+# Real build PDFs (testdata/review-carry): dt_pinion_handle's v48 release sheet
+# and the v49 sheet that differs from it only in the BUILD/REV value; two builds
+# of dt_cone_gear_tl_phasing_comb whose ink differs by 52 pixels, all within
+# 1 px; two builds of pd_transgear_drive_collar whose pin callout and note 2
+# were reworded.
+_CARRY_PAIRS = Path(__file__).resolve().parent / "testdata" / "review-carry"
+
+
+def _reviewed_index(monkeypatch, entries):
+    """``_review_carry`` over a cache index holding ``entries`` (sidecar name
+    to bytes, newest first)."""
+    import _review_carry
+
+    monkeypatch.setattr(
+        _review_carry._cache, "list_sidecars",
+        lambda prefix: [(name, 0.0) for name in entries if name.startswith(prefix)],
+    )
+    monkeypatch.setattr(_review_carry._cache, "fetch_sidecar", entries.get)
+    return _review_carry
+
+
+def test_carry_skips_other_sheets_and_unreadable_entries_for_a_stamp_only_rebuild(
+    monkeypatch,
+):
+    import hashlib
+    import _review_carry
+
+    v48 = (_CARRY_PAIRS / "stamp-v48.pdf").read_bytes()
+    name = lambda key: _review_carry.entry_name("dt_pinion_handle", "ctx", key)  # noqa: E731
+    rc = _reviewed_index(monkeypatch, {
+        name("e" * 64): (_CARRY_PAIRS / "edit-a.pdf").read_bytes(),
+        name("f" * 64): b"not a PDF",
+        name("d" * 64): v48,
+        _review_carry.entry_name("dt_pinion_handle", "other", "9" * 64): v48,
+    })
+    carry = rc.find("dt_pinion_handle", "ctx", _CARRY_PAIRS / "stamp-v49.pdf")
+    assert carry.review_key == "d" * 64
+    assert carry.pdf_sha256 == hashlib.sha256(v48).hexdigest()
+    [page] = carry.comparison["pages"]
+    assert (page["old_stamp"], page["new_stamp"]) == (["v48", "v48"], ["v49", "v49"])
+
+
+def test_carry_renders_the_sheet_once_for_all_candidates(monkeypatch):
+    import _drawing_diff
+    import _review_carry
+
+    edit = (_CARRY_PAIRS / "edit-a.pdf").read_bytes()
+    rc = _reviewed_index(monkeypatch, {
+        _review_carry.entry_name("drive_collar", "ctx", str(n) * 64): edit for n in range(3)
+    })
+    rendered = []
+    render = _drawing_diff.render_pages
+    monkeypatch.setattr(
+        _drawing_diff, "render_pages", lambda path: rendered.append(path) or render(path)
+    )
+    sheet = _CARRY_PAIRS / "edit-b.pdf"
+    assert rc.find("drive_collar", "ctx", sheet) is None
+    assert rendered.count(sheet) == 1
+    assert len(rendered) == 4
+
+
+def test_carry_takes_a_sheet_whose_ink_moved_within_one_pixel(monkeypatch):
+    import _pdf_ink_digest
+    import _review_carry
+
+    before, after = _CARRY_PAIRS / "jitter-a.pdf", _CARRY_PAIRS / "jitter-b.pdf"
+    # The ink key misses this pair; only the carry reuses its verdict.
+    assert _pdf_ink_digest.pdf_ink_digest(before) != _pdf_ink_digest.pdf_ink_digest(after)
+    entry = _review_carry.entry_name("phasing_comb", "ctx", "d" * 64)
+    rc = _reviewed_index(monkeypatch, {entry: before.read_bytes()})
+    carry = rc.find("phasing_comb", "ctx", after)
+    assert carry.review_key == "d" * 64
+    assert carry.comparison["pages"][0]["pixels_differing"] == 52
+
+
+@pytest.mark.parametrize("entry", [None, "edit-a.pdf"])
+def test_carry_reviews_afresh_without_a_reviewed_sheet_that_prints_the_same(
+    monkeypatch, entry
+):
+    import _review_carry
+
+    entries = {}
+    if entry:
+        name = _review_carry.entry_name("drive_collar", "ctx", "d" * 64)
+        entries[name] = (_CARRY_PAIRS / entry).read_bytes()
+    rc = _reviewed_index(monkeypatch, entries)
+    assert rc.find("drive_collar", "ctx", _CARRY_PAIRS / "edit-b.pdf") is None
+
+
+@pytest.mark.parametrize("listed", [False, True])
+def test_indexing_uploads_a_reviewed_pdf_only_once(monkeypatch, listed):
+    import _review_carry
+
+    pdf = _CARRY_PAIRS / "stamp-v49.pdf"
+    name = _review_carry.entry_name("dt_pinion_handle", "ctx", "d" * 64)
+    published = []
+    monkeypatch.setattr(_review_carry._cache, "writable", lambda: True)
+    monkeypatch.setattr(
+        _review_carry._cache, "list_sidecars",
+        lambda prefix: [(name, 0.0)] if listed and name.startswith(prefix) else [],
+    )
+    monkeypatch.setattr(
+        _review_carry._cache, "publish_sidecar",
+        lambda entry, data: published.append((entry, data)) or "stored",
+    )
+    outcome = _review_carry.index("dt_pinion_handle", "ctx", "d" * 64, pdf)
+    assert outcome == ("exists" if listed else "stored")
+    assert published == ([] if listed else [(name, pdf.read_bytes())])
+
+
+
 @pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mode):
     def locked(*_args):

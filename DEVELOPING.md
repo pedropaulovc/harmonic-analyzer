@@ -141,10 +141,32 @@ The PDF's ink is `_pdf_ink_digest.pdf_ink_digest`: every page's size, printed
 characters and 144 dpi grayscale PDFium raster, with no tolerance. Two exports
 of an unchanged drawing differ in export time, document `/ID` and font-subset
 tags only, so a rebuild that prints the same sheet keeps its verdict, `SHIP`
-or `FIX`, and one changed pixel or character reviews it again (#2714). On an
+or `FIX`, and one changed pixel or character misses the key (#2714). On an
 ink-key miss the leaf first adopts a verdict published under the earlier
 byte-digest key for the same PDF bytes (`review_adopted_byte_key` in
 `cache.jsonl`; removed under #2811), so the change itself rolls no reviewer.
+
+Then it tries to carry a verdict (`_review_carry`, #2714): it compares the PDF
+with the newest eight PDFs reviewed for that drawing under the same non-PDF
+review inputs (`_machinist_review_context`, the review key without the PDF)
+using the release drawing diff's page rule, `_drawing_diff.compare_drawings`:
+the same page count and sizes, the same printed characters outside the BUILD/REV
+values, and every ink pixel within 1 px of ink in the other PDF unless its grey
+changed by 68 levels or less. A match stores that review's verdict, `SHIP` or
+`FIX`, under the new key with `carry/provenance.json` naming the reviewed PDF's
+key and SHA-256 and each page's stamps and differing-pixel count
+(`review_carried` in `cache.jsonl`; a subdirectory, because `machinist_review.py`
+reads every top-level `*.json` of a report directory as a review). So a
+revision-stamp change or a one-pixel move rolls no reviewer, and a changed
+character, a larger move, an extra page or a PDF that cannot be compared is
+reviewed afresh. This is the owner's ruling of 2026-11-14 on #2714, and the
+comparator's documented limits (its module docstring) now apply to verdict
+reuse: a low-contrast edit, or one within a pixel of existing ink, that changes
+no character carries the earlier verdict. The index is one create-only sidecar
+per reviewed PDF, `machinist-review/epoch-<epoch>/<stem>/<context>/<review key>.pdf`,
+written on a fresh review, a hit or an adoption, never for a carried verdict,
+so every carry is measured against a sheet the reviewers saw. The search and
+restore run in a `cache.carry <label>` span.
 
 Both review CLIs use a **120-second** sheets MCP startup budget, capped by the
 per-attempt timeout. The runner sets Claude's `MCP_TIMEOUT` (milliseconds) and

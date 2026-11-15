@@ -73,6 +73,9 @@ class _Raster:
     size_points: tuple[float, float]
     stamp_boxes: list[tuple[int, int, int, int]]
     text: tuple[str, ...]
+    # The BUILD/REV values the masks cover, in page order: what a reader of
+    # a comparison needs to see was ignored, never compared.
+    stamp: tuple[str, ...] = ()
 
 
 def _box(glyphs: list[_Glyph]) -> tuple[int, int, int, int]:
@@ -111,7 +114,7 @@ def _device_box(
 
 def _stamp_text(
     page: pdfium.PdfPage, width: int, height: int
-) -> tuple[list[tuple[int, int, int, int]], tuple[str, ...]]:
+) -> tuple[list[tuple[int, int, int, int]], tuple[str, ...], tuple[str, ...]]:
     """Find value glyphs by label geometry, not PDF extraction order.
 
     SolidWorks writes text items as distinct text objects. In particular REV's
@@ -155,6 +158,7 @@ def _stamp_text(
 
     ignored: set[int] = set()
     boxes = []
+    stamp = []
     for label, label_box in labels:
         if not in_title(label_box):
             continue
@@ -188,6 +192,7 @@ def _stamp_text(
                 candidates.append((distance, glyphs))
         if candidates:
             _, glyphs = min(candidates, key=lambda item: item[0])
+            stamp.append("".join(glyph.char for glyph in glyphs))
             # Individual tight glyph boxes, with one pixel for raster coverage,
             # never a whole cell or a rectangular union across a version string.
             for glyph in glyphs:
@@ -207,7 +212,7 @@ def _stamp_text(
             if id(glyph) not in ignored and not glyph.char.isspace()
         )
     )
-    return boxes, text
+    return boxes, text, tuple(stamp)
 
 
 @contextmanager
@@ -238,8 +243,8 @@ def _raster(document: pdfium.PdfDocument, index: int, path: Path) -> _Raster:
         finally:
             bitmap.close()
         height, width = gray.shape
-        boxes, text = _stamp_text(page, width, height)
-        return _Raster(gray, size, boxes, text)
+        boxes, text, stamp = _stamp_text(page, width, height)
+        return _Raster(gray, size, boxes, text, stamp)
     except Exception as error:
         raise ValueError(f"Cannot render drawing PDF {path}, page {index + 1}: {error}") from error
     finally:
@@ -253,9 +258,12 @@ def _nearby_darkest(gray: np.ndarray) -> np.ndarray:
             return np.array(nearby, dtype=np.int16)
 
 
-def _overlay(
-    old: _Raster | None, new: _Raster | None, *, include_unchanged: bool = False
-) -> tuple[bytes | None, bool, bool]:
+def _changes(
+    old: _Raster | None, new: _Raster | None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, bool, bool]:
+    """Both pages on one canvas with BUILD/REV values masked, the ink only the
+    old page has (``removed``) and only the new one has (``added``), whether
+    the printed characters changed and whether the page changed at all."""
     available = [r for r in (old, new) if r is not None]
     height = max(r.gray.shape[0] for r in available)
     width = max(r.gray.shape[1] for r in available)
@@ -298,6 +306,13 @@ def _overlay(
         or text_changed
         or bool(np.any(removed | added))
     )
+    return before, after, removed, added, text_changed, changed
+
+
+def _overlay(
+    old: _Raster | None, new: _Raster | None, *, include_unchanged: bool = False
+) -> tuple[bytes | None, bool, bool]:
+    before, after, removed, added, text_changed, changed = _changes(old, new)
     if not changed and not include_unchanged:
         return None, False, False
 
@@ -320,6 +335,70 @@ def _overlay(
             return stream.getvalue(), text_changed, changed
     finally:
         image.close()
+
+
+COMPARISON_RULE = {
+    "dpi": DPI,
+    "antialias_intensity_tolerance": ANTIALIAS_TOLERANCE,
+    "spatial_tolerance_pixels": SPATIAL_TOLERANCE_PIXELS,
+    "spatial_distance_metric": "chebyshev",
+    "comparison_rule": "symmetric-darker-ink-neighborhood-v1",
+    "tolerances_disabled_for_text_changes": True,
+    "text_comparison": "visible-character-multiset",
+}
+
+
+def compare_drawings(old_path: Path, new_path: Path) -> dict[str, Any]:
+    """Whether two PDFs print the same sheet under this module's page rule:
+    :func:`compare_pages` of both PDFs' :func:`render_pages`."""
+    return compare_pages(render_pages(old_path), render_pages(new_path))
+
+
+def render_pages(path: Path) -> list[_Raster]:
+    """Every page of ``path`` as the drawing diff reads it. A PDF that cannot
+    be opened or rendered raises ``ValueError``."""
+    with _document(path) as document:
+        return [_raster(document, index, path) for index in range(len(document))]
+
+
+def compare_pages(old_pages: list[_Raster], new_pages: list[_Raster]) -> dict[str, Any]:
+    """Whether two rendered PDFs print the same sheet under this module's page rule.
+
+    The rule is the one every page of the release drawing diff is classified
+    by: the same page count and page sizes, the same printed characters
+    outside the BUILD/REV values, and every ink pixel matched in both
+    directions within ``SPATIAL_TOLERANCE_PIXELS`` and ``ANTIALIAS_TOLERANCE``
+    grey levels. It stops at the first changed page. Each compared page
+    reports the BUILD/REV values masked on either side and how many pixels
+    differ at all once they are masked (zero: identical rasters).
+    """
+    if len(old_pages) != len(new_pages):
+        return {
+            "unchanged": False,
+            "reason": f"{len(old_pages)} pages, now {len(new_pages)}",
+            "pages": [],
+        }
+    pages: list[dict[str, Any]] = []
+    for index, (old, new) in enumerate(zip(old_pages, new_pages, strict=True)):
+        before, after, _removed, _added, text_changed, changed = _changes(old, new)
+        pages.append(
+            {
+                "page": index + 1,
+                "old_stamp": list(old.stamp),
+                "new_stamp": list(new.stamp),
+                "pixels_differing": int(np.count_nonzero(before != after)),
+            }
+        )
+        if changed:
+            if old.size_points != new.size_points:
+                what = "page size changed"
+            elif text_changed:
+                what = "printed characters changed"
+            else:
+                what = "ink differs beyond the tolerance"
+            return {"unchanged": False, "reason": f"page {index + 1}: {what}", "pages": pages}
+    return {"unchanged": True, "reason": None, "pages": pages}
+
 
 
 def _pdfs(directory: Path) -> dict[str, Path]:
@@ -452,13 +531,7 @@ def create_drawing_diff(
         "schema_version": 2,
         "old_label": old_label,
         "new_label": new_label,
-        "dpi": DPI,
-        "antialias_intensity_tolerance": ANTIALIAS_TOLERANCE,
-        "spatial_tolerance_pixels": SPATIAL_TOLERANCE_PIXELS,
-        "spatial_distance_metric": "chebyshev",
-        "comparison_rule": "symmetric-darker-ink-neighborhood-v1",
-        "tolerances_disabled_for_text_changes": True,
-        "text_comparison": "visible-character-multiset",
+        **COMPARISON_RULE,
         "tolerance_limitations": [
             f"Ink contrast changes of at most {ANTIALIAS_TOLERANCE} grayscale levels "
             "can be omitted.",
