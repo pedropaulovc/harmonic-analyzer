@@ -6189,28 +6189,36 @@ def test_shift_view_hands_back_a_fresh_section_after_the_move_rebuild(monkeypatc
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
     monkeypatch.setattr(drawing, "double_array", list)
 
-    def identity(_app, model, view, *, label):
-        assert (model, view, label) == (adapter.currentModel, stale, "pivot centre")
-        events.append("identity")
-        return "pivot section identity"
-
     def resolve(_app, section, *, label):
         assert (section, label) == ("pivot section identity", "pivot centre")
         events.append("resolve")
         return fresh_model, fresh
 
-    monkeypatch.setattr(drawing, "_section_visibility_identity", identity)
     monkeypatch.setattr(drawing, "_resolve_section_visibility_view", resolve)
+    section = "pivot section identity" if view_type == 2 else None
 
-    moved = drawing._shift_view(adapter, stale, (0.05, 0.05), label="pivot centre")
+    moved = drawing._shift_view(
+        adapter, stale, (0.05, 0.05), label="pivot centre", section=section
+    )
 
     if view_type == 2:
-        assert events == ["identity", "rebuild", "resolve"]
+        assert events == ["rebuild", "resolve"]
         assert moved is fresh and adapter.currentModel is fresh_model
     else:
         assert events == ["rebuild"]
         assert moved is stale
     assert moved.Position == pytest.approx((0.15, 0.25))
+
+
+@pytest.mark.parametrize("view_type", (2, 7), ids=("section-without-identity", "view-with-identity"))
+def test_shift_view_refuses_a_section_it_could_not_re_resolve(monkeypatch, view_type):
+    view = _MovableView(view_type)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    section = None if view_type == 2 else "identity"
+    with pytest.raises(RuntimeError, match="moves with its identity"):
+        drawing._shift_view(adapter, view, (0.05, 0.05), label="ring fit", section=section)
+    assert view.Position == (0.1, 0.2)
 
 
 def test_centre_pivot_view_reads_and_returns_the_view_handed_back_by_the_move(monkeypatch):
@@ -6223,10 +6231,90 @@ def test_centre_pivot_view_reads_and_returns_the_view_handed_back_by_the_move(mo
         centre = (0.0, 0.0) if view is stale else target
         return [centre, (1.0, 2.0), (1.0, 3.0)][: len(points)]
 
-    monkeypatch.setattr(drawing, "_pivot_sheet_points", sheet_points)
-    monkeypatch.setattr(drawing, "_shift_view", lambda _adapter, view, _delta, **_: fresh)
+    def shift(_adapter, view, _delta, *, label, section):
+        assert (view, section) == (stale, "identity")
+        return fresh
 
-    view, head, front = drawing._centre_pivot_view(object(), stale, target, label="pivot")
+    monkeypatch.setattr(drawing, "_pivot_sheet_points", sheet_points)
+    monkeypatch.setattr(drawing, "_shift_view", shift)
+
+    view, head, front = drawing._centre_pivot_view(
+        object(), stale, target, label="pivot", section="identity"
+    )
 
     assert read_from == [stale, fresh]
     assert view is fresh and (head, front) == ((1.0, 2.0), (1.0, 3.0))
+
+
+def test_place_pivot_view_walks_the_section_only_through_handles_resolved_after_rebuilds(
+    monkeypatch,
+):
+    # A rebuild stales the section handle in hand; each component walk must
+    # get a handle resolved after the last rebuild (#2824).
+    events = []
+    handles = iter(range(1, 10))
+    state = {"handle": "created", "fresh": True}
+    adapter = SimpleNamespace(swApp="app", currentModel="drawing")
+
+    def rebuilds(name):
+        def operation(_adapter, view, *_args, **_kwargs):
+            if view == "locator":
+                return None
+            assert view == state["handle"], f"{name} got a superseded handle {view!r}"
+            events.append(name)
+            state["fresh"] = False
+        return operation
+
+    def walks(name):
+        def operation(_adapter, view, *_args, **_kwargs):
+            assert (view, state["fresh"]) == (state["handle"], True), name
+            events.append(name)
+            state["fresh"] = False  # Its leader notes rebuild.
+        return operation
+
+    def resolve(_adapter, identity, *, label):
+        assert identity == "identity"
+        state.update(handle=f"fresh {next(handles)}", fresh=True)
+        events.append("resolve")
+        return state["handle"]
+
+    def centre(_adapter, view, _target, *, label, section=None):
+        if view == "locator":
+            assert section is None
+            return view, (0.0, 1.0), (0.0, 0.0)
+        assert (view, section) == ("created", "identity")
+        events.append("centre")
+        state.update(handle="fresh after move", fresh=True)
+        return state["handle"], (0.0, 1.0), (0.0, 0.0)
+
+    def identity(app, model, view, *, label):
+        assert (app, model, view) == ("app", "drawing", "created")
+        events.append("identity")
+        return "identity"
+
+    for name, stub in {
+        "_early_bound": lambda obj, *_: obj,
+        "_activate_sheet": lambda *_: None,
+        "place_view": lambda *_, **__: "locator",
+        "apply_view_configuration": lambda *_, **__: None,
+        "set_drawing_view_instance_visibility": lambda _adapter, view, *_, **__: view,
+        "_check_axis_down_the_sheet": lambda *_, **__: None,
+        "create_section_view": lambda *_, **__: "created",
+        "_section_visibility_identity": identity,
+        "_centre_pivot_view": centre,
+        "_crop_to_circle": rebuilds("crop"),
+        "set_hidden_lines_removed": rebuilds("hidden lines"),
+        "position_section_caption": rebuilds("caption"),
+        "_current_section": resolve,
+        "_balloon_pivot_section": walks("balloons"),
+        "_note_pivot_stake": walks("stake"),
+        "_place_sheet_note": lambda *_, **__: None,
+    }.items():
+        monkeypatch.setattr(drawing, name, stub)
+
+    drawing._place_pivot_view(adapter, {})
+
+    assert events == [
+        "identity", "centre", "crop", "hidden lines", "caption",
+        "resolve", "balloons", "resolve", "stake",
+    ]

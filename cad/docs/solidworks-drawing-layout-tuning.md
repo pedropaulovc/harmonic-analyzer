@@ -844,6 +844,18 @@ cleanup before rebuilding; never call the old drawing proxy from a failure
 cleanup path after re-resolution fails. Preserve the primary refusal and its
 timings when a still-owned selection's cleanup also fails.
 
+Moving a section has the same hazard (#2824). PD-00's pivot section was moved
+with `SetViewPosition` + `EditRebuild3` and its components were then walked
+through the pre-move wrapper. On about one build in four the walk never
+reached a leaf. A stall probe counted 0 leaves while the pending stack grew
+past 69,000 nodes in 300 s, with the seat responsive and about 90% of a core
+busy. The 900 s COM watchdog then reported a seat wedge. Prove a moved
+section's identity before the move and re-resolve it after the rebuild.
+Before every later component walk, resolve the section again by that
+identity if a crop, display, caption or note rebuild came in between
+(`draw_pd_paper_drive_assembly._current_section`). Whether those rebuilds
+stale the wrapper the way a move does is unproven.
+
 The [matched channel A–B–B–A report and independent replay](https://github.com/user-attachments/files/34537651/channel-matched-abba-proof.zip)
 measured seven isolation calls per fresh drawing at A1/B1/B2/A2 =
 1419.6296 / 71.5919 / 72.2693 / 1663.9559 seconds: summed isolation time fell

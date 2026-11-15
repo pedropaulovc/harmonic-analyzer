@@ -63,6 +63,7 @@ from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
+    _SectionVisibilityIdentity,
     _anchor_model_points,
     _resolve_section_visibility_view,
     _section_visibility_identity,
@@ -3837,32 +3838,48 @@ def _view_outline(view: Any) -> Box:
     return outline
 
 
+def _current_section(
+    adapter: Any, section: _SectionVisibilityIdentity, *, label: str
+) -> Any:
+    """A fresh handle on ``section``, installing its fresh drawing.
+
+    A section's IView wrapper kept across a rebuild is stale on SOLIDWORKS
+    34.4.0 (cad/docs/solidworks-drawing-layout-tuning.md, "section wrapper
+    lifetime"): walking the hanger pivot section's components through its
+    pre-move wrapper never reached a leaf until the 900 s watchdog killed the
+    build (#2824). Resolve the section again before every component walk
+    that follows a rebuild.
+    """
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    model, view = _resolve_section_visibility_view(app, section, label=label)
+    adapter.currentModel = model
+    return view
+
+
 def _shift_view(
-    adapter: Any, view: Any, delta: tuple[float, float], *, label: str
+    adapter: Any,
+    view: Any,
+    delta: tuple[float, float],
+    *,
+    label: str,
+    section: _SectionVisibilityIdentity | None = None,
 ) -> Any:
     """Move a drawing view by a sheet-space delta, read the move back and
-    return the view handle to use from here on.
-
-    A section's pre-move wrapper is stale after the rebuild on SOLIDWORKS
-    34.4.0 (cad/docs/solidworks-drawing-layout-tuning.md, "section wrapper
-    lifetime"): walking the hanger pivot section's components through it
-    never reached a leaf until the 900 s watchdog killed the build (#2824).
-    A section is re-resolved by its proven identity; other views keep theirs.
-    """
+    return the view handle to use from here on: a section, which must
+    come with its ``section`` identity, is re-resolved after the move's
+    rebuild (``_current_section``); any other view keeps its handle."""
     view = _early_bound(view, "IView")
-    section = None
-    if int(view.Type) == 2:  # swDrawingSectionView
-        app = _early_bound(adapter.swApp, "ISldWorks")
-        model = _early_bound(adapter.currentModel, "IModelDoc2")
-        section = _section_visibility_identity(app, model, view, label=label)
+    if (int(view.Type) == 2) != (section is not None):  # swDrawingSectionView
+        raise RuntimeError(
+            f"{label}: a section view moves with its identity, any other view without one"
+        )
     before = tuple(float(value) for value in view.Position)
     target = (before[0] + delta[0], before[1] + delta[1])
     if not view.SetViewPosition(double_array(list(target)), False):
         raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
     adapter.currentModel.EditRebuild3()
     if section is not None:
-        model, view = _resolve_section_visibility_view(app, section, label=label)
-        adapter.currentModel = model
+        view = _current_section(adapter, section, label=label)
     after = tuple(float(value) for value in view.Position)
     if math.dist(after, target) > 1e-6:
         raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
@@ -4054,7 +4071,12 @@ def _pivot_sheet_points(
 
 
 def _centre_pivot_view(
-    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+    adapter: Any,
+    view: Any,
+    target: tuple[float, float],
+    *,
+    label: str,
+    section: _SectionVisibilityIdentity | None = None,
 ) -> tuple[Any, tuple[float, float], tuple[float, float]]:
     """Shift ``view`` until the pivot stack's midpoint sits on ``target``;
     return the view handle to use from here on (see ``_shift_view``) and the
@@ -4071,6 +4093,7 @@ def _centre_pivot_view(
         view,
         (target[0] - centre[0], target[1] - centre[1]),
         label=f"{label} centre",
+        section=section,
     )
     centre, head, front = _pivot_sheet_points(adapter, view, points, label=label)
     if math.dist(centre, target) > 1e-4:
@@ -4270,8 +4293,20 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
         label=section_label,
     )
     section = set_drawing_view_instance_visibility(adapter, section, PIVOT_VIEW_INSTANCES, mode="show", label=section_label)
+    # Proven before the move; every component walk after a rebuild reads
+    # through a handle resolved fresh from it (_current_section, #2824).
+    section_identity = _section_visibility_identity(
+        _early_bound(adapter.swApp, "ISldWorks"),
+        _early_bound(adapter.currentModel, "IModelDoc2"),
+        section,
+        label=section_label,
+    )
     section, head, front = _centre_pivot_view(
-        adapter, section, PIVOT_SECTION_CENTER, label=section_label
+        adapter,
+        section,
+        PIVOT_SECTION_CENTER,
+        label=section_label,
+        section=section_identity,
     )
     # The balloon columns stand left and right of a vertical axis (farm run
     # 20261015T101105899Z read the cut bar 56 mm wide, 19 mm tall at 2:1);
@@ -4292,9 +4327,11 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
     position_section_caption(
         adapter, section, PIVOT_SECTION_CAPTION_XY, label=section_label
     )
+    section = _current_section(adapter, section_identity, label=section_label)
     _balloon_pivot_section(
         adapter, section, items, label="paper-drive hanger pivot balloons"
     )
+    section = _current_section(adapter, section_identity, label=section_label)
     _note_pivot_stake(
         adapter, section, head, front, label="paper-drive hanger pivot stake note"
     )
