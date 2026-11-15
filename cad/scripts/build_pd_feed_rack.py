@@ -67,6 +67,7 @@ from _sketch import (
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _document_units import apply_package_model_units
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _named_views import name_octant_views
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -288,6 +289,9 @@ async def build(adapter) -> dict[str, str]:
         "Top Plane", PITCH_LINE_Y, "pitch axis",
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The taps open on the flat top (-Y), which the built-in isometric hides;
+    # the print places the FRONT-BOTTOM-RIGHT octant named here.
+    name_octant_views(adapter, label=PART_NAME)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         for dimension_name in sorted(dimension_names & DRAWING_REFERENCE_DIMENSIONS):
             display, _dimension = _named_dimension(

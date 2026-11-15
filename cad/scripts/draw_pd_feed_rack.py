@@ -42,6 +42,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
+from _named_views import octant_view_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
@@ -295,7 +296,14 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=END_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The built-in isometric looks from +Y, the teeth, and hides the four taps
+    # that open on the flat top (-Y); with no thread in sight its cosmetic
+    # threads read draft quality and finalize refuses the shaded view (r2-r4).
+    # The FRONT-BOTTOM-RIGHT octant the part names shows the tapped flat
+    # (draw_dt_pinion_cam).
+    iso = place_view(
+        adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=ISO_SCALE
+    )
     # The taps are fully defined by their native callout (rule 9). The
     # isometric joins the loop so finalize can lift its cosmetic threads to
     # precise Shaded With Edges (PR #1436).
