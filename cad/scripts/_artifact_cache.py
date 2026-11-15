@@ -560,7 +560,8 @@ _BLOCK_SIZE = 4 * 1024 * 1024
 # recording does not compress (its log and captures are gzip already; the
 # three largest stored, 28.7 to 44.6 MB, deflate by under 0.4%). The blob of
 # a sidecar carries the cache epoch after its prefix (_sidecar_blob).
-_SIDECAR_PREFIXES = ("com-replay/",)
+# ``machinist-review/`` is the reviewed-PDF index of _review_carry.
+_SIDECAR_PREFIXES = ("com-replay/", "machinist-review/")
 _SIDECAR_MAX = 512 * 1024 * 1024
 
 # Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded

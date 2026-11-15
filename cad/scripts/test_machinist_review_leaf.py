@@ -1433,6 +1433,115 @@ def test_forced_refresh_does_not_adopt_the_byte_keyed_verdict(action, monkeypatc
     assert action.calls["run"] == 1
 
 
+@pytest.fixture
+def carry(action, monkeypatch):
+    """A cache with one reviewed PDF of probe, published under ``reviewed``."""
+    import _review_carry
+
+    dodo = action.dodo
+    state = {"found": True, "verdict": "FIX", "carried_archive": False}
+    restored, events, indexed = [], [], []
+    reviewed = "b" * 64
+
+    def find(stem, context, pdf):
+        assert (stem, pdf) == ("probe", dodo.DRAWINGS_BY_NAME["probe"].outputs["pdf"])
+        assert context == dodo._machinist_review_context("probe", action.profile)
+        if not state["found"]:
+            return None
+        pages = [{"page": 1, "old_stamp": ["v49"], "new_stamp": ["v50"], "pixels_differing": 12}]
+        return _review_carry.Carry(reviewed, "c" * 64, {"unchanged": True, "reason": None, "pages": pages})
+
+    def restore(key, outputs, _label):
+        restored.append(key)
+        if key != reviewed:
+            return False
+        _write_aggregate(outputs[0], state["verdict"])
+        if state["carried_archive"]:
+            (outputs[0] / _review_carry.CARRIED_FILE).write_text("{}", encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(_review_carry, "find", find)
+    monkeypatch.setattr(
+        _review_carry, "index",
+        lambda stem, context, key, pdf: indexed.append((stem, context, key)) or "stored",
+    )
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._cache, "record_event",
+        lambda event, label, key, **extra: events.append((event, key, extra)),
+    )
+    return SimpleNamespace(
+        state=state, restored=restored, events=events, indexed=indexed, reviewed=reviewed
+    )
+
+
+@pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
+def test_sheet_printing_a_reviewed_sheet_carries_its_verdict(action, carry, verdict):
+    import _review_carry
+
+    dodo = action.dodo
+    carry.state["verdict"] = verdict
+    dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
+    assert carry.restored == [byte_key, carry.reviewed]
+    assert action.calls["run"] == 0
+    assert action.calls["store"] == 1
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
+    record = json.loads(
+        (dodo._machinist_review_dir("probe") / _review_carry.CARRIED_FILE).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert record["carried_from"]["review_key"] == carry.reviewed
+    assert record["carried_from"]["pdf_sha256"] == "c" * 64
+    assert record["carried_from"]["verdict"] == verdict
+    assert record["difference"][0]["new_stamp"] == ["v50"]
+    assert [event for event, _key, _extra in carry.events] == ["review_carried"]
+    assert carry.events[0][2]["from_key"] == carry.reviewed
+    # A carried verdict is never offered to later carries.
+    assert carry.indexed == []
+
+
+def test_sheet_without_a_matching_reviewed_sheet_is_reviewed(action, carry):
+    carry.state["found"] = False
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.indexed == [(
+        "probe", action.dodo._machinist_review_context("probe", action.profile), "a" * 64,
+    )]
+
+
+def test_a_verdict_that_was_itself_carried_is_not_carried_again(action, carry):
+    carry.state["carried_archive"] = True
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.events == []
+
+
+def test_reviewed_verdict_hit_is_indexed_for_later_carries(action, carry):
+    action.state["hit"] = True
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 0
+    assert [key for _stem, _context, key in carry.indexed] == ["a" * 64]
+
+
+def test_carry_scope_excludes_the_pdf_and_moves_with_other_review_inputs(inputs):
+    dodo = inputs.module
+    profile = dodo._machinist_review_profile()
+    context = dodo._machinist_review_context("probe", profile)
+    inputs.pdf.write_bytes(b"another PDF")
+    assert dodo._machinist_review_context("probe", profile) == context
+    inputs.exception.write_text("probe: {waived: true}\n", encoding="utf-8")
+    assert dodo._machinist_review_context("probe", profile) != context
+
+
+
 @pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mode):
     def locked(*_args):
