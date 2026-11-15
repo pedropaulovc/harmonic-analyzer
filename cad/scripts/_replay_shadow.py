@@ -284,7 +284,7 @@ class BuildKind(StrEnum):
 DEFAULT_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
     BuildKind.ASSEMBLY: ReplayMode.REUSE,
-    BuildKind.DRAWING: ReplayMode.AUDIT,
+    BuildKind.DRAWING: ReplayMode.SHADOW,  # #2824 diag
 }
 _HIGHEST_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
