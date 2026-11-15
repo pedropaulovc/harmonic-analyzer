@@ -16,8 +16,9 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 | part | qty | material | stock |
 |---|---|---|---|
 | `pd-platen` | TODO | TODO | TODO |
-| `pd-platen-rack` | TODO | TODO | TODO |
+| `pd-feed-rack` | TODO | TODO | TODO |
 | `pd-platen-guide` | TODO | TODO | TODO |
+| `pd-platen-bottom-guide` | TODO | TODO | TODO |
 | `pd-platen-clip` | TODO | TODO | TODO |
 | `pd-platen-paper` | TODO | TODO | TODO |
 | `pd-rack-pinion` | TODO | TODO | TODO |

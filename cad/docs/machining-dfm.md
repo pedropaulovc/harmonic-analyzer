@@ -1307,7 +1307,7 @@ setup allowance, not a gear accuracy grade.
 | `pd-rack-pinion` (reducer disc) | 150 | 48DP PA20 | #1, TTC 10-289-481 | 4 on 15 |
 | `pd-transgear-knob-shaft` integral pinion | 15 | 48DP PA20 | #7, TTC 10-289-487 | 2 turns + 10 on 15 |
 | `pd-transgear-feed-pinion` | 12 | 32DP PA20 | #8, Precise/Penn 10-289-328 | 3 turns + 5 on 15 |
-| `pd-platen-rack` | rack, pitch 2.4936 mm | 32DP PA20 | none: bought as stock rack | none |
+| `pd-feed-rack` | rack, pitch 2.4936 mm | 32DP PA20 | none: bought as stock rack | none |
 
 The reducer is 15:150 at 48DP (#2034 replaced 12:120; the ratio stays 1:10). Its two 48DP
 cutters, #1 and #7, are sizes the cones do not use, so the 48DP set needs both. The knob's 15T is
@@ -1329,10 +1329,12 @@ tailstock centre in sacrificial length parted off afterwards; the Ø.113 relief 
 least section under the tool (#2419).
 The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
-[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to the printed 269.6 mm callout
-(`cad/config/parts/pd-platen-rack.yaml`) and soldered to the existing backer. The 269.64 mm
-CAD nominal is not the shop cut length; `pd_platen_rack_spec.DRAWING_PRECISION` prints it
-to one decimal place under the ordinary .X band. Check it against the feed pinion before fitting; the pitch-index limit the model
+[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to the platen's printed 10.62 in
+(`cad/config/parts/pd-feed-rack.yaml`, MHA-PD-26; `pd_feed_rack_spec.DRAWING_PRECISION` prints it
+at the ordinary .XX band). Four #0-80 taps go in its flat top, each on a tooth centre, and four
+stock #0-80 fillisters screw it to the underside of the MHA-PD-27 bottom guide rail
+(`pd-platen-bottom-guide`), whose holes are struck from those taps at MHA-PD-00; there is no
+backer and no solder (#2410). Check it against the feed pinion before fitting; the pitch-index limit the model
 allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch_index_deviation_mm`).
 
 The chain is 66 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket (#2034

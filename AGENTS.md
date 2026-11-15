@@ -1321,7 +1321,7 @@ the spec, never in a family table or recipe module imported by unrelated specs.
 Shared parameterized geometry belongs in its own helper (for example
 `_shoulder_screw_geometry`), not in another SKU's decorated recipe module.
 Assemblies and drawings read dimensions from specs or these pure providers, not
-from part builders. `pd_platen_rack_spec` owns the rack section and receiving
+from part builders. `pd_feed_rack_spec` owns the rack section and receiving
 contract; `_platen_rack_receiving` supplies its source receiving controls without
 importing the feed-law and loaded-geometry checks in `paper_drive_geom`.
 `_paper_drive_placement` owns the pivot, stud, knob-axis and rack placements;

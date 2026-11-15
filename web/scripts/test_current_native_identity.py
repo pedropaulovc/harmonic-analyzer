@@ -282,7 +282,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 50)
+        self.assertEqual(len(retired), 51)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
@@ -293,7 +293,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         # MHA-DT-VN-54 stack collar and the MHA-DT-VN-55 cup adjuster;
         # #2326: the spring hooks stand bare, retiring both jam nuts;
         # #2339: the purchased MHA-SH-VN-58 dowel retired the made MHA-CH-10
-        # rod and MHA-CH-11 bar pivot pins.
+        # rod and MHA-CH-11 bar pivot pins;
+        # #2410: the MHA-PD-26 strip screwed to MHA-PD-27 retired the soldered
+        # MHA-PD-05 rack and backer.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
@@ -306,7 +308,8 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                                                 ("ch-anchor-jam-nut", ["MHA-CH-14"]),
                                                 ("vn-boss-hook-jam-nut", ["MHA-SM-VN-55"]),
                                                 ("ch-rod-pivot-pin", ["MHA-CH-10"]),
-                                                ("ch-bar-pivot-pin", ["MHA-CH-11"])])
+                                                ("ch-bar-pivot-pin", ["MHA-CH-11"]),
+                                                ("pd-platen-rack", ["MHA-PD-05"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",

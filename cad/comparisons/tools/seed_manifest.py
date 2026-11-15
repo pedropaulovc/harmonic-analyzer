@@ -71,7 +71,7 @@ PHOTO_FOCUS = {
     "gooseneck guide tube": ["sm_gooseneck"],
     "magnifying lever": ["mg_magnifying_lever"],
     "magnifying wheel": ["mg_magnifying_wheel"],
-    "platen + rack": ["pd_platen", "pd_platen_rack"],
+    "platen + rack": ["pd_platen", "pd_feed_rack"],
     "pen mechanism (modern)": ["pn_pen_frame", "pn_vn_pen_marker"],
     "translational gearing / chain": ["pd_transgear_knob_shaft", "pd_transgear_removable"],
     "pinion gear": ["pinion_drum"],

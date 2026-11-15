@@ -240,7 +240,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     knob_shaft = _one(adapter, "pd-transgear-knob-shaft")
     feed_pinion = _one(adapter, "pd-transgear-feed-pinion")
     disc = _one(adapter, "pd-rack-pinion")
-    # The pd-platen BODY exactly (pd-platen-<n>), not a "pd-platen-rack"/"pd-platen-clip" sibling.
+    # The pd-platen BODY exactly (pd-platen-<n>), not a "pd-platen-guide"/"pd-platen-clip" sibling.
     platen = next((n for n in component_names(adapter)
                    if n.rsplit("-", 1)[0] == "pd-platen"), "")
     if not platen:

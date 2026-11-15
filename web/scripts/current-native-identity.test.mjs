@@ -97,9 +97,10 @@ retiredTooling.push(...[
 // MHA-DT-VN-66 loop link to the screwed jack chain (#2144 9.2), the
 // MHA-DT-VN-54 stack collar and MHA-DT-VN-55 cup adjuster to the bonded cone
 // tip and its end screw (owner decision C1 keyed, 2026-11-09, PR #1992),
-// the MHA-CH-14 and MHA-SM-VN-55 spring-hook jam nuts to bare hooks (#2326), and
+// the MHA-CH-14 and MHA-SM-VN-55 spring-hook jam nuts to bare hooks (#2326),
 // the made MHA-CH-10 rod and MHA-CH-11 bar pivot pins to the purchased
-// MHA-SH-VN-58 dowel's RodPin and BarPin members (#2339).
+// MHA-SH-VN-58 dowel's RodPin and BarPin members (#2339), and the soldered
+// MHA-PD-05 rack and backer to the MHA-PD-26 strip screwed to MHA-PD-27 (#2410).
 const retiredMachine = [{
   old_stem: 'vn-pen-rod-set-screw',
   old_number: 'MHA-VN-061',
@@ -154,6 +155,11 @@ const retiredMachine = [{
   old_stem: 'ch-bar-pivot-pin',
   old_number: 'MHA-CH-011',
   new_identities: [{ stem: 'ch-bar-pivot-pin', number: 'MHA-CH-11' }],
+  status: 'retired',
+}, {
+  old_stem: 'pd-platen-rack',
+  old_number: 'MHA-PD-005',
+  new_identities: [{ stem: 'pd-platen-rack', number: 'MHA-PD-05' }],
   status: 'retired',
 }]
 

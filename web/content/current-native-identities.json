@@ -1382,12 +1382,22 @@
       ]
     },
     {
-      "sourceStem": "pd-platen-rack",
-      "sourceNumber": "MHA-PD-005",
+      "sourceStem": "pd-feed-rack",
+      "sourceNumber": null,
       "identities": [
         {
-          "stem": "pd-platen-rack",
-          "number": "MHA-PD-05"
+          "stem": "pd-feed-rack",
+          "number": "MHA-PD-26"
+        }
+      ]
+    },
+    {
+      "sourceStem": "pd-platen-bottom-guide",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "pd-platen-bottom-guide",
+          "number": "MHA-PD-27"
         }
       ]
     },
