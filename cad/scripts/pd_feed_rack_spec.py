@@ -38,7 +38,12 @@ from _hole_spec import (
     blind_cut_dia_mm,
 )
 import _mcmaster_91794a055 as _screw
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 from _package_units import drawing_unit
 from _inch_wall_limits import WALL_FLOOR_MM
 
@@ -127,7 +132,9 @@ FRONT_SET_BAND = 0.010 * MM_PER_IN
 # The strip is drilled and tapped on its own; the MHA-PD-27 rail's four holes
 # are then struck from these taps at MHA-PD-00 with a transfer screw, so the
 # taps' places along the strip need no fit to the rail (delegated ruling
-# 2026-11-14 (Main), pending owner confirmation, #2410).
+# 2026-11-14 (Main), pending owner confirmation; owner review #2144, #2410;
+# precedent R9-9, the disc's taps spotted through MHA-PD-17's holes at
+# assembly).
 TAP_SIZE = "#0-80"
 TAP_PITCH = MM_PER_IN / 80.0
 TAP_MAJOR_DIA = THREAD_MAJOR_MM[TAP_SIZE]
@@ -162,6 +169,10 @@ TAP_SPACING = TAP_SPACING_PITCHES * PITCH
 TAP_Z = RACK_THICKNESS / 2.0
 # Each tap sits on its own tooth centre to the .XXX band along the strip.
 TAP_TOOTH_OFFSET_MAX = TAP_BAND
+# The title block's .010 tap mouth break, charged on the taps' face walls and
+# on the screws' full thread, as MHA-PD-27's taps and MHA-PD-VN-60's
+# engagement pay it.
+TAP_MOUTH_BREAK = max(edge_break_chamfer_mm(unit=UNIT), edge_break_radius_mm(unit=UNIT))
 
 
 def tooth_width_at_depth_mm(depth_from_top_mm: float, strip_height_mm: float) -> float:
@@ -265,18 +276,32 @@ TAP_TOOTH_WALL_MIN = min(TAP_TOOTH_MARGINS_MM["drill"], TAP_TOOTH_MARGINS_MM["th
 TAP_TOOTH_WALL_NOMINAL = min(
     TAP_TOOTH_MARGINS_NOMINAL_MM["drill"], TAP_TOOTH_MARGINS_NOMINAL_MM["thread"]
 )
-# The tap's wall to the strip's front and back faces (RV-03): the least face
-# width, the thread major and the tap's .XXX place from the front face.
-TAP_FACE_WALL_MIN = (
-    PURCHASED_RACK_FACE_WIDTH_MIN_MM - TAP_MAJOR_DIA
-) / 2.0 - TAP_BAND
+# The tap's wall to the strip's front and back faces (RV-03). It is located
+# from the front face (TapFromFront, .XXX), so the back wall also pays the
+# strip's least face width (its receiving room); both pay the thread major and
+# the tap's mouth break.
+TAP_FRONT_WALL_MIN = TAP_Z - TAP_BAND - TAP_MAJOR_DIA / 2.0 - TAP_MOUTH_BREAK
+TAP_BACK_WALL_MIN = (
+    PURCHASED_RACK_FACE_WIDTH_MIN_MM
+    - (TAP_Z + TAP_BAND)
+    - TAP_MAJOR_DIA / 2.0
+    - TAP_MOUTH_BREAK
+)
+TAP_FACE_WALL_MIN = min(TAP_FRONT_WALL_MIN, TAP_BACK_WALL_MIN)
 TAP_FACE_WALL_NOMINAL = (RACK_THICKNESS - TAP_MAJOR_DIA) / 2.0
 if TAP_FACE_WALL_MIN <= 0.0:
     raise AssertionError("a #0-80 rack tap breaks out of the strip's face")
-# Rule 20's stated wall, floored to .001 in.
+
+
+def _wall_text(value_mm: float) -> str:
+    return f"{_floor_in(max(value_mm, 0.0)) / MM_PER_IN:.3f}".removeprefix("0")
+
+
+# Rule 20's stated walls, floored to .001 in: to the faces, and inside the
+# tooth at the deepest thread.
 TAP_FACE_WALL_STATEMENT = (
-    f"TAPS: WALL {f'{_floor_in(TAP_FACE_WALL_MIN) / MM_PER_IN:.3f}'.removeprefix('0')} "
-    "MIN TO FRONT AND BACK FACES."
+    f"TAPS: WALL {_wall_text(TAP_FACE_WALL_MIN)} MIN TO FRONT AND BACK FACES,\n"
+    f"{_wall_text(TAP_TOOTH_WALL_MIN)} MIN TO TOOTH ROOT."
 )
 if any(
     abs((x - TOOTH_CENTRE_PHASE_X) / PITCH - k) > 1e-9
@@ -305,11 +330,17 @@ SCREW_TIP_REACH_MAX = SCREW_LENGTH - (SCREW_FLOOR - SCREW_FLOOR_BAND)
 if SCREW_TIP_REACH_MAX > TAP_THREAD_DEPTH_MIN + 1e-9:
     raise AssertionError("the longest rack screw can reach its tap's lead")
 # Full-thread engagement: shortest stock on the thickest floor, the screw's
-# first thread lost; nominal: the catalogue length on the nominal floor.
+# first thread and the tap's mouth break lost (rule 18 counts full threads
+# only); nominal: the catalogue length on the nominal floor.
 ENGAGEMENT_WORST = (
-    SCREW_LENGTH_MIN - (SCREW_FLOOR + SCREW_FLOOR_BAND) - SCREW_FIRST_THREAD_LOSS
+    SCREW_LENGTH_MIN
+    - (SCREW_FLOOR + SCREW_FLOOR_BAND)
+    - SCREW_FIRST_THREAD_LOSS
+    - TAP_MOUTH_BREAK
 )
-ENGAGEMENT_NOMINAL = SCREW_LENGTH - SCREW_FLOOR - SCREW_FIRST_THREAD_LOSS
+ENGAGEMENT_NOMINAL = (
+    SCREW_LENGTH - SCREW_FLOOR - SCREW_FIRST_THREAD_LOSS - TAP_MOUTH_BREAK
+)
 ENGAGEMENT_WORST_D = ENGAGEMENT_WORST / TAP_MAJOR_DIA
 ENGAGEMENT_NOMINAL_D = ENGAGEMENT_NOMINAL / TAP_MAJOR_DIA
 ENGAGEMENT_TARGET_D = 1.5

@@ -57,6 +57,19 @@ def test_underside_seats_the_rack_and_the_platen_taps_follow_mha_pd_02() -> None
     )
 
 
+def test_the_spot_punch_float_is_booked_at_the_drilled_platen_hole() -> None:
+    import draw_pd_paper_drive_assembly as assembly_sheet
+    from _printed_tolerance import drilled_oversize_mm
+    from pd_platen_spec import GUIDE_HOLE_DIA
+    from pd_platen_spec import UNIT as PLATEN_UNIT
+
+    punch = float(assembly_sheet.GUIDE_SPOT_PUNCH) * 25.4
+    assert punch < GUIDE_HOLE_DIA < punch + 25.4 / 64.0
+    hole_max = GUIDE_HOLE_DIA + drilled_oversize_mm(unit=PLATEN_UNIT)
+    assert spec.PLATEN_SPOT_PUNCH_FLOAT == pytest.approx((hole_max - punch) / 2.0)
+    assert spec.PLATEN_SPOT_PUNCH_FLOAT > spec.HOLE_TRANSFER_BAND
+
+
 def test_height_is_the_least_thousandth_that_keeps_every_tap_wall() -> None:
     walls = (
         spec.PLATEN_TAP_TOP_WALL_MIN,
@@ -96,6 +109,21 @@ def test_rack_screw_holes_take_the_stock_screw_on_the_rack_floor() -> None:
 
 def test_counterbore_front_wall_shortfall_is_a_declared_minor() -> None:
     assert 0.0 < spec.SCREW_CBORE_FRONT_WALL_MIN < spec.SCREW_CBORE_FRONT_WALL_NOMINAL
+    # The strip lies flipped, so its taps sit (width - TapFromFront) behind its
+    # machine-front face: the narrowest strip with every band at its corner.
+    tap_from_front = (
+        rack.FRONT_BEHIND_PLATEN
+        - rack.FRONT_SET_BAND
+        + rack.PURCHASED_RACK_FACE_WIDTH_MIN_MM
+        - (rack.TAP_Z + rack.TAP_BAND)
+        - spec.HOLE_TRANSFER_BAND
+    )
+    from _printed_tolerance import drilled_oversize_mm
+
+    cbore_radius = (spec.SCREW_CBORE_DIA + drilled_oversize_mm(unit=spec.UNIT)) / 2.0
+    assert spec.SCREW_CBORE_FRONT_WALL_MIN == pytest.approx(
+        tap_from_front - cbore_radius - spec.EDGE_BREAK
+    )
     declared = {
         entry["id"]: entry["kind"]
         for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]

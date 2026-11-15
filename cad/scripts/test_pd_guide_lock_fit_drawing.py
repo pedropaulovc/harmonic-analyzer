@@ -152,7 +152,7 @@ _STATION_MAX = _SET_MAX + _TAP_DY + PLACEMENT
 # plate, y .155 from its guide-side edge, on the .29 top rail's tap row .140
 # above its bottom face (owner ruling 2026-11-01, B2): the plate laps .005
 # past the top rail's top face; the .45 height at .XX. PR #1897 grew the plate
-# so every hole wall reaches the wall target. The .621 bottom rail MHA-PD-27
+# so every hole wall reaches the wall target. The .624 bottom rail MHA-PD-27
 # (#2410) prints its lock-tap row .466 above its underside, at .XXX, and
 # stands on the platen where the strip's height (.006 room) and the crest set
 # (±.002) put it.
@@ -161,7 +161,7 @@ _HOLE_Y = 0.155 * IN
 _RAIL = 0.29 * IN
 _TAP_Y = 0.140 * IN
 _LIP_TOP = _HOLE_Y - (_RAIL - _TAP_Y)
-_BOTTOM_RAIL = 0.621 * IN
+_BOTTOM_RAIL = 0.624 * IN
 _BOTTOM_ROW = 0.466 * IN
 _BOTTOM_Y_BAND = (0.006 + 0.002) * IN
 _WIDTH = 0.89 * IN
@@ -408,7 +408,7 @@ def _retention(monkeypatch, assembly) -> dict[str, float]:
 def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
     """User ruling 2026-10-11: the bar runs a clearance over the bottom rail and
     one plate size serves both rails. At the printed worst case (bar 1.010
-    at .XXX, the top rail .29 at .XX, the bottom rail .621 at .XXX anywhere
+    at .XXX, the top rail .29 at .XX, the bottom rail .624 at .XXX anywhere
     in its y band, plate height .45 at .XX, the set plate's guide-side reach)
     the bottom rail still clears the bar and each set plate still overlaps it,
     the top plates with the platen lifted until its bottom rail meets the
@@ -425,7 +425,7 @@ def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
     bottom_rail, top_rail = assembly.GUIDE_Y
     bar_bottom = top_rail - bar_height
     gap = bar_bottom - (bottom_rail + _BOTTOM_RAIL)
-    assert gap == pytest.approx(0.844, abs=1e-3)
+    assert gap == pytest.approx(0.768, abs=1e-3)
     reach = assembly.LOCK_SET_EDGE_REACH[1] - height_low
     lift = gap + bar_band - rail_low + _BOTTOM_Y_BAND
     bottom_low = bottom_rail + _BOTTOM_ROW - _HOLE_Y

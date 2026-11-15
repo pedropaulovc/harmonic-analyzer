@@ -111,13 +111,9 @@ GEAR_DATA_XY = (0.020, 0.254)
 # the border.
 NOTES_XY = (0.020, 0.064)
 # Rule 7: the part facts the views cannot carry; the mesh is set by the
-# MHA-PD-00 assembly steps, not on this part sheet. Rule 20: the taps' wall
-# to the strip's faces (RV-03).
-NOTES_TEXT = (
-    "END TOOTH PHASE NOT CONTROLLED.\n"
-    f"{TAP_FACE_WALL_STATEMENT}\n"
-    "REMOVE ANY TAP BURR BROKEN THROUGH INTO A TOOTH SPACE."
-)
+# MHA-PD-00 assembly steps, not on this part sheet. Rule 20: the taps' walls
+# to the strip's faces and to the tooth root (RV-03).
+NOTES_TEXT = f"END TOOTH PHASE NOT CONTROLLED.\n{TAP_FACE_WALL_STATEMENT}"
 # The tap callout stands right of the bottom view's right end, above VIEW A,
 # its leader on the fourth tap.
 TAP_CALLOUT_XY = (0.330, 0.192)

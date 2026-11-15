@@ -1856,8 +1856,10 @@ RACK_SCREWS = PLATEN_QUANTITIES[explode.RACK_SCREW]
 GUIDE_TAPS_IN_ROW = 9
 # The bottom guide's platen-screw taps follow the rack's crest set, so they
 # are spotted through MHA-PD-02's lower row (delegated ruling 2026-11-14
-# (Main), #2410) with the largest 64ths transfer punch that enters its holes.
-GUIDE_SPOT_PUNCH = Fraction(math.floor(platen.GUIDE_HOLE_DIA / 25.4 * 64.0), 64)
+# (Main), pending owner confirmation; owner review #2144, #2410; precedent
+# R9-9) with the largest 64ths transfer punch that enters its holes
+# (pd_platen_bottom_guide_spec books its float).
+GUIDE_SPOT_PUNCH = Fraction(bottom_guide.PLATEN_SPOT_PUNCH_64THS, 64)
 
 
 # The engaged-feed window, measured from the rack's -X cut end. Machine X is
@@ -2081,16 +2083,15 @@ def _step_text(
         # taps (delegated ruling 2026-11-14 (Main)), the strip's front face
         # set behind the guide's front face against a rule.
         "rack-screwed": (
-            f"MAKE {RACK_SCREWS} POINTED {feed_rack.TAP_SIZE} TRANSFER SCREWS: FILE "
-            f"THE HEAD OFF A SPARE {n[explode.RACK_SCREW]} SCREW AND FILE THAT END "
-            "TO A POINT.",
-            f"SCREW A TRANSFER SCREW INTO EACH OF THE {n['pd-feed-rack']} RACK'S "
-            f"{RACK_SCREWS} TAPS, ITS POINT JUST PROUD OF THE RACK'S FLAT TOP.",
+            f"SCREW A SPARE {n[explode.RACK_SCREW]} SCREW INTO EACH OF THE "
+            f"{n['pd-feed-rack']} RACK'S {RACK_SCREWS} TAPS UNTIL IT STOPS.",
+            "CUT EACH SCREW OFF 1/32 PROUD OF THE RACK'S FLAT TOP AND FILE THE "
+            "CUT END TO A POINT: THESE ARE THE TRANSFER SCREWS.",
             f"CLAMP THE RACK, TEETH DOWN, TO THE {n['pd-platen-bottom-guide']} "
             "BOTTOM GUIDE'S UNDERSIDE, ENDS FLUSH, ITS FRONT FACE "
             f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S FRONT FACE, SET "
             f"AGAINST A RULE, SQUEEZING TO STRIKE THE {RACK_SCREWS} MARKS.",
-            "UNCLAMP AND REMOVE THE TRANSFER SCREWS.",
+            "UNCLAMP AND UNSCREW THE TRANSFER SCREWS WITH PLIERS.",
             "DRILL AND COUNTERBORE THE GUIDE AT EACH MARK PER "
             f"{n['pd-platen-bottom-guide']}.",
             f"SCREW THE RACK ON WITH THE {RACK_SCREWS} {n[explode.RACK_SCREW]} "

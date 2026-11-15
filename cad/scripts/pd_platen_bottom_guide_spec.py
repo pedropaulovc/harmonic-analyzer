@@ -14,11 +14,15 @@ as MHA-PD-11. Three hole families:
   stations and the same height above the platen as before, printed;
 * five #4-40 platen-screw taps, THROUGH from the front face, transferred
   from MHA-PD-02's lower row at MHA-PD-00 with the rack already on and its
-  crests set (delegated ruling 2026-11-14 (Main), #2410): the platen-screw
-  float cannot absorb the crest set, so the holes follow it;
+  crests set: the platen-screw float cannot absorb the crest set, so the
+  holes follow it;
 * four stepped rack-screw holes from the top face, #51 through and a
   Ø.110 counterbore, struck from the rack's taps at MHA-PD-00 with a
-  transfer screw (delegated ruling 2026-11-14 (Main), #2410).
+  transfer screw.
+
+Both transfers: delegated ruling 2026-11-14 (Main), pending owner
+confirmation; owner review #2144 (#2410); precedent R9-9, the disc's taps
+spotted through MHA-PD-17's holes at assembly.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``); bands and
 limits stay physical millimetres, each the exact decimal of its inch value.
@@ -42,7 +46,7 @@ import _mcmaster_91794a055 as _screw
 import pd_feed_rack_spec as rack
 import pd_platen_guide_spec as top_rail
 from pd_platen_spec import DRAWING_PRECISION_BY_NAME as PLATEN_PRECISION
-from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
+from pd_platen_spec import GUIDE_HOLE_DIA, GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
 from pd_platen_spec import UNIT as PLATEN_UNIT
 
 UNIT = drawing_unit(
@@ -80,15 +84,24 @@ _STRIP_HEIGHT_ROOM = rack.PURCHASED_RACK_HEIGHT_MAX_MM - rack.RACK_HEIGHT
 # --- The platen-screw taps, transferred from MHA-PD-02 -----------------------
 # On MHA-PD-02's lower guide-hole row; their row on this rail follows the
 # platen's hole (its .XXX row), the strip's height, the crest set and the
-# transfer punch (HOLE_TRANSFER_BAND, pd_guide_lock_spec's premise).
+# spot: MHA-PD-00 spots them with the largest 1/64 transfer punch that enters
+# the platen's Ø.144 holes (draw_pd_paper_drive_assembly.GUIDE_SPOT_PUNCH),
+# which floats in a hole drilled to its oversize
+# (rocker_bracket_seat_layout.PUNCH_FLOAT's premise).
 PLATEN_TAP_X = GUIDE_HOLE_X
 PLATEN_TAP_Y = GUIDE_HOLE_Y[0] - UNDERSIDE_ABOVE_PLATEN_BOTTOM  # .466
-HOLE_TRANSFER_BAND = 0.0254  # .001 per axis
+HOLE_TRANSFER_BAND = 0.0254  # .001 per axis, a transfer screw in its own tap
+PLATEN_SPOT_PUNCH_64THS = math.floor(GUIDE_HOLE_DIA / MM_PER_IN * 64.0)  # 9/64
+PLATEN_SPOT_PUNCH_FLOAT = (
+    GUIDE_HOLE_DIA
+    + drilled_oversize_mm(unit=PLATEN_UNIT)
+    - PLATEN_SPOT_PUNCH_64THS / 64.0 * MM_PER_IN
+) / 2.0
 PLATEN_TAP_Y_BAND = (
     printed_band_mm(PLATEN_PRECISION["Guide1Y"], unit=PLATEN_UNIT)
     + _STRIP_HEIGHT_ROOM
     + CREST_SET_BAND
-    + HOLE_TRANSFER_BAND
+    + PLATEN_SPOT_PUNCH_FLOAT
 )
 
 # --- The lock taps, printed --------------------------------------------------
@@ -120,7 +133,7 @@ GUIDE_HEIGHT = (
     )
     / 1000.0
     * MM_PER_IN
-)  # .621
+)  # .624
 TOP_ABOVE_PLATEN_BOTTOM = UNDERSIDE_ABOVE_PLATEN_BOTTOM + GUIDE_HEIGHT
 # How far the top rose over the former bottom rail's: the 0.98 running room
 # under the support bar pays it (build_pd_paper_drive_assembly asserts).
@@ -148,7 +161,7 @@ SCREW_HOLE_X = tuple(sorted(GUIDE_LENGTH - x for x in rack.TAP_X))
 SCREW_HOLE_Z = rack.FRONT_BEHIND_PLATEN + rack.TAP_Z  # from the front face
 SCREW_HOLE_DIA = NUMBER_DRILL_MM["#51"]  # .067
 SCREW_CBORE_DIA = 0.110 * MM_PER_IN  # #35
-SCREW_CBORE_DEPTH = GUIDE_HEIGHT - rack.SCREW_FLOOR  # .466
+SCREW_CBORE_DEPTH = GUIDE_HEIGHT - rack.SCREW_FLOOR  # .469
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     "#0",
@@ -172,7 +185,13 @@ if not (SCREW_HOLE_DIA < _screw.HEAD_DIA < SCREW_CBORE_DIA - 2.0 * SCREW_FLOAT_R
 # The counterbore's wall to the front face at the top edge (rule 17; RV-01):
 # the hole follows the strip (front set, the tap's .XXX place across it, the
 # transfer), the counterbore at its drilled oversize, the .010 edge break.
-_SCREW_HOLE_Z_BAND = rack.FRONT_SET_BAND + rack.TAP_BAND + HOLE_TRANSFER_BAND
+# The strip lies Rx180 (build_pd_paper_drive_assembly), so the face its taps
+# are located from is the machine-rear one: a strip narrower by its receiving
+# room brings the taps that much nearer the rail's front face.
+_STRIP_WIDTH_ROOM = rack.RACK_THICKNESS - rack.PURCHASED_RACK_FACE_WIDTH_MIN_MM
+_SCREW_HOLE_Z_BAND = (
+    rack.FRONT_SET_BAND + _STRIP_WIDTH_ROOM + rack.TAP_BAND + HOLE_TRANSFER_BAND
+)
 SCREW_CBORE_FRONT_WALL_MIN = (
     SCREW_HOLE_Z
     - _SCREW_HOLE_Z_BAND

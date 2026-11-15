@@ -46,6 +46,9 @@ _ARCHIVE_MEMBERS = {
     "dt-vn-swing-stop-screw": (
         "sh-vn-fillister-screw-90280a108", "Default", "SwingStopScrew"
     ),
+    "pd-vn-transgear-disc-screw": (
+        "sh-vn-fillister-screw-91794a055", "DiscScrew", "DiscScrew"
+    ),
 }
 _ARCHIVE_STOCK = {
     "dt-vn-fillister-screw": "sh-vn-brass-fillister-screw",
@@ -1062,8 +1065,7 @@ expect(PD, "pd-transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **
 for i, (x, y) in enumerate(p.DISC_SCREW_XY):
     expect(
         PD,
-        # DiscScrew members follow the four RackScrew instances.
-        f"sh-vn-fillister-screw-91794a055-{len(p.RACK_TAP_X) + i + 1}",
+        f"pd-vn-transgear-disc-screw-{i + 1}",
         [x, y, p.DISC_SCREW_Z0],
         p.ROT_X_NEG90,
         f"disc screw {i + 1}",

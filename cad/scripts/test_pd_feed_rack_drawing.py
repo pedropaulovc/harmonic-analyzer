@@ -122,6 +122,7 @@ def test_engagement_shortfall_and_walls_are_declared_minors() -> None:
         spec.SCREW_LENGTH_MIN
         - (spec.SCREW_FLOOR + spec.SCREW_FLOOR_BAND)
         - spec.SCREW_FIRST_THREAD_LOSS
+        - spec.TAP_MOUTH_BREAK
     )
     assert spec.ENGAGEMENT_WORST == pytest.approx(worst)
     assert 0.0 < spec.ENGAGEMENT_WORST < spec.ENGAGEMENT_NOMINAL
@@ -129,6 +130,16 @@ def test_engagement_shortfall_and_walls_are_declared_minors() -> None:
     assert spec.ENGAGEMENT_CALLOUT_MIN * 25.4 <= spec.ENGAGEMENT_WORST
     assert spec.ENGAGEMENT_CALLOUT_D <= spec.ENGAGEMENT_WORST_D
     assert spec.TAP_FACE_WALL_MIN < spec.TAP_FACE_WALL_NOMINAL
+    # Located from the front face: the back wall on the narrowest strip, the
+    # tap at its band's far corner, pays the major and the mouth break.
+    back = (
+        spec.PURCHASED_RACK_FACE_WIDTH_MIN_MM
+        - (spec.TAP_Z + spec.TAP_BAND)
+        - spec.TAP_MAJOR_DIA / 2.0
+        - spec.TAP_MOUTH_BREAK
+    )
+    assert spec.TAP_FACE_WALL_MIN == pytest.approx(min(back, spec.TAP_FRONT_WALL_MIN))
+    assert spec.TAP_FACE_WALL_STATEMENT in drawing.NOTES_TEXT
     assert min(spec.TAP_FACE_WALL_MIN, spec.TAP_TOOTH_WALL_MIN) < WALL_FLOOR_MM
     declared = {
         entry["id"]: entry["kind"]
