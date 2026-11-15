@@ -623,14 +623,15 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
 
 def test_the_run_check_accepts_end_gear_shake_but_no_bind_or_skip() -> None:
     """Owner ruling 2026-11-14 on #2584 (option A): a gear past the binds
-    that hold the cone line may run loose; the sheet states it.  Check 4R,
-    the run after the lock, still refuses a bind or a skip, and its remedy
-    (4S) still follows it."""
+    that hold the cone line may run loose; the sheet states it as a plain
+    fact naming those gears by the 4E binds.  Check 4R, the run after the
+    lock, still refuses a bind, and its remedy (4S) still follows it."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     (run,) = re.findall(r"(?<![-\w])4R\. [^.]*\.", check)
     assert f"{drawing.CHECK_RUN_CRANK_TURNS} TURNS" in run
-    assert "BIND" in run and "SKIP" in run
-    assert "ACCEPT" in run and "SHAKE" in run
+    assert "NEVER BIND" in run
+    assert "4E" in run and "SHAKE" in run
+    assert "ACCEPT" not in run
     assert check.index(run) < check.index("4S. IF ONE BINDS")
 
 

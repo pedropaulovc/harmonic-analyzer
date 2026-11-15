@@ -126,8 +126,9 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   wherever the binds fall near each end, and a gear past a hold rides the
   line's extension, higher by its slope times the overhang. Whether that may
   let a gear come loose was asked on #2584: owner ruling 2026-11-14 (Pedro,
-  option A) accepts it and states it on MHA-DT-00 check 4R (no bind, no skip,
-  end-gear shake accepted). The stack's contact ratio ≥ 1 holds for pairs
+  option A) accepts it (dt-drive-train.yaml DT-08); MHA-DT-00 check 4R states
+  it as a plain fact: a gear outside the two 4E binds may shake, and no gear
+  may bind. The stack's contact ratio ≥ 1 holds for pairs
   between the holds; an end-side gear past a hold may run below it. No
   allowance is booked for it. Check 4N stops easing at the first free run, an
   observable stop; the ease is neither printed nor measured, and no number is
