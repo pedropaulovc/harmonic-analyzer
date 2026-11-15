@@ -2111,13 +2111,16 @@ def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() ->
     assert "pd-transgear-arm-1" not in moved
     # Every part moves along one machine axis, so it stays on its own axis
     # seen from above; the cup pin leaves along X, out of its cross hole, and
-    # the hub's key pin along X too, out of its chord ream (#2409).
-    radial = {
-        ("pd-vn-transgear-knob-cup-pin",): "x",
-        ("pd-vn-transgear-hub-key-pin",): "x",
+    # the hub's key pin along X too, out of its chord ream (#2409). The
+    # collar's flat pin, drawn out of its blind ream along Z, drops along Y
+    # below the collar's outline so the isometric sees it.
+    off_axis = {
+        "cup pin out of the cup": "x",
+        "hub key pin out": "x",
+        "collar flat pin below the collar": "y",
     }
     for step, _names in transgear:
-        assert step.axis == radial.get(step.stems, "z")
+        assert step.axis == off_axis.get(step.label, "z")
 
 
 def test_the_cluster_explode_spreads_pin_shims_bushing_and_sleeve_in_order() -> None:
@@ -2716,10 +2719,17 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
         for row in pressed
     )
     assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
-    # The pin rides the collar off the shaft; it never leaves its ream.
-    assert not any(
-        step.stems == ("pd-vn-transgear-collar-flat-pin",) for step in explode.TRANSGEAR_STEPS
+    # The pin rides the collar off the shaft, then (drawn apart only) leaves
+    # its blind ream the way it went in, rearward out of the open end, before
+    # any other move, so sheet 3's isometric can show it.
+    pin_stem = "pd-vn-transgear-collar-flat-pin"
+    own = [step for step in explode.TRANSGEAR_STEPS if step.stems == (pin_stem,)]
+    riding = next(
+        i for i, step in enumerate(explode.TRANSGEAR_STEPS)
+        if pin_stem in step.stems and "pd-transgear-drive-collar" in step.stems
     )
+    assert own and explode.TRANSGEAR_STEPS.index(own[0]) > riding
+    assert own[0].axis == "z" and own[0].distance_mm > collar.FLAT_PIN_LENGTH
     faced = texts["collar-rear-faced-to-fit"]
     face = next(i for i, row in enumerate(faced) if row.startswith("FACE THE COLLAR'S REAR"))
     assert faced[face + 1].startswith("BREAK THE COLLAR'S REAR BORE MOUTH 45°")
