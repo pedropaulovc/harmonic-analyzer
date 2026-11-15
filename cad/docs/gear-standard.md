@@ -12,7 +12,7 @@ involute cutter instead of making cutters for an odd pitch.
 | Cone and cylinder train | `dt-cone-tip-gear` T006, `dt-cone-gear` T012–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
 | Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, straight teeth inclined 12.0247° right hand) | normal 24DP, normal PA20 |
 | Paper-drive reducer | `pd-rack-pinion` (150T disc), `pd-transgear-knob-shaft` (integral 15T) | 48DP, PA20 (#1 and #7, added to the cone set) |
-| Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
+| Paper feed | `pd-transgear-feed-pinion` (12T), `pd-feed-rack` | 32DP, PA20 |
 | Chain | crank and knob sprockets, 66 links | ANSI #25 |
 
 The configured values live in [`../config/machine/gear_train.yaml`](../config/machine/gear_train.yaml)
@@ -220,7 +220,7 @@ the stack starts from that later bind, where every corner keeps the 0.25 mm
 root clearance. The run's tight spot sets the arm, so every other station runs
 looser by the rack's index error and the feed's lateral terms (along the rack),
 the pinion's toothspace runout and the rack's crest drift along the run, up to
-twice the rack-soldered ±.002 crest band (radial). These are independent, and
+twice the rack's ±.002 crest set at assembly (radial). These are independent, and
 the loose side takes their root sum square: 0.188 mm of backlash at the
 loosest feel set. Against coming loose and for a feed at constant speed, every
 printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
@@ -233,8 +233,8 @@ continuous conjugate action is what "paper advances at constant speed" asks,
 and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
 is used because the setting is by feel and the acceptance is functional, an
 exception to the worst-case mesh stacks limited to this mesh. A hitch with every
-part inside its sheet is cured by re-soldering the rack with its crests reading
-the same at both ends, which leaves at most one .001 division of drift; with
+part inside its sheet is cured by loosening the guide screws and re-setting the
+bottom rail with the rack's crests reading the same at both ends, which leaves at most one .001 division of drift; with
 that the arithmetic worst case keeps contact ratio 1.0 (1.037,
 `FEED_LEVEL_RACK_WORST_CASE_MESH`), and the mesh is set again by feel on a new
 hook. Easing

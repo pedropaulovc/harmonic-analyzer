@@ -664,7 +664,9 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pn_pen_adjust_screw",  # made MHA-PN brass eye stud, #0-80 UNF member into the pen rod's top tap; carries the jam nut
         "dt_pinion_cam",  # #2-56 UNC-2B tap + supplied ASME B18.3 #2-56 x 3/16 flat-point socket set screw, member (collar) gripping pinion_lift_rod
         "pd_platen",  # #2-56 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
-        "pd_platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
+        "pd_platen_guide",  # MHA-PD-11 top rail: #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
+        "pd_platen_bottom_guide",  # MHA-PD-27: #4-40 front through taps transferred at assembly (guide screws) + rear through lock taps, receiver; plain #51 counterbored rack-screw holes
+        "pd_feed_rack",  # MHA-PD-26 strip: 4x #0-80 blind taps in the flat top (pd_feed_rack_spec.TAP_SPEC), receiver of the rack screws
         "dt_vn_post_mount_screw",  # 1/4-20 (MSC 40923906 fillister, 4 in stock cut to fit), member into cone_swing_platform
         "pd_rack_pinion",  # 120T disc (MHA-PD-06): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
@@ -676,7 +678,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #2-56 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-18: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-23 is pressed in a reamed hole
         "pd_vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-PD-VN-56), 1-in stock cut to fit; member: 2 into transgear_arm
-        "pd_vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-PD-VN-55), cut to fit; member: 3 through the hub flange into rack_pinion
+        "sh_vn_fillister_screw_91794a055",  # #0-80 x 1/4 slotted fillister (McMaster 91794A055), members: DiscScrew x3 cut to fit through the hub flange into rack_pinion, RackScrew x4 through the bottom guide into feed_rack
         "pd_transgear_knob_shaft",  # MHA-PD-08: #8-32 UNC single-pointed front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-PD-VN-62)
         "pd_vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 90325A174, MHA-PD-VN-57), member into the support_bar's through pivot tap
         "pd_transgear_thumbnut",  # MHA-PD-13 knurled nut, #8-32 UNC-2B through; member on the knob shaft's front thread
@@ -759,7 +761,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_pivot_shaft",  # plain Ø6.35 rod, domed both ends, two set-screw flats; no thread
         "pd_platen_clip",  # #2 clearance holes only (build_pd_platen_clip); clamped by platen_clip_screw
         "pd_platen_paper",  # paper sheet, no thread
-        "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
         "ch_vn_rocker_thrust_washer",  # MHA-CH-VN-56 carbon-steel ring shim (McMaster 3088A429) loose on the MHA-CH-05 shaft, north and south; no thread
         "pd_transgear_arm_plate",  # MHA-PD-19: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
@@ -2129,13 +2130,27 @@ JOINTS: tuple[Joint, ...] = (
         member="sh_vn_brass_fillister_screw",
         receiver="pd_platen_guide",
         thread="#4-40 UNC",
-        quantity=10,
+        quantity=5,
         installed_at="guides-screwed",
         exposure=Exposure.STATIC_CLAMP,
-        exposure_reason="clamps the platen to its two guide rails, which move together as one body. The rails slide on the support bar's top edge, and that drag runs along X, transverse to the screw axes (Z), shared in shear by 5 screws per rail. No operating torque acts about any screw axis",
+        exposure_reason="clamps the platen to its top guide rail, which moves with it as one body. The rail slides on the support bar's top edge, and that drag runs along X, transverse to the screw axes (Z), shared in shear by its 5 screws. No operating torque acts about any screw axis",
         axial_capture="fillister head 0.2 sub-flush in the platen front counterbore; shank through the platen #4 hole into the guide's front #4-40 tap (through, R9-64), 5.27 mm engagement, tip stopping inside the rail",
         lock=Lock.NONE,
         evidence="build_pd_paper_drive_assembly.py:build ('platen guide-screw grid') and _assert_fastener_stacks (90114A511 guide screws); draw_pd_paper_drive_assembly._step_text 'guides-screwed'; pd_platen_guide_spec.TAPPED_HOLE_SPEC; build_pd_platen_guide.GUIDE_SCREW_THREAD_ENGAGEMENT/GUIDE_SCREW_TIP_INSIDE_MIN",
+    ),
+    Joint(
+        id="pd-paper-drive/guide-screw-in-bottom-guide",
+        assembly="pd_paper_drive",
+        member="sh_vn_brass_fillister_screw",
+        receiver="pd_platen_bottom_guide",
+        thread="#4-40 UNC",
+        quantity=5,
+        installed_at="guides-screwed",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason="clamps the platen to its bottom guide rail, which carries the feed rack and moves with the platen as one body. The feed mesh's drive runs along X, transverse to the screw axes (Z), shared in shear by its 5 screws; the mesh's separating force presses the rack up into the rail. No operating torque acts about any screw axis",
+        axial_capture="fillister head 0.2 sub-flush in the platen front counterbore; shank through the platen #4 hole into the rail's front #4-40 tap, transferred THROUGH from the platen at assembly with the rack's crests set, the same engagement as the top rail's, tip stopping inside the rail",
+        lock=Lock.NONE,
+        evidence="build_pd_paper_drive_assembly.py:build ('platen guide-screw grid'); draw_pd_paper_drive_assembly._step_text 'guides-screwed'; pd_platen_bottom_guide_spec.PLATEN_TAP_SPEC/PLATEN_TAP_Y",
     ),
     Joint(
         id="pd-paper-drive/lock-screw-in-guide",
@@ -2143,13 +2158,41 @@ JOINTS: tuple[Joint, ...] = (
         member="pd_vn_guide_lock_screw",
         receiver="pd_platen_guide",
         thread="#4-40 UNC",
-        quantity=8,
+        quantity=4,
         installed_at="platen-hung",
         exposure=Exposure.STATIC_CLAMP,
-        exposure_reason="clamps each guide-lock plate to the back of its guide rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
+        exposure_reason="clamps each top guide-lock plate to the back of the top rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
         axial_capture="slotted pan head on the 1/16-sheet guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
         lock=Lock.NONE,
-        evidence="build_pd_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_pd_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); pd_vn_guide_lock_screw_spec.ENGAGEMENT_WORST; build_pd_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT (4 per rail x 2 rails); pd_guide_lock_spec.HOLE_SPEC; pd_platen_guide_spec.LOCK_GAP_FIT",
+        evidence="build_pd_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_pd_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); pd_vn_guide_lock_screw_spec.ENGAGEMENT_WORST; build_pd_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT; pd_guide_lock_spec.HOLE_SPEC; pd_platen_guide_spec.LOCK_GAP_FIT",
+    ),
+    Joint(
+        id="pd-paper-drive/lock-screw-in-bottom-guide",
+        assembly="pd_paper_drive",
+        member="pd_vn_guide_lock_screw",
+        receiver="pd_platen_bottom_guide",
+        thread="#4-40 UNC",
+        quantity=4,
+        installed_at="platen-hung",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason="clamps each bottom guide-lock plate to the back of the bottom rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
+        axial_capture="slotted pan head on the 1/16-sheet guide_lock back face; shank through the lock's 1/8 drilled hole into the rail's printed rear #4-40 through tap, tip stopping inside the rail",
+        lock=Lock.NONE,
+        evidence="build_pd_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY, LOCK_TAP_ROW_Y); draw_pd_paper_drive_assembly._step_text 'platen-hung' and 'guide-locks-set'; pd_platen_bottom_guide_spec.LOCK_TAP_SPEC/LOCK_TAP_X/LOCK_TAP_Y; pd_guide_lock_spec.HOLE_SPEC",
+    ),
+    Joint(
+        id="pd-paper-drive/rack-screws",
+        assembly="pd_paper_drive",
+        member="sh_vn_fillister_screw_91794a055",
+        receiver="pd_feed_rack",
+        thread="#0-80 UNF",
+        quantity=4,
+        installed_at="rack-screwed",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason="clamp the MHA-PD-26 strip's flat top to the MHA-PD-27 bottom rail's underside; strip, rail and platen move as one body. The feed mesh's drive acts along X, across the screw axes (Y), shared in shear by the four screws, and its separating force presses the strip up into the rail, so no operating torque acts about any screw axis",
+        axial_capture="fillister head on the rail's counterbore floor, .155 REF above the strip; shank through the rail's #51 hole (struck from the strip's tap at assembly) into the strip's #0-80 blind tap, worst-case engagement 0.70 D (pd_feed_rack_spec.ENGAGEMENT_WORST_D, accepted as pd-feed-rack RV-02, delegated ruling 2026-11-14)",
+        lock=Lock.NONE,
+        evidence="build_pd_paper_drive_assembly.py:build ('feed-rack screw (x' placements, RACK_SCREW_FLOOR_Y); draw_pd_paper_drive_assembly._step_text 'rack-screwed'; pd_feed_rack_spec.TAP_SPEC/SCREW_FLOOR/ENGAGEMENT_WORST_D; pd_platen_bottom_guide_spec.SCREW_HOLE_SPEC",
     ),
     Joint(
         id="pd-paper-drive/arm-plate-screws",
@@ -2215,7 +2258,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pd-paper-drive/disc-screws",
         assembly="pd_paper_drive",
-        member="pd_vn_transgear_disc_screw",
+        member="sh_vn_fillister_screw_91794a055",
         receiver="pd_rack_pinion",
         thread="#0-80 UNF",
         quantity=3,
@@ -2237,7 +2280,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_pd_paper_drive_assembly._step_text 'disc-cluster-assembled', 'disc-taps-transferred' and "
             "'disc-screws-cut'; build_pd_paper_drive_assembly.py 'transgear-disc-screw (' placements and "
-            "lock mates; pd_rack_pinion_spec.TAP_SPEC; pd_vn_transgear_disc_screw_spec.ENGAGEMENT_WORST_D; "
+            "lock mates; pd_rack_pinion_spec.TAP_SPEC; pd_transgear_disc_screw_spec.ENGAGEMENT_WORST_D; "
             "pd_transgear_disc_hub_geometry.SCREW_COUNT"
         ),
     ),
@@ -2496,6 +2539,15 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "pd-paper-drive/lock-screw-in-guide": Occurrence(
         "pd_paper_drive", "build_pd_paper_drive_assembly.py", "platen lock-screw grid"
+    ),
+    "pd-paper-drive/guide-screw-in-bottom-guide": Occurrence(
+        "pd_paper_drive", "build_pd_paper_drive_assembly.py", "platen guide-screw grid"
+    ),
+    "pd-paper-drive/lock-screw-in-bottom-guide": Occurrence(
+        "pd_paper_drive", "build_pd_paper_drive_assembly.py", "LOCK_TAP_ROW_Y"
+    ),
+    "pd-paper-drive/rack-screws": Occurrence(
+        "pd_paper_drive", "build_pd_paper_drive_assembly.py", "feed-rack screw (x"
     ),
     "pd-paper-drive/arm-plate-screws": Occurrence(
         "pd_paper_drive", "build_pd_paper_drive_assembly.py", "transgear-arm-plate-screw #"

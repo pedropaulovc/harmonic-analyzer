@@ -377,31 +377,30 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         assert paper_drive[pair] == pytest.approx(39.87518418692443)
 
     # The MHA-PD-VN-52 guide screws alone: seed -1, then the grid -2..-10.
+    # #2410: odd guide screws in the bottom rail MHA-PD-27, even in the top
+    # rail MHA-PD-11 (now its only instance).
     guide_receivers_and_limits = {
-        1: (1, 13.951902256034774),
-        2: (2, 13.951902256034774),
-        3: (1, 13.951902256034774),
-        4: (2, 13.951902256034774),
-        5: (1, 13.951902256034774),
-        6: (2, 13.951902256034774),
-        7: (1, 13.951902256034774),
-        8: (2, 13.951902256034774),
-        9: (1, 13.951902256034774),
-        10: (2, 13.951902256034774),
+        n: ("pd-platen-bottom-guide-1" if n % 2 else "pd-platen-guide-1", 13.951902256034774)
+        for n in range(1, 11)
     }
-    for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
-        pair = frozenset(
-            (f"sh-vn-brass-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
-        )
+    for screw_number, (guide, limit) in guide_receivers_and_limits.items():
+        pair = frozenset((f"sh-vn-brass-fillister-screw-{screw_number}", guide))
         assert paper_drive[pair] == pytest.approx(limit)
     # R9-31: the lock-plate screws are MHA-PD-VN-60 slotted pan heads, not
     # fillisters; R9-48: 3/8 long through the 1/16 lock sheet, so 7.9375 of
-    # each sits in the guide's through tap.
-    lock_receivers = {1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 2, 7: 1, 8: 2}
-    for screw_number, guide_number in lock_receivers.items():
-        pair = frozenset(
-            (f"pd-vn-guide-lock-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
-        )
+    # each sits in the rail's through tap.
+    lock_receivers = {
+        1: "pd-platen-bottom-guide-1",
+        2: "pd-platen-bottom-guide-1",
+        3: "pd-platen-guide-1",
+        4: "pd-platen-bottom-guide-1",
+        5: "pd-platen-guide-1",
+        6: "pd-platen-guide-1",
+        7: "pd-platen-bottom-guide-1",
+        8: "pd-platen-guide-1",
+    }
+    for screw_number, guide in lock_receivers.items():
+        pair = frozenset((f"pd-vn-guide-lock-screw-{screw_number}", guide))
         assert paper_drive[pair] == pytest.approx(20.440626113418)
 
     summing = _allowed("sm-summing")
@@ -663,7 +662,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **_expected_numbered_pairs(
                 "sh-vn-brass-fillister-screw",
                 range(1, 11, 2),
-                "pd-platen-guide",
+                "pd-platen-bottom-guide",
                 2.8448,
                 2.261,
                 5.4178,
@@ -675,12 +674,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.8448,
                 2.261,
                 5.4178,
-                second_number=2,
             ),
             **_expected_numbered_pairs(
                 "pd-vn-guide-lock-screw",
                 (1, 2, 4, 7),
-                "pd-platen-guide",
+                "pd-platen-bottom-guide",
                 2.8448,
                 2.261,
                 7.9375,
@@ -692,7 +690,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.8448,
                 2.261,
                 7.9375,
-                second_number=2,
+            ),
+            # #2410: the RackScrew members, under-head on MHA-PD-27's .155
+            # floor, 6.35 - 3.937 in the MHA-PD-26 strip's 1.191 tap drills.
+            **_expected_numbered_pairs(
+                "sh-vn-fillister-screw-91794a055",
+                range(1, 5),
+                "pd-feed-rack",
+                1.524,
+                1.191,
+                6.35 - 3.937,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
             # MHA-PD-23 pin's press in the arm, and the MHA-PD-13 1/4-20 nut.
@@ -742,8 +749,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             )
             * _annulus_limit(2.413, 2.3876, 0.381),
             **_expected_numbered_pairs(
-                "pd-vn-transgear-disc-screw",
-                range(1, 4),
+                # The DiscScrew members follow the four RackScrew instances.
+                "sh-vn-fillister-screw-91794a055",
+                range(5, 8),
                 "pd-rack-pinion",
                 1.524,
                 1.191,

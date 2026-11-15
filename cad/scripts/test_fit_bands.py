@@ -195,7 +195,7 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("pd_vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
+    ("pd_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
     ),

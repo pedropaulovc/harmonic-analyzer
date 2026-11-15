@@ -75,7 +75,7 @@ recipes:
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `dt-vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
-| 91794A055 | `pd-vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A055 | `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59: `DiscScrew`, `RackScrew`) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A078 | `mg-vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `ch-vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A558 | `dt-cone-tip-end-screw` (MHA-DT-39, fabricated from stock: one added drill-and-ream pivot hole in its threaded end; owner decision C1 keyed, 2026-11-09, PR #1992) | 18-8 Stainless Steel Fillister Head Slotted Screw, 1/4"-28 x 5/8" |
@@ -1426,16 +1426,18 @@ Catalog specifications checked on September 10, 2026:
   derived from the actual view projection. The left text field must clear the
   complete shoulder-length text, witnesses and arrows as well as neighbouring
   ink, views and border, including a fresh exact-name cold readback.
-- [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
-  MHA-PD-VN-55, three) joins the brass disc hub's flange to the 150T disc: each
-  head sits on the flange and the thread enters one of the disc's through
-  taps. The product page was read on September 30, 2026: 18-8 stainless
+- [91794A055](https://www.mcmaster.com/91794A055/) (`sh-vn-fillister-screw-91794a055`,
+  MHA-SH-VN-59, seven): three `DiscScrew` members join the brass disc hub's
+  flange to the 150T disc, each head on the flange and the thread in one of
+  the disc's through taps, cut to fit (MHA-PD-VN-55 until 2026-11-14), and
+  four stock-length `RackScrew` members screw the MHA-PD-26 feed rack to the
+  MHA-PD-27 rail (#2410). The product page was read on September 30, 2026: 18-8 stainless
   steel slotted fillister head, #0-80 UNF class 2A, 1/4 in under the head,
   fully threaded, high narrow head Ø0.096 in x 0.055 in. The user supplied
   the vendor model `91794A055.SLDPRT`, harvested on amet on September 30,
   2026 into the read-only dump `cad/out/reports/mcmaster-91794A055-dump.json`.
   It is not the 90280A narrow-fillister tree, so `diag_build_91794A055.py`
-  replays its own laws (in `pd_vn_transgear_disc_screw_spec.py`) instead of
+  replays its own laws (in `pd_transgear_disc_screw_spec.py`) instead of
   `diag_mcmaster_fillister.py`: a spherical dome over a side 0.7 of the head
   height tall, drafted 5° narrower toward the bearing face; a neck
   Ø1.02 x the size, 0.05 x the length long; a slot 0.1 of the head Ø wide

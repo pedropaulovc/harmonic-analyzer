@@ -22,6 +22,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_platen_bottom_guide",
+        part="pd_platen_bottom_guide",
+        artifact_stem="pd-platen-bottom-guide",
+        script_name="draw_pd_platen_bottom_guide.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_platen",
         part="pd_platen",
         artifact_stem="pd-platen",
@@ -660,10 +667,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pd_platen_rack",
-        part="pd_platen_rack",
-        artifact_stem="pd-platen-rack",
-        script_name="draw_pd_platen_rack.py",
+        name="pd_feed_rack",
+        part="pd_feed_rack",
+        artifact_stem="pd-feed-rack",
+        script_name="draw_pd_feed_rack.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -1101,10 +1108,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pd_vn_transgear_disc_screw",
-        part="pd_vn_transgear_disc_screw",
-        artifact_stem="pd-vn-transgear-disc-screw",
-        script_name="draw_pd_vn_transgear_disc_screw.py",
+        name="sh_vn_fillister_screw_91794a055",
+        part="sh_vn_fillister_screw_91794a055",
+        artifact_stem="sh-vn-fillister-screw-91794a055",
+        script_name="draw_sh_vn_fillister_screw_91794a055.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

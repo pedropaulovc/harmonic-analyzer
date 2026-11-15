@@ -1,0 +1,39 @@
+pd-feed-rack:
+  title: Feed Rack
+  number: MHA-PD-26
+  # Owner rulings 2026-11-13 (#2410): the purchased strip alone, cut to the
+  # platen's width and screwed by its flat top to the MHA-PD-27 bottom guide
+  # rail; no backer, no solder. It replaces the retired MHA-PD-05.
+  stock_name: Purchased Brass Rack Stock, 32DP PA20, 3/16 in Square, 48 in
+  supplier: SDP/SI
+  supplier_skus: [A 1B12-Y324]
+  # https://shop.sdp-si.com/a-1b12-y324.html
+  # https://sdp-si.com/D820/PDFS/Gears.pdf p. 1-193: Y = PA20; F = T = 3/16 in.
+  # Commercial rack; no published pitch-accuracy grade, inventory or certification claim.
+  material: Brass
+  material_specification: "SDP/SI A 1B12-Y324 brass rack stock, 32DP PA20, 48 in, 3/16 in square"
+  finish: "rack as purchased"
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock: cut to the platen's 10.62 in, then drill and tap four #0-80 holes in its flat top, each on a tooth centre; the MHA-PD-27 rail's four screw holes are struck from these taps at MHA-PD-00"
+  drawing_unit: in
+  installation_notes: |-
+    CUT TO 10.62 IN; TAP ON TOOTH CENTRES.
+    SET MESH AT ASSEMBLY.
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "the sheet carrying only the two incoming stock sizes and the purchased-rack line"
+      finding: "pitch-accuracy limits missing on the purchased rack (rule 12)"
+      reason: "pitch accuracy is the catalogue part own; the assembly checks the running mesh over the whole engaged window (owner-accepted; carried over from the retired MHA-PD-05, the same purchased strip)"
+    - id: "RV-02"
+      kind: "minor"
+      where: "bottom view, the four #0-80 taps' callout: ENGAGEMENT .032 MIN (0.54D)"
+      finding: "rack-screw full-thread engagement .032 in (0.54D) worst, below rule 18's 1.5D (and below 1.0D)"
+      reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation; owner review #2144 (#2410). Precedent: owner ruling 2026-11-01, MHA-DT-VN-61 post-mount engagement 0.88D accepted as a minor (no precedent this far under 1.0D). Prefer a short engagement to trimming: the screws only hold a brass strip against a pen-weight feed load. Owner ruling 2026-11-13: four stock 91794A055 #0-80 x 1/4 fillisters, untrimmed. Worst case, every band at its corner: the shortest stock screw (1/4 less the .03 length band) on the thickest counterbore floor of MHA-PD-27 (.155 REF, the rail's .624 height less the callout's .469 counterbore depth, each +-.005: .165), its first thread and the strip tap's .010 mouth break lost, leaves .0325 (0.54D); nominal (catalogue length, .155 floor) .0725 (1.20D). The tooth caps the full thread: on the shortest strip the tap's .129 drill and .110 full thread (each +.005) and its .005 station off the tooth centre stay inside the tooth, and the floor is the least that keeps the longest screw on the thinnest floor above the least full thread (pd_feed_rack_spec.ENGAGEMENT_WORST)."
+    - id: "RV-03"
+      kind: "minor"
+      where: "the notes: TAPS: WALL .042 MIN TO FRONT AND BACK FACES, .000 MIN TO TOOTH ROOT."
+      finding: "tap walls below rule 17's .060 floor: .042 to the strip's faces, .000 (about .0003 in metal) to the tooth-root fillet at the worst corner"
+      reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation; owner review #2144 (#2410). Precedent: owner ruling 2026-11-13 (Pedro), #1679, MHA-DT-11 RV-07 (a .036 MIN wall printed and accepted where the feature carries no load). A #0-80 tap in a 3/16 strip, located .094 +-.005 from its front face. To the faces: .042 worst at the back face (the strip's least face width with its receiving room, the tap .005 back, the .060 major and the .010 tap mouth break), .049 to the front face, .063 centred on a 3/16 strip without the break. Inside the tooth: the depths are sized so the deepest drill and full thread on the shortest strip, the tap .005 off its tooth centre, just stay in metal (.000 printed, the thread may graze the root fillet); .011 nominal. The root fillet lies below the working depth (the 12T's tips never reach it), so the graze does not touch the mesh."

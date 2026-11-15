@@ -4,7 +4,7 @@ The turned brass hub and flange whose reamed round bore slides on the pinion
 sleeve's (MHA-PD-10) boss. Its rear spigot passes the reducer disc's
 (MHA-PD-06) bore, which it clears, and seats on the sleeve's step; the
 flange's rear face clamps the disc's front face and three #0-80 fillister
-screws (MHA-PD-VN-55) hold them.  One 1/16 dowel (MHA-PD-VN-69), pressed
+screws (MHA-SH-VN-59 DiscScrew) hold them.  One 1/16 dowel (MHA-PD-VN-69), pressed
 from +X into a .0615 chord ream on local -Y to its stop, lies along the
 sleeve's D-flat and keys the hub in rotation
 (``pd_transgear_disc_hub_spec``, ``pd_transgear_disc_hub_geometry``).

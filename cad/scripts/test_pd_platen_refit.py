@@ -17,7 +17,7 @@ import build_pd_platen_guide as guide
 import pd_platen_guide_spec as guide_spec
 import _recording_geometry as paper_geometry
 import paper_drive_geom as feed_geometry
-import pd_platen_rack_spec as rack
+import pd_feed_rack_spec as rack
 import build_pd_support_bar as support
 import sh_vn_brass_fillister_screw_spec as fillister
 import pd_vn_platen_clip_screw_spec as clip_screw
@@ -33,8 +33,8 @@ def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
 
 
 def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> None:
-    """Codex P2 (724f78f26): MHA-PD-00 solders the rack ends flush with the
-    platen's, so the model places it flush, and the mesh phasing (a rack gap
+    """Codex P2 (724f78f26): MHA-PD-00 sets the rack ends flush with the
+    rail's and the platen's (#2410), so the model places it flush, and the mesh phasing (a rack gap
     centre on the feed pinion's +90-deg tooth over the stud) moves the platen
     off its photo x by the least shift instead of the rack along the platen."""
     assert rack.BAR_LENGTH == platen.PLATE_WIDTH

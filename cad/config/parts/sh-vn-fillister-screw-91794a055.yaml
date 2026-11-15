@@ -1,0 +1,28 @@
+sh-vn-fillister-screw-91794a055:
+  title: Stainless Fillister Head Slotted Screw
+  number: MHA-SH-VN-59
+  stock_name: 18-8 Stainless Steel Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91794A055]
+  material: 18-8 stainless steel
+  material_specification: "18-8 stainless steel, slotted fillister head, fully threaded; McMaster-Carr 91794A055"
+  finish: plain
+  # One #0-80 x 1/4 SKU in two modelled forms (#2410): DiscScrew, the three
+  # MHA-PD-06 disc screws cut to fit at MHA-PD-00 (MHA-PD-VN-55 until
+  # 2026-11-14), and RackScrew, the four MHA-PD-26 strip screws at stock
+  # length. The quantity is the installed members only (7). MHA-PD-00 also
+  # strikes the MHA-PD-27 rail's four rack-screw holes in one clamping with
+  # four spare RackScrews screwed into its taps, cut 1/32 proud and filed to a point (the
+  # assembly sheet's TOOLS row). Those are tools taken from the same pack,
+  # not BOM members, so the quantity stays 7 and no purchase line is added.
+  # The pack size (7 + 4 = 11 needed) is unverified (2026-11-14: the live
+  # McMaster page could not be read here).
+  quantity: 7
+  default_configuration: RackScrew
+  configuration_quantities:
+    RackScrew: 4
+    DiscScrew: 3
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in

@@ -1,4 +1,4 @@
-"""Ruling R9-47, parts (1) and (2): the MHA-PD-VN-55 disc screws cut to fit and the
+"""Ruling R9-47, parts (1) and (2): the MHA-SH-VN-59 DiscScrew disc screws cut to fit and the
 platen's float faced to fit, each judged at the printed worst case.
 
 Each test recomputes the worst corner from the catalogue and the printed
@@ -17,7 +17,7 @@ import pd_paper_drive_assembly_steps as steps
 import pd_platen_guide_spec as guide
 import pd_rack_pinion_spec as disc
 import pd_transgear_disc_hub_spec as hub
-import pd_vn_transgear_disc_screw_spec as screw
+import pd_transgear_disc_screw_spec as screw
 from _printed_tolerance import printed_band_mm
 
 IN = 25.4
@@ -101,7 +101,7 @@ def test_assembly_places_the_cut_tip_inside_the_disc_rear_face() -> None:
 def test_a_disc_too_thin_for_the_cut_screw_is_refused(monkeypatch) -> None:
     # A .102 face at its printed min leaves the cut screw under 1.5D.
     monkeypatch.setattr(disc, "FACE_WIDTH_MIN", 0.102 * IN)
-    with pytest.raises(AssertionError, match="MHA-PD-VN-55 disc screw .* worst engagement"):
+    with pytest.raises(AssertionError, match="MHA-SH-VN-59 DiscScrew in .* worst engagement"):
         _exec_fresh(screw)
 
 
@@ -109,7 +109,7 @@ def test_a_stock_screw_stopping_short_of_the_window_is_refused(monkeypatch) -> N
     # A disc that may run .016 thick leaves the shortest stock .013 inside:
     # no cut can bring it back into the window.
     monkeypatch.setattr(disc, "FACE_WIDTH_MAX", FACE + 0.016 * IN)
-    with pytest.raises(AssertionError, match="MHA-PD-VN-55 disc screw tip .* shortest"):
+    with pytest.raises(AssertionError, match="MHA-SH-VN-59 DiscScrew tip .* shortest"):
         _exec_fresh(screw)
 
 
@@ -202,7 +202,10 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     assert "OVER THE WINDOW, REPLACE" not in lock_step
 
     cut_step = printed_step("disc-screws-cut")
-    assert drawing.BOM_PART_NUMBERS["pd-vn-transgear-disc-screw"] in cut_step
+    import _config
+
+    # The step names the screws by their purchase Number, MHA-SH-VN-59.
+    assert _config.parts(screw.STEM)["number"] in cut_step
     tip_window = re.search(
         r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+) BELOW THE DISC REAR FACE\b",
         cut_step,

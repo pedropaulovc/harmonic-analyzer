@@ -27,6 +27,8 @@ import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
 import pd_transgear_feed_pinion_spec as feed_pinion
+import pd_feed_rack_spec as feed_rack
+import pd_platen_bottom_guide_spec as bottom_guide
 import _gear_quality as gear_quality
 import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
@@ -51,7 +53,7 @@ SEQUENCE: tuple[str, ...] = (
     # Platen and support, on the exploded sheet: the bar on the columns at its
     # height, the platen built up on the bench, then hung with its locks.
     "bar-clamped",
-    "rack-soldered",
+    "rack-screwed",
     "guides-screwed",
     "clips-fitted",
     "platen-hung",
@@ -94,7 +96,7 @@ SEQUENCE: tuple[str, ...] = (
     "arm-plate-screws-cut",
     "hanger-pivoted",
     # R9-47: tips flush to 0.20 below the disc's rear face, cut ends broken
-    # (pd_vn_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
+    # (pd_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
     "disc-screws-cut",
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushings, as made, the ring last.
@@ -207,10 +209,12 @@ BAR_TOP_ABOVE_DECK_TEXT = inch_text(BAR_TOP_ABOVE_DECK, 2)
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
 # less RACK_TIP_Y). The hook's pin hole is match-drilled wherever the meshed
 # hanger puts the pin, but a rack set off this band swings the latched hanger
-# and moves the pin along the hook's straight run, so the band is held at the
-# solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
+# and moves the pin along the hook's straight run, so the band is held where
+# the MHA-PD-27 bottom guide, the rack screwed on, is set on the platen and
+# its platen taps are transferred (pd_platen_bottom_guide_spec.CREST_SET_BAND).
+# The feed mesh's datum pitch-line distance sets the crest drop.
 RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
-RACK_CREST_TOL = 0.0508  # .002
+RACK_CREST_TOL = bottom_guide.CREST_SET_BAND  # .002
 # The feed rack's datum setup band and its gates are the builder's design
 # proofs (paper_drive_rack_setup). The sheet prints no number for that mesh:
 # the fitter sets it by feel and accepts it on function, no tight spot, no
@@ -225,7 +229,7 @@ RACK_CREST_TOL = 0.0508  # .002
 # interference point). The run's tight spot sets it, so every other station
 # runs looser by the rack's relative index error and the feed's lateral terms
 # (along the rack), the pinion's toothspace runout over a turn and the rack's
-# crest drift along the run (radial: the rack-soldered band lets one end of
+# crest drift along the run (radial: the crest set's band lets one end of
 # the engaged feed sit 2 x RACK_CREST_TOL higher than the other; codjiflo P2
 # on 6fa30c1d3). The loosest feel set books those from the later of the two
 # binds. Easing past the bind is not booked: the remedy eases the arm only
@@ -270,7 +274,7 @@ FEED_LOOSE_TERMS_MM = {
     ),
 }
 # The terms are independent (the stock rack's index, the mounting and cock of
-# the feed, the pinion's cut, the solder joint), so the loose side takes
+# the feed, the pinion's cut, the bottom guide's crest set), so the loose side takes
 # their root sum square. Delegated ruling (Main, 2026-11-11, under the owner
 # direction on #2416; owner review #2144): RSS here because the setting is by
 # feel and the acceptance is functional; an exception to the repo's
@@ -306,8 +310,9 @@ if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
 # If every term stacks, the contact ratio falls just under 1.0: a slight hitch
 # in the feed at that station, which the steady-advance check
 # ("loaded-rack-geometry-checked") catches. With every part inside its sheet
-# its remedy re-solders the rack with its crests reading the same at both ends
-# on step 2's height gauge, the one term the fitter controls, before setting
+# its remedy re-sets the bottom guide, the guide screws slackened, with the
+# rack's crests reading the same at both ends on the height gauge, the one
+# term the fitter controls, before setting
 # the mesh again by feel on a new hook. "The same" leaves at most one .001
 # division of drift, and with that the arithmetic worst case keeps the floor,
 # so the loop ends.
@@ -367,3 +372,9 @@ OFFSET_ACCEPT_TEXT = (
 )
 COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
 RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
+# The rack's front face behind the bottom guide's (so the platen's back) face,
+# set against a rule when the guide's rack-screw holes are struck.
+RACK_FRONT_SET_TEXT = (
+    f"{inch_text(feed_rack.FRONT_BEHIND_PLATEN, 3)} "
+    f"\u00b1{inch_text(feed_rack.FRONT_SET_BAND, 3)}"
+)

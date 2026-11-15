@@ -237,7 +237,7 @@ def feed_service_cocking_lateral_deviation_mm() -> float:
     source feed-axis tilt is used, not an assumed world-Z journal.
     Rigid quasi-static kinematics; elastic compliance excluded by scope.
     """
-    import pd_platen_rack_spec as rack
+    import pd_feed_rack_spec as rack
 
     edge = edge_break_chamfer_mm(unit=pd_transgear_feed_pinion_spec.UNIT)
     if not math.isfinite(edge) or edge < 0.0:
@@ -299,27 +299,16 @@ def feed_lateral_deviation_mm() -> float:
 
 
 def feed_rack_cut_end_section_maxima_mm() -> tuple[float, float]:
-    """Whole actual cut-Y/cut-Z envelope, not the nominal overall-height REF.
+    """Whole actual cut-Y/cut-Z envelope of the bare purchased strip.
 
     The purchased strip's HEIGHT and face WIDTH maxima are the room the
-    receiving geometry gives it (pd_platen_rack_spec, #2694).  The printed
-    SeamHeight, BackerDepth and RackInset bounds locate the soldered stock.
+    receiving geometry gives it (pd_feed_rack_spec, #2694); no backer or
+    seam adds to them (owner rulings 2026-11-13, #2410).
     """
-    import pd_platen_rack_spec as rack
-    from _printed_tolerance import printed_deviations
+    import pd_feed_rack_spec as rack
 
-    def dimension_band(name: str) -> tuple[float, float]:
-        nominal = rack.DRAWING_NOMINALS_MM[name]
-        lower, upper = printed_deviations(
-            nominal, rack.DRAWING_PRECISION_BY_NAME[name], unit=rack.UNIT
-        )
-        return nominal + lower, nominal + upper
-
-    seam = dimension_band("SeamHeight")
-    backer = dimension_band("BackerDepth")
-    inset = dimension_band("RackInset")
-    height = seam[1] + rack.PURCHASED_RACK_HEIGHT_MAX_MM
-    depth = max(backer[1], inset[1] + rack.PURCHASED_RACK_FACE_WIDTH_MAX_MM) - min(0.0, inset[0])
+    height = rack.PURCHASED_RACK_HEIGHT_MAX_MM
+    depth = rack.PURCHASED_RACK_FACE_WIDTH_MAX_MM
     if not all(math.isfinite(value) and value > 0.0 for value in (height, depth)):
         raise ValueError("actual rack cut section has no finite positive envelope")
     return math.nextafter(height, math.inf), math.nextafter(depth, math.inf)

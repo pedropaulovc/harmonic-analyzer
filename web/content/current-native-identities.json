@@ -445,17 +445,6 @@
       ]
     },
     {
-      "sourceStem": "vn-transgear-disc-screw",
-      "sourceNumber": "MHA-VN-039",
-      "identities": [
-        {
-          "parent": "pd-paper-drive",
-          "stem": "pd-vn-transgear-disc-screw",
-          "number": "MHA-PD-VN-55"
-        }
-      ]
-    },
-    {
       "sourceStem": "vn-transgear-arm-plate-screw",
       "sourceNumber": "MHA-VN-040",
       "identities": [
@@ -641,6 +630,26 @@
           "number": "MHA-SH-VN-58",
           "configuration": "BarPin",
           "role": "BarPin"
+        }
+      ]
+    },
+    {
+      "sourceStem": "sh-vn-fillister-screw-91794a055",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "sh-vn-fillister-screw-91794a055",
+          "number": "MHA-SH-VN-59",
+          "configuration": "RackScrew",
+          "role": "RackScrew"
+        },
+        {
+          "parent": "pd-paper-drive",
+          "stem": "sh-vn-fillister-screw-91794a055",
+          "number": "MHA-SH-VN-59",
+          "configuration": "DiscScrew",
+          "role": "DiscScrew"
         }
       ]
     },
@@ -1117,9 +1126,19 @@
       "registry": null,
       "builder": null,
       "status": "archive-only"
+    },
+    {
+      "sourceStem": "vn-transgear-disc-screw",
+      "sourceNumber": "MHA-VN-039",
+      "parent": "pd-paper-drive",
+      "stem": "pd-vn-transgear-disc-screw",
+      "number": null,
+      "registry": null,
+      "builder": null,
+      "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "abd66278fc4c4c9b685b11f5238114f6f88f0751a81b8163c52e8e8508a87f7f",
+  "currentRegistryMapSha256": "969e63167e55287518eaf6772bcd91726e3f06019d91fd7237bbd5eead3d6b8d",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -1382,12 +1401,22 @@
       ]
     },
     {
-      "sourceStem": "pd-platen-rack",
-      "sourceNumber": "MHA-PD-005",
+      "sourceStem": "pd-feed-rack",
+      "sourceNumber": null,
       "identities": [
         {
-          "stem": "pd-platen-rack",
-          "number": "MHA-PD-05"
+          "stem": "pd-feed-rack",
+          "number": "MHA-PD-26"
+        }
+      ]
+    },
+    {
+      "sourceStem": "pd-platen-bottom-guide",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "pd-platen-bottom-guide",
+          "number": "MHA-PD-27"
         }
       ]
     },
@@ -3109,6 +3138,17 @@
         "BarPin"
       ],
       "neutralExportConfiguration": "RodPin"
+    },
+    {
+      "stem": "sh-vn-fillister-screw-91794a055",
+      "number": "MHA-SH-VN-59",
+      "supplier": "McMaster",
+      "supplierSku": "91794A055",
+      "configurations": [
+        "RackScrew",
+        "DiscScrew"
+      ],
+      "neutralExportConfiguration": "RackScrew"
     }
   ],
   "sourceFiles": [

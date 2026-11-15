@@ -41,7 +41,7 @@ from pd_rack_pinion_spec import (
 )
 
 KNOB_NUMBER = "MHA-PD-08"
-SCREW_NUMBER = "MHA-PD-VN-55"
+SCREW_NUMBER = "MHA-SH-VN-59"
 BORE_NOTE = 1
 TAP_NOTE = 2
 
@@ -81,7 +81,7 @@ TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
 SPAN_CALLOUT = "MATCHED, SEE GEAR DATA"
 MESH_CALLOUT = "SEE GEAR DATA"
 # The .XXX thickness is the screw engagement's: its least is the tapped
-# length (pd_vn_transgear_disc_screw_spec), and .XX would cut that below
+# length (pd_transgear_disc_screw_spec), and .XX would cut that below
 # 1.5D.
 FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 

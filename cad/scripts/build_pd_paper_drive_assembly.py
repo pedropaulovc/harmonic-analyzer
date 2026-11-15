@@ -311,18 +311,22 @@ from pd_vn_guide_lock_screw_spec import (  # noqa: E402
     SHANK_DIA as LOCK_SCREW_SHANK_DIA,
     SHANK_LEN as LOCK_SCREW_SHANK_LEN,
 )
-from pd_platen_rack_spec import (  # noqa: E402
+from pd_feed_rack_spec import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
-    BAR_HEIGHT as RACK_BAR_HEIGHT,
     BAR_LENGTH as RACK_BAR_LENGTH,
-    BAR_THICKNESS as RACK_BAR_THICKNESS,
     FIRST_GAP_X as RACK_FIRST_GAP_X,
+    FRONT_BEHIND_PLATEN as RACK_FRONT_BEHIND_PLATEN,
+    FRONT_SET_BAND as RACK_FRONT_SET_BAND,
+    PURCHASED_RACK_FACE_WIDTH_MAX_MM,
+    PURCHASED_RACK_HEIGHT_MAX_MM,
+    RACK_HEIGHT,
     RACK_THICKNESS as RACK_TEETH_THICKNESS,
-    RACK_Z0 as RACK_TEETH_Z_INSET,
     PITCH as RACK_PITCH,
-    DRAWING_PRECISION_BY_NAME as RACK_PRECISION,
-    UNIT as RACK_UNIT,
+    TAP_X as RACK_TAP_X,
+    TAP_Z as RACK_TAP_Z,
 )
+import pd_platen_bottom_guide_spec as BOTTOM_GUIDE  # noqa: E402
+import pd_feed_rack_screw_spec as RACK_SCREW  # noqa: E402
 import paper_drive_geom as PAPER_GEOMETRY  # noqa: E402
 import _paper_drive_placement as PAPER_PLACEMENT  # noqa: E402
 import _recording_geometry as RECORDING_GEOMETRY  # noqa: E402
@@ -337,19 +341,57 @@ PLATE_X0_PHOTO = -33.213
 PLATE_Y0 = PAPER_PLACEMENT.PLATEN_BOTTOM_Y
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
-# The platen hangs: the bar's top edge carries the top guide's underside. The
-# bottom rail's underside sits just over the rack backer on the platen back.
-GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
+# The feed rack MHA-PD-26 is the bare purchased strip, its crests the feed
+# mesh's crest drop below the platen's bottom edge (the datum pitch-line
+# distance sets it), screwed by its flat top to the bottom rail MHA-PD-27's
+# underside with its front face RACK_FRONT_BEHIND_PLATEN behind the platen's
+# back (owner rulings 2026-11-13, #2410: no backer, no solder). The pressed
+# stud, pivot and latch pose are retained.
+RACK_TIP_Y = PAPER_PLACEMENT.RACK_TIP_Y
+RACK_PITCH_Y = PAPER_PLACEMENT.RACK_PITCH_Y
+RACK_Y0 = RACK_TIP_Y + RACK_HEIGHT  # the flat top; Rx180: local +Y maps downward
+RACK_TEETH_FRONT_Z = BAR_FRONT_Z + RACK_FRONT_BEHIND_PLATEN
+RACK_BACK_Z = RACK_TEETH_FRONT_Z + RACK_TEETH_THICKNESS
+RACK_TEETH_BACK_Z = RACK_BACK_Z
+
+# The platen hangs: the bar's top edge carries the top rail's (MHA-PD-11)
+# underside. The bottom rail (MHA-PD-27) seats the strip's flat top on its
+# underside.
+GUIDE_Y = (RACK_Y0, 317.734)  # bottom / top rail undersides (machine y)
+if abs(GUIDE_Y[0] - PLATE_Y0 - BOTTOM_GUIDE.UNDERSIDE_ABOVE_PLATEN_BOTTOM) > 1e-5:
+    raise AssertionError("MHA-PD-27's underside is off the MHA-PD-26 strip's flat top")
+GUIDE_HEIGHTS = (BOTTOM_GUIDE.GUIDE_HEIGHT, GUIDE_HEIGHT)
+# Each rail's lock-tap row (machine y): its lock plates and screws sit on it.
+LOCK_TAP_ROW_Y = (GUIDE_Y[0] + BOTTOM_GUIDE.LOCK_TAP_Y, GUIDE_Y[1] + GUIDE_TAP_Y)
+# The bottom rail's y on the platen follows the strip's received height and
+# the crest set at MHA-PD-00 (the rail's platen taps are transferred with the
+# crests set), either way; the lock sweep and retention checks carry it.
+BOTTOM_GUIDE_Y_BAND = (
+    PURCHASED_RACK_HEIGHT_MAX_MM - RACK_HEIGHT + BOTTOM_GUIDE.CREST_SET_BAND
+)
+# The rack screws' under-head faces: MHA-PD-27's counterbore floors, the
+# strip's printed screw floor above its flat top.
+RACK_SCREW_FLOOR_Y = GUIDE_Y[0] + BOTTOM_GUIDE.GUIDE_HEIGHT - BOTTOM_GUIDE.SCREW_CBORE_DEPTH
+# The placement below names the member literally (the build graph reads it).
+if (RACK_SCREW.STEM, RACK_SCREW.CONFIGURATION) != (
+    "sh-vn-fillister-screw-91794a055",
+    "RackScrew",
+):
+    raise AssertionError("the rack-screw placement names another member")
 BAR_TOP_Y = GUIDE_Y[1]
 BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 304.907
 # The SH column clamps' screw line, below the bar's centre (pd_support_bar_spec).
 CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # The bar fills the channel between the rails down to this running clearance
-# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT).
-BOTTOM_RAIL_CLEARANCE = 0.98
+# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT). MHA-PD-27's
+# top stands BOTTOM_GUIDE.TOP_RISE above the former .29 bottom rail's, paid
+# from the former 0.98.
+BOTTOM_RAIL_CLEARANCE = 0.98 - BOTTOM_GUIDE.TOP_RISE
 if (
-    abs(BAR_TOP_Y - BAR_HEIGHT - GUIDE_Y[0] - GUIDE_HEIGHT - BOTTOM_RAIL_CLEARANCE)
-    > 1e-9
+    abs(
+        BAR_TOP_Y - BAR_HEIGHT - GUIDE_Y[0] - GUIDE_HEIGHTS[0] - BOTTOM_RAIL_CLEARANCE
+    )
+    > 1e-5
 ):
     raise AssertionError(
         "the support bar's bottom edge is off the bottom rail's clearance"
@@ -357,26 +399,8 @@ if (
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
 # 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
-
-# Relocate the rack/backer on the platen to the shifted pitch-line distance,
-# retaining the pressed stud, pivot and latch pose.
-RACK_TIP_Y = PAPER_PLACEMENT.RACK_TIP_Y
-RACK_PITCH_Y = PAPER_PLACEMENT.RACK_PITCH_Y
-RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # Rx180: local +Y maps downward
-RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS
-RACK_TEETH_BACK_Z = RACK_BACK_Z - RACK_TEETH_Z_INSET
-RACK_TEETH_FRONT_Z = RACK_TEETH_BACK_Z - RACK_TEETH_THICKNESS
-# Both ride the platen back in one z band, so the bottom rail's underside
-# keeps air over the rack backer's tallest received section above the tooth
-# tips (paper_drive_geom; the .29 rails grew into the bar's channel for it).
-RACK_BACKER_RAIL_AIR_WORST = GUIDE_Y[0] - (
-    RACK_TIP_Y + PAPER_GEOMETRY.feed_rack_cut_end_section_maxima_mm()[0]
-)
-if RACK_BACKER_RAIL_AIR_WORST <= 0.0:
-    raise AssertionError(
-        f"MHA-PD-11 bottom guide rail meets the MHA-PD-05 rack backer: air "
-        f"{RACK_BACKER_RAIL_AIR_WORST:.3f}"
-    )
+if abs(BOTTOM_GUIDE.GUIDE_DEPTH - GUIDE_DEPTH) > 1e-9:
+    raise AssertionError("the two rails' depths differ, so their lock plates do")
 
 # --- transgear (the real six-gear train) -------------------------------------
 from pd_rack_pinion_spec import (  # noqa: E402
@@ -399,7 +423,7 @@ import transgear_cluster_fit as CLUSTER  # noqa: E402
 import pd_cluster_air as CLUSTER_AIR  # noqa: E402
 import pd_transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
 import pd_transgear_disc_hub_spec as DISC_HUB  # noqa: E402
-import pd_vn_transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
+import pd_transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
 import pd_transgear_drive_collar_spec as COLLAR  # noqa: E402
 import pd_transgear_feed_pinion_spec as FEED  # noqa: E402
 import pd_transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
@@ -730,7 +754,7 @@ if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9 or abs(CLUSTER.F_Z - KNOB_SHAFT_Z0)
     raise AssertionError("F is off the arm, plate hub and thrust ring chain")
 if abs(DISC_Z0 - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
     raise AssertionError("the model's disc is off the cluster stack's station from F")
-# The 150T disc's rear face (the MHA-PD-VN-55 tips sit inside it) to the platen's
+# The 150T disc's rear face (the MHA-SH-VN-59 DiscScrew tips sit inside it) to the platen's
 # front face, cluster rearward on the rear bushing: an air stack in the
 # repository's statistical style (pd_cluster_air).  From the model's nominal
 # air it closes by the clearances -- the platen forward by its fitted float,
@@ -747,20 +771,16 @@ if abs(DISC_Z0 - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
 # flange squareness and the disc's rear-face parallelism at the rim, and the
 # pin's S projected axis zone at the rim.
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
-# The platen prints its thickness and the rack its backer depth
-# (pd_platen_spec / pd_platen_rack_spec DRAWING_PRECISION).
-# Each band is the larger printed deviation from the model (the printed value
-# rounds off the model nominal).
+# The platen prints its thickness (pd_platen_spec DRAWING_PRECISION); the band
+# is the larger printed deviation from the model (the printed value rounds
+# off the model nominal).
 _PLATEN_THICKNESS_BAND = max(
     map(abs, printed_deviations(PLATE_THICKNESS, PLATEN_PRECISION["Depth"], unit=PLATEN_UNIT))
 )
-_RACK_THICKNESS_BAND = max(
-    map(
-        abs,
-        printed_deviations(
-            RACK_BAR_THICKNESS, RACK_PRECISION["BackerDepth"], unit=RACK_UNIT
-        ),
-    )
+# How far rearward of the model the strip's back face can stand: its front
+# set behind the platen back at MHA-PD-00 and its received face width.
+_RACK_BACK_REARWARD_BAND = RACK_FRONT_SET_BAND + (
+    PURCHASED_RACK_FACE_WIDTH_MAX_MM - RACK_TEETH_THICKNESS
 )
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - (DISC_Z0 + DISC_SPEC.FACE_WIDTH)  # 1.59
 CLUSTER_TILT_AT_DISC_RIM = (
@@ -857,7 +877,8 @@ DISC_PLATEN_AIR = CLUSTER_AIRS["platen_air"]
 # The platen stack at the arithmetic worst case: the rack reach below reads it.
 DISC_PLATEN_AIR_WORST = PLATEN_AIR.arithmetic_mm
 # R9-67/R9-68: the feed sleeve's 12T cuts full depth from its rear face over
-# the rack's whole width.  The rack's front face is the platen's back face, so
+# the rack's whole width.  The rack's front face stands its set distance
+# behind the platen's back face (MHA-PD-00, #2410), so
 # the stack above sets how far forward of the sleeve's rear face it reaches,
 # less the terms that do not lie between the sleeve and the platen's back
 # (the platen's own band, the disc's mount wobble, the rim's tilts, which
@@ -886,29 +907,25 @@ RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
     - HANGER_TILT_AT_DISC_RIM
     + HANGER_TILT_AT_FEED_TIPS
     - PLATE_THICKNESS
-    - (
-        RACK_TEETH_Z_INSET
-        + printed_deviations(
-            RACK_TEETH_Z_INSET, RACK_PRECISION["RackInset"], unit=RACK_UNIT
-        )[0]
-    )
+    - (RACK_FRONT_BEHIND_PLATEN - RACK_FRONT_SET_BAND)
 )
 if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     raise AssertionError(
         f"MHA-PD-10 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
         f"face, inside the rack's worst reach {RACK_FRONT_FROM_SLEEVE_REAR_WORST:.3f}"
     )
-# The MHA-PD-24 rear bushing's front face to the MHA-PD-05 rack's back face (its
+# The MHA-PD-24 rear bushing's front face to the MHA-PD-26 strip's back face (its
 # Ø9 .X can reach the rack's crests radially): the arm forward on the
-# shortest spacer, the bar thinnest, the rack thickest, the bushing (and its
+# shortest spacer, the bar thinnest, the strip set rearmost at its widest,
+# the bushing (and its
 # shims) following the sleeve forward to the sleeve's most forward rear face,
 # and the hanger's tilt at the bushing's far rim.
-BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
+BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 3.03
 BUSHING_RACK_AIR_WORST = (
     BUSHING_RACK_AIR_NOMINAL
     - SPACER.LENGTH_BAND
     - BAR.BAR_DEPTH_BAND
-    - _RACK_THICKNESS_BAND
+    - _RACK_BACK_REARWARD_BAND
     - (
         CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1]
         - REAR_BUSHING.LENGTH
@@ -920,10 +937,10 @@ BUSHING_RACK_AIR_WORST = (
         + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES, unit=REAR_BUSHING.UNIT))
         / 2.0
     )
-)  # 1.89
+)  # 1.69
 if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
-        "MHA-PD-24 rear bushing enters the MHA-PD-05 rack at the printed worst case: "
+        "MHA-PD-24 rear bushing enters the MHA-PD-26 rack at the printed worst case: "
         f"air {BUSHING_RACK_AIR_WORST:.4f} (R9-68)"
     )
 
@@ -1072,8 +1089,8 @@ KNOB_FLAT_PIN_CREST_AIR = (
 if KNOB_FLAT_PIN_CREST_AIR <= 0.0:
     raise AssertionError("the collar's flat pin crest reaches the knob shaft's D-flat")
 # The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), so a
-# rack GAP centre must sit exactly on the stud's x. The rack is soldered with
-# its ends flush with the platen's (MHA-PD-00 "rack-soldered"), so its gaps
+# rack GAP centre must sit exactly on the stud's x. The strip is screwed with
+# its ends flush with the platen's (MHA-PD-00, #2410), so its gaps
 # march +X from FIRST_GAP_X in from the platen's -X end: the photo pose moves
 # by the smallest shift that lands a gap on the stud (no more than half a
 # pitch, far inside the photo fit). Machine-handed: the rack is teeth-down
@@ -1186,10 +1203,13 @@ GUIDE_SCREW_XY = tuple(
     for y in PLATEN_GUIDE_HOLE_Y
     for x in PLATEN_GUIDE_HOLE_X
 )
-# Lock screws: 2 per lock plate, heads on the lock backs, into the guides.
+# Lock screws: 2 per lock plate, heads on the lock backs, into each rail's
+# lock-tap row.
 LOCK_SCREW_XY = tuple(
-    (PLATE_X0 + x, gy + GUIDE_TAP_Y) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
+    (PLATE_X0 + x, row) for row in LOCK_TAP_ROW_Y for x in GUIDE_LOCK_HOLE_X
 )
+if tuple(sorted(BOTTOM_GUIDE.LOCK_TAP_X)) != tuple(sorted(GUIDE_LOCK_HOLE_X)):
+    raise AssertionError("the bottom rail's lock taps are off the top rail's stations")
 
 # Placed parts that can reach the chain plane (the band the bought chain
 # sweeps, z CHAIN_FRONT_Z_WORST .. seat + CHAIN_REACH_REAR_WORST), as coaxial
@@ -1275,19 +1295,19 @@ CHAIN_PLANE_ENVELOPES = (
 )
 
 # The guide-lock stations ride the platen: each lock plate bridges the bar
-# behind one guide rail (bottom plate up from the lower rail's seat, top plate
-# down from the upper rail's top edge), its two screws on the rail's tap row,
-# lapping past the rail's outer edge (R9-59): the bottom rail's outer edge is
-# its datum B, the top rail's its top face.
-LOCK_LIP = (LOCK_HOLE_Y - GUIDE_TAP_Y, LOCK_HOLE_Y - (GUIDE_HEIGHT - GUIDE_TAP_Y))
-if any(abs(y - LOCK_HOLE_Y) > 1e-9 for _, y in LOCK_HOLE_XY) or min(LOCK_LIP) < 0.0:
+# behind one guide rail, its two screws on the rail's lock-tap row (holes
+# LOCK_HOLE_Y in from the plate's rail-side edge). The top rail's plate laps
+# past its top face (R9-59, LOCK_LIP); the bottom rail MHA-PD-27 reaches down
+# to the strip, so its plate lies wholly on the rail's back face, bridging up
+# across the running clearance onto the bar.
+LOCK_LIP = LOCK_HOLE_Y - (GUIDE_HEIGHT - GUIDE_TAP_Y)
+if any(abs(y - LOCK_HOLE_Y) > 1e-9 for _, y in LOCK_HOLE_XY) or LOCK_LIP < 0.0:
     raise AssertionError("guide-lock screw holes are off the guide rail's tap row")
+if LOCK_TAP_ROW_Y[0] - LOCK_HOLE_Y < GUIDE_Y[0]:
+    raise AssertionError("the bottom lock plate hangs below MHA-PD-27's underside")
 LOCK_PLATE_Y = (
-    (GUIDE_Y[0] - LOCK_LIP[0], GUIDE_Y[0] - LOCK_LIP[0] + LOCK_HEIGHT),
-    (
-        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_LIP[1] - LOCK_HEIGHT,
-        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_LIP[1],
-    ),
+    (LOCK_TAP_ROW_Y[0] - LOCK_HOLE_Y, LOCK_TAP_ROW_Y[0] - LOCK_HOLE_Y + LOCK_HEIGHT),
+    (LOCK_TAP_ROW_Y[1] + LOCK_HOLE_Y - LOCK_HEIGHT, LOCK_TAP_ROW_Y[1] + LOCK_HOLE_Y),
 )
 
 
@@ -1482,7 +1502,7 @@ def _assert_fastener_stacks() -> None:
         <= DISC_SCREW.TIP_BELOW_REAR_FACE[1]
     ):
         raise AssertionError(
-            "MHA-PD-VN-55 disc-screw tip to the MHA-PD-06 disc rear face: "
+            "DiscScrew tip to the MHA-PD-06 disc rear face: "
             f"{tip_below_rear:.3f} inside, off the cut window"
         )
     valid_engagement(
@@ -1628,10 +1648,12 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # spacer, its plate's lower section on the thinnest arm stock and the deepest
 # notch. Deviations are (lower, upper) from the model, read from the specs the
 # parts author on their model dimensions, so the sheets and the sweep agree.
-# Unmodelled contributor (R9-61): the bottom rail's y on the platen, set
-# against the top rail (which hangs on the bar's top edge) by the platen's
-# guide-screw rows and the #4 screws' float in its Ø3.0 holes. The platen has
-# no sheet and so no printed bands, so the sweep holds both rails at GUIDE_Y.
+# Unmodelled contributor (R9-61): the platen's y against the top rail (which
+# hangs on the bar's top edge), set by the platen's upper guide-screw row and
+# the #4 screws' float in its Ø3.0 holes. The platen has no sheet and so no
+# printed bands, so the sweep holds the top rail at GUIDE_Y. The bottom rail
+# MHA-PD-27 follows the strip and the crest set (BOTTOM_GUIDE_Y_BAND), which
+# the sweep carries.
 LOCK_SWEEP_FLOOR = 0.10
 _BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
 _GUIDE_DEPTH_DEV = printed_deviations(
@@ -1639,6 +1661,12 @@ _GUIDE_DEPTH_DEV = printed_deviations(
 )
 # The rail's sheet prints its other sizes at the same document places.
 _GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=GUIDE_UNIT)
+# MHA-PD-27 prints its height at .XXX.
+_BOTTOM_GUIDE_HEIGHT_DEV = printed_deviations(
+    BOTTOM_GUIDE.GUIDE_HEIGHT, BOTTOM_GUIDE.PLACES, unit=BOTTOM_GUIDE.UNIT
+)
+_RAIL_HEIGHT_DEVS = (_BOTTOM_GUIDE_HEIGHT_DEV, _GUIDE_HEIGHT_DEV)
+_RAIL_Y_SHIFTS = (BOTTOM_GUIDE_Y_BAND, 0.0)  # either way, per rail
 _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"], unit=LOCK_UNIT)
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
@@ -1685,9 +1713,10 @@ def _assert_lock_station_sweep() -> None:
     plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) + LOCK_SET_EDGE_REACH[0]
     moving = []
     for index, (gy, (y0, y1)) in enumerate(zip(GUIDE_Y, LOCK_PLATE_Y, strict=True)):
-        yc = gy + GUIDE_TAP_Y
-        # The bottom rail's lock laps the rail's underside and is pushed down;
-        # the top rail's laps its top and is pushed up.
+        yc = LOCK_TAP_ROW_Y[index]
+        rail_dy = _RAIL_Y_SHIFTS[index]
+        # The bottom rail's lock is pushed down, away from the bar; the top
+        # rail's laps its top and is pushed up.
         grow_down, grow_up = (
             (plate_outward, plate_inward)
             if index == 0
@@ -1698,7 +1727,7 @@ def _assert_lock_station_sweep() -> None:
                 f"lock plates y{y0:.1f}",
                 _grown(
                     (y0 - grow_down, y1 + grow_up, LOCK_Z0, lock_back),
-                    0.0,
+                    rail_dy,
                     front_forward,
                     back_rear,
                 ),
@@ -1712,7 +1741,7 @@ def _assert_lock_station_sweep() -> None:
                         lock_back,
                         lock_back + LOCK_SCREW_HEAD_H,
                     ),
-                    0.0,
+                    rail_dy,
                     back_forward,
                     back_rear,
                 ),
@@ -1720,8 +1749,8 @@ def _assert_lock_station_sweep() -> None:
             (
                 f"guide rail rear lip y{gy:.1f}",
                 _grown(
-                    (gy, gy + GUIDE_HEIGHT, BAR_BACK_Z, LOCK_Z0),
-                    max(_GUIDE_HEIGHT_DEV[1], 0.0),
+                    (gy, gy + GUIDE_HEIGHTS[index], BAR_BACK_Z, LOCK_Z0),
+                    max(_RAIL_HEIGHT_DEVS[index][1], 0.0) + rail_dy,
                     0.0,
                     front_rear,
                 ),
@@ -1895,7 +1924,7 @@ def _assert_lock_station_sweep() -> None:
     # Pushed away from the bar (R9-49), a lock plate's guide-side edge moves
     # over the platen's own back. Behind the platen back only the rails and
     # the rack stand; paper and clips are on its front face.
-    rack = (RACK_TIP_Y, RACK_Y0, BAR_FRONT_Z, RACK_BACK_Z)
+    rack = (RACK_TIP_Y, RACK_Y0, RACK_TEETH_FRONT_Z, RACK_BACK_Z)
     rack_gap = min(
         _section_gap(section, rack)
         for label, section in moving
@@ -1939,14 +1968,21 @@ def _assert_lock_retention() -> None:
     plate must still overlap the bar, at the printed worst case: the bar at
     its .XXX height band (it hangs the platen by its top edge), the rails at
     their printed height band (their taps locate from the bottom face), the
-    plate at its least height, set away from the bar by its whole guide-side
-    reach (pd_vn_guide_lock_screw_spec.LOCK_SET_EDGE_REACH, its hole bands
+    bottom rail MHA-PD-27 also anywhere in its y band on the platen (the
+    strip's height and the crest set), the plate at its least height, set
+    away from the bar by its whole guide-side reach
+    (pd_vn_guide_lock_screw_spec.LOCK_SET_EDGE_REACH, its hole bands
     included). The bottom plates retain the hanging platen; the top plates
     retain it lifted until its bottom rail meets the bar."""
     bar_bottom = BAR_TOP_Y - BAR_HEIGHT
-    rail_top = GUIDE_Y[0] + GUIDE_HEIGHT
+    rail_top = GUIDE_Y[0] + GUIDE_HEIGHTS[0]
+    height_dev = _RAIL_HEIGHT_DEVS[0]
     clearance_min = (
-        bar_bottom - BAR.BAR_HEIGHT_BAND - rail_top - max(_GUIDE_HEIGHT_DEV[1], 0.0)
+        bar_bottom
+        - BAR.BAR_HEIGHT_BAND
+        - rail_top
+        - max(height_dev[1], 0.0)
+        - BOTTOM_GUIDE_Y_BAND
     )
     if clearance_min < LOCK_SWEEP_FLOOR:
         raise AssertionError(
@@ -1954,12 +1990,17 @@ def _assert_lock_retention() -> None:
             f" (worst-case gap {clearance_min:.3f} < {LOCK_SWEEP_FLOOR})"
         )
     lift_max = (
-        bar_bottom + BAR.BAR_HEIGHT_BAND - rail_top - min(_GUIDE_HEIGHT_DEV[0], 0.0)
+        bar_bottom
+        + BAR.BAR_HEIGHT_BAND
+        - rail_top
+        - min(height_dev[0], 0.0)
+        + BOTTOM_GUIDE_Y_BAND
     )
     retreat = LOCK_SET_EDGE_REACH[1] - min(_LOCK_HEIGHT_DEV[0], 0.0)
     overlaps = {
         "bottom plates (hanging)": LOCK_PLATE_Y[0][1]
         - retreat
+        - BOTTOM_GUIDE_Y_BAND
         - (bar_bottom + BAR.BAR_HEIGHT_BAND),
         "top plates (lifted)": BAR_TOP_Y - LOCK_PLATE_Y[1][0] - retreat - lift_max,
     }
@@ -2037,7 +2078,7 @@ def _assert_native_rack_operating_pose(
     axis = world_point(adapter, running_pin, [0.0, 0.0, PIN_Z0 - feed_mid_z])
     pitch_line = world_point(
         adapter, rack,
-        [0.0, RACK_BAR_HEIGHT - RACK_ADDENDUM, RACK_BACK_Z - feed_mid_z],
+        [0.0, RACK_HEIGHT - RACK_ADDENDUM, RACK_BACK_Z - feed_mid_z],
     )
     rack_setup.require_feed_rack_datum_axis_distance(pitch_line[1] - axis[1])
     displacement = PAPER_GEOMETRY.feed_running_axis_x_displacement_band_mm()
@@ -3128,41 +3169,68 @@ async def build(adapter) -> dict[str, str]:
             label=f"{label} locked to platen",
         )
 
-    # Rack: Rx(180) -> teeth point down, crests 2 below the platen edge (the
-    # machine reflection of the pre-mirror Rz180; z origin on the rack back).
+    # Feed rack (MHA-PD-26): Rx(180) -> teeth point down, crests the crest drop
+    # below the platen edge; z origin on the strip's back face, its front
+    # RACK_FRONT_BEHIND_PLATEN behind the platen back.
     rack = await place_component(
         adapter,
-        "pd-platen-rack",
+        "pd-feed-rack",
         [RACK_X0, RACK_Y0, RACK_BACK_Z],
         [180.0, 0.0, 0.0],
         ROT_X_180,
         ground=False,
     )
-    await _lock_to_platen(rack, "pd-platen-rack")
+    await _lock_to_platen(rack, "pd-feed-rack")
     # Guide rails on the platen back, above/below the bar band -- the platen
-    # HANGS by the top rail's underside on the bar's top edge.
+    # HANGS by the top rail's (MHA-PD-11) underside on the bar's top edge; the
+    # bottom rail (MHA-PD-27) seats the strip's flat top on its underside.
     guides = []
-    for gy in GUIDE_Y:
-        # platen-guide is authored into -Z so its native Front is the
+    for stem, gy in (
+        ("pd-platen-bottom-guide", GUIDE_Y[0]),
+        ("pd-platen-guide", GUIDE_Y[1]),
+    ):
+        # Each rail is authored into -Z so its native Front is the
         # machinist-facing hole-entry face. Ry(180) maps that local -Z depth
-        # back onto the unchanged machine +Z envelope and reverses the
-        # symmetric X station set; shifting to the far X end preserves every
-        # world-space hole and outside face exactly.
+        # back onto the unchanged machine +Z envelope and reverses the X
+        # station set; shifting to the far X end preserves every world-space
+        # hole and outside face (MHA-PD-27's rack-screw holes are authored
+        # mirrored for it, pd_platen_bottom_guide_spec.SCREW_HOLE_X).
         guide = await place_component(
             adapter,
-            "pd-platen-guide",
+            stem,
             [PLATE_X0 + GUIDE_LENGTH, gy, BAR_FRONT_Z],
             [0.0, 180.0, 0.0],
             ROT_Y_180,
             ground=False,
-            label=f"platen-guide (y{gy:.1f})",
+            label=f"{stem} (y{gy:.1f})",
         )
-        await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
+        await _lock_to_platen(guide, f"{stem} y{gy:.1f}")
         guides.append(guide)
+    # The four rack screws, heads up on MHA-PD-27's counterbore floors, shanks
+    # down into the strip's taps (the fillister frame: axis +Y, under-head at
+    # y 0, so identity).
+    for index, x in enumerate(RACK_TAP_X, start=1):
+        rack_screw = await place_component(
+            adapter,
+            "sh-vn-fillister-screw-91794a055",
+            [RACK_X0 + x, RACK_SCREW_FLOOR_Y, RACK_TEETH_FRONT_Z + RACK_TAP_Z],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            configuration="RackScrew",
+            label=f"feed-rack screw (x{RACK_X0 + x:+.1f})",
+        )
+        if rack_screw != f"sh-vn-fillister-screw-91794a055-{index}":
+            raise RuntimeError(
+                f"rack screw {index} is {rack_screw!r}: the interference contract "
+                "numbers the RackScrew members first"
+            )
+        await _lock_to_platen(rack_screw, f"feed-rack screw x{RACK_X0 + x:+.1f}")
     # Lock plates on the guide backs, bridging BEHIND the bar (clear of its
-    # back face) and lapping LOCK_LIP past each rail's outer edge: top-rail
-    # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
-    # the running clearance onto the bar (identity; _assert_lock_retention).
+    # back face): top-rail locks lap LOCK_LIP past its top face and hang DOWN
+    # over the bar (Rz180), bottom-rail locks lie on MHA-PD-27's back face and
+    # bridge UP across the running clearance onto the bar (identity;
+    # _assert_lock_retention).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c). The plate's hole
@@ -3595,18 +3663,27 @@ async def build(adapter) -> dict[str, str]:
         label="hub key pin locked to the disc hub",
     )
     # Rx(-90): heads on the flange's front face, shanks to +Z through the disc.
-    for angle, (x, y) in zip(
-        DISC_HUB_GEOM.SCREW_ANGLES_DEG, DISC_SCREW_XY, strict=True
+    for index, angle, (x, y) in zip(
+        range(len(RACK_TAP_X) + 1, len(RACK_TAP_X) + 1 + len(DISC_SCREW_XY)),
+        DISC_HUB_GEOM.SCREW_ANGLES_DEG,
+        DISC_SCREW_XY,
+        strict=True,
     ):
         disc_screw = await place_component(
             adapter,
-            "pd-vn-transgear-disc-screw",
+            "sh-vn-fillister-screw-91794a055",
             [x, y, DISC_SCREW_Z0],
             [-90.0, 0.0, 0.0],
             ROT_X_NEG90,
             ground=False,
+            configuration="DiscScrew",
             label=f"transgear-disc-screw ({angle:.0f} deg)",
         )
+        if disc_screw != f"sh-vn-fillister-screw-91794a055-{index}":
+            raise RuntimeError(
+                f"disc screw at {angle:.0f} deg is {disc_screw!r}: the interference "
+                "contract numbers the DiscScrew members after the rack screws"
+            )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{disc_screw}", "PLANE"),

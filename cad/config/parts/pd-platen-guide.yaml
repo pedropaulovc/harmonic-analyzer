@@ -3,7 +3,8 @@ pd-platen-guide:
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-rolled steel
   finish: black oxide + oil
-  quantity: 2
+  # Owner rulings 2026-11-13 (#2410): the top rail only; the bottom rail is MHA-PD-27.
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in
@@ -12,4 +13,4 @@ pd-platen-guide:
       kind: "minor"
       where: "the 9X #4-40 tap pattern A1-A9, note 1: WALL .059 MIN, TAPS TO EDGES (both rows at .140 ±.005, to the bottom face and to the top face)"
       finding: "tap wall to the rail's edges .059 at the finished worst case, below the .080 target and .001 under the .060 floor (rules 17, 20)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144: the .060 floor is confirmed, following the approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989) and RV-04 on MHA-PD-18 (#1379); the floor stays .060. The taps are noncritical, so they print plain coordinates. The rail is .29 at .XX (owner ruling B2, 2026-11-01): the bottom row cannot move (the rack backer blocks the rail growing down) and the #4-40 taps receive vendor screws, so the unbroken wall pays the .010 outside edge break and the .010 tap mouth break. Delegated ruling 2026-11-09 (Main), pending owner confirmation; owner review #2144 item 2.3: the plain-tap row prints .140 ±.005, the shop's drilled-hole location row, with no fit route (integration review 20261109T062834910Z: ±.004 was narrower than that row), so the .079 unbroken wall lands at .059 finished, and this pattern is accepted .001 under the .060 floor. This accepts no other wall, band or pattern"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144: the .060 floor is confirmed, following the approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989) and RV-04 on MHA-PD-18 (#1379); the floor stays .060. The taps are noncritical, so they print plain coordinates. The rail is .29 at .XX (owner ruling B2, 2026-11-01): the tap row cannot move (it stands on MHA-PD-02's hole row; when this sheet also made the bottom rail, the rack backer blocked it growing down, and since #2410 the bottom rail is MHA-PD-27) and the #4-40 taps receive vendor screws, so the unbroken wall pays the .010 outside edge break and the .010 tap mouth break. Delegated ruling 2026-11-09 (Main), pending owner confirmation; owner review #2144 item 2.3: the plain-tap row prints .140 ±.005, the shop's drilled-hole location row, with no fit route (integration review 20261109T062834910Z: ±.004 was narrower than that row), so the .079 unbroken wall lands at .059 finished, and this pattern is accepted .001 under the .060 floor. This accepts no other wall, band or pattern"

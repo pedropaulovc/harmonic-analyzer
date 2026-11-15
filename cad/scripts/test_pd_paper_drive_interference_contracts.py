@@ -25,7 +25,10 @@ import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_transgear_disc_hub_spec as hub
-import pd_vn_transgear_disc_screw_spec as disc_screw
+import pd_transgear_disc_screw_spec as disc_screw
+import pd_feed_rack_spec as feed_rack
+import pd_feed_rack_screw_spec as rack_screw
+import pd_platen_bottom_guide_spec as bottom_guide
 import transgear_hanger_joints as joints
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_transgear_knob_cup_spec as cup
@@ -112,8 +115,25 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     engaged = disc_screw.CUT_LENGTH - hub.FLANGE_THICK
     assert 0.0 < disc.FACE_WIDTH - engaged <= disc_screw.TIP_BELOW_REAR_FACE[1]
     limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, engaged)
-    for n in (1, 2, 3):
-        pair = _pair(f"pd-vn-transgear-disc-screw-{n}", "pd-rack-pinion-1")
+    for n in (5, 6, 7):
+        pair = _pair(f"sh-vn-fillister-screw-91794a055-{n}", "pd-rack-pinion-1")
+        assert allowed[pair] == pytest.approx(limit)
+
+
+def test_rack_screw_rows_follow_the_strip_and_the_bottom_guide() -> None:
+    allowed = _allowed()
+    # #2410: each stock RackScrew under-head on MHA-PD-27's counterbore floor,
+    # the screw floor above the strip's flat top; the rest of its shank in the
+    # strip's tap drill, short of the drill's bottom.
+    floor = bottom_guide.GUIDE_HEIGHT - bottom_guide.SCREW_CBORE_DEPTH
+    assert floor == pytest.approx(feed_rack.SCREW_FLOOR)
+    engaged = rack_screw.LENGTH - floor
+    assert 0.0 < engaged < feed_rack.TAP_DRILL_DEPTH
+    limit = _annulus(
+        feed_rack.TAP_MAJOR_DIA, TAP_DRILL_MM[feed_rack.TAP_SIZE], engaged
+    )
+    for n in (1, 2, 3, 4):
+        pair = _pair(f"sh-vn-fillister-screw-91794a055-{n}", "pd-feed-rack-1")
         assert allowed[pair] == pytest.approx(limit)
 
 

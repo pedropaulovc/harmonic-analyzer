@@ -11,7 +11,7 @@ import paper_drive_geom as geometry
 import paper_drive_mesh_check as mesh
 import paper_drive_rack_setup as rack_setup
 import paper_drive_rack_travel as travel
-import pd_platen_rack_spec as rack
+import pd_feed_rack_spec as rack
 import _recording_geometry as recording
 import pd_platen_spec as platen
 

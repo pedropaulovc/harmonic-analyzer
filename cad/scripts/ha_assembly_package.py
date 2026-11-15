@@ -354,11 +354,6 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment.toml:consumables.epoxy-30-minute",),
     ),
     Tool(
-        "Soft solder, 60/40 tin-lead, and rosin flux",
-        r"SOFT-SOLDER|60/40 TIN-LEAD|ROSIN FLUX|\bSOLDER\b",
-        ("shop-equipment.toml:consumables.solder-60-40",),
-    ),
-    Tool(
         "Paste wax", r"(?:PASTE )?WAX\b", ("shop-equipment.toml:consumables.paste-wax",)
     ),
     Tool("Degreaser", r"DEGREASE", ("shop-equipment.toml:consumables.degreaser",)),

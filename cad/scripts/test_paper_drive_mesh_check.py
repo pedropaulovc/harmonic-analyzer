@@ -8,7 +8,7 @@ import math
 import pytest
 
 import paper_drive_mesh_check as mesh
-import pd_platen_rack_spec as rack
+import pd_feed_rack_spec as rack
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed
 import pd_transgear_knob_shaft_spec as knob

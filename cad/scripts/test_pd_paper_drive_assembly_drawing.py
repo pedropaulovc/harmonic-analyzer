@@ -1,6 +1,7 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-00)."""
 
 import asyncio
+import itertools
 from itertools import product
 import math
 import re
@@ -34,6 +35,7 @@ import pd_paper_drive_knob_setting_spec as knob_setting
 import pd_transgear_arm_geometry as steps_arm
 import _paper_drive_placement as placement
 import pd_paper_drive_explode_spec as explode
+import pd_feed_rack_spec as feed_rack
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_feed_pinion_spec as feed_pinion
@@ -83,8 +85,10 @@ UNCHANGED_FAMILIES = {
     "sh-column-clamp-back",
     "sh-vn-clamp-screw",
     "pd-platen",
-    "pd-platen-rack",
+    "pd-feed-rack",  # #2410: the bare purchased strip replaces MHA-PD-05
+    "pd-platen-bottom-guide",  # #2410: MHA-PD-27, the rack screwed under it
     "pd-platen-guide",
+    "sh-vn-fillister-screw-91794a055--RackScrew",
     "pd-guide-lock",
     "pd-platen-clip",
     "pd-platen-paper",
@@ -116,7 +120,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-retaining-ring": 1,
     "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
-    "pd-vn-transgear-disc-screw": 3,
+    "sh-vn-fillister-screw-91794a055--DiscScrew": 3,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
     "pd-vn-transgear-knob-drive-pin": 2,
@@ -127,6 +131,10 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-cup": 1,
     "pd-vn-transgear-knob-cup-pin": 1,
 }
+# The shared #0-80 fillister's native names: the builder places the four
+# RackScrews first, then the three DiscScrews (it proves each name).
+RACK_SCREW_INSTANCES = tuple(f"sh-vn-fillister-screw-91794a055-{i}" for i in (1, 2, 3, 4))
+DISC_SCREW_INSTANCES = tuple(f"sh-vn-fillister-screw-91794a055-{i}" for i in (5, 6, 7))
 RETIRED_FAMILIES = {
     "transgear-latch",
     "transgear-pinion",
@@ -338,24 +346,41 @@ def test_bom_rows_are_exactly_the_round10_families() -> None:
     assert families == UNCHANGED_FAMILIES | set(CONTRACT_TRANSGEAR_QUANTITIES)
     assert not families & RETIRED_FAMILIES
     assert drawing.TRANSGEAR_QUANTITIES == CONTRACT_TRANSGEAR_QUANTITIES
+    assert drawing.PLATEN_QUANTITIES == {
+        "sh-vn-fillister-screw-91794a055--RackScrew": len(feed_rack.TAP_X)
+    }
 
 
 def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
     for stem, number in drawing.BOM_PART_NUMBERS.items():
         assert number == _number(stem), stem
+    # A shared member's BOM text is its model's own (the builder stamps it
+    # on the configuration, and it wins over a written cell).
+    members = {
+        explode.RACK_SCREW: drawing.rack_screw.BOM_DESCRIPTION,
+        explode.DISC_SCREW: drawing.disc_screw.BOM_DESCRIPTION,
+    }
     for stem, description in drawing.BOM_DESCRIPTIONS.items():
         registry = _config.parts(drawing.BOM_COMPONENT_IDENTITIES[stem][0])
         skus = registry.get("supplier_skus") or ()
-        # A fabricated part from purchased stock (the SDP/SI platen rack) is
+        if stem in members:
+            assert description == members[stem], stem
+        # A fabricated part from purchased stock (the SDP/SI feed rack) is
         # not itself a McMaster purchase line.
-        if skus and registry.get("supplier") == "McMaster-Carr":
+        elif skus and registry.get("supplier") == "McMaster-Carr":
             assert description.endswith(f"MCMASTER {skus[0]}"), stem
         else:
             assert "MCMASTER" not in description, stem
     # Distinct physical members deliberately share one canonical purchase Number.
-    inner, outer = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
-    assert drawing.BOM_PART_NUMBERS[inner] == drawing.BOM_PART_NUMBERS[outer]
-    assert drawing.BOM_COMPONENT_IDENTITIES[inner] != drawing.BOM_COMPONENT_IDENTITIES[outer]
+    for first, second in (
+        ("sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"),
+        (explode.RACK_SCREW, explode.DISC_SCREW),
+    ):
+        assert drawing.BOM_PART_NUMBERS[first] == drawing.BOM_PART_NUMBERS[second]
+        assert (
+            drawing.BOM_COMPONENT_IDENTITIES[first]
+            != drawing.BOM_COMPONENT_IDENTITIES[second]
+        )
 
 
 def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
@@ -378,8 +403,9 @@ def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
         drawing.BOM_PART_NUMBERS["pd-vn-chain-connecting-link"],
     ):
         assert text in note.replace("\n", " "), text
-    assert drawing.BOM_SHEET_CAPTION.endswith(note)
+    assert f"\n{note}\n" in drawing.BOM_SHEET_CAPTION
     assert drawing.BOM_SHEET_CAPTION.startswith(drawing.BOM_REFERENCE_CAPTION)
+    assert drawing.BOM_SHEET_CAPTION.endswith(drawing.BOM_EXPENDABLES_NOTE)
     # The caption hangs right of the reference view, above the border and
     # left of the title block (rows of at most 36 characters).
     rows = drawing.BOM_SHEET_CAPTION.split("\n")
@@ -387,6 +413,31 @@ def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
     x, y = drawing.BOM_REFERENCE_CAPTION_XY
     assert x > drawing.BOM_REFERENCE_LIMITS[2]
     assert y - len(rows) * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+
+
+def test_bom_sheet_lists_what_the_steps_use_up() -> None:
+    """Machinist review r3, r5 (rule 22): the four spare rack screws cut into
+    transfer screws and the #4-40 transfer screws are named with their counts
+    and steps on the BOM sheet."""
+    note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
+    assert f"{drawing.RACK_SCREWS} MORE {_number(explode.RACK_SCREW)}" in note
+    made = f"{drawing.sub_step('rack-screwed', 0)}-{drawing.sub_step('rack-screwed', 2)}"
+    assert f"{made} MAKE THEM TRANSFER SCREWS" in note
+    assert f"{drawing.sub_step('platen-hung', 0)} USES 8 #4-40 TRANSFER SCREWS" in note
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    rack = " ".join(texts["rack-screwed"][:3])
+    assert f"SPARE {_number(explode.RACK_SCREW)}" in rack and "TRANSFER SCREWS" in rack
+    hung = _step_body("platen-hung")
+    assert "2ND, 4TH, 6TH AND 8TH OF EACH" in hung and "#4-40 TRANSFER SCREW" in hung
+    # Codjiflo P2 on 19ef870: the pointed screws keep a pliers grip, are run
+    # in by fingers short of bottoming, and the strip is pressed square on
+    # its points (they lie on its centreline, the roll axis of any tilt).
+    made_steps = texts["rack-screwed"]
+    assert "BY FINGERS" in made_steps[0] and "NOT BOTTOMED" in made_steps[0]
+    assert "PLIERS GRIP" in made_steps[1]
+    assert f"PRESSED SQUARE ON ITS {drawing.RACK_SCREWS} POINTS" in made_steps[3]
+    assert any(text == "UNSCREW THE TRANSFER SCREWS WITH PLIERS." for text in made_steps)
+    assert all("PROUD" not in text or "GRIP" in text for text in made_steps)
 
 
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
@@ -784,8 +835,9 @@ def test_bom_identifies_the_current_inch_mesh_parts_without_cutter_prose() -> No
         assert "SHIFTED" not in description
         assert len(description) <= drawing.BOM_DESCRIPTION_MAX_CHARS
     assert "REDUCER DISC" in drawing.BOM_DESCRIPTIONS["pd-rack-pinion"]
-    rack = drawing.BOM_DESCRIPTIONS["pd-platen-rack"]
-    assert "RACK + BACKER" in rack
+    # #2410: the bare purchased strip, no backer.
+    rack = drawing.BOM_DESCRIPTIONS["pd-feed-rack"]
+    assert "RACK" in rack and "BACKER" not in rack
     assert f"{feed_pinion.DIAMETRAL_PITCH:g}DP" in rack
     assert f"PA{feed_pinion.PRESSURE_ANGLE_DEG:g}" in rack
     for text in (*drawing.sheet_texts(_unit_step_notes()), *drawing.BOM_DESCRIPTIONS.values()):
@@ -833,9 +885,11 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
         f"{stem}-{index}"
         for stem in CONTRACT_TRANSGEAR_QUANTITIES
         for index in range(1, _transgear_drawn_count(stem) + 1)
-        if stem != "pd-transgear-removable"
-    } | {"pd-transgear-removable-1"}
+        if stem not in ("pd-transgear-removable", explode.DISC_SCREW)
+    } | {"pd-transgear-removable-1", *DISC_SCREW_INSTANCES}
     assert drawing.TRANSGEAR_INSTANCES == expected
+    # The shared fillister's RackScrews are the platen's, never sheet 2's.
+    assert not set(RACK_SCREW_INSTANCES) & drawing.TRANSGEAR_INSTANCES
     # Every transgear family has a batch anchor, on either sheet's view.
     assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == set(CONTRACT_TRANSGEAR_QUANTITIES)
     # The knob wheel is instance 1; crank wheel and spare T18 stay off.
@@ -1111,12 +1165,13 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
         numbers = [int(item) for _stem, item in balloons]
         assert numbers == sorted(numbers)
     # The explode shows every instance of its families, the mounted knob
-    # wheel only of the removables, and nothing else.
+    # wheel only of the removables, the shared fillister's DiscScrews only
+    # (never the platen's RackScrews), and nothing else.
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES == {
         f"{stem}-{index}"
-        for stem in exploded_stems - {"pd-transgear-removable"}
+        for stem in exploded_stems - {"pd-transgear-removable", explode.DISC_SCREW}
         for index in range(1, _transgear_drawn_count(stem) + 1)
-    } | {explode.KNOB_WHEEL_INSTANCE}
+    } | {explode.KNOB_WHEEL_INSTANCE, *DISC_SCREW_INSTANCES}
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES <= drawing.TRANSGEAR_INSTANCES
     # The pivot stack is SECTION A-A's; the latch hook stays on the bar.
     for stem in (
@@ -1634,7 +1689,7 @@ def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None
 def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> None:
     faced = _step_body("collar-rear-faced-to-fit")
     assert (
-        f"WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
+        f"IN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "COLLAR ON THE SHAFT, ITS PIN ON THE D-FLAT" in seated
@@ -2037,8 +2092,10 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
         "sh-column-clamp-back",
         "sh-vn-clamp-screw",
         "pd-platen",
-        "pd-platen-rack",
+        "pd-feed-rack",
+        "pd-platen-bottom-guide",
         "pd-platen-guide",
+        "sh-vn-fillister-screw-91794a055--RackScrew",
         "pd-guide-lock",
         "pd-platen-clip",
         "pd-platen-paper",
@@ -2052,8 +2109,8 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
     # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar;
-    # balloon 7 on the top guide (the bottom one stands behind the platen),
-    # on its top edge, between a screw station and a lock station.
+    # balloon 7 on the top guide, on its top edge, between a screw station
+    # and a lock station; the rack-screw balloon on one rack screw.
     pinned = {
         stem: anchor.instance
         for stem, anchor in drawing.PLATEN_BALLOON_ANCHORS.items()
@@ -2061,8 +2118,10 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     }
     assert pinned == {
         "pd-guide-lock": "pd-guide-lock-2",
-        "pd-platen-guide": "pd-platen-guide-2",
+        "pd-platen-guide": "pd-platen-guide-1",
+        explode.RACK_SCREW: drawing.PLATEN_RACK_SCREW_INSTANCE,
     }
+    assert drawing.PLATEN_RACK_SCREW_INSTANCE in RACK_SCREW_INSTANCES
     x, y, z = drawing.PLATEN_GUIDE_BALLOON_POINT_MM
     from build_pd_platen_guide import HOLE_X, SCREW_STATION_X
     from pd_platen_guide_spec import GUIDE_HEIGHT
@@ -2072,15 +2131,95 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert any(a + 10.0 < x < b - 10.0 for a, b in zip(stations, stations[1:]))
 
 
+def test_the_hanging_rack_group_balloons_on_its_drawn_edges_apart() -> None:
+    """The bottom guide and the rack balloon on a top edge, mid-span between
+    their rack-screw holes and clear of them; the guide, the pinned rack
+    screw and the rack attach at distinct stations along the platen, and
+    none at the platen's own balloon station."""
+    import pd_platen_bottom_guide_spec as bottom_guide
+
+    gx, gy, gz = drawing.BOTTOM_GUIDE_BALLOON_POINT_MM
+    assert (gy, gz) == (bottom_guide.GUIDE_HEIGHT, 0.0)
+    clear = bottom_guide.SCREW_CBORE_DIA / 2.0 + 10.0
+    assert all(abs(gx - hole) > clear for hole in bottom_guide.SCREW_HOLE_X)
+    assert 0.0 < gx < bottom_guide.GUIDE_LENGTH
+    rx, ry, rz = drawing.FEED_RACK_BALLOON_POINT_MM
+    assert (ry, rz) == (0.0, 0.0)  # the flat top's edge, in the strip's frame
+    assert all(abs(rx - tap) > 10.0 for tap in feed_rack.TAP_X)
+    # Machine x from the platen's crank-side edge: the guide is placed Ry180
+    # (its x runs from the far end), the rack unturned about y.
+    screw = RACK_SCREW_INSTANCES.index(drawing.PLATEN_RACK_SCREW_INSTANCE)
+    stations = (
+        bottom_guide.GUIDE_LENGTH - gx,
+        feed_rack.TAP_X[screw],
+        rx,
+        drawing.PLATEN_BALLOON_POINT_MM[0],
+    )
+    assert all(abs(a - b) > 20.0 for a, b in itertools.combinations(stations, 2))
+
+
 def _explode_instances() -> list[explode.Instance]:
-    instances = [explode.Instance(f"{stem}-1", stem) for stem in explode.SHOWN_STEMS]
+    """The model's components as the builder's explode reads them: each
+    keyed by its family, the shared fillister's by member, under the native
+    names the builder gives them."""
+    instances = [
+        explode.Instance(f"{stem}-1", stem)
+        for stem in explode.SHOWN_STEMS - {explode.RACK_SCREW}
+    ]
+    instances += [explode.Instance(name, explode.RACK_SCREW) for name in RACK_SCREW_INSTANCES]
+    instances += [explode.Instance(name, explode.DISC_SCREW) for name in DISC_SCREW_INSTANCES]
     instances.append(explode.Instance("pd-rack-pinion-1", "pd-rack-pinion"))
     for stem, count in CONTRACT_TRANSGEAR_QUANTITIES.items():
-        if stem != "pd-rack-pinion":
+        if stem not in ("pd-rack-pinion", explode.DISC_SCREW):
             instances += [
                 explode.Instance(f"{stem}-{index}", stem) for index in range(1, count + 1)
             ]
     return instances
+
+
+def _moved_families(plan) -> set[str]:
+    family = {instance.name: instance.stem for instance in _explode_instances()}
+    return {family[name] for _step, names in plan for name in names}
+
+
+def test_the_shared_fillister_is_one_family_per_member() -> None:
+    stem = "sh-vn-fillister-screw-91794a055"
+    assert explode.member_family(stem, "RackScrew") == explode.RACK_SCREW
+    assert explode.member_family(stem, "DiscScrew") == explode.DISC_SCREW
+    assert explode.member_family("pd-feed-rack", "Default") == "pd-feed-rack"
+    assert drawing.BOM_COMPONENT_IDENTITIES[explode.RACK_SCREW] == (stem, "RackScrew")
+    assert drawing.BOM_COMPONENT_IDENTITIES[explode.DISC_SCREW] == (stem, "DiscScrew")
+
+
+def test_each_fillister_member_moves_and_shows_only_on_its_own_sheet() -> None:
+    """The RackScrews hang with the rack on the platen sheet; the DiscScrews
+    go with the disc cluster on the transgear sheet. Neither member's
+    instances move with the other's group or show on the other's sheet."""
+    plan = explode.plan_explode(_explode_instances())
+    platen = plan[: len(explode.PLATEN_STEPS)]
+    transgear = plan[len(explode.PLATEN_STEPS) :]
+    platen_moved = {name for _step, names in platen for name in names}
+    transgear_moved = {name for _step, names in transgear for name in names}
+    assert set(RACK_SCREW_INSTANCES) <= platen_moved
+    assert not set(RACK_SCREW_INSTANCES) & transgear_moved
+    assert set(DISC_SCREW_INSTANCES) <= transgear_moved
+    assert not set(DISC_SCREW_INSTANCES) & platen_moved
+    assert explode.RACK_SCREW in explode.SHOWN_STEMS
+    assert explode.DISC_SCREW not in explode.SHOWN_STEMS
+    assert explode.DISC_SCREW in explode.TRANSGEAR_SHOWN_STEMS
+    assert explode.RACK_SCREW not in explode.TRANSGEAR_SHOWN_STEMS
+    # Sheets 2 and 3 show instances by name: the DiscScrews only.
+    shown = {name for name in drawing.TRANSGEAR_INSTANCES if "91794a055" in name}
+    assert shown == set(DISC_SCREW_INSTANCES)
+    exploded = {
+        name for name in drawing.TRANSGEAR_EXPLODED_INSTANCES if "91794a055" in name
+    }
+    assert exploded == set(DISC_SCREW_INSTANCES)
+    cluster = next(
+        group for group in drawing.TRANSGEAR_EXPLODED_GROUPS
+        if explode.DISC_SCREW in group.stems
+    )
+    assert set(DISC_SCREW_INSTANCES) <= drawing.exploded_group_instances(cluster)
 
 
 def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
@@ -2088,13 +2227,49 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
     moved = {name for _step, names in plan for name in names}
     assert "pd-rack-pinion-1" not in moved
     assert "pd-platen-1" not in moved
-    assert {name.rsplit("-", 1)[0] for name in moved} == (
-        explode.SHOWN_STEMS - explode.STATIONARY_STEMS
-    )
+    assert _moved_families(plan) == explode.SHOWN_STEMS - explode.STATIONARY_STEMS
     # The guide screws leave with the guides' step, the clip screws with the
     # clips': the two screw families never share a step.
     for _step, names in plan:
         assert not {"sh-vn-brass-fillister-screw-1", "pd-vn-platen-clip-screw-1"} <= set(names)
+
+
+def test_the_platen_explode_hangs_the_rack_group_below_the_platen() -> None:
+    """#2410: the bottom guide, the rack and its screws drop below the platen
+    together; the rack then hangs clear under the guide and the screws stand
+    above the guide's top, in sight under the platen's bottom edge; the top
+    guide and every lock still rise."""
+    import _mcmaster_91794a055 as fillister
+
+    def throw(family: str) -> float:
+        return sum(
+            step.distance_mm
+            for step in explode.PLATEN_STEPS
+            if family in step.stems and step.axis == "y"
+        )
+
+    platen_bottom = assembly.PLATE_Y0
+    guide_top = assembly.GUIDE_Y[0] + assembly.GUIDE_HEIGHTS[0] + throw(
+        "pd-platen-bottom-guide"
+    )
+    guide_underside = assembly.GUIDE_Y[0] + throw("pd-platen-bottom-guide")
+    rack_top = assembly.RACK_Y0 + throw("pd-feed-rack")
+    under_head = assembly.RACK_SCREW_FLOOR_Y + throw(explode.RACK_SCREW)
+    tip = under_head - drawing.rack_screw.LENGTH
+    head_top = under_head + fillister.HEAD_H
+    assert guide_top < platen_bottom
+    assert rack_top < guide_underside
+    assert guide_top < tip < head_top < platen_bottom
+    # The isometric's line of sight rises as it comes forward: a head standing
+    # behind the platen's front face shows only under the height it would
+    # reach at that face.
+    head_front_z = (
+        assembly.RACK_TEETH_FRONT_Z + assembly.RACK_TAP_Z - fillister.HEAD_DIA / 2.0
+    )
+    sight = platen_bottom - (head_front_z - assembly.PLATE_FRONT_Z)
+    assert head_top < sight
+    for family in ("pd-platen-guide", "pd-guide-lock", "pd-vn-guide-lock-screw"):
+        assert throw(family) > 0.0, family
 
 
 def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() -> None:
@@ -2104,7 +2279,7 @@ def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() ->
     moved = {name for _step, names in transgear for name in names}
     removables = {name for name in moved if name.startswith("pd-transgear-removable-")}
     assert removables == {explode.KNOB_WHEEL_INSTANCE}
-    stems = {name.rsplit("-", 1)[0] for name in moved}
+    stems = _moved_families(transgear)
     assert stems == explode.TRANSGEAR_SHOWN_STEMS - explode.TRANSGEAR_STATIONARY_STEMS
     # Nothing outside the transgear moves on these steps; the arm stays put.
     assert stems <= set(CONTRACT_TRANSGEAR_QUANTITIES)
@@ -2152,6 +2327,13 @@ def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
     instances = [i for i in _explode_instances() if i.stem != "pd-transgear-thumbnut"]
     with pytest.raises(ValueError, match="pd-transgear-thumbnut"):
         explode.plan_explode(instances)
+    # A model whose fillisters all read as one member lacks the other.
+    instances = [
+        explode.Instance(i.name, explode.DISC_SCREW) if i.stem == explode.RACK_SCREW else i
+        for i in _explode_instances()
+    ]
+    with pytest.raises(ValueError, match="RackScrew"):
+        explode.plan_explode(instances)
 
 
 def test_the_explode_refuses_a_model_missing_the_knob_wheel() -> None:
@@ -2165,7 +2347,7 @@ def test_the_explode_refuses_a_model_missing_the_knob_wheel() -> None:
 
 def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     """Codex B2: the steps started with the locks already on."""
-    order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
+    order = ["bar-clamped", "rack-screwed", "guides-screwed", "clips-fitted"]
     order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
     assert list(steps.SEQUENCE[: len(order)]) == order
     assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE " in _step_body("bar-clamped")
@@ -2174,32 +2356,119 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     bar_clamped = _step_body("bar-clamped")
     assert bar_clamped.index("ROUND-HOLE PAIR") < bar_clamped.index("SLOTTED PAIR")
     assert "END A" not in bar_clamped
-    # The latched hook cannot take up a rack set off its band (rack-crest
-    # ruling): the step prints the crest band itself.
-    assert f"CRESTS {steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE" in _step_body(
-        "rack-soldered"
-    )
     assert steps.BAR_TOP_ABOVE_DECK == pytest.approx(
         assembly.BAR_TOP_Y - assembly.BASE_DECK_Y, abs=5e-4
     )
     assert steps.RACK_CREST_DROP == pytest.approx(
         assembly.PLATE_Y0 - assembly.RACK_TIP_Y, abs=1e-9
     )
-    # Codex P2 (724f78f26): the step solders the rack flush; the model places
-    # it so (the platen pose, not the rack, takes the mesh phasing).
-    assert "ENDS FLUSH WITH THE PLATEN'S" in _step_body("rack-soldered")
-    assert assembly.RACK_X0 == assembly.PLATE_X0
     # Every platen-group screw count the steps print is the model's.
     assert f"{drawing.GUIDE_SCREWS} " in _step_body("guides-screwed")
     assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(
         assembly.GUIDE_SCREW_XY
     ) + len(assembly.CLIP_SCREW_XY)
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 2.3: MHA-PD-11's screw taps
-    # are tapped to its print and the screws float in MHA-PD-02's holes, so
-    # nothing is spotted, drilled or tapped through the platen at assembly.
-    guides_screwed = " ".join(_step_body("guides-screwed").split())
-    for word in ("SPOT", "TRANSFER", "DRILL", "TAP EACH"):
-        assert word not in guides_screwed
+    assert f"{drawing.RACK_SCREWS} " in _step_body("rack-screwed")
+    assert drawing.RACK_SCREWS == len(assembly.RACK_TAP_X)
+
+
+def test_the_rack_is_screwed_to_its_guide_before_the_guide_is_set_by_its_crests() -> None:
+    """#2410: the guide's rack-screw holes are struck from the strip's taps
+    and the strip screwed on, its ends flush and its front face set behind
+    the guide's, before the guide goes on the platen; the guide is then set
+    by the rack's crests (the latched hook cannot take up a rack set off its
+    band), its platen taps transferred at that set, and it is set at it
+    again before it is screwed on. The top guide is tapped to its own print
+    (owner ruling 2026-11-08, #2144 item 2.3): nothing is spotted through
+    the platen for it."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    rack = texts["rack-screwed"]
+    struck = next(i for i, text in enumerate(rack) if "STRIKE" in text)
+    clamped = struck - 1
+    assert rack[clamped].startswith("CLAMP THE RACK")
+    screwed = next(
+        i for i, text in enumerate(rack)
+        if text.startswith("SCREW THE RACK ON") and _number(explode.RACK_SCREW) in text
+    )
+    assert struck < screwed
+    for index in (clamped, screwed):
+        assert "ENDS FLUSH" in rack[index]
+        assert steps.RACK_FRONT_SET_TEXT in rack[index]
+        assert "RULE" in rack[index]
+    assert _number("pd-platen-bottom-guide") in rack[clamped]
+    # The transfer screws are made from spare rack screws in the step.
+    assert "FILE" in " ".join(rack[:clamped])
+    # The guide is set by the crests before its taps are transferred and
+    # again before it is screwed on.
+    guides = texts["guides-screwed"]
+    crest_set = next(
+        i for i, text in enumerate(guides)
+        if f"CRESTS {steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE" in text
+    )
+    assert "HEIGHT GAUGE" in guides[crest_set]
+    assert _number("pd-platen-bottom-guide") in guides[crest_set]
+    spotted = next(i for i, text in enumerate(guides) if "TRANSFER PUNCH" in text)
+    screwed_on = next(i for i, text in enumerate(guides) if text.startswith("SCREW THE GUIDES"))
+    again = next(
+        i for i, text in enumerate(guides)
+        if drawing.sub_step("guides-screwed", crest_set) in text and i > spotted
+    )
+    assert crest_set < spotted < again < screwed_on
+    # The model places the rack's ends flush with the platen's.
+    assert assembly.RACK_X0 == assembly.PLATE_X0
+    for text in guides:
+        if any(word in text for word in ("SPOT", "TRANSFER", "DRILL", "TAP EACH")):
+            assert _number("pd-platen-guide") not in text
+    # A new bottom guide takes the rack again from the rack's own step.
+    rack_step = f"STEP {steps.step_number('rack-screwed')}"
+    assert any(
+        _number("pd-platen-bottom-guide") in text and rack_step in text for text in guides
+    )
+    assert any(
+        _number("pd-platen-bottom-guide") in text and rack_step in text
+        for text in texts["lock-seats-faced"]
+    )
+
+
+def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
+    """Owner rulings 2026-11-13 (#2410): no solder, no backer. A loaded-rack
+    check that finds every part inside its sheet sets the bottom guide again
+    by the crests, rather than reworking a joint."""
+    for text in drawing.sheet_texts(_unit_step_notes()):
+        assert "SOLDER" not in text and "BACKER" not in text
+    rework = _step_body("loaded-rack-geometry-checked")
+    assert f"SLACKEN THE {_number('pd-platen-bottom-guide')} BOTTOM GUIDE" in rework
+    # Machinist review r8: the re-set names its reference and band (3B's
+    # crest drop) and the level the mesh gate assumes.
+    assert f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)}" in rework
+    level = f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER"
+    assert level in rework
+
+
+def test_every_screwed_or_staked_setting_has_a_holding_check() -> None:
+    """Machinist review r8 and a run of this sheet for #2824 (rule 23): the
+    guide locks, the refitted plate screws, the staked pivot screw and the
+    hook each get a bench check after they are tightened or staked, with a
+    remedy, as 2M, 3N and 4C already had."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    locks = texts["guide-locks-set"]
+    assert locks[3] == "CHECK: PUSHED FIRMLY BY HAND, NO LOCK MOVES ON ITS GUIDE."
+    assert locks[4].startswith("IF ONE MOVES, FIT NEW ")
+    plate = texts["arm-plate-screws-cut"]
+    assert plate[4] == "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT."
+    assert plate[5] == "IF IT SHAKES OR SHOWS DAYLIGHT, DO 13U AND REPEAT 14E."
+    pivot = texts["hanger-pivoted"]
+    assert pivot[8].startswith("PLATEN SLID CLEAR, STAKE THE TAP MOUTH")
+    assert "HEX KEY TO LOOSEN, THE SCREW HOLDS" in pivot[9]
+    assert "THE ARM STILL FALLS FREELY" in pivot[10]
+    assert pivot[11] == "IF BOTH CHECKS PASS, SKIP 15N-15R."
+    assert "UNSCREW" in pivot[12] and "THROUGH ITS STAKES" in pivot[12]
+    assert pivot[15].startswith("REPEAT FROM 15A WITH A NEW ")
+    assert "STAKING FRESH METAL AT 15J" in pivot[15]
+    accepted = texts["fitup-accepted"]
+    assert "ARM UNLATCHED, DO 15N-15R." in " ".join(accepted)
+    hook = texts["hook-pin-hole-match-drilled"]
+    assert hook[5] == "TIGHTEN THE HOOK SCREWS."
+    assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
@@ -2611,7 +2880,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
         f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-        f"WITH THE {_number('pd-vn-transgear-disc-screw')} SCREWS SLACKENED, REPEAT "
+        f"WITH THE {_number(explode.DISC_SCREW)} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 3)}-"
         f"{drawing.sub_step('disc-cluster-assembled', 4)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
@@ -2666,7 +2935,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # same hub, its key pin left in (#2409).
     assert (
         f"A NEW {_number('pd-rack-pinion')} DISC AND NEW "
-        f"{_number('pd-vn-transgear-disc-screw')} SCREWS ON THE SAME HUB, ITS PIN LEFT "
+        f"{_number(explode.DISC_SCREW)} SCREWS ON THE SAME HUB, ITS PIN LEFT "
         f"IN AND RIDING THE FLAT, THEN STEPS {steps.step_number('disc-screws-cut')}, "
     ) in pose
 
@@ -2831,7 +3100,7 @@ def test_native_rack_pose_reads_the_cut_end_and_running_axis_with_all_loaded_mot
         (
             "actual-rack",
             (
-                0.0, assembly.RACK_BAR_HEIGHT - assembly.RACK_ADDENDUM,
+                0.0, assembly.RACK_HEIGHT - assembly.RACK_ADDENDUM,
                 assembly.RACK_BACK_Z - (assembly.FEED_Z0 - assembly.FEED_FACE / 2.0),
             ),
         ): [-30.0, feed_pinion.RACK_AXIS_DISTANCE, 0.0],
@@ -3037,7 +3306,7 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
         lambda _scale: (cx - 0.001, cy - 0.001, cx + 0.001, cy + 0.001)
     )
     hidden = {drawing.SPARE_INSTANCE, *drawing.SPARE_SHIM_INSTANCES}
-    names = (*sorted(hidden), "pd-transgear-removable-1", "pd-platen-rack-1")
+    names = (*sorted(hidden), "pd-transgear-removable-1", "pd-feed-rack-1")
     views: dict[str, tuple[object, list[_DrawnInstance]]] = {}
 
     def place_view(_adapter, _path, orientation, _x, _y, *, scale):
@@ -3319,7 +3588,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     )
     quantities = {
         key: 1 for key in drawing.BOM_COMPONENT_IDENTITIES
-    } | drawing.TRANSGEAR_QUANTITIES | drawing.CHAIN_QUANTITIES
+    } | drawing.TRANSGEAR_QUANTITIES | drawing.CHAIN_QUANTITIES | drawing.PLATEN_QUANTITIES
     quantities["sh-vn-brass-fillister-screw"] = len(assembly.GUIDE_SCREW_XY)
     quantities["sh-vn-clamp-screw"] = len(assembly.CLAMP_HOLE_X)
     components_by_key = {}

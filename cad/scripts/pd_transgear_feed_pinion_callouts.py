@@ -24,6 +24,7 @@ this part.
 
 from __future__ import annotations
 
+import _config
 import pd_transgear_disc_hub_spec as HUB
 from pd_cluster_stack_band import STACK_NAME
 from pd_rack_pinion_spec import inch_floor_mm, inch_text
@@ -32,12 +33,16 @@ from pd_transgear_feed_pinion_spec import (
     BORE_DIAMETRAL_CLEARANCE,
     HUB_NUMBER,
     PIN_NUMBER,
-    RACK_NUMBER,
     TEETH,
     TOOTHSPACE_GAUGE_DIA_MM,
     TOOTH_SPACE_RUNOUT_TIR_MM,
 )
 from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
+
+# The screwed feed rack (#2410), read from its registry row.  It lives here,
+# not in the spec, so naming it re-keys only this sheet; the spec's unread
+# RACK_NUMBER is the retired strip's (#2820).
+RACK_NUMBER = _config.parts("pd-feed-rack")["number"]
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow

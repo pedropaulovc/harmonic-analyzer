@@ -30,9 +30,9 @@ TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 
 # Owner ruling 2026-11-01 (option B2): the rail is .29 tall and both tap rows
-# stand .140 above the bottom face (local y 0). The bottom rail's bottom face
-# stays on the frame's GUIDE_Y over the rack backer, so both rails grow into
-# the support bar's channel (pd_support_bar_spec.BAR_HEIGHT).
+# stand .140 above the bottom face (local y 0). Since the owner rulings of
+# 2026-11-13 (#2410) this part is the top rail only; the bottom rail is
+# MHA-PD-27 (pd_platen_bottom_guide_spec), which keeps this section's depth.
 #
 # Owner ruling 2026-11-08 (Pedro, #2144 item 2.3: "these are noncritical
 # holes, why use GD&T in the first place"): the 9X #4-40 taps print plain
@@ -110,9 +110,8 @@ LOCK_GAP_FIT = (0.0508, 0.2286)  # .002, .009
 
 # The one running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the platen HANGS by the top rail's
 # bottom face (local y 0) on the support bar's top edge and slides
-# along it across the feed. Both rails are this part, so the face is cut on
-# both. Every other face is cast/machined per the title block. The symbol
-# names the bar it slides on.
+# along it across the feed. Every other face is cast/machined per the title
+# block. The symbol names the bar it slides on.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "bar_slide",

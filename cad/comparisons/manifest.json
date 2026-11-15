@@ -493,7 +493,7 @@
       "component_focus": [
         "dt_crank_drive_gear",
         "pd_transgear_removable",
-        "pd_platen_rack"
+        "pd_feed_rack"
       ],
       "status": "aligned",
       "notes": "translational gearing from below-front (az~204 el~-24): knob-shaft T24 disc + chain sprocket + chain, rack-pinion at stub, platen rack above.",
@@ -531,7 +531,7 @@
         "pn_pen_rod",
         "pn_pen_v_block",
         "pd_platen",
-        "pd_platen_rack"
+        "pd_feed_rack"
       ],
       "status": "aligned",
       "notes": "pen mechanism on platen, near-frontal (az~184): pen v-block right-of-center on paper, rack + rack-pinion below. Model: v-block painted green + marker nickel/blunt-nose 2026-07-08; paper has no trace; marker still vertical (Appendix C simplification).",

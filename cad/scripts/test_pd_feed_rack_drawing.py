@@ -1,4 +1,4 @@
-"""Offline manufacturing contracts for the composite platen-rack package."""
+"""Offline manufacturing contracts for the MHA-PD-26 feed-rack package."""
 
 from __future__ import annotations
 
@@ -13,18 +13,20 @@ import pytest
 import _config
 import _gear_quality as quality
 
-import build_pd_platen_rack as builder
-import draw_pd_platen_rack as drawing
-import pd_platen_rack_spec as spec
+import build_pd_feed_rack as builder
+import draw_pd_feed_rack as drawing
+import pd_feed_rack_spec as spec
 import pd_transgear_feed_pinion_spec as feed
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
 )
+from _hole_spec import TAP_DRILL_MM
+from _inch_wall_limits import WALL_FLOOR_MM
 from _test_stubbed_build import offline_adapter, stub_seat
 from _drawing_types import DrawingLayout
 from _printed_tolerance import printed_deviations
-from pd_platen_spec import PLATE_WIDTH
+from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
 
 
 def test_rack_form_comes_from_the_feed_spec_without_profile_shift() -> None:
@@ -34,10 +36,10 @@ def test_rack_form_comes_from_the_feed_spec_without_profile_shift() -> None:
     assert spec.PITCH == pytest.approx(math.pi * feed.MODULE_MM)
     assert spec.ADDENDUM == feed.MODULE_MM
     assert spec.DEDENDUM == feed.DEDENDUM_FACTOR * feed.MODULE_MM
-    assert spec.PITCH_LINE_Y == spec.BAR_HEIGHT - spec.ADDENDUM
+    assert spec.PITCH_LINE_Y == spec.RACK_HEIGHT - spec.ADDENDUM
     assert spec.ROOT_Y == spec.PITCH_LINE_Y - spec.DEDENDUM
     assert spec.half_width(spec.PITCH_LINE_Y) == pytest.approx(spec.PITCH / 4.0)
-    assert spec.half_width(spec.BAR_HEIGHT) - spec.half_width(
+    assert spec.half_width(spec.RACK_HEIGHT) - spec.half_width(
         spec.ROOT_Y
     ) == pytest.approx(
         (spec.ADDENDUM + spec.DEDENDUM)
@@ -48,54 +50,133 @@ def test_rack_form_comes_from_the_feed_spec_without_profile_shift() -> None:
     assert builder.half_width is spec.half_width
 
 
-def test_square_strip_is_centred_on_the_backer_and_ends_flush() -> None:
+def test_the_bare_square_strip_runs_the_platen_width_with_no_backer() -> None:
     assert spec.BAR_LENGTH == PLATE_WIDTH
     assert spec.RACK_HEIGHT == pytest.approx(3.0 / 16.0 * feed.MM_PER_IN)
     assert spec.RACK_THICKNESS == spec.RACK_HEIGHT
-    assert spec.BACKER_HEIGHT + spec.RACK_HEIGHT == pytest.approx(spec.BAR_HEIGHT)
-    assert 0.0 < spec.RACK_Z0 < spec.BAR_THICKNESS
-    assert spec.RACK_Z0 + spec.RACK_THICKNESS < spec.BAR_THICKNESS
-    assert spec.RACK_Z0 == pytest.approx(
-        spec.BAR_THICKNESS - spec.RACK_Z0 - spec.RACK_THICKNESS
-    )
-    assert spec.BACKER_HEIGHT < spec.ROOT_Y < spec.BAR_HEIGHT
+    assert 0.0 < spec.ROOT_Y < spec.RACK_HEIGHT
+    for retired in ("BACKER_HEIGHT", "BAR_HEIGHT", "BAR_THICKNESS", "RACK_Z0"):
+        assert not hasattr(spec, retired), retired
     # The nominal CAD end keeps a crest for its section view; this does not
     # turn the bought strip's physical end phase into a cutting requirement.
-    assert spec.FIRST_GAP_X - spec.half_width(spec.BAR_HEIGHT) > 0.0
+    assert spec.FIRST_GAP_X - spec.half_width(spec.RACK_HEIGHT) > 0.0
     last_gap = spec.FIRST_GAP_X + (spec.GAP_COUNT - 1) * spec.PITCH
-    assert last_gap + spec.half_width(spec.BAR_HEIGHT) < spec.BAR_LENGTH
-    for name in (
-        "BAR_LENGTH",
-        "BAR_HEIGHT",
-        "BAR_THICKNESS",
-        "RACK_HEIGHT",
-        "RACK_THICKNESS",
-        "BACKER_HEIGHT",
-        "RACK_Z0",
-        "ROOT_Y",
-        "GAP_COUNT",
-    ):
+    assert last_gap + spec.half_width(spec.RACK_HEIGHT) < spec.BAR_LENGTH
+    for name in ("BAR_LENGTH", "RACK_HEIGHT", "RACK_THICKNESS", "ROOT_Y", "GAP_COUNT"):
         assert getattr(builder, name) == getattr(spec, name), name
 
 
-def test_composite_sizes_have_native_controls_and_stock_references() -> None:
-    assert spec.DRAWING_DIMENSIONS["EndStockProfile"] == {
-        "RackDepth",
-        "RackHeight",
-        "RackInset",
-        "SeamHeight",
+def test_taps_stand_on_tooth_centres_at_the_ruled_platen_stations() -> None:
+    # Owner ruling 2026-11-13: centred on the platen's middle guide hole,
+    # +-11 and +-33 rack pitches from it, each over a tooth.
+    centre = GUIDE_HOLE_X[len(GUIDE_HOLE_X) // 2]
+    offsets = [round((x - centre) / spec.PITCH, 9) for x in spec.TAP_STATION_X]
+    assert offsets == [-33, -11, 11, 33]
+    for x, k in zip(spec.TAP_X, spec.TAP_TOOTH_INDEX, strict=True):
+        assert (x - spec.TOOTH_CENTRE_PHASE_X) / spec.PITCH == pytest.approx(k)
+        # A tooth centre is midway between two gap centres.
+        gap_left = spec.FIRST_GAP_X + (k - 1) * spec.PITCH
+        assert x - gap_left == pytest.approx(spec.PITCH / 2.0)
+    # Each tap stands on the tooth centre nearest its station.
+    for x, station in zip(spec.TAP_X, spec.TAP_STATION_X, strict=True):
+        assert abs(x - station) <= spec.PITCH / 2.0
+    assert spec.TAP_SPACING == pytest.approx(22 * spec.PITCH)
+    assert spec.TAP_Z == pytest.approx(spec.RACK_THICKNESS / 2.0)
+    assert builder.TAP_X is spec.TAP_X and builder.TAP_SPEC is spec.TAP_SPEC
+
+
+def test_the_tap_stations_are_controlling_dimensions() -> None:
+    # Machinist review r7-r9 (rules 26, 4): a location is a dimension, not a
+    # sentence, and an explicit band is a plain inch step. The first tap's
+    # station prints .XX with a window just over half a pitch, so a tooth
+    # centre always lies in it; the others are whole pitches from it on the
+    # title block's .XXX, as each tap stands on its tooth centre.
+    band = spec.TAP_START_BAND
+    assert band == pytest.approx(0.050 * 25.4)
+    assert spec.PITCH / 2.0 <= band and spec.DRAWING_PRECISION_BY_NAME["TapStart"] == 2
+    assert spec.TAP_STATION_SLIP_MAX == band
+    assert drawing.DRAWING_SYMMETRIC_BANDS_MM == {"TapStart": band}
+    assert builder.DRAWING_SYMMETRIC_BANDS_MM is spec.DRAWING_SYMMETRIC_BANDS_MM
+    assert spec.TAP_TOOTH_OFFSET_MAX == spec.TAP_BAND
+    for index, pitches in ((2, 22), (3, 44), (4, 66)):
+        nominal = spec.DRAWING_NOMINALS_MM[f"TapStation{index}"]
+        assert nominal == pytest.approx(pitches * spec.PITCH)
+        assert f"{nominal / 25.4:.3f}" == f"{2.160 * pitches / 22:.3f}"
+    # Codjiflo P2 on a17aebb: the tooth-wall stack's per-tap offset is printed
+    # as each tap's own limit about its tooth centre, not left to the chain.
+    assert drawing.TAP_CALLOUT_BELOW.splitlines()[0] == "ON TOOTH CENTRES \u00b1.005"
+    assert spec.TAP_TOOTH_OFFSET_MAX == pytest.approx(0.005 * 25.4)
+    # Rule 7: no more than two lines of words under the callout.
+    assert len(drawing.TAP_CALLOUT_BELOW.splitlines()) == 2
+
+
+def test_tap_depths_stay_in_the_tooth_at_every_band_corner() -> None:
+    assert spec.TAP_SPEC.kind == "tapped_bottoming"
+    assert spec.TAP_SPEC.size == "#0-80" and spec.TAP_SPEC.end == "blind"
+    assert spec.TAP_SPEC.depth_mm == spec.TAP_DRILL_DEPTH
+    assert spec.TAP_SPEC.overrides_mm == {"ThreadDepth": spec.TAP_THREAD_DEPTH}
+    worst = spec.tap_tooth_margins_mm()
+    assert min(worst.values()) >= 0.0
+    # One more thousandth of drill depth would break the deepest thread out.
+    deeper = spec.tap_tooth_margins_mm(
+        drill_depth_mm=spec.TAP_DRILL_DEPTH + spec.TAP_BAND + 0.0254,
+        thread_depth_mm=spec.TAP_THREAD_DEPTH_MAX + 0.0254,
+    )
+    assert min(deeper["drill"], deeper["thread"]) < 0.0
+    # A tap over a tooth space instead breaks through.
+    over_space = spec.tap_tooth_margins_mm(offset_mm=spec.PITCH / 2.0)
+    assert over_space["drill"] < 0.0
+    # The full thread's lower limit is reachable from the shallowest drill.
+    assert spec.TAP_THREAD_DEPTH_MIN <= (
+        spec.TAP_DRILL_DEPTH - spec.TAP_BAND - spec.TAP_LEAD_LIMITS[1] + 1e-9
+    )
+
+
+def test_screw_floor_keeps_the_longest_screw_off_the_tap_lead() -> None:
+    reach_max = spec.SCREW_LENGTH - (spec.SCREW_FLOOR - spec.SCREW_FLOOR_BAND)
+    assert reach_max <= spec.TAP_THREAD_DEPTH_MIN + 1e-9
+    # The floor is the least .001 that does it.
+    thinner = spec.SCREW_FLOOR - 0.0254
+    assert spec.SCREW_LENGTH - (thinner - spec.SCREW_FLOOR_BAND) > (
+        spec.TAP_THREAD_DEPTH_MIN + 1e-9
+    )
+
+
+def test_engagement_shortfall_and_walls_are_declared_minors() -> None:
+    worst = (
+        spec.SCREW_LENGTH_MIN
+        - (spec.SCREW_FLOOR + spec.SCREW_FLOOR_BAND)
+        - spec.SCREW_FIRST_THREAD_LOSS
+        - spec.TAP_MOUTH_BREAK
+    )
+    assert spec.ENGAGEMENT_WORST == pytest.approx(worst)
+    assert 0.0 < spec.ENGAGEMENT_WORST < spec.ENGAGEMENT_NOMINAL
+    assert spec.ENGAGEMENT_WORST_D < spec.ENGAGEMENT_TARGET_D
+    assert spec.ENGAGEMENT_CALLOUT_MIN * 25.4 <= spec.ENGAGEMENT_WORST
+    assert spec.ENGAGEMENT_CALLOUT_D <= spec.ENGAGEMENT_WORST_D
+    assert spec.TAP_FACE_WALL_MIN < spec.TAP_FACE_WALL_NOMINAL
+    # Located from the front face: the back wall on the narrowest strip, the
+    # tap at its band's far corner, pays the major and the mouth break.
+    back = (
+        spec.PURCHASED_RACK_FACE_WIDTH_MIN_MM
+        - (spec.TAP_Z + spec.TAP_BAND)
+        - spec.TAP_MAJOR_DIA / 2.0
+        - spec.TAP_MOUTH_BREAK
+    )
+    assert spec.TAP_FACE_WALL_MIN == pytest.approx(min(back, spec.TAP_FRONT_WALL_MIN))
+    assert spec.TAP_FACE_WALL_STATEMENT in drawing.NOTES_TEXT
+    assert min(spec.TAP_FACE_WALL_MIN, spec.TAP_TOOTH_WALL_MIN) < WALL_FLOOR_MM
+    declared = {
+        entry["id"]: entry["kind"]
+        for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]
     }
-    assert spec.DRAWING_NOMINALS_MM == {
-        "Length": spec.BAR_LENGTH,
-        "BackerDepth": spec.BAR_THICKNESS,
-        "RackDepth": spec.RACK_THICKNESS,
-        "RackHeight": spec.RACK_HEIGHT,
-        "RackInset": spec.RACK_Z0,
-        "SeamHeight": spec.BACKER_HEIGHT,
-        "OverallHeight": spec.BAR_HEIGHT,
-    }
+    assert declared["RV-02"] == declared["RV-03"] == "minor"
+    assert spec.ENGAGEMENT_STATEMENT in drawing.TAP_CALLOUT_BELOW
+
+
+def test_sheet_sizes_have_native_controls_and_stock_references() -> None:
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP) | set(drawing.END_KEEP)
     assert marked == kept == spec.DRAWING_NOMINALS_MM.keys()
     assert not (set(drawing.FRONT_KEEP) & set(drawing.END_KEEP))
     assert builder.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
@@ -103,17 +184,16 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
     assert builder.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert marked == spec.DRAWING_PRECISION_BY_NAME.keys()
-    assert spec.DRAWING_REFERENCE_DIMENSIONS == {
-        "RackDepth", "RackHeight", "OverallHeight",
-    }
+    # The cut length, the tap stations and the tap's place across the strip
+    # are controls; the purchased sizes are references.
+    assert spec.DRAWING_DIMENSIONS["TapStations"].isdisjoint(
+        spec.DRAWING_REFERENCE_DIMENSIONS
+    )
     assert "Length" not in spec.DRAWING_REFERENCE_DIMENSIONS
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"RackDepth", "RackHeight"}
+    assert spec.DRAWING_NOMINALS_MM["TapStation4"] == pytest.approx(66 * spec.PITCH)
     assert drawing.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
-
-
-def test_the_retired_first_gap_witness_is_neither_dimensioned_nor_kept() -> None:
-    assert "FirstGap" not in spec.DRAWING_NOMINALS_MM
-    assert "FirstGap" not in drawing.FRONT_KEEP
 
 
 _SOLID_FEATURES = (
@@ -122,13 +202,10 @@ _SOLID_FEATURES = (
 )
 
 
-def test_end_and_overall_witnesses_carry_the_sheet_sizes_and_add_no_solid(
+def test_tap_station_witness_carries_the_sheet_sizes_and_adds_no_solid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The real _drawing_witnesses, seat stubbed: the end-stock rectangle and
-    # the overall-height line are sketches whose dimensions are the ones the
-    # sheet imports, named on their features, then blanked; nothing solid.
-    seat = stub_seat(monkeypatch, builder, keep=("_drawing_witnesses",))
+    seat = stub_seat(monkeypatch, builder, keep=("_tap_station_witness",))
     sketches: list = []
 
     class Dims:
@@ -145,41 +222,32 @@ def test_end_and_overall_witnesses_carry_the_sheet_sizes_and_add_no_solid(
             return []
 
     monkeypatch.setattr(builder, "SketchDims", Dims)
-    seat.define_rectilinear_chain.side_effect = (
-        lambda *_args, dims, names, **_kwargs: dims.names.extend(names)
-    )
+    seat.add_line_chain.return_value = ["L0", "L1", "L2"]
     seat.name_last_feature.side_effect = lambda _adapter, name: name
     adapter = offline_adapter()
-    asyncio.run(builder._drawing_witnesses(adapter))
+    asyncio.run(builder._tap_station_witness(adapter))
 
-    witnesses = ("EndStockProfile", "OverallHeightReference")
-    assert {sketch.feature: set(sketch.names) for sketch in sketches} == {
-        feature: set(spec.DRAWING_DIMENSIONS[feature]) for feature in witnesses
-    }
-    (between,) = seat.dimension_between.call_args_list
-    start, end = between.args[1:3]
-    assert start.endswith(".start") and end == start.removesuffix(".start") + ".end"
-    assert between.args[3:5] == ("vertical_distance", builder.BAR_HEIGHT)
-    names = [name for name, _args, _kwargs in seat.mock_calls]
-    (blanked,) = seat.blank_reference_sketches.call_args_list
-    assert set(blanked.args[1]) == set(witnesses)
-    named = [
-        args[1] for name, args, _kwargs in seat.mock_calls if name == "name_last_feature"
+    ((sketch,),) = (sketches,)
+    assert sketch.feature == "TapStations"
+    assert set(sketch.names) == spec.DRAWING_DIMENSIONS["TapStations"]
+    spans = [call.args[3:5] for call in seat.dimension_between.call_args_list]
+    assert spans == [
+        ("horizontal_distance", pytest.approx(spec.TAP_X[k] - spec.TAP_X[0]))
+        for k in (1, 2, 3)
     ]
-    assert named == list(witnesses)
-    assert names.index("blank_reference_sketches") > max(
-        k for k, name in enumerate(names) if name == "name_last_feature"
-    )
+    (blanked,) = seat.blank_reference_sketches.call_args_list
+    assert set(blanked.args[1]) == {"TapStations"}
     for method in _SOLID_FEATURES:
         getattr(adapter, method).assert_not_awaited()
 
 
-def test_build_marks_the_sheet_dimensions_and_saves_a_simplified_plain_bar(
+def test_build_taps_marks_the_sheet_and_saves_a_simplified_plain_bar(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seat = stub_seat(monkeypatch, builder)
     seat.name_last_feature.side_effect = lambda _adapter, name: name
     seat._named_dimension.side_effect = lambda *_args: (MagicMock(), MagicMock())
+    seat.wizard_holes.return_value.hole_dia_mm = spec.TAP_DRILL_DIA
     adapter = offline_adapter()
     seat.attach_mock(adapter, "adapter")
     saved = asyncio.run(builder.build(adapter))
@@ -191,8 +259,14 @@ def test_build_marks_the_sheet_dimensions_and_saves_a_simplified_plain_bar(
         at = len(names) - 1 - names[::-1].index(f"adapter.{method}")
         return next(args[1] for name, args, _ in calls[at:] if name == "name_last_feature")
 
-    # The witnesses follow the patterned teeth; the driven model is re-checked.
-    assert names.index("_drawing_witnesses") > names.index("adapter.linear_pattern_feature")
+    # One native tap feature into the flat top, after the teeth.
+    (taps,) = seat.wizard_holes.call_args_list
+    assert taps.args[1] is spec.TAP_SPEC
+    assert [point[1] for point in taps.args[2]] == [0.0] * 4
+    assert [point[0] for point in taps.args[2]] == list(spec.TAP_X)
+    assert tuple(taps.args[3]) == (0.0, -1.0, 0.0)
+    assert names.index("wizard_holes") > names.index("adapter.linear_pattern_feature")
+    assert names.index("_tap_station_witness") > names.index("wizard_holes")
     last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
     assert "volume_check" in names[last_rebuild:]
     # Drawing precision, then a clean slate, then exactly the sheet's marks.
@@ -208,31 +282,35 @@ def test_build_marks_the_sheet_dimensions_and_saves_a_simplified_plain_bar(
     }
     # The simplified configuration suppresses the seed gap and its pattern.
     (simplified,) = seat.save_simplified_part.await_args_list
-    assert simplified.args[1] == builder.PART_NAME
+    assert simplified.args[1] == builder.PART_NAME == "pd-feed-rack"
     assert tuple(simplified.args[2]) == (
         named_after("create_cut_extrude"), named_after("linear_pattern_feature")
     )
     assert saved is seat.save_simplified_part.return_value
 
 
-def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
+def test_sheet_has_aligned_clean_views_and_a_legible_enlarged_end() -> None:
     assert drawing.SPEC.layout == DrawingLayout.LANDSCAPE
     assert drawing.SPEC.source_kind == "part"
-    assert drawing.SPEC.part == "pd_platen_rack"
-    assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.SPEC.part == "pd_feed_rack"
+    assert drawing.BOTTOM_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.BOTTOM_CENTER[1] < drawing.FRONT_CENTER[1]
     assert drawing.END_SCALE[0] / drawing.END_SCALE[1] > (
         drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
     )
     assert drawing.ISO_SCALE == (1, 2)
     assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
-    assert "draw_pd_platen_rack.py" in PRECISION_MIGRATED_DRAWINGS
+    assert "draw_pd_feed_rack.py" in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(
         Path(drawing.__file__).read_text(encoding="utf-8"),
-        filename="draw_pd_platen_rack.py",
+        filename="draw_pd_feed_rack.py",
     )
+    assert drawing.TAP_CALLOUT_PRECISION is spec.TAP_CALLOUT_PRECISION
+    assert set(spec.TAP_CALLOUT_PRECISION.values()) == {spec.TAP_PLACES}
+    assert len(drawing.NOTES_TEXT.splitlines()) <= 4
 
 
-def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> None:
+def test_purchase_properties_do_not_prescribe_tooth_manufacture_or_a_joint() -> None:
     assert builder.GEAR_DATA is spec.GEAR_DATA
     assert builder.PURCHASED_RACK_NOTE is spec.PURCHASED_RACK_NOTE
     assert spec.PURCHASED_RACK_NOTE in spec.GEAR_DATA
@@ -246,38 +324,34 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"{feed.DIAMETRAL_PITCH:g} DP" in spec.GEAR_DATA
     assert f"{feed.PRESSURE_ANGLE_DEG:g}\N{DEGREE SIGN} PA" in spec.GEAR_DATA
     assert spec.PURCHASED_RACK_MATERIAL.upper() not in spec.GEAR_DATA.upper()
-    # The sheet's own notes: the leadered joint and flush-end requirements and
-    # one general line; no assembly instruction on the part sheet (rule 7).
-    sheet_notes = (drawing.NOTES_TEXT, drawing.SOLDER_NOTE, drawing.FLUSH_NOTE)
+    sheet_notes = (drawing.NOTES_TEXT, drawing.TAP_CALLOUT_BELOW)
     assert "MESH" not in "\n".join(sheet_notes)
-    text = "\n".join(
-        (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, *sheet_notes)
-    ).upper()
+    text = "\n".join((spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, *sheet_notes)).upper()
     for claim in (
         "FORM CUTTER", "RACK FORM", "135T", "STOCKED", "DROP-IN", "BRAZE",
-        "WAIVER", "ACCEPTED", "EXCEPTION",
+        "SOLDER", "BACKER", "WAIVER", "ACCEPTED", "EXCEPTION",
     ):
         assert claim not in text
     row = _config.parts(builder.PART_NAME)
-    assert row["finish"] == "rack as purchased; backer and solder fillet cleaned"
+    assert row["number"] == "MHA-PD-26"
+    for word in ("solder", "backer"):
+        assert word not in row["finish"].lower()
     installation = row["installation_notes"]
     lines = installation.splitlines()
     assert len(lines) <= 4 and all(len(line) <= 70 for line in lines)
-    assert "SOFT-SOLDER TO BACKER" in installation
-    assert "SET MESH AT ASSEMBLY" in installation
-    for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
+    for method in ("WIRE", "SECANT", "INDICATOR", " U +/-", "FLANK", "SOLDER"):
         assert method not in installation
-    # The purchased rack's flanks are as purchased: neither the sheet nor the
-    # installation note adds a flank requirement, and the assembly's rack step
-    # carries no measuring method.
-    assert "FLANK" not in installation
     assembly = importlib.import_module("draw_pd_paper_drive_assembly")
     rack_setup = importlib.import_module("paper_drive_rack_setup")
-    soldered = assembly._step_text(
+    screwed = assembly._step_text(
         operating_domain=rack_setup.feed_rack_operating_domain()
-    )["rack-soldered"]
-    for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
-        assert method not in soldered
+    )["rack-screwed"]
+    for method in ("WIRE", "SECANT", "INDICATOR", "U +/-", "SOLDER"):
+        assert method not in "\n".join(screwed)
+
+
+def test_tap_drill_is_the_native_number_drill() -> None:
+    assert spec.TAP_DRILL_DIA == pytest.approx(TAP_DRILL_MM["#0-80"])
 
 
 def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
@@ -293,7 +367,7 @@ def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
 def test_one_millimetre_gauge_pin_seats_on_both_source_flanks_clear_of_root() -> None:
     diameter = spec.INCOMING_GAUGE_PIN_DIA_MM
     seat = spec.rack_gauge_pin_contact_mm(diameter)
-    assert spec.ROOT_Y < seat.flank_contact_y_mm < spec.BAR_HEIGHT
+    assert spec.ROOT_Y < seat.flank_contact_y_mm < spec.RACK_HEIGHT
     assert seat.root_clearance_mm > 0.0
     assert spec.half_width(seat.flank_contact_y_mm) == pytest.approx(
         diameter / 2.0 * math.cos(math.radians(spec.PA_DEG))
@@ -840,11 +914,8 @@ def test_an_ordinary_drawn_strip_fits_as_supplied_and_prints_plain_refs() -> Non
         measured_face_width_max_mm=spec.RACK_THICKNESS + drawn,
         face_width_measurement_uncertainty_mm=micrometer,
     )
-    seam_upper = spec.BACKER_HEIGHT + printed_deviations(
-        spec.BACKER_HEIGHT, spec.DRAWING_PRECISION_BY_NAME["SeamHeight"], unit=spec.UNIT
-    )[1]
-    section_height, _ = paper_drive_geom.feed_rack_cut_end_section_maxima_mm()
-    assert section_height >= seam_upper + height
+    section_height, section_width = paper_drive_geom.feed_rack_cut_end_section_maxima_mm()
+    assert section_height >= height and section_width >= width
     # The stock sizes print as plain references: nothing for the shop to gauge.
     assert {"RackHeight", "RackDepth"} <= spec.DRAWING_REFERENCE_DIMENSIONS
     assert not hasattr(drawing, "DIMENSION_CALLOUTS")

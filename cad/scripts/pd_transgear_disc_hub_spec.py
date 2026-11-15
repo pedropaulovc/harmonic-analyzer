@@ -7,7 +7,7 @@ a Ø.498 +.000/-.001 rear spigot.  The spigot passes the reducer disc's
 (MHA-PD-06) bore, which it clears (the disc is centred at assembly), and its
 end seats on the sleeve's step face (the 12T's tooth ends); the flange's rear
 face clamps the disc's front face, the spigot's length ahead of the step.
-Three #0-80 fillister screws (MHA-PD-VN-55) pass the flange's #51 holes on the
+Three #0-80 fillister screws (MHA-SH-VN-59 DiscScrew) pass the flange's #51 holes on the
 Ø.75 circle into the disc's taps (``pd_transgear_disc_hub_geometry``; the
 taps are spotted through these holes at assembly, R9-9).  One 1/16 × 5/16
 hardened dowel (MHA-PD-VN-69) lies on a chord of the hub body over the
@@ -104,14 +104,14 @@ MM_PER_IN = 25.4
 SLEEVE_NUMBER = "MHA-PD-10"
 DISC_NUMBER = "MHA-PD-06"
 DISC_NAME = "DISC"
-SCREW_NUMBER = "MHA-PD-VN-55"
+SCREW_NUMBER = "MHA-SH-VN-59"
 SCREW_NAME = "DISC SCREW"
 if SLEEVE.SLEEVE_NUMBER != SLEEVE_NUMBER:
     raise AssertionError("the hub's fit notes name another part than the sleeve")
 if SLEEVE.DISC_NUMBER != DISC_NUMBER:
     raise AssertionError("the hub's fit notes name another part than the disc")
 
-# --- screw (MHA-PD-VN-55, McMaster 91794A055) ------------------------------------
+# --- screw (MHA-SH-VN-59 DiscScrew, McMaster 91794A055) --------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
     FILLISTER_SIZE
 )
@@ -637,7 +637,7 @@ STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
 HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
-# in pd_vn_transgear_disc_screw_spec reads it).
+# in pd_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
 # The spigot slides into the disc's bore at assembly (the disc is then
 # centred and its taps transferred); its turned-row band keeps it clear at

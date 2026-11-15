@@ -406,16 +406,6 @@
       ]
     },
     {
-      "old_stem": "pd-platen-rack",
-      "old_number": "MHA-PD-005",
-      "new_identities": [
-        {
-          "stem": "pd-platen-rack",
-          "number": "MHA-PD-05"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-platen",
       "old_number": "MHA-PD-002",
       "new_identities": [
@@ -734,17 +724,6 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-arm-plate-screw",
           "number": "MHA-PD-VN-56"
-        }
-      ]
-    },
-    {
-      "old_stem": "vn-transgear-disc-screw",
-      "old_number": "MHA-VN-039",
-      "new_identities": [
-        {
-          "parent": "pd-paper-drive",
-          "stem": "pd-vn-transgear-disc-screw",
-          "number": "MHA-PD-VN-55"
         }
       ]
     },
@@ -2436,6 +2415,49 @@
           "number": "MHA-CH-06-TL-VN-85"
         }
       ]
+    },
+    {
+      "old_stem": "pd-feed-rack",
+      "old_number": null,
+      "introduced": "2026-11-13",
+      "new_identities": [
+        {
+          "stem": "pd-feed-rack",
+          "number": "MHA-PD-26"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-bottom-guide",
+      "old_number": null,
+      "introduced": "2026-11-13",
+      "new_identities": [
+        {
+          "stem": "pd-platen-bottom-guide",
+          "number": "MHA-PD-27"
+        }
+      ]
+    },
+    {
+      "old_stem": "sh-vn-fillister-screw-91794a055",
+      "old_number": null,
+      "introduced": "2026-11-14",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "sh-vn-fillister-screw-91794a055",
+          "number": "MHA-SH-VN-59",
+          "configuration": "RackScrew",
+          "role": "RackScrew"
+        },
+        {
+          "parent": "pd-paper-drive",
+          "stem": "sh-vn-fillister-screw-91794a055",
+          "number": "MHA-SH-VN-59",
+          "configuration": "DiscScrew",
+          "role": "DiscScrew"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -3018,6 +3040,29 @@
         }
       ],
       "status": "retired"
+    },
+    {
+      "old_stem": "pd-platen-rack",
+      "old_number": "MHA-PD-005",
+      "new_identities": [
+        {
+          "stem": "pd-platen-rack",
+          "number": "MHA-PD-05"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-transgear-disc-screw",
+      "old_number": "MHA-VN-039",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-disc-screw",
+          "number": "MHA-PD-VN-55"
+        }
+      ],
+      "status": "retired"
     }
   ],
   "historical_current_aliases": [
@@ -3039,7 +3084,7 @@
   ],
   "classification_decisions": {
     "ch-pivot-bracket-tl-angle-plate": "Shop-reworked bought stock remains fabricated tooling; only numeric width changes.",
-    "pd-platen-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
+    "pd-feed-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
   },
   "shared_vendor_groups": [
     {
@@ -3136,6 +3181,17 @@
         "BarPin"
       ],
       "neutral_export_configuration": "RodPin"
+    },
+    {
+      "stem": "sh-vn-fillister-screw-91794a055",
+      "number": "MHA-SH-VN-59",
+      "supplier": "McMaster",
+      "supplier_sku": "91794A055",
+      "configurations": [
+        "RackScrew",
+        "DiscScrew"
+      ],
+      "neutral_export_configuration": "RackScrew"
     }
   ],
   "configured_kits": [

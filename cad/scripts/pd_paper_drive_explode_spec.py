@@ -8,7 +8,9 @@ its own axis. Each sheet shows only its own group, so the other group's moves
 never reach it. This module names that presentation and the ordered native
 steps that open it. Positions come from the opened model; distances are
 presentation offsets, not dimensions. The chain, the hanger pivot stack, the
-latch hook and the crank and spare wheels never move.
+latch hook and the crank and spare wheels never move. A shared purchased
+file whose members serve both groups is one family per member
+(``member_family``), so each member moves and shows with its own group.
 
 Machine frame: +Y up, -Z front (the paper side). Both sheets look from the
 front-left-top isometric, so a part raised in +Y or pushed rearward in +Z
@@ -25,6 +27,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal, Sequence
+
+import pd_feed_rack_screw_spec as _rack_screw
+import pd_transgear_disc_screw_spec as _disc_screw
 
 EXPLODED_VIEW_NAME = "PAPER_DRIVE_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -43,8 +48,44 @@ class ExplodeStep:
     instances: tuple[str, ...] = ()
 
 
+# The purchased #0-80 fillister's two members (MHA-SH-VN-59) share one file
+# stem; each is its own family, keyed as its BOM row is (stem--member): the
+# four RackScrews hold the MHA-PD-26 feed rack to the MHA-PD-27 bottom guide
+# (platen sheet), the three DiscScrews the MHA-PD-06 disc to its hub
+# (transgear sheet), so neither moves with the other's group.
+FILLISTER = _rack_screw.STEM
+RACK_SCREW = f"{FILLISTER}--{_rack_screw.CONFIGURATION}"
+DISC_SCREW = f"{_disc_screw.STEM}--{_disc_screw.CONFIGURATION}"
+if _disc_screw.STEM != FILLISTER:
+    raise AssertionError("the rack and disc screws are members of one shared stem")
+
+
+def member_family(stem: str, configuration: str) -> str:
+    """A component's family key: the shared fillister's per member, else its stem."""
+    return f"{stem}--{configuration}" if stem == FILLISTER else stem
+
+
+# The bottom guide MHA-PD-27 no longer rises with the top guide: the rack
+# hangs from its underside on the four rack screws, so the three drop below
+# the platen together, the rack then drops clear of the guide and the screws
+# rise out of their counterbores, standing above the guide's top face in the
+# order they go in. The screw heads' front lies 6.0 behind the platen's front
+# face, and the isometric's line of sight rises as it comes forward, so seen
+# past the platen's bottom edge (machine y 273.2) a head's top must stay
+# under 267.2. At 45 down the guide's top stands at 246.2 and the screws,
+# 25 up, span 253.0 (tip) to 260.8 (head top): 6.8 clear of the guide and
+# 6.4 under that sight line. At 35 down (the old rack's throw) the heads
+# stood at 270.8, behind the platen. The rack's top face, 20 under the
+# guide's underside, shows its four taps.
 PLATEN_STEPS: tuple[ExplodeStep, ...] = (
-    ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -35.0),
+    ExplodeStep(
+        "bottom guide, rack and rack screws below the platen",
+        ("pd-platen-bottom-guide", "pd-feed-rack", RACK_SCREW),
+        "y",
+        -45.0,
+    ),
+    ExplodeStep("rack below the bottom guide", ("pd-feed-rack",), "y", -20.0),
+    ExplodeStep("rack screws above the bottom guide", (RACK_SCREW,), "y", 25.0),
     ExplodeStep("guide screws forward", ("sh-vn-brass-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",
@@ -54,13 +95,16 @@ PLATEN_STEPS: tuple[ExplodeStep, ...] = (
     ),
     ExplodeStep("clip screws forward", ("pd-vn-platen-clip-screw",), "z", -30.0),
     ExplodeStep(
-        "guides above the platen",
+        "top guide and locks above the platen",
         ("pd-platen-guide", "pd-guide-lock", "pd-vn-guide-lock-screw"),
         "y",
         110.0,
     ),
     ExplodeStep(
-        "locks above the guides", ("pd-guide-lock", "pd-vn-guide-lock-screw"), "y", 45.0
+        "locks above the top guide",
+        ("pd-guide-lock", "pd-vn-guide-lock-screw"),
+        "y",
+        45.0,
     ),
     ExplodeStep("lock screws rearward", ("pd-vn-guide-lock-screw",), "z", 35.0),
     ExplodeStep(
@@ -160,7 +204,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
             "pd-vn-transgear-hub-key-pin",
-            "pd-vn-transgear-disc-screw",
+            DISC_SCREW,
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
         ),
@@ -173,7 +217,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
             "pd-rack-pinion",
             "pd-transgear-disc-hub",
             "pd-vn-transgear-hub-key-pin",
-            "pd-vn-transgear-disc-screw",
+            DISC_SCREW,
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
         ),
@@ -185,14 +229,14 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
         (
             "pd-transgear-disc-hub",
             "pd-vn-transgear-hub-key-pin",
-            "pd-vn-transgear-disc-screw",
+            DISC_SCREW,
             "pd-transgear-front-bushing",
             "pd-vn-transgear-retaining-ring",
         ),
         "z",
         -18.0,
     ),
-    ExplodeStep("disc screws forward", ("pd-vn-transgear-disc-screw",), "z", -14.0),
+    ExplodeStep("disc screws forward", (DISC_SCREW,), "z", -14.0),
     # #2409: the hub's key pin out of its chord ream the way it went in,
     # along its own axis (machine +X, out of the reamed end), clear of the hub.
     ExplodeStep("hub key pin out", ("pd-vn-transgear-hub-key-pin",), "x", 12.0),
@@ -261,6 +305,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = PLATEN_STEPS + TRANSGEAR_STEPS
 
 @dataclass(frozen=True)
 class Instance:
+    """One model component: its name and its family key (``member_family``)."""
+
     name: str
     stem: str
 

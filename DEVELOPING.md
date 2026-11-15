@@ -2456,7 +2456,7 @@ build: on 2026-11-11, 5 of 10 identical-source part rebuilds diverged on
 #2514 those, `_drawing_precision.apply_drawing_precision` (specs build
 `DRAWING_PRECISION` from sets),
 `_supplier_washer_model.assert_supplier_washer_references`,
-`_assembly_patterns.assert_pattern_targets` and `build_pd_platen_rack`'s
+`_assembly_patterns.assert_pattern_targets` and `build_pd_feed_rack`'s
 reference-dimension loop iterate sorted names, and since #2655 so does the
 vendored `sw_type_info.flag_methods` (one `GetIDsOfNames` request per method,
 reached through `_com._flag`, `segment_point_objects` and

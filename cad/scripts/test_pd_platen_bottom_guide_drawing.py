@@ -1,0 +1,213 @@
+"""Offline manufacturing contracts for the MHA-PD-27 platen bottom guide."""
+
+from __future__ import annotations
+
+import asyncio
+import math
+from pathlib import Path
+
+import pytest
+
+import _config
+import build_pd_platen_bottom_guide as builder
+import build_pd_platen_guide as top_builder
+import draw_pd_platen_bottom_guide as drawing
+import pd_feed_rack_spec as rack
+import pd_platen_bottom_guide_spec as spec
+import pd_platen_guide_spec as top_spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, drawing_specification_violations
+from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM
+from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
+from _test_stubbed_build import offline_adapter, stub_seat
+from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
+
+
+def test_identity_and_quantity() -> None:
+    row = _config.parts(builder.PART_NAME)
+    assert row["number"] == "MHA-PD-27"
+    assert row["quantity"] == 1
+    assert _config.parts("pd-platen-guide")["quantity"] == 1
+
+
+def test_it_keeps_the_top_rail_section_and_lock_geometry() -> None:
+    assert spec.GUIDE_LENGTH == PLATE_WIDTH
+    assert spec.GUIDE_DEPTH == top_builder.GUIDE_DEPTH
+    assert spec.GUIDE_DEPTH_BAND == top_spec.GUIDE_DEPTH_BAND
+    assert spec.LOCK_TAP_X == top_builder.HOLE_X
+    assert spec.LOCK_SCREW_DX == top_builder.LOCK_SCREW_DX
+    assert spec.LOCK_TAP_SPEC == top_spec.LOCK_TAP_SPEC
+    assert spec.PLATEN_TAP_SPEC == top_spec.TAPPED_HOLE_SPEC
+    # The lock taps stand where the bottom MHA-PD-11 rail's did above the
+    # platen, to the print's .XXX.
+    former = 10.5 + top_spec.TAP_Y
+    assert abs(spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM + spec.LOCK_TAP_Y - former) <= spec.BAND
+
+
+def test_underside_seats_the_rack_and_the_platen_taps_follow_mha_pd_02() -> None:
+    assert spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM < rack.RACK_HEIGHT
+    assert spec.PLATEN_TAP_X == GUIDE_HOLE_X
+    assert spec.PLATEN_TAP_Y == pytest.approx(
+        GUIDE_HOLE_Y[0] - spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM
+    )
+    # The transferred row pays the strip's room and the crest set, so it is
+    # wider than a printed row.
+    assert spec.PLATEN_TAP_Y_BAND > spec.BAND + (
+        rack.PURCHASED_RACK_HEIGHT_MAX_MM - rack.RACK_HEIGHT
+    )
+
+
+def test_the_spot_punch_float_is_booked_at_the_drilled_platen_hole() -> None:
+    import draw_pd_paper_drive_assembly as assembly_sheet
+    from _printed_tolerance import drilled_oversize_mm
+    from pd_platen_spec import GUIDE_HOLE_DIA
+    from pd_platen_spec import UNIT as PLATEN_UNIT
+
+    punch = float(assembly_sheet.GUIDE_SPOT_PUNCH) * 25.4
+    assert punch < GUIDE_HOLE_DIA < punch + 25.4 / 64.0
+    hole_max = GUIDE_HOLE_DIA + drilled_oversize_mm(unit=PLATEN_UNIT)
+    assert spec.PLATEN_SPOT_PUNCH_FLOAT == pytest.approx((hole_max - punch) / 2.0)
+    assert spec.PLATEN_SPOT_PUNCH_FLOAT > spec.HOLE_TRANSFER_BAND
+
+
+def test_height_is_the_least_thousandth_that_keeps_every_tap_wall() -> None:
+    walls = (
+        spec.PLATEN_TAP_TOP_WALL_MIN,
+        spec.PLATEN_TAP_BOTTOM_WALL_MIN,
+        spec.LOCK_TAP_TOP_WALL_MIN,
+    )
+    assert min(walls) >= WALL_FLOOR_MM - 1e-9
+    lower = spec.GUIDE_HEIGHT - 0.0254
+    assert lower - spec.BAND - (spec.PLATEN_TAP_Y + spec.PLATEN_TAP_Y_BAND) - (
+        THREAD_MAJOR_MM["#4-40"] / 2.0 + spec.EDGE_BREAK + spec.TAP_MOUTH_BREAK
+    ) < WALL_FLOOR_MM
+    assert round(spec.GUIDE_HEIGHT / 25.4, 6) == round(spec.GUIDE_HEIGHT / 25.4, 3)
+    assert 0.0 <= spec.TOP_RISE < spec.BAND * 2.0
+
+
+def test_rack_screw_holes_take_the_stock_screw_on_the_rack_floor() -> None:
+    # The rail is placed Ry180 (as MHA-PD-11), so its local stations mirror
+    # about its length onto the strip's taps.
+    assert sorted(spec.GUIDE_LENGTH - x for x in spec.SCREW_HOLE_X) == pytest.approx(
+        rack.TAP_X
+    )
+    assert spec.SCREW_HOLE_Z == pytest.approx(
+        rack.FRONT_BEHIND_PLATEN + rack.RACK_THICKNESS / 2.0
+    )
+    assert spec.GUIDE_HEIGHT - spec.SCREW_CBORE_DEPTH == pytest.approx(rack.SCREW_FLOOR)
+    assert SHANK_DIA < spec.SCREW_HOLE_DIA < HEAD_DIA < spec.SCREW_CBORE_DIA
+    assert spec.SCREW_FLOAT_RADIAL >= math.hypot(
+        spec.HOLE_TRANSFER_BAND, spec.HOLE_TRANSFER_BAND
+    )
+    assert spec.SCREW_HOLE_SPEC.overrides_mm == {
+        "HoleDiameter": spec.SCREW_HOLE_DIA,
+        "CounterBoreDiameter": spec.SCREW_CBORE_DIA,
+        "CounterBoreDepth": spec.SCREW_CBORE_DEPTH,
+    }
+    assert spec.SCREW_HOLE_TAP_WALL_MIN >= WALL_FLOOR_MM
+
+
+def test_counterbore_front_wall_shortfall_is_a_declared_minor() -> None:
+    assert 0.0 < spec.SCREW_CBORE_FRONT_WALL_MIN < spec.SCREW_CBORE_FRONT_WALL_NOMINAL
+    # The strip lies flipped, so its taps sit (width - TapFromFront) behind its
+    # machine-front face: the narrowest strip with every band at its corner.
+    tap_from_front = (
+        rack.FRONT_BEHIND_PLATEN
+        - rack.FRONT_SET_BAND
+        + rack.PURCHASED_RACK_FACE_WIDTH_MIN_MM
+        - (rack.TAP_Z + rack.TAP_BAND)
+        - spec.HOLE_TRANSFER_BAND
+    )
+    from _printed_tolerance import drilled_oversize_mm
+
+    cbore_radius = (spec.SCREW_CBORE_DIA + drilled_oversize_mm(unit=spec.UNIT)) / 2.0
+    assert spec.SCREW_CBORE_FRONT_WALL_MIN == pytest.approx(
+        tap_from_front - cbore_radius - spec.EDGE_BREAK
+    )
+    declared = {
+        entry["id"]: entry["kind"]
+        for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]
+    }
+    if spec.SCREW_CBORE_FRONT_WALL_MIN < WALL_FLOOR_MM:
+        assert declared["RV-01"] == "minor"
+        assert spec.SCREW_CBORE_FRONT_WALL_TEXT in drawing.SCREW_CALLOUT_BELOW
+
+
+def test_print_marks_the_kept_dimensions_and_names_the_transfers() -> None:
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    assert marked == kept == spec.DRAWING_NOMINALS_MM.keys() == spec.DRAWING_PRECISION_BY_NAME.keys()
+    assert spec.DRAWING_PRECISION_BY_NAME["Height"] == 3
+    assert _config.parts("pd-platen")["number"] in drawing.PLATEN_CALLOUT_BELOW
+    assert _config.parts("pd-feed-rack")["number"] in drawing.SCREW_CALLOUT_BELOW
+    assert "TRANSFER" not in drawing.LOCK_CALLOUT_BELOW
+    assert "draw_pd_platen_bottom_guide.py" in PRECISION_MIGRATED_DRAWINGS
+    assert drawing.SPEC.part == "pd_platen_bottom_guide"
+    assert not drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename="draw_pd_platen_bottom_guide.py",
+    )
+
+
+def test_build_cuts_three_native_hole_families_and_marks_the_print(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, builder)
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    seat.wizard_holes.return_value.placement_drive_jobs = []
+    adapter = offline_adapter()
+    asyncio.run(builder.build(adapter))
+
+    holes = {call.kwargs["name"]: call for call in seat.wizard_holes.call_args_list}
+    assert set(holes) == {"LockHoles", "PlatenScrewHoles", "RackScrewHoles"}
+    lock = holes["LockHoles"]
+    assert tuple(lock.args[3]) == (0.0, 0.0, -1.0)
+    assert len(lock.kwargs["placement_dims"]) == len(spec.LOCK_TAP_X)
+    platen = holes["PlatenScrewHoles"]
+    assert "placement_dims" not in platen.kwargs
+    assert [p[1] for p in platen.args[2]] == [spec.PLATEN_TAP_Y] * 5
+    screws = holes["RackScrewHoles"]
+    assert screws.args[1] is spec.SCREW_HOLE_SPEC
+    assert tuple(screws.args[3]) == (0.0, 1.0, 0.0)
+    assert [p[1] for p in screws.args[2]] == [spec.GUIDE_HEIGHT] * 4
+    assert [-p[2] for p in screws.args[2]] == [spec.SCREW_HOLE_Z] * 4
+    marks = {
+        (call.args[1], frozenset(call.args[2]))
+        for call in seat.mark_dimensions_for_drawing.call_args_list
+    }
+    assert marks == {
+        (feature, frozenset(names)) for feature, names in spec.DRAWING_DIMENSIONS.items()
+    }
+
+
+def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
+    # The front view's right end, where the length's extension line drops.
+    rail_end = drawing._LEFT_X + spec.GUIDE_LENGTH / 1000.0
+    right_left = drawing.RIGHT_CENTER[0] - spec.GUIDE_DEPTH / 2000.0
+    # ~2.8 mm per character at the sheet's text height (r3 render).
+    half_text = 0.0028 * max(
+        len(line) for line in drawing.HEIGHT_CALLOUT.splitlines()
+    ) / 2.0
+    height_x = drawing.FRONT_KEEP["Height"][0]
+    assert rail_end < height_x - half_text
+    assert height_x + half_text < right_left
+    # Value plus reason (~5.9 mm a line) is taller than the rail, so the text
+    # stands wholly below its bottom extension line (r5).
+    height_y = drawing.FRONT_KEEP["Height"][1]
+    half_block = 0.0059 * (1 + len(drawing.HEIGHT_CALLOUT.splitlines())) / 2.0
+    assert spec.GUIDE_HEIGHT / 1000.0 < 2.0 * half_block
+    assert height_y + half_block < drawing.FRONT_CENTER[1] - spec.GUIDE_HEIGHT / 2000.0
+    # The depth's text is wider than the right view, so it stands left of the
+    # view's left extension line, right of the top view's end, above the
+    # front view's top (r4: centred, both extension lines struck it).
+    depth_x, depth_y = drawing.RIGHT_KEEP["Depth"]
+    half_depth = (
+        0.0028 * max(len(line) for line in spec.GUIDE_DEPTH_CALLOUT.splitlines()) / 2.0
+    )
+    assert rail_end < depth_x - half_depth
+    assert depth_x + half_depth < right_left
+    assert depth_y > drawing.FRONT_CENTER[1] + spec.GUIDE_HEIGHT / 1000.0
+
+
+def test_the_height_band_names_its_screw_by_number() -> None:
+    assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-SH-VN-59"]

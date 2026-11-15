@@ -1,9 +1,10 @@
 """McMaster 91794A055 dimensions and vendor-model laws in mm, no CAD imports.
 
-MHA-PD-VN-55, the transgear disc screws (x3): 18-8 stainless slotted fillister
-head, #0-80 x 1/4, fully threaded (contract §2.6, ruling 4).  They pass
-through the brass hub's flange clearance holes and thread into the 120T
-disc's #0-80 through taps.
+The ``DiscScrew`` member of MHA-SH-VN-59 (``sh_vn_fillister_screw_91794a055_spec``;
+MHA-PD-VN-55 until 2026-11-14, #2410), the transgear disc screws (x3): 18-8
+stainless slotted fillister head, #0-80 x 1/4, fully threaded (contract §2.6,
+ruling 4).  They pass through the brass hub's flange clearance holes and
+thread into the 120T disc's #0-80 through taps.
 
 Catalogue (McMaster 91794A055 page, read 2026-09-30): #0-80 UNF class 2A,
 1/4 in under the head, fully threaded, high narrow fillister head Ø0.096 in
@@ -34,9 +35,7 @@ behind the disc never meets a screw.  The model is that installed screw,
 
 import math
 
-import _config
-from _package_units import drawing_unit
-import _mcmaster_91794a055 as _supplier
+import sh_vn_fillister_screw_91794a055_spec as _shared
 from _mcmaster_91794a055 import (
     HEAD_DIA,
     HEAD_H,
@@ -59,9 +58,10 @@ from pd_rack_pinion_spec import (
 from pd_transgear_disc_hub_spec import FLANGE_THICK, FLANGE_THICK_PLACES
 from pd_transgear_disc_hub_spec import UNIT as HUB_UNIT
 
-UNIT = drawing_unit(
-    "parts/pd-vn-transgear-disc-screw", _config.parts("pd-vn-transgear-disc-screw")
-)
+STEM = _shared.PART_STEM
+CONFIGURATION = _shared.DISC_SCREW_CONFIGURATION
+BOM_DESCRIPTION = "DISC SCREW, CUT TO FIT"
+UNIT = _shared.UNIT
 
 
 # --- head (Revolve1 / Sketch2) ----------------------------------------------
@@ -193,47 +193,18 @@ ENGAGEMENT_NOMINAL_D = ENGAGEMENT_NOMINAL / SHANK_DIA
 
 if not 0.0 <= TIP_BELOW_REAR_FACE[0] < TIP_BELOW_REAR_FACE[1]:
     raise AssertionError(
-        "MHA-PD-VN-55 disc screw tip to the MHA-PD-06 disc rear face: the cut window "
+        "MHA-SH-VN-59 DiscScrew tip to the MHA-PD-06 disc rear face: the cut window "
         f"{TIP_BELOW_REAR_FACE} lets a tip stand proud"
     )
 if STOCK_TIP_INSIDE_REAR_MAX > TIP_BELOW_REAR_FACE[1]:
     raise AssertionError(
-        "MHA-PD-VN-55 disc screw tip to the MHA-PD-06 disc rear face: the shortest "
+        "MHA-SH-VN-59 DiscScrew tip to the MHA-PD-06 disc rear face: the shortest "
         f"stock stops {STOCK_TIP_INSIDE_REAR_MAX:.3f} inside, past the cut "
         f"window's {TIP_BELOW_REAR_FACE[1]:.2f}"
     )
 if ENGAGEMENT_WORST_D < ENGAGEMENT_FLOOR_D - 1e-9:
     raise AssertionError(
-        f"MHA-PD-VN-55 disc screw in the MHA-PD-06 disc tap: worst engagement "
+        f"MHA-SH-VN-59 DiscScrew in the MHA-PD-06 disc tap: worst engagement "
         f"{ENGAGEMENT_WORST:.3f} ({ENGAGEMENT_WORST_D:.3f}D) under "
         f"{ENGAGEMENT_FLOOR_D}D"
-    )
-
-# --- supplier references the part carries and the sheet prints -------------
-# The supplier's references less its stock length: the screw is drawn as
-# cut, so a .25 stock length landed in air below the drawn tip on a witness
-# line that belonged to no feature (machinist review r7, all runs).  The
-# ITEM row's "#0-80 x 1/4" names the stock; MHA-PD-00's step the cut.
-_STOCK_LENGTH = "SupplierStockLength"
-SUPPLIER_REFERENCE_DIMENSIONS = tuple(
-    row for row in _supplier.SUPPLIER_REFERENCE_DIMENSIONS if row[0] != _STOCK_LENGTH
-)
-SUPPLIER_REFERENCE_STARTS = {
-    name: start
-    for name, start in _supplier.SUPPLIER_REFERENCE_STARTS.items()
-    if name != _STOCK_LENGTH
-}
-SUPPLIER_REFERENCE_FORMATS = {
-    name: row
-    for name, row in _supplier.SUPPLIER_REFERENCE_FORMATS.items()
-    if name != _STOCK_LENGTH
-}
-SUPPLIER_REFERENCE_PLANES = _supplier.SUPPLIER_REFERENCE_PLANES
-SUPPLIER_REFERENCE_SIDES = _supplier.SUPPLIER_REFERENCE_SIDES
-if (
-    len(SUPPLIER_REFERENCE_DIMENSIONS)
-    != len(_supplier.SUPPLIER_REFERENCE_DIMENSIONS) - 1
-):
-    raise AssertionError(
-        "MHA-PD-VN-55: the supplier stock length reference is not dropped"
     )

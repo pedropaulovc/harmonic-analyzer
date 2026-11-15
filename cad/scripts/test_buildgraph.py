@@ -130,9 +130,9 @@ _INSERTED_SOURCES = {
     "pd_paper_drive": "pd_vn_chain_connecting_link sh_vn_chain_link sh_vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front sh_vn_brass_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
     "sh_vn_fillister_screw_90280a108 pd_vn_platen_clip_screw "
-    "pd_platen pd_platen_clip pd_platen_guide pd_platen_paper pd_platen_rack pd_rack_pinion pd_support_bar "
+    "pd_feed_rack pd_platen pd_platen_bottom_guide pd_platen_clip pd_platen_guide pd_platen_paper pd_rack_pinion pd_support_bar "
     "pd_transgear_arm pd_transgear_arm_plate pd_vn_transgear_arm_plate_locating_pin pd_vn_transgear_arm_plate_screw "
-    "pd_transgear_disc_hub pd_vn_transgear_hub_key_pin pd_vn_transgear_disc_screw "
+    "pd_transgear_disc_hub pd_vn_transgear_hub_key_pin sh_vn_fillister_screw_91794a055 "
     "pd_transgear_drive_collar pd_vn_transgear_collar_flat_pin pd_transgear_feed_pinion "
     "pd_transgear_knob_cup pd_vn_transgear_knob_cup_pin pd_vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring pd_vn_transgear_latch_pin pd_vn_transgear_pivot_screw "
@@ -187,6 +187,7 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
         ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),
         ("sh_vn_pivot_pin", {"ch_channel"}),
+        ("sh_vn_fillister_screw_91794a055", {"pd_paper_drive"}),
         # Parent-scoped kits (owner exception, #2187): one producer, two
         # configured members each, one direct consumer.
         ("ch_rocker_arm_tl_vn_oblique_rail_kit", {"ch_rocker_arm_tl_oblique_jig"}),
@@ -335,6 +336,8 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         ("ch_rocker_arm_tl_vn_oblique_pivot_cotter", "MHA-CH-06-TL-VN-75"),
         ("ch_rocker_arm_tl_vn_oblique_pivot_lock_wire", "MHA-CH-06-TL-VN-76"),
         ("pd_vn_transgear_pivot_shim", "MHA-PD-VN-67"),
+        # #2410: the disc screws are MHA-SH-VN-59's DiscScrew member.
+        ("pd_vn_transgear_disc_screw", "MHA-PD-VN-55"),
         # Owner ruling 2026-11-08 (#2144 item 9.2): the jack chain's end link is
         # screwed to the arm and the ring threads its far link, so neither the
         # formed anchor eye nor the bead chain's loop link remains.
