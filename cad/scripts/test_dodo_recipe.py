@@ -13,7 +13,6 @@ import inspect
 import os
 import re
 import time
-import types
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
@@ -3026,7 +3025,12 @@ def test_channel_spring_variants_ride_the_cache_with_their_stl(tmp_path, monkeyp
             variants.append(path)
     # The installed spring's own STL is its part task's.
     (out / "stl" / "ch-vn-channel-spring-installed.STL").write_bytes(b"part")
-    assert dodo._channel_spring_variants() == sorted(variants)
+    assert dodo._assembly_discovered_on_disk("ch_channel") == sorted(variants)
+    assert not [
+        stem
+        for stem in dodo.ASSEMBLY_ORDER
+        if stem != "ch_channel" and dodo._assembly_discovered_on_disk(stem)
+    ]
     assert set(variants) <= set(dodo._assembly_cache_outputs("ch_channel"))
     # Judged byte for byte: neither the models nor their STL, whose bytes
     # SolidWorks writes otherwise run to run (#2737).
@@ -3095,9 +3099,7 @@ def test_a_channel_reuse_on_a_clean_tree_declares_its_spring_variants_by_glob(
     monkeypatch.setattr(dodo, "_cache_key", lambda *_a: "k" * 64)
     monkeypatch.setattr(dodo, "_probe_cache", lambda *_a: "miss")
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
-    monkeypatch.setattr(
-        dodo, "explode_plan", lambda _stem: types.SimpleNamespace(closure=())
-    )
+    monkeypatch.setattr(dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=()))
     with pytest.raises(_Attempted):
         dodo.build_or_refresh("ch_channel", [], [], [])
     [part] = attempted

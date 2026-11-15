@@ -1816,17 +1816,6 @@ _CHANNEL_SPRING_VARIANTS = (
 )
 
 
-def _channel_spring_variants() -> list[Path]:
-    """The channel's spring variants on disk (:data:`_CHANNEL_SPRING_VARIANTS`).
-    These are assembly-owned outputs, not separate task targets; cleanup and
-    cache packing share this inventory so a hit restores every spring component
-    referenced by ch-channel.SLDASM.
-    """
-    return sorted(
-        path for pattern in _CHANNEL_SPRING_VARIANTS for path in CAD_OUT.glob(pattern)
-    )
-
-
 def _assembly_discovered_outputs(stem: str) -> tuple[str, ...]:
     """Globs (under cad/out) of an assembly's cache outputs that exist only once
     its build has made them, so a tree that never built it, as a clean farm
@@ -1834,6 +1823,19 @@ def _assembly_discovered_outputs(stem: str) -> tuple[str, ...]:
     members against the globs, not against this tree's files
     (``_replay_shadow.DependentBuild.discovered``)."""
     return _CHANNEL_SPRING_VARIANTS if stem == "ch_channel" else ()
+
+
+def _assembly_discovered_on_disk(stem: str) -> list[Path]:
+    """This tree's files matching :func:`_assembly_discovered_outputs`: for the
+    channel, the spring variants and their STL it last built or restored. They
+    are assembly-owned outputs, not separate task targets; cleanup and cache
+    packing share this inventory so a hit restores every spring component
+    referenced by ch-channel.SLDASM."""
+    return sorted(
+        path
+        for pattern in _assembly_discovered_outputs(stem)
+        for path in CAD_OUT.glob(pattern)
+    )
 
 
 def _part_configuration_outputs(stem: str) -> list[Path]:
@@ -1894,8 +1896,7 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     # would then find no drive specs to author transiently and fail loud.
     dof = sldasm.parent / f".{sldasm.stem}.dof.json"
     outs = [sldasm, _png_dir(stem), massprops, dof, _input_ledger(stem)]
-    if stem == "ch_channel":
-        outs += _channel_spring_variants()
+    outs += _assembly_discovered_on_disk(stem)
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
     if stem == "ch_rocker_arm_tl_oblique_jig":
@@ -3550,17 +3551,17 @@ def _force_remove(path: Path) -> None:
 
 
 def _clean_assembly(stem):
-    """Remove the .SLDASM target, its png/<dashed> render dir, and -- for channel
-    -- the dynamically-generated stretched-spring variants (which are not any
-    task's declared target, so a stale stretchNN body would otherwise be reused on
-    the next build; codex review #4)."""
+    """Remove the .SLDASM target, its png/<dashed> render dir, and the outputs
+    its build discovers (:func:`_assembly_discovered_on_disk`: the channel's
+    stretched-spring variants, which are not any task's declared target, so a
+    stale stretchNN body would otherwise be reused on the next build; codex
+    review #4)."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(Path(_assembly_execution_token(stem)))
     _force_remove(_input_ledger(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
-    if stem == "ch_channel":
-        for variant in _channel_spring_variants():
-            _force_remove(variant)
+    for variant in _assembly_discovered_on_disk(stem):
+        _force_remove(variant)
 
 
 def _assembly_task(stem: str) -> dict[str, Any]:
