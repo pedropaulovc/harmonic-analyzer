@@ -333,6 +333,36 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
 
 
+def _export_sheet(path, line_end, created):
+    """One sheet as SolidWorks exports it: same marks, new time, ID and offsets."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=200, height=100)
+    content = DecodedStreamObject()
+    content.set_data(f"2 w 20 50 m {line_end} 50 l S".encode())
+    page[NameObject("/Contents")] = writer._add_object(content)
+    writer.add_metadata({"/CreationDate": created, "/ModDate": created})
+    with path.open("wb") as stream:
+        writer.write(stream)
+
+
+def test_rebuilt_sheet_with_the_same_ink_keeps_its_review_key(inputs):
+    dodo = inputs.module
+    _export_sheet(inputs.pdf, 150, "D:20261112094451-08'00'")
+    first_bytes = inputs.pdf.read_bytes()
+    first = _review_key(dodo)
+    _export_sheet(inputs.pdf, 150, "D:20261112174226-08'00'")
+    assert inputs.pdf.read_bytes() != first_bytes
+    assert _review_key(dodo) == first
+    assert dodo._machinist_review_byte_key(
+        "probe", dodo._machinist_review_profile()
+    ) != first
+    _export_sheet(inputs.pdf, 151, "D:20261112174226-08'00'")
+    assert _review_key(dodo) != first
+
+
 @pytest.mark.parametrize("manifest", ["pyproject.toml", "uv.lock"])
 def test_dependency_manifest_edits_rekey_review(inputs, manifest):
     dodo = inputs.module
@@ -1327,6 +1357,82 @@ def test_cache_hit_replaces_instead_of_mixing_previous_evidence(action):
     assert action.calls["store"] == 0
 
 
+def _write_aggregate(directory, verdict):
+    directory.mkdir(parents=True)
+    (directory / "probe.aggregate.json").write_text(json.dumps({
+        "name": "probe", "kind": "part", "verdict": verdict,
+        "gating_count": 0 if verdict == "SHIP" else 2, "error": None,
+    }), encoding="utf-8")
+
+
+@pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
+def test_verdict_published_under_the_byte_key_is_adopted_not_rolled_again(
+    action, monkeypatch, verdict
+):
+    dodo = action.dodo
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
+    restored, events = [], []
+
+    def restore(key, outputs, _label):
+        restored.append(key)
+        if key != byte_key:
+            return False
+        _write_aggregate(outputs[0], verdict)
+        return True
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._cache, "record_event",
+        lambda event, label, key, **extra: events.append((event, label, key, extra)),
+    )
+    dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert restored == [byte_key]
+    assert action.calls["run"] == 0
+    assert action.calls["store"] == 1
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
+    assert events == [(
+        "review_adopted_byte_key", "check:machinist_review:probe", "a" * 64,
+        {"byte_key": byte_key, "store": "stored"},
+    )]
+
+
+def test_adoption_that_loses_publication_takes_the_winners_verdict(action, monkeypatch):
+    dodo = action.dodo
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
+    restored = []
+
+    def restore(key, outputs, _label):
+        restored.append(key)
+        _write_aggregate(outputs[0], "SHIP" if key == byte_key else "FIX")
+        return True
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
+    dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert restored == [byte_key, "a" * 64]
+    assert action.calls["run"] == 0
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == "FIX"
+
+
+def test_forced_refresh_does_not_adopt_the_byte_keyed_verdict(action, monkeypatch):
+    dodo = action.dodo
+    monkeypatch.setattr(dodo._cache, "forced_refresh", lambda _label: "owner asked")
+    monkeypatch.setattr(
+        dodo._cache, "restore",
+        lambda *_args: pytest.fail("forced refresh restored a cached verdict"),
+    )
+    monkeypatch.setattr(dodo._cache, "require_refresh_store", lambda _label, outcome: outcome)
+    dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+
+
 @pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mode):
     def locked(*_args):
@@ -1416,18 +1522,28 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     assert cache.last_stored_key("check:machinist_review:probe") is None
 
 
+@pytest.mark.parametrize("published", ["reviewed", "byte-key"])
 @pytest.mark.parametrize("failure", ["missing", "locked", "cleanup", "invalid-aggregate"])
-def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, failure):
+def test_failed_review_adoption_is_fatal_even_in_learn(
+    action, monkeypatch, failure, published
+):
     dodo = action.dodo
     directory = dodo._machinist_review_dir("probe")
     monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
 
     def restore(key, outputs, label):
         assert outputs == [directory]
+        if key == byte_key:
+            if published == "reviewed":
+                return False  # nothing was published under the byte key
+            _write_aggregate(directory, "SHIP")
+            return True
         if failure == "locked":
             raise dodo._cache.RestoreLocked(label, key, PermissionError("locked"))
         if failure == "invalid-aggregate":
-            directory.mkdir()
+            directory.mkdir(exist_ok=True)
             (directory / "probe.aggregate.json").write_text("{}", encoding="utf-8")
             return True
         return False

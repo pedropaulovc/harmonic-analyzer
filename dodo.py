@@ -3790,7 +3790,7 @@ def _machinist_review_profile() -> ReviewProfile:
     return _MACHINIST_REVIEW_PROFILE
 
 
-def _machinist_review_digest(profile: ReviewProfile):
+def _machinist_review_digest(profile: ReviewProfile, *, pdf_ink: bool = True):
     # The config module is a real review input. Its contextual digest records
     # both its actual source and the frozen effective profile, keeping normal
     # cache-key provenance instead of adding a virtual file or a post-hoc salt.
@@ -3798,6 +3798,17 @@ def _machinist_review_digest(profile: ReviewProfile):
     effective = json.dumps(profile._asdict(), sort_keys=True, separators=(",", ":"))
 
     def digest(path: str) -> str:
+        if pdf_ink and Path(path).suffix.casefold() == ".pdf":
+            # The reviewed sheet is keyed by the ink it prints: a rebuild that
+            # prints the same sheet differs in export time, document ID and
+            # font-subset tags, and must reuse its verdict (#2714). A file
+            # PDFium cannot render keeps its byte digest.
+            from _pdf_ink_digest import PdfInkError, pdf_ink_digest
+
+            try:
+                return pdf_ink_digest(path)
+            except PdfInkError:
+                pass
         source = ContentChecker._digest(path)
         if Path(path).resolve() == config_path:
             return hashlib.sha256(f"{source}\0{effective}".encode()).hexdigest()
@@ -3812,6 +3823,67 @@ def _machinist_review_cache_key(
     return _cache.cache_key(
         _machinist_review_file_deps(stem), _machinist_review_digest(profile), label
     )
+
+
+def _machinist_review_byte_key(stem: str, profile: ReviewProfile) -> str:
+    """The key this review had while the PDF was hashed by its bytes."""
+    return _cache.cache_key(
+        _machinist_review_file_deps(stem),
+        _machinist_review_digest(profile, pdf_ink=False),
+    )
+
+
+def _adopt_byte_keyed_review(
+    stem: str, profile: ReviewProfile, key: str, directory: Path, label: str
+) -> bool:
+    """Republish under ``key`` the verdict these exact PDF bytes already have.
+
+    Every review published before the ink key is stored under its byte key.
+    Without this the first build after the change would review every reviewed
+    sheet again (about 290 reviews, $700 and, at 7% FIX per roll on unchanged
+    ink, about 20 new FIX). Remove it under #2811 once a full build of main
+    records no ``review_adopted_byte_key`` event.
+    """
+    legacy = _machinist_review_byte_key(stem, profile)
+    if legacy == key:
+        return False
+    try:
+        if not _cache.restore(legacy, [directory], label):
+            return False
+    except _cache.RestoreLocked as error:
+        # The same drawing error policy as a locked probe of the ink key.
+        raise OSError(str(error)) from error
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE,
+    ) as store:
+        _tag_cache_key(store, key)
+        store.set_attribute("adopted_from", legacy)
+        outcome = _cache.store(key, [directory], label)
+        store.set_attribute("cache", outcome)
+    if outcome == "lost":
+        _adopt_canonical_review(stem, key, directory, label)
+    _cache.record_event(
+        "review_adopted_byte_key", label, key, byte_key=legacy, store=outcome
+    )
+    return True
+
+
+def _adopt_canonical_review(
+    stem: str, key: str, directory: Path, label: str
+) -> dict[str, Any]:
+    """Replace this leaf's reports with those another build published under
+    ``key`` first, and read their verdict. LEARN may soften a review verdict,
+    never a failure to adopt the winning evidence: every failure is fatal."""
+    try:
+        shutil.rmtree(directory)
+        if not _cache.restore(key, [directory], label):
+            raise RuntimeError(
+                f"{label}: lost cache publication but canonical reports "
+                "could not be restored"
+            )
+        return _read_machinist_aggregate(stem)
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"{label}: could not adopt canonical reports: {error}") from error
 
 
 def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
@@ -3901,6 +3973,9 @@ def _cached_machinist_review_action(
             )
             return
     try:
+        if probed == "miss" and _cache.forced_refresh(label) is None:
+            if _adopt_byte_keyed_review(stem, profile, key, directory, label):
+                probed = "hit"
         if probed != "hit":
             if probed == "locked":
                 raise OSError(f"{label}: report outputs are locked")
@@ -3926,19 +4001,7 @@ def _cached_machinist_review_action(
                     store.set_attribute("cache", outcome)
                     _cache.require_refresh_store(label, outcome)
                 if outcome == "lost":
-                    try:
-                        shutil.rmtree(directory)
-                        if not _cache.restore(key, [directory], label):
-                            raise RuntimeError(
-                                f"{label}: lost cache publication but canonical reports "
-                                "could not be restored"
-                            )
-                        aggregate = _read_machinist_aggregate(stem)
-                    except (OSError, ValueError) as error:
-                        # LEARN may soften a review verdict, never failed adoption.
-                        raise RuntimeError(
-                            f"{label}: could not adopt canonical reports: {error}"
-                        ) from error
+                    aggregate = _adopt_canonical_review(stem, key, directory, label)
         else:
             aggregate = _read_machinist_aggregate(stem)
     except (OSError, ValueError) as error:
