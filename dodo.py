@@ -1807,13 +1807,33 @@ def _stl(stem: str) -> Path:
     return prt.parent.parent / "stl" / f"{prt.stem}.STL"
 
 
+# The measured-length spring variants the channel assembly builds and inserts,
+# each with the STL ``build_spring`` -> ``save_part_and_images`` exports beside
+# it (#2801), as globs under cad/out. Neutral also uses stretch00.
+_CHANNEL_SPRING_VARIANTS = (
+    "sldprt/ch-vn-channel-spring-installed-stretch*.SLDPRT",
+    "stl/ch-vn-channel-spring-installed-stretch*.STL",
+)
+
+
 def _channel_spring_variants() -> list[Path]:
-    """Measured-length spring variants inserted by the channel assembly.
-    Neutral also uses stretch00. These are assembly-owned outputs, not separate
-    task targets; cleanup and cache packing share this inventory so a hit restores
-    every spring component referenced by ch-channel.SLDASM.
+    """The channel's spring variants on disk (:data:`_CHANNEL_SPRING_VARIANTS`).
+    These are assembly-owned outputs, not separate task targets; cleanup and
+    cache packing share this inventory so a hit restores every spring component
+    referenced by ch-channel.SLDASM.
     """
-    return sorted((CAD_OUT / "sldprt").glob("ch-vn-channel-spring-installed-stretch*.SLDPRT"))
+    return sorted(
+        path for pattern in _CHANNEL_SPRING_VARIANTS for path in CAD_OUT.glob(pattern)
+    )
+
+
+def _assembly_discovered_outputs(stem: str) -> tuple[str, ...]:
+    """Globs (under cad/out) of an assembly's cache outputs that exist only once
+    its build has made them, so a tree that never built it, as a clean farm
+    worker, holds none at build start: a reuse matches the base archive's
+    members against the globs, not against this tree's files
+    (``_replay_shadow.DependentBuild.discovered``)."""
+    return _CHANNEL_SPRING_VARIANTS if stem == "ch_channel" else ()
 
 
 def _part_configuration_outputs(stem: str) -> list[Path]:
@@ -2718,13 +2738,15 @@ def _execution_identity(token: str) -> str:
 
 def _assembly_judged_sidecars(stem: str) -> tuple[Path, ...]:
     """What Python writes beside an assembly that its COM-conversation recording's
-    outcome compares byte for byte: every cache output but the models, the renders
-    and the input ledger (which names the build's inputs, not its result)."""
+    outcome compares byte for byte: every cache output but the models, their STL
+    exports (SolidWorks writes other STL bytes run to run, #2737), the renders and
+    the input ledger (which names the build's inputs, not its result)."""
     skipped = {Path(_sldasm(stem)), _png_dir(stem), _input_ledger(stem)}
     return tuple(
         path
         for path in map(Path, _assembly_cache_outputs(stem))
-        if path not in skipped and path.suffix.lower() not in (".sldasm", ".sldprt")
+        if path not in skipped
+        and path.suffix.lower() not in (".sldasm", ".sldprt", ".stl")
     )
 
 
@@ -3274,13 +3296,15 @@ def build_or_refresh(stem, dependencies, changed, targets):
         base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
 
     asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
-    # HARMONIC_COM_REPLAY's assembly mode ``audit`` (the default) or ``reuse``
+    # HARMONIC_COM_REPLAY's assembly mode ``reuse`` (the default) or ``audit``
     # in a cache role that can publish: before the seat, the nearest FULL
     # build's recording made on the same children and bound to its archive may
     # make that archive this key's outputs, with SolidWorks absent
-    # (_replay_shadow.reuse_attempt). ``audit`` serves none: its would-be reuse
-    # builds on the seat below and is judged against that base afterwards. A
-    # POST_ASSEMBLY hook changes the model outside any recording: no attempt.
+    # (_replay_shadow.reuse_attempt). ``audit`` serves none, nor does ``reuse``
+    # outside DEPENDENT_SERVE_LABELS or for one key in DEPENDENT_AUDIT_ONE_IN:
+    # such a would-be reuse builds on the seat below and is judged against that
+    # base afterwards. A POST_ASSEMBLY hook changes the model outside any
+    # recording: no attempt.
     reuse = None
     if probed == "miss" and not POST_ASSEMBLY.get(stem):
         dependent = _replay_shadow.DependentBuild(
@@ -3295,6 +3319,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
             functools.partial(_com_process_inputs, label),
             lambda: _assembly_dependent(stem, asm_script),
             rewritten=(ledger,),
+            discovered=_assembly_discovered_outputs(stem),
         )
         with _replay_shadow.reuse_attempt(dependent) as reuse:
             if reuse.decision is _replay_shadow.ReuseDecision.REUSED and (

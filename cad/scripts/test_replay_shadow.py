@@ -4337,7 +4337,11 @@ class _AssemblyShop(_Shop):
         return key
 
     def assembly(
-        self, *, key: str | None = None, rewritten: tuple[Path, ...] | None = None
+        self,
+        *,
+        key: str | None = None,
+        rewritten: tuple[Path, ...] | None = None,
+        discovered: tuple[str, ...] = (),
     ) -> shadow.DependentBuild:
         return shadow.DependentBuild(
             shadow.BuildKind.ASSEMBLY,
@@ -4351,6 +4355,7 @@ class _AssemblyShop(_Shop):
             lambda: dict(_PINS),
             self.dependent,
             rewritten=(self.ledger,) if rewritten is None else rewritten,
+            discovered=discovered,
         )
 
     def attempt(self, **options: Any) -> shadow.Reuse:
@@ -4436,6 +4441,48 @@ def test_an_inert_assembly_edit_replays_on_its_children_and_is_reused(
         f"[com-replay] {_ASSEMBLY_LABEL}: reuse=reused | base={base.key[:12]}"
     )
     assert logged["error"] == []
+
+
+def test_an_archive_matches_what_the_assembly_build_discovers_by_glob(
+    blob, tmp_path, monkeypatch
+):
+    # #2801: the channel's spring variants exist only once its build made
+    # them, so a clean farm worker's inventory lists none at build start, and
+    # every archive member of theirs was outside the declared outputs.
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    variant = "sldprt/sh-widget-stretch00.SLDPRT"
+    # Unrelated files: one beside the variants, one below a variant's name.
+    strangers = ("sldprt/other.SLDPRT", "sldprt/sh-widget-stretch01/other.SLDPRT")
+    glob = ("sldprt/sh-widget-stretch*.SLDPRT",)
+
+    def base(*made: str) -> None:
+        """A base whose build also made ``made``, then a clean tree."""
+        written = {rel: f"made {rel}".encode() for rel in made}
+        for rel, data in written.items():
+            (shop.out / rel).parent.mkdir(parents=True, exist_ok=True)
+            (shop.out / rel).write_bytes(data)
+            shop.outputs.append(shop.out / rel)
+        outputs = {rel: _sha(data) for rel, data in written.items()}
+        com = {"sldasm/sh-widget.SLDASM": _sha(_NATIVE), **outputs}
+        _replay_assembly(monkeypatch, shop, com_outputs=com)
+        shop.base()
+        for rel in made:
+            (shop.out / rel).unlink()
+            shop.outputs.remove(shop.out / rel)
+        shop.edit(audited=False)
+
+    base(variant)
+    declined = shop.attempt()
+    assert declined.value == "declined:output_set_differs", declined.detail
+    assert f"declared outputs: {[variant.casefold()]}" in declined.detail
+    assert shop.attempt(discovered=glob).value == "audited"
+    # A member no glob matches still declines.
+    base(variant, *strangers)
+    declined = shop.attempt(discovered=glob)
+    assert declined.value == "declined:output_set_differs", declined.detail
+    folded = sorted(rel.casefold() for rel in strangers)
+    assert f"declared outputs: {folded}" in declined.detail
 
 
 def test_an_assembly_replay_that_raises_says_why_in_its_detail_and_line(
