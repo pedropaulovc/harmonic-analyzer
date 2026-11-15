@@ -3778,9 +3778,26 @@ def _adopt_byte_keyed_review(
     again on ink that has a verdict. Remove once main's sheets are re-published.
     """
     legacy = _machinist_review_byte_key(stem, profile)
-    if legacy == key or not _cache.restore(legacy, [directory], label):
+    if legacy == key:
         return False
-    _cache.store(key, [directory], label)
+    try:
+        if not _cache.restore(legacy, [directory], label):
+            return False
+    except _cache.RestoreLocked as error:
+        # The same drawing error policy as a locked probe of the ink key.
+        raise OSError(str(error)) from error
+    outcome = _cache.store(key, [directory], label)
+    if outcome == "lost":
+        # Another build published this ink first; its reports are canonical.
+        shutil.rmtree(directory)
+        if not _cache.restore(key, [directory], label):
+            raise RuntimeError(
+                f"{label}: lost cache publication but canonical reports "
+                "could not be restored"
+            )
+    _cache.record_event(
+        "review_adopted_byte_key", label, key, byte_key=legacy, store=outcome
+    )
     return True
 
 

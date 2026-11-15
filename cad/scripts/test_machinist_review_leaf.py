@@ -1357,26 +1357,34 @@ def test_cache_hit_replaces_instead_of_mixing_previous_evidence(action):
     assert action.calls["store"] == 0
 
 
+def _write_aggregate(directory, verdict):
+    directory.mkdir(parents=True)
+    (directory / "probe.aggregate.json").write_text(json.dumps({
+        "name": "probe", "kind": "part", "verdict": verdict,
+        "gating_count": 0 if verdict == "SHIP" else 2, "error": None,
+    }), encoding="utf-8")
+
+
 @pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
 def test_verdict_published_under_the_byte_key_is_adopted_not_rolled_again(
     action, monkeypatch, verdict
 ):
     dodo = action.dodo
     byte_key = dodo._machinist_review_byte_key("probe", action.profile)
-    restored = []
+    restored, events = [], []
 
     def restore(key, outputs, _label):
         restored.append(key)
         if key != byte_key:
             return False
-        outputs[0].mkdir(parents=True)
-        (outputs[0] / "probe.aggregate.json").write_text(json.dumps({
-            "name": "probe", "kind": "part", "verdict": verdict,
-            "gating_count": 0 if verdict == "SHIP" else 2, "error": None,
-        }), encoding="utf-8")
+        _write_aggregate(outputs[0], verdict)
         return True
 
     monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._cache, "record_event",
+        lambda event, label, key, **extra: events.append((event, label, key, extra)),
+    )
     dodo._cached_machinist_review_action(
         "probe", MachinistReviewMode.LEARN, action.profile
     )
@@ -1384,6 +1392,31 @@ def test_verdict_published_under_the_byte_key_is_adopted_not_rolled_again(
     assert action.calls["run"] == 0
     assert action.calls["store"] == 1
     assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
+    assert events == [(
+        "review_adopted_byte_key", "check:machinist_review:probe", "a" * 64,
+        {"byte_key": byte_key, "store": "stored"},
+    )]
+
+
+def test_adoption_that_loses_publication_takes_the_winners_verdict(action, monkeypatch):
+    dodo = action.dodo
+    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
+    restored = []
+
+    def restore(key, outputs, _label):
+        restored.append(key)
+        _write_aggregate(outputs[0], "SHIP" if key == byte_key else "FIX")
+        return True
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
+    dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert restored == [byte_key, "a" * 64]
+    assert action.calls["run"] == 0
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == "FIX"
 
 
 def test_forced_refresh_does_not_adopt_the_byte_keyed_verdict(action, monkeypatch):
