@@ -2120,18 +2120,17 @@ def revoke_refreshed(part: PartBuild | DependentBuild) -> bool:
 
 
 def _published(engine: str, part: PartBuild | DependentBuild) -> bool:
-    """Is a recording of ``part.key`` published? A part's manifest by its
-    name; an assembly's or drawing's under whichever children group it was
-    made on (:func:`children_group`; or none, published before groups), so by
-    listing the stem's manifests."""
-    if part.kind is BuildKind.PART:
-        _, manifest_name = blob_names(engine, part.name, part.key)
-        return _cache.read_sidecar(manifest_name) is not None
-    suffix = f"/{part.key}.json"
-    return any(
-        name.endswith(suffix)
-        for name, _ in _cache.list_sidecars(blob_prefix(engine, part.name))
-    )
+    """Is a recording of ``part.key`` published? Its manifest read by name
+    (``_cache.read_sidecar``, which raises when the cache cannot say, so a
+    revocation fails closed into :func:`revoke_refreshed`'s WARN): a part's;
+    an assembly's or drawing's under the children group of the models it
+    opens (:func:`children_group`; its key fixes them), or under none
+    (published before groups)."""
+    names = [blob_names(engine, part.name, part.key)[1]]
+    if isinstance(part, DependentBuild):
+        group = children_group(dict(part.describe().children))
+        names.insert(0, blob_names(engine, part.name, part.key, group)[1])
+    return any(_cache.read_sidecar(name) is not None for name in names)
 
 
 @contextlib.contextmanager
@@ -2884,10 +2883,13 @@ def after_build(
                     label=label,
                 )
                 record.update(outcome="error", error=repr(exc)[:EVIDENCE_CHARS])
+        # A dependent's audit is its own judgement (_audit_dependent); a
+        # part's is its shadow's, which never sets ``audit``.
         reuse = recording.reuse
         if (
             reuse is not None
             and reuse.decision is ReuseDecision.AUDITED
+            and recording.kind is not BuildKind.PART
             and "audit" not in record
         ):
             record.update(

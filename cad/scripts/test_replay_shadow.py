@@ -2664,6 +2664,25 @@ def test_an_audited_build_that_took_a_seat_path_detour_revokes_nothing(
     assert again.value == "reused", again.detail
 
 
+def test_an_audited_part_is_judged_by_its_shadow_alone(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _Shop(tmp_path, monkeypatch)
+    shop.build()
+    shop.edit(audited=True)
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    shop.build(reuse=reuse)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    assert (record["reuse_decision"], record["outcome"]) == ("audited", "evaluated")
+    assert record["verdict"] == "noop" and not record["soundness_alarm"]
+    # The shadow judged the would-be reuse: no unjudged audit, its WARN or
+    # its span (an assembly's or drawing's, _unjudged).
+    assert not [field for field in record if field.startswith("audit")]
+    assert logged["warn"] == [] and spans.named("replay.audit ") == []
+    assert " audit=" not in logged["info"][-1]
+
+
 def test_a_build_on_another_solidworks_revision_is_not_judged_by_the_replay(
     blob, tmp_path, monkeypatch
 ):
@@ -4595,6 +4614,47 @@ def test_an_assembly_is_served_only_for_an_allowed_label_and_an_unaudited_key(
     assert reason("f" * 64) is None
     assert shop.attempt(key=second).value == "declined:forced_refresh"
     assert reason(second) == "forced refresh of a base"
+
+
+def test_a_forced_refresh_finds_an_assembly_base_by_name_and_fails_closed(
+    blob, tmp_path, monkeypatch, logged
+):
+    shop = _AssemblyShop(tmp_path, monkeypatch)
+    _replay_assembly(monkeypatch, shop)
+    base = shop.base()
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    monkeypatch.setattr(cache, "forced_refresh", lambda label: "suspect")
+
+    def reason(revoked: str) -> str | None:
+        marker = cache.fetch_sidecar(
+            shadow.revoked_name(_ENGINE, _ASSEMBLY_NAME, revoked)
+        )
+        return None if marker is None else json.loads(marker)["reason"]
+
+    # Read by its names, never listed: a listing that failed reads as empty.
+    monkeypatch.setattr(cache, "list_sidecars", lambda prefix: [])
+    assert shop.attempt(key=base).value == "declined:forced_refresh"
+    assert reason(base) == "forced refresh of a base"
+    # A base published before groups, under none.
+    legacy = "e" * 64
+    _, name = shadow.blob_names(_ENGINE, _ASSEMBLY_NAME, legacy)
+    assert cache.publish_sidecar(name, b"{}") == "stored"
+    assert shop.attempt(key=legacy).value == "declined:forced_refresh"
+    assert reason(legacy) == "forced refresh of a base"
+    # A manifest the cache cannot read is no answer: the revocation fails,
+    # in a WARN, never reads as unpublished.
+    read = cache._BlobBackend.get_sidecar
+
+    def unreadable(backend: Any, blob_name: str) -> bytes | None:
+        if "/manifest/" in blob_name:
+            raise RuntimeError("injected: 503 server busy")
+        return read(backend, blob_name)
+
+    monkeypatch.setattr(cache._BlobBackend, "get_sidecar", unreadable)
+    assert shop.attempt(key="f" * 64).value == "declined:forced_refresh"
+    assert reason("f" * 64) is None
+    [warned] = [m for m in logged["warn"] if "revocation failed" in m]
+    assert "injected: 503 server busy" in warned
 
 
 _SAME_DISPLAY = {"view_window": [1010, 678], "px_per_mm": 3.0}

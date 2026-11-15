@@ -3641,8 +3641,9 @@ The record carries `audit`, `audit_cause`, `audit_split`, `audit_outcome`,
 `audit_signals`, `audit_s` and `audit_base_key` (the span `replay.audit
 <label>` the same); the INFO line carries `audit=<judgement> base=<key>`. A
 forced refresh of an assembly key revokes it as a base only when a recording
-of it is published (a manifest of the key, grouped or not), and always the
-origin its `reused/` marker names.
+of it is published (its manifest read by name, under its children's group or
+none; a read the cache cannot answer fails the revocation in a WARN, never
+reads as unpublished), and always the origin its `reused/` marker names.
 
 Would-be reuses and their audits per stem:
 
