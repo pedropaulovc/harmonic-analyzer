@@ -110,11 +110,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         smooth_annulus_limit_mm3(THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 3.85),
     ),
     # MHA-PD-VN-52 guide screws: seed -1, then the grid -2..-10, alternating
-    # between the two guide rails.
+    # between the bottom rail (MHA-PD-27, odd) and the top rail (MHA-PD-11,
+    # even); the bottom rail's platen taps are transferred THROUGH at the same
+    # #4-40 size and depth, so both rails take one bound.
     **numbered_pairs(
         "sh-vn-brass-fillister-screw",
         range(1, 11, 2),
-        "pd-platen-guide",
+        "pd-platen-bottom-guide",
         smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
     ),
     **numbered_pairs(
@@ -122,15 +124,14 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         range(2, 11, 2),
         "pd-platen-guide",
         smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
-        second_number=2,
     ),
     # MHA-PD-VN-60 guide-lock screws (R9-31, R9-48): seeds -1/-2, then the grid
     # -3..-8; each 9.525 shank passes the 1.5875 (1/16 sheet) lock plate into
-    # the guide's rear through tap.
+    # the rail's rear through tap (bottom rail MHA-PD-27, top rail MHA-PD-11).
     **numbered_pairs(
         "pd-vn-guide-lock-screw",
         (1, 2, 4, 7),
-        "pd-platen-guide",
+        "pd-platen-bottom-guide",
         smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
     ),
     **numbered_pairs(
@@ -138,7 +139,17 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         (3, 5, 6, 8),
         "pd-platen-guide",
         smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
-        second_number=2,
+    ),
+    # The RackScrew members (-1..-4, placed before the disc screws) of
+    # MHA-SH-VN 91794A055 #0-80 x 1/4 (pd_feed_rack_screw_spec), heads on
+    # MHA-PD-27's counterbore floors 3.937 (.155) above the strip, through the
+    # rail's #51 clearance into the MHA-PD-26 strip's taps drilled 1.191:
+    # 6.35 - 3.937 = 2.413 in the strip.
+    **numbered_pairs(
+        "sh-vn-fillister-screw-91794a055",
+        range(1, 5),
+        "pd-feed-rack",
+        smooth_annulus_limit_mm3(1.524, 1.191, 6.35 - 3.937),
     ),
     # MHA-PD-VN-56 #8-32 x 5/8 (pd_vn_transgear_arm_plate_screw_spec; from the top of the
     # oval head's bevel, flush in the plate's countersink) through the 5.0038
@@ -200,13 +211,14 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     ): _RING_PRONG_SHARE * smooth_annulus_limit_mm3(2.413, 2.3876, 0.381),
-    # MHA-PD-VN-55 #0-80 x 1/4 (pd_vn_transgear_disc_screw_spec) through the hub
-    # flange's #51 (.067) clearance into the disc's 3/64 taps (pd_rack_pinion_spec),
-    # cut at assembly (R9-47) to 5.2832 under the head: 5.2832 - 2.3876 = 2.8956
+    # The DiscScrew members (-5..-7) of MHA-SH-VN 91794A055 #0-80 x 1/4
+    # (pd_transgear_disc_screw_spec) through the hub flange's #51 (.067)
+    # clearance into the disc's 3/64 taps (pd_rack_pinion_spec), cut at
+    # assembly (R9-47) to 5.2832 under the head: 5.2832 - 2.3876 = 2.8956
     # (.114) of the .118 face.
     **numbered_pairs(
-        "pd-vn-transgear-disc-screw",
-        range(1, 4),
+        "sh-vn-fillister-screw-91794a055",
+        range(5, 8),
         "pd-rack-pinion",
         smooth_annulus_limit_mm3(1.524, 1.191, 5.2832 - 2.3876),
     ),

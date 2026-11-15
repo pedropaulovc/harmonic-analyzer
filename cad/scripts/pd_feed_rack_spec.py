@@ -117,8 +117,8 @@ TOOTH_CENTRE_PHASE_X = FIRST_GAP_X - PITCH / 2.0
 # whole face; its ends lie flush with the rail's (and so the platen's). It is
 # set there against a rule when the rail's holes are struck from its taps at
 # MHA-PD-00 (FRONT_SET_BAND); the screws then return it to that place.
-FRONT_BEHIND_PLATEN = 1.0  # ~.04
-FRONT_SET_BAND = 0.25
+FRONT_BEHIND_PLATEN = 0.040 * MM_PER_IN
+FRONT_SET_BAND = 0.010 * MM_PER_IN
 
 # --- Rack-screw taps (drawing-guidelines.md rules 17, 18, 20) ----------------
 # Four #0-80 taps in the strip's flat top, each on a TOOTH centre (over a

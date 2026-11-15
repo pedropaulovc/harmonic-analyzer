@@ -141,7 +141,10 @@ if min(PLATEN_TAP_TOP_WALL_MIN, PLATEN_TAP_BOTTOM_WALL_MIN, LOCK_TAP_TOP_WALL_MI
 # from the front face. #51 through (close to the .060 screw), counterbored
 # Ø.110 from the top to the rack spec's floor (rail height less the
 # callout's counterbore depth: both .XXX, pd_feed_rack_spec.SCREW_FLOOR_BAND).
-SCREW_HOLE_X = rack.TAP_X
+# The rail is placed Ry180 (its native Front on the platen, as MHA-PD-11), so
+# its local x runs from the platen's +X end while the strip's runs from its
+# -X end: the stations mirror about the rail's length.
+SCREW_HOLE_X = tuple(sorted(GUIDE_LENGTH - x for x in rack.TAP_X))
 SCREW_HOLE_Z = rack.FRONT_BEHIND_PLATEN + rack.TAP_Z  # from the front face
 SCREW_HOLE_DIA = NUMBER_DRILL_MM["#51"]  # .067
 SCREW_CBORE_DIA = 0.110 * MM_PER_IN  # #35

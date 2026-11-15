@@ -73,7 +73,11 @@ def test_height_is_the_least_thousandth_that_keeps_every_tap_wall() -> None:
 
 
 def test_rack_screw_holes_take_the_stock_screw_on_the_rack_floor() -> None:
-    assert spec.SCREW_HOLE_X == rack.TAP_X
+    # The rail is placed Ry180 (as MHA-PD-11), so its local stations mirror
+    # about its length onto the strip's taps.
+    assert sorted(spec.GUIDE_LENGTH - x for x in spec.SCREW_HOLE_X) == pytest.approx(
+        rack.TAP_X
+    )
     assert spec.SCREW_HOLE_Z == pytest.approx(
         rack.FRONT_BEHIND_PLATEN + rack.RACK_THICKNESS / 2.0
     )
