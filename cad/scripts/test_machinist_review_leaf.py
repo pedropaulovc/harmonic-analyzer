@@ -1923,7 +1923,11 @@ def sweep(action, monkeypatch):
             return "miss"
         write(outputs[0], "SHIP", state["cached_at"])
         if state["carried"]:
-            (outputs[0] / "carried.json").write_text("{}", encoding="utf-8")
+            import _review_carry
+
+            carried = outputs[0] / _review_carry.CARRIED_FILE
+            carried.parent.mkdir(parents=True, exist_ok=True)
+            carried.write_text("{}", encoding="utf-8")
         return "hit"
 
     def run(cmd, *_args, **_kwargs):
