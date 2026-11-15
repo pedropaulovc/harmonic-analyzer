@@ -2125,12 +2125,15 @@ def _step_text(
             "SCREWS FROM THE GUIDE TOP, ENDS FLUSH, ITS FRONT FACE "
             f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S, SET AGAINST A RULE.",
             "CHECK: EVERY SCREW ENTERS ITS TAP BY HAND.",
-            "IF ONE DOES NOT, REFIT THE TRANSFER SCREWS, MAKE A NEW "
-            f"{n['pd-platen-bottom-guide']} GUIDE AND REPEAT FROM {s('rack-screwed', 3)}.",
+            f"IF EVERY SCREW ENTERS, SKIP {s('rack-screwed', 12)}-{s('rack-screwed', 14)}.",
+            "REMOVE THE RACK SCREWS AND THE RACK.",
+            f"SCREW THE TRANSFER SCREWS BACK INTO THE RACK'S TAPS PER {s('rack-screwed', 0)}.",
+            f"MAKE A NEW {n['pd-platen-bottom-guide']} GUIDE AND REPEAT FROM "
+            f"{s('rack-screwed', 3)}.",
             f"TIGHTEN THE {RACK_SCREWS} RACK SCREWS.",
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
             "DOES NOT SHIFT ON THE GUIDE.",
-            f"IF IT SHIFTS, REPEAT {s('rack-screwed', 9)}-{s('rack-screwed', 13)} "
+            f"IF IT SHIFTS, REPEAT {s('rack-screwed', 9)}-{s('rack-screwed', 16)} "
             f"WITH NEW {n[explode.RACK_SCREW]} SCREWS.",
         ),
         # The top guide's taps are tapped to MHA-PD-11's print; the bottom
