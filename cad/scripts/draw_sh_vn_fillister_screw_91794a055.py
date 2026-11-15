@@ -40,6 +40,14 @@ ITEM = "#0-80 x 1/4 FILLISTER HEAD SLOTTED SCREW"
 # literal so a renumbered MHA-PD-00 does not re-key this sheet;
 # test_sh_vn_fillister_screw_91794a055_drawing pins it to the key.
 CUT_STEP = 16
+# The stock-length witness stands left of the screw (its start is -HEAD_DIA),
+# so its dimension and AS-SUPPLIED STOCK LENGTH print there, clear of the
+# shank; the head height takes the right (machinist review, r3).
+SIDES = {
+    **supplier.SUPPLIER_REFERENCE_SIDES,
+    "SupplierStockLength": "left",
+    "SupplierHeadHeight": "right",
+}
 GENERAL_TEXT = (
     f"PURCHASED PART, VIEWS AS SUPPLIED. DISC SCREWS CUT PER MHA-PD-00 STEP {CUT_STEP}."
 )
@@ -62,7 +70,7 @@ async def build(adapter: Any) -> dict[str, str]:
             formats=supplier.SUPPLIER_REFERENCE_FORMATS,
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
-            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            sides=SIDES,
             settled_checks=supplier_checks,
         )
 
@@ -78,7 +86,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_margins=supplier_screw_margins(
             supplier.SUPPLIER_REFERENCE_DIMENSIONS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
-            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            sides=SIDES,
         ),
         supplier_dimensions=supplier_dimensions,
         configuration=CONFIGURATION,

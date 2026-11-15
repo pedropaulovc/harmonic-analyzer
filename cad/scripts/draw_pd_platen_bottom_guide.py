@@ -84,14 +84,14 @@ PNG = OUTPUTS.png
 # beside it, the isometric at 1:2 in the field over the right view.
 FRONT_CENTER = (0.190, 0.120)
 TOP_CENTER = (FRONT_CENTER[0], 0.160)
-RIGHT_CENTER = (0.370, 0.120)
+RIGHT_CENTER = (0.390, 0.120)
 ISO_CENTER = (0.355, 0.215)
 ISO_SCALE = (1, 2)
 ISO_NOTE_XY = (0.3245, 0.180)
 _LEFT_X = FRONT_CENTER[0] - GUIDE_LENGTH / 2000.0
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], 0.080),
-    "Height": (0.338, FRONT_CENTER[1]),
+    "Height": (0.354, FRONT_CENTER[1]),
     # The lock taps' stations stack under the view, the row left of it.
     "LockTap1X": (_LEFT_X + LOCK_TAP_X[0] / 2000.0, 0.104),
     "LockTap2X": (_LEFT_X + LOCK_TAP_X[1] / 2000.0, 0.098),
@@ -99,7 +99,12 @@ FRONT_KEEP = {
     "LockTap4X": (_LEFT_X + LOCK_TAP_X[3] / 2000.0, 0.086),
     "LockTapY": (_LEFT_X - 0.012, FRONT_CENTER[1]),
 }
-RIGHT_KEEP = {"Depth": (0.341, 0.085)}
+# The depth's limits and clearance text stand over the right view, clear of
+# the length's right extension line (machinist review, r3).
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.150)}
+# The height's .XXX band is half of the counterbore floor's band, which the
+# rack screws' worst engagement pays (pd_feed_rack_spec.SCREW_FLOOR_BAND).
+HEIGHT_CALLOUT = "SETS RACK-SCREW\nENGAGEMENT"
 # Both front-view tap callouts sit between the views, clear under the top
 # view (its underside ~0.155) so the counterbore leader into it runs past
 # them; the platen-tap leader takes the middle hole, right of the lock taps,
@@ -220,8 +225,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The depth's one-sided band names what it protects (rule 4).
-    set_dimension_callouts(adapter, annotations, {"Depth": GUIDE_DEPTH_CALLOUT})
+    # The depth's one-sided band and the height's .XXX band name what they
+    # protect (rule 4).
+    set_dimension_callouts(
+        adapter, annotations, {"Depth": GUIDE_DEPTH_CALLOUT, "Height": HEIGHT_CALLOUT}
+    )
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")

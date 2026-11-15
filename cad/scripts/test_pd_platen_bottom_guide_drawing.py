@@ -178,3 +178,20 @@ def test_build_cuts_three_native_hole_families_and_marks_the_print(
     assert marks == {
         (feature, frozenset(names)) for feature, names in spec.DRAWING_DIMENSIONS.items()
     }
+
+
+def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
+    # The front view's right end, where the length's extension line drops.
+    rail_end = drawing._LEFT_X + spec.GUIDE_LENGTH / 1000.0
+    right_left = drawing.RIGHT_CENTER[0] - spec.GUIDE_DEPTH / 2000.0
+    # ~2.8 mm per character at the sheet's text height (r3 render).
+    half_text = 0.0028 * max(
+        len(line) for line in drawing.HEIGHT_CALLOUT.splitlines()
+    ) / 2.0
+    height_x = drawing.FRONT_KEEP["Height"][0]
+    assert rail_end < height_x - half_text
+    assert height_x + half_text < right_left
+    # The depth's text stands over the right view, above the front view's top.
+    depth_x, depth_y = drawing.RIGHT_KEEP["Depth"]
+    assert depth_x == drawing.RIGHT_CENTER[0]
+    assert depth_y > drawing.FRONT_CENTER[1] + spec.GUIDE_HEIGHT / 1000.0

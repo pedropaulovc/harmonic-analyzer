@@ -19,6 +19,7 @@ import pd_feed_rack_screw_spec as rack
 import pd_transgear_disc_screw_spec as screw
 import sh_vn_fillister_screw_91794a055_spec as shared
 from _fastener_catalog import FASTENERS
+from _supplier_screw_layout import supplier_screw_lane_plan
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91794A055 as entry
 from _mcmaster_91794a055 import FILLISTER_SIZE
@@ -526,6 +527,17 @@ def test_the_sheet_shows_the_supplied_rack_screw_with_every_catalogue_reference(
     assert "SupplierStockLength" in {name for name, *_ in annotated["dimensions"]}
     assert annotated["formats"] is supplier.SUPPLIER_REFERENCE_FORMATS
     assert annotated["starts"] is supplier.SUPPLIER_REFERENCE_STARTS
+    # The stock-length dimension stands on its witness's side of the screw,
+    # so neither it nor its qualifier crosses the shank (machinist review r3).
+    witness_x = supplier.SUPPLIER_REFERENCE_STARTS["SupplierStockLength"][0]
+    assert witness_x < -supplier.SHANK_DIA / 2.0
+    assert annotated["sides"]["SupplierStockLength"] == "left"
+    plan = supplier_screw_lane_plan(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=annotated["sides"],
+    )
+    assert plan["SupplierStockLength"][0] == "left"
     (settled,) = seen["settled_checks"]
     settled()
     assert supplier.SHANK_LEN == pytest.approx(0.25 * 25.4)

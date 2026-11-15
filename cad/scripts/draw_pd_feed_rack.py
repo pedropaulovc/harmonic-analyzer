@@ -34,6 +34,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -344,6 +345,11 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         add_property_linked_note(adapter, property_name, *position, char_height=NOTE_HEIGHT)
     _add_sheet_notes(adapter, front)
+    # The shaded isometric's taps need their cosmetic threads imported for
+    # finalize's precise Shaded With Edges (cosmetic_threads read False
+    # without it, r2 and r3), before the cleanup below so any label the
+    # import pins is counted then (draw_dt_cone_tip_gear_tl_cutter_bar).
+    import_cosmetic_threads(adapter, iso)
     # SolidWorks pins its own "Tapped Hole" note beside a tap's native callout;
     # the callout already states the thread.
     removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
