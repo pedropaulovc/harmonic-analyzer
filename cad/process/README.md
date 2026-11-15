@@ -103,9 +103,13 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
   12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row;
 - the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
-  and 2026-11-08, #2315): a 4130-N `[[stock]]` row of form `round_tube`
-  (OnlineMetals 7322, one 24 in cut), read by `test_sm_gooseneck_drawing.py`
-  against the bent tube's developed length plus its ~2 in tail.
+  2026-11-08, #2315, and 2026-11-14, #2401): a 4130-N `[[stock]]` row of form
+  `round_tube` (OnlineMetals 7322, one 36 in cut with about 11 in for a trial
+  bend), read by `test_sm_gooseneck_drawing.py` against the bent tube's
+  developed length plus its ~2 in arm-end tail and ~1 in at the foot, and the
+  shop-made bend form it is
+  bent on (`fixtures.sm-gooseneck-bend-form`, no toleranced size: the radius
+  is a reference);
 - the leadscrew kit's hacksaw (`tools.kit-hacksaw`) and 3/16 in-body 82°
   countersink (`tools.kit-countersink-82`), not owned (HA #2740);
 

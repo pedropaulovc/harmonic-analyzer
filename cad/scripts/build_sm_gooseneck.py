@@ -1,10 +1,12 @@
 r"""Build MHA-SM-01, the gooseneck: a bent 1/2 in tube.
 
 Owner rulings 2026-10-27 (#1951): the gooseneck is 1/2 in x 0.065 in 4130-N
-seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Owner rulings
-2026-11-08 (Pedro), #2315: MHA-SM-01 is the bent tube ALONE.  It is bent with
-a tail, then its arm end is sawn and faced to TUBE_END_X; it is polished bare,
-oiled or waxed, with no torch work.  The end plug that carries the shoulder
+seamless tube, bent R3.0.  Owner rulings 2026-11-08 (Pedro), #2315: MHA-SM-01
+is the bent tube ALONE, bent with a tail; it is polished bare, oiled or
+waxed, with no torch work.  Owner ruling 2026-11-14 (Pedro), #2401: it is
+bent on a simple form and the radius is a reference; both ends are sawn and
+faced after the bend, to the overall height and reach.  The end plug that
+carries the shoulder
 screw's tap is its own part, MHA-SM-05 ``sm-gooseneck-end-plug``, bonded into
 the arm end at MHA-SM-00; the reference machine has no leg sleeve, so the
 bare leg is the post MHA-FR-02's hub bore takes.  Decimal-inch document and
@@ -54,6 +56,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -77,6 +80,7 @@ from sm_gooseneck_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    OVERALL_HEIGHT_TOLERANCE_MM,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
@@ -166,22 +170,28 @@ def _author_reference_dimensions(adapter) -> None:
     reference, untoleranced (the drawing imports them as they are).
 
     ``ShowParenthesis`` brackets the whole text block, so a reference that
-    carries a callout below (the tube's stock wall) would read its callout as
-    reference too (machinist review of 6b67c9516).  That one brackets only its
-    value with a "(" prefix and ")" suffix, carrying SolidWorks' own
-    "<MOD-DIAM>" token since a custom prefix replaces the Ø glyph."""
-    open_paren = "(<MOD-DIAM>"
+    carries a callout below (the tube's stock wall, the bend's "TUBE
+    CENTERLINE") would read its callout as reference too (machinist review
+    of 6b67c9516).  Those bracket only their value with a "(" prefix and ")"
+    suffix.  A custom prefix replaces SolidWorks' own glyph, so each carries
+    it: the Ø as SolidWorks' "<MOD-DIAM>" token, the radius as the letter R
+    (pd_guide_lock's "4X R", farm run 20261012T061737079Z printed "4X 1.8"
+    without it)."""
+    open_parens = {"TubeOdReference": "(<MOD-DIAM>", "BendPath": "(R"}
     for feature, names in REFERENCE_DIMENSIONS.items():
         resolved = _named_dimensions(adapter, feature, set(names))
         for name in names:
             display, _dimension = resolved[name]
             if name in DIMENSION_CALLOUTS.get(feature, {}):
-                display.SetText(1, open_paren)  # swDimensionTextPrefix
+                existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+                open_paren = open_parens[feature]
+                display.SetText(1, open_paren)
                 display.SetText(2, ")")  # swDimensionTextSuffix
-                if (str(display.GetText(1)), str(display.GetText(2))) != (
-                    open_paren,
-                    ")",
-                ):
+                applied = (str(display.GetText(1)), str(display.GetText(2)))
+                _telemetry.info(
+                    f"{name}@{feature}: reference prefix {existing!r} -> {applied[0]!r}"
+                )
+                if applied != (open_paren, ")"):
                     raise RuntimeError(
                         f"{name}@{feature}: reference brackets did not persist"
                     )
@@ -723,6 +733,16 @@ async def build(adapter) -> dict[str, str]:
     # its wall callout, so _author_reference_dimensions writes its
     # "(<MOD-DIAM>" prefix.
     _author_reference_dimensions(adapter)
+    # The foot's loose band (spec OVERALL_HEIGHT_TOLERANCE_MM), native on the
+    # overall height's source dimension; the .XX row would hold it to ±.01.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "OverallReference",
+        "OverallHeight",
+        OVERALL_HEIGHT_TOLERANCE_MM,
+        places=DRAWING_PRECISION["OverallReference"]["OverallHeight"],
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.

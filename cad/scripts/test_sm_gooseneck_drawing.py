@@ -219,19 +219,28 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     assert wall.replace(f"({stock_wall})", "").count(stock_wall) == 0
 
 
-def test_references_and_the_governing_arm_size() -> None:
-    # The tube's stock Ø and the overall height are references; the arm end
-    # is sawn and faced after the bend (#2315), so the overall reach to real
-    # faces governs and the arm straight to the bend's tangent is reference.
+def test_references_and_the_governing_end_sizes() -> None:
+    # Owner ruling 2026-11-14 (Pedro), #2401: only where the tube's two ends
+    # finish matters.  Both ends are sawn and faced after the bend, so the
+    # overall height (foot face to arm top) and reach (faced arm end to the
+    # leg's outer side) govern; the bend radius and the lengths to its
+    # tangents are references, as is the stock Ø.
     assert spec.REFERENCE_DIMENSIONS == {
         "TubeOdReference": frozenset({"TubeOdRef"}),
-        "StationReference": frozenset({"ArmStraight"}),
-        "OverallReference": frozenset({"OverallHeight"}),
+        "StationReference": frozenset({"ArmStraight", "LegLength"}),
+        "BendPath": frozenset({"BendRadius"}),
     }
     for feature, names in spec.REFERENCE_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
     referenced = set().union(*spec.REFERENCE_DIMENSIONS.values())
-    assert {"LegLength", "BendRadius", "OverallReach"}.isdisjoint(referenced)
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert marked - referenced == {"OverallHeight", "OverallReach"}
+    # The reach sits at the title block's .XX row.  The height prints at two
+    # places (a one-place tie) but the foot only has to leave the leg
+    # spanning the hub, so its own band is looser than the .XX row's.
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallReach"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallHeight"] == 2
+    assert spec.OVERALL_HEIGHT_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
     # The tube Ø's reference line runs on the leg, below the bend tangent.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
@@ -261,11 +270,15 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
     monkeypatch.setattr(part, "_named_dimensions", named)
     part._author_reference_dimensions(None)
-    assert set(displays) == {"TubeOdRef", "ArmStraight", "OverallHeight"}
+    assert set(displays) == {"TubeOdRef", "ArmStraight", "LegLength", "BendRadius"}
     tube = displays["TubeOdRef"]
     assert (tube.GetText(1), tube.GetText(2)) == ("(<MOD-DIAM>", ")")
     assert not tube.ShowParenthesis
-    for name in ("ArmStraight", "OverallHeight"):
+    # A custom prefix replaces SolidWorks' own R, so the radius carries it.
+    radius = displays["BendRadius"]
+    assert (radius.GetText(1), radius.GetText(2)) == ("(R", ")")
+    assert not radius.ShowParenthesis
+    for name in ("ArmStraight", "LegLength"):
         assert displays[name].ShowParenthesis
         assert displays[name].text == {}
 
@@ -275,7 +288,8 @@ def test_note_states_the_bend_acceptance_without_method_or_sizes() -> None:
     assert 1 <= len(lines) <= 4
     assert all(re.match(r"\d\. ", line) for line in lines)
     notes = " ".join(spec.DRAWING_NOTES.split())
-    assert "OVALITY 5% MAX" in notes and "NO KINKS" in notes
+    # #2401: NO KINKS only; no fit or load at the bend needs an ovality limit.
+    assert "NO KINKS" in notes and "OVALITY" not in notes and "%" not in notes
     # Rule 7 (machinist review of the v49 release): the short acceptance
     # prints at its leader on the bend, the part's note without its number
     # and "BEND:", so no numbered note stands alone in the corner.
@@ -331,9 +345,17 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     assert row["od_mm"] == pytest.approx(geom.TUBE_DIA)
     assert row["wall_mm"] == pytest.approx(geom.WALL_T)
     # Leg, the bend's centreline arc and the arm straight, plus the owner's
-    # ~2 in tail (#2315), inside the supplier's -1/8 in cut tolerance.
+    # ~2 in tail at the arm end (#2315) and ~1 in to face the foot (both ends
+    # are faced after the bend, #2401), inside the supplier's -1/8 in cut
+    # tolerance, and about 11 in left over for a trial bend (owner ruling
+    # 2026-11-14, #2401).
     developed = geom.LEG_LENGTH + math.pi / 2.0 * geom.BEND_R + geom.TUBE_STRAIGHT
-    assert row["length_mm"] - 3.175 >= developed + 2.0 * geom.MM_PER_IN
+    part_length = developed + 3.0 * geom.MM_PER_IN
+    assert row["length_mm"] == pytest.approx(36.0 * geom.MM_PER_IN)
+    assert row["length_mm"] - 3.175 - part_length >= 10.0 * geom.MM_PER_IN
+    # The form it is bent on is a shop record, made in the shop, not bought.
+    form = equipment["fixtures"]["sm-gooseneck-bend-form"]
+    assert form["shop_made"] and not form["present"]
 
 
 def test_sheet_is_the_elevation_and_isometric_only() -> None:
@@ -387,9 +409,9 @@ def test_bend_acceptance_leader_lands_on_the_bend_clear_of_the_radius_line() -> 
     inner_r = (geom.BEND_R - geom.TUBE_DIA / 2.0) * drawing._S
     assert math.dist((tip_x, tip_y), centre) == pytest.approx(inner_r)
     assert tip_x > centre[0] and tip_y > centre[1]
-    # The two-row block (farm run 20261112T194827228Z: "OVALITY 5% MAX,"
-    # printed 39.4 mm wide, the leader leaving its right end ~6 mm under the
-    # block's top) stands left of the faced arm end and under the arm.
+    # The one-row block (~2.65 mm a glyph; farm run 20261112T194827228Z
+    # printed "OVALITY 5% MAX," 39.4 mm wide) stands left of the faced arm end
+    # and under the arm.
     left, top = drawing.BEND_NOTE_XY
     right = left + 0.00265 * max(map(len, drawing.BEND_ACCEPTANCE.splitlines()))
     arm_inner = drawing.ARM_AXIS_Y - geom.TUBE_DIA / 2.0 * drawing._S

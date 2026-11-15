@@ -5,19 +5,25 @@ this module adds what the print states: the marked model dimensions, their
 places and callouts, and the notes.  ``build_sm_gooseneck`` marks and authors
 them on the part; ``draw_sm_gooseneck`` places exactly ``DRAWING_DIMENSIONS``.
 
-Design (owner rulings 2026-10-27, #1951; 2026-11-08 (Pedro), #2315).
-MHA-SM-01 is 1/2 in x 0.065 in 4130-N seamless tube (OnlineMetals 7322), its
-OD and wall printed as stock, bent R3.0 on the 1/2 in x 3 in CLR die, then
-its arm end sawn and faced to length.  It is polished bare, oiled or waxed
-(the registry row's finish, in the title block).  The end plug bonded into
-the arm end is its own part and sheet (MHA-SM-05), and the leg carries no
-sleeve: the bare leg is the post MHA-FR-02's hub takes.
+Design (owner rulings 2026-10-27, #1951; 2026-11-08 (Pedro), #2315;
+2026-11-14 (Pedro), #2401).  MHA-SM-01 is 1/2 in x 0.065 in 4130-N seamless
+tube (OnlineMetals 7322), its OD and wall printed as stock, bent by hand on a
+simple shop-made form, then both ends sawn and faced.  It is polished bare,
+oiled or waxed (the registry row's finish, in the title block).  The end plug
+bonded into the arm end is its own part and sheet (MHA-SM-05), and the leg
+carries no sleeve: the bare leg is the post MHA-FR-02's hub takes.
 
-Every size is a native model dimension on the elevation: the leg length (foot
-to the bend's entry tangent), the bend's centreline radius, the overall reach
-from the faced arm end to the leg's outer side, and as references the tube's
-stock Ø, the arm straight (the bend's exit tangent to the faced end) and the
-overall height.  The one note is the bend's acceptance.
+Owner ruling 2026-11-14 (Pedro), #2401: "Loosen first ... make the radius
+reference ... bend on a simple form"; "no need to check only where the
+tube's two ends finish matters".  Every size is a native model dimension on
+the elevation.  The two that govern are where the ends finish, both to real
+faces: the overall height (foot face to the arm's top, ±.10: the leg slides
+in its hub, so the foot needs little) and the overall reach (faced arm end
+to the leg's outer side, the title block's .XX); the leg and arm stay square
+to each other at the title block's implied 90°.  The bend's
+centreline radius, the leg length and arm straight (each to a bend tangent),
+and the tube's stock Ø are references.  The one note is the bend's
+acceptance, NO KINKS.
 
 Decimal-inch sheet (#290): every size prints at the places its band needs
 (DRAWING_PRECISION, below); the arm end's station follows the calibrated
@@ -54,10 +60,11 @@ for _name, _mm, _inches in (
 ):
     if not math.isclose(_mm, _inches * geom.MM_PER_IN, abs_tol=1e-9):
         raise AssertionError(f"gooseneck {_name} no longer matches its stated stock")
-# R3.0 (76.2 mm) is the 1/2 in x 3 in CLR die's (owner ruling 2026-10-27); the
-# print states the radius, not the tool (rule 7, codjiflo on #1997).
+# R3.0 (76.2 mm) is the bend radius ruled from the photos (owner ruling
+# 2026-10-27, #1951); it prints as a reference (#2401), so the simple form it
+# is bent on carries no size of its own.
 if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
-    raise AssertionError("gooseneck bend radius is no longer the 3 in CLR die's")
+    raise AssertionError("gooseneck bend radius is no longer the ruled R3.0")
 
 # Callouts the PART authors on its dimensions, below the value (the drawing
 # imports and reads them back; a drawing-side SetText can write through to
@@ -105,31 +112,40 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # machinist review of main 31cea0b73, owner ruling 2026-10-31).  Its wall is
 # hidden on the elevation and cut by no section, so the reference Ø's callout
 # states the stock wall (rule 9).
-# The leg length lays out the bend on the straight stock and governs; the
-# overall height checks the finished bend from real faces (machinist review
-# r5 of farm run 20261101T004958072Z).  The arm end is sawn and faced AFTER
-# the bend (owner rulings 2026-11-08 (Pedro), #2315), so its governing size
-# is the overall reach, from the faced end to the leg's outer side, both real
-# faces; the arm straight to the bend's exit tangent, a point no one can
-# touch on the finished bend, is its reference (rule 10).
+# Owner ruling 2026-11-14 (Pedro), #2401: only where the tube's two ends
+# finish matters.  Both ends are sawn and faced after the bend, so the
+# governing sizes run between real faces: the overall height from the foot
+# face to the arm's top (it fixes where the foot finishes), and the overall
+# reach from the faced arm end to the leg's outer side (where the arm end
+# finishes).  The bend radius is free (reference), and with it the leg
+# length and the arm straight, each to a bend tangent no one can touch on the
+# finished bend (rule 10).
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
     "TubeOdReference": frozenset({"TubeOdRef"}),
-    "StationReference": frozenset({"ArmStraight"}),
-    "OverallReference": frozenset({"OverallHeight"}),
+    "StationReference": frozenset({"ArmStraight", "LegLength"}),
+    "BendPath": frozenset({"BendRadius"}),
 }
 # Where TubeOdReference's line runs on the leg: TUBE_OD_REF_SPAN long, centred
 # a quarter of the leg below the bend's entry tangent, level with the leg
 # length's text and well above the overall height's at the view's mid-height.
 TUBE_OD_REF_Y = round(geom.LEG_TOP - geom.LEG_LENGTH / 4.0, 1)
 TUBE_OD_REF_SPAN = 20.0
-# Inch places (#290).  The leg is a sawn tube length and the bend radius the
-# die's: the title block's .X band (drawing-guidelines.md rule 3).  The
-# overall reach sets the faced arm end, the spring eye's station less the end
-# plug's head: .XX.  The overall height prints at two places (the snapped leg
-# puts it at 19.650, a one-place tie), as does the arm straight.  The stock Ø
-# (REF) prints at its three-place size.
+# Inch places (#290).  The leg length and bend radius are references at
+# their one-place sizes.  The overall reach sets the faced arm end, the
+# spring eye's station less the end plug's head: the title block's .XX.  The
+# overall height prints at two places only because the snapped leg puts it
+# at 19.650, a one-place tie; its band is OVERALL_HEIGHT_TOLERANCE_MM, not the
+# .XX row's.  The arm straight (REF) prints at two places, the stock Ø (REF)
+# at its three-place size.
 ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius"})
 THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef"})
+# The foot only has to leave the straight leg spanning MHA-FR-02's hub bore
+# (build_sm_summing_assembly._assert_gooseneck_leg_spans_hub_bore): at the
+# settled setting the leg runs 5.36 in below the bore and its bend tangent
+# 9.3 in above it, so neither the foot's finish nor a hand bend's springback
+# comes near it.  The foot is held to ±.10, the band the leg's .X length
+# carried before #2401 (codjiflo on PR #2809: .XX ±.01 served no function).
+OVERALL_HEIGHT_TOLERANCE_MM = 0.10 * geom.MM_PER_IN
 
 
 def places(name: str) -> int:
@@ -150,10 +166,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
-# One line (drawing-guidelines.md rule 7): the bent form's acceptance.  The
-# sizes are on the features and the bend radius is native, so it names no
-# tool; the bend order (owner rulings 2026-11-08 (Pedro), #2315: bend with a
-# tail, then saw and face the arm end) is method, stated by the geometry: the
-# arm end's governing size runs from the finished bend's real faces.
-DRAWING_NOTES = "1. BEND: OVALITY 5% MAX, NO KINKS"
+# One line (drawing-guidelines.md rule 7): the bent form's acceptance.  No
+# fit or load at the bend needs an ovality limit (the spigot of MHA-SM-05
+# sits in the straight arm, and the hub slides on the straight leg), so the
+# 5% is gone (#2401).  NO KINKS stays: a kink creases the wall at the bend,
+# where the counter spring's moment on the arm is largest, and leaves a crease
+# the original's smooth bend does not have.  It is seen by eye, not measured.
+DRAWING_NOTES = "1. BEND: NO KINKS"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
