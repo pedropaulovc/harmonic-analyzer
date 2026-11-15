@@ -154,8 +154,13 @@ SM_LAST_BENCH_STEP = "8B"
 # Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):
 # the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
 # drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
+# The frame parts the steps name, by their registry numbers (rule 4: each
+# mate named by number; ENFORCE review on #2822 and two earlier PRs).
+_COLUMN = _config.parts("fr-tube-frame")["number"]
+_TOP_FRAME = _config.parts("fr-top-frame")["number"]
 _FRAME_REERECTED = (
-    f"FIT THE COLUMNS AND MHA-FR-02 BACK ON MHA-FR-01 PER {build.FRAME_ERECTED.text}."
+    f"FIT THE {_COLUMN} COLUMNS AND MHA-FR-02 BACK ON MHA-FR-01 PER "
+    f"{build.FRAME_ERECTED.text}."
 )
 _BUILT_APART = (
     f"DRIVE TRAIN: BUILD {build.DT_BENCH.text} AT THE BENCH.",
@@ -173,7 +178,7 @@ _REERECTED_HEAD = (
 _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "frame-built": (
         f"FRAME: FIT {build.FRAME_FITTED.text} ON A FLAT BENCH.",
-        "LEAVE THE COLUMNS AND MHA-FR-02 OFF MHA-FR-01 ONCE "
+        f"LEAVE THE {_COLUMN} COLUMNS AND MHA-FR-02 OFF MHA-FR-01 ONCE "
         f"{fr_steps.step_ref(build.FRAME_LIFTED_KEY)} LIFTS THEM, UNTIL "
         f"{_REERECTED_HEAD}.",
         f"FIT {build.LOOSE_CASTINGS.text} NOW, ON THE LOOSE MHA-FR-01 AND "
@@ -200,7 +205,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "HOOK EACH SPRING'S BOTTOM LOOP INTO ITS ANCHOR EYE.",
     ),
     "summing-levelled": (
-        "DROP THE MHA-SM-01 POST INTO THE TOP FRAME'S GOOSENECK HUB.",
+        f"DROP THE MHA-SM-01 POST INTO THE {_TOP_FRAME} TOP FRAME'S GOOSENECK HUB.",
         "HOOK THE MHA-SM-VN-51 LOWER LOOP INTO THE MHA-SM-VN-50 EYE.",
         f"SET EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR TO ZERO ON THE MHA-MS-00 "
         "STICK'S SCALE.",
@@ -216,7 +221,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"{_n('summing-levelled')}D-{_n('summing-levelled')}E.",
     ),
     "paper-drive-built": (
-        f"PAPER DRIVE: BUILD MHA-PD-00 ON THE FRONT COLUMNS, ITS STEPS "
+        f"PAPER DRIVE: BUILD MHA-PD-00 ON THE FRONT {_COLUMN} COLUMNS, ITS STEPS "
         f"1-{len(pd_steps.SEQUENCE)} IN ORDER.",
         f"LAY THE LOOSE {SPARE_SPROCKET_NUMBER} {SPARE_SPROCKET_CONFIG} SPARE "
         "SPROCKET SUPPLIED WITH MHA-PD-00 (LABELLED ON SHEET 3) FLAT ON THE "
@@ -244,7 +249,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     # the paper. Check 8 accepts the drum.
     "magnifier-bar-clamped": (
         "MAGNIFIER BAR: CLOSE THE MHA-SH-01/MHA-SH-02 CLAMP ARCS SUPPLIED WITH "
-        "MHA-MG-00 ROUND THE LEFT FRONT COLUMN, THE MHA-MG-08 BAR RUNNING TO "
+        f"MHA-MG-00 ROUND THE LEFT FRONT {_COLUMN} COLUMN, THE MHA-MG-08 BAR RUNNING TO "
         "THE RIGHT (FRONT VIEW), BOTH MHA-SH-VN-53 CLAMP SCREWS LOOSE.",
         "SET THE MHA-MG-08 BAR TOP TO ITS HEIGHT ABOVE THE RAISED DECK TOP "
         "(SHEET 1), READ WITH A RULE FROM THE DECK TOP.",
@@ -324,7 +329,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     ),
     "stick-parked": (
         "MEASURING STICK: PARK MHA-MS-00 ON THE MHA-FR-01 AS-CAST TOP BETWEEN "
-        "THE RIGHT EDGE OF THE RAISED DECK AND THE RIGHT-HAND COLUMNS (FRONT "
+        f"THE RIGHT EDGE OF THE RAISED DECK AND THE RIGHT-HAND {_COLUMN} COLUMNS (FRONT "
         "VIEW), AS SHEET 2 SHOWS IT: STICK FRONT TO REAR AND CENTRED, "
         "THUMBSCREW ON TOP.",
     ),
