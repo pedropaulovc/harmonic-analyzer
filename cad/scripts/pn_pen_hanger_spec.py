@@ -153,7 +153,11 @@ SLOT_WIDTH_BAND = (0.0508, 0.0)
 # setup: with the strap's back face on the mill table the cutter stands
 # square to the strap and one feed along it slots both plates, so the two
 # slots are in line however the bond left the plates, and the .002 slot band
-# rides the mill's travel, not the joint.  Deep enough that the printed
+# rides the mill's travel, not the joint.  The cutter's side push across a
+# standing plate is the largest load the bond ever sees (it pries the butt
+# open), so each plate is packed solid on both faces up to just below its
+# slot and the slots are taken in light passes (the part's `process` row):
+# the plate bears on the packing, not the bond.  Deep enough that the printed
 # reach and slot depth and the strap's stock band, with the corner radius at
 # its printed MAX below, still keep the rod's back corners off the
 # slot-corner fillets (guarded below).
