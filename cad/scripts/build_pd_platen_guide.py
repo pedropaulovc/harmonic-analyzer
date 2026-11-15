@@ -1,8 +1,9 @@
-r"""Reproduction script: platen guide rail (book ch. 22, pp. 54-55; 2 used).
+r"""Reproduction script: platen top guide rail (book ch. 22, pp. 54-55).
 
-One of the two black guide rails screwed across the FULL width of the platen
-back, above and below the bright wear band where the support bar slides --
-the platen HANGS on the bar by these. Each is fastened by a row of 5 screws
+The top of the two black guide rails screwed across the FULL width of the
+platen back, above the bright wear band where the support bar slides -- the
+platen HANGS on the bar by it; the bottom rail is MHA-PD-27
+(build_pd_platen_bottom_guide.py, #2410). It is fastened by a row of 5 screws
 whose heads show on the platen front (ch22 front photo; counterbored flush so
 the paper lies flat, shanks threading into the rail) and carries 2 lock
 plates (build_pd_guide_lock.py) that bridge behind the bar so the platen cannot

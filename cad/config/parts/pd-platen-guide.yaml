@@ -3,7 +3,8 @@ pd-platen-guide:
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-rolled steel
   finish: black oxide + oil
-  quantity: 2
+  # Owner rulings 2026-11-13 (#2410): the top rail only; the bottom rail is MHA-PD-27.
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in

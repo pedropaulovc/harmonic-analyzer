@@ -1,0 +1,148 @@
+"""Offline manufacturing contracts for the MHA-PD-27 platen bottom guide."""
+
+from __future__ import annotations
+
+import asyncio
+import math
+from pathlib import Path
+
+import pytest
+
+import _config
+import build_pd_platen_bottom_guide as builder
+import build_pd_platen_guide as top_builder
+import draw_pd_platen_bottom_guide as drawing
+import pd_feed_rack_spec as rack
+import pd_platen_bottom_guide_spec as spec
+import pd_platen_guide_spec as top_spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, drawing_specification_violations
+from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM
+from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
+from _test_stubbed_build import offline_adapter, stub_seat
+from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
+
+
+def test_identity_and_quantity() -> None:
+    row = _config.parts(builder.PART_NAME)
+    assert row["number"] == "MHA-PD-27"
+    assert row["quantity"] == 1
+    assert _config.parts("pd-platen-guide")["quantity"] == 1
+
+
+def test_it_keeps_the_top_rail_section_and_lock_geometry() -> None:
+    assert spec.GUIDE_LENGTH == PLATE_WIDTH
+    assert spec.GUIDE_DEPTH == top_builder.GUIDE_DEPTH
+    assert spec.GUIDE_DEPTH_BAND == top_spec.GUIDE_DEPTH_BAND
+    assert spec.LOCK_TAP_X == top_builder.HOLE_X
+    assert spec.LOCK_SCREW_DX == top_builder.LOCK_SCREW_DX
+    assert spec.LOCK_TAP_SPEC == top_spec.LOCK_TAP_SPEC
+    assert spec.PLATEN_TAP_SPEC == top_spec.TAPPED_HOLE_SPEC
+    # The lock taps stand where the bottom MHA-PD-11 rail's did above the
+    # platen, to the print's .XXX.
+    former = 10.5 + top_spec.TAP_Y
+    assert abs(spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM + spec.LOCK_TAP_Y - former) <= spec.BAND
+
+
+def test_underside_seats_the_rack_and_the_platen_taps_follow_mha_pd_02() -> None:
+    assert spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM < rack.RACK_HEIGHT
+    assert spec.PLATEN_TAP_X == GUIDE_HOLE_X
+    assert spec.PLATEN_TAP_Y == pytest.approx(
+        GUIDE_HOLE_Y[0] - spec.UNDERSIDE_ABOVE_PLATEN_BOTTOM
+    )
+    # The transferred row pays the strip's room and the crest set, so it is
+    # wider than a printed row.
+    assert spec.PLATEN_TAP_Y_BAND > spec.BAND + (
+        rack.PURCHASED_RACK_HEIGHT_MAX_MM - rack.RACK_HEIGHT
+    )
+
+
+def test_height_is_the_least_thousandth_that_keeps_every_tap_wall() -> None:
+    walls = (
+        spec.PLATEN_TAP_TOP_WALL_MIN,
+        spec.PLATEN_TAP_BOTTOM_WALL_MIN,
+        spec.LOCK_TAP_TOP_WALL_MIN,
+    )
+    assert min(walls) >= WALL_FLOOR_MM - 1e-9
+    lower = spec.GUIDE_HEIGHT - 0.0254
+    assert lower - spec.BAND - (spec.PLATEN_TAP_Y + spec.PLATEN_TAP_Y_BAND) - (
+        THREAD_MAJOR_MM["#4-40"] / 2.0 + spec.EDGE_BREAK + spec.TAP_MOUTH_BREAK
+    ) < WALL_FLOOR_MM
+    assert round(spec.GUIDE_HEIGHT / 25.4, 6) == round(spec.GUIDE_HEIGHT / 25.4, 3)
+    assert 0.0 <= spec.TOP_RISE < spec.BAND * 2.0
+
+
+def test_rack_screw_holes_take_the_stock_screw_on_the_rack_floor() -> None:
+    assert spec.SCREW_HOLE_X == rack.TAP_X
+    assert spec.SCREW_HOLE_Z == pytest.approx(
+        rack.FRONT_BEHIND_PLATEN + rack.RACK_THICKNESS / 2.0
+    )
+    assert spec.GUIDE_HEIGHT - spec.SCREW_CBORE_DEPTH == pytest.approx(rack.SCREW_FLOOR)
+    assert SHANK_DIA < spec.SCREW_HOLE_DIA < HEAD_DIA < spec.SCREW_CBORE_DIA
+    assert spec.SCREW_FLOAT_RADIAL >= math.hypot(
+        spec.HOLE_TRANSFER_BAND, spec.HOLE_TRANSFER_BAND
+    )
+    assert spec.SCREW_HOLE_SPEC.overrides_mm == {
+        "HoleDiameter": spec.SCREW_HOLE_DIA,
+        "CounterBoreDiameter": spec.SCREW_CBORE_DIA,
+        "CounterBoreDepth": spec.SCREW_CBORE_DEPTH,
+    }
+    assert spec.SCREW_HOLE_TAP_WALL_MIN >= WALL_FLOOR_MM
+
+
+def test_counterbore_front_wall_shortfall_is_a_declared_minor() -> None:
+    assert 0.0 < spec.SCREW_CBORE_FRONT_WALL_MIN < spec.SCREW_CBORE_FRONT_WALL_NOMINAL
+    declared = {
+        entry["id"]: entry["kind"]
+        for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]
+    }
+    if spec.SCREW_CBORE_FRONT_WALL_MIN < WALL_FLOOR_MM:
+        assert declared["RV-01"] == "minor"
+        assert spec.SCREW_CBORE_FRONT_WALL_TEXT in drawing.SCREW_CALLOUT_BELOW
+
+
+def test_print_marks_the_kept_dimensions_and_names_the_transfers() -> None:
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    assert marked == kept == spec.DRAWING_NOMINALS_MM.keys() == spec.DRAWING_PRECISION_BY_NAME.keys()
+    assert spec.DRAWING_PRECISION_BY_NAME["Height"] == 3
+    assert _config.parts("pd-platen")["number"] in drawing.PLATEN_CALLOUT_BELOW
+    assert _config.parts("pd-feed-rack")["number"] in drawing.SCREW_CALLOUT_BELOW
+    assert "TRANSFER" not in drawing.LOCK_CALLOUT_BELOW
+    assert "draw_pd_platen_bottom_guide.py" in PRECISION_MIGRATED_DRAWINGS
+    assert drawing.SPEC.part == "pd_platen_bottom_guide"
+    assert not drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename="draw_pd_platen_bottom_guide.py",
+    )
+
+
+def test_build_cuts_three_native_hole_families_and_marks_the_print(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, builder)
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    seat.wizard_holes.return_value.placement_drive_jobs = []
+    adapter = offline_adapter()
+    asyncio.run(builder.build(adapter))
+
+    holes = {call.kwargs["name"]: call for call in seat.wizard_holes.call_args_list}
+    assert set(holes) == {"LockHoles", "PlatenScrewHoles", "RackScrewHoles"}
+    lock = holes["LockHoles"]
+    assert tuple(lock.args[3]) == (0.0, 0.0, -1.0)
+    assert len(lock.kwargs["placement_dims"]) == len(spec.LOCK_TAP_X)
+    platen = holes["PlatenScrewHoles"]
+    assert "placement_dims" not in platen.kwargs
+    assert [p[1] for p in platen.args[2]] == [spec.PLATEN_TAP_Y] * 5
+    screws = holes["RackScrewHoles"]
+    assert screws.args[1] is spec.SCREW_HOLE_SPEC
+    assert tuple(screws.args[3]) == (0.0, 1.0, 0.0)
+    assert [p[1] for p in screws.args[2]] == [spec.GUIDE_HEIGHT] * 4
+    assert [-p[2] for p in screws.args[2]] == [spec.SCREW_HOLE_Z] * 4
+    marks = {
+        (call.args[1], frozenset(call.args[2]))
+        for call in seat.mark_dimensions_for_drawing.call_args_list
+    }
+    assert marks == {
+        (feature, frozenset(names)) for feature, names in spec.DRAWING_DIMENSIONS.items()
+    }

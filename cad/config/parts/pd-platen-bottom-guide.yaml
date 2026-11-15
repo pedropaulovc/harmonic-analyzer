@@ -1,0 +1,19 @@
+pd-platen-bottom-guide:
+  title: Platen Bottom Guide
+  number: MHA-PD-27
+  # Owner rulings 2026-11-13 (#2410): the platen's bottom guide rail, MHA-PD-11's
+  # .40-deep section grown downward so the MHA-PD-26 feed rack screws to its
+  # underside; MHA-PD-11 is now the top rail only.
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-rolled steel
+  finish: black oxide + oil
+  quantity: 1
+  tolerance_class: machined_block
+  process: "machined (steel); the five platen-screw taps are transferred from MHA-PD-02 and the four rack-screw holes struck from MHA-PD-26 at MHA-PD-00"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "top view, the four rack-screw counterbores' callout: WALL .050 MIN TO FRONT FACE"
+      finding: "counterbore wall to the front face .050 at the worst corner, below rule 17's .060 floor"
+      reason: "Delegated ruling 2026-11-14 (Main), pending owner confirmation (#2410): the four stepped holes are struck from the MHA-PD-26 strip's taps, so they follow the strip, set .04 behind the rail's front face (+-0.25 mm) with its taps on its centreline (.XXX) and the transfer (.001). The Ø.110 counterbore for the stock 91794A055 fillister head (Ø.096) at its drilled oversize, less the .010 edge break, leaves .050 worst at the top edge; .078 nominal (centred, no oversize or break). Moving the strip back would eat the 12T's full-depth margin over the strip's face, and a smaller counterbore leaves the head no clearance (pd_platen_bottom_guide_spec.SCREW_CBORE_FRONT_WALL_MIN)."
