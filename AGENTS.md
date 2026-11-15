@@ -1033,7 +1033,7 @@ cache role that can publish (`rw`) is recorded through
 unrecorded. Off the seat, it is then replayed against the nearest
 earlier recording and judged, as telemetry. `HARMONIC_COM_REPLAY=off` is the
 kill switch; the other values are `record`, `shadow` (observe only: nothing is
-reused), `audit` (replayed and judged, nothing served) and
+reused), `audit` (replayed and judged, nothing served: drawings' default) and
 `reuse` (the default for parts and assemblies). A recorder fault after a
 call's result is in hand stops recording and the build finishes as its own
 (nothing published); one that leaves the build's results untrustworthy exits
@@ -1101,8 +1101,8 @@ from that commit; locally `HARMONIC_COM_REPLAY=part=shadow`. See DEVELOPING.md
 drawing builds that run under `rw` are recorded through the same driver and
 engine (`_replay_shadow.plan_dependent`; a drawing keeps its artifact-stem
 argument, also in the exit-92 unrecorded re-run); REFRESH tiers and gates are
-not. Drawings are never replayed or reused (`shadow` is their highest mode; per
-kind: `HARMONIC_COM_REPLAY=drawing=off`); assemblies are audited (below). After the store, off the seat, the fresh
+not. Both kinds attempt a reuse before the build (below; per kind:
+`HARMONIC_COM_REPLAY=drawing=off`). After the store, off the seat, the fresh
 recording is diffed against the nearest earlier recording of the stem under
 the same cache salt made on the same children (every opened model's
 `.execution` token, transitively): `split=noop | diverged | children_changed`,
@@ -1116,7 +1116,7 @@ requests, answers, sidecar bytes; drawings: requests, answers, PDF ink). A
 WARN `output_nondeterminism` (`output_cause=seat_display` when the two logs'
 own answers report different drawing windows, else `answers`) or
 WARN `unexplained_output_divergence` (answers alike); a dependent's
-`SOUNDNESS ALARM` comes only from an assembly's audit (below). A recording left unpublished because another writer's bytes stand
+`SOUNDNESS ALARM` comes only from its audit (below). A recording left unpublished because another writer's bytes stand
 under its key (`publish=exists|lost`) and that is no confirmed `noop` is kept
 create-only outside `manifest/` as evidence (`evidence=`); a bundle whose files
 pass 512 MiB on disk is never built. The comparison runs before the leaf's
@@ -1132,8 +1132,10 @@ output, exit code or cache key. See DEVELOPING.md "Assemblies and drawings".
 before the seat, `reuse_attempt` replays the current source against the nearest
 recording of the stem made on the same children (every child's `.execution`
 token; a stem whose bound recordings were all made on other children declines
-`children_changed`), with those children's models copied from the output root
-into the replay's scratch (`com_replay.py replay --kind assembly`, `staged`).
+`children_changed`), with those children staged into the replay's scratch
+(`com_replay.py replay --kind assembly`, `staged`: a file the script's Python
+read copied, a model only SolidWorks opened an empty stub, each output-root
+file hashed once; a Python read of a stub declines `unjudged_input`).
 Every part check holds, and each model the replay opened must hold its token's
 bytes (`child_mismatch`); unlike a part's, document title counters the script
 echoes (`Assem3`) are accepted, counted (`title_echoes`) and audited. A replay
@@ -1153,6 +1155,36 @@ assemblies fleet-wide, set it to `ReplayMode.AUDIT` (`SHADOW`: no assembly
 replays at all) and launch from that commit; locally
 `HARMONIC_COM_REPLAY=assembly=audit`. See DEVELOPING.md
 "Assembly reuse".
+
+**Drawing reuse (`audit`, the default).** A drawing's attempt is an assembly's
+(`_cached_com_action(dependent=...)`), its children the model it draws. The
+driver alone (`com_replay.py replay --kind drawing -- <artifact stem>`) passes
+the artifact stem, stages the model drawn, and moves the paths
+`_drawing_types` names under the output root (the model, the sheet, PDF, PNG
+and layout report) into the replay's scratch once the recipe imports it: no
+engine or recipe change, so no drawing re-keys. Every Python output must be
+the base archive's bytes but the layout report, which may differ only by its
+audit's wall seconds (`summary.collect_s`/`total_s`, `layout_alike`). A served
+drawing (`dodo._reuse_drawing`) installs the base's sheet, PDF, PNG and
+layout report and stores them under the key (`_store_outputs`, as a build);
+no drawing label is in `DEPENDENT_SERVE_LABELS`, so every part drawing's
+would-be reuse is audited. The attempt runs before the seat and serves nothing
+(about 8 to 12 s per part-drawing miss, natively); `DRAWING_AUDIT_ONE_IN` (1:
+every key) samples it by key hash, the rest declining `unsampled` before any
+lookup. An audit whose PDFs, with the base's request multiset and text, differ
+only by ink moved at most `_com_outcome.SUB_RESOLUTION_INK_MM` (0.127 mm: each
+piece drawn on one side only lies that close to a piece of the same stroke on
+the other; a bound on how far ink moved, not on piece length, which let small
+circles move anywhere) reads `output_nondeterminism` (`sub_resolution_ink`)
+when the seat led, and revokes nothing. An assembly sheet (registry
+`source_kind` `assembly`, passed as `DependentBuild.source_kind`) declines
+`assembly_sheet` before any hash, lookup or replay, served or not: its builds
+do not repeat (the seat's component order, ray-hit order and title counters),
+so the 14 to 16 s replay could never confirm a base, and natively it alarmed
+and revoked on noise (2026-11-15 passes 2 and 3). Its post-build split is
+unchanged. `DEFAULT_MODES[BuildKind.DRAWING] = ReplayMode.SHADOW` stops
+drawing replays fleet-wide; locally `HARMONIC_COM_REPLAY=drawing=shadow`. See
+DEVELOPING.md "Drawing reuse".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the

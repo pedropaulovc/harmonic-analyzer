@@ -148,6 +148,24 @@ _VIEW_MOVES = frozenset(
         "IView.UseSheetScale",
     }
 )
+# A drawing's PDF difference with the base's requests that is only ink moved
+# too little to print apart, the text the same (:func:`sub_resolution_ink`):
+# the judgement's ``pdf_cause``.
+SUB_RESOLUTION_INK_CAUSE = "sub_resolution_ink"
+# How far (mm) sub-resolution ink may move: every path piece one side draws and
+# the other does not lies within this of a piece of the same stroke the other
+# side draws. 0.005 in: 1.5 px at 300 dpi, under the thinnest printed line
+# weight. 2026-11-15, three assembly sheets that issued their base's request
+# multiset: mg_magnifier_assembly (32 pieces, longest 0.080 mm, no pixel
+# differing at 300 dpi) and fr_frame_assembly (7 pieces, longest 0.092 mm, 2
+# pixels) are the seat's component order and a 1-ulp GetExtremePoint picking
+# another edge through one point; pd_paper_drive_assembly's cosmetic thread
+# texture, drawn otherwise and visibly (pieces up to 0.537 mm), stays out.
+SUB_RESOLUTION_INK_MM = 0.127
+# The cells (sheet metres) of :func:`_moved_within`'s index: at least twice the
+# bound, so a point within the bound of a piece is in the 3x3 cells around one
+# of the piece's samples, which lie a cell apart at most.
+_INK_CELL = max(1e-3, 2 * SUB_RESOLUTION_INK_MM / 1000.0)
 # The signals of :func:`outcome` per kind of build: a drawing holds no mass
 # property and writes no STL; an assembly writes no STL, and the outputs Python
 # writes beside it (its geometry proof, DOF manifest, BOM) are compared as
@@ -339,8 +357,9 @@ def judge(
     raised is told from one absent from both logs. ``title_echo``
     (:func:`title_echo`, ``None`` when not judged) is judged only for a
     :data:`TITLE_COUNTER_CAUSE`; ``pdf_cause`` (:data:`JAGGED_OUTLINE_CAUSE`
-    when :func:`jagged_outline`, else ``None``) only for a ``different``
-    ``pdf`` signal."""
+    when :func:`jagged_outline`, else :data:`SUB_RESOLUTION_INK_CAUSE` when
+    the ``requests`` signal is ``same`` and :func:`sub_resolution_ink`, else
+    ``None``) only for a ``different`` ``pdf`` signal."""
     streams, streams_error = _attempt(lambda: _streams(base, new))
     inks = _read_once(base, new, base_captures, new_captures)
     cause, cause_error = (None, streams_error)
@@ -398,6 +417,12 @@ def judge(
             found["judge_faults"].append({"step": "pdf_cause", "error": ink_error})
         if jagged:
             ink = JAGGED_OUTLINE_CAUSE
+        elif signals.get("requests") == Signal.SAME.value:
+            fine, fine_error = _attempt(lambda: sub_resolution_ink(*inks()))
+            if fine_error is not None:
+                found["judge_faults"].append({"step": "pdf_cause", "error": fine_error})
+            if fine:
+                ink = SUB_RESOLUTION_INK_CAUSE
     return {
         "truth_cause": cause,
         **found,
@@ -2136,7 +2161,8 @@ def pdf_inks(
     """Per PDF path the build had SolidWorks write, its last write's
     :func:`_pdf_ink`; ``None`` when a capture is missing or not the bytes
     the log describes. Read once per judgement: :func:`judge` hands both
-    builds' to the ``pdf`` signal and to :func:`jagged_outline`."""
+    builds' to the ``pdf`` signal, :func:`jagged_outline` and
+    :func:`sub_resolution_ink`."""
     found = _last_writes(conversation, captures, _PDF_SUFFIX)
     if found is None:
         return None
@@ -2275,6 +2301,96 @@ def jagged_outline(
                 return False
             rewiggled = True
     return rewiggled
+
+
+def sub_resolution_ink(a: dict[str, Any] | None, b: dict[str, Any] | None) -> bool:
+    """Whether two drawings' PDFs (``a``, ``b``: :func:`pdf_inks`) differ
+    only by ink moved too little to print apart: the same PDFs, each with the
+    same number of pages, page by page the same size and text runs, and every
+    path piece one of them draws and the other does not within
+    :data:`SUB_RESOLUTION_INK_MM` of a piece of the same stroke the other
+    draws on that page (:func:`_moved_within`). Nothing may appear, vanish or
+    move farther, however finely a curve is cut into pieces. Any doubt is
+    False."""
+    if not a or not b or a.keys() != b.keys():
+        return False
+    differs = False
+    for rel in sorted(a):
+        x, y = a[rel], b[rel]
+        if isinstance(x, str) or isinstance(y, str) or len(x) != len(y):
+            return False
+        for page_a, page_b in zip(x, y, strict=True):
+            if page_a[0] != page_b[0]:  # size
+                return False
+            if page_a[1] != page_b[1]:  # text runs
+                return False
+            left, right = Counter(page_a[2]), Counter(page_b[2])
+            if left == right:
+                continue
+            if not _moved_within(left - right, page_b[2]):
+                return False
+            if not _moved_within(right - left, page_a[2]):
+                return False
+            differs = True
+    return differs
+
+
+def _moved_within(moved: Counter[Any], other: Sequence[Any]) -> bool:
+    """Whether every piece of ``moved`` lies within
+    :data:`SUB_RESOLUTION_INK_MM` of one piece of ``other`` (one page's
+    pieces, :func:`_pdf_ink`'s) of the same stroke: width, colour, dash, fill
+    and stroke alike. Both its ends within the bound of that piece's segment
+    put all of it there, since the distance to a segment is convex along
+    another. Pieces of ``other`` are looked up in :data:`_INK_CELL` cells."""
+    bound = SUB_RESOLUTION_INK_MM / 1000.0
+    strokes = {_stroke(piece) for piece in moved}
+    cells: dict[tuple[int, int], list[tuple[Any, ...]]] = {}
+    for piece in set(other):
+        if _stroke(piece) not in strokes:
+            continue
+        (x0, y0), (x1, y1) = _piece_ends(piece)
+        steps = max(1, math.ceil(math.dist((x0, y0), (x1, y1)) / _INK_CELL))
+        samples = (
+            (x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps)
+            for i in range(steps + 1)
+        )
+        for cell in {_ink_cell(*sample) for sample in samples}:
+            cells.setdefault(cell, []).append(piece)
+    for piece in moved:
+        start, end = _piece_ends(piece)
+        column, row = _ink_cell(*start)
+        near = (
+            candidate
+            for dx, dy in itertools.product((-1, 0, 1), repeat=2)
+            for candidate in cells.get((column + dx, row + dy), ())
+        )
+        if not any(
+            _stroke(candidate) == _stroke(piece)
+            and _to_segment(start, candidate) <= bound
+            and _to_segment(end, candidate) <= bound
+            for candidate in near
+        ):
+            return False
+    return True
+
+
+def _stroke(piece: tuple[Any, ...]) -> tuple[Any, ...]:
+    """A path piece's stroke: its width, colour, dash, fill and stroke."""
+    return (piece[0][4], *piece[1:])
+
+
+def _ink_cell(x: float, y: float) -> tuple[int, int]:
+    return math.floor(x / _INK_CELL), math.floor(y / _INK_CELL)
+
+
+def _to_segment(point: tuple[float, float], piece: tuple[Any, ...]) -> float:
+    """The distance from ``point`` to a path piece's segment."""
+    (x0, y0), (x1, y1) = _piece_ends(piece)
+    dx, dy = x1 - x0, y1 - y0
+    length = dx * dx + dy * dy
+    along = ((point[0] - x0) * dx + (point[1] - y0) * dy) / length if length else 0.0
+    t = min(1.0, max(0.0, along))
+    return math.dist(point, (x0 + t * dx, y0 + t * dy))
 
 
 def _jagged_boxes(calls: Sequence[conv.Call]) -> list[tuple[float, ...]]:

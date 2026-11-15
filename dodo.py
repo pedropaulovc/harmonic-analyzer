@@ -2446,7 +2446,7 @@ def _cached_com_action(
     outputs: list[Path],
     log_stem: str,
     stamp: str | None = None,
-    recorded: Callable[[str], _replay_shadow.Recording | None] | None = None,
+    dependent: Callable[[str], _replay_shadow.DependentBuild] | None = None,
 ) -> None:
     """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
@@ -2467,11 +2467,15 @@ def _cached_com_action(
     the stamp instead of reopening the models. Every ``outputs`` path MUST live
     under ``cad/out`` -- the cache refuses to extract anything else.
 
-    ``recorded`` (drawings): given the key, the build's COM-conversation
-    recording or None (``_replay_shadow.plan_dependent``), asked only when it
-    builds on the seat; a recorded build runs under the recording driver, and
-    the recording is published and judged after the store, off the seat
-    (telemetry only)."""
+    ``dependent`` (drawings): given the key, the build as a
+    ``_replay_shadow.DependentBuild``. On a MISS, before the seat, the drawing mode
+    ``audit`` (the default) or ``reuse`` of HARMONIC_COM_REPLAY replays the current
+    source against the nearest recording made on the same children
+    (``_replay_shadow.reuse_attempt``): ``reuse`` may make the base's archive this
+    key's outputs with SolidWorks absent (:func:`_reuse_drawing`); ``audit`` serves
+    none, and the would-be reuse builds below and is judged against that base
+    after the store. A build on the seat runs under the recording driver, and the
+    recording is published and judged after the store, off the seat."""
     recording: _replay_shadow.Recording | None = None
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
@@ -2485,8 +2489,18 @@ def _cached_com_action(
         _farm_build(label, key, outputs)
         return
 
+    build = None if dependent is None else dependent(key)
+    reuse = None
+    if build is not None and probed == "miss":
+        with _replay_shadow.reuse_attempt(build) as reuse:
+            if reuse.decision is _replay_shadow.ReuseDecision.REUSED and (
+                _reuse_drawing(label, key, outputs, reuse)
+            ):
+                return
+
     with _com_seat(label) as waited:
         if _reprobe_under_seat(key, outputs, label, probed):
+            _replay_shadow.audit_unjudged(reuse, "a peer published the key first")
             return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
@@ -2496,8 +2510,10 @@ def _cached_com_action(
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _tag_cache_key(sp, key)
-            if recorded is not None:
-                recording = recorded(key)
+            if build is not None:
+                recording = _replay_shadow.plan_dependent(
+                    build.kind, build.describe, key, reuse=reuse
+                )
             _exec_com(
                 cmd if recording is None else recording.command,
                 label,
@@ -2509,6 +2525,42 @@ def _cached_com_action(
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
+    _store_outputs(label, key, outputs)
+    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
+    if recording is None:
+        _replay_shadow.audit_unjudged(reuse, "the build made no recording")
+
+
+def _reuse_drawing(
+    label: str, key: str, outputs: list[Path], reuse: _replay_shadow.Reuse
+) -> bool:
+    """:func:`_reuse_assembly` for a drawing: install the base's verified archive
+    (the sheet, PDF, PNG and layout report) as a HIT restores one, publish the
+    ``reused/`` marker naming the base, then store under ``key`` as a build does
+    (:func:`_store_outputs`). A drawing has no ``.execution`` token and
+    a reuse publishes no recording. False: a step before the store failed (WARN;
+    declined ``fault``), and the caller builds on the seat."""
+    with _telemetry.span(
+        f"task {label}", label=label, service=_stage_name(label)
+    ) as sp:
+        sp.set_attribute("cache", "reuse")
+        sp.set_attribute("com", "none")
+        _tag_cache_key(sp, key)
+        try:
+            reuse.install(outputs)
+            reuse.mark()
+        except Exception as exc:  # noqa: BLE001 - a reuse never costs a build
+            sp.set_attribute("cache", "reuse_failed")
+            reuse.fall_through(reuse.phase, exc)
+            return False
+    reuse.finish(_store_outputs(label, key, outputs))
+    return True
+
+
+def _store_outputs(label: str, key: str, outputs: list[Path]) -> str:
+    """Publish a COM leaf's outputs under ``key`` (span ``cache.store``), built or
+    reused: a forced refresh must store (``_cache.require_refresh_store``), and a
+    lost store adopts the winner's canonical outputs. Returns the outcome."""
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
@@ -2518,7 +2570,7 @@ def _cached_com_action(
         _cache.require_refresh_store(label, outcome)
     if outcome == "lost":
         _adopt_canonical(key, outputs, label)
-    _replay_shadow.after_build(recording, file_deps, ContentChecker._digest)
+    return outcome
 
 
 @_farm.leaf_action
@@ -2526,14 +2578,27 @@ def _cached_com_action(
 def _cached_drawing_action(stem: str) -> None:
     """Restore a matched part+drawing pair or build and publish the drawing."""
     spec = DRAWINGS_BY_NAME[stem]
+    label = f"drawing:{stem}"
+    file_deps = _drawing_file_deps(stem)
+    outputs = _drawing_cache_outputs(stem)
     _cached_com_action(
-        f"drawing:{stem}",
+        label,
         [sys.executable, str(spec.script.resolve()), spec.artifact_stem],
-        _drawing_file_deps(stem),
-        _drawing_cache_outputs(stem),
+        file_deps,
+        outputs,
         log_stem=f"drawing-{stem}",
-        recorded=lambda key: _replay_shadow.plan_dependent(
-            _replay_shadow.BuildKind.DRAWING, lambda: _drawing_dependent(stem), key
+        dependent=lambda key: _replay_shadow.DependentBuild(
+            _replay_shadow.BuildKind.DRAWING,
+            stem,
+            spec.script.resolve(),
+            key,
+            file_deps,
+            ContentChecker._digest,
+            outputs,
+            _resolved(spec.outputs["slddrw"]),
+            functools.partial(_com_process_inputs, label),
+            lambda: _drawing_dependent(stem),
+            source_kind=_replay_shadow.BuildKind(spec.source_kind),
         ),
     )
 

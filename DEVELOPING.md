@@ -2423,8 +2423,9 @@ component after the failure. `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the
 same requests, and requires an unnamed component to fail closed.
 
-Gates are not recorded; FULL assembly builds and drawings are, and nothing of
-theirs is reused ("Assemblies and drawings" below). Nothing under
+Gates are not recorded; FULL assembly builds and drawings are. An assembly's
+would-be reuse is served for four labels and audited for the rest; a
+drawing's is audited ("Assemblies and drawings" below). Nothing under
 `cad/out/replay` or `cad/out/rs` is a doit target, `file_dep` or cache-key
 input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 `_com_outcome.py`, `com_replay.py`) are in no recipe closure
@@ -2437,9 +2438,9 @@ input, and the four modules (`_replay_shadow.py`, `_com_conversation.py`,
 comma-separated items, each a mode for every kind (`shadow`) or for one kind
 (`part=`, `assembly=` or `drawing=`), a later item winning: `shadow,drawing=off`
 shadows parts and assemblies and leaves drawings unrecorded. Unset or empty is
-`_replay_shadow.DEFAULT_MODES`: parts `reuse`, assemblies `audit`, drawings
-`shadow`. A drawing never runs above `shadow` (`audit` and `reuse` shadow it).
-The modes, for a part (an assembly's: "Assembly reuse" below):
+`_replay_shadow.DEFAULT_MODES`: parts and assemblies `reuse`, drawings
+`audit`. The modes, for a part (an assembly's or drawing's: "Assembly reuse"
+and "Drawing reuse" below):
 
 | value | effect |
 | --- | --- |
@@ -3066,7 +3067,7 @@ All spans are on service `build-infra` and carry `label=<kind>:<stem>`:
 | `replay.publish <label>` | `replay.publish` (`stored`/`exists`/`skip`/`off`/`error`; for a build that stored no archive, the store's outcome: `lost`, `empty`, `error`, or `unstored`), `replay.bundle_bytes`, `replay.bound` |
 | `replay.base_lookup <label>` | `replay.lookup` (`found`/`none`/`budget`/`off`), `replay.listed`, `replay.read`; an assembly or drawing also `replay.candidates` and `replay.same_children` |
 | `replay.shadow <label>` | `replay.verdict`, `replay.verdict_class`, `replay.recorded`, `replay.served`, `replay.divergence_member`/`_field`/`_caller`/`_index`, `replay.inert_recorded`/`_served`/`_unserved`, `replay.substitutions`, `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals` (`mass:same,requests:same,...`), `replay.noop_judgement` (no-ops only), `replay.soundness_alarm`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path` (`detour`/`unaligned`/`not_read`/`answer`/`selection_kept`/`error`, judged diffs only), `replay.noop_unexplained_divergence`, `replay.noop_outcome_unknown`, `replay.false_divergence`, `replay.judge_fault`, `replay.judge_faults` (`truth_cause,stl,...`, faults only), `replay.wall_s` |
-| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.name_bound` (arrays bound by name, when any), `replay.output_nondeterminism`, `replay.output_cause` (`jagged_outline`/`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
+| `replay.split <label>` | an assembly or drawing, mode `shadow` ("Assemblies and drawings"): `replay.split`, `replay.candidates`, `replay.same_children`, `replay.children_unreadable` (`children_unknown` only), `replay.base_key`, `replay.differing_count`, `replay.differing_classes`, `replay.own_differing`, `replay.recipe_requests`, `replay.base_recipe_requests`, `replay.ground_truth`, `replay.truth_cause`, `replay.artefact_outcome`, `replay.outcome_signals`, `replay.noop_judgement` (`OutputJudgement`, no-ops only), `replay.title_echo`, `replay.name_bound` (arrays bound by name, when any), `replay.output_nondeterminism`, `replay.output_cause` (`jagged_outline`/`sub_resolution_ink`/`seat_display`/`answers`), `replay.unexplained_output_divergence`, `replay.display`, `replay.base_display`, `replay.seat_nondeterminism`, `replay.seat_path_divergence`, `replay.seat_path`, `replay.noop_outcome_unknown`, `replay.judge_fault`, `replay.judge_faults`, `replay.wall_s` |
 | `replay.evidence <label>` | an assembly's or drawing's evidence copy ("Evidence copies"): `replay.evidence` (`stored`/`exists`/`skip`/`off`/`error`) |
 
 The sidecar transfers inside them are `cache.sidecar.upload`,
@@ -3218,14 +3219,14 @@ Measured 2026-11-09..12, assemblies cost 34 seat-hours and drawings 35, and
 changed. Keying them on their children's content instead saves about 1%. The
 question part reuse answered for parts is open for them: when an assembly's or
 drawing's own closure changes and its children do not, how often does the new
-source issue the identical COM conversation? These recordings answer it. A
-drawing's are telemetry only: every output, exit code and cache key is an
-unrecorded build's. An assembly's are also the bases of assembly reuse
-("Assembly reuse" below), served for four labels and audited for the rest.
+source issue the identical COM conversation? These recordings answer it, and
+they are the bases of assembly and drawing reuse ("Assembly reuse" and
+"Drawing reuse" below): an assembly's served for four labels and audited for
+the rest, a part drawing's audited, an assembly sheet's not attempted.
 
 **What is recorded.** A FULL assembly build (`build_or_refresh`'s FULL tier,
 including the fallback after a failed EXPLODE) and every drawing build
-(`_cached_drawing_action`, through `_cached_com_action(recorded=...)`) run
+(`_cached_drawing_action`, through `_cached_com_action(dependent=...)`) run
 under the same driver as a part, planned by `_replay_shadow.plan_dependent`,
 which describes the build (script, argument, children, sidecars) only once the
 mode and cache role call for a recording; a description that raises builds
@@ -3291,13 +3292,14 @@ budget spent), is the record outcome `no_base`. The outcome is judged per kind
 `sidecars` (byte for byte); a
 drawing on `requests`, `answers` and `pdf`, the ink of every PDF SolidWorks
 wrote (text runs and path pieces per page, coordinates to 1 um), never its
-bytes, which carry the export's date. Nothing of these kinds is reused, so a
-`noop` is never an alarm; its `noop_judgement` (`OutputJudgement`) is one of:
+bytes, which carry the export's date. The split judges no reuse, so a `noop`
+is never an alarm there (a would-be reuse's audit, below, can be); its
+`noop_judgement` (`OutputJudgement`) is one of:
 
 | `noop_judgement` | meaning |
 | --- | --- |
 | `confirmed` | the base's assembly or drawing |
-| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
+| `output_nondeterminism` | another output, and the seat was seen to differ: `output_cause=jagged_outline` when the PDFs differ only by a jagged crop outline drawn again, else `sub_resolution_ink` when only by ink moved too little to print (below), else `seat_display` when the two recordings' drawing displays differ, else `answers` (SolidWorks answered some request otherwise); WARN |
 | `unexplained_output_divergence` | another output, though SolidWorks answered alike: nothing recorded explains it; WARN |
 | `noop_outcome_unknown` | a signal absent, or no comparison |
 
@@ -3418,6 +3420,44 @@ drawing's other sheets are bounded by it too. What remains possible is a real
 edit that re-routes a line of the same stroke, inside such a view, between the
 same two unchanged points.
 
+A drawing whose `pdf` signal differs, whose `requests` signal is `same` (the
+base's request multiset) and whose ink is no jagged outline gets
+`pdf_cause=sub_resolution_ink` (`_com_outcome.sub_resolution_ink`) only when
+every condition holds:
+
+- the same PDFs, each with the same number of pages and the same page sizes;
+- the same text runs on every page;
+- every path piece one side draws and the other does not lies within
+  `_com_outcome.SUB_RESOLUTION_INK_MM` of a piece of the same stroke (width,
+  colour, dash, fill) that the other side draws on that page: both its ends
+  within that distance of the other piece's segment, which puts the whole
+  piece there. The bound is 0.127 mm (0.005 in): 1.5 pixels at 300 dpi and
+  under the thinnest printed line weight.
+
+The bound is on how far ink moved, not on how long a piece is: `_pdf_ink` cuts
+every Bezier into 32 pieces, so a whole circle up to 5 mm across is pieces
+shorter than 0.127 mm, and a bound on length let it appear, vanish or move
+anywhere (#2804 review). Here a circle that is new, gone or moved by more than
+the bound keeps the whole difference. The other side's pieces are looked up in
+1 mm cells: 0.5 to 0.6 s for a five-page assembly sheet of 17,000 to 51,000
+pieces a page.
+
+On 2026-11-15 the native audits of two assembly sheets raised SOUNDNESS
+ALARMs that were the seat's, not the replay's. `mg_magnifier_assembly`
+issued the base's 32,014 requests in another order: the seat enumerated the
+components otherwise, a `GetExtremePoint` one ulp off reordered the ray hits,
+and the balloon pick took another edge through the same anchor point. Its ink
+moved by at most 0.054 mm, with no pixel differing at 300 dpi.
+`fr_frame_assembly` (26,770 requests, a title counter first) moved by at most
+0.018 mm, 2 pixels. The text was the same on every page.
+`pd_paper_drive_assembly`, also with the base's request multiset, drew a
+cosmetic thread's texture otherwise, ink moved by up to 0.92 mm and visible: it
+keeps its whole difference. Those three were the only ones of the 23
+same-children comparisons of assembly sheets in the 10 days before to issue
+the base's request multiset. What remains possible is a real edit that
+issues the same requests and changes no text and no stroke, and moves no ink
+by more than 0.127 mm.
+
 The recorder numbers handles in allocation order, so the elements of an array
 answer such as `IAssemblyDoc.GetComponents` are numbered in the seat's
 enumeration order. A script that reads every component's name and then visits
@@ -3478,7 +3518,11 @@ and sidecars, a drawing's PDF ink. A `noop` never has a seat path; a
 `out_inputs` (named output-root files the log did not capture as written: the
 models it opened, which a replay would have to stage at their recorded bytes)
 and `python_out_reads` (output-root files the script's own Python read, an
-upper bound). Their counts size a second engine identity for these kinds.
+upper bound). They measure the engine's replay alone: the driver's
+`--kind` replay closes the first three for assemblies and drawings (it passes
+the argument, moves `_drawing_types`' paths and stages the models; "Assembly
+reuse" and "Drawing reuse" below), and the reuse attempt's own checks judge
+the rest.
 
 **Bounds and cost.** Every recording name fits the farm's path budget with 32
 characters to spare (`test_every_dependent_recording_has_a_name_of_its_own_within_the_path_limit`);
@@ -3530,6 +3574,7 @@ dependencies
             title_echo=countif(echo),
             seat_display=countif(nondeterminism == "seat_display"),
             jagged_outline=countif(nondeterminism == "jagged_outline"),
+            sub_resolution_ink=countif(nondeterminism == "sub_resolution_ink"),
             answers=countif(nondeterminism == "answers"),
             unexplained_output=countif(unexplained)
             by kind, label
@@ -3564,11 +3609,22 @@ log did not capture (`replay_gaps`), so the engine replays an assembly
 unchanged: SolidWorks' answers for the models it opens come from the log. The
 script itself, though, checks in Python that each child's model exists under
 the redirected output root (`_assembly.place_component`'s `missing part`):
-`com_replay.py replay --kind assembly` first copies every output-root file the
-log read and did not write from the output root into the scratch root
-(`staged`, each one's SHA-256; one the script leaves unchanged is no Python
-output). Without it, both proof leaves declined `replay_error` after 15
-requests (2026-11-14). A replay that raised names the exception, its message
+`com_replay.py replay --kind assembly` first stages every output-root file the
+log read and did not write into the scratch root: a copy of each the
+script's Python read, and an empty stub of each model only SolidWorks opened,
+so a replay copies no large part of `cad/out` inside the reuse deadline
+(#2799). `staged` holds each output-root file's SHA-256, hashed once, which
+the child check below reads instead of hashing `cad/out` again; a stub or
+copy the script leaves unchanged is no Python output, and a Python read of a
+stub (`stub_reads`), whose bytes the replay never judged, declines
+`unjudged_input`. The split follows the base's recorded `reads`, which the
+recorder observes only inside the build window (`build(adapter)`), while the
+replay observes the whole script, import time and `run_build` before the
+window included: a model the script's Python reads only outside the window
+is staged as a stub, and its attempt declines (`unjudged_input` on the stub
+read, or `replay_error` on the empty bytes), never serves; before #2799 it
+was copied and could. Without staging, both proof leaves declined `replay_error`
+after 15 requests (2026-11-14). A replay that raised names the exception, its message
 and its innermost frame in its detail and INFO line
 (`<type>: <message> (at <file>:<line> in <function>)`,
 `_replay_shadow.script_error`; parts too).
@@ -3587,8 +3643,8 @@ and its innermost frame in its detail and INFO line
   declines `unjudged_input`.
 - **What SolidWorks opens.** Every output-root file the replay's log names
   that it did not capture (`solidworks_out_inputs`) must be a child's model,
-  and must hold the bytes its token names now (`child_mismatch` otherwise);
-  any other declines `unjudged_input`.
+  and must hold the bytes its token names now, as the replay staged it
+  (`staged`; `child_mismatch` otherwise); any other declines `unjudged_input`.
 - **Title counters.** An assembly script echoes the titles SolidWorks gives
   the documents it makes (`Assem3` in `SelectByID2` and `ActivateDoc3`; 16
   requests in `ms_measuring_stick`'s replay), which a build here would ask
@@ -3624,10 +3680,10 @@ judged as a part's replay no-op is (`noop_judgement`):
   (`[com-replay] SOUNDNESS ALARM assembly:<stem>: ...`), the base is revoked,
   and the INFO line carries `SOUNDNESS ALARM`.
 - `output_nondeterminism`: another output that the comparison explains by the
-  seat (a jagged crop outline, the drawing display), when the seat led: the
-  requests were the base's, or SolidWorks answered otherwise first (a
-  `response:` cause). Another output after a `request` divergence stays a
-  `soundness_alarm`. WARN, no revocation.
+  seat (a jagged crop outline, sub-resolution ink, the drawing display), when
+  the seat led: the requests were the base's, or SolidWorks answered
+  otherwise first (a `response:` cause). Another output after a `request`
+  divergence stays a `soundness_alarm`. WARN, no revocation.
 - `seat_nondeterminism` or `seat_path_divergence`: the base's assembly,
   reached through other answers or detours of the seat; recorded, no log.
 - `noop_unexplained_divergence` or `noop_outcome_unknown`: WARN.
@@ -3644,18 +3700,100 @@ of it is published (its manifest read by name, under its children's group or
 none; a read the cache cannot answer fails the revocation in a WARN, never
 reads as unpublished), and always the origin its `reused/` marker names.
 
-Would-be reuses and their audits per stem:
+#### Drawing reuse
+
+A drawing build reuses as an assembly does, through `_cached_com_action`'s
+`dependent` (a `DependentBuild` from `_cached_drawing_action`; its `native` is
+the sheet, it has no `.execution` token and no rewritten output). Its children
+are the model it draws: a part's token, or an assembly's and, transitively,
+its parts'. Three things the engine's replay lacks for a drawing the driver
+supplies (`com_replay.py replay --kind drawing -- <artifact stem>`), with no
+change to the engine or to any recipe, so no drawing re-keys:
+
+- **Its argument.** The artifact stem is passed after `--`, as `record` passes
+  it (`_keep_argv`); `_replay_command` takes it from the build's `Dependent`.
+- **Its paths.** `_drawing_types` names the model drawn, the sheet, PDF, PNG
+  and layout report under the output root, outside the engine's redirect of
+  `_paths.OUT_*`. Once the engine makes the scratch root, and once the
+  recipe's own import has executed `_drawing_types` (`_AfterImport`, before
+  any importer binds a name of it), `DrawingSpec.source`,
+  `DrawingSpec.outputs` and `LAYOUT_REPORT_DIR` move under it
+  (`_redirect_drawing`). The output root itself also encodes as `<OUT>`, so a
+  model a script names there is the request its recording made. Any write
+  that still escapes is refused by the replay's guard (`sandbox`).
+- **Its model.** The model drawn is staged as an assembly's children are, with
+  the same limit: a model the drawing's Python reads only outside the
+  recorded window is a stub, and the attempt declines.
+
+Every Python output must be the base archive's byte for byte, but the layout
+report, which Python writes with the audit's own wall seconds
+(`summary.collect_s`, `summary.total_s`): it must be the archive's JSON once
+both are set aside (`_replay_shadow.layout_alike`, on the bytes the replay
+wrote, kept in `Reuse.kept`). A served drawing installs the base's sheet, PDF,
+PNG and layout report (`dodo._reuse_drawing`): the base's PDF bytes, so a
+machinist review keyed on them is the base's. Replayed offline on 2026-11-14
+against this source, the bases of `fr_harmonic_base` (36,332 requests),
+`dt_cone_pivot_post` (15,926), `mg_magnifier_assembly` (32,014) and
+`fr_frame_assembly` (26,770, 12 echoed title counters) were no-ops whose
+sheet, PDF and PNG were the archives' bytes and whose layout reports differed
+by their timing alone; `dt_cone_gear_tl_indexing_assembly`'s, recorded on a
+source that placed a view elsewhere, diverged at that view
+(`CreateDrawViewFromModelView3`). The four stems' newest bases (recorded
+2026-11-14/15), replayed on 7080305d9f with this staging, were the same
+no-ops: `fr_harmonic_base`'s model, which only SolidWorks opens, staged as a
+stub; the other three's, which their Python also reads, copied; no stub
+read. No drawing label is served:
+`DEPENDENT_SERVE_LABELS` names assemblies only, so every part drawing's
+would-be reuse is audited, in `reuse` too; an assembly sheet makes no attempt
+(below).
+
+**Cost.** An audited attempt serves nothing, and runs before the seat: on a
+farm worker the seat waits for it. Natively (2026-11-15) its replay took
+11.97 s for `fr_harmonic_base`, whose build took 130.7 s, and 7.8 s for
+`dt_cone_pivot_post` (48.5 s): about 8 to 12 s per part-drawing miss, the
+whole attempt bounded by `DEPENDENT_LOOKUP_SECONDS` (10 s) and
+`REUSE_SECONDS` (120 s). Both audits read `confirmed`. Every key is audited
+while the evidence is gathered: `_replay_shadow.DRAWING_AUDIT_ONE_IN` (1)
+samples one key in that many, by the key's hash, of a drawing whose label is
+not served; the rest decline `unsampled` before any lookup and pay nothing.
+Sampling is a change of that one number; `drawing=shadow` stops the attempts.
+
+**Assembly sheets are not attempted.** A sheet that draws an assembly (its
+registry row's `source_kind` is `assembly`, which dodo passes as
+`DependentBuild.source_kind`) declines `assembly_sheet` before any hash,
+lookup or replay, served label or not, so it pays no pre-seat replay (14 to
+16 s per miss natively) and raises no alarm on its own build noise. Its
+builds do not repeat. Each build asks for the components in the order the
+seat enumerates them, picks ray hits in the order they come back, and echoes
+the session's title counters. In the 10 days to 2026-11-15, all 23
+same-children comparisons of assembly sheets diverged in their requests. The
+three that issued the base's request multiset still drew other PDFs: two by
+sub-resolution ink (above), and `pd_paper_drive_assembly` by a visible
+cosmetic-thread texture. The native audits bear it out. On pass 2
+(2026-11-15) `mg_magnifier_assembly` and `fr_frame_assembly` raised SOUNDNESS
+ALARMs and revoked their bases on noise alone. On pass 3, with
+`sub_resolution_ink`, `mg_magnifier_assembly` read `output_nondeterminism`,
+but `fr_frame_assembly` (the base's requests, a title counter first) moved ink
+by 0.3 to 0.5 mm, past the bound, and revoked its base again. An audit can
+name such noise at best, never confirm the base, so a reuse would serve a
+sheet the seat may draw otherwise. The split after the build still compares
+an assembly sheet's recording with its base, as before. Part sheets, whose
+native audits read `confirmed`, are the candidates for serving.
+
+Would-be reuses and their audits per stem (assemblies and drawings):
 
 ```kusto
 dependencies
-| where timestamp > ago(7d) and name startswith "replay.reuse assembly:"
+| where timestamp > ago(7d)
+    and (name startswith "replay.reuse assembly:" or name startswith "replay.reuse drawing:")
 | extend label=tostring(customDimensions.label),
          decision=tostring(customDimensions["replay.reuse_decision"])
 | summarize attempts=count(), audited=countif(decision == "audited"),
             reused=countif(decision == "reused") by label
 | join kind=leftouter (
     dependencies
-    | where timestamp > ago(7d) and name startswith "replay.audit assembly:"
+    | where timestamp > ago(7d)
+        and (name startswith "replay.audit assembly:" or name startswith "replay.audit drawing:")
     | extend label=tostring(customDimensions.label),
              audit=tostring(customDimensions["replay.audit"])
     | summarize judged=countif(audit != "unjudged"), unjudged=countif(audit == "unjudged"),

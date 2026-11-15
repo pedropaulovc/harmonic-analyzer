@@ -2109,13 +2109,19 @@ def _replay_as(
     }
     replayed: list[str] = []
 
-    def replay_before(part, reuse, deadline):
+    def replay_before(part, reuse, deadline, argv=()):
         replayed.append(part.key)
         assert part.environment() == _PINS
         reuse.replay_rc = (
             (0 if replay["verdict"] == "noop" else 3) if rc == "auto" else rc
         )
-        reuse.replay = None if absent else replay
+        # As the driver stages them: each opened model's bytes, hashed then.
+        staged = {
+            rel: _sha((shop.out / rel).read_bytes())
+            for rel in replay["solidworks_out_inputs"]
+            if (shop.out / rel).is_file()
+        }
+        reuse.replay = None if absent else {"staged": staged, **replay}
         reuse.replayed = True
         reuse.replay_log = "replayed\n"
         reuse.certificate = certificate
@@ -3189,26 +3195,24 @@ def test_an_audited_key_builds_on_the_seat(blob, tmp_path, monkeypatch, spans):
 
 # --------------------------------------------------------------------------- #
 # Assemblies and drawings: recorded, judged against the nearest earlier
-# recording made on the same children; assemblies audited and reused
+# recording made on the same children; audited and reused
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (None, ("reuse", "reuse", "shadow")),
-        ("reuse", ("reuse", "reuse", "shadow")),
-        ("audit", ("audit", "audit", "shadow")),
+        (None, ("reuse", "reuse", "audit")),
+        ("reuse", ("reuse", "reuse", "reuse")),
+        ("audit", ("audit", "audit", "audit")),
         ("record", ("record", "record", "record")),
         ("off", ("off", "off", "off")),
         ("shadow,drawing=off", ("shadow", "shadow", "off")),
-        ("assembly=record", ("reuse", "record", "shadow")),
-        ("drawing=reuse", ("reuse", "reuse", "shadow")),
+        ("assembly=record", ("reuse", "record", "audit")),
+        ("drawing=reuse", ("reuse", "reuse", "reuse")),
         (" Drawing = Record , part=off ", ("off", "reuse", "record")),
         ("off,assembly=shadow", ("off", "shadow", "off")),
     ],
 )
-def test_each_kind_has_its_mode_and_drawings_never_reuse(
-    monkeypatch, logged, value, expected
-):
+def test_each_kind_has_its_mode(monkeypatch, logged, value, expected):
     if value is None:
         monkeypatch.delenv(shadow.MODE_ENV, raising=False)
     else:
@@ -3370,6 +3374,12 @@ def test_a_drawing_dependent_names_its_script_argument_and_model(monkeypatch, tm
     specs = {
         spec.source_kind: (name, spec) for name, spec in dodo.DRAWINGS_BY_NAME.items()
     }
+    built: list[shadow.DependentBuild] = []
+    monkeypatch.setattr(
+        dodo,
+        "_cached_com_action",
+        lambda *_a, dependent, **_k: built.append(dependent("k" * 64)),
+    )
     for kind in ("part", "assembly"):
         name, spec = specs[kind]
         dependent = dodo._drawing_dependent(name)
@@ -3379,6 +3389,9 @@ def test_a_drawing_dependent_names_its_script_argument_and_model(monkeypatch, tm
             spec.script.resolve(),
             (spec.artifact_stem,),
         )
+        # The leaf's attempt knows the kind of model drawn from the registry.
+        dodo._cached_drawing_action(name)
+        assert built.pop().source_kind is shadow.BuildKind(kind)
         if kind == "part":
             assert dependent.children == {f".{spec.part}.part": "missing"}
         else:
@@ -3420,13 +3433,25 @@ def _com_action_runs(dodo: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     monkeypatch.setattr(dodo, "_com_seat", seat)
     monkeypatch.setattr(dodo, "_exec_com", exec_com)
     monkeypatch.setattr(dodo._replay_shadow, "after_build", after_build)
+    outputs = [tmp_path / f"{_STEM}.SLDDRW"]
     dodo._cached_com_action(
         f"drawing:{_STEM}",
         [sys.executable, str(script), _STEM],
         deps,
-        [tmp_path / f"{_STEM}.SLDDRW"],
+        outputs,
         log_stem=f"drawing-{_STEM}",
-        recorded=lambda key: _planned(_drawing(script), key),
+        dependent=lambda key: shadow.DependentBuild(
+            shadow.BuildKind.DRAWING,
+            _STEM,
+            script,
+            key,
+            deps,
+            _digest,
+            outputs,
+            outputs[0],
+            lambda: dict(_PINS),
+            lambda: _drawing(script),
+        ),
     )
     return script, deps, order, runs, observed
 
@@ -3819,6 +3844,16 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| output_nondeterminism cause=jagged_outline",
         ),
         (
+            # Named before the answers: the ink difference cannot print.
+            dataclasses.replace(
+                _noop("different", answers="different", pdf="different"),
+                pdf_cause=_com_outcome.SUB_RESOLUTION_INK_CAUSE,
+            ),
+            (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
+            "output_nondeterminism",
+            "| output_nondeterminism cause=sub_resolution_ink",
+        ),
+        (
             _noop("different", answers="different", pdf="different"),
             (_SEAT_WINDOWS["base"], _SEAT_WINDOWS["base"]),
             "output_nondeterminism",
@@ -3837,7 +3872,14 @@ def _noop(outcome: str, ground_truth: str = "same", **signals: str) -> shadow.Sh
             "| title_echo",
         ),
     ],
-    ids=["seat_display", "jagged_outline", "answers", "unexplained", "title_echo"],
+    ids=[
+        "seat_display",
+        "jagged_outline",
+        "sub_resolution_ink",
+        "answers",
+        "unexplained",
+        "title_echo",
+    ],
 )
 def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
     blob, tmp_path, monkeypatch, spans, logged, found, displays, judgement, line_end
@@ -3866,10 +3908,16 @@ def test_a_dependent_noop_whose_output_differs_is_never_an_alarm(
         assert "this build's 1010x598 px/mm=2.098" in warned
     if record["output_cause"] == "jagged_outline":
         assert "(jagged_outline: SolidWorks broke a jagged crop outline" in warned
+    if record["output_cause"] == "sub_resolution_ink":
+        assert "(sub_resolution_ink: the PDFs differ only by path pieces" in warned
 
 
 def test_a_dependents_diff_judgements_reach_its_split(blob, tmp_path, monkeypatch):
     assert shadow.OutputCause.JAGGED_OUTLINE.value == _com_outcome.JAGGED_OUTLINE_CAUSE
+    assert (
+        shadow.OutputCause.SUB_RESOLUTION_INK.value
+        == _com_outcome.SUB_RESOLUTION_INK_CAUSE
+    )
     monkeypatch.setenv(shadow.MODE_ENV, "shadow")
     recording = _planned(_drawing(tmp_path / "draw.py"), "k" * 64)
     recording.log.write_bytes(b"log")
@@ -4981,3 +5029,637 @@ def test_an_audited_assembly_leaf_that_refreshes_reports_its_audit_unjudged(
     [audit] = _events(tmp_path, "replay_audit")
     assert (audit["audit"], audit["audit_base_key"]) == ("unjudged", base)
     assert audit["audit_why"] == "the parts tier made no recording"
+
+
+# --------------------------------------------------------------------------- #
+# Drawing reuse: the replay redirects the paths _drawing_types names, passes
+# the artifact stem and stages the model drawn; a layout report differs from
+# its base's by its timing alone
+# --------------------------------------------------------------------------- #
+_DRAWING_LABEL = f"drawing:{_STEM}"
+_DRAWING_NAME = f"drawing-{_STEM}"
+_ARTIFACT = "sh-widget"
+_DRAWING_RECIPE = (
+    "import json, sys, time\n"
+    "import _drawing_types\n"
+    "from _drawing_types import DrawingLayout, DrawingSpec, layout_report_path\n"
+    "from _session import run_build\n"
+    "import test_com_conversation  # noqa: F401 -- the fake seat's interfaces\n"
+    "async def build(adapter):\n"
+    "    spec = DrawingSpec(\n"
+    "        'sh_widget', 'sh_widget', sys.argv[1], 'x.py', DrawingLayout.LANDSCAPE\n"
+    "    )\n"
+    "    app = adapter.swApp\n"
+    "    if not spec.source.is_file():\n"
+    "        raise RuntimeError(f'missing model {spec.source}')\n"
+    "    if not app.Open(str(spec.source)):\n"
+    "        raise RuntimeError('the model is missing')\n"
+    "    # The model again, named under the output root as _paths.CAD_ROOT does.\n"
+    "    model = _drawing_types.CAD_ROOT / 'out' / 'sldprt' / 'sh-widget.SLDPRT'\n"
+    "    if not app.Open(str(model)):\n"
+    "        raise RuntimeError('the model is missing')\n"
+    "    total = app.Add(1.5, 2.25)\n"
+    "    stl = (spec.source.parent.parent / 'stl' / 'sh-widget.STL').read_text()\n"
+    "    outputs = spec.outputs\n"
+    "    app.SaveTo(str(outputs['slddrw']))\n"
+    "    for name in ('pdf', 'png'):\n"
+    "        outputs[name].parent.mkdir(parents=True, exist_ok=True)\n"
+    "        outputs[name].write_text(f'{name} {total.hex()} {stl}', encoding='utf-8')\n"
+    "    report = layout_report_path(spec.artifact_stem)\n"
+    "    report.parent.mkdir(parents=True, exist_ok=True)\n"
+    "    timing = {'collect_s': time.perf_counter(), 'total_s': time.perf_counter()}\n"
+    "    summary = {'sheets': 1, **timing}\n"
+    "    report.write_text(json.dumps({'summary': summary, 'findings': []}))\n"
+    "    return {}\n"
+    "if __name__ == '__main__':\n"
+    "    sys.exit(run_build(build))\n"
+)
+
+
+class _DrawingShop(_AssemblyShop):
+    """:class:`_AssemblyShop` drawing its one child with
+    :data:`_DRAWING_RECIPE`: the sheet SolidWorks saves, and the PDF, PNG and
+    timed layout report Python writes, at the paths ``_drawing_types`` names
+    under the shop's output root (its ``CAD_ROOT`` the shop's root in the
+    recording and the replay processes alike); the artifact stem is the
+    script's one argument."""
+
+    def __init__(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, digest: Any = _digest
+    ) -> None:
+        super().__init__(tmp_path, monkeypatch, digest)
+        self.script.write_text(_DRAWING_RECIPE, "utf-8")
+        self.native = self.out / "slddrw" / f"{_ARTIFACT}.SLDDRW"
+        self.pdf = self.out / "pdf" / f"{_ARTIFACT}.pdf"
+        self.png = self.out / "png" / f"{_ARTIFACT}_drawing.png"
+        self.report = self.out / "reports" / "layout-audit" / f"{_ARTIFACT}.json"
+        self.python_output = self.report
+        self.outputs = [self.native, self.pdf, self.png, self.report]
+        reports = self.out / "reports" / "layout-audit"
+        roots = (
+            "from pathlib import Path\n"
+            "import _drawing_types\n"
+            f"_drawing_types.CAD_ROOT = Path({str(self.root)!r})\n"
+            f"_drawing_types.LAYOUT_REPORT_DIR = Path({str(reports)!r})\n"
+            "import com_replay\n"
+        )
+        driver = self.root / "replay_driver.py"
+        text = driver.read_text("utf-8")
+        driver.write_text(text.replace("import com_replay\n", roots, 1), "utf-8")
+        self.record_driver = DEPENDENT_DRIVER.replace("import com_replay\n", roots, 1)
+
+    def dependent(self) -> shadow.Dependent:
+        return shadow.Dependent(
+            shadow.BuildKind.DRAWING, _STEM, self.script, (_ARTIFACT,), self.children()
+        )
+
+    def write(self, native: bytes = _NATIVE, python: bytes = _PY) -> None:
+        for path, data in (
+            (self.native, native),
+            (self.pdf, b"pdf"),
+            (self.png, b"png"),
+            (self.report, python),
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+
+    def build(self, reuse: shadow.Reuse | None = None) -> shadow.Recording:
+        """The current source drawn on the fake seat as dodo's drawing action
+        builds a miss: under the recorder, stored, observed."""
+        key = self.key()
+        recording = shadow.plan_dependent(
+            shadow.BuildKind.DRAWING, self.dependent, key, reuse=reuse
+        )
+        assert recording is not None
+        command = recording.command[2:]
+        at = command.index("--")
+        env = {k: v for k, v in os.environ.items() if k not in _PINS}
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                self.record_driver,
+                *command[:at],
+                "--out-root",
+                str(self.out),
+                *command[at:],
+            ],
+            cwd=SCRIPTS,
+            env={**env, "OTEL_EXPORTER_OTLP_ENDPOINT": "", "PYTHONHASHSEED": "0"},
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert cache.store(key, self.outputs, _DRAWING_LABEL) == "stored"
+        shadow.after_build(recording, self.deps, self.digest)
+        return recording
+
+    def base(
+        self,
+        *,
+        store: bool = True,
+        native: bytes = _NATIVE,
+        python: bytes = _PY,
+        children: dict[str, str] | None = None,
+    ) -> str:
+        key = self.key()
+        self.write(native, python)
+        if store:
+            assert cache.store(key, self.outputs, _DRAWING_LABEL) == "stored"
+        os.environ[shadow.MODE_ENV] = "record"
+        recording = shadow.plan_dependent(shadow.BuildKind.DRAWING, self.dependent, key)
+        assert recording is not None
+        if children is not None:
+            recording.children = children
+        recording.log.write_bytes(b"log of " + key.encode())
+        recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+        shadow.after_build(recording, self.deps, self.digest)
+        os.environ[shadow.MODE_ENV] = "reuse"
+        return key
+
+    def assembly(
+        self, *, key: str | None = None, rewritten: tuple[Path, ...] | None = None
+    ) -> shadow.DependentBuild:
+        return shadow.DependentBuild(
+            shadow.BuildKind.DRAWING,
+            _STEM,
+            self.script,
+            key or self.key(),
+            list(self.deps),
+            self.digest,
+            list(self.outputs),
+            self.native,
+            lambda: dict(_PINS),
+            self.dependent,
+        )
+
+    def attempt(self, **options: Any) -> shadow.Reuse:
+        """dodo's drawing reuse path (_cached_com_action, _reuse_drawing)."""
+        build = self.assembly(**options)
+        with shadow.reuse_attempt(build) as reuse:
+            if reuse.decision is shadow.ReuseDecision.REUSED:
+                reuse.install(build.outputs)
+                reuse.mark()
+                reuse.finish(cache.store(build.key, build.outputs, _DRAWING_LABEL))
+        return reuse
+
+    def marker(self, key: str, engine: str | None = None) -> dict[str, Any] | None:
+        engine = engine or conv.sha256_file(conv.ENGINE_FILE)
+        data = cache.fetch_sidecar(shadow.reused_name(engine, _DRAWING_NAME, key))
+        return None if data is None else json.loads(data)
+
+
+def test_an_inert_drawing_edit_replays_redirected_with_its_argument_and_is_reused(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    base = shop.build()
+    built = shop.outputs_now()
+    shop.edit(audited=False)
+    # ``audit``: the replay draws in its scratch root, never the output root,
+    # with the artifact stem and the staged model; nothing is served.
+    audited = shop.attempt()
+    assert audited.value == "audited", audited.detail
+    assert audited.base.manifest["key"] == base.key
+    assert audited.replay["verdict"] == "noop"
+    # The model only SolidWorks opened is a stub, the STL Python read a copy:
+    # the PDF and PNG carry the STL's text, so a stub of it would differ.
+    assert audited.replay["staged"] == {
+        "sldprt/sh-widget.SLDPRT": _sha(_MODEL),
+        "stl/sh-widget.STL": _sha(b"its STL"),
+    }
+    assert audited.replay["stub_reads"] == []
+    assert audited.replay["solidworks_out_inputs"] == ["sldprt/sh-widget.SLDPRT"]
+    assert sorted(audited.replay["py_outputs"]) == [
+        f"pdf/{_ARTIFACT}.pdf",
+        f"png/{_ARTIFACT}_drawing.png",
+        f"reports/layout-audit/{_ARTIFACT}.json",
+    ]
+    assert list(audited.replay["com_outputs"]) == [f"slddrw/{_ARTIFACT}.SLDDRW"]
+    # The report the replay wrote is the base's but for its timing.
+    report = f"reports/layout-audit/{_ARTIFACT}.json"
+    assert audited.replay["py_outputs"][report] != _sha(built[f"{_ARTIFACT}.json"])
+    assert shadow.layout_alike(audited.kept[report], built[f"{_ARTIFACT}.json"])
+    # Judged on the very bytes the replay reported writing, and no others.
+    kept = audited.kept[report]
+    audited.archive = cache.fetch_archive(base.key)
+    assert audited.archive is not None
+    with audited.archive:
+        assert shadow._timing_only(audited, report, _sha(kept))
+        assert not shadow._timing_only(audited, report, _sha(kept + b" "))
+        assert not shadow._timing_only(audited, f"pdf/{_ARTIFACT}.pdf", _sha(kept))
+        content = json.loads(kept)
+        content["findings"] = ["overlap"]
+        audited.kept[report] = other = json.dumps(content).encode()
+        assert not shadow._timing_only(audited, report, _sha(other))
+    assert audited.token == _sha(built[f"{_ARTIFACT}.SLDDRW"])
+    assert shop.outputs_now() == built and shop.marker(shop.key()) is None
+    # ``reuse`` for a label it serves: the base's sheet, PDF, PNG and report.
+    monkeypatch.setenv(shadow.MODE_ENV, "reuse")
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_DRAWING_LABEL}))
+    for output in shop.outputs:
+        output.unlink()
+    reuse = shop.attempt()
+    assert reuse.value == "reused", reuse.detail
+    assert shop.outputs_now() == built
+    assert shop.marker(shop.key())["origin_key"] == base.key
+    assert cache.publication(shop.key())[0] == "stored"
+    assert shop.ran == ["replay", "replay"]
+    assert logged["error"] == []
+
+
+def test_a_replay_whose_python_reads_a_model_staged_as_a_stub_declines(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    shop.build()
+    # A read of the model's bytes that changes no request and no output: the
+    # replay read the empty stub of a model only SolidWorks opened in the
+    # base, bytes nothing judged (#2799).
+    text = shop.script.read_text("utf-8")
+    add = "    total = app.Add(1.5, 2.25)\n"
+    peek = "    spec.source.read_bytes()\n" + add
+    shop.script.write_text(text.replace(add, peek, 1), "utf-8")
+    shop.edit(audited=False)
+    declined = shop.attempt()
+    assert declined.value == "declined:unjudged_input", declined.detail
+    assert declined.replay["verdict"] == "noop"
+    assert declined.replay["stub_reads"] == ["sldprt/sh-widget.SLDPRT"]
+    assert declined.detail.endswith("staged empty: sldprt/sh-widget.SLDPRT")
+
+
+def test_a_layout_report_is_alike_but_for_its_timing_only():
+    def report(**summary: Any) -> bytes:
+        timed = {"sheets": 1, "collect_s": 1.25, "total_s": 2.5, **summary}
+        return json.dumps({"summary": timed, "findings": []}).encode()
+
+    assert shadow.layout_alike(report(), report(collect_s=9.0, total_s=0))
+    assert not shadow.layout_alike(report(), report(sheets=2))
+    findings = json.dumps({"summary": json.loads(report())["summary"], "findings": [1]})
+    assert not shadow.layout_alike(report(), findings.encode())
+    # Each must carry its timing, as a number: anything else is no report.
+    assert not shadow.layout_alike(report(), report(total_s="2.5"))
+    untimed = {"summary": {"sheets": 1, "collect_s": 1.25}, "findings": []}
+    assert not shadow.layout_alike(json.dumps(untimed).encode(), report())
+    assert not shadow.layout_alike(b"\xff", report())
+    assert not shadow.layout_alike(b"[]", b"[]")
+
+
+def test_the_layout_report_facts_are_the_drawing_audits():
+    import _drawing_types
+
+    reports = _drawing_types.LAYOUT_REPORT_DIR.relative_to(
+        _drawing_types.CAD_ROOT / "out"
+    )
+    assert shadow.LAYOUT_REPORT_DIR == reports.as_posix()
+    audit = (SCRIPTS / "_drawing_layout_audit.py").read_text("utf-8")
+    for name in shadow.LAYOUT_TIMING_FIELDS:
+        assert f'summary["{name}"] = round(' in audit
+
+
+def test_a_drawing_replay_redirects_the_paths_drawing_types_names(
+    tmp_path, monkeypatch
+):
+    import com_replay
+
+    path = SCRIPTS / "_drawing_types.py"
+    spec = importlib.util.spec_from_file_location("_drawing_types_copy", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "_drawing_types_copy", module)
+    spec.loader.exec_module(module)
+    drawing = module.DrawingSpec(
+        "a_b", "a_b", "a-b", "x.py", module.DrawingLayout.PORTRAIT
+    )
+    real = module.CAD_ROOT / "out"
+    assert drawing.source == real / "sldprt" / "a-b.SLDPRT"
+    scratch = tmp_path / "rs" / "o"
+    com_replay._redirect_drawing(module, scratch)
+    assert drawing.source == scratch / "sldprt" / "a-b.SLDPRT"
+    assert drawing.outputs == {
+        "slddrw": scratch / "slddrw" / "a-b.SLDDRW",
+        "pdf": scratch / "pdf" / "a-b.pdf",
+        "png": scratch / "png" / "a-b_drawing.png",
+    }
+    assert drawing.layout_report == scratch / "reports" / "layout-audit" / "a-b.json"
+    # Run once a module is imported, before its importer binds a name of it.
+    (tmp_path / "late_module.py").write_text("VALUE = 1\n", "utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    seen: list[Any] = []
+
+    def then(found: Any) -> None:
+        seen.append(found.__name__)
+        found.VALUE = 2
+
+    finder = com_replay._AfterImport("late_module", then)
+    monkeypatch.setattr(sys, "meta_path", [finder, *sys.meta_path])
+    from late_module import VALUE  # type: ignore[import-not-found]
+
+    assert (VALUE, seen) == (2, ["late_module"]) and finder not in sys.meta_path
+    monkeypatch.delitem(sys.modules, "late_module")
+
+
+def _replay_drawing(monkeypatch: pytest.MonkeyPatch, shop: _DrawingShop) -> list[str]:
+    """_replay_assembly with the synthetic drawing base's outputs."""
+    return _replay_assembly(
+        monkeypatch,
+        shop,
+        com_outputs={f"slddrw/{_ARTIFACT}.SLDDRW": _sha(_NATIVE)},
+        py_outputs={
+            f"pdf/{_ARTIFACT}.pdf": _sha(b"pdf"),
+            f"png/{_ARTIFACT}_drawing.png": _sha(b"png"),
+            f"reports/layout-audit/{_ARTIFACT}.json": _sha(_PY),
+        },
+    )
+
+
+@pytest.mark.parametrize("one_in", [1, 3])
+def test_an_unserved_drawing_attempts_for_one_key_in_its_sample(
+    blob, tmp_path, monkeypatch, spans, logged, one_in
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    replayed = _replay_drawing(monkeypatch, shop)
+    shop.base()
+    assert shadow.DRAWING_AUDIT_ONE_IN == 1  # shipped: every key, for evidence
+    monkeypatch.setattr(shadow, "DRAWING_AUDIT_ONE_IN", one_in)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    text = shop.script.read_text("utf-8")
+    # Two keys of each kind the sample can draw (at 1, every key attempts).
+    wanted = {True: 2, False: 0 if one_in == 1 else 2}
+    decisions: dict[str, str] = {}
+    sources: dict[str, str] = {}
+
+    def drawn(sampled: bool) -> int:
+        return sum(shadow.audited(k, one_in) is sampled for k in decisions)
+
+    for n in itertools.count():
+        if all(drawn(sampled) >= count for sampled, count in wanted.items()):
+            break
+        shop.script.write_text(f"{text}# edit {n}\n", "utf-8")
+        key = shop.key()
+        sources[key] = f"{text}# edit {n}\n"
+        sampled = shadow.audited(key, one_in)
+        if drawn(sampled) >= wanted[sampled]:
+            continue
+        attempt = shop.attempt()
+        decisions[key] = attempt.value
+        if not sampled:
+            # Declined before any lookup: nothing looked up, nothing replayed.
+            assert attempt.base is None and key not in replayed
+            assert (
+                attempt.detail
+                == f"one drawing key in {one_in} is audited, not this one"
+            )
+    assert decisions == {
+        key: "audited" if shadow.audited(key, one_in) else "declined:unsampled"
+        for key in decisions
+    }
+    assert sorted(replayed) == sorted(k for k, v in decisions.items() if v == "audited")
+    if one_in == 1:
+        return
+    unsampled = next(k for k, v in decisions.items() if v == "declined:unsampled")
+    shop.script.write_text(sources[unsampled], "utf-8")
+    # Nor is an assembly's attempt: it goes on to its own checks.
+    assembly = dataclasses.replace(shop.assembly(), kind=shadow.BuildKind.ASSEMBLY)
+    with shadow.reuse_attempt(assembly) as other:
+        pass
+    assert other.value not in ("declined:unsampled", None)
+    # A served drawing label is sampled by DEPENDENT_AUDIT_ONE_IN alone.
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_DRAWING_LABEL}))
+    with shadow.reuse_attempt(shop.assembly()) as served:
+        pass
+    assert served.value == "audited" and unsampled in replayed
+
+
+def test_an_assembly_sheet_declines_before_any_lookup(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    replayed = _replay_drawing(monkeypatch, shop)
+    shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    sheet = dataclasses.replace(shop.assembly(), source_kind=shadow.BuildKind.ASSEMBLY)
+    drawing = dataclasses.replace(shop.assembly(), source_kind=shadow.BuildKind.PART)
+
+    def refused(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("an assembly sheet hashes, looks up and replays nothing")
+
+    # Served or not: its real builds do not repeat.
+    for served in (frozenset(), frozenset({_DRAWING_LABEL})):
+        with monkeypatch.context() as gate:
+            gate.setattr(shadow, "DEPENDENT_SERVE_LABELS", served)
+            gate.setattr(shadow, "_current_inputs", refused)
+            gate.setattr(shadow, "find_base", refused)
+            with shadow.reuse_attempt(sheet) as reuse:
+                pass
+        assert reuse.value == "declined:assembly_sheet" and reuse.base is None
+        assert reuse.detail == (
+            'its real builds do not repeat; see DEVELOPING.md "Drawing reuse"'
+        )
+        assert replayed == []
+        # A part's drawing goes on to its checks.
+        with monkeypatch.context() as gate:
+            gate.setattr(shadow, "DEPENDENT_SERVE_LABELS", served)
+            with shadow.reuse_attempt(drawing) as reuse:
+                pass
+        assert reuse.value == "audited", reuse.detail
+        assert replayed.pop() == drawing.key
+
+
+# case: (the comparison's truth cause, its pdf_cause, the audit's judgement),
+# each a build SolidWorks steered off the base's request order but not its
+# request multiset.
+_DRAWING_AUDITS = {
+    # mg_magnifier_assembly, 2026-11-15: a 1-ulp GetExtremePoint first, then
+    # PDFs that differ only by path pieces too short to print apart.
+    "sub_resolution": (
+        "response:IBody2.GetExtremePoint",
+        _com_outcome.SUB_RESOLUTION_INK_CAUSE,
+        "output_nondeterminism",
+    ),
+    # The same ink after the build asked otherwise first: no seat explains it.
+    "sub_resolution_request": (
+        "request",
+        _com_outcome.SUB_RESOLUTION_INK_CAUSE,
+        "soundness_alarm",
+    ),
+    # pd_paper_drive_assembly: a piece long enough to print (0.537 mm).
+    "visible": ("response:IBody2.GetExtremePoint", None, "soundness_alarm"),
+}
+
+
+@pytest.mark.parametrize("case", _DRAWING_AUDITS)
+def test_an_audited_drawing_whose_ink_differs_below_resolution_revokes_nothing(
+    blob, tmp_path, monkeypatch, spans, logged, case
+):
+    cause, ink, expected = _DRAWING_AUDITS[case]
+    shop = _DrawingShop(tmp_path, monkeypatch)
+    _replay_drawing(monkeypatch, shop)
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    reuse = shop.attempt()
+    assert reuse.value == "audited", reuse.detail
+    found = {
+        "request_divergence": _REQUEST,
+        "truth_cause": cause,
+        "outcome": "different",
+        "outcome_signals": {
+            "requests": "same",
+            "answers": "different",
+            "pdf": "different",
+        },
+        "pdf_cause": ink,
+        "display": {"base": _SAME_DISPLAY, "new": _SAME_DISPLAY},
+    }
+    monkeypatch.setattr(shadow, "_diff", lambda *_a: (0, found))
+    recording = shadow.plan_dependent(
+        shadow.BuildKind.DRAWING, shop.dependent, shop.key(), reuse=reuse
+    )
+    assert recording is not None
+    recording.log.write_bytes(b"log of the build")
+    recording.summary_path.write_text(json.dumps(_summary()), "utf-8")
+    _stored(recording.key)
+    shadow.after_build(recording, shop.deps, shop.digest)
+    record = _events(tmp_path, "replay_shadow")[-1]
+    alarmed = expected == "soundness_alarm"
+    assert (record["audit"], record["audit_cause"]) == (
+        expected,
+        None if alarmed else ink,
+    )
+    assert shadow.revoked(_ENGINE, _DRAWING_NAME, base) is alarmed
+    assert len([m for m in logged["error"] if "SOUNDNESS ALARM" in m]) == alarmed
+    warned = [
+        m
+        for m in logged["warn"]
+        if m.startswith("[com-replay] audit output_nondeterminism")
+    ]
+    assert len(warned) == (not alarmed)
+    if not alarmed:
+        assert f" against this build ({ink}): " in warned[0]
+
+
+def test_a_reused_drawing_leaf_runs_no_com_and_an_audited_one_builds(
+    blob, tmp_path, monkeypatch, spans, logged
+):
+    dodo = _load_dodo()
+    shop = _DrawingShop(tmp_path, monkeypatch, digest=dodo.ContentChecker._digest)
+    _replay_assembly(
+        monkeypatch,
+        shop,
+        com_outputs={f"slddrw/{_ARTIFACT}.SLDDRW": _sha(_NATIVE)},
+        py_outputs={
+            f"pdf/{_ARTIFACT}.pdf": _sha(b"pdf"),
+            f"png/{_ARTIFACT}_drawing.png": _sha(b"png"),
+            f"reports/layout-audit/{_ARTIFACT}.json": _sha(_PY),
+        },
+    )
+    base = shop.base()
+    shop.edit(audited=False)
+    monkeypatch.setattr(shadow, "DEPENDENT_SERVE_LABELS", frozenset({_DRAWING_LABEL}))
+    order: list[str] = []
+    recordings: list[Any] = []
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_probe_cache", lambda *_a: "miss")
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: order.append("sw.connect"))
+
+    @contextlib.contextmanager
+    def seat(_label: str):
+        order.append("seat")
+        yield 0.0
+
+    def exec_com(cmd, label, log_stem=None, **options):
+        order.append("build")
+        shop.write(native=b"built on the seat")
+        recordings.append(options.get("recording"))
+
+    store = cache.store
+
+    def counted_store(key, outputs, label, **options):
+        order.append("store")
+        return store(key, outputs, label, **options)
+
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(cache, "store", counted_store)
+    monkeypatch.setattr(
+        dodo._replay_shadow,
+        "after_build",
+        lambda recording, deps, digest: order.append("observe"),
+    )
+
+    def action() -> None:
+        dodo._cached_com_action(
+            _DRAWING_LABEL,
+            ["draw"],
+            list(shop.deps),
+            list(shop.outputs),
+            "drawing-x",
+            dependent=lambda key: shop.assembly(key=key),
+        )
+
+    # ``reuse`` for a served label: the base's outputs, stored, no COM.
+    for output in shop.outputs:
+        output.unlink()
+    monkeypatch.setenv(shadow.MODE_ENV, "reuse")
+    action()
+    assert order == ["store"] and recordings == []
+    assert shop.native.read_bytes() == _NATIVE and shop.report.read_bytes() == _PY
+    [record] = _events(tmp_path, "replay_reuse")
+    assert (record["reuse_decision"], record["store"], record["marker"]) == (
+        "reused",
+        "stored",
+        "stored",
+    )
+    assert shop.marker(shop.key(), _ENGINE)["origin_key"] == base
+    [task] = spans.named("task ")
+    assert (task["cache"], task["com"]) == ("reuse", "none")
+    # A served reuse that fails to install builds on the seat instead.
+    order.clear()
+    shop.edit(audited=False)
+
+    def broken(*_a: Any) -> None:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as broke:
+        broke.setattr(shadow.Reuse, "install", broken)
+        action()
+    assert order == ["seat", "sw.connect", "build", "store", "observe"]
+    assert _events(tmp_path, "replay_reuse")[-1]["reuse_decision"] == "declined:fault"
+    assert shop.marker(shop.key(), _ENGINE) is None
+    recordings.clear()
+    # ``audit``: built on the seat, recorded and judged after the store; a
+    # build that made no recording reports its audit unjudged.
+    order.clear()
+    shop.edit(audited=False)
+    monkeypatch.setenv(shadow.MODE_ENV, "audit")
+    action()
+    assert order == ["seat", "sw.connect", "build", "store", "observe"]
+    [recording] = recordings
+    assert recording.reuse.value == "audited" and recording.kind.value == "drawing"
+    assert recording.argv == (_ARTIFACT,)
+    order.clear()
+    shop.edit(audited=False)
+    monkeypatch.setattr(dodo._replay_shadow, "plan_dependent", lambda *_a, **_k: None)
+    action()
+    assert order == ["seat", "sw.connect", "build", "store", "observe"]
+    [audit] = _events(tmp_path, "replay_audit")
+    assert (audit["audit"], audit["audit_base_key"]) == ("unjudged", base)
+    assert audit["audit_why"] == "the build made no recording"
+    # A peer that published the key while this leaf waited for the seat.
+    order.clear()
+    shop.edit(audited=False)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: True)
+    action()
+    assert order == ["seat"]
+    peer = _events(tmp_path, "replay_audit")[-1]
+    assert (peer["audit"], peer["audit_why"]) == (
+        "unjudged",
+        "a peer published the key first",
+    )

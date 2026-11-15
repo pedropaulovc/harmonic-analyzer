@@ -4,8 +4,8 @@ parts from it (dodo's side).
 One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
 = ``off`` | ``record`` | ``shadow`` | ``audit`` | ``reuse``, for every kind or
 per kind (``drawing=off``); unset, :data:`DEFAULT_MODES` (parts and
-assemblies ``reuse``, drawings ``shadow``, the highest they have). The bullets
-below are parts'; the last one is what differs for assemblies and drawings.
+assemblies ``reuse``, drawings ``audit``). The bullets below are parts'; the
+last one is what differs for assemblies and drawings.
 
 * ``off``: a part build runs exactly as it did before recording existed: the
   same command line, and the engine (``_com_conversation``) is never imported.
@@ -50,16 +50,19 @@ below are parts'; the last one is what differs for assemblies and drawings.
   outcome judged per kind (span ``replay.split <label>``). A no-op whose
   outcome differs is never an alarm there: an :class:`OutputJudgement` logged
   at WARN. A recording whose key already existed is kept as evidence unless
-  confirmed (:func:`_keep_evidence`). An assembly also has ``audit`` and
-  ``reuse`` (a drawing's replay cannot yet redirect the output paths it
-  builds): :func:`reuse_attempt` with a :class:`DependentBuild`, against a
-  base made on the same children whose replay opens no output-root file but
-  those children (:func:`_prepare_dependent`). ``reuse`` serves only the
-  labels in :data:`DEPENDENT_SERVE_LABELS`, auditing one key in
-  :data:`DEPENDENT_AUDIT_ONE_IN`; every other would-be reuse is audited. An
+  confirmed (:func:`_keep_evidence`). Assemblies and drawings also have
+  ``audit`` and ``reuse``: :func:`reuse_attempt` with a
+  :class:`DependentBuild`, against a base made on the same children whose
+  replay opens no output-root file but those children
+  (:func:`_prepare_dependent`; a drawing's replay redirects its own output
+  paths and passes its argument). ``reuse`` serves only the labels in
+  :data:`DEPENDENT_SERVE_LABELS`, auditing one key in
+  :data:`DEPENDENT_AUDIT_ONE_IN`; every other would-be reuse is audited (an
+  unserved drawing's for one key in :data:`DRAWING_AUDIT_ONE_IN`), but for a
+  drawing of an assembly, which never attempts (``assembly_sheet``). An
   audited one is compared with its base after the build
-  (:func:`_audit_dependent`): another assembly than the base's is a soundness
-  alarm that revokes the base.
+  (:func:`_audit_dependent`): another assembly or drawing than the base's is
+  a soundness alarm that revokes the base.
 
 A driver exit of :data:`EXIT_RECORD_FAULT` (the recorder failed where the
 build's results cannot be trusted, not the script or SolidWorks) re-runs the
@@ -175,6 +178,11 @@ DEPENDENT_SERVE_LABELS = frozenset(
     }
 )
 DEPENDENT_AUDIT_ONE_IN = 4
+# A drawing whose label is not served attempts its would-be reuse, and so is
+# audited, for one key in this many (by the key's hash, as audited()); the
+# rest decline ``unsampled`` before any lookup and build at no replay cost
+# (:func:`_prepare_dependent`). 1: every key, until the audit evidence is in.
+DRAWING_AUDIT_ONE_IN = 1
 REUSE_NAME = "reuse.json"
 # Bound on the pre-build replay's own log kept for the recording directory.
 REUSE_LOG_CHARS = 200_000
@@ -225,6 +233,13 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 # (every ``python_output_differs`` decline, 2026-11-12/13). Pinned by test.
 CERTIFICATE_DIR = "reports/part-neutral"
 NATIVE_IDENTITY_FIELD = "execution_identity"
+# A drawing's layout-audit reports (_drawing_types.LAYOUT_REPORT_DIR, under
+# the output root; pinned by test), which Python writes from the sheet with
+# the wall seconds the audit took (summary LAYOUT_TIMING_FIELDS,
+# _drawing_layout_audit.run_layout_audit): no two runs share them, so a reuse
+# compares a report without them (:func:`layout_alike`).
+LAYOUT_REPORT_DIR = "reports/layout-audit"
+LAYOUT_TIMING_FIELDS = ("collect_s", "total_s")
 
 
 class Recovery(StrEnum):
@@ -254,20 +269,26 @@ class BuildKind(StrEnum):
 
 
 # The fleet switch, per kind: farm workers get no submitter environment, so a
-# fleet-wide change of mode is a change of these defaults. Nothing of a
-# drawing's recording is ever reused: ``shadow`` is the highest mode it has
-# (_HIGHEST_MODES). An assembly is served only for a label in
-# DEPENDENT_SERVE_LABELS, and audited otherwise: back to ``audit`` stops
-# serving every one of them.
+# fleet-wide change of mode is a change of these defaults. An assembly is
+# served only for a label in DEPENDENT_SERVE_LABELS, and audited otherwise:
+# back to ``audit`` stops serving every one of them. A drawing's reuse ships
+# audited: serving one is a change of its default to ``reuse`` (and its label
+# in DEPENDENT_SERVE_LABELS). Its cost, for no serve: every sampled drawing
+# miss (DRAWING_AUDIT_ONE_IN, now every one) replays its base before the seat,
+# about 8 to 12 s for a part drawing whose build takes 50 to 130 s (native,
+# 2026-11-15: fr_harmonic_base 11.97 s against 130.7 s, dt_cone_pivot_post
+# 7.8 s against 48.5 s), the whole attempt bounded by DEPENDENT_LOOKUP_SECONDS
+# and REUSE_SECONDS. A larger DRAWING_AUDIT_ONE_IN samples it;
+# ``drawing=shadow`` stops it.
 DEFAULT_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
     BuildKind.ASSEMBLY: ReplayMode.REUSE,
-    BuildKind.DRAWING: ReplayMode.SHADOW,
+    BuildKind.DRAWING: ReplayMode.AUDIT,
 }
 _HIGHEST_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
     BuildKind.ASSEMBLY: ReplayMode.REUSE,
-    BuildKind.DRAWING: ReplayMode.SHADOW,
+    BuildKind.DRAWING: ReplayMode.REUSE,
 }
 _UNKNOWN_MODES: set[str] = set()
 
@@ -1214,7 +1235,7 @@ class Shadow:
     # (``com_replay.py diff`` ``display``: ``base``, ``new``).
     display: dict[str, Any] | None = None
     # A drawing's PDF difference explained by the judge (_com_outcome.judge
-    # ``pdf_cause``: ``jagged_outline`` or ``None``).
+    # ``pdf_cause``: ``jagged_outline``, ``sub_resolution_ink`` or ``None``).
     pdf_cause: str | None = None
     # How many component arrays the comparison bound to the base's by name
     # (``com_replay.py diff`` ``name_bound`` ``arrays``; ``None``: none).
@@ -1408,10 +1429,12 @@ def _replay_command(
     seat_log: Path,
     base_outputs: Path | None,
     kind: BuildKind = BuildKind.PART,
+    argv: tuple[str, ...] = (),
 ) -> list[str]:
     """The driver replaying ``script`` against the base bundle in ``work``;
     a dependent's with its kind, so the driver stages the output-root files
-    its recording read."""
+    its recording read (and redirects a drawing's own output paths), and
+    with the script's own arguments (a drawing's artifact stem)."""
     base_dir = work / WORK_BASE
     command = [
         sys.executable,
@@ -1433,6 +1456,8 @@ def _replay_command(
         command += ["--base-outputs", str(base_outputs)]
     if kind is not BuildKind.PART:
         command += ["--kind", kind.value]
+    if argv:
+        command += ["--", *argv]
     return command
 
 
@@ -1676,6 +1701,13 @@ class Decline(StrEnum):
     """Why a build was not reused (the first check that failed)."""
 
     FORCED_REFRESH = "forced_refresh"
+    # A drawing of an assembly (DependentBuild.source_kind), before any
+    # lookup: its real builds do not repeat (the seat's component order, ray
+    # hits and title counters), so no audit can confirm a base.
+    ASSEMBLY_SHEET = "assembly_sheet"
+    # A drawing key outside the one in DRAWING_AUDIT_ONE_IN that attempts:
+    # nothing looked up, nothing replayed.
+    UNSAMPLED = "unsampled"
     INPUTS_MOVED = "inputs_moved"
     NO_BASE = "no_base"
     # Recordings of the stem exist, but none is a real build's bound to the
@@ -1851,12 +1883,13 @@ class PartBuild:
 
 @dataclass(frozen=True)
 class DependentBuild:
-    """What dodo knows of one assembly build before it runs
-    (:func:`reuse_attempt`): a :class:`PartBuild`'s facts (``native``: the
-    model whose bytes its ``.execution`` token hashes), what its recording's
-    :class:`Dependent` says (``describe``, asked only by an attempt), and the
-    cache outputs dodo itself rewrites after any build, which no replay writes
-    (``rewritten``: an assembly's input ledger)."""
+    """What dodo knows of one assembly or drawing build before it runs
+    (:func:`reuse_attempt`): a :class:`PartBuild`'s facts (``native``: an
+    assembly's model, whose bytes its ``.execution`` token hashes; a
+    drawing's sheet), what its recording's :class:`Dependent` says
+    (``describe``, asked only by an attempt), and the cache outputs dodo
+    itself rewrites after any build, which no replay writes (``rewritten``:
+    an assembly's input ledger)."""
 
     kind: BuildKind
     stem: str
@@ -1868,6 +1901,9 @@ class DependentBuild:
     native: Path
     environment: Callable[[], dict[str, str | None]]
     describe: Callable[[], Dependent]
+    # A drawing's: the kind of model it draws (its registry row's
+    # ``source_kind``, from dodo); None for an assembly build.
+    source_kind: BuildKind | None = None
     rewritten: tuple[Path, ...] = ()
 
     @property
@@ -1905,6 +1941,9 @@ class Reuse:
     # The export certificate the replay wrote (CERTIFICATE_DIR), if any: its
     # work directory is gone by the time the outputs are verified.
     certificate: bytes | None = None
+    # A drawing's layout reports the replay wrote, by folded output-root path
+    # (:func:`_timing_only`), kept for the same reason.
+    kept: dict[str, bytes] = field(default_factory=dict)
     # The base's verified archive and its members, while a reuse is pending.
     archive: BinaryIO | None = None
     archive_bytes: int | None = None
@@ -2306,8 +2345,10 @@ def _prepare(part: PartBuild, reuse: Reuse) -> None:
 
 
 def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
-    """:func:`_prepare` for an assembly: the same checks in the same order,
-    and where they differ, its children (:attr:`Dependent.children`). The
+    """:func:`_prepare` for an assembly or drawing: the same checks in the
+    same order, and where they differ, its children
+    (:attr:`Dependent.children`), its replay passed the script's arguments
+    (:attr:`Dependent.argv`, a drawing's artifact stem). The
     base must have been made on the children this build opens, every token
     the same SHA-256 as now. A differing key input that is one of those
     children's models (a SolidWorks document whose key digest is its
@@ -2318,14 +2359,33 @@ def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
     after any build (``part.rewritten``) are no replay's. In mode ``reuse`` a
     would-be reuse is served only for a label in
     :data:`DEPENDENT_SERVE_LABELS` and not one key in
-    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited."""
+    :data:`DEPENDENT_AUDIT_ONE_IN`; any other is audited. A drawing of an
+    assembly (``part.source_kind``) declines ``assembly_sheet``, and a drawing
+    whose label is not served attempts for one key in
+    :data:`DRAWING_AUDIT_ONE_IN` only (``unsampled`` otherwise), both before
+    any lookup."""
     deadline = time.monotonic() + REUSE_SECONDS
     if revoke_refreshed(part):
         raise Declined(
             Decline.FORCED_REFRESH, "a forced cache refresh builds on the seat"
         )
+    if part.kind is BuildKind.DRAWING and part.source_kind is BuildKind.ASSEMBLY:
+        raise Declined(
+            Decline.ASSEMBLY_SHEET,
+            'its real builds do not repeat; see DEVELOPING.md "Drawing reuse"',
+        )
+    if (
+        part.kind is BuildKind.DRAWING
+        and part.label not in DEPENDENT_SERVE_LABELS
+        and not audited(part.key, DRAWING_AUDIT_ONE_IN)
+    ):
+        raise Declined(
+            Decline.UNSAMPLED,
+            f"one drawing key in {DRAWING_AUDIT_ONE_IN} is audited, not this one",
+        )
     reuse.inputs = _current_inputs(part)
-    reuse.children = children = dict(part.describe().children)
+    described = part.describe()
+    reuse.children = children = dict(described.children)
     unreadable = _unreadable(children)
     if not children or unreadable:
         raise Declined(
@@ -2407,7 +2467,7 @@ def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
         )
         raise Declined(reason, _BUNDLE_REASONS[str(failure)])
     with reuse.timed("replay"):
-        _replay_before(part, reuse, deadline)
+        _replay_before(part, reuse, deadline, described.argv)
     replay = reuse.replay or {}
     unjudged = solidworks_named(base.differing, replay)
     if unjudged:
@@ -2439,9 +2499,22 @@ def _prepare_dependent(part: DependentBuild, reuse: Reuse) -> None:
             "SolidWorks opens output-root files the base did not capture that "
             "are no child of this build: " + ", ".join(strangers[:5]),
         )
+    # Staged as stubs (SolidWorks alone opened them in the base, and its
+    # answers come from the log), their bytes are no input a replay judges.
+    stub_reads = [str(rel) for rel in replay.get("stub_reads") or []]
+    if stub_reads:
+        raise Declined(
+            Decline.UNJUDGED_INPUT,
+            "the replayed Python read model(s) only SolidWorks opened in the "
+            "base, staged empty: " + ", ".join(stub_reads[:5]),
+        )
+    # Each opened model's bytes as the replay staged them, hashed once there.
+    staged = {
+        _fold(str(rel)): digest for rel, digest in (replay.get("staged") or {}).items()
+    }
     for rel in opened:
         token = natives[_fold(rel)][1]
-        held = _sha256_file(OUT_ROOT / rel)
+        held = staged.get(_fold(rel))
         if held != token:
             raise Declined(
                 Decline.CHILD_MISMATCH,
@@ -2529,21 +2602,31 @@ def _verdict_decline(shadow: Shadow) -> Decline:
 
 
 def _replay_before(
-    part: PartBuild | DependentBuild, reuse: Reuse, deadline: float
+    part: PartBuild | DependentBuild,
+    reuse: Reuse,
+    deadline: float,
+    argv: tuple[str, ...] = (),
 ) -> None:
     """Replay the current source against the base bundle with SolidWorks
     absent, standing for the base's seat (its own log is the seat log), under
-    the process inputs the build would get. No comparison of Python outputs
-    here: :func:`_verify_outputs` compares the replay's own digests with the
-    base archive's members once a no-op makes downloading it worthwhile, and
-    the export certificate the replay wrote, kept here, with the archive's."""
+    the process inputs the build would get and with the script's arguments
+    (``argv``, a drawing's). No comparison of Python outputs here:
+    :func:`_verify_outputs` compares the replay's own digests with the base
+    archive's members once a no-op makes downloading it worthwhile, and the
+    files whose bytes it compares beyond their digest, kept here: a part's
+    export certificate, a drawing's layout reports (:attr:`Reuse.kept`)."""
     environment = part.environment()
     with _work_directory() as work:
         unbundle(reuse.bundle or b"", work / WORK_BASE)
         log = work / "replay.log"
         reuse.replay_rc = _run(
             _replay_command(
-                part.script, work, work / WORK_BASE / LOG_NAME, None, part.kind
+                part.script,
+                work,
+                work / WORK_BASE / LOG_NAME,
+                None,
+                part.kind,
+                argv,
             ),
             _child_env({"environment": environment}, work / WORK_TMP),
             deadline,
@@ -2555,6 +2638,10 @@ def _replay_before(
             reuse.certificate = (
                 work / WORK_OUTPUT / certificate_path(part.stem)
             ).read_bytes()
+        for rel in (reuse.replay or {}).get("py_outputs") or {}:
+            if _is_layout_report(_fold(rel)):
+                with contextlib.suppress(OSError):
+                    reuse.kept[_fold(rel)] = (work / WORK_OUTPUT / rel).read_bytes()
         with contextlib.suppress(OSError):
             reuse.replay_log = log.read_text("utf-8", errors="replace")[
                 -REUSE_LOG_CHARS:
@@ -2703,12 +2790,13 @@ def _undeclared(outputs: list[Path], members: Iterable[str]) -> list[str]:
 
 
 def _verify_dependent_outputs(part: DependentBuild, reuse: Reuse) -> None:
-    """:func:`_verify_outputs` for an assembly: the replay wrote exactly the
-    base archive's files but those dodo rewrites after any build
+    """:func:`_verify_outputs` for an assembly or drawing: the replay wrote
+    exactly the base archive's files but those dodo rewrites after any build
     (``part.rewritten``, never a replay's), all within the task's declared
-    outputs; each one Python wrote is the archive's byte for byte, with no
-    exception; the native model is among them, its digest the token a reuse
-    must re-stamp."""
+    outputs; each one Python wrote is the archive's byte for byte, but a
+    drawing's layout report, which may differ only by its timing
+    (:func:`_timing_only`); the native model is among them, its digest the
+    token a reuse must re-stamp."""
     replay = reuse.replay or {}
     python = {
         _fold(rel): digest for rel, digest in (replay.get("py_outputs") or {}).items()
@@ -2733,7 +2821,11 @@ def _verify_dependent_outputs(part: DependentBuild, reuse: Reuse) -> None:
             Decline.OUTPUT_SET_DIFFERS,
             f"archive files outside the task's declared outputs: {outside[:5]}",
         )
-    differing = sorted(rel for rel, digest in python.items() if built[rel] != digest)
+    differing = sorted(
+        rel
+        for rel, digest in python.items()
+        if built[rel] != digest and not _timing_only(reuse, rel, digest)
+    )
     if differing:
         raise Declined(
             Decline.PYTHON_OUTPUT_DIFFERS,
@@ -2746,6 +2838,46 @@ def _verify_dependent_outputs(part: DependentBuild, reuse: Reuse) -> None:
             Decline.OUTPUT_SET_DIFFERS, f"the archive holds no native model {native}"
         )
     reuse.token = token
+
+
+def _is_layout_report(rel: str) -> bool:
+    """Is folded output-root path ``rel`` a drawing's layout-audit report?"""
+    return rel.startswith(_fold(LAYOUT_REPORT_DIR) + "/")
+
+
+def _timing_only(reuse: Reuse, rel: str, digest: str) -> bool:
+    """Is the replay's ``rel`` (``digest``) a layout report that is the base
+    archive's but for its timing? Judged on the very bytes the replay
+    reported writing, which :func:`_replay_before` keeps of layout reports
+    alone (:attr:`Reuse.kept`), against the archive's member."""
+    ours = reuse.kept.get(rel)
+    if ours is None or reuse.archive is None:
+        return False
+    if hashlib.sha256(ours).hexdigest() != digest:
+        return False
+    named = {_fold(name): name for name in reuse.members}
+    theirs = _cache.archive_member(reuse.archive, named[rel])
+    return theirs is not None and layout_alike(ours, theirs)
+
+
+def layout_alike(ours: bytes, theirs: bytes) -> bool:
+    """Are layout reports ``ours`` and ``theirs`` the same JSON but for the
+    audit's wall seconds (:data:`LAYOUT_TIMING_FIELDS` of its ``summary``,
+    which each must carry)?"""
+
+    def untimed(data: bytes) -> Any:
+        content = json.loads(data.decode("utf-8"))
+        summary = content["summary"]
+        for name in LAYOUT_TIMING_FIELDS:
+            if not isinstance(summary[name], int | float):
+                raise ValueError(f"summary {name} is no number")
+            summary[name] = None
+        return content
+
+    try:
+        return untimed(ours) == untimed(theirs)
+    except (ValueError, KeyError, TypeError):  # not UTF-8 JSON of a report
+        return False
 
 
 def reuse_record(reuse: Reuse) -> dict[str, Any]:
@@ -3397,6 +3529,12 @@ class OutputCause(StrEnum):
     # (_com_outcome.JAGGED_OUTLINE_CAUSE, the judge's ``pdf_cause``; pinned by
     # test): SolidWorks breaks such an outline along a random wiggle each time.
     JAGGED_OUTLINE = "jagged_outline"
+    # The drawing's PDFs, for the base's request multiset, differ only by path
+    # pieces too short to print apart, the text the same
+    # (_com_outcome.SUB_RESOLUTION_INK_CAUSE, the judge's ``pdf_cause``;
+    # pinned by test). 2026-11-15: mg_magnifier_assembly and
+    # fr_frame_assembly, at most 0.092 mm, from the seat's component order.
+    SUB_RESOLUTION_INK = "sub_resolution_ink"
     # The drawing display the sheet picks hit-tested in (com_replay._display:
     # view window or px/mm), as the two recordings' answers report it.
     SEAT_DISPLAY = "seat_display"
@@ -3409,16 +3547,16 @@ def _output_judgement(
 ) -> tuple[OutputJudgement | None, OutputCause | None]:
     """The judgement of a NOOP split (``None`` for any other) and, for an
     output nondeterminism, its cause: a PDF that differs only by a jagged
-    outline first, then the display, which explains answers that differ
-    with it."""
+    outline or by sub-resolution ink first, then the display, which explains
+    answers that differ with it."""
     if shadow.verdict != Split.NOOP:
         return None, None
     if shadow.outcome == "same":
         return OutputJudgement.CONFIRMED, None
     if shadow.outcome != "different":
         return OutputJudgement.OUTCOME_UNKNOWN, None
-    if shadow.pdf_cause == OutputCause.JAGGED_OUTLINE:
-        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.JAGGED_OUTLINE
+    if shadow.pdf_cause in (OutputCause.JAGGED_OUTLINE, OutputCause.SUB_RESOLUTION_INK):
+        return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause(shadow.pdf_cause)
     if display is not None and base_display is not None and display != base_display:
         return OutputJudgement.OUTPUT_NONDETERMINISM, OutputCause.SEAT_DISPLAY
     if shadow.outcome_signals.get("answers") == "different":
@@ -3661,6 +3799,8 @@ def _judge_dependent(
         seat = "SolidWorks answered some request otherwise"
         if cause is OutputCause.JAGGED_OUTLINE:
             seat = "SolidWorks broke a jagged crop outline along another wiggle"
+        if cause is OutputCause.SUB_RESOLUTION_INK:
+            seat = "the PDFs differ only by path pieces too short to print apart"
         if cause is OutputCause.SEAT_DISPLAY:
             seat = (
                 f"the base's display {fields['base_display']}, this build's "
@@ -3823,8 +3963,8 @@ def _audit_judgement(
     """An audited would-be reuse judged as a part's replay no-op is
     (:attr:`Shadow.noop_judgement`, on this build's comparison with the base
     the attempt chose), but another output the comparison explains by the
-    seat (a jagged crop outline, the drawing display) is an
-    :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`, never an alarm, when the
+    seat (a jagged crop outline, sub-resolution ink, the drawing display) is
+    an :attr:`OutputJudgement.OUTPUT_NONDETERMINISM`, never an alarm, when the
     seat led: the requests were the base's, or SolidWorks answered otherwise
     first (a ``response:`` cause). A comparison that judged nothing is
     ``noop_outcome_unknown``."""
@@ -3841,7 +3981,11 @@ def _audit_judgement(
         return judgement, None
     display = compared.display or {}
     _, cause = _output_judgement(judged, display.get("new"), display.get("base"))
-    if cause in (OutputCause.JAGGED_OUTLINE, OutputCause.SEAT_DISPLAY):
+    if cause in (
+        OutputCause.JAGGED_OUTLINE,
+        OutputCause.SUB_RESOLUTION_INK,
+        OutputCause.SEAT_DISPLAY,
+    ):
         return OutputJudgement.OUTPUT_NONDETERMINISM, cause
     return judgement, None
 
@@ -3852,13 +3996,13 @@ def _audit_dependent(
     record: dict[str, Any],
     judged: tuple[str, Shadow] | None = None,
 ) -> None:
-    """An assembly whose attempt was ``audited`` (every check held, so a
+    """An assembly or drawing whose attempt was ``audited`` (every check held, so a
     reuse would have served its base's archive), after its build: this
     build's recording compared with that base and judged
     (:func:`_audit_judgement`). The comparison is the split's when the judge
     chose the same base (``judged``: its base key and comparison), else made
     here on the bundle the attempt verified (:func:`_compare_dependent`). A
-    ``soundness_alarm`` (another assembly than the base's) is an ERROR and
+    ``soundness_alarm`` (another output than the base's) is an ERROR and
     revokes the base; an output nondeterminism, an unexplained divergence or
     an unknown outcome is a WARN. Fills ``record``'s ``audit*`` fields; never
     raises."""
