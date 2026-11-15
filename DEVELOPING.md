@@ -246,7 +246,9 @@ variables above to restore defaults on the next build process.
 A cached verdict stands until the sheet's ink changes, so a review that was
 lenient once is never asked again. The opt-in `review_sweep` task (#2714)
 reviews older sheets again without blocking anything. It is not in `build` or
-`release`, never fails the invocation, and never replaces a cached verdict:
+`release`, never fails the invocation on a FIX, a finding or a review error
+(only a malformed `HARMONIC_REVIEW_SWEEP_DAYS` is refused), and never replaces
+a cached verdict:
 
 ```powershell
 $env:HARMONIC_REVIEW_SWEEP_DAYS = '30'   # default; a whole number of days, or 'all'
