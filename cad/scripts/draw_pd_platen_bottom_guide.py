@@ -100,8 +100,13 @@ FRONT_KEEP = {
     "LockTapY": (_LEFT_X - 0.012, FRONT_CENTER[1]),
 }
 RIGHT_KEEP = {"Depth": (0.341, 0.085)}
-LOCK_CALLOUT_XY = (0.090, 0.150)
-PLATEN_CALLOUT_XY = (0.215, 0.150)
+# Both front-view tap callouts sit between the views, clear under the top
+# view (its underside ~0.155) so the counterbore leader into it runs past
+# them; the platen-tap leader takes the middle hole, right of the lock taps,
+# so the two leaders never cross (first farm render, r2).
+LOCK_CALLOUT_XY = (0.090, 0.1435)
+PLATEN_CALLOUT_XY = (0.215, 0.1435)
+PLATEN_CALLOUT_HOLE = len(PLATEN_TAP_X) // 2
 SCREW_CALLOUT_XY = (0.150, 0.200)
 PLATEN_NUMBER = _config.parts("pd-platen")["number"]
 RACK_NUMBER = _config.parts("pd-feed-rack")["number"]
@@ -224,7 +229,8 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, station, diameter, xy, below, label in (
         (front, LOCK_TAP_X[0], _TAP_DRILL, LOCK_CALLOUT_XY, LOCK_CALLOUT_BELOW,
          f"lock taps ({LOCK_TAP_SPEC.size})"),
-        (front, PLATEN_TAP_X[0], _TAP_DRILL, PLATEN_CALLOUT_XY, PLATEN_CALLOUT_BELOW,
+        (front, PLATEN_TAP_X[PLATEN_CALLOUT_HOLE], _TAP_DRILL, PLATEN_CALLOUT_XY,
+         PLATEN_CALLOUT_BELOW,
          f"platen-screw taps ({PLATEN_TAP_SPEC.size})"),
         (top, SCREW_HOLE_X[0], SCREW_CBORE_DIA, SCREW_CALLOUT_XY, SCREW_CALLOUT_BELOW,
          "rack-screw counterbores"),

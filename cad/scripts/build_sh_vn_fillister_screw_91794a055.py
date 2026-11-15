@@ -71,18 +71,18 @@ if SPEC.skus != (SKU,):
 CONFIGURATIONS = shared.CONFIGURATIONS
 # Each member's length under the head, the tip at y = -length.
 LENGTHS = {
-    disc.CONFIGURATION: disc.CUT_LENGTH,
     rack.CONFIGURATION: rack.LENGTH,
+    disc.CONFIGURATION: disc.CUT_LENGTH,
 }
 DESCRIPTIONS = {
-    disc.CONFIGURATION: disc.BOM_DESCRIPTION,
     rack.CONFIGURATION: rack.BOM_DESCRIPTION,
+    disc.CONFIGURATION: disc.BOM_DESCRIPTION,
 }
 # Parents before dependents (set_member_suppression hides in reverse).
 DISC_CUT_FEATURES = ("DiscCutProfile", "DiscCut")
 MEMBER_FEATURES: dict[str, tuple[str, ...]] = {
-    disc.CONFIGURATION: DISC_CUT_FEATURES,
     rack.CONFIGURATION: (),
+    disc.CONFIGURATION: DISC_CUT_FEATURES,
 }
 if tuple(LENGTHS) != CONFIGURATIONS or tuple(MEMBER_FEATURES) != CONFIGURATIONS:
     raise AssertionError("each registered member needs its length and features")
@@ -196,7 +196,7 @@ async def _save_members(adapter, part_name, suppressed_features):
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
     )
     artefacts = await save_simplified_part(adapter, part_name, suppressed_features)
-    # save_simplified_part leaves the saved native open, DiscScrew active; no
+    # save_simplified_part leaves the saved native open, RackScrew active; no
     # native save may follow the member exports.
     await export_member_configurations(adapter, part_name, CONFIGURATIONS)
     return artefacts

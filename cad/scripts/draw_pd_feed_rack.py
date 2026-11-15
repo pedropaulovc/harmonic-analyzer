@@ -294,9 +294,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=END_SCALE)
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # The taps are fully defined by their native callout (rule 9).
-    for view in (front, bottom, end):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The taps are fully defined by their native callout (rule 9). The
+    # isometric joins the loop so finalize can lift its cosmetic threads to
+    # precise Shaded With Edges (PR #1436).
+    for view in (front, bottom, end, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -346,7 +348,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the callout already states the thread.
     removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
-    for view in (front, bottom, end):
+    for view in (front, bottom, end, iso):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(
         adapter,

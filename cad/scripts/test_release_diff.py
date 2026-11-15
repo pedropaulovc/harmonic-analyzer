@@ -70,8 +70,8 @@ FAMILIES = GROUPS + KITS
 INTRODUCED = [
     ("sh-vn-pivot-pin", "MHA-SH-VN-58", "RodPin", ("RodPin", "BarPin")),
     (
-        "sh-vn-fillister-screw-91794a055", "MHA-SH-VN-59", "DiscScrew",
-        ("DiscScrew", "RackScrew"),
+        "sh-vn-fillister-screw-91794a055", "MHA-SH-VN-59", "RackScrew",
+        ("RackScrew", "DiscScrew"),
     ),
 ]
 INTRODUCED_RETIRED = {

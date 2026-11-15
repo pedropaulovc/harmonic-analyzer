@@ -328,7 +328,7 @@ def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
 
 def test_one_part_two_members_in_registry_order() -> None:
     """One SKU in two modelled forms is Shared (subsystem-identities.md): the
-    default DiscScrew is the cut disc screw, RackScrew the stock one."""
+    default RackScrew is the stock screw, DiscScrew the cut disc screw."""
     metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == entry.__name__
     assert metadata.callable_name == entry.build_91794A055.__name__
@@ -341,10 +341,10 @@ def test_one_part_two_members_in_registry_order() -> None:
     assert row["number"] == "MHA-SH-VN-59"
     assert row["supplier_skus"] == [screw.SKU]
     assert row["stock_name"] == part.SPEC.stock_name
-    assert row["default_configuration"] == "DiscScrew"
-    assert row["configuration_quantities"] == {"DiscScrew": 3, "RackScrew": 4}
+    assert row["default_configuration"] == "RackScrew"
+    assert row["configuration_quantities"] == {"RackScrew": 4, "DiscScrew": 3}
     assert int(row["quantity"]) == 7
-    assert shared.CONFIGURATIONS == ("DiscScrew", "RackScrew")
+    assert shared.CONFIGURATIONS == ("RackScrew", "DiscScrew")
     assert (screw.STEM, screw.CONFIGURATION) == (shared.PART_STEM, "DiscScrew")
     assert (rack.STEM, rack.CONFIGURATION) == (shared.PART_STEM, "RackScrew")
     assert screw.UNIT == shared.UNIT == "in"
@@ -447,27 +447,28 @@ def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -
     assert artefacts == {"part": "p"}
     kinds = [event[0] for event in events]
     assert events[kinds.index("create_member_configurations")][1:] == (
-        part.PART_NAME, ("DiscScrew", "RackScrew"),
+        part.PART_NAME, ("RackScrew", "DiscScrew"),
     )
     selected = [e[1:] for e in events if e[0] == "select_member_features"]
     assert selected == [
-        ("DiscScrew", part.MEMBER_FEATURES), ("RackScrew", part.MEMBER_FEATURES),
+        ("RackScrew", part.MEMBER_FEATURES), ("DiscScrew", part.MEMBER_FEATURES),
     ]
-    assert [e[1] for e in events if e[0] == "_require_tip"] == ["DiscScrew", "RackScrew"]
+    assert [e[1] for e in events if e[0] == "_require_tip"] == ["RackScrew", "DiscScrew"]
     assert [e[1:3] for e in events if e[0] == "apply_member_properties"] == [
-        (part.PART_NAME, "DiscScrew"), (part.PART_NAME, "RackScrew"),
+        (part.PART_NAME, "RackScrew"), (part.PART_NAME, "DiscScrew"),
     ]
-    assert [e[1:] for e in events if e[0] == "apply_member_properties"][0][2] == (
+    assert [e[1:] for e in events if e[0] == "apply_member_properties"][1][2] == (
         screw.BOM_DESCRIPTION
     )
     # Every catalogue reference, the stock length included, rides the part.
     (reference,) = [e for e in events if e[0] == "add_supplier_reference_sketch"]
     assert reference[1] == supplier_module().SUPPLIER_REFERENCE_DIMENSIONS
-    # The default member is active for the save; the member exports follow it.
+    # The default member, the drawing's, is active for the save; the member
+    # exports follow it.
     assert kinds.index("activate_member") < kinds.index("save_simplified_part")
-    assert events[kinds.index("activate_member")][1] == "DiscScrew"
+    assert events[kinds.index("activate_member")][1] == shared.DRAWING_CONFIGURATION
     assert kinds[-2:] == ["save_simplified_part", "export_member_configurations"]
-    assert events[-1][1:] == (part.PART_NAME, ("DiscScrew", "RackScrew"))
+    assert events[-1][1:] == (part.PART_NAME, ("RackScrew", "DiscScrew"))
 
 
 def supplier_module():

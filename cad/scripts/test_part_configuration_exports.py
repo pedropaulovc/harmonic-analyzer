@@ -22,7 +22,7 @@ _MEMBERS = {
     "sh-vn-clamping-kit-hardware": ("HoldDownStud", "TNut", "FlangeNut"),
     "sh-vn-music-wire": ("LeverWire", "PenWire"),
     "sh-vn-pivot-pin": ("RodPin", "BarPin"),
-    "sh-vn-fillister-screw-91794a055": ("DiscScrew", "RackScrew"),
+    "sh-vn-fillister-screw-91794a055": ("RackScrew", "DiscScrew"),
 }
 _MEMBER_CASES = [
     (stem, member) for stem, members in _MEMBERS.items() for member in members

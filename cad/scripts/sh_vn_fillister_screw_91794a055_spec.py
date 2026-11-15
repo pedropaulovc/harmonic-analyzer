@@ -31,7 +31,9 @@ UNIT = drawing_unit(
 
 DISC_SCREW_CONFIGURATION = "DiscScrew"
 RACK_SCREW_CONFIGURATION = "RackScrew"
-# The registry order: default member first.
-CONFIGURATIONS = (DISC_SCREW_CONFIGURATION, RACK_SCREW_CONFIGURATION)
+# The registry order: default member first, the screw as supplied. It is the
+# saved active member (the neutral export's) and the purchase drawing's, so
+# the drawing's supplier references are proved against the active source.
+CONFIGURATIONS = (RACK_SCREW_CONFIGURATION, DISC_SCREW_CONFIGURATION)
 # The member the purchase drawing's views show: the screw as supplied.
 DRAWING_CONFIGURATION = RACK_SCREW_CONFIGURATION
