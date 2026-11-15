@@ -3194,15 +3194,15 @@ def test_an_audited_key_builds_on_the_seat(blob, tmp_path, monkeypatch, spans):
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (None, ("reuse", "audit", "shadow")),
+        (None, ("reuse", "reuse", "shadow")),
         ("reuse", ("reuse", "reuse", "shadow")),
         ("audit", ("audit", "audit", "shadow")),
         ("record", ("record", "record", "record")),
         ("off", ("off", "off", "off")),
         ("shadow,drawing=off", ("shadow", "shadow", "off")),
         ("assembly=record", ("reuse", "record", "shadow")),
-        ("drawing=reuse", ("reuse", "audit", "shadow")),
-        (" Drawing = Record , part=off ", ("off", "audit", "record")),
+        ("drawing=reuse", ("reuse", "reuse", "shadow")),
+        (" Drawing = Record , part=off ", ("off", "reuse", "record")),
         ("off,assembly=shadow", ("off", "shadow", "off")),
     ],
 )

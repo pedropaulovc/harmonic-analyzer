@@ -3,8 +3,8 @@ parts from it (dodo's side).
 
 One switch, read here and nowhere else (:func:`mode`): ``HARMONIC_COM_REPLAY``
 = ``off`` | ``record`` | ``shadow`` | ``audit`` | ``reuse``, for every kind or
-per kind (``drawing=off``); unset, :data:`DEFAULT_MODES` (parts ``reuse``,
-assemblies ``audit``, drawings ``shadow``, the highest they have). The bullets
+per kind (``drawing=off``); unset, :data:`DEFAULT_MODES` (parts and
+assemblies ``reuse``, drawings ``shadow``, the highest they have). The bullets
 below are parts'; the last one is what differs for assemblies and drawings.
 
 * ``off``: a part build runs exactly as it did before recording existed: the
@@ -256,11 +256,12 @@ class BuildKind(StrEnum):
 # The fleet switch, per kind: farm workers get no submitter environment, so a
 # fleet-wide change of mode is a change of these defaults. Nothing of a
 # drawing's recording is ever reused: ``shadow`` is the highest mode it has
-# (_HIGHEST_MODES). An assembly's reuse ships audited: serving one is a change
-# of its default to ``reuse``.
+# (_HIGHEST_MODES). An assembly is served only for a label in
+# DEPENDENT_SERVE_LABELS, and audited otherwise: back to ``audit`` stops
+# serving every one of them.
 DEFAULT_MODES: dict[BuildKind, ReplayMode] = {
     BuildKind.PART: ReplayMode.REUSE,
-    BuildKind.ASSEMBLY: ReplayMode.AUDIT,
+    BuildKind.ASSEMBLY: ReplayMode.REUSE,
     BuildKind.DRAWING: ReplayMode.SHADOW,
 }
 _HIGHEST_MODES: dict[BuildKind, ReplayMode] = {

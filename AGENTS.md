@@ -1033,8 +1033,8 @@ cache role that can publish (`rw`) is recorded through
 unrecorded. Off the seat, it is then replayed against the nearest
 earlier recording and judged, as telemetry. `HARMONIC_COM_REPLAY=off` is the
 kill switch; the other values are `record`, `shadow` (observe only: nothing is
-reused), `audit` (replayed and judged, nothing served: assemblies' default) and
-`reuse` (parts' default). A recorder fault after a
+reused), `audit` (replayed and judged, nothing served) and
+`reuse` (the default for parts and assemblies). A recorder fault after a
 call's result is in hand stops recording and the build finishes as its own
 (nothing published); one that leaves the build's results untrustworthy exits
 92, and the build is then re-run once unrecorded. Every COM subprocess runs
@@ -1128,7 +1128,7 @@ part or an assembly). The record driver splits the script's arguments at the
 first `--` itself (argparse before 3.12.7 rejects them). Recording changes no
 output, exit code or cache key. See DEVELOPING.md "Assemblies and drawings".
 
-**Assembly reuse (`audit`, the default).** On an assembly key miss under `rw`,
+**Assembly reuse (`reuse`, the default).** On an assembly key miss under `rw`,
 before the seat, `reuse_attempt` replays the current source against the nearest
 recording of the stem made on the same children (every child's `.execution`
 token; a stem whose bound recordings were all made on other children declines
@@ -1138,19 +1138,20 @@ Every part check holds, and each model the replay opened must hold its token's
 bytes (`child_mismatch`); unlike a part's, document title counters the script
 echoes (`Assem3`) are accepted, counted (`title_echoes`) and audited. A replay
 that raised names the exception, its message and innermost frame in its
-detail. In `audit` (`DEFAULT_MODES[BuildKind.ASSEMBLY]`) the attempt is
-`audited`: the leaf builds on the seat as before and, after the store, its
-recording is judged against that base (`audit=` a part no-op's judgement, or
+detail. A would-be reuse of a label outside `DEPENDENT_SERVE_LABELS` (the
+measuring stick, the magnifier and two fixtures), one key in four of those
+(`DEPENDENT_AUDIT_ONE_IN`), and every one in `audit` is `audited`: the leaf
+builds on the seat as before and, after the store, its recording is judged
+against that base (`audit=` a part no-op's judgement, or
 `output_nondeterminism` when the seat led and its display explains another
 output; `unjudged` with `audit_why` when nothing judges it: a REFRESH tier, a
 peer that published the key first, no recording); a `SOUNDNESS ALARM` (another
-assembly than the would-be reuse's) is an ERROR and revokes the base. Only
-`reuse` (`HARMONIC_COM_REPLAY=reuse` included), for a label in
-`DEPENDENT_SERVE_LABELS` (the measuring stick, the magnifier and two fixtures),
-installs the base's archive as a part reuse does, still auditing one key in
-four (`DEPENDENT_AUDIT_ONE_IN`). To stop assembly replays fleet-wide, set
-`DEFAULT_MODES[BuildKind.ASSEMBLY] = ReplayMode.SHADOW` and launch from that
-commit; locally `HARMONIC_COM_REPLAY=assembly=shadow`. See DEVELOPING.md
+assembly than the would-be reuse's) is an ERROR and revokes the base. Any
+other installs the base's archive as a part reuse does
+(`DEFAULT_MODES[BuildKind.ASSEMBLY] = ReplayMode.REUSE`). To stop serving
+assemblies fleet-wide, set it to `ReplayMode.AUDIT` (`SHADOW`: no assembly
+replays at all) and launch from that commit; locally
+`HARMONIC_COM_REPLAY=assembly=audit`. See DEVELOPING.md
 "Assembly reuse".
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
