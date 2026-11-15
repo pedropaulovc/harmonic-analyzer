@@ -1895,7 +1895,8 @@ def sub_step(key: str, index: int) -> str:
 LOCK_TRANSFER_SCREWS = 4 * 2
 BOM_EXPENDABLES_NOTE = (
     f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}:\n"
-    f"{sub_step('rack-screwed', 0)} MAKES THEM TRANSFER SCREWS.\n"
+    f"{sub_step('rack-screwed', 0)}-{sub_step('rack-screwed', 2)} MAKE THEM "
+    "TRANSFER SCREWS.\n"
     f"{sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS} #4-40 TRANSFER\n"
     "SCREWS, A SHOP TOOL."
 )
@@ -2097,16 +2098,22 @@ def _step_text(
         # the guide's top; the guide's four holes are struck from the strip's
         # taps (delegated ruling 2026-11-14 (Main)), the strip's front face
         # set behind the guide's front face against a rule.
-        # One action per sub-step (rule 22; machinist review r3, r5).
+        # One action per sub-step (rule 22; machinist review r3, r5). The
+        # transfer screws keep a grip for the pliers (codjiflo P2 on 19ef870):
+        # run in by fingers short of the tap's end, never bottomed against
+        # the tooth-root wall (RV-03), and the strip pressed square on the
+        # four points, which lie on its centreline and so stay on the roll
+        # axis of any tilt.
         "rack-screwed": (
-            f"SCREW A SPARE {n[explode.RACK_SCREW]} SCREW INTO EACH OF THE "
-            f"{n['pd-feed-rack']} RACK'S {RACK_SCREWS} TAPS UNTIL IT STOPS.",
-            "CUT EACH SCREW OFF .03 PROUD OF THE RACK'S FLAT TOP.",
+            f"SCREW A SPARE {n[explode.RACK_SCREW]} BY FINGERS INTO EACH OF THE "
+            f"{n['pd-feed-rack']} RACK'S {RACK_SCREWS} TAPS UNTIL IT STOPS TURNING "
+            "FREELY, NOT BOTTOMED.",
+            "CUT EACH SCREW OFF, LEAVING A PLIERS GRIP PROUD OF THE FLAT TOP.",
             "FILE EACH CUT END TO A POINT: THESE ARE THE TRANSFER SCREWS.",
-            f"CLAMP THE RACK, TEETH DOWN, TO THE {n['pd-platen-bottom-guide']} "
-            "BOTTOM GUIDE'S UNDERSIDE, ENDS FLUSH, ITS FRONT FACE "
-            f"{steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S FRONT FACE, SET "
-            "AGAINST A RULE.",
+            f"CLAMP THE RACK, TEETH DOWN, PRESSED SQUARE ON ITS {RACK_SCREWS} "
+            f"POINTS, TO THE {n['pd-platen-bottom-guide']} GUIDE'S UNDERSIDE, ENDS "
+            f"FLUSH, ITS FRONT FACE {steps.RACK_FRONT_SET_TEXT} BEHIND THE GUIDE'S "
+            "FRONT FACE, SET AGAINST A RULE.",
             f"SQUEEZE THE CLAMPS TO STRIKE THE {RACK_SCREWS} MARKS.",
             "UNCLAMP THE RACK.",
             "UNSCREW THE TRANSFER SCREWS WITH PLIERS.",

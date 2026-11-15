@@ -421,13 +421,23 @@ def test_bom_sheet_lists_what_the_steps_use_up() -> None:
     and steps on the BOM sheet."""
     note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
     assert f"{drawing.RACK_SCREWS} MORE {_number(explode.RACK_SCREW)}" in note
-    assert f"{drawing.sub_step('rack-screwed', 0)} MAKES THEM TRANSFER SCREWS" in note
+    made = f"{drawing.sub_step('rack-screwed', 0)}-{drawing.sub_step('rack-screwed', 2)}"
+    assert f"{made} MAKE THEM TRANSFER SCREWS" in note
     assert f"{drawing.sub_step('platen-hung', 0)} USES 8 #4-40 TRANSFER SCREWS" in note
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     rack = " ".join(texts["rack-screwed"][:3])
     assert f"SPARE {_number(explode.RACK_SCREW)}" in rack and "TRANSFER SCREWS" in rack
     hung = _step_body("platen-hung")
     assert "2ND, 4TH, 6TH AND 8TH OF EACH" in hung and "#4-40 TRANSFER SCREW" in hung
+    # Codjiflo P2 on 19ef870: the pointed screws keep a pliers grip, are run
+    # in by fingers short of bottoming, and the strip is pressed square on
+    # its points (they lie on its centreline, the roll axis of any tilt).
+    made_steps = texts["rack-screwed"]
+    assert "BY FINGERS" in made_steps[0] and "NOT BOTTOMED" in made_steps[0]
+    assert "PLIERS GRIP" in made_steps[1]
+    assert f"PRESSED SQUARE ON ITS {drawing.RACK_SCREWS} POINTS" in made_steps[3]
+    assert any(text == "UNSCREW THE TRANSFER SCREWS WITH PLIERS." for text in made_steps)
+    assert all("PROUD" not in text or "GRIP" in text for text in made_steps)
 
 
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
