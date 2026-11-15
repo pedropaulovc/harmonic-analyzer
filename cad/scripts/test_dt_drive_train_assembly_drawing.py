@@ -621,6 +621,20 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "FEELER" not in check and "LEAVES" not in check
 
 
+def test_the_run_check_accepts_end_gear_shake_but_no_bind_or_skip() -> None:
+    """Owner ruling 2026-11-14 on #2584 (option A): a gear past the binds
+    that hold the cone line may run loose; the sheet states it as a plain
+    fact naming those gears by the 4E binds.  Check 4R, the run after the
+    lock, still refuses a bind, and its remedy (4S) still follows it."""
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    (run,) = re.findall(r"(?<![-\w])4R\. [^.]*\.", check)
+    assert f"{drawing.CHECK_RUN_CRANK_TURNS} TURNS" in run
+    assert "NEVER BIND" in run
+    assert "4E" in run and "SHAKE" in run
+    assert "ACCEPT" not in run
+    assert check.index(run) < check.index("4S. IF ONE BINDS")
+
+
 def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
     """Check 4J sends the fitter to the recheck table's last column, and every
     row has a remedy naming that end's gears (X) or its indicator (Y); the
