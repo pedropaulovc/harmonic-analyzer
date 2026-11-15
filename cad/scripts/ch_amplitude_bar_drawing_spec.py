@@ -18,7 +18,7 @@ from ch_amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT, UNIT
 # sliding face, symbol on the floor in DETAIL A (Main ruling 2026-09-27, Codex
 # #936 PRRT_kwDOPHDy386mWF0L). drawing-simplicity-policy.md rule 6 grades the
 # amplitude-bar slide MACHINED_UM (1.6 um, 63 uin on the inch sheet); a ground
-# 32 asks the shop for more than a chrome-plated slide on the rocker needs
+# 32 asks the shop for more than a polished bar sliding on the rocker needs
 # (machinist review, #1293).
 # PlanarFace offsets run ALONG the outward normal (point . normal): the floor
 # looks -Y, down into the notch, from y = BOTTOM_NOTCH_HEIGHT; the ledges' -Y

@@ -1,6 +1,6 @@
 r"""Reproduction script: amplitude bar (book ch. 15, pp. 30-33).
 
-One of the 20 chrome-finished bars (~81 cm long, 1/4" square) that set each
+One of the 20 polished-steel bars (~81 cm long, 1/4" square) that set each
 channel's Fourier coefficient. The bottom-end notch rides the rocker arm;
 the deeper top-end notch straddles the channel lever and hangs from the
 MHA-SH-VN-58 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
