@@ -15,6 +15,7 @@ import sys
 from typing import Any
 
 import _mcmaster_91794a055 as supplier
+from _drawing_annotation_extent import move_annotation
 import _telemetry
 import sh_vn_fillister_screw_91794a055_spec as shared
 from _machinist_review_mode import MachinistReviewMode
@@ -41,13 +42,17 @@ ITEM = "#0-80 x 1/4 FILLISTER HEAD SLOTTED SCREW"
 # test_sh_vn_fillister_screw_91794a055_drawing pins it to the key.
 CUT_STEP = 16
 # The stock-length witness stands left of the screw (its start is -HEAD_DIA),
-# so its dimension and AS-SUPPLIED STOCK LENGTH print there, clear of the
-# shank; the head height takes the right (machinist review, r3).
+# so its dimension and AS-SUPPLIED STOCK LENGTH print there; the head height
+# takes the right (machinist review, r3). The qualifier is ~61 mm wide and
+# centred on its 6 mm lane ran ~14 mm onto the shank (r4), so the dimension
+# moves 24 mm further left: the text ends ~7 mm short of the shank, the
+# extension lines carried out.
 SIDES = {
     **supplier.SUPPLIER_REFERENCE_SIDES,
     "SupplierStockLength": "left",
     "SupplierHeadHeight": "right",
 }
+STOCK_LENGTH_SHIFT_M = 0.024
 GENERAL_TEXT = (
     f"PURCHASED PART, VIEWS AS SUPPLIED. DISC SCREWS CUT PER MHA-PD-00 STEP {CUT_STEP}."
 )
@@ -63,7 +68,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callback_count += 1
         if callback_count != 1:
             raise RuntimeError("supplier dimensions callback must run exactly once")
-        annotate_supplier_screw(
+        displays = annotate_supplier_screw(
             adapter,
             views_by_orientation,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
@@ -72,6 +77,13 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=SIDES,
             settled_checks=supplier_checks,
+        )
+        move_annotation(
+            adapter,
+            displays["SupplierStockLength"].GetAnnotation(),
+            -STOCK_LENGTH_SHIFT_M,
+            0.0,
+            label="supplier stock length",
         )
 
     def assert_supplier_dimensions_settled():

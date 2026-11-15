@@ -99,12 +99,17 @@ FRONT_KEEP = {
     "LockTap4X": (_LEFT_X + LOCK_TAP_X[3] / 2000.0, 0.086),
     "LockTapY": (_LEFT_X - 0.012, FRONT_CENTER[1]),
 }
-# The depth's limits and clearance text stand over the right view, clear of
-# the length's right extension line (machinist review, r3).
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.150)}
+# The depth's limits and clearance text are wider than the 10 mm right view:
+# centred over it (r3, r4) both extension lines ran up into CLEAR MHA-PD-19,
+# so the text stands left of the left extension line, the dimension line
+# carried out, clear right of the top view and above the height's arrow.
+RIGHT_KEEP = {"Depth": (0.358, 0.153)}
 # The height's .XXX band is half of the counterbore floor's band, which the
-# rack screws' worst engagement pays (pd_feed_rack_spec.SCREW_FLOOR_BAND).
-HEIGHT_CALLOUT = "SETS RACK-SCREW\nENGAGEMENT"
+# rack screws' worst engagement pays (pd_feed_rack_spec.SCREW_FLOOR_BAND); the
+# band names its mate by number (rule 4, r4), two lines that fit between the
+# front and right views.
+SCREW_NUMBER = _config.parts("sh-vn-fillister-screw-91794a055")["number"]
+HEIGHT_CALLOUT = f"SETS ENGAGEMENT\nOF {SCREW_NUMBER}"
 # Both front-view tap callouts sit between the views, clear under the top
 # view (its underside ~0.155) so the counterbore leader into it runs past
 # them; the platen-tap leader takes the middle hole, right of the lock taps,

@@ -191,7 +191,17 @@ def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
     height_x = drawing.FRONT_KEEP["Height"][0]
     assert rail_end < height_x - half_text
     assert height_x + half_text < right_left
-    # The depth's text stands over the right view, above the front view's top.
+    # The depth's text is wider than the right view, so it stands left of the
+    # view's left extension line, right of the top view's end, above the
+    # front view's top (r4: centred, both extension lines struck it).
     depth_x, depth_y = drawing.RIGHT_KEEP["Depth"]
-    assert depth_x == drawing.RIGHT_CENTER[0]
+    half_depth = (
+        0.0028 * max(len(line) for line in spec.GUIDE_DEPTH_CALLOUT.splitlines()) / 2.0
+    )
+    assert rail_end < depth_x - half_depth
+    assert depth_x + half_depth < right_left
     assert depth_y > drawing.FRONT_CENTER[1] + spec.GUIDE_HEIGHT / 1000.0
+
+
+def test_the_height_band_names_its_screw_by_number() -> None:
+    assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-SH-VN-59"]

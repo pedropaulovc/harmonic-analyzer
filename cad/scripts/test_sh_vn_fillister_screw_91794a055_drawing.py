@@ -505,6 +505,12 @@ def test_the_sheet_shows_the_supplied_rack_screw_with_every_catalogue_reference(
     supplier = supplier_module()
     seen: dict = {}
     annotated: dict = {}
+    moved: list = []
+    stock_annotation = object()
+
+    class StockDisplay:
+        def GetAnnotation(self):
+            return stock_annotation
 
     async def fake_drawing(adapter, spec, **kwargs):
         seen.update(kwargs, spec=spec)
@@ -514,9 +520,14 @@ def test_the_sheet_shows_the_supplied_rack_screw_with_every_catalogue_reference(
     def fake_annotate(adapter, views, **kwargs):
         annotated.update(kwargs)
         kwargs["settled_checks"].append(lambda: None)
+        return {"SupplierStockLength": StockDisplay()}
+
+    def fake_move(adapter, annotation, dx, dy, *, label):
+        moved.append((annotation, dx, dy))
 
     monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", fake_drawing)
     monkeypatch.setattr(drawing, "annotate_supplier_screw", fake_annotate)
+    monkeypatch.setattr(drawing, "move_annotation", fake_move)
     asyncio.run(drawing.build(None))
     assert seen["spec"] is drawing.SPEC
     assert drawing.SPEC.artifact_stem == part.PART_NAME
@@ -538,6 +549,9 @@ def test_the_sheet_shows_the_supplied_rack_screw_with_every_catalogue_reference(
         sides=annotated["sides"],
     )
     assert plan["SupplierStockLength"][0] == "left"
+    # Its ~61 mm qualifier, centred on the lane, ran onto the shank (r4):
+    # the whole dimension moves further left, once.
+    assert moved == [(stock_annotation, -drawing.STOCK_LENGTH_SHIFT_M, 0.0)]
     (settled,) = seen["settled_checks"]
     settled()
     assert supplier.SHANK_LEN == pytest.approx(0.25 * 25.4)
