@@ -4148,7 +4148,7 @@ def _census_live_components(*, label: str) -> None:
         real = getattr(obj, "_real", None) if name == "RecordingProxy" else None
         if real is not None:
             return f"RecordingProxy[{type(real).__name__}]"
-        module = type(obj).__module__ or ""
+        module = type(obj).__dict__.get("__module__") if isinstance(type(obj).__dict__.get("__module__"), str) else ""
         if name in ("CDispatch", "PyIDispatch") or "_generated" in module or "win32com.gen_py" in module:
             return name
         return None
