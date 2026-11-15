@@ -406,16 +406,6 @@
       ]
     },
     {
-      "old_stem": "pd-platen-rack",
-      "old_number": "MHA-PD-005",
-      "new_identities": [
-        {
-          "stem": "pd-platen-rack",
-          "number": "MHA-PD-05"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-platen",
       "old_number": "MHA-PD-002",
       "new_identities": [
@@ -2436,6 +2426,28 @@
           "number": "MHA-CH-06-TL-VN-85"
         }
       ]
+    },
+    {
+      "old_stem": "pd-feed-rack",
+      "old_number": null,
+      "introduced": "2026-11-13",
+      "new_identities": [
+        {
+          "stem": "pd-feed-rack",
+          "number": "MHA-PD-26"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-bottom-guide",
+      "old_number": null,
+      "introduced": "2026-11-13",
+      "new_identities": [
+        {
+          "stem": "pd-platen-bottom-guide",
+          "number": "MHA-PD-27"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -3018,6 +3030,17 @@
         }
       ],
       "status": "retired"
+    },
+    {
+      "old_stem": "pd-platen-rack",
+      "old_number": "MHA-PD-005",
+      "new_identities": [
+        {
+          "stem": "pd-platen-rack",
+          "number": "MHA-PD-05"
+        }
+      ],
+      "status": "retired"
     }
   ],
   "historical_current_aliases": [
@@ -3039,7 +3062,7 @@
   ],
   "classification_decisions": {
     "ch-pivot-bracket-tl-angle-plate": "Shop-reworked bought stock remains fabricated tooling; only numeric width changes.",
-    "pd-platen-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
+    "pd-feed-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
   },
   "shared_vendor_groups": [
     {
