@@ -3851,26 +3851,42 @@ def _carry_reviewed_verdict(
     import _review_carry
 
     pdf = Path(DRAWINGS_BY_NAME[stem].outputs["pdf"])
-    carry = _review_carry.find(stem, _machinist_review_context(stem, profile), pdf)
-    if carry is None:
-        return False
-    try:
-        restored = _cache.restore(carry.review_key, [directory], label)
-    except _cache.RestoreLocked as error:
-        raise OSError(str(error)) from error
-    try:
-        if not restored or (directory / _review_carry.CARRIED_FILE).exists():
-            raise ValueError("the reviewed verdict is not restorable")
-        record = _review_carry.provenance(carry, _read_machinist_aggregate(stem))
-    except (OSError, ValueError):
-        shutil.rmtree(directory, ignore_errors=True)
-        return False
-    (directory / _review_carry.CARRIED_FILE).write_text(
-        json.dumps(record, indent=2) + "\n", encoding="utf-8"
-    )
+    with _telemetry.span(
+        f"cache.carry {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE,
+    ) as span:
+        _tag_cache_key(span, key)
+        try:
+            carry = _review_carry.find(stem, _machinist_review_context(stem, profile), pdf)
+        except OSError:
+            carry = None
+        if carry is None:
+            span.set_attribute("cache", "miss")
+            return False
+        span.set_attribute("carried_from", carry.review_key)
+        try:
+            restored = _cache.restore(carry.review_key, [directory], label)
+        except _cache.RestoreLocked as error:
+            raise OSError(str(error)) from error
+        try:
+            if not restored or (directory / _review_carry.CARRIED_FILE).exists():
+                raise ValueError("the reviewed verdict is not restorable")
+            record = _review_carry.provenance(carry, _read_machinist_aggregate(stem))
+        except (OSError, ValueError):
+            shutil.rmtree(directory, ignore_errors=True)
+            span.set_attribute("cache", "miss")
+            return False
+        span.set_attribute("cache", "hit")
+    carried = directory / _review_carry.CARRIED_FILE
+    carried.parent.mkdir(parents=True, exist_ok=True)
+    carried.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     outcome = _store_reused_review(
         stem, key, directory, label, carried_from=carry.review_key
     )
+    if outcome == "lost":
+        # Another build published this key first; its reports, carried or
+        # reviewed, replaced these and decide the verdict.
+        _telemetry.info(f"{label}: carry lost to the verdict already published")
+        return True
     _cache.record_event(
         "review_carried", label, key, from_key=carry.review_key,
         from_pdf_sha256=carry.pdf_sha256, verdict=record["carried_from"]["verdict"],
@@ -4527,6 +4543,11 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Supplier native regressions read captured paint and shelf facts.
             str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
             str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
+            # Carry-forward tests compare real build PDFs read at runtime.
+            *(
+                str(path.resolve())
+                for path in (SCRIPTS_DIR / "testdata" / "review-carry").glob("*.pdf")
+            ),
             # Shop-equipment contracts read the tracked shop records at runtime.
             str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
             str((REPO_ROOT / "cad" / "config" / "shop-equipment.toml").resolve()),

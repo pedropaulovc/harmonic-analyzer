@@ -349,7 +349,20 @@ COMPARISON_RULE = {
 
 
 def compare_drawings(old_path: Path, new_path: Path) -> dict[str, Any]:
-    """Whether two PDFs print the same sheet under this module's page rule.
+    """Whether two PDFs print the same sheet under this module's page rule:
+    :func:`compare_pages` of both PDFs' :func:`render_pages`."""
+    return compare_pages(render_pages(old_path), render_pages(new_path))
+
+
+def render_pages(path: Path) -> list[_Raster]:
+    """Every page of ``path`` as the drawing diff reads it. A PDF that cannot
+    be opened or rendered raises ``ValueError``."""
+    with _document(path) as document:
+        return [_raster(document, index, path) for index in range(len(document))]
+
+
+def compare_pages(old_pages: list[_Raster], new_pages: list[_Raster]) -> dict[str, Any]:
+    """Whether two rendered PDFs print the same sheet under this module's page rule.
 
     The rule is the one every page of the release drawing diff is classified
     by: the same page count and page sizes, the same printed characters
@@ -357,37 +370,33 @@ def compare_drawings(old_path: Path, new_path: Path) -> dict[str, Any]:
     directions within ``SPATIAL_TOLERANCE_PIXELS`` and ``ANTIALIAS_TOLERANCE``
     grey levels. It stops at the first changed page. Each compared page
     reports the BUILD/REV values masked on either side and how many pixels
-    differ at all once they are masked (zero: identical rasters). A PDF that
-    cannot be opened or rendered raises ``ValueError``.
+    differ at all once they are masked (zero: identical rasters).
     """
-    with _document(old_path) as old_doc, _document(new_path) as new_doc:
-        if len(old_doc) != len(new_doc):
-            return {
-                "unchanged": False,
-                "reason": f"{len(old_doc)} pages, now {len(new_doc)}",
-                "pages": [],
+    if len(old_pages) != len(new_pages):
+        return {
+            "unchanged": False,
+            "reason": f"{len(old_pages)} pages, now {len(new_pages)}",
+            "pages": [],
+        }
+    pages: list[dict[str, Any]] = []
+    for index, (old, new) in enumerate(zip(old_pages, new_pages, strict=True)):
+        before, after, _removed, _added, text_changed, changed = _changes(old, new)
+        pages.append(
+            {
+                "page": index + 1,
+                "old_stamp": list(old.stamp),
+                "new_stamp": list(new.stamp),
+                "pixels_differing": int(np.count_nonzero(before != after)),
             }
-        pages: list[dict[str, Any]] = []
-        for index in range(len(old_doc)):
-            old = _raster(old_doc, index, old_path)
-            new = _raster(new_doc, index, new_path)
-            before, after, _removed, _added, text_changed, changed = _changes(old, new)
-            pages.append(
-                {
-                    "page": index + 1,
-                    "old_stamp": list(old.stamp),
-                    "new_stamp": list(new.stamp),
-                    "pixels_differing": int(np.count_nonzero(before != after)),
-                }
-            )
-            if changed:
-                if old.size_points != new.size_points:
-                    what = "page size changed"
-                elif text_changed:
-                    what = "printed characters changed"
-                else:
-                    what = "ink differs beyond the tolerance"
-                return {"unchanged": False, "reason": f"page {index + 1}: {what}", "pages": pages}
+        )
+        if changed:
+            if old.size_points != new.size_points:
+                what = "page size changed"
+            elif text_changed:
+                what = "printed characters changed"
+            else:
+                what = "ink differs beyond the tolerance"
+            return {"unchanged": False, "reason": f"page {index + 1}: {what}", "pages": pages}
     return {"unchanged": True, "reason": None, "pages": pages}
 
 

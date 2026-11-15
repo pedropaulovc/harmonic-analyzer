@@ -1457,7 +1457,9 @@ def carry(action, monkeypatch):
             return False
         _write_aggregate(outputs[0], state["verdict"])
         if state["carried_archive"]:
-            (outputs[0] / _review_carry.CARRIED_FILE).write_text("{}", encoding="utf-8")
+            carried = outputs[0] / _review_carry.CARRIED_FILE
+            carried.parent.mkdir(parents=True, exist_ok=True)
+            carried.write_text("{}", encoding="utf-8")
         return True
 
     monkeypatch.setattr(_review_carry, "find", find)
@@ -1500,6 +1502,38 @@ def test_sheet_printing_a_reviewed_sheet_carries_its_verdict(action, carry, verd
     assert carry.events[0][2]["from_key"] == carry.reviewed
     # A carried verdict is never offered to later carries.
     assert carry.indexed == []
+    # machinist_review.load_reviews reads every top-level *.json as a review:
+    # the provenance stays out of that glob.
+    reports = dodo._machinist_review_dir("probe").glob("*.json")
+    assert [path.name for path in reports] == ["probe.aggregate.json"]
+
+
+def test_lost_carry_adopts_the_winner_without_claiming_a_carry(action, carry, monkeypatch):
+    dodo = action.dodo
+    adopted = []
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+    monkeypatch.setattr(
+        dodo, "_adopt_canonical_review",
+        lambda stem, key, directory, label: adopted.append(key) or {"verdict": "SHIP"},
+    )
+    dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
+    assert adopted == ["a" * 64]
+    assert carry.events == []
+    assert action.calls["run"] == 0
+
+
+def test_a_carry_search_that_fails_reviews_afresh(action, carry, monkeypatch):
+    import _review_carry
+
+    def unwritable(*_args):
+        raise OSError("no scratch space")
+
+    monkeypatch.setattr(_review_carry, "find", unwritable)
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
+    assert action.calls["run"] == 1
+    assert carry.events == []
 
 
 def test_sheet_without_a_matching_reviewed_sheet_is_reviewed(action, carry):
@@ -1581,6 +1615,25 @@ def test_carry_skips_other_sheets_and_unreadable_entries_for_a_stamp_only_rebuil
     assert carry.pdf_sha256 == hashlib.sha256(v48).hexdigest()
     [page] = carry.comparison["pages"]
     assert (page["old_stamp"], page["new_stamp"]) == (["v48", "v48"], ["v49", "v49"])
+
+
+def test_carry_renders_the_sheet_once_for_all_candidates(monkeypatch):
+    import _drawing_diff
+    import _review_carry
+
+    edit = (_CARRY_PAIRS / "edit-a.pdf").read_bytes()
+    rc = _reviewed_index(monkeypatch, {
+        _review_carry.entry_name("drive_collar", "ctx", str(n) * 64): edit for n in range(3)
+    })
+    rendered = []
+    render = _drawing_diff.render_pages
+    monkeypatch.setattr(
+        _drawing_diff, "render_pages", lambda path: rendered.append(path) or render(path)
+    )
+    sheet = _CARRY_PAIRS / "edit-b.pdf"
+    assert rc.find("drive_collar", "ctx", sheet) is None
+    assert rendered.count(sheet) == 1
+    assert len(rendered) == 4
 
 
 def test_carry_takes_a_sheet_whose_ink_moved_within_one_pixel(monkeypatch):
