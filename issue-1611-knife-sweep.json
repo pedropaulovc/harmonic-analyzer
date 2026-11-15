@@ -1,0 +1,71 @@
+[
+ {
+  "f_mm": 0.0025,
+  "knife_pct": 0.1112829894500725,
+  "knife_allow": 0.45,
+  "total_mae": 0.43330158829230603,
+  "pair_worst": 1.3957390194395602,
+  "fails": []
+ },
+ {
+  "f_mm": 0.005,
+  "knife_pct": 0.222565978900145,
+  "knife_allow": 0.45,
+  "total_mae": 0.47483257284114067,
+  "pair_worst": 1.577118152688951,
+  "fails": []
+ },
+ {
+  "f_mm": 0.0075,
+  "knife_pct": 0.33384896835021755,
+  "knife_allow": 0.45,
+  "total_mae": 0.5368686492629755,
+  "pair_worst": 1.8121300133181981,
+  "fails": []
+ },
+ {
+  "f_mm": 0.01,
+  "knife_pct": 0.44513195780029,
+  "knife_allow": 0.45,
+  "total_mae": 0.6131485635658507,
+  "pair_worst": 2.0767880579273617,
+  "fails": [
+   "pair expected worst coefficient 2.077 > 2.0 (joint draw; per-source scatter 0.903, reading 0.796, stall 1.429, index 0.150; residual max 0.050; p99 3.146; conservative envelope 2.513)"
+  ]
+ },
+ {
+  "f_mm": 0.0125,
+  "knife_pct": 0.5564149472503626,
+  "knife_allow": 0.45,
+  "total_mae": 0.6989791715242869,
+  "pair_worst": 2.3611248104258173,
+  "fails": [
+   "pair expected worst coefficient 2.361 > 2.0 (joint draw; per-source scatter 0.903, reading 0.796, stall 1.787, index 0.150; residual max 0.050; p99 3.567; conservative envelope 2.678)",
+   "knife 0.556 > allowance 0.45"
+  ]
+ },
+ {
+  "f_mm": 0.015,
+  "knife_pct": 0.6676979367004351,
+  "knife_allow": 0.45,
+  "total_mae": 0.791231711546557,
+  "pair_worst": 2.659918322328489,
+  "fails": [
+   "pair expected worst coefficient 2.660 > 2.0 (joint draw; per-source scatter 0.903, reading 0.796, stall 2.144, index 0.150; residual max 0.050; p99 3.947; conservative envelope 2.866)",
+   "knife 0.668 > allowance 0.45",
+   "total MAE 0.791 > benchmark 0.7"
+  ]
+ },
+ {
+  "f_mm": 0.02,
+  "knife_pct": 0.89026391560058,
+  "knife_allow": 0.45,
+  "total_mae": 0.9876560059527411,
+  "pair_worst": 3.288205349410756,
+  "fails": [
+   "pair expected worst coefficient 3.288 > 2.0 (joint draw; per-source scatter 0.903, reading 0.796, stall 2.859, index 0.150; residual max 0.050; p99 4.802; conservative envelope 3.296)",
+   "knife 0.890 > allowance 0.45",
+   "total MAE 0.988 > benchmark 0.7"
+  ]
+ }
+]
