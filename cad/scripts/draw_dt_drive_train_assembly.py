@@ -1880,7 +1880,9 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
     "arbor-collar-pinned": (
         # Rubric sample round 13 (rule 26): "the drum bond" was a private label.
         ("BEFORE THE DRUM BOND: ", f"BEFORE STEP {steps.step_number('drum-bonded')}: "),
-        ("PIN STATION; DRIVE ", "PIN STATION.\nDRIVE "),
+        # Machinist review r20 of PR #2735 (rule 26): "pin station" was a coined
+        # label the sheet defined in a header line; the hole has a plain name.
+        ("TO THE PIN STATION; DRIVE ", "TO THE MHA-DT-22 COLLAR PIN HOLE.\nDRIVE "),
         # Machinist review r8 of PR #2640 (rule 26): "crown end" was a private
         # label; the back end is plain.
         ("FROM ITS BACK CROWN END", "FROM ITS BACK END"),
@@ -2100,15 +2102,11 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
 
 # Each feeler the rig steps and checks print is a stack of gage leaves the
 # sheet 15 table lists (rubric sample review of v47: no mm in the steps).
-# Step 11's "PIN STATION" is MHA-DT-33's part-spec wording; the arbor's print
-# dimensions it as the COLLAR PIN hole (rubric sample round 2: undefined term).
 FEELER_TABLE_NOTE = _note_text(
     (
         # Round 16 (#0): package-wide, not only the rig's.
         f"ALL SET FEELERS AND SHIMS: {FITUP.FEELER_GAGE_NAME} LEAF STACKS, SHEET "
         f"{SETTING_SHEET} TABLE.",
-        f"PIN STATION (STEP {steps.step_number('arbor-collar-pinned')}): THE MHA-DT-22 COLLAR "
-        "PIN HOLE (SEE ITS PRINT).",
     ),
     heading=False,
 )
