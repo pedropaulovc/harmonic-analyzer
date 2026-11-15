@@ -4034,6 +4034,78 @@ def _pivot_sheet_points(
     )
 
 
+class _StallProbe:
+    """Issue #2824 diagnostic (never merge): while armed, print the main
+    thread's Python stack and the seat's CPU seconds to stderr every 30 s,
+    plus a C-level dump of every thread every 120 s (faulthandler), so a
+    wedge names its call. stderr only: it never feeds the watchdog's clock."""
+
+    def __init__(self, label: str) -> None:
+        import threading
+
+        self.label = label
+        self.main = threading.main_thread().ident
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._run, name="stall-probe", daemon=True)
+
+    def _seat_cpu(self) -> str:
+        import ctypes
+
+        from solidworks_mcp.adapters import sw_recovery
+
+        out = []
+        for pid in sorted(sw_recovery.pids_of_image("sldworks.exe")):
+            handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))
+            if not handle:
+                out.append(f"{pid}=?")
+                continue
+            times = [ctypes.c_uint64() for _ in range(4)]
+            ok = ctypes.windll.kernel32.GetProcessTimes(
+                handle, *(ctypes.byref(t) for t in times)
+            )
+            ctypes.windll.kernel32.CloseHandle(handle)
+            out.append(
+                f"{pid}={(times[2].value + times[3].value) / 1e7:.2f}s" if ok else f"{pid}=?"
+            )
+        return ",".join(out) or "none"
+
+    def _run(self) -> None:
+        import time
+        import traceback
+
+        started = time.monotonic()
+        while not self.stop.wait(30.0):
+            frame = sys._current_frames().get(self.main)
+            stack = traceback.format_stack(frame)[-6:] if frame is not None else []
+            leaves = None
+            probe = frame
+            while probe is not None:
+                if probe.f_code.co_name == "_view_component_leaves":
+                    leaves = (len(probe.f_locals.get("leaves", ())), len(probe.f_locals.get("pending", ())))
+                    break
+                probe = probe.f_back
+            print(
+                f"[stall-probe #2824] {self.label}: {time.monotonic() - started:.0f}s "
+                f"seat_cpu={self._seat_cpu()} leaves,pending={leaves}\n"
+                + "".join(stack),
+                file=sys.__stderr__,
+                flush=True,
+            )
+
+    def __enter__(self) -> "_StallProbe":
+        import faulthandler
+
+        faulthandler.dump_traceback_later(120, repeat=True, file=sys.__stderr__)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        import faulthandler
+
+        faulthandler.cancel_dump_traceback_later()
+        self.stop.set()
+
+
 def _centre_pivot_view(
     adapter: Any, view: Any, target: tuple[float, float], *, label: str
 ) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -4250,9 +4322,10 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
         label=section_label,
     )
     section = set_drawing_view_instance_visibility(adapter, section, PIVOT_VIEW_INSTANCES, mode="show", label=section_label)
-    head, front = _centre_pivot_view(
-        adapter, section, PIVOT_SECTION_CENTER, label=section_label
-    )
+    with _StallProbe(section_label):
+        head, front = _centre_pivot_view(
+            adapter, section, PIVOT_SECTION_CENTER, label=section_label
+        )
     # The balloon columns stand left and right of a vertical axis (farm run
     # 20261015T101105899Z read the cut bar 56 mm wide, 19 mm tall at 2:1);
     # which end is up does not matter to them.
