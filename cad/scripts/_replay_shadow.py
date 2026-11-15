@@ -80,6 +80,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import datetime
+import fnmatch
 import functools
 import hashlib
 import io
@@ -1887,9 +1888,12 @@ class DependentBuild:
     (:func:`reuse_attempt`): a :class:`PartBuild`'s facts (``native``: an
     assembly's model, whose bytes its ``.execution`` token hashes; a
     drawing's sheet), what its recording's :class:`Dependent` says
-    (``describe``, asked only by an attempt), and the cache outputs dodo
-    itself rewrites after any build, which no replay writes (``rewritten``:
-    an assembly's input ledger)."""
+    (``describe``, asked only by an attempt), the cache outputs dodo itself
+    rewrites after any build, which no replay writes (``rewritten``: an
+    assembly's input ledger), and the output-root-relative globs of those it
+    finds on disk only once a build has made them (``discovered``: the
+    channel's spring variants), which a tree that never built it lacks, so an
+    archive's members are matched against the globs themselves."""
 
     kind: BuildKind
     stem: str
@@ -1905,6 +1909,7 @@ class DependentBuild:
     # ``source_kind``, from dodo); None for an assembly build.
     source_kind: BuildKind | None = None
     rewritten: tuple[Path, ...] = ()
+    discovered: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -2778,14 +2783,28 @@ def _verify_outputs(part: PartBuild, reuse: Reuse) -> None:
     reuse.token = token
 
 
-def _undeclared(outputs: list[Path], members: Iterable[str]) -> list[str]:
+def _undeclared(
+    outputs: list[Path], members: Iterable[str], discovered: Iterable[str] = ()
+) -> list[str]:
     """The archive members (folded, output-root-relative) outside every one
-    of the task's declared ``outputs``."""
+    of the task's declared ``outputs`` and matching none of the
+    ``discovered`` globs (output-root-relative, ``*`` within one path
+    segment, as ``Path.glob``)."""
     declared = [rel for rel in map(_out_relative, outputs) if rel is not None]
+    globs = [_fold(pattern).split("/") for pattern in discovered]
+
+    def globbed(rel: str) -> bool:
+        parts = rel.split("/")
+        return any(
+            len(parts) == len(glob) and all(map(fnmatch.fnmatchcase, parts, glob))
+            for glob in globs
+        )
+
     return sorted(
         rel
         for rel in members
         if not any(rel == own or rel.startswith(own + "/") for own in declared)
+        and not globbed(rel)
     )
 
 
@@ -2815,7 +2834,7 @@ def _verify_dependent_outputs(part: DependentBuild, reuse: Reuse) -> None:
             f"lacks; the archive holds {sorted(set(built) - produced)[:5]} the "
             "replay did not write",
         )
-    outside = _undeclared(part.outputs, members)
+    outside = _undeclared(part.outputs, members, part.discovered)
     if outside:
         raise Declined(
             Decline.OUTPUT_SET_DIFFERS,

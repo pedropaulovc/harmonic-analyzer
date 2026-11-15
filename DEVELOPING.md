@@ -3663,7 +3663,13 @@ and its innermost frame in its detail and INFO line
   judges the outcome.
 - **Outputs.** As for a part, but the input ledger, which dodo rewrites after
   any build and no replay writes, is left out of the comparison (`rewritten`),
-  and every Python output must be the base's, byte for byte.
+  and every Python output must be the base's, byte for byte. The outputs only
+  a build of the stem makes, which a tree that never built it lacks at build
+  start (the channel's spring variants and their STL,
+  `dodo._assembly_discovered_outputs`), are declared by glob
+  (`DependentBuild.discovered`): an archive member matching one is declared on
+  a clean farm worker too; any other member outside the declared outputs
+  still declines `output_set_differs`.
 - **Serving.** `dodo._reuse_assembly` installs the archive, re-stamps the
   `.execution` token (which must be the base's), publishes the `reused/`
   marker, then rewrites the input ledger from the current inputs (a failure
