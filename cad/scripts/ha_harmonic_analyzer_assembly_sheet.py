@@ -235,8 +235,13 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     # are laid out on the bar's front face parallel to the paper plane: the
     # pen-rod line is set off the paper, and the wheel plane and the drum lane
     # derive from it. So the heading sub-step sets that datum against the
-    # MHA-PD-02 platen face, which the paper-drive step has already placed;
-    # checks 6 and 8 prove the function once the wires and the pen are on.
+    # MHA-PD-02 platen face, which the paper-drive step has already placed.
+    # Sight alone cannot hold the carriage's stand-off on a bar this long, and
+    # the carriage's printed worst case leaves the heading nothing, so the
+    # heading is the fit-up adjustment that covers that stack (rule 19). Its
+    # acceptance is where the stack closes: once the nib is on the paper
+    # ("nib-on-paper"), only the nib touches it, else the bar turns away from
+    # the paper. Check 8 accepts the drum.
     "magnifier-bar-clamped": (
         "MAGNIFIER BAR: CLOSE THE MHA-SH-01/MHA-SH-02 CLAMP ARCS SUPPLIED WITH "
         "MHA-MG-00 ROUND THE LEFT FRONT COLUMN, THE MHA-MG-08 BAR RUNNING TO "
@@ -310,6 +315,12 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "THE PAPER.",
         "TIGHTEN THE THUMB SCREW FINGER-TIGHT.",
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
+        "CHECK: ONLY THE NIB TOUCHES THE PAPER.",
+        "IF ANY OTHER PART OF MHA-PN-00 TOUCHES, SLACKEN BOTH MHA-SH-VN-53 "
+        "CLAMP SCREWS, TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER UNTIL IT "
+        f"CLEARS, AND REPEAT {_n('magnifier-bar-clamped')}B, "
+        f"{_n('magnifier-bar-clamped')}D-{_n('magnifier-bar-clamped')}E AND "
+        f"{_n('nib-set')}A-{_n('nib-on-paper')}E.",
     ),
     "stick-parked": (
         "MEASURING STICK: PARK MHA-MS-00 ON THE MHA-FR-01 AS-CAST TOP BETWEEN "

@@ -269,7 +269,10 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     """Machinist review run 20261115T023412590Z (r3): the clamp arcs close
     round a plumb column, so turning the bar on it cannot level it. The turn
     sets the bar's heading, laid out parallel to the paper plane, against the
-    platen the paper-drive step has already placed; no part goes unnumbered."""
+    platen the paper-drive step has already placed. The heading carries the
+    pen carriage's paper stand-off (Codjiflo on 2b645fc), so it is accepted
+    where that stack closes, with the nib on the paper, and the remedy turns
+    the bar. No part goes unnumbered."""
     import _config
 
     lines = notes.step_lines("magnifier-bar-clamped")
@@ -281,6 +284,14 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     assert steps.SEQUENCE.index("paper-drive-built") < steps.SEQUENCE.index(
         "magnifier-bar-clamped"
     )
+    nib = notes.step_lines("nib-on-paper")
+    check = next(i for i, line in enumerate(nib) if "ONLY THE NIB TOUCHES" in line)
+    assert nib[check].split(". ", 1)[1].startswith("CHECK:")
+    remedy = nib[check + 1].split(". ", 1)[1]
+    bar = steps.step_number("magnifier-bar-clamped")
+    assert remedy.startswith("IF ")
+    assert "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER" in remedy
+    assert f"REPEAT {bar}B, {bar}D-{bar}E AND " in remedy
     assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
 
 
