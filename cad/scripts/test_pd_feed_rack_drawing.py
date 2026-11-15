@@ -85,6 +85,17 @@ def test_taps_stand_on_tooth_centres_at_the_ruled_platen_stations() -> None:
     assert builder.TAP_X is spec.TAP_X and builder.TAP_SPEC is spec.TAP_SPEC
 
 
+def test_the_sheet_locates_the_taps_by_tooth_counts() -> None:
+    # Machinist review r7 (rule 26): the REF decimals alone left the pattern
+    # to a sentence; the builder steps off whole teeth from the first tap,
+    # which takes the tooth centre nearest its REF station.
+    assert spec.TAP_SPACING_PITCHES == 22
+    lines = drawing.TAP_CALLOUT_BELOW.splitlines()
+    assert lines[:2] == ["ON TOOTH CENTRES,", "22 TEETH APART"]
+    assert drawing.TAP_START_CALLOUT.replace("\n", " ") == "NEAREST TOOTH CENTRE"
+    assert "TapStart" in spec.DRAWING_REFERENCE_DIMENSIONS
+
+
 def test_tap_depths_stay_in_the_tooth_at_every_band_corner() -> None:
     assert spec.TAP_SPEC.kind == "tapped_bottoming"
     assert spec.TAP_SPEC.size == "#0-80" and spec.TAP_SPEC.end == "blind"
