@@ -48,6 +48,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+import pd_feed_rack_callouts as callouts
 from pd_feed_rack_spec import (
     BAR_LENGTH,
     DRAWING_DIMENSIONS,
@@ -55,7 +56,6 @@ from pd_feed_rack_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
     DRAWING_SYMMETRIC_BANDS_MM,
-    ENGAGEMENT_STATEMENT,
     RACK_HEIGHT,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH,
@@ -123,9 +123,9 @@ NOTES_TEXT = f"END TOOTH PHASE NOT CONTROLLED.\n{TAP_FACE_WALL_STATEMENT}"
 # read them as one block (r6), so it sits 4 mm lower, wholly right of the
 # bottom view: its top ~6 mm under the letter, clear of the border.
 TAP_CALLOUT_XY = (0.365, 0.188)
-# Rule 7/20: the taps stand on tooth centres, and their engagement (RV-02);
-# their places along the strip are the stations' dimensions (rule 26).
-TAP_CALLOUT_BELOW = f"ON TOOTH CENTRES\n{ENGAGEMENT_STATEMENT}"
+# Rule 7/20: each tap's limit about its tooth centre and its engagement
+# (RV-02), worded in pd_feed_rack_callouts.
+TAP_CALLOUT_BELOW = callouts.TAP_CALLOUT_BELOW
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # Rule 9: the enlarged end view is VIEW A, its viewing arrow on the front
 # view's right end face, approaching from the right (third-angle right view).

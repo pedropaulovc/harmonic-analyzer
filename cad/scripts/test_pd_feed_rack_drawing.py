@@ -102,7 +102,10 @@ def test_the_tap_stations_are_controlling_dimensions() -> None:
         nominal = spec.DRAWING_NOMINALS_MM[f"TapStation{index}"]
         assert nominal == pytest.approx(pitches * spec.PITCH)
         assert f"{nominal / 25.4:.3f}" == f"{2.160 * pitches / 22:.3f}"
-    assert drawing.TAP_CALLOUT_BELOW.splitlines()[0] == "ON TOOTH CENTRES"
+    # Codjiflo P2 on a17aebb: the tooth-wall stack's per-tap offset is printed
+    # as each tap's own limit about its tooth centre, not left to the chain.
+    assert drawing.TAP_CALLOUT_BELOW.splitlines()[0] == "ON TOOTH CENTRES \u00b1.005"
+    assert spec.TAP_TOOTH_OFFSET_MAX == pytest.approx(0.005 * 25.4)
     # Rule 7: no more than two lines of words under the callout.
     assert len(drawing.TAP_CALLOUT_BELOW.splitlines()) == 2
 
