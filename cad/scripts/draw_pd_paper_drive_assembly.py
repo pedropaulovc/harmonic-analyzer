@@ -4133,6 +4133,59 @@ def _pivot_sheet_points(
     )
 
 
+def _census_live_components(*, label: str) -> None:
+    """#2824 diagnostic, no COM calls: live COM wrappers by type, and who
+    holds the drawing/native component ones."""
+    import collections
+    import gc
+    import types
+
+    out = sys.__stderr__
+
+    def kind(obj: Any) -> str | None:
+        name = type(obj).__name__
+        real = getattr(obj, "_real", None) if name == "RecordingProxy" else None
+        if real is not None:
+            return f"RecordingProxy[{type(real).__name__}]"
+        module = type(obj).__module__ or ""
+        if name in ("CDispatch", "PyIDispatch") or "_generated" in module or "win32com.gen_py" in module:
+            return name
+        return None
+
+    def describe(obj: Any) -> str:
+        if isinstance(obj, types.FrameType):
+            return f"frame:{obj.f_code.co_name}@{obj.f_code.co_filename.rsplit(chr(92), 1)[-1]}:{obj.f_lineno}"
+        if isinstance(obj, BaseException):
+            return f"exception:{type(obj).__name__}"
+        if isinstance(obj, types.TracebackType):
+            return "traceback"
+        if isinstance(obj, dict):
+            return f"dict(len={len(obj)}, keys={[str(k)[:30] for k in list(obj)[:5]]})"
+        if isinstance(obj, (list, tuple)):
+            return f"{type(obj).__name__}(len={len(obj)})"
+        return type(obj).__qualname__
+
+    live = [obj for obj in gc.get_objects() if kind(obj) is not None]
+    counts = collections.Counter(kind(obj) for obj in live)
+    print(f"[census #2824] {label}: gc_counts={gc.get_count()} live={dict(counts.most_common(25))}", file=out, flush=True)
+    picked = [obj for obj in live if "Component" in (kind(obj) or "")][:4]
+    ignore = {id(live), id(picked)}
+    for obj in picked:
+        chain = []
+        frontier = [obj]
+        for level in range(3):
+            nxt = []
+            for item in frontier:
+                refs = [ref for ref in gc.get_referrers(item) if id(ref) not in ignore and ref is not frontier and ref is not nxt]
+                chain.append(f"L{level}:" + " | ".join(describe(ref) for ref in refs[:6]))
+                nxt.extend(refs[:3])
+            frontier = nxt
+        print(f"[census #2824]   {kind(obj)} held by: " + " || ".join(chain), file=out, flush=True)
+    unreachable = gc.collect()
+    after = collections.Counter(kind(obj) for obj in gc.get_objects() if kind(obj) is not None)
+    print(f"[census #2824] {label}: gc.collect()={unreachable} after={dict(after.most_common(25))}", file=out, flush=True)
+
+
 def _centre_pivot_view(
     adapter: Any,
     view: Any,
@@ -4151,6 +4204,8 @@ def _centre_pivot_view(
         (0.0, PIVOT_FRONT_FACE_Y, 0.0),
     )
     centre = _pivot_sheet_points(adapter, view, points, label=label)[0]
+    if section is not None:
+        _census_live_components(label=f"{label} before move")
     view = _shift_view(
         adapter,
         view,
