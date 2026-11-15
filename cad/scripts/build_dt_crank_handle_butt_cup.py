@@ -110,7 +110,7 @@ def _pocket_floor_max_limit(adapter) -> None:
     ):
         raise RuntimeError(f"{label}: nominal is not the pocket corner's maximum")
     # Equation-owned dimensions can read DrivenState 1; IsReference is the
-    # native controlling/reference distinction (draw_pd_feed_rack).
+    # native controlling/reference distinction (draw_pd_platen_rack).
     if bool(dimension.IsReference()):
         raise RuntimeError(f"{label}: radius is a reference model dimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")

@@ -78,7 +78,7 @@ SLEEVE_NUMBER = "MHA-PD-10"
 PIN_NUMBER = pd_transgear_pin_spec.PIN_NUMBER
 HUB_NUMBER = "MHA-PD-17"
 DISC_NUMBER = "MHA-PD-06"
-RACK_NUMBER = "MHA-PD-26"
+RACK_NUMBER = "MHA-PD-05"
 if pd_rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
     raise AssertionError("the disc's fit note names another hub than this sheet")
 

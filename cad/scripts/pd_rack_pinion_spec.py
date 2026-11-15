@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
 driven 15:150 by the knob shaft's finite #7/reference-14 PA20 48DP form (#2034:
 15:150 replaced 12:120 at the same 1:10 feed) and
 screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
-screws (MHA-SH-VN-59 DiscScrew, McMaster 91794A055; the joint is
+screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
 ``pd_transgear_disc_hub_geometry``'s).  Its Ø.501 REAM_H7 bore clears the
 hub's Ø.498 spigot, which passes it and seats on the pinion sleeve's
 (MHA-PD-10) step face; the clearance lets MHA-PD-00 set the disc central to
@@ -354,7 +354,7 @@ BORE_FRONT_CHAMFER_LIMITS = (
     BORE_FRONT_CHAMFER + _BAND[3],
 )  # .005-.015
 
-# --- screw (MHA-SH-VN-59 DiscScrew) ---------------------------------------------------
+# --- screw (MHA-PD-VN-55) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
 
 # --- #0-80 taps --------------------------------------------------------------------
@@ -363,7 +363,7 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 TAP_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
 if abs(TAP_MAJOR - SCREW_MAJOR_DIA) > 1e-9:
     raise AssertionError(
-        "the disc tap and the MHA-SH-VN-59 screw disagree on the #0-80 major"
+        "the disc tap and the MHA-PD-VN-55 screw disagree on the #0-80 major"
     )
 # The tapped major's allowance over basic (contract §8, "tap major 0.025" radial).
 TAP_MAJOR_ALLOWANCE = 0.05
@@ -377,9 +377,9 @@ TAP_CENTRES = screw_centres()
 MOUTH_BREAK_MAX = 0.1016  # .004
 
 # --- the tap's thread losses (contract §7) -------------------------------------
-# The MHA-SH-VN-59 DiscScrew screws are cut to fit at assembly (R9-47): their tips stop
+# The MHA-PD-VN-55 screws are cut to fit at assembly (R9-47): their tips stop
 # inside the rear face, so the joint's engagement, the cut window and the
-# stock's reach are judged in pd_transgear_disc_screw_spec from these losses.
+# stock's reach are judged in pd_vn_transgear_disc_screw_spec from these losses.
 ENGAGEMENT_FLOOR_D = 1.5
 MOUTH_THREAD_LOSS = MOUTH_BREAK_MAX
 

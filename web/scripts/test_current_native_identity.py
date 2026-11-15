@@ -250,8 +250,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         mapping = json.loads(TABLE_PATH.read_text())
         # The three pre-cutover retirements plus the v39 MHA-DT-VN-66 loop link
         # (retired 2026-11-08, #2144 9.2) and the v39 MHA-DT-VN-54 collar and
-        # MHA-DT-VN-55 adjuster (retired 2026-11-09, C1 keyed, PR #1992).
-        self.assertEqual(len(mapping["archiveOnlyVendors"]), 6)
+        # MHA-DT-VN-55 adjuster (retired 2026-11-09, C1 keyed, PR #1992), and
+        # the v39 MHA-PD-VN-55 disc screw (retired 2026-11-14, #2410).
+        self.assertEqual(len(mapping["archiveOnlyVendors"]), 7)
         identity = CurrentNativeIdentity()
         for row in mapping["archiveOnlyVendors"]:
             self.assertEqual(row["status"], "archive-only")
@@ -282,7 +283,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 51)
+        self.assertEqual(len(retired), 52)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room;
         # #2144 item 11.4: the purchased MHA-SM-VN-56 shoulder screw retired the
@@ -295,7 +296,8 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         # #2339: the purchased MHA-SH-VN-58 dowel retired the made MHA-CH-10
         # rod and MHA-CH-11 bar pivot pins;
         # #2410: the MHA-PD-26 strip screwed to MHA-PD-27 retired the soldered
-        # MHA-PD-05 rack and backer.
+        # MHA-PD-05 rack and backer, and the rack's stock-length screws made the
+        # cut MHA-PD-VN-55 disc screws a member of the shared MHA-SH-VN-59.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
         self.assertEqual([(row["old_stem"], [t["number"] for t in row["new_identities"]])
                           for row in machine], [("vn-pen-rod-set-screw", ["MHA-PN-VN-52"]),
@@ -309,7 +311,8 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                                                 ("vn-boss-hook-jam-nut", ["MHA-SM-VN-55"]),
                                                 ("ch-rod-pivot-pin", ["MHA-CH-10"]),
                                                 ("ch-bar-pivot-pin", ["MHA-CH-11"]),
-                                                ("pd-platen-rack", ["MHA-PD-05"])])
+                                                ("pd-platen-rack", ["MHA-PD-05"]),
+                                                ("vn-transgear-disc-screw", ["MHA-PD-VN-55"])])
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",
