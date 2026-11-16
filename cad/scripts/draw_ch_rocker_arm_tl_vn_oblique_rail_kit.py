@@ -7,15 +7,16 @@ CARRIAGE`` in four native views; each member's installed quantity, the kit
 as the purchase unit, and the carriage's note (the owner's kit description
 and the fit-up play acceptance in MHA-CH-06-TL-00).
 
-Sheet 2 shows nominal REF geometry for the matched rail/bar route. Trim the
-actual rail flush with its actual bar and transfer its eight mounting holes.
-The first hole's station and the length are model-linked, parenthesised and
-untoleranced; the flag under them gives the rest as one REF pattern
-(``8X HOLES ON (60.000) PITCH``, rule 10) with its match-transfer mate. The
-end wall is the model's ``EndWall`` reference, far end face to far
-counterbore edge, its callout ``2X, 2.0 MIN AFTER TRIM``. No supplier pitch
-accuracy or transfer-tool accuracy is claimed. Free screw insertion,
-retained actual walls and full travel accept the pair (the jig's steps).
+Sheet 2 shows nominal REF geometry for the rail on its base bar. The bar is
+drilled at its own banded stations (MHA-CH-06-TL-20); the untrimmed rail is
+fitted to it, then trimmed flush with the bar's ends (owner ruling
+2026-11-16). The first hole's station and the length are model-linked,
+parenthesised and untoleranced; the flag under them gives the rest as one
+REF pattern (``8X HOLES ON (60.000) PITCH``, rule 10) with the bar whose taps
+it fits. The end wall is the model's ``EndWall`` reference, far end face to
+far counterbore edge, its callout ``2X, SEE NOTE 1``. No supplier pitch
+accuracy is claimed. Free screw insertion, retained actual walls and full
+travel accept the pair (the jig's steps).
 FRONT (the hole face) and TOP stand at the sheet's 1:2 and print no
 scale; the end profile is VIEW B at 2:1, so its raceway grooves read, named
 by a letter arrow on TOP's far end; the isometric at 1:4.
@@ -275,11 +276,11 @@ FRONT_DIMENSION_PRECISION = {
 }
 # The flag: the hole pattern's callout, centred under the station (a callout
 # on the station stacked that value onto the row over it), its leader to one
-# hole's counterbore (rule 7: a match-transfer requirement is the feature's
-# callout, leadered; as loose text under the view it failed machinist review,
-# farm run 20261108T015328529Z). Its top stands 4 mm under the station's
-# line, under its extension lines' overrun; its two lines are the pattern
-# and its match-transfer mate.
+# hole's counterbore (rule 7: the pattern's mate is the feature's callout,
+# leadered; as loose text under the view it failed machinist review, farm
+# run 20261108T015328529Z). Its top stands 4 mm under the station's line,
+# under its extension lines' overrun; its two lines are the pattern and the
+# base bar whose taps it fits.
 _LAST_ROW_LINE_DROP = (
     STATION_FIRST_DROP
     + (len(DRAWN_STATIONS) - 1) * STATION_ROW_PITCH

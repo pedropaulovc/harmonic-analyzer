@@ -324,7 +324,7 @@ def test_rail_volume_mass_and_centroid_match_the_reference() -> None:
 
 
 def test_rail_stations_are_unbanded_model_references() -> None:
-    """Actual hardware transfers the pattern; nominal stations are REF only."""
+    """The base bar carries the banded stations; the rail's are REF only."""
     assert rail.STATION_DIMENSIONS == tuple(f"Station{k}" for k in range(1, 9))
     assert rail.DRAWING_DIMENSIONS == {
         "Rail": {"Length"},
@@ -453,17 +453,21 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     )
     assert rail.WALL_ACCEPTANCE_MM == 2.0
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
-    # The flag gives the hole pattern as one REF pattern (rule 10), then its
-    # match-transfer mate.
+    # The flag gives the hole pattern as one REF pattern (rule 10), then the
+    # base bar whose taps it fits (owner ruling 2026-11-16: no transfer).
     assert rail.RECEIPT_FLAG.splitlines() == [
         f"{rail.HOLE_COUNT}X HOLES ON ({rail.HOLE_PITCH:.3f}) PITCH",
-        f"MATCH-TRANSFER TO BASE BAR {bar['number']}",
+        f"FITS TAPS OF BASE BAR {bar['number']}",
     ]
+    assert "TRANSFER" not in rail.RECEIPT_FLAG
     assert rail.RECEIPT_FLAG.splitlines()[0] == "8X HOLES ON (60.000) PITCH"
     assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS"
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
-    assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
+    # Each rail hole within its screw's float of a tap at its banded station,
+    # the far end ground flush with a bar at its short .XX length.
+    offset = base_bar.RAIL_HOLE_POSITION_RADIUS + base_bar.RAIL_SCREW_CLEARANCE
+    assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214 - offset, 5.96 - offset))
     # The 2:1 end profile is lettered VIEW B; views at the sheet's scale
     # print no scale (rule 9).
     assert draw.caption_text("RIGHT", (2, 1)) == "VIEW B  2:1"
@@ -578,18 +582,19 @@ def test_pattern_flag_leader_rises_left_of_its_text(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
-@pytest.mark.parametrize("near_station", (8.0, 9.964, 12.0))
-def test_actual_station_can_differ_from_reference_with_safe_walls(
-    bar_deviation: float, near_station: float
+@pytest.mark.parametrize("rail_offset", (-1.0, 1.0))
+def test_trimmed_rail_walls_hold_at_the_fit_extremes(
+    bar_deviation: float, rail_offset: float
 ) -> None:
+    """The rail floats on its screws over the bar's taps by at most the
+    station band plus the screws' clearance, either way, and is ground flush
+    with a bar at either end of its length band: both end walls hold."""
     actual_bar = rail.LENGTH + bar_deviation
-    # These deliberately do not fit the retired +/-0.080 station envelope.
-    stations = tuple(near_station + 60.0 * k for k in range(8))
-    base_bar.require_matched_rail_walls(
-        counterbore_end_wall=min(stations[0], actual_bar - stations[-1]) - rail.CBORE_DIA / 2.0,
-        tap_end_wall=min(stations[0], actual_bar - stations[-1]) - 2.1,
-        tap_slot_wall=3.0, tap_bracket_wall=3.0,
-    )
+    shift = rail_offset * (base_bar.RAIL_HOLE_POSITION_RADIUS + base_bar.RAIL_SCREW_CLEARANCE)
+    near = rail.HOLE_X[0] + shift - rail.CBORE_DIA / 2.0
+    far = actual_bar - (rail.HOLE_X[-1] + shift) - rail.CBORE_DIA / 2.0
+    assert min(near, far) >= rail.CBORE_END_WALL_WORST - 1e-9
+    assert min(near, far) >= base_bar.WALL_TARGET_MM
 
 
 # --- Carriage member ----------------------------------------------------------------

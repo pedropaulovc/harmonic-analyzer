@@ -208,15 +208,16 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. Setups
   2–3 run in the low belt range and Setup 4 in the high range, so both bars
   take one belt change. The rail
-  stations are REF only, never drill targets (spec; owner R4 ruling, restated
-  2026-11-11): all eight hole centres are picked up on the bar's own rail,
-  trimmed flush with the angle grinder per TL-00 steps 1D–1G
-  (`tools.rail-trim-grinder`, not owned yet) and clamped on the rail face,
-  with the edge finder on the X DRO (both sides of each counterbore, centre =
-  midpoint; owner ruling 2026-11-13, #2546), the rail comes off, and each
-  hole is drilled at its recorded X. The 1/2 in end mill alone cuts both
-  slots, tracing a cutter-centre rectangle printed per slot, and `tool_sizing`
-  checks it against the slot width band less the path offset (the 3/8 in slot
+  holes are drilled at their printed stations, ±0.05 mm from ZERO END on the
+  X DRO (owner ruling 2026-11-16, superseding the R4 transfer from the
+  trimmed rail): each bar's untrimmed rail is then fitted with its eight
+  screws entering free and only then cut and ground flush with both bar ends
+  per TL-00 steps 1D–1F (`tools.rail-trim-grinder`, not owned yet). The owner
+  assumes the purchased rail's hole span within 0.15 mm of nominal; the
+  base-bar spec's `RAIL_FIT_STACK` closes that under the screws' float. The
+  1/2 in end mill alone cuts both slots, tracing a cutter-centre rectangle
+  printed per slot, and `tool_sizing` checks it against the slot width band
+  less the path offset (the 3/8 in slot
   drill and 17/32 in slot-finish cutter are gone). Position checks are added:
   X on the DRO before unclamping, rows from ZERO EDGE with calipers. The saw
   is the 14 in Evolution metal-cutting miter saw (`tools.saw-evolution-14`,

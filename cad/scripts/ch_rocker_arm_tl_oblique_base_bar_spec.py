@@ -8,8 +8,8 @@ imported as ``trammel``; values marked ⚙ are read from it). Each bar carries
 its rail off its centreline, toward the operator, and is held down by two
 1/2-13 T-slot studs in slots across the bar. The rails are aligned on the
 table by indicating the pin, so the bar's own position on the table does not
-matter; the only tight bands are the rail holes' end distance and pitch
-(below).
+matter; the only tight bands are the rail holes' stations, which must take
+the purchased rail's screws (below).
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
 stay physical millimetres, each fabricated nominal the exact millimetres of
@@ -22,9 +22,9 @@ with its own band (``METRIC_DIMENSIONS``, ``_metric_vendor_dimension``).
 
 Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
 6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
-``BASE_BAR_LENGTH`` 17.32. Trim each purchased rail to match its actual bar,
-flush both ends, retaining safe end walls around every supplied hole.
-The nominal end removals are 5.036 mm each. The bars are
+``BASE_BAR_LENGTH`` 17.32. Each purchased rail is fitted untrimmed to its
+drilled bar, then both rail ends are ground flush with the bar's ends
+(MHA-CH-06-TL-00 step 1); the nominal end removals are 5.036 mm each. The bars are
 milled to width ⚙ ``BASE_BAR_WIDTH`` 5.50 on edge in the
 vise, no bandsaw rip: the width is a machined size at the title block's .XX
 band. Both large faces are faced from ⚙ ``BASE_BAR_STOCK_THICK`` to ⚙
@@ -46,17 +46,48 @@ face; +X along the bar away from the spindle, +Y across it, +Z up
 ⚙ ``BASE_BAR_COLUMN_EDGE`` (lateral +3.50) is the -Y side and the
 operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
-Rail holes: 8 x #8-32 UNC tapped THRU on the rail axis. The model's
-``RAIL_HOLE_X`` stations are nominal REF only, not receipt limits or DRO
-targets. Trim the actual rail to its actual bar, flush both ends, check
-the retained walls, clamp the pair and transfer the eight hole centres.
-Remove the rail before drilling/tapping. Keep each rail paired and oriented
-to its own bar. Accept only when all eight screws enter freely by hand
-without shifting or forcing the rail, with both ends flush. The supplier
-publishes no pitch accuracy; no transfer-punch accuracy is assumed.
-The rail's Ø4.5 mm holes take #8 socket screws (``RAIL_SCREW``); a 3/4 in
-screw seats 9.7 mm above the base and engages the bar 9.35 mm.
-The ordinary rail-row height carries its reason (``RAIL_ROW_CALLOUT``).
+Rail holes: 8 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
+``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (9.964 .. 429.964 mm), each
+station ± ``RAIL_HOLE_BAND`` 0.05 mm from the spindle-end face (ZERO END),
+drilled and tapped at those stations by DRO or CNC. Owner ruling 2026-11-16
+(Pedro): "change plan to trim rail after fit; rail programs stay normal", so
+nothing transfers from the rail. The sheet prints holes 1 and 8 with that
+band and the eight as one equally spaced pattern; the row prints from the
+faced -Y edge at the title block's .XX (all eight at one DRO Y setting, so
+the row's band moves the whole row and the rail with it). The untrimmed
+rail is then fitted with its eight screws and only then are both its ends
+ground flush with the bar's ends; the pair is accepted when all eight
+screws enter freely by hand without forcing the rail. The rail's Ø4.5 mm
+holes take #8 socket screws
+(``RAIL_SCREW``); a 3/4 in screw seats 9.7 mm above the base and engages the
+bar 9.35 mm.
+
+Rail fit stack (``RAIL_FIT_STACK``, radial at the worst hole, against the
+screw's float ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's catalogue
+Ø4.5 hole: the #8-32 basic major Ø4.166 is the largest a 3A screw reaches):
+
+- the rail's own pattern, 0.075: owner ruling 2026-11-16 assumes the
+  purchased rail's R1-R8 span within ``RAIL_PATTERN_SPAN_ERROR`` 0.15 of the
+  nominal 7 x 60 = 420.000 ("assume it will always be within .15"), with no
+  receipt gate. That bounds the whole pattern: a rail's pitch error
+  accumulates along it, so the end-to-end span is where it is largest and
+  every hole lies in the same 0.15. The untrimmed rail floats on its eight
+  screws until they are tightened, so it centres on the bar's pattern and
+  each end takes half;
+- thermal, 0.026: the DRO's magnetic scale and the rail are both steel, so
+  the drilled pattern matches a steel rail at the drilling temperature;
+  fitted ``FIT_TEMPERATURE_DIFFERENCE`` 10 °C away, the 6061 bar's 420 span
+  moves 0.053 against the rail (``ALUMINIUM_CTE`` 23.6 against
+  ``RAIL_STEEL_CTE`` 11.0 µm/m·°C, the low end of carbon and bearing steels,
+  so the larger difference), centred like the pattern error;
+- the bar's hole, 0.050: its station band (the stations print exact, so no
+  rounding adds to it). All eight holes share one Y setting, so the row adds
+  no hole-to-hole scatter.
+
+0.075 + 0.026 + 0.050 = 0.151 under the 0.167 float: ``RAIL_FIT_MARGIN``
+0.016. The ±0.05 mm stations are a CNC-typical position band, narrower than
+drawing-guidelines' DRO-drilled row; the tap callout names the matched rail
+and the pair's free-screw acceptance at the feature.
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
 along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` .08 (.69 overall). Near slot
@@ -165,20 +196,50 @@ RAIL_HOLE_X: tuple[float, ...] = tuple(
 if len(RAIL_HOLE_X) != 8:
     raise AssertionError("the kit rail's base bar carries eight rail holes")
 RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
-# Nominal metric references only: the actual rail transfers the pattern.
+# The stations print exact three-place millimetres with their own band (owner
+# ruling 4): DRO or CNC positions from ZERO END (owner ruling 2026-11-16).
 RAIL_HOLE_PLACES = 3
+RAIL_HOLE_BAND = 0.05
 RAIL_ROW_PLACES = 2
-RAIL_HOLE_DIA = 4.5  # reference catalogue size; verify on the received kit
+# The first and last stations print; the six between are equally spaced.
+RAIL_PRINTED_HOLES = (1, len(RAIL_HOLE_X))
+# One Y setting for the row: only the station band scatters hole from hole.
+RAIL_HOLE_POSITION_RADIUS = max(
+    _deviation(x, RAIL_HOLE_PLACES, RAIL_HOLE_BAND, unit=METRIC_UNIT)
+    for x in RAIL_HOLE_X
+)
+# The rail's bolt hole, HIWIN catalogue G99TE23-2203 d (the kit rail copies
+# the HGR15), and the #8-32 screw's float in it at its basic major, the
+# largest a 3A screw reaches: 0.167 a side.
+RAIL_HOLE_DIA = 4.5
 RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0
+# The fit stack (module docstring), radial at the worst hole. Owner ruling
+# 2026-11-16: the purchased rail's R1-R8 span is assumed within 0.15 of the
+# nominal 420.000, no receipt gate and no transfer fallback.
+RAIL_PATTERN_SPAN_ERROR = 0.15
+RAIL_SPAN = RAIL_HOLE_X[-1] - RAIL_HOLE_X[0]  # 420.000
+# Linear expansion, 20-100 °C: 6061-T6 (ASM Handbook vol. 2) against the
+# low end of carbon and bearing steels, the larger difference. The DRO's
+# magnetic scale is steel too, so only the drill-to-fit temperature
+# difference moves the bar's pattern against the rail.
+ALUMINIUM_CTE = 23.6e-6
+RAIL_STEEL_CTE = 11.0e-6
+FIT_TEMPERATURE_DIFFERENCE = 10.0  # °C, drilling to fitting, one shop
+RAIL_THERMAL_SPAN_ERROR = (
+    RAIL_SPAN * (ALUMINIUM_CTE - RAIL_STEEL_CTE) * FIT_TEMPERATURE_DIFFERENCE
+)  # 0.053
+# Both span errors are linear along the rail, and the untrimmed rail floats
+# on its screws until they are tightened, so it centres on the bar's
+# pattern: each end hole takes half of them. The bar's own band does not
+# centre out: any hole may sit at either limit.
+RAIL_FIT_STACK = (
+    RAIL_PATTERN_SPAN_ERROR + RAIL_THERMAL_SPAN_ERROR
+) / 2.0 + RAIL_HOLE_POSITION_RADIUS  # 0.151
+RAIL_FIT_MARGIN = RAIL_SCREW_CLEARANCE - RAIL_FIT_STACK  # 0.016
+if RAIL_FIT_MARGIN <= 0.0:
+    raise AssertionError("the rail screws bind: the fit stack exceeds their float")
 # The rail kit's Number: the rail is its Rail configuration.
 RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
-# The mate and its fit-up acceptance (rule 7: a matched fit names its mate
-# and how it is accepted).
-RAIL_MATE_CALLOUT = (
-    f"MATCHES HGR15 RAIL {RAIL_NUMBER}; "
-    f"ALL {len(RAIL_HOLE_X)} SCREWS START BY HAND"
-)
-RAIL_ROW_CALLOUT = "HOLES IN LINE\nFOR HGR15 RAIL"
 # Rule 18: the screw's thread in the bar at least 1.5 major diameters.
 RAIL_SCREW_ENGAGEMENT = trammel.RAIL_SCREW_LENGTH - trammel.RAIL_SCREW_SEAT_ABOVE_BASE
 if RAIL_SCREW_ENGAGEMENT < 1.5 * THREAD_MAJOR_MM[RAIL_SCREW]:
@@ -273,22 +334,22 @@ for _label, _worst in (
 if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
     raise AssertionError("a hold-down slot runs under the rail")
 
-# The nominal trimmed pattern retains all eight taps with ample end material.
-# Nominal-model envelope with the bar/slot manufacturing bands. This is not
-# a supplier pitch certificate: inspect actual rail/tap walls before use.
+# Rule 17 from each rail tap's thread major to the end faces and to the
+# hold-down slots, at the printed bands: the station's ±0.05 mm, the row's
+# .XX, the length's .XX and the slots' stations and rises at .XX.
 _RAIL_TAP_RADIUS = THREAD_MAJOR_MM[RAIL_SCREW] / 2.0
 RAIL_TAP_END_WALL_WORST = (
     min(
-        RAIL_HOLE_X[0],
+        RAIL_HOLE_X[0] - RAIL_HOLE_POSITION_RADIUS,
         BAR_LENGTH
         - _deviation(BAR_LENGTH, STATION_PLACES)
-        - RAIL_HOLE_X[-1],
+        - (RAIL_HOLE_X[-1] + RAIL_HOLE_POSITION_RADIUS),
     )
     - _RAIL_TAP_RADIUS
 )
 RAIL_TAP_SLOT_WALL_WORST = min(
     math.hypot(x - sx, max(0.0, abs(sy) - SLOT_RUN / 2.0))
-    - _XX
+    - math.hypot(RAIL_HOLE_POSITION_RADIUS, _XX)
     - math.hypot(_deviation(sx, STATION_PLACES), _XX)
     - _R_MAX
     - _RAIL_TAP_RADIUS
@@ -301,25 +362,6 @@ for _label, _worst in (
 ):
     if _worst < WALL_TARGET_MM:
         raise AssertionError(f"base bar wall {_label}: {_worst:.3f} worst")
-
-
-def require_matched_rail_walls(
-    *, counterbore_end_wall: float, tap_end_wall: float,
-    tap_slot_wall: float, tap_bracket_wall: float,
-) -> None:
-    """Accept measured minimum ligaments, with measurement uncertainty removed.
-
-    These are actual nearest-edge measurements on the retained rail and
-    transferred taps, not deviations from the nominal supplier hole pattern.
-    """
-    for label, wall in (
-        ("rail counterbore to end", counterbore_end_wall),
-        ("bar tap to end", tap_end_wall),
-        ("bar tap to slot", tap_slot_wall),
-        ("bar tap to bracket hole", tap_bracket_wall),
-    ):
-        if not math.isfinite(wall) or wall < WALL_TARGET_MM:
-            raise ValueError(f"matched rail wall {label}: {wall!r}, require {WALL_TARGET_MM}")
 
 # --- End bracket holes (PR C4), Bar1 configuration only ------------------
 # The two TL-28 brackets' #8-32 x 3/4 SHCS (the jig's common screw), two a
@@ -461,9 +503,9 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
     def position(x: float, y: float) -> float:
         return math.hypot(station(x), row(y))  # a hole's corner of its square
 
-    # Nominal rail stations only; actual transferred taps are inspected
-    # against the bracket holes separately at assembly.
-    rail_position = _XX
+    # A rail tap's station holds its band but its row only the title block's
+    # .XX (c3-r7): the row moves all eight taps against these holes' rows.
+    rail_position = math.hypot(RAIL_HOLE_POSITION_RADIUS, _XX)
     radius = BRACKET_CBORE_RADIUS_MAX
     # Both slots: station and rise at .XX from the -Y side, as the holes' rows.
     slots = (
@@ -550,7 +592,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FarSlotRise",
     },
     "Bar": {"BarThick"},
-    "RailHoles": {f"RailHole{k}X" for k in range(1, len(RAIL_HOLE_X) + 1)},
+    # The rail holes print as one equally spaced pattern between holes 1 and
+    # 8 (rule 10: one hole axis), each station banded from the end face.
+    "RailHoles": {f"RailHole{k}X" for k in RAIL_PRINTED_HOLES},
     "RailRowReference": {"RailRowY"},
     # The bracket holes' stations (one per KP08 station) from the spindle-end
     # face, and the two rows from the faced -Y edge (the hidden reference
@@ -561,13 +605,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The width is milled to size (owner ruling #2083) and the thickness faced
 # (owner ruling 2026-10-30): both take the title block's .XX band; the rail
 # row's height takes it too (c3-r7).
-# Bracket controls remain this package's existing independent contract.
-# The rail positions are deliberately absent: they are untoleranced REF.
-RAIL_REFERENCE_DIMENSIONS = {
-    ("RailHoles", name): RAIL_HOLE_PLACES
-    for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
-}
+# The metric vendor lines' stations (owner ruling 4): (feature, dimension) ->
+# (millimetre places, symmetric band mm). The rail holes' carries the one
+# tight band, the rail screws' fit stack (RAIL_FIT_STACK).
 METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
+    **{
+        ("RailHoles", name): (RAIL_HOLE_PLACES, RAIL_HOLE_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
+    },
     **{
         ("BracketHoles", name): (BRACKET_STATION_PLACES, BRACKET_STATION_BAND)
         for name in sorted(DRAWING_DIMENSIONS["BracketHoles"])
@@ -584,7 +629,6 @@ _PLACES = {
     "BarWidth": WIDTH_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
     **{name: places for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()},
-    **{name: places for (_feature, name), places in RAIL_REFERENCE_DIMENSIONS.items()},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: _PLACES.get(name, STATION_PLACES) for name in names}

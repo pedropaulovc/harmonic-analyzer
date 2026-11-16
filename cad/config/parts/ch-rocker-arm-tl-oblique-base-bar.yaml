@@ -27,9 +27,9 @@ ch-rocker-arm-tl-oblique-base-bar:
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "front view: RailHoles station references and BracketHoles vendor-mating station dimensions"
+      where: "front view: RailHoles hole 1 and hole 8 station dimensions and BracketHoles vendor-mating station dimensions"
       finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
-      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: controlled interfaces to the metric-only KP08, HGR15 and Tr8 vendor lines retain exact millimetres, the mm unit label and their applicable explicit mm bands rather than rounded inch conversions (drawing-simplicity-policy.md, supplier-unit exception). Owner ruling 2026-11-08 (Pedro), #2144 item 13.1 supersedes the former independent rail-station bands: rail positions are untoleranced REF, transferred from the actual trimmed rail to its paired base bar and accepted by free screw insertion with rail ends flush to base-bar ends. This records the existing rulings, not a new waiver."
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: controlled interfaces to the metric-only KP08, HGR15 and Tr8 vendor lines retain exact millimetres, the mm unit label and their applicable explicit mm bands rather than rounded inch conversions (drawing-simplicity-policy.md, supplier-unit exception). Owner ruling 2026-11-16 (Pedro) supersedes #2144 item 13.1's transfer from the trimmed rail: 'change plan to trim rail after fit; rail programs stay normal' and 'assume it will always be within .15; no transfer needed'. The eight rail holes are drilled and tapped at their printed stations (±0.05 mm from the end face, the rail screws' fit stack), the untrimmed rail is fitted with free screw insertion and only then are its ends ground flush with the base-bar ends. This records the existing rulings, not a new waiver."
     - id: "RV-02"
       kind: "minor"
       where: "end view: the Ra 125 seat label SEATS ON PM-30MV MILL TABLE (SHOP EQUIPMENT) (sheet 1 underside, sheet 2 top face)"
