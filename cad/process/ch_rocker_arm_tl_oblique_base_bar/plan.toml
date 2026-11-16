@@ -214,6 +214,9 @@ speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
 instruction = "Face full length, +X passes, .60 stepover. Side 1: one pass, ~half the allowance. Flip end-for-end, ZERO EDGE at fixed jaw; side 2: one pass to {{cad.thickness_in:.4f}}."
+# TODO(#2850): facing is ~107 min of the two bars' cutting at these chart
+# speeds (850 rpm, .002 in/tooth); measure the 3/4 in face mill with dechatter
+# and move to a measured record as the edges did (#2846).
 settings = "basebar-face-6061-t6511"
 milling_cuts = [
   { name = "side 1 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
