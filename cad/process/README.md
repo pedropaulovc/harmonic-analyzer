@@ -380,6 +380,9 @@ being written, yet these checks caught a spot depth measured from the
 counterbore floor, a feed height below the stock top, a slot cut from the
 outside and an oversized radial step. A failed check removes every output.
 Fix the recipe, not the expectation.
+The base-bar recipe refuses to post when the manifest's rail stations are REF
+(no `station` requirement): such holes are transferred from each bar's own
+rail, and posting at the nominal would drill off the real rail.
 
 For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
 back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.

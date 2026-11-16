@@ -50,8 +50,9 @@ def test_silent_fusion_output_is_a_failure():
     assert fusion_cam.parse_result(f"noise\n{fusion_cam.RESULT_MARKER}{{\"files\": []}}\n") == {"files": []}
 
 
-def _features() -> dict:
-    """The v49 manifest's base-bar features, reduced to what the recipe reads."""
+def _features(rail_requirements=("thread", "dia", "station", "height", "thru")) -> dict:
+    """The base bar's features, reduced to what the recipe reads; rail stations
+    are held (a "station" requirement) unless ``rail_requirements`` drops it."""
     def plane(value):
         return {"kind": "plane", "plane": {"value": value}}
 
@@ -63,7 +64,8 @@ def _features() -> dict:
         "far_slot": {"kind": "slot", "at": [389.89, 35.56, 11.938], "separation": [3.81, 4.318], "width_nominal": 13.462},
     }
     for i in range(4):
-        f[f"rail_{i}"] = {"kind": "threaded_hole", "at": [9.964 + 60 * i, 0.0, 11.938], "nominal_dia": 3.4544}
+        f[f"rail_{i}"] = {"kind": "threaded_hole", "at": [9.964 + 60 * i, 0.0, 11.938], "nominal_dia": 3.4544,
+                          "requirements": list(rail_requirements)}
     for name, x, y in (("b1", 47.484, -33.991), ("b2", 428.0, -75.991)):
         f[name] = {"kind": "hole", "at": [x, y, 11.938], "dia_nominal": 4.8006}
         f[f"{name}_cbore"] = {"kind": "counterbore", "parent": name, "dia_nominal": 7.9502, "depth_ref": 5.08}
@@ -74,6 +76,15 @@ def _context() -> dict:
     recipe = _cam_programs.load_recipe(STEM)
     with _process_plans.plan_path(STEM).open("rb") as plan, _process_plans.SHOP_PATH.open("rb") as shop:
         return recipe.context(_features(), tomllib.load(plan), tomllib.load(shop), "bar.STEP")
+
+
+def test_rail_programs_refuse_ref_stations():
+    # A REF rail station is transferred from each bar's own rail; drilling the
+    # nominal would miss the real rail holes (Codjiflo P1 on #2832).
+    recipe = _cam_programs.load_recipe(STEM)
+    with _process_plans.plan_path(STEM).open("rb") as plan, _process_plans.SHOP_PATH.open("rb") as shop:
+        with pytest.raises(ValueError, match="REF"):
+            recipe.context(_features(("thread", "dia", "height", "thru")), tomllib.load(plan), tomllib.load(shop), "bar.STEP")
 
 
 def test_recipe_maps_features_into_the_drawing_frame():
