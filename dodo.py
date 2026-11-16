@@ -4464,6 +4464,8 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 
 
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    import _cam_programs
+
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_selected_factories.py",
@@ -4910,6 +4912,13 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Shop-equipment contracts read the tracked shop records at runtime.
             str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
             str((REPO_ROOT / "cad" / "config" / "shop-equipment.toml").resolve()),
+            # test_fusion_cam loads each CAM recipe by path (importlib, outside
+            # cad/scripts) and reads its plan's milling cuts at runtime.
+            *(
+                str(path.resolve())
+                for stem in _cam_programs.CAM_STEMS
+                for path in (_cam_programs.recipe_path(stem), _cam_programs.PROCESS_ROOT / stem / "plan.toml")
+            ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(

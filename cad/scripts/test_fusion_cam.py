@@ -170,3 +170,12 @@ def test_event_stream_replies_decode_to_their_response():
     assert _decode(body, "text/event-stream") == {"jsonrpc": "2.0", "id": 3, "result": {"ok": 1}}
     with pytest.raises(FusionError):
         _decode("event: ping\n\n", "text/event-stream")
+
+
+def test_lateral_feed_below_the_stock_top_is_caught(tmp_path):
+    # A G1 link between two holes at Z-1 drags the drill through the part; a G0
+    # check alone passes it (Codjiflo round 3 on #2832).
+    text = "G0 X10 Y5 Z5\nG1 Z-3 F100\nG1 Z-1\nG1 X40\nG1 Z-3\nG0 Z5\n"
+    program = _program(tmp_path, text)
+    assert _gcode.check_rapids_clear(program, 0.0, [(10.0, 5.0), (40.0, 5.0)]) == []
+    assert [f.check for f in _gcode.check_vertical_below_top(program, 0.0)] == ["lateral"]

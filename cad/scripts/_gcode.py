@@ -170,6 +170,22 @@ def check_rapids_clear(program: Program, z_top: float, open_holes: Iterable[tupl
     return findings
 
 
+def check_vertical_below_top(program: Program, z_top: float) -> list[Finding]:
+    """Below the stock top a hole program only moves along Z: any move there that
+    changes X or Y, rapid or feed, drags the tool through the part. Feeds matter
+    as much as rapids because Fusion Personal may post linking moves as G1."""
+    findings = []
+    for m in program.moves:
+        low = min(m.start[2], m.end[2]) < z_top - _TOL_MM
+        lateral = not (_close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1]))
+        if low and lateral:
+            findings.append(Finding(
+                program.path.name, "lateral",
+                f"{m.motion.name} X{m.start[0]:.3f} Y{m.start[1]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} below stock top {z_top:.3f}",
+            ))
+    return findings
+
+
 def check_bounds(
     program: Program,
     window: tuple[tuple[float, float], tuple[float, float]],

@@ -10,6 +10,7 @@ machine running Fusion produces these files.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 from pathlib import Path
 from types import ModuleType
@@ -45,8 +46,18 @@ def nc_dir(stem: str, out: Path = CAD_OUT) -> Path:
     return Path(out) / "nc" / stem
 
 
+def program_names(stem: str) -> tuple[str, ...]:
+    """The recipe's program names, read statically from its literal ``PROGRAMS``
+    so a broken recipe fails its own ``cam:<stem>`` task, never task loading."""
+    tree = ast.parse(recipe_path(stem).read_text(encoding="utf-8"))
+    for node in tree.body:
+        target = node.target if isinstance(node, ast.AnnAssign) else (node.targets[0] if isinstance(node, ast.Assign) else None)
+        if isinstance(target, ast.Name) and target.id == "PROGRAMS":
+            return tuple(name for name, _ops in ast.literal_eval(node.value))
+    raise ValueError(f"{recipe_path(stem)} has no literal PROGRAMS")
+
+
 def cam_outputs(stem: str, out: Path = CAD_OUT) -> tuple[Path, ...]:
     """Every file the cam task writes: each program's ``.nc``, then the manifest."""
     directory = nc_dir(stem, out)
-    programs = tuple(directory / f"{name}.nc" for name, _ops in load_recipe(stem).PROGRAMS)
-    return (*programs, directory / MANIFEST_NAME)
+    return (*(directory / f"{name}.nc" for name in program_names(stem)), directory / MANIFEST_NAME)

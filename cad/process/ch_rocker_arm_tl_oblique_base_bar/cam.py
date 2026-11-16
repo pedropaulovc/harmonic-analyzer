@@ -244,6 +244,7 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
             (program, "spindle", {"rpm": rpm}),
             (program, "holes", {"centres": [tuple(c) for c in centres], "z_bottom": z}),
             (program, "rapids_clear", {"z_top": 0.0, "open_holes": [tuple(c) for c in centres]}),
+            (program, "vertical_below_top", {"z_top": 0.0}),
         ]
     return out
 
