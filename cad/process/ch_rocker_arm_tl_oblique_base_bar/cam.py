@@ -140,7 +140,8 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     bracket_drill = _shop_tool(plan, shop, "bracket-drill")["diameter_mm"]
     spot_dia = _cut(plan, "spot R1–R4, B1–B2")["cutter_dia_mm"]
     spot_depth = CENTRE_DRILL["pilot_length_mm"] + (spot_dia - CENTRE_DRILL["pilot_mm"]) / 2 / math.tan(math.radians(30))
-    edge_rpm, edge_feed = _setting(shop, "basebar-edge-6061-t6511")
+    edge_rpm, edge_feed = _setting(shop, "em-half-hss-6061-v11-wide")
+    end_rpm, end_feed = _setting(shop, "em-half-hss-6061-v11-narrow")
     slot_rpm, slot_feed = _setting(shop, "basebar-slot-rough-6061-t6511")
     face_rpm, face_feed = _setting(shop, "basebar-face-6061-t6511")
     _, slot_plunge = _plunge_feed(plan, "S1–S2 corner plunges")
@@ -177,7 +178,7 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                  "steps": math.ceil((y_trim - edge_finish) / edge_step) + 1, "tip": p["edge_cut_tip_z_mm"],
                  "stepdown": p["side_max_stepdown_mm"]},
         "face": {"rpm": face_rpm, "feed": face_feed, "stepover": face_stepover},
-        "ends": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
+        "ends": {"rpm": end_rpm, "feed": end_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
                  "stepdown": p["side_max_stepdown_mm"],
                  "left_step": left_step, "left_steps": math.ceil(x_trim / left_step) + EXTRA_ROUGHING_STEPS,
                  "right_step": right_step, "right_steps": math.ceil(x_trim / right_step) + EXTRA_ROUGHING_STEPS},
@@ -215,8 +216,8 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB03_S3_face_side2_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB03_S3_face_side2_T2", "depth", {"z_min": T}),
         ("BB03_S3_face_side2_T2", "rapids_clear", {"z_top": ctx["side1"]}),
-        # Ends run at the measured edge settings; the full-width slots keep their own.
-        ("BB04_S3_ends_slots_T1", "spindle", {"rpm": [ends["rpm"], slots["rpm"]]}),
+        # One hand-set spindle speed per program: the ends and slots share it.
+        ("BB04_S3_ends_slots_T1", "spindle", {"rpm": ends["rpm"]}),
         ("BB04_S3_ends_slots_T1", "depth", {"z_min": -T + ends["tip"]}),
         ("BB04_S3_ends_slots_T1", "rapids_clear", {"z_top": 0.0}),
         # Left end becomes ZERO END, cutter -Y; right end to length, cutter +Y.

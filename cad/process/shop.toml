@@ -135,20 +135,35 @@ tap_drill_mm = 3.4544
 description = "5/16 in centre-cutting 2-flute end mill"
 diameter_mm = 7.9375
 
+[settings.basebar-edge-6061-t6511]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "6 in/min"
 # Measured: dechatter 0.3.0 report v11, 2026-11-12, on the PM-30MV with a 1/2 in
 # 2-flute HSS end mill (48.8 mm stickout, R8) side-milling 6061, conventional,
 # 7.62 mm deep: cad/process/dechatter/2026-11-12-pm30mv-em-half-hss-6061-v11.html.
 # Raw data: https://1drv.ms/u/c/302eadd0a0193b06/IQBA9O2JVkqiTq0-oYk6oitRAWDgJWY83FRwBQnn81tMpAg?e=sZ0jBr
-# 2250 rpm at .089 mm (.0035 in)/tooth was stable to 4.7 mm wide, chatter at 5.0;
-# 1830 rpm chattered at 2.2 mm, so keep off that band. 2250 rpm * 2 flutes *
-# .0035 in = 15.75 in/min (the report's 400 mm/min). Valid within 7.62 mm deep:
-# deeper cuts take equal depth levels (plan side_max_stepdown_mm). Replaces the
-# LittleMachineShop 165 ft/min chart value (1250 rpm, 6 in/min).
-[settings.basebar-edge-6061-t6511]
+# Every pass held .089 mm (.0035 in)/tooth. Valid only for that tool assembly
+# and within 7.62 mm deep: deeper cuts take equal depth levels (the plan's
+# side_max_stepdown_mm). The chart record above stays for plans that cut
+# full depth in one level.
+# Wide: 2250 rpm was stable to 4.7 mm wide (chatter at 5.0); 1830 rpm
+# chattered at 2.2 mm, so keep off that band. 2250 * 2 * .0035 = 15.75 in/min
+# (the report's 400 mm/min). High belt range.
+[settings.em-half-hss-6061-v11-wide]
 tool = "basebar-em-half"
 material = "6061-t6511"
 rpm = 2250
 feed = "15.75 in/min"
+# Narrow (≤ 0.6 mm wide): 0.6 mm was stable at every speed tested, 570 to
+# 2250 rpm, so 1250 (the slot speed, low belt range) is inside that column.
+# 1250 * 2 * .0035 = 8.75 in/min.
+[settings.em-half-hss-6061-v11-narrow]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "8.75 in/min"
 [settings.basebar-slot-rough-6061-t6511]
 tool = "basebar-em-half"
 material = "6061-t6511"
