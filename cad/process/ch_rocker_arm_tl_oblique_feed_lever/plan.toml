@@ -129,7 +129,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~3/16 across. X ±{{cad.station_tol_in:.2f}}; Y {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}}."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 # H1 (.28) sits just outside the left jaw side, H2 (.91) inside the jaws.
 milling_cuts = [

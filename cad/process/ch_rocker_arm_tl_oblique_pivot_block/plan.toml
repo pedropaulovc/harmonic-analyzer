@@ -11,9 +11,9 @@
 # cuts it and squares its floor; the owned pin-gauge set checks it.
 # Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
-# 3000 (#15 3501 → 3000; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
+# 2800 (owner 2026-11-16; #15 3501 → 2800; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
 # The 1/2 in end mill faces at block-em-half-6061-t6511 (1800 rpm, 8 in/min,
-# .0022 in/tooth). Every speed lies in the high belt range (1400-3000), so
+# .0022 in/tooth). Every speed lies in the high belt range (1400-2800), so
 # the belt never moves.
 title = "Oblique trammel pivot block"
 part = "{{cad.drawing_number}}"
@@ -259,7 +259,7 @@ instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_to
 instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
 # Stations: X from ROW SIDE. The #2 centre drill at its 3/16 in body Ø (largest cone).
 milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
-rpm = 3000
+rpm = 2800
 feed = "hand"
 
 [setups.operations.table]
@@ -272,7 +272,7 @@ tool = "drill-15"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
 instruction = "H1–H4 through, full-retract pecks every .18."
 milling_cuts = [{ name = "H1–H4", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.572, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
-rpm = 3000
+rpm = 2800
 feed = "hand"
 inspection = "Ø{{cad.hole_dia_min_in:.3dot}}–{{cad.hole_dia_max_in:.3dot}} (the #15 drill); rows {{cad.hole_y1_nominal_in:.3dot}}/{{cad.hole_y2_nominal_in:.3dot}}, stations {{cad.hole_x1_nominal_in:.3dot}}/{{cad.hole_x2_nominal_in:.3dot}}, ±{{cad.hole_x_tol_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_x1_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_x2_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_y1_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_y2_band_mm}}" }]

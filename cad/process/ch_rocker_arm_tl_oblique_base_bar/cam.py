@@ -140,7 +140,8 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     bracket_drill = _shop_tool(plan, shop, "bracket-drill")["diameter_mm"]
     spot_dia = _cut(plan, "spot R1–R4, B1–B2")["cutter_dia_mm"]
     spot_depth = CENTRE_DRILL["pilot_length_mm"] + (spot_dia - CENTRE_DRILL["pilot_mm"]) / 2 / math.tan(math.radians(30))
-    edge_rpm, edge_feed = _setting(shop, "basebar-edge-6061-t6511")
+    edge_rpm, edge_feed = _setting(shop, "em-half-hss-6061-v11-wide")
+    end_rpm, end_feed = _setting(shop, "em-half-hss-6061-v11-narrow")
     slot_rpm, slot_feed = _setting(shop, "basebar-slot-rough-6061-t6511")
     face_rpm, face_feed = _setting(shop, "basebar-face-6061-t6511")
     _, slot_plunge = _plunge_feed(plan, "S1–S2 corner plunges")
@@ -174,9 +175,11 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             "rail_drill": rail_drill, "bracket_drill": bracket_drill, "centre_drill": CENTRE_DRILL,
         },
         "edge": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "step": edge_step, "finish": edge_finish,
-                 "steps": math.ceil((y_trim - edge_finish) / edge_step) + 1, "tip": p["edge_cut_tip_z_mm"]},
+                 "steps": math.ceil((y_trim - edge_finish) / edge_step) + 1, "tip": p["edge_cut_tip_z_mm"],
+                 "stepdown": p["side_max_stepdown_mm"]},
         "face": {"rpm": face_rpm, "feed": face_feed, "stepover": face_stepover},
-        "ends": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
+        "ends": {"rpm": end_rpm, "feed": end_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
+                 "stepdown": p["side_max_stepdown_mm"],
                  "left_step": left_step, "left_steps": math.ceil(x_trim / left_step) + EXTRA_ROUGHING_STEPS,
                  "right_step": right_step, "right_steps": math.ceil(x_trim / right_step) + EXTRA_ROUGHING_STEPS},
         "slots": {"rpm": slot_rpm, "feed": slot_feed, "plunge": slot_plunge,
@@ -203,26 +206,27 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         # Front edge becomes ZERO EDGE: conventional, cutter +X (plan S2).
         ("BB01_S2_edges_T1", "side_passes", {"axis": "Y", "final": -r, "raw": -ctx["y_trim"] - r,
                                               "max_step": edge["step"], "finish": edge["finish"], "direction": 1.0,
-                                              "span": L / 2, "below_z": 0.0}),
+                                              "span": L / 2, "below_z": 0.0, "max_stepdown": edge["stepdown"]}),
         ("BB01_S2_edges_T1", "side_passes", {"axis": "Y", "final": W + r, "raw": W + ctx["y_trim"] + r,
                                               "max_step": edge["step"], "finish": edge["finish"], "direction": -1.0,
-                                              "span": L / 2, "below_z": 0.0}),
+                                              "span": L / 2, "below_z": 0.0, "max_stepdown": edge["stepdown"]}),
         ("BB02_S3_face_side1_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB02_S3_face_side1_T2", "depth", {"z_min": ctx["side1"]}),
         ("BB02_S3_face_side1_T2", "rapids_clear", {"z_top": bt}),
         ("BB03_S3_face_side2_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB03_S3_face_side2_T2", "depth", {"z_min": T}),
         ("BB03_S3_face_side2_T2", "rapids_clear", {"z_top": ctx["side1"]}),
+        # One hand-set spindle speed per program: the ends and slots share it.
         ("BB04_S3_ends_slots_T1", "spindle", {"rpm": ends["rpm"]}),
         ("BB04_S3_ends_slots_T1", "depth", {"z_min": -T + ends["tip"]}),
         ("BB04_S3_ends_slots_T1", "rapids_clear", {"z_top": 0.0}),
         # Left end becomes ZERO END, cutter -Y; right end to length, cutter +Y.
         ("BB04_S3_ends_slots_T1", "side_passes", {"axis": "X", "final": -r, "raw": -ctx["x_trim"] - r,
                                                    "max_step": ends["left_step"], "direction": -1.0,
-                                                   "span": W / 2, "below_z": 0.0}),
+                                                   "span": W / 2, "below_z": 0.0, "max_stepdown": ends["stepdown"]}),
         ("BB04_S3_ends_slots_T1", "side_passes", {"axis": "X", "final": L + r, "raw": L + ctx["x_trim"] + r,
                                                    "max_step": ends["right_step"], "direction": 1.0,
-                                                   "span": W / 2, "below_z": 0.0}),
+                                                   "span": W / 2, "below_z": 0.0, "max_stepdown": ends["stepdown"]}),
     ]
     for slot in slots["items"]:
         e = (slot["width"] - 2 * r) / 2  # cutter-centre offset inside the slot
@@ -300,6 +304,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
             "doRoughingPasses": "true", "maximumStepover": f"{e['step']} mm", "maximumRoughingSteps": str(e["steps"]),
             "doMultipleFinishingPasses": "true", "numberOfFinishingStepovers": "1", "finishingStepover": f"{e['finish']} mm",
             "bottomHeight_offset": f"{e['tip']} mm", "doRamp": "false",
+            "doMultipleDepths": "true", "maximumStepdown": f"{e['stepdown']} mm", "useEvenStepdowns": "true",
             "clearanceHeight_mode": "'from stock top'", "clearanceHeight_offset": f"{STRAP_CLEARANCE_MM} mm",
         })
         ops[key] = op
@@ -319,6 +324,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
         rt.set_params(op, {
             "compensation": "'right'", "doRoughingPasses": "true", "maximumStepover": f"{step} mm",
             "maximumRoughingSteps": str(steps), "bottomHeight_offset": f"{en['tip']} mm", "doRamp": "false",
+            "doMultipleDepths": "true", "maximumStepdown": f"{en['stepdown']} mm", "useEvenStepdowns": "true",
         })
         ops[key] = op
     sl = ctx["slots"]

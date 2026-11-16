@@ -188,7 +188,7 @@ tool = "spot"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR + X), cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
 instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:g}}, in the gap between the parts, and zero Y there. X0 on the left INNER END; touch the right part's INNER END from the gap and note XR. Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR + X), cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 milling_cuts = [
   { name = "spot H1–H2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.969, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 6.35 },
@@ -203,7 +203,7 @@ speed_kind = "spindle"
 tool = "drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
 instruction = "H1–H{{cad.hole_count:d}} through on both parts to Z −1.06 below BAR SIDE (exit full size); full-retract pecks every .14 (L/D 8; a parabolic-flute #29 helps)."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 inspection = "Each part from its INNER END: stations as tabled ±{{cad.station_tol_in:.3f}} ({{cad.hole_stations_mm}} mm ±{{cad.station_tol_mm:.2f}}); row {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}} from ROW EDGE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]

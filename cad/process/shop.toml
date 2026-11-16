@@ -19,7 +19,8 @@
 # cad/config/shop-equipment.toml cnc.pm-30mv.
 [machines.pm-30mv]
 kind = "mill"
-rpm_ranges = [[50, 3000]]
+# Owner (Pedro, 2026-11-16): spindle 100 rpm minimum, 2800 rpm maximum.
+rpm_ranges = [[100, 2800]]
 travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
 spindle_to_table_mm = [62.484, 431.8]
@@ -140,6 +141,30 @@ tool = "basebar-em-half"
 material = "6061-t6511"
 rpm = 1250
 feed = "6 in/min"
+# Measured: dechatter 0.3.0 report v11, 2026-11-12, on the PM-30MV with a 1/2 in
+# 2-flute HSS end mill (48.8 mm stickout, R8) side-milling 6061, conventional,
+# 7.62 mm deep: cad/process/dechatter/2026-11-12-pm30mv-em-half-hss-6061-v11.html.
+# Raw data: https://1drv.ms/u/c/302eadd0a0193b06/IQBA9O2JVkqiTq0-oYk6oitRAWDgJWY83FRwBQnn81tMpAg?e=sZ0jBr
+# Every pass held .089 mm (.0035 in)/tooth. Valid only for that tool assembly
+# and within 7.62 mm deep: deeper cuts take equal depth levels (the plan's
+# side_max_stepdown_mm). The chart record above stays for plans that cut
+# full depth in one level.
+# Wide: 2250 rpm was stable to 4.7 mm wide (chatter at 5.0); 1830 rpm
+# chattered at 2.2 mm, so keep off that band. 2250 * 2 * .0035 = 15.75 in/min
+# (the report's 400 mm/min). High belt range.
+[settings.em-half-hss-6061-v11-wide]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 2250
+feed = "15.75 in/min"
+# Narrow (≤ 0.6 mm wide): 0.6 mm was stable at every speed tested, 570 to
+# 2250 rpm, so 1250 (the slot speed, low belt range) is inside that column.
+# 1250 * 2 * .0035 = 8.75 in/min.
+[settings.em-half-hss-6061-v11-narrow]
+tool = "basebar-em-half"
+material = "6061-t6511"
+rpm = 1250
+feed = "8.75 in/min"
 [settings.basebar-slot-rough-6061-t6511]
 tool = "basebar-em-half"
 material = "6061-t6511"
@@ -209,8 +234,9 @@ flutes = 4
 # tools.ms-stick-engraver: make, SKU, 30 deg V, .005 in tip) on its brass,
 # read by test_ms_stick_drawing. Source: 2L "Feeds and Speeds for Engraving
 # with an Engraving Tool" (engraving_tool_speed_and_feed_table.pdf, read live
-# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm (the
-# PM-30MV's top speed), halved for small tip widths as its note says: 3 in/min
+# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm, halved
+# for small tip widths as its note says: .001 in/tooth, so 2.8 in/min at the
+# PM-30MV's 2800 rpm top speed (owner 2026-11-16)
 # by handwheel, plunge at half that; passes .005 deep, the last .001-.002 at a
 # slower feed to leave no burr. diameter_mm is the 1/8 in shank (the bit's
 # body); the cutting width is the V at depth, set by the equipment record.
@@ -221,8 +247,8 @@ diameter_mm = 3.175
 [settings.ms-stick-engrave-brass]
 tool = "ms-stick-engraver"
 material = "ms-stick-brass"
-rpm = 3000
-feed = "3 in/min"
+rpm = 2800
+feed = "2.8 in/min"
 
 # Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
 # Number and letter drills are the 115-piece index's (jig-drill-11-32);
@@ -274,7 +300,7 @@ description = "3/8 in 82° countersink"
 
 # Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
 # coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
-# in the PM-30MV high belt range (1400-3000 rpm) with Setups 4-5's drills, so
+# in the PM-30MV high belt range (1400-2800 rpm) with Setups 4-5's drills, so
 # no belt change: 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
 [settings.riser-em-half-6061-t6511]
 tool = "jig-em-half"

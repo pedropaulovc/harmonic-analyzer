@@ -209,9 +209,12 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   the 1-3/8 in parallels and two screw jacks (touch only; Setup 4 gives their
   DRO positions and its drill and counterbore operations split by end, each
   over its jack). Facing runs full length at 850 rpm, 6.8 in/min (owner ruling
-  2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. Setups
-  2–3 run in the low belt range and Setup 4 in the high range, so both bars
-  take one belt change. The rail
+  2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. The
+  edges and ends use the dechatter v11 records
+  (`settings.em-half-hss-6061-v11-wide`/`-narrow`, at most 7.62 mm per depth
+  level, 48.8 mm stickout): Setup 2 runs in the high belt range (2250 rpm),
+  Setup 3 in the low range (facing 850, ends and slots 1250) and Setup 4 in
+  the high range, so both bars take two belt changes. The rail
   holes are drilled at their printed stations, ±0.05 mm from ZERO END, on
   the CNC by programs BB05 (spot) and BB07 (#29 drill) of
   `cam:ch_rocker_arm_tl_oblique_base_bar` (owner rulings 2026-11-16,

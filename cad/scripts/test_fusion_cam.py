@@ -140,6 +140,25 @@ def test_finish_pass_heavier_than_the_finish_step_is_caught(tmp_path):
     assert [f.detail for f in findings] == ["Y -6.350 removes 0.500 > 0.254"]
 
 
+def test_side_pass_deeper_than_the_measured_stepdown_is_caught(tmp_path):
+    # The edge settings hold only within 7.62 mm deep (dechatter v11): one
+    # 14.732 mm level fails, two even 7.366 mm levels pass, and each station is
+    # judged alone, so a roughing station's two levels cannot cover a finish
+    # pass cut at full depth (Codjiflo on #2846).
+    kwargs = {"axis": "Y", "final": -6.35, "raw": -10.0, "max_step": 4.1, "direction": 1.0,
+              "span": 200.0, "below_z": 0.0, "max_stepdown": 7.62}
+    one = _program(tmp_path, "G0 X0 Y-6.35 Z5\nG1 Z-14.732 F100\nG1 X400\nG0 Z5\n")
+    assert [f.detail for f in _gcode.check_side_passes(one, **kwargs)] == ["Y -6.350: Z -14.732 steps down 14.732 > 7.620"]
+    two = _program(tmp_path, "G0 X0 Y-6.35 Z5\nG1 Z-7.366 F100\nG1 X400\nG0 Z5\nG0 X0\nG1 Z-14.732\nG1 X400\nG0 Z5\n")
+    assert _gcode.check_side_passes(two, **kwargs) == []
+    rough_levels_finish_full = _program(tmp_path, (
+        "G0 X0 Y-8 Z5\nG1 Z-7.366 F100\nG1 X400\nG0 Z5\nG0 X0\nG1 Z-14.732\nG1 X400\nG0 Z5\n"
+        "G0 X0 Y-6.35\nG1 Z-14.732\nG1 X400\nG0 Z5\n"
+    ))
+    findings = _gcode.check_side_passes(rough_levels_finish_full, **kwargs)
+    assert [f.detail for f in findings] == ["Y -6.350: Z -14.732 steps down 14.732 > 7.620"]
+
+
 def test_rapid_after_a_machine_retract_keeps_its_motion(tmp_path):
     # A G0 set on a machine-coordinate retract (G53) stays modal after a G1 cut,
     # and the Grbl post's G28 G91 Z0 / G90 pair leaves absolute mode. A rapid

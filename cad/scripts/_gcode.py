@@ -235,6 +235,7 @@ def check_side_passes(
     span: float,
     below_z: float,
     finish: float | None = None,
+    max_stepdown: float | None = None,
 ) -> list[Finding]:
     """Straight side-cut passes along the other axis, longer than ``span``, at
     constant ``axis`` coordinate and below ``below_z``: the last pass sits at
@@ -242,7 +243,8 @@ def check_side_passes(
     removes more than ``max_step``. ``raw`` is the cutter-centre coordinate that
     just touches the raw face, so each step is the distance between consecutive
     pass positions, starting from ``raw``. With ``finish``, the final pass
-    removes no more than that finishing step."""
+    removes no more than that finishing step. With ``max_stepdown``, the pass
+    depths step down from ``below_z`` (the stock top) by no more than that."""
     a = "XY".index(axis)
     b = 1 - a
     passes = [
@@ -265,6 +267,17 @@ def check_side_passes(
         if step > limit + _TOL_MM:
             findings.append(Finding(program.path.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {limit:.3f}"))
         previous = station
+    if max_stepdown is not None:
+        for station in stations:
+            levels = sorted({round(m.end[2], 3) for m in passes if _close(m.end[a], station)}, reverse=True)
+            previous = below_z
+            for level in levels:
+                if previous - level > max_stepdown + _TOL_MM:
+                    findings.append(Finding(
+                        program.path.name, "passes",
+                        f"{axis} {station:.3f}: Z {level:.3f} steps down {previous - level:.3f} > {max_stepdown:.3f}",
+                    ))
+                previous = level
     last = [m for m in passes if _close(m.end[a], final)]
     if last and any((m.end[b] - m.start[b]) * direction <= 0 for m in last):
         findings.append(Finding(program.path.name, "passes", f"final pass does not run {'+' if direction > 0 else '-'}{'XY'[b]}"))
