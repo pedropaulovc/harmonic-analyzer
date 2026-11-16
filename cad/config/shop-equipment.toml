@@ -361,6 +361,21 @@ cite = [
   "DRO accuracy, vendor-stated: MagXact MX-100M product page (https://www.precisionmatthews.com/products/dro-mag-m-3ax-18x36x20), read 2026-10-27: \"Magnetic Scales and encoders, .0002” Accuracy\"; the X, Y and Z scales are each listed at .0002 in. Installed DRO and 0.0002 in precision confirmed by the owner 2026-10-27.",
 ]
 
+# The PM-30MV's CNC conversion; the mill's capacity stays cad/process/shop.toml
+# machines.pm-30mv (prechips has no control or repeatability field). Owner
+# (Pedro) 2026-11-16, relayed by Main: "the PM-30MV is CNC-converted and runs
+# GRBL with ballscrews on X/Y. Positioning repeatability is ±0.02 mm" (owner
+# value). The base bar's rail stations are drilled on it (programs BB05/BB07
+# of cam:ch_rocker_arm_tl_oblique_base_bar; part yaml RV-04), and its
+# repeatability is the rail row's hole-to-hole scatter.
+[cnc.pm-30mv]
+control = "GRBL"
+drive = "ballscrews on X and Y"
+repeatability_mm = 0.02
+cite = [
+  "Owner (Pedro) 2026-11-16, relayed by Main: PM-30MV CNC-converted, GRBL, ballscrews on X/Y; positioning repeatability ±0.02 mm (owner value).",
+]
+
 # --- tools ----------------------------------------------------------------
 
 # Existing set confirmed live 2026-10-16, SKU 6784: each size includes 2 and 4 flutes;
@@ -381,6 +396,18 @@ flutes = [2, 4]
 # tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
 [tools.taps-unc-hand.members.8-32-plug]
 flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+
+# Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
+# spindle (tap squared to the quill), and add a squareness term to the
+# stack." The base bar's eight rail taps are cut in it; squareness_deg is the
+# owner's value, charged in the base bar's rail fit stack.
+[tools.spring-tap-guide]
+name = "Spring-loaded tap guide held in the mill spindle, tap squared to the quill"
+kind = "tap_guide"
+squareness_deg = 0.05
+cite = [
+  "Owner ruling 2026-11-16 (Pedro), relayed by Main: spring tap guide in the spindle required; tilt 0.05° (owner value).",
+]
 
 # Shop-made trammel that scribes the rocker template's R800/R816 arcs.
 [tools.rocker-trammel]
@@ -637,7 +664,7 @@ source = "https://www.harborfreight.com/7-amp-4-12-in-slide-switch-angle-grinder
 purchase = "Harbor Freight 64856, $29.99 (listing read live 2026-11-11)"
 present = false
 status = "not owned: to buy"
-use = "MHA-CH-06-TL-00 steps 1E-1F: cut each HGR15 rail end long, then grind it square to its mark"
+use = "MHA-CH-06-TL-00 steps 1E-1F: cut each HGR15 rail end long on its bar, then grind it flush with the bar's end"
 max_rpm = 11000
 
 [tools.rail-trim-grinder.wheels.cut-off]

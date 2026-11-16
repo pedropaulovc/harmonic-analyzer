@@ -7,11 +7,12 @@ views referencing that configuration, and prints its member's Description
 and quantity 1 (``member_note``) under the one Number. Bar 1's plan
 (the *Front view, looking down on the top face) carries the bar's length and
 milled width (owner ruling #2083), the rail holes as one pattern (rule 10:
-hole 1's REF station from the end face, the pitch on the one native tap
-callout with the matched rail, the row's lateral station from the -Y edge
-to one drawn centreline through the eight holes), the end brackets' four
-counterbored holes (stations from the end face, two rows from the -Y edge,
-one native callout: drill, far-side counterbore, the TL-28 mate and bar 1),
+holes 1 and 8's banded stations from the end face, the eight equally spaced
+on the one native tap callout with the matched rail, the row's lateral
+station from the -Y edge to one drawn centreline through the eight holes),
+the end brackets' four counterbored holes (stations from the end face, two
+rows from the -Y edge, one native callout: drill, far-side counterbore, the
+TL-28 mate and bar 1),
 and both slots' stations, rises, width and centre-to-centre run (slot
 centre marks); the end view, projected right of the plan on its
 centreline, carries the faced thickness and both faced seats' Ra 125 µin,
@@ -20,9 +21,9 @@ member; the shaded isometric rides bottom left under the plan's stack,
 left of the title block. Bar 2's sheet is the same layout less the
 brackets' holes, their stations, rows and callout, its seat labels swapped
 (the bar is turned over). The sheet prints decimal inch (#290); the model
-keeps its millimetre nominals. The rail holes' station and pitch and the
-brackets' stations and rows belong to metric vendor lines (HGR15, KP08) and
-print exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
+keeps its millimetre nominals. The rail holes' stations and the brackets'
+stations and rows belong to metric vendor lines (HGR15, KP08) and print
+exact millimetres with their bands, labelled mm (owner ruling 4, 2026-11-01).
 
 Run with SolidWorks open::
 
@@ -238,12 +239,14 @@ def _below_line(k: int) -> float:
 
 
 # The plan: the rail holes are one regular pattern (rule 10: one hole axis),
-# so only hole 1's REF station stands above it, from the end face; the pitch
-# rides the tap callout and one drawn centreline joins the eight holes
-# (rule 26: holes in line share a drawn centreline). Its span is shorter than
-# its metric text with a gap each side, so the text prints left of the end
-# face's extension line, where no other line runs (r1 printed the 40.00
-# across that line).
+# so only holes 1 and 8's stations stand above it, from the end face, each
+# with its band (owner ruling 2026-11-16: drilled at the stations, no
+# transfer); the tap callout says the eight are equally spaced and one drawn
+# centreline joins them (rule 26: holes in line share a drawn centreline).
+# Hole 1's span is shorter than its metric text with a gap each side, so its
+# text prints left of the end face's extension line, where no other line
+# runs (r1 printed the 40.00 across that line); hole 8's prints mid-span one
+# lane further out.
 #
 # Below it, nearest first: the near slot's width (its extension lines then
 # cross no other dimension), the near slot's station, the near bracket row's
@@ -287,8 +290,8 @@ _FAR_RISE_TEXT_HALF = 0.0055  # "4.90": the r6 sheet's "23.0" was 8.8 wide
 _RAIL_ROW_TEXT_HALF = 0.0055
 # "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
 _BAR_WIDTH_TEXT_HALF = 0.0055
-# The metric vendor station at about 2.6 a glyph (owner ruling 4); sized
-# for the 17-glyph banded form the REF "(9.964 mm)" stays inside.
+# The metric vendor stations at about 2.6 a glyph (owner ruling 4), sized for
+# the 17-glyph banded form: "9.964 ±0.05 mm" and "429.964 ±0.05 mm".
 _RAIL_HOLE_TEXT_HALF = 0.0221
 _BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "47.48 ±0.13 mm", 14 glyphs; 15 allowed
 _BRACKET_ROW_TEXT_HALF = 0.0195  # "54.909 ±0.13 mm", 15 glyphs
@@ -331,18 +334,22 @@ _BRACKET_ROW_TEXT_Y = (_sheet_y(FRONT_CENTER, (LOW_SIDE_Y + BRACKET_ROW_Y[0]) / 
 _HOLE_TEXT_LEFT = -(_TEXT_GAP + _RAIL_HOLE_TEXT_HALF) * 1000.0 / _S
 if RAIL_HOLE_X[0] * _S / 1000.0 >= 2.0 * (_RAIL_HOLE_TEXT_HALF + _TEXT_GAP):
     raise AssertionError("hole 1's station text now fits its own span")
-# The pattern: eight holes on one pitch, so hole 1's station and the pitch
-# locate every hole (REF: the actual rail transfers them).
+# The pattern: eight holes on one pitch, so holes 1 and 8's banded stations
+# and the equal spacing locate every hole.
 RAIL_PITCH = RAIL_HOLE_X[1] - RAIL_HOLE_X[0]
 if any(
     abs(b - a - RAIL_PITCH) > 1e-9 for a, b in zip(RAIL_HOLE_X, RAIL_HOLE_X[1:])
 ):
     raise AssertionError("the rail holes are not one regular pattern")
-RAIL_STATION_PRINTED = "RailHole1X"
+RAIL_STATIONS_PRINTED = tuple(f"RailHole{k}X" for k in part_spec.RAIL_PRINTED_HOLES)
 FRONT_KEEP = {
-    RAIL_STATION_PRINTED: (
+    RAIL_STATIONS_PRINTED[0]: (
         _sheet_x(FRONT_CENTER, _HOLE_TEXT_LEFT),
         _above_line(0) + TEXT_DROP,
+    ),
+    RAIL_STATIONS_PRINTED[1]: (
+        _sheet_x(FRONT_CENTER, RAIL_HOLE_X[-1] / 2.0),
+        _above_line(1) + TEXT_DROP,
     ),
     "BarLength": (FRONT_CENTER[0], _below_line(5) + TEXT_DROP),
     "BarWidth": (_LEFT - _BAR_WIDTH_LANE, _ROW_SHEET_Y + 0.010),
@@ -473,18 +480,22 @@ def seat_label_xy(key: str, text: str) -> tuple[float, float]:
 
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The rail taps' one callout carries the pattern and its mate (rule 10: one
-# regular pattern, its pitch on the callout; rule 7: a location dimension
-# carries no words, the mate sits once on the size callout). The pitch is
-# REF in millimetres like the stations (RV-01). The holes match the actual
-# trimmed rail (owner R4 ruling: REF positions, transferred), so the
-# callout names the kit's rail by its full number and states the matched
-# pair's acceptance (rule 4); the old "ALL 8 SCREWS START BY HAND" read as
-# an assembly instruction (rule 7).
-RAIL_PITCH_TEXT = f" ON ({RAIL_PITCH:.{part_spec.RAIL_HOLE_PLACES}f} mm) PITCH"
+# The rail taps' one callout carries the pattern, its band and its mate
+# (rule 10: one regular pattern; rule 7: a location dimension carries no
+# words, the mate sits once on the size callout). Holes 1 and 8 carry the
+# banded stations, so the count row says the eight are equally spaced (EQ
+# SP), the pitch after it REF in millimetres like the stations (RV-01), and
+# the line under the thread gives the six between the same band at their
+# equally spaced stations, measured from the same end (rule 10: baseline,
+# never chained; Codjiflo #2833 round 1). The CNC holds that band (owner
+# ruling 2026-11-16, RV-04) and the untrimmed rail is fitted to the bar, so
+# the callout names the kit's rail by its full number; the old "ALL 8
+# SCREWS START BY HAND" read as an assembly instruction (rule 7), and the
+# screws' free entry is TL-00's step, not the bar's requirement.
+RAIL_PITCH_TEXT = f" EQ SP ({RAIL_PITCH:.{part_spec.RAIL_HOLE_PLACES}f} mm)"
 RAIL_TAP_CALLOUT_BELOW = (
+    f"EACH <MOD-PM>{part_spec.RAIL_HOLE_BAND:.2f} mm FROM END AT EQ SP",
     f"MATCHES HGR15 RAIL OF {part_spec.RAIL_NUMBER}",
-    "SCREWS ENTER FREE, NO FORCING",
 )
 # The bracket holes' one callout: size, then process, then depth (rule 26:
 # the drill word after the size, the far-side counterbore by its symbol),
@@ -494,10 +505,12 @@ BRACKET_DRILL_TEXT = " DRILL"
 BRACKET_FAR_SIDE_TEXT = " FAR SIDE"
 BRACKET_CALLOUT_BELOW = (f"MATCHES {part_spec.BRACKET_MATE}", "BAR 1 ONLY")
 # The tap callout's four lines (two native, two of words), centred about here
-# over the plan's far end, about 10.5 above and below (r1): its top clears
-# the 267 border by about 5, its foot the underside seat's label by about 6,
-# and its leader runs down to hole 8 left of the top seat's label.
-TAP_CALLOUT_XY = (0.327, 0.2515)
+# over the end view, about 10.5 above and below (r1): its top clears the 267
+# border by about 5, its foot the seat labels by about 6. Its left edge
+# stands right of hole 8, so its leader runs down to hole 8 right of hole
+# 8's station line and crosses no dimension line, and left of the top seat's
+# label.
+TAP_CALLOUT_XY = (0.352, 0.2515)
 # The bracket callout's four lines (two native, two of words), centred about
 # here: right of the length's extension line, under the end view, above the
 # title block (the widening dropped the end view's foot 13, so the block
@@ -705,9 +718,19 @@ for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
         },
     )
 
+_RAIL_PLACES = part_spec.RAIL_HOLE_PLACES
+_RAIL_BAND = (part_spec.RAIL_HOLE_BAND, -part_spec.RAIL_HOLE_BAND)
 for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
-    # Actual rail transfers this nominal reference station to its own bar.
+    # Baseline from the spindle-end face (the frame's x 0) in the rail
+    # screws' fit band (owner ruling 2026-11-16: drilled at the station),
+    # and from the faced -Y side at the title block's band (c3-r7: the row's
+    # height has no mate; one DRO setting lines the holes up). Holes 2-7 print
+    # as the equally spaced pattern between 1 and 8, inside the same band.
     _station: dict[str, tuple[Any, tuple[Any, ...]]] = {
+        "station": (
+            limits(round(_x, _RAIL_PLACES), _RAIL_PLACES, _RAIL_BAND),
+            ("RAIL_HOLE_X", "RAIL_HOLE_BAND"),
+        ),
         "station_nominal": (_x, ("RAIL_HOLE_X",)),
         "height": (
             _limits(part_spec.RAIL_ROW_Y, part_spec.RAIL_ROW_PLACES),
@@ -720,7 +743,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
         f"rail_hole_{_index}",
         kind="threaded_hole",
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
-        requirements=("thread", "dia", "height", "thru", "note"),
+        requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={
             "at": ([_x, 0.0, part_spec.BAR_THICK], ("RAIL_HOLE_X", "BAR_THICK")),
             "axis": _INTO_BAR,
@@ -736,18 +759,19 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             "nominal_dia": (_TAP_DRILL_PRINTED, ("TAP_DRILL",)),
             "thru": (True, ("TAP_SPEC",)),
             **_station,
-            # The pattern's callout names the matched rail and its acceptance.
+            # The pattern's callout: every station's band and the matched rail.
             "note": (
-                "; ".join(RAIL_TAP_CALLOUT_BELOW),
+                "; ".join(RAIL_TAP_CALLOUT_BELOW).replace("<MOD-PM>", "±"),
                 (
                     "RAIL_NUMBER",
-                    "RAIL_SCREW_CLEARANCE",
+                    "RAIL_HOLE_BAND",
                     ("draw_ch_rocker_arm_tl_oblique_base_bar", "RAIL_TAP_CALLOUT_BELOW"),
                 ),
             ),
         },
         precision={
             "dia": _CALLOUT_PLACES,
+            "station": _RAIL_PLACES,
             "height": part_spec.RAIL_ROW_PLACES,
         },
     )
@@ -898,8 +922,8 @@ def _only_token(definitions: dict[int, str], token: str, *, label: str) -> tuple
 
 
 def rail_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """The pitch at the end of the counted drill row (``8X Ø.136 THRU ALL ON
-    (60.000 mm) PITCH``); the matched rail and its acceptance below."""
+    """The equal spacing at the end of the counted drill row (``8X Ø.136
+    THRU ALL EQ SP (60.000 mm)``); the matched rail and its acceptance below."""
     label = "rail screw taps"
     updated = _callout_below(definitions, RAIL_TAP_CALLOUT_BELOW, label=label)
     part, index = _only_token(definitions, "<NUM_INST>", label=label)
@@ -1098,8 +1122,7 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
     # member's own note names it and its quantity (member_note).
     configure_reference_views(adapter, configuration, [front, end, iso])
     front_keep = member_front_keep(configuration)
-    # The rail holes' feature also brings stations 2-8, which the import
-    # deletes: the pattern prints hole 1's station and the pitch.
+    # Bar2's plan keeps no bracket dimension (member_front_keep).
     printed = set(front_keep) | set(END_KEEP)
 
     # The plan shows the hidden RailRowReference sketch (its 88.90) and, on
@@ -1134,12 +1157,7 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
             name: places
             for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
             if name in printed
-        } | {
-            name: places
-            for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
-            if name in printed
         },
-        references=DRAWING_DIMENSIONS["RailHoles"] & printed,
     )
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
 

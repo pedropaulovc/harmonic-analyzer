@@ -2539,25 +2539,44 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     preparation = _step_groups()["1"]
     assert spec.BASE_BAR_NUMBER == "MHA-CH-06-TL-20"
     assert spec.RAIL_RECEIPT_REFERENCE == "MHA-CH-06-TL-VN-83 SHEET 2"
-    assert f"{spec.BASE_BAR_NUMBER} PROCESS PLAN" in preparation
-    assert f"{spec.RAIL_RECEIPT_REFERENCE} NOTE 1" in preparation
+    # Owner ruling 2026-11-16: the bars are drilled at their stations, so
+    # step 1 no longer picks the holes up from the rail.
+    assert "PROCESS PLAN" not in preparation and "TRANSFER" not in preparation
+    # The removed rail is checked to the receipt sheet: its holes' Ø4.50
+    # minimum (the base bar's fit stack) and NOTE 1's end walls.
+    assert f"TO {spec.RAIL_RECEIPT_REFERENCE}." in preparation
+    assert f"Ø{base_bar.RAIL_HOLE_DIA_MIN:.2f} MIN" in guide_rail.RECEIPT_FLAG
     assert f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN" in guide_rail.DRAWING_NOTES
     assert " MM MIN" not in preparation
 
 
-def test_rail_trim_uses_a_rated_recorded_abrasive_tool_after_the_carriages_come_off() -> None:
+def test_each_rail_is_fitted_to_its_drilled_bar_before_it_is_trimmed() -> None:
     # #2446: no owned saw cuts the hardened rail; the trim is cut long with
     # the recorded grinder's cut-off wheel and ground flush (owner ruling
-    # #2144 item 13.1 A), carriages off before any cutting.
+    # #2144 item 13.1 A), carriages off before any cutting. Owner ruling
+    # 2026-11-16: "change plan to trim rail after fit", so the untrimmed rail
+    # goes on its bar with all its screws first and is cut and ground there.
     steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
     record = spec._RAIL_TRIM_GRINDER
     assert {"cut-off", "grinding"} <= set(record["wheels"])
     assert all(wheel["max_rpm"] >= record["max_rpm"] for wheel in record["wheels"].values())
-    # The cut allowance is printed as a decimal and the trim cuts happen
-    # between moving the carriages off and fitting the rails to their bars.
+    assert "UNTRIMMED RAIL" in steps["1D"]
+    assert f"WITH {len(base_bar.RAIL_HOLE_X)} " in steps["1D"]
+    assert "MARKED AS A PAIR" in steps["1D"]
+    # The cut allowance is printed as a decimal; both trim steps run with the
+    # rail still on its bar, then the free screw entry accepts the pair.
     assert spec.RAIL_CUT_OFF_ALLOWANCE_IN.startswith(".") and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
+    assert "TRIM EACH RAIL ON ITS BAR" in steps["1E"]
+    assert "FLUSH WITH ITS BAR'S END" in steps["1F"]
+    assert "FREELY BY HAND" in steps["1G"]
+    assert "REMOVE EACH RAIL" in steps["1H"]
+    assert "HOLE SIZES AND END COUNTERBORE WALLS" in steps["1J"]
+    assert "BOTH ENDS FLUSH" in steps["2A"] and "MARKED BAR" in steps["2A"]
     order = list(steps)
-    assert order.index("1C") < order.index("1E") < order.index("1F") < order.index("2A")
+    assert (
+        order.index("1C") < order.index("1D") < order.index("1E") < order.index("1F")
+        < order.index("1G") < order.index("1H") < order.index("1J") < order.index("2A")
+    )
 
 
 def test_bom_note_names_the_base_bar_rows_as_two_configurations() -> None:

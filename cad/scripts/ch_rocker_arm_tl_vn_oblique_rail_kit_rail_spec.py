@@ -38,10 +38,12 @@ profile read from its analytic faces (``vendor-cad/HGR15R.dims.md``).
 
 UNVERIFIED for the kit rail: its hole stations, profile and hole sizes.
 The model is nominal HIWIN reference geometry, not a supplier accuracy
-certificate. Trim the actual rail to its bar, flush both ends, and transfer
-its eight mounting holes to that bar. Keep each pair identified. Accept
-free hand insertion of all eight screws without moving or forcing the rail;
-inspect actual retained walls and full-travel carriage support.
+certificate. Owner ruling 2026-11-16 assumes the rail's hole span within
+0.15 of nominal (``base_bar.RAIL_PATTERN_SPAN_ERROR``): its base bar is
+drilled at its printed stations, the untrimmed rail is fitted to it with
+all eight screws entering free, and only then are both rail ends ground
+flush with the bar's ends. Keep each pair identified; inspect the retained
+walls and full-travel carriage support.
 
 Source of each number:
 
@@ -280,8 +282,8 @@ CENTROID = (
 # mass-property evaluation (well under one through hole, 154 mm^3).
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
-# Nominal reference stations, not independent manufacturing/receipt limits.
-# The actual trimmed rail is the template for its own base bar's taps.
+# Nominal reference stations, not independent manufacturing/receipt limits:
+# the base bar's stations carry the fit's band (base_bar.RAIL_FIT_STACK).
 STATION_DIMENSIONS: tuple[str, ...] = tuple(
     f"Station{k}" for k in range(1, HOLE_COUNT + 1)
 )
@@ -311,17 +313,21 @@ DRAWING_PRECISION = {
     "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, REFERENCE_PLACES),
     SUPPLIER_REFERENCE: {END_WALL_DIMENSION: REFERENCE_PLACES},
 }
-# No supplier pitch precision is published or assumed. The matched pair is
-# accepted by free screw insertion with both ends flush, not a station band.
+# No supplier pitch precision is published; the owner's 0.15 span assumption
+# enters the base bar's fit stack. The pair is accepted by free screw
+# insertion with both ends flush, not a station band on the rail.
 # The kit drawing's sheet that prints the receipt check; citations name it.
 RECEIPT_SHEET = 2
 # The flag, a note of its own under the station dimension, gives the hole
 # pattern as one REF pattern callout (rule 10: a regular pattern counts as
 # one axis): the first station is dimensioned from the end, the rest step
-# off at the pitch; the pattern's mate follows it.
+# off at the pitch; the pattern's mate, whose taps it fits, follows it. The
+# holes' receipt minimum is the base bar's fit stack's Ø4.50 (the screw's
+# float; Codjiflo #2833 round 1): MHA-CH-06-TL-00 step 1J checks it.
 RECEIPT_FLAG = (
-    f"{HOLE_COUNT}X HOLES ON ({HOLE_PITCH:.{base_bar.RAIL_HOLE_PLACES}f}) PITCH\n"
-    "MATCH-TRANSFER TO BASE BAR MHA-CH-06-TL-20"
+    f"{HOLE_COUNT}X Ø{base_bar.RAIL_HOLE_DIA_MIN:.2f} MIN HOLES ON "
+    f"({HOLE_PITCH:.{base_bar.RAIL_HOLE_PLACES}f}) PITCH\n"
+    "FITS TAPS OF BASE BAR MHA-CH-06-TL-20"
 )
 END_FIT_CALLOUT = (
     "RAIL ENDS FLUSH WITH BASE BAR ENDS\n"
@@ -339,8 +345,8 @@ WALL_ACCEPTANCE_MM = 2.0
 # location; run 20261108T060418489Z, 3 of 3, note 1 unlinked from the
 # dimension; before them, run 20261108T031012373Z, a worded "END WALL"
 # leader did not say what the 2.0 runs between). The trim is MHA-CH-06-TL-00
-# step 1's ("TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS"). The note is
-# the member's one manufacturing note, on one line. The pairing of each rail
+# steps 1E-1F: each rail, fitted to its drilled bar, is cut and ground flush.
+# The note is the member's one manufacturing note, on one line. The pairing of each rail
 # with its bar and the free screw entry stay the jig's steps (rule 7).
 END_WALL_CALLOUT = "2X, SEE NOTE 1"
 TRIM_STEP = "MHA-CH-06-TL-00 STEP 1"
@@ -355,11 +361,13 @@ DRAWING_NOTES = " ".join(END_WALL_NOTE.splitlines())
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the nominal trimmed rail's hole pattern is not symmetric")
-# Nominal-model end walls at the shortest bar. Actual supplier holes have
-# no assumed band: inspect both end ligaments before transfer/cutting.
+# Worst end walls after the trim: each rail hole sits within its screw's
+# float of its bar tap, and the tap within its station band; both ends are
+# ground flush with the bar, whose length takes its .XX band.
+_HOLE_OFFSET_MAX = base_bar.RAIL_HOLE_POSITION_RADIUS + base_bar.RAIL_SCREW_CLEARANCE
 CBORE_END_WALLS_WORST = (
-    HOLE_X[0] - CBORE_DIA / 2.0,
-    LENGTH - trammel.RAIL_LENGTH_BAND - HOLE_X[-1] - CBORE_DIA / 2.0,
+    HOLE_X[0] - _HOLE_OFFSET_MAX - CBORE_DIA / 2.0,
+    LENGTH - trammel.RAIL_LENGTH_BAND - (HOLE_X[-1] + _HOLE_OFFSET_MAX) - CBORE_DIA / 2.0,
 )
 CBORE_END_WALL_WORST = min(CBORE_END_WALLS_WORST)
 if CBORE_END_WALL_WORST < base_bar.WALL_TARGET_MM:

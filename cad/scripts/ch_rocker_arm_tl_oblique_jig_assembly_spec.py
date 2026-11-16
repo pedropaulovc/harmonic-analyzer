@@ -1505,8 +1505,9 @@ if not (
     raise AssertionError("the shop's gauge-block set moved; recheck the rail-setting stacks")
 # Step 1's rail trim tool (#2446; shop-equipment tools.rail-trim-grinder):
 # no owned saw cuts the hardened HGR15 rail, so each end is cut long with an
-# abrasive cut-off wheel and ground square to its mark. Owner ruling #2144
-# item 13.1 A (2026-11-08) keeps the trimmed ends flush with the bars.
+# abrasive cut-off wheel and ground square. Owner ruling #2144 item 13.1 A
+# (2026-11-08) keeps the trimmed ends flush with the bars; the owner's
+# 2026-11-16 ruling trims each rail only after it is fitted to its bar.
 _RAIL_TRIM_GRINDER = tomllib.loads(
     (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
 )["tools"]["rail-trim-grinder"]
@@ -2106,14 +2107,15 @@ GENERAL_TORQUE_NOTE = (
     f"{', '.join(map(str, _SNUG_ITEMS[:-1]))} AND {_SNUG_ITEMS[-1]}): "
     "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
-# Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
-# bar's process plan and the rail kit's receipt sheet, whose NOTE 1 states
-# the counterbore-to-end wall each trimmed rail keeps.
+# Documents are cited by Number (TL-00 review 62753c5e): step 1 cites the
+# rail kit's receipt sheet, whose hole flag states the mounting holes' Ø4.50
+# minimum and whose NOTE 1 the counterbore-to-end wall each trimmed rail
+# keeps, and the BOM note the base bar's two sheets.
 # A literal row (base_bar_spec's convention): drawing closures track this
 # concrete registry row, not a dynamic read of another part's.
 BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
 if base_bar.PART_NAME != "ch-rocker-arm-tl-oblique-base-bar":
-    raise AssertionError("step 1's base-bar Number reads another part's row")
+    raise AssertionError("the BOM note's base-bar Number reads another part's row")
 RAIL_RECEIPT_REFERENCE = f"{base_bar.RAIL_NUMBER} SHEET {guide_rail.RECEIPT_SHEET}"
 
 # The nut-tap transfer drills, by the names the fitter asks for; TL-32's
@@ -2312,18 +2314,20 @@ ASSEMBLY_STEPS = (
     f"1B. KEEP THE {QUANTITIES[CARRIAGE]} TIGHTEST CARRIAGES, ONE PER RAIL.",
     "1C. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO A PLASTIC LOADING ARBOR FROM "
     "THE KIT.",
-    f"1D. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR'S LENGTH, THE SAME "
-    "AMOUNT OFF EACH END, AS IN STEPS 1E-1F.",
-    f"1E. CUT EACH RAIL END {RAIL_CUT_OFF_ALLOWANCE_IN} LONG WITH AN ANGLE "
-    "GRINDER'S CUT-OFF WHEEL, CARRIAGES OFF AS IN STEP 1C.",
+    # Owner ruling 2026-11-16: the bars are drilled at their printed rail
+    # stations; each untrimmed rail is fitted to its bar, then trimmed flush.
+    f"1D. FIT EACH UNTRIMMED RAIL {_item(RAIL)} ON THE RAIL SEAT OF ITS BASE BAR "
+    f"WITH {trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, CARRIAGES "
+    "OFF AS IN STEP 1C: RAIL AND BAR MARKED AS A PAIR.",
+    "1E. TRIM EACH RAIL ON ITS BAR WITH AN ANGLE GRINDER'S CUT-OFF WHEEL TO "
+    f"{RAIL_CUT_OFF_ALLOWANCE_IN} LONG OF EACH BAR END.",
     "1F. GRIND EACH CUT END SQUARE WITH THE GRINDER'S GRINDING WHEEL UNTIL "
     "FLUSH WITH ITS BAR'S END.",
-    "1G. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
-    f"{RAIL_RECEIPT_REFERENCE} NOTE 1.",
-    f"1H. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THE {BASE_BAR_NUMBER} "
-    "PROCESS PLAN: RAIL AND BAR MARKED AS A PAIR.",
-    f"1J. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
-    "BY HAND WITHOUT MOVING THE RAIL.",
+    f"1G. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS OF EACH RAIL LOOSEN AND "
+    "RETIGHTEN FREELY BY HAND WITHOUT MOVING THE RAIL.",
+    "1H. REMOVE EACH RAIL FROM ITS MARKED BAR.",
+    "1J. CHECK THE HOLE SIZES AND END COUNTERBORE WALLS OF EACH REMOVED RAIL TO "
+    f"{RAIL_RECEIPT_REFERENCE}.",
     "1K. CLEAN ALL CUTTING AND GRINDING GRIT FROM THE RAILS AND BARS.",
     "1L. SLIDE EACH RAIL'S KEPT CARRIAGE FROM ITS ARBOR ONTO THAT RAIL, THE "
     "SAME WAY ROUND AS SUPPLIED.",
@@ -2332,8 +2336,8 @@ ASSEMBLY_STEPS = (
     "SETS THE BARS ON THE TABLE.",
     f"2. LAY BASE BAR 1 {_item(BASE_BAR_1)} AS DRAWN AND BASE BAR 2 "
     f"{_item(BASE_BAR_2)} TURNED OVER, AS SHOWN ON SHEET 1.",
-    "2A. FIT RAIL 1 ON BAR 1 AND RAIL 2 ON BAR 2, EACH WITH "
-    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}: NEAR ENDS FLUSH.",
+    "2A. FIT EACH RAIL ON ITS MARKED BAR, RAIL 1 ON BAR 1 AND RAIL 2 ON BAR 2, "
+    f"WITH {trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}: BOTH ENDS FLUSH.",
     f"2B. FIT AN END BRACKET {_item(END_BRACKET)} AT EACH PILLOW-BLOCK STATION "
     f"ON BAR 1 WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
     f"{_item(PILLOW_BLOCK_SCREW)} FROM BELOW: NO WASHERS, "

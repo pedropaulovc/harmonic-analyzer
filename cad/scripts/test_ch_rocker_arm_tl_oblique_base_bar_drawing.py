@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -224,45 +226,82 @@ def test_walls_meet_rule_17() -> None:
     )
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
     assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
-    # Nominal-model envelope only; actual transferred holes are inspected.
+    # The rail taps at their printed stations, ±0.05 mm, and the bar's length
+    # at .XX (owner ruling 2026-11-16: drilled at the stations).
     xx_station = printed_band_mm(2, unit="in")
     tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
     far_nominal = spec.BAR_LENGTH - spec.RAIL_HOLE_X[-1] - tap_r
     assert far_nominal / 25.4 == pytest.approx(0.310, abs=5e-4)
+    assert spec.RAIL_HOLE_POSITION_RADIUS == pytest.approx(spec.RAIL_HOLE_BAND)
     assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(
-        far_nominal - xx_station
+        far_nominal - xx_station - spec.RAIL_HOLE_BAND
     )
-    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - tap_r
+    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - tap_r - spec.RAIL_HOLE_BAND
     assert spec.RAIL_TAP_END_WALL_WORST >= WALL_TARGET_MM
     assert spec.RAIL_TAP_SLOT_WALL_WORST >= WALL_TARGET_MM
+    assert not hasattr(spec, "require_matched_rail_walls")
     build = BUILD.read_text(encoding="utf-8")
     assert "high_corner" not in build
     assert "adapter, low_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE" in build
 
 
-@pytest.mark.parametrize("wall_name", (
-    "counterbore_end_wall", "tap_end_wall", "tap_slot_wall", "tap_bracket_wall",
-))
-@pytest.mark.parametrize("bad_wall", (1.5, float("nan"), float("inf")))
-def test_matched_rail_rejects_insufficient_actual_walls(wall_name, bad_wall) -> None:
-    walls = dict.fromkeys(
-        ("counterbore_end_wall", "tap_end_wall", "tap_slot_wall", "tap_bracket_wall"), 3.0
+def test_rail_station_band_closes_the_rail_screws_fit() -> None:
+    """Owner rulings 2026-11-16: the bar is drilled at its stations on the
+    CNC-converted PM-30MV (±0.05 mm, RV-04) and tapped in a spring tap guide,
+    and the untrimmed rail fitted to it; the rail's R1-R8 span is assumed
+    within 0.15 of nominal. Half that span error (the rail centres on its
+    screws), the steel rail's differential expansion against the aluminium
+    bar over a 10 °C swing between drilling and fitting and the station band
+    along the rail, with the CNC's ±0.02 mm repeatability across it, plus the
+    tap guide's 0.05° tilt at the screw's seat, stay inside each screw's
+    radial float in the rail's hole at its Ø4.50 receipt minimum."""
+    equipment = tomllib.loads(
+        (Path(spec.__file__).parents[1] / "config" / "shop-equipment.toml").read_text(
+            encoding="utf-8"
+        )
     )
-    spec.require_matched_rail_walls(**walls)
-    walls[wall_name] = bad_wall
-    with pytest.raises(ValueError, match="matched rail wall"):
-        spec.require_matched_rail_walls(**walls)
+    cnc = equipment["cnc"]["pm-30mv"]
+    guide = equipment["tools"]["spring-tap-guide"]
+    assert cnc["control"] == "GRBL" and "ballscrews" in cnc["drive"]
+    assert cnc["repeatability_mm"] == 0.02 and guide["squareness_deg"] == 0.05
+    assert any("Owner (Pedro) 2026-11-16" in cite for cite in cnc["cite"])
+    assert any("Owner ruling 2026-11-16" in cite for cite in guide["cite"])
+    assert spec.RAIL_HOLE_BAND == 0.05
+    assert spec.RAIL_HOLE_ROW_SCATTER == cnc["repeatability_mm"]
+    assert spec.RAIL_PATTERN_SPAN_ERROR == 0.15
+    assert spec.RAIL_SPAN == pytest.approx(420.0)
+    assert spec.RAIL_HOLE_DIA_MIN == 4.5
+    assert spec.RAIL_SCREW_CLEARANCE == pytest.approx((4.5 - 4.166) / 2.0)
+    assert spec.RAIL_THERMAL_SPAN_ERROR == pytest.approx(
+        420.0 * (23.6e-6 - 11.0e-6) * 10.0
+    )
+    tilt = 9.7 * math.tan(math.radians(0.05))
+    assert spec.RAIL_TAP_TILT_OFFSET == pytest.approx(tilt)
+    assert spec.RAIL_TAP_TILT_OFFSET == pytest.approx(0.0085, abs=5e-5)
+    along = (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.05
+    assert spec.RAIL_FIT_STACK == pytest.approx(math.hypot(along, 0.02) + tilt)
+    assert spec.RAIL_FIT_STACK == pytest.approx(0.161, abs=5e-4)
+    assert spec.RAIL_FIT_MARGIN == pytest.approx(
+        spec.RAIL_SCREW_CLEARANCE - spec.RAIL_FIT_STACK
+    )
+    assert spec.RAIL_FIT_MARGIN == pytest.approx(0.006, abs=5e-4)
+    # The shop's ±.005 in drilled-hole location would not close the fit.
+    assert (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.127 > spec.RAIL_SCREW_CLEARANCE
+    # The plan names the CNC route and the tap guide.
+    plan = (
+        Path(spec.__file__).parents[1]
+        / "process"
+        / "ch_rocker_arm_tl_oblique_base_bar"
+        / "plan.toml"
+    ).read_text(encoding="utf-8")
+    assert "cnc.pm-30mv" in plan and "spring tap guide" in plan
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
-    """Every marked dimension prints once, except rail stations 2-8: the
-    rail holes print as one pattern (rule 10), hole 1's station and the
-    pitch on the tap callout. The model still marks them until its next
-    re-key (spec ``DRAWING_DIMENSIONS``); the plan's import deletes them."""
+    """Every marked dimension prints once: the rail holes mark only holes 1
+    and 8, the six between printing as the callout's equal spacing (rule 10)."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    pattern = spec.DRAWING_DIMENSIONS["RailHoles"] - {drawing.RAIL_STATION_PRINTED}
-    assert len(pattern) == len(spec.RAIL_HOLE_X) - 1
-    assert set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) == marked - pattern
+    assert set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.END_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert not hasattr(spec, "STOCK_DIMENSIONS")
@@ -300,34 +339,52 @@ def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
     assert drawing.FRONT_KEEP["SlotRun"][0] > drawing._RIGHT
 
 
-def test_rail_holes_print_as_one_matched_pattern_named_on_their_callout() -> None:
+def test_rail_holes_print_as_one_banded_pattern_named_on_their_callout() -> None:
     """Pre-screen 957501d1 (rule 10, rule 7): eight stacked stations counted
-    as eight hole axes, and the mate rode the last station. The pattern
-    prints hole 1's REF station and the pitch, and the tap callout names the
-    matched rail once with the pair's acceptance."""
-    stations = {f"RailHole{k}X" for k in range(1, 9)}
-    assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
-    assert spec.RAIL_REFERENCE_DIMENSIONS == {
-        ("RailHoles", name): 3 for name in stations
-    }
-    assert not any(feature == "RailHoles" for feature, _ in spec.METRIC_DIMENSIONS)
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
+    as eight hole axes, and the mate rode the last station. Owner ruling
+    2026-11-16 drills the holes at their stations, so holes 1 and 8 print
+    their stations from the end face with the fit's ±0.05 mm band, the tap
+    callout says the eight are equally spaced, and names the matched rail
+    once with the pair's acceptance."""
+    printed = {"RailHole1X", "RailHole8X"}
+    assert spec.DRAWING_DIMENSIONS["RailHoles"] == printed
+    assert not hasattr(spec, "RAIL_REFERENCE_DIMENSIONS")
+    assert {
+        name: band
+        for (feature, name), band in spec.METRIC_DIMENSIONS.items()
+        if feature == "RailHoles"
+    } == {name: (3, 0.05) for name in printed}
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in printed)
     assert all(x == round(x, 3) for x in spec.RAIL_HOLE_X)
-    assert stations & set(drawing.FRONT_KEEP) == {drawing.RAIL_STATION_PRINTED}
-    assert drawing.RAIL_STATION_PRINTED == "RailHole1X"
-    # One regular pattern: the printed pitch steps every station from hole 1.
+    assert drawing.RAIL_STATIONS_PRINTED == ("RailHole1X", "RailHole8X")
+    assert printed <= set(drawing.FRONT_KEEP)
+    # One regular pattern: equal spacing between the two banded stations.
     assert drawing.RAIL_PITCH == pytest.approx(60.0)
-    assert drawing.RAIL_PITCH_TEXT == " ON (60.000 mm) PITCH"
+    assert drawing.RAIL_PITCH_TEXT == " EQ SP (60.000 mm)"
     assert spec.RAIL_HOLE_X == pytest.approx(
         tuple(spec.RAIL_HOLE_X[0] + k * drawing.RAIL_PITCH for k in range(8))
     )
-    # The mate by the kit member and its full number (rule 4), with the
-    # matched pair's acceptance; two lines of words at most (rule 7), and no
-    # assembly instruction (rule 7's "ALL 8 SCREWS START BY HAND").
+    # Every hole's manifest station carries the band; no REF station remains.
+    features = export_features.requirement_manifest(STEM)["features"]
+    for k, x in enumerate(spec.RAIL_HOLE_X, start=1):
+        hole = features[f"rail_hole_{k}"]
+        assert "station" in hole["requirements"]
+        assert hole["station"] == pytest.approx([x - 0.05, x + 0.05])
+    build = BUILD.read_text(encoding="utf-8")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'presentation="reference"' not in build
+    assert "references=" not in sheet
+    # Each station's band for the six between holes 1 and 8, from the same
+    # end (rule 10: baseline, never chained), then the mate by the kit
+    # member and its full number (rule 4); two lines of words at most (rule
+    # 7), and no assembly instruction (rule 7's "ALL 8 SCREWS START BY HAND").
     rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
     assert drawing.RAIL_TAP_CALLOUT_BELOW == (
+        "EACH <MOD-PM>0.05 mm FROM END AT EQ SP",
         f"MATCHES HGR15 RAIL OF {rail_number}",
-        "SCREWS ENTER FREE, NO FORCING",
+    )
+    assert features["rail_hole_1"]["note"] == (
+        f"EACH ±0.05 mm FROM END AT EQ SP; MATCHES HGR15 RAIL OF {rail_number}"
     )
     text = " ".join(drawing.RAIL_TAP_CALLOUT_BELOW)
     assert "START BY HAND" not in text and "RECEIVED" not in text
@@ -374,14 +431,14 @@ def test_tap_callout_puts_the_pitch_on_the_count_row_and_the_mate_below() -> Non
     assert callout.definitions == {
         5: "<hw-threaddesc> <hw-thru>",
         6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-thrutapdrldia> <hw-thru> ON (60.000 mm) PITCH",
+        7: "<NUM_INST>X <MOD-DIAM><hw-thrutapdrldia> <hw-thru> EQ SP (60.000 mm)",
         8: "\n".join(drawing.RAIL_TAP_CALLOUT_BELOW),
     }
     # The count row and the thread row in one definition: the pitch ends
     # the count row, the thread row stays below it.
     one = {**_NATIVE_TAP, 5: f"{_NATIVE_TAP[7]}\n{_NATIVE_TAP[5]}", 7: ""}
     assert drawing.rail_tap_callout_definitions(one)[5] == (
-        f"{_NATIVE_TAP[7]} ON (60.000 mm) PITCH\n{_NATIVE_TAP[5]}"
+        f"{_NATIVE_TAP[7]} EQ SP (60.000 mm)\n{_NATIVE_TAP[5]}"
     )
     for refused in (
         {**_NATIVE_TAP, 8: "PRINTED BELOW"},
@@ -468,7 +525,7 @@ def test_rail_row_is_a_drawn_centreline_and_its_height_carries_no_words() -> Non
         member.index("_add_rail_row_centreline(adapter, front)")
     )
     assert "zone_lines.CENTER_LINE_STYLE" in sheet
-    # The screw's nominal radial float is not a transfer-tool accuracy claim.
+    # The screws' radial float in the rail's holes takes the fit's stack.
     assert spec.RAIL_SCREW_CLEARANCE > 0.0
 
 
@@ -485,21 +542,22 @@ def test_tap_callout_clears_the_border_and_the_seat_labels() -> None:
     half_w = widest * 0.0026 / 2.0
     assert y + half_h <= 0.267 - 0.004
     assert x + half_w <= 0.4194 - 0.005
-    # Above the plan and its one station lane, and above both seat labels.
-    assert y - half_h >= drawing._above_line(0) + 0.008
+    # Above the plan and its two station lanes, and above both seat labels.
+    assert y - half_h >= drawing._above_line(1) + 0.008
     label_top = max(
         drawing.seat_label_xy(key, text)[1]
         for labels in drawing.SEAT_LABELS.values()
         for key, text in labels.items()
     )
     assert y - half_h >= label_top + 0.005
-    # The leader runs down to hole 8 left of the top seat's label.
+    # The leader runs down to hole 8 from the right of its station's lines
+    # (rule 14: it crosses no dimension line) and left of the top seat's label.
     hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
     left_label = min(
         drawing.seat_label_xy("top_seat", text)[0]
         for text in (drawing.RAIL_SEAT_LABEL, drawing.TABLE_SEAT_LABEL)
     )
-    assert x - half_w <= hole_8 <= left_label - 0.010
+    assert hole_8 + 0.006 <= x - half_w <= left_label - 0.010
 
 
 def test_short_span_texts_print_beside_their_spans() -> None:
@@ -594,19 +652,25 @@ def test_short_span_texts_print_beside_their_spans() -> None:
     assert rise_y < run_low
 
 
-def test_rail_station_prints_left_of_the_end_face_in_the_first_lane() -> None:
-    """Hole 1's REF station (owner ruling 4's mm label) is wider than its
+def test_rail_stations_print_in_the_first_two_lanes() -> None:
+    """Hole 1's banded station (owner ruling 4's mm label) is wider than its
     span with a gap each side, so it stands left of the end face's extension
-    line, in the first lane above the top edge, inside the left border."""
-    x, y = drawing.FRONT_KEEP[drawing.RAIL_STATION_PRINTED]
+    line, in the first lane above the top edge, inside the left border; hole
+    8's prints mid-span in the second lane, clear of the tap callout."""
+    x, y = drawing.FRONT_KEEP["RailHole1X"]
     half = drawing._RAIL_HOLE_TEXT_HALF
-    assert half >= len("(9.964 mm)") * 0.0026 / 2.0
+    assert half >= len("429.964 ±0.05 mm") * 0.0026 / 2.0
     assert spec.RAIL_HOLE_X[0] * drawing._S / 1000.0 < 2 * (half + drawing._TEXT_GAP)
     assert drawing._above_line(0) - drawing._TOP >= 0.008
     assert y == pytest.approx(drawing._above_line(0) + drawing.TEXT_DROP)
     assert x + half <= drawing._LEFT - 0.002
     assert x - half >= 0.010 + 0.005
     assert y - 0.00175 >= drawing._TOP + 0.002
+    x8, y8 = drawing.FRONT_KEEP["RailHole8X"]
+    hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
+    assert y8 == pytest.approx(drawing._above_line(1) + drawing.TEXT_DROP)
+    assert drawing._LEFT + 0.002 <= x8 - half and x8 + half <= hole_8 - 0.002
+    assert y8 + 0.00175 <= drawing.TAP_CALLOUT_XY[1] - 0.0105 - 0.005
 
 
 def test_end_view_projects_on_the_plans_centreline() -> None:
@@ -1105,6 +1169,8 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
     stations print exact millimetres, labelled mm: the part authors them, the
     sheet proves they survived the import."""
     assert set(spec.METRIC_DIMENSIONS) == {
+        ("RailHoles", "RailHole1X"),
+        ("RailHoles", "RailHole8X"),
         ("BracketHoles", "BracketHole1X"),
         ("BracketHoles", "BracketHole3X"),
         ("BracketRowReference", "BracketRow1Y"),
@@ -1229,14 +1295,6 @@ def test_metric_reference_requires_both_parentheses_and_unit(monkeypatch, prefix
         )
 
 
-def test_base_bar_reference_text_is_owned_by_the_model() -> None:
-    build = BUILD.read_text(encoding="utf-8")
-    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'presentation="reference"' in build
-    assert 'references=DRAWING_DIMENSIONS["RailHoles"]' in sheet
-    assert "set_reference_dimensions(" not in sheet
-
-
 def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "REFERENCE" not in spec.DRAWING_NOTES
@@ -1292,7 +1350,15 @@ def test_each_seat_names_its_own_mate_on_each_member() -> None:
     declared = {
         entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, STEM, "part")
     }
-    assert set(declared) == {"RV-01", "RV-02", "RV-03"}
+    assert set(declared) == {"RV-01", "RV-02", "RV-03", "RV-04"}
+    # The rail stations' ±0.05 mm, tighter than the shop's drilled-hole row,
+    # is the owner's CNC ruling, quoted verbatim (rule 4 exception).
+    band = declared["RV-04"]
+    assert band.kind == "minor"
+    assert "'Rail holes CNC at ±0.05 mm OK.'" in band.reason
+    assert drawing.RAIL_TAP_CALLOUT_BELOW[0].replace("<MOD-PM>", "±") in band.where
+    # RV-01 accepts the unit only and points at RV-04 for the band.
+    assert "unit only" in declared["RV-01"].reason and "RV-04" in declared["RV-01"].reason
     shop = declared["RV-02"]
     assert shop.kind == "minor"
     assert table.removeprefix("SEATS ON ") in shop.where

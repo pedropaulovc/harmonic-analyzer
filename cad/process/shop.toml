@@ -14,6 +14,9 @@
 # millimetres), plus the HA records marked below. Where HA's own records
 # (45952b66bc:cad/process/shop/{inventory,shop-policy}.toml) gave a different
 # value, HA's value is used and marked "HA:".
+# The PM-30MV is CNC-converted (GRBL, ballscrews on X/Y; owner 2026-11-16):
+# prechips has no control or repeatability field, so those facts are
+# cad/config/shop-equipment.toml cnc.pm-30mv.
 [machines.pm-30mv]
 kind = "mill"
 rpm_ranges = [[50, 3000]]

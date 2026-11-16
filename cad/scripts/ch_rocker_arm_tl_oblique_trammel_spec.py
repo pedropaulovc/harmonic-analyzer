@@ -111,8 +111,9 @@ both blocks and their shoulder bores centre on the HGH15CA patterns. The
 carrier holes and cutter circles are unchanged; carriage travel and stops
 follow the pin stations, 75.2 to 389.4. The feed nut faces away from the
 spindle and the near KP08 moves inward to clear that travel. The rails retain
-their 439.928 nominal fitted length, flush with the actual bars. Each actual
-rail transfers its mounting pattern to its own bar; printed stations are REF.
+their 439.928 nominal fitted length, flush with the actual bars. Each bar is
+drilled at its printed rail stations; its untrimmed rail is fitted to it,
+then ground flush with both bar ends (owner ruling 2026-11-16).
 """
 
 from __future__ import annotations
@@ -374,8 +375,10 @@ CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HGR15 kit rails arrive 450 long. Trim to the actual existing 17.32 in bar,
-# flush both ends with safe end walls, then transfer the actual hole pattern.
+# HGR15 kit rails arrive 450 long. Each is fitted untrimmed to its drilled
+# 17.32 in bar, screws entering free, then both ends are cut long and ground
+# flush with the bar's ends (owner ruling 2026-11-16: trim after fit), the
+# nominal RAIL_TRIM_PER_END off each.
 RAIL_SUPPLY_LENGTH = 450.0
 BASE_BAR_LENGTH = 439.928  # 17.32; retain the existing bar blanks
 RAIL_LENGTH = BASE_BAR_LENGTH
@@ -385,7 +388,8 @@ RAIL_HOLE_PITCH = 60.0
 RAIL_HOLE_COUNT = 8
 RAIL_TRIM_LENGTH = RAIL_SUPPLY_LENGTH - RAIL_LENGTH
 RAIL_TRIM_PER_END = RAIL_TRIM_LENGTH / 2.0
-# Nominal per end only; actual removals need not be equal.
+# Nominal per end only: the fitted rail centres on its screws, so the actual
+# removals need not be equal.
 RAIL_HOLE_END = round((RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0, 9)
 RAIL_LENGTH_BAND = printed_band_mm(2, unit=BASE_BAR_UNIT)
 # The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
@@ -404,7 +408,7 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 
 # --- Rails on the bars --------------------------------------------------------
-# Each rail starts RAIL_NEAR_S from the spindle; after datum-led trimming it
+# Each rail starts RAIL_NEAR_S from the spindle; trimmed after fitting, it
 # is flush with its actual finished bar at both ends.
 RAIL_NEAR_S = 15.0
 RAIL_FAR_S = RAIL_NEAR_S + RAIL_LENGTH

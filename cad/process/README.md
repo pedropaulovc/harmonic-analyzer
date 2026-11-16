@@ -164,7 +164,11 @@ need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
 `cad.overhang_mm` (from the lever's one `overhang_in`), and the base-bar adapter
 refuses a Setup 4 jack centre off the bar or inside a rail-hole, counterbore or
-slot outline. The feed-lever plan needs 0.11.0, which binds the lever's
+slot outline. Since owner ruling 2026-11-16 the base-bar plan needs the first
+prechips release after 0.11.2, which carries pedropaulovc/prechips#427: 0.11.2
+refuses the manifest's banded rail stations, and the plan reads that release's
+`cad.rail_station_tol_in`, `cad.rail_station_tol_mm`, `cad.rail_first_band_mm`
+and `cad.rail_last_band_mm`. The feed-lever plan needs 0.11.0, which binds the lever's
 grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
@@ -208,15 +212,23 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. Setups
   2–3 run in the low belt range and Setup 4 in the high range, so both bars
   take one belt change. The rail
-  stations are REF only, never drill targets (spec; owner R4 ruling, restated
-  2026-11-11): all eight hole centres are picked up on the bar's own rail,
-  trimmed flush with the angle grinder per TL-00 steps 1D–1G
-  (`tools.rail-trim-grinder`, not owned yet) and clamped on the rail face,
-  with the edge finder on the X DRO (both sides of each counterbore, centre =
-  midpoint; owner ruling 2026-11-13, #2546), the rail comes off, and each
-  hole is drilled at its recorded X. The 1/2 in end mill alone cuts both
-  slots, tracing a cutter-centre rectangle printed per slot, and `tool_sizing`
-  checks it against the slot width band less the path offset (the 3/8 in slot
+  holes are drilled at their printed stations, ±0.05 mm from ZERO END, on
+  the CNC by programs BB05 (spot) and BB07 (#29 drill) of
+  `cam:ch_rocker_arm_tl_oblique_base_bar` (owner rulings 2026-11-16,
+  superseding the R4 transfer from the trimmed rail; "Rail holes CNC at
+  ±0.05 mm OK" is the part yaml's RV-04): each bar's untrimmed rail is then
+  fitted with its eight screws entering free and only then cut and ground
+  flush with both bar ends per TL-00 steps 1D–1F (`tools.rail-trim-grinder`,
+  not owned yet). The owner assumes the purchased rail's hole span within
+  0.15 mm of nominal; the base-bar spec's `RAIL_FIT_STACK` closes that, with
+  the CNC's hole-to-hole scatter (the converted PM-30MV's ±0.02 mm
+  repeatability, `cad/config/shop-equipment.toml` `cnc.pm-30mv`), the
+  spring tap guide's 0.05° squareness (`tools.spring-tap-guide`; owner ruling
+  2026-11-16) and the rail holes' Ø4.50 receipt minimum (TL-VN-83 sheet 2,
+  checked at TL-00 step 1J), under the screws' float. The
+  1/2 in end mill alone cuts both slots, tracing a cutter-centre rectangle
+  printed per slot, and `tool_sizing` checks it against the slot width band
+  less the path offset (the 3/8 in slot
   drill and 17/32 in slot-finish cutter are gone). Position checks are added:
   X on the DRO before unclamping, rows from ZERO EDGE with calipers. The saw
   is the 14 in Evolution metal-cutting miter saw (`tools.saw-evolution-14`,
@@ -332,3 +344,50 @@ the check.
 A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
 [feature/traveler contract](../docs/pipeline/features-travelers.md).
+
+## NC programs (Fusion CAM)
+
+A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS` also has
+`<stem>/cam.py`, a Fusion CAM recipe that turns the plan's machining setups
+into G-code. `uv run --frozen python -m doit cam:<stem>` (opt-in; not in
+`build` or `release`) needs a running Autodesk Fusion with Preferences >
+General > API > Fusion MCP Server enabled and no command dialog open. It writes
+one `.nc` per recipe program and `manifest.json` (input, post and output
+SHA-256s, Fusion version) to `cad/out/nc/<stem>/`.
+
+A recipe has four parts:
+
+- `PROGRAMS`: the file names, each listing its operations. Each program uses
+  one tool, because GRBL has no tool changer and Fusion Personal refuses
+  tool-change posts.
+- `context(features, plan, shop, step)`: a pure function. It reads every part
+  dimension from the part's `features.toml`. Blank size, cutter tip depths and
+  radial steps come from the part's `plan.toml` (`[parameters]`,
+  `milling_cuts`), and cutter diameters, speeds and feeds from `shop.toml`.
+  It also places the part in each setup's work frame. Values neither record
+  carries are recipe constants with a stated source: catalogue tool lengths
+  (Fusion's collision model only), the centre drill's geometry, the S2 strap
+  clearance and the facing plunge feed. A part dimension typed into the
+  recipe would let the NC drift from the CAD.
+- `build(ctx, rt)`: runs inside Fusion with the `_fusion_cam_runtime.py`
+  helpers.
+- `expectations(ctx)`: the `_gcode` checks every posted file must pass, such
+  as depths, hole centres, slot cutter-centre bounds, pass positions and
+  directions, spindle speeds, and no rapid below the stock top.
+
+Fusion produced toolpaths that looked valid while the base-bar programs were
+being written, yet these checks caught a spot depth measured from the
+counterbore floor, a feed height below the stock top, a slot cut from the
+outside and an oversized radial step. A failed check removes every output.
+Fix the recipe, not the expectation.
+The base-bar recipe refuses to post when the manifest's rail stations are REF
+(no `station` requirement): such holes are transferred from each bar's own
+rail, and posting at the nominal would drill off the real rail.
+
+For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
+back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.
+Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the model's Z0 face, so one set
+of S3 and S4 programs serves both hands; `_bar1` programs are bar 1 only. S2
+is different: X0 is the blank's left end, Y0 the finished front edge with the
+bar at +Y, and Z0 the blank's top. Posted NC is not machining approval: prove
+each program in air and check the setup against the traveler first.
