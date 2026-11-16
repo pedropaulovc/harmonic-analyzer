@@ -23,7 +23,8 @@
 # over .480 (X1: neither flatness nor parallelism is toleranced); the ends
 # rough at .100 (X2); the edges keep .080 roughing, since .150 bends the
 # two-strap blank 0.15 mm (milling_deflection, X3 refused); the reamer keeps
-# the owner-ruled 3000 rpm (#2748) and gains a test hole and a runout check
+# the PM-30MV's top speed (owner-ruled 3000, #2748; 2800 since the owner's
+# 2026-11-16 correction) and gains a test hole and a runout check
 # (S1's safeguards; its lower speed is not taken).
 #
 # The pin holes' underside edges carry the title block's edge break only, no
@@ -312,7 +313,7 @@ tool = "spot"
 sizing = "other"
 instruction = "Spot A1, A2, B1, B2 and the coupon (full Ø.19 cone) and CL, CR (cone just under .136) from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
 instruction_detailed = "Edge-find ZERO END for X0 and ZERO EDGE for Y0. Spot A1, A2, B1, B2, CL and CR at the table's X/Y: CL and CR with the cone just under the #29 (.136); A1, A2, B1, B2 down to the full Ø.19 body, the largest cone a #2 centre drill cuts, so the 23/64 starts true; spot the coupon's test hole (X 10.25, Y 5.9) the same way. R1–R4, L1 and L2 follow in the next op. Every position is ±{{cad.location_tol_in:.3dot}}, except that A2 and B2 sit {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above the A1–B1 line. Sheet 2's note 2 measures B1, A2, B2, CL, CR and R1–R4 from A1 and that line, not from the corner, so keep one zero for every hole and approach each X and each Y from the same side: the holes then sit right relative to A1 even if the edge-find is a little off."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 # The #2 centre drill's Ø3/16 body cone, .001 in/rev.
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
@@ -330,7 +331,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot R1–R4 (cone just under .089) and L1, L2 (full Ø.19 cone) the same way, from the same zero."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" },
@@ -340,8 +341,9 @@ milling_cuts = [
 # Drill and ream speeds: LittleMachineShop "Cutting Speeds", Drilling &
 # Reaming table, row wrought aluminum 6061-T6: drilling 350-400 ft/min,
 # reaming 350-400 ft/min (https://littlemachineshop.com/pages/cutting-speeds,
-# read 2026-11-13). Every size here computes above the PM-30MV's 3000 rpm top
-# speed, so drills and the reamer run at 3000 (owner ruling 2026-11-13, #2748).
+# read 2026-11-13). Every size here computes above the PM-30MV's 2800 rpm top
+# speed (owner 2026-11-16), so drills and the reamer run at 2800 (owner ruling
+# 2026-11-13, #2748, made at the then-recorded 3000).
 # The blind review (S1) cited lower HSS reaming speeds; the owner ruling
 # stands, and its safeguards are taken instead: reamer runout checked and a
 # test hole gauged in the offcut before the plate.
@@ -350,7 +352,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 sizing = { kind = "band", band_mm = "{{cad.riser_drill_band_mm}}" }
 instruction = "R1–R4 through; full-retract peck every .09 (5D deep)."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 milling_cuts = [{ name = "R1–R4 at .001 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 2.2606, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" }]
 
@@ -359,7 +361,7 @@ speed_kind = "spindle"
 tool = "drill-29"
 sizing = { kind = "band", band_mm = "{{cad.clamp_drill_band_mm}}" }
 instruction = "CL, CR through; one chip-break peck at about .27 deep."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [{ name = "CL, CR at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.clamp_x_mm}}" }]
@@ -370,7 +372,7 @@ tool = "drill-f"
 sizing = { kind = "band", band_mm = "{{cad.lever_drill_band_mm}}" }
 instruction = "L1, L2 through; no peck."
 instruction_detailed = "L1 and L2 straight through, no peck (the plate is under 2 drill diameters thick): light feed for the first .05 so the drill follows the spot, then a steady feed."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 milling_cuts = [{ name = "L1, L2 at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 6.5278, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.lever_x_mm}}" }]
 
@@ -380,7 +382,7 @@ tool = "drill-23-64"
 sizing = "other"
 instruction = "A1, B1, A2, B2 and the coupon's test hole through for the reamer; no peck."
 instruction_detailed = "Chuck the 23/64 short, no more than 1-1/4 in out of the chuck, so it cannot wander. Drill A1, B1, A2, B2 straight through, no peck: light feed for the first .05 in the spot, then a steady feed. Drill the coupon's test hole the same way."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [{ name = "A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 9.128125, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
@@ -391,7 +393,7 @@ tool = "reamer"
 sizing = { kind = "band", band_mm = "{{cad.pin_dia_band_mm}}" }
 instruction = "Indicate the reamer's runout in the chuck, ≤.0005. Ream the coupon's test hole and gauge it, then A1, B1, A2, B2 through."
 instruction_detailed = "Reamer in the drill chuck: indicate it just above the flutes and turn the chuck by hand; re-seat it until the runout reads .0005 or less, and leave it in the chuck until the four plate holes are done. Ream the coupon's test hole first, exactly as below, then gauge it: the .376 GO pin enters and the .377 NO-GO does not start. If it fails, stop and sort out the reamer before touching the plate: these four holes cannot be reworked. Then, at the same X/Y as each 23/64 hole, brush on cutting fluid (WD-40 or kerosene for aluminium) and feed down in one steady pass, about .004 per revolution (12 in/min: about 4 s for the .8 in of travel, the plate plus the reamer's lead past the underside), until the full-diameter flutes are through the underside; do not dwell or stop in the bore. Withdraw with the spindle still running, then wipe the chips off the flutes before the next hole."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 # The coupon's test hole is not declared: it is a scrap piece on its own
 # parallels, and nothing it does bends the plate.

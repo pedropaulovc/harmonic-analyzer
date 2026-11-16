@@ -308,7 +308,7 @@ speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
 instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch_rocker_arm_tl_oblique_base_bar), rail X ±{{cad.rail_station_tol_in:.4f}} as posted; {{cad.bracket_range}} bar 1 only by DRO, X/Y ±{{cad.bracket_position_tol_in:.3f}}. Drill tips .125 past underside. Rail row ±{{cad.rail_row_tol_in:.2f}}."
-rpm = 3000
+rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
 milling_cuts = [
@@ -325,7 +325,7 @@ speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; chip-break pecks after .27 deep (L/D 4)."
-rpm = 3000
+rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
@@ -337,7 +337,7 @@ speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R5–R8 in the same BB07 run, over the right jack."
-rpm = 3000
+rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
@@ -349,7 +349,7 @@ speed_kind = "spindle"
 tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
 instruction = "Bar 1 only: B1–B2 through over the left jack; chip-break pecks after .38 deep (L/D 3)."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
@@ -361,7 +361,7 @@ speed_kind = "spindle"
 tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
 instruction = "Bar 1 only: B3–B4 over the right jack, as above."
-rpm = 3000
+rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [

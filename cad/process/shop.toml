@@ -19,7 +19,8 @@
 # cad/config/shop-equipment.toml cnc.pm-30mv.
 [machines.pm-30mv]
 kind = "mill"
-rpm_ranges = [[50, 3000]]
+# Owner (Pedro, 2026-11-16): spindle 100 rpm minimum, 2800 rpm maximum.
+rpm_ranges = [[100, 2800]]
 travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
 spindle_to_table_mm = [62.484, 431.8]
@@ -233,8 +234,9 @@ flutes = 4
 # tools.ms-stick-engraver: make, SKU, 30 deg V, .005 in tip) on its brass,
 # read by test_ms_stick_drawing. Source: 2L "Feeds and Speeds for Engraving
 # with an Engraving Tool" (engraving_tool_speed_and_feed_table.pdf, read live
-# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm (the
-# PM-30MV's top speed), halved for small tip widths as its note says: 3 in/min
+# 2026-11-11), row Brass/Bronze: .002 in/tooth, 6 in/min at 3,000 rpm, halved
+# for small tip widths as its note says: .001 in/tooth, so 2.8 in/min at the
+# PM-30MV's 2800 rpm top speed (owner 2026-11-16)
 # by handwheel, plunge at half that; passes .005 deep, the last .001-.002 at a
 # slower feed to leave no burr. diameter_mm is the 1/8 in shank (the bit's
 # body); the cutting width is the V at depth, set by the equipment record.
@@ -245,8 +247,8 @@ diameter_mm = 3.175
 [settings.ms-stick-engrave-brass]
 tool = "ms-stick-engraver"
 material = "ms-stick-brass"
-rpm = 3000
-feed = "3 in/min"
+rpm = 2800
+feed = "2.8 in/min"
 
 # Source: ch_rocker_arm_tl_oblique_carrier/plan.toml (MHA-CH-06-TL-21 v49).
 # Number and letter drills are the 115-piece index's (jig-drill-11-32);
@@ -298,7 +300,7 @@ description = "3/8 in 82° countersink"
 
 # Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
 # coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
-# in the PM-30MV high belt range (1400-3000 rpm) with Setups 4-5's drills, so
+# in the PM-30MV high belt range (1400-2800 rpm) with Setups 4-5's drills, so
 # no belt change: 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
 [settings.riser-em-half-6061-t6511]
 tool = "jig-em-half"
