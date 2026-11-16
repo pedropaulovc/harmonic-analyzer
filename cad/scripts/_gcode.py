@@ -120,10 +120,13 @@ def check_depth(program: Program, z_min: float) -> list[Finding]:
     return [Finding(program.path.name, "depth", f"deepest Z {lowest:.3f}, expected {z_min:.3f}")]
 
 
-def check_spindle(program: Program, rpm: float) -> list[Finding]:
-    if program.spindle_rpm == {rpm}:
+def check_spindle(program: Program, rpm: float | Iterable[float]) -> list[Finding]:
+    """The program's S words are exactly ``rpm``, or exactly the given speeds
+    when operations in one program run at different settings."""
+    expected = {float(rpm)} if isinstance(rpm, (int, float)) else {float(r) for r in rpm}
+    if program.spindle_rpm == expected:
         return []
-    return [Finding(program.path.name, "spindle", f"S words {sorted(program.spindle_rpm)}, expected {rpm:g}")]
+    return [Finding(program.path.name, "spindle", f"S words {sorted(program.spindle_rpm)}, expected {sorted(expected)}")]
 
 
 def check_holes(program: Program, centres: Iterable[tuple[float, float]], z_bottom: float) -> list[Finding]:
@@ -235,6 +238,7 @@ def check_side_passes(
     span: float,
     below_z: float,
     finish: float | None = None,
+    max_stepdown: float | None = None,
 ) -> list[Finding]:
     """Straight side-cut passes along the other axis, longer than ``span``, at
     constant ``axis`` coordinate and below ``below_z``: the last pass sits at
@@ -242,7 +246,8 @@ def check_side_passes(
     removes more than ``max_step``. ``raw`` is the cutter-centre coordinate that
     just touches the raw face, so each step is the distance between consecutive
     pass positions, starting from ``raw``. With ``finish``, the final pass
-    removes no more than that finishing step."""
+    removes no more than that finishing step. With ``max_stepdown``, the pass
+    depths step down from ``below_z`` (the stock top) by no more than that."""
     a = "XY".index(axis)
     b = 1 - a
     passes = [
@@ -265,6 +270,13 @@ def check_side_passes(
         if step > limit + _TOL_MM:
             findings.append(Finding(program.path.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {limit:.3f}"))
         previous = station
+    if max_stepdown is not None:
+        levels = sorted({round(m.end[2], 3) for m in passes}, reverse=True)
+        previous = below_z
+        for level in levels:
+            if previous - level > max_stepdown + _TOL_MM:
+                findings.append(Finding(program.path.name, "passes", f"Z {level:.3f} steps down {previous - level:.3f} > {max_stepdown:.3f}"))
+            previous = level
     last = [m for m in passes if _close(m.end[a], final)]
     if last and any((m.end[b] - m.start[b]) * direction <= 0 for m in last):
         findings.append(Finding(program.path.name, "passes", f"final pass does not run {'+' if direction > 0 else '-'}{'XY'[b]}"))

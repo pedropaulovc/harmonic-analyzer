@@ -63,6 +63,14 @@ jack_right_x_in = 15.8
 jack_right_y_in = -1.8
 edge_cut_tip_z_mm = -2.032       # Edge cutter .04–.08 in below the underside.
 end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
+# Deepest side-milling level the 1/2 in end mill's settings were measured at
+# (shop.toml settings.basebar-edge-6061-t6511, dechatter v11). Edges and ends
+# go down in equal levels no deeper than this: edges 2 x 7.366 mm
+# ((blank thickness + .08 in)/2), ends 2 x 6.477 mm ((thickness + .04 in)/2).
+# Edge roughing width is 2.54 mm (.100 in), not dechatter's stable 4.1-4.7:
+# at 4.1 the strapped bar's milling_deflection estimate reads 0.127 mm against
+# the 0.1 mm rough limit (prechips 0.11.3, 170 N); 2.54 passes.
+side_max_stepdown_mm = 7.62
 drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
 half_cutter_dia_mm = 12.7        # 1/2 in end mill; also cuts the slots.
 face_cutter_dia_mm = 19.05       # 3/4 in end mill.
@@ -162,25 +170,25 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Cutter .04–.08 below. Front edge, conventional, table −X (cutter +X): rough .050–.080 radial, finish .005–.010; note finish-pass Y; mark ZERO EDGE."
+instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .100 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
 settings = "basebar-edge-6061-t6511"
 milling_cuts = [
-  { name = "front edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 2.032, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "front edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "front edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "front edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Opposite edge, conventional, table +X (cutter −X); D = measured cutter Ø. Rough to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; finish at front-pass Y + {{cad.width_in:.3f}} + D."
-instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Rough .050–.080 radial passes down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
+instruction = "Opposite edge, conventional, table +X (cutter −X), two equal depth levels; D = measured cutter Ø. Rough to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; finish at front-pass Y + {{cad.width_in:.3f}} + D."
+instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Each pass runs at two equal depth levels, ≤ .30 each. Rough passes of at most .100 radial down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
 settings = "basebar-edge-6061-t6511"
 inspection = "Width at ends/middle."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 milling_cuts = [
-  { name = "opposite edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 2.032, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "opposite edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "opposite edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "opposite edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups]]
@@ -216,14 +224,14 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Cutter .04 below bar. Left end, conventional (table away, cutter −Y), .020 passes: X0 here; mark ZERO END. Right end, conventional (table toward you, cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + D/2. Mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
-instruction_detailed = "Measure cutter D. Cutter .04 below bar; it runs just past the end, clear of parallels and jacks. Left end: conventional, table moving away from you (cutter −Y), .020 passes until clean; mark ZERO END both faces; cutter still touching that end, set DRO X = −D/2 (X0 = end face). Right end: conventional, table moving toward you (cutter +Y), .010 passes; read length on DRO before the last pass; final cutter-centre X = {{cad.length_in:.4f}} + D/2. With ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
+instruction = "1/2 in end mill out 1.92 in (48.8 mm), as measured. Cutter .04 below bar, in two equal depth levels. Left end, conventional (table away, cutter −Y), .020 passes: X0 here; mark ZERO END. Right end, conventional (table toward you, cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + D/2. Mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
+instruction_detailed = "Measure cutter D. Cutter .04 below bar; it runs just past the end, clear of parallels and jacks. Every pass runs at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes until clean; mark ZERO END both faces; cutter still touching that end, set DRO X = −D/2 (X0 = end face). Right end: conventional, table moving toward you (cutter +Y), .010 passes; read length on DRO before the last pass; final cutter-centre X = {{cad.length_in:.4f}} + D/2. With ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
 settings = "basebar-edge-6061-t6511"
 inspection = "DRO X, before unclamping: right end {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} at both edges."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 152.4, stations_mm = 0 },
-  { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.thickness_mm}}", radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 152.4, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 2250, feed_mm_min = 400.05, stations_mm = 0 },
+  { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
 # Each depth step starts with a slow plunge at the cutter-centre rectangle's
