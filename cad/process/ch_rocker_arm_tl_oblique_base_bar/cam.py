@@ -120,11 +120,13 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     rail = sorted((v for v in f.values() if v["kind"] == "threaded_hole"), key=lambda v: v["at"][0])
     # BB05/BB07 drill the rail holes at their manifest stations, which is only
     # right when the drawing holds those stations (a "station" requirement with
-    # limits). A REF station means the plan transfers each hole from its own
-    # rail, so posting at the nominal would drill off the real rail.
+    # limits; owner ruling 2026-11-16 "Rail holes CNC at ±0.05 mm OK"). A REF
+    # station means the plan transfers each hole from its own rail, so posting
+    # at the nominal would drill off the real rail. The program set is fixed
+    # (they are the task's declared targets), so the whole post is refused.
     ref = sorted(k for k, v in f.items() if v["kind"] == "threaded_hole" and "station" not in v["requirements"])
     if ref:
-        raise ValueError(f"rail stations {ref} are REF in this manifest; refusing to post rail programs at nominal")
+        raise ValueError(f"rail stations {ref} are REF in this manifest; BB05/BB07 would drill at nominal, so nothing is posted")
     bracket = sorted((v for v in f.values() if v["kind"] == "hole"), key=lambda v: (v["at"][0], v["at"][1]))
     counterbores = [v for v in f.values() if v["kind"] == "counterbore"]
     if {c["parent"] for c in counterbores} != {k for k, v in f.items() if v["kind"] == "hole"}:

@@ -51,8 +51,10 @@ def test_silent_fusion_output_is_a_failure():
 
 
 def _features(rail_requirements=("thread", "dia", "station", "height", "thru")) -> dict:
-    """The base bar's features, reduced to what the recipe reads; rail stations
-    are held (a "station" requirement) unless ``rail_requirements`` drops it."""
+    """The base bar's exported features, reduced to what the recipe reads. Rail
+    holes carry the drawing's export requirements, "station" included since the
+    stations are held at ±0.05 mm; ``rail_requirements`` without it is the REF
+    shape the recipe refuses."""
     def plane(value):
         return {"kind": "plane", "plane": {"value": value}}
 
