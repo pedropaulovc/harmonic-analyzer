@@ -551,9 +551,10 @@ See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 Each part in `_cam_programs.CAM_STEMS` (the oblique-trammel base bar) has an
 opt-in `cam:<stem>` task, run by `cad/scripts/fusion_cam.py`. Its recipe,
-`cad/process/<stem>/cam.py`, derives every dimension, tool, speed and step
-from the part's `features.toml`, its `plan.toml` and `cad/process/shop.toml`.
-It types no part dimension. The driver sends the recipe and
+`cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
+diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
+`cad/process/shop.toml`; constants that neither record carries are named in
+the recipe. The driver sends the recipe and
 `_fusion_cam_runtime.py` to a local Fusion through its MCP server
 (`http://127.0.0.1:27182/mcp`, override `HARMONIC_FUSION_MCP_URL`). Fusion
 builds the toolpaths in an unsaved document, posts one file per program with

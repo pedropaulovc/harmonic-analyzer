@@ -31,6 +31,8 @@ import adsk.core
 import adsk.fusion
 
 MM = 0.1  # Fusion API lengths are centimetres.
+# A first run downloads the library post from Autodesk; allow for a slow link.
+POST_DOWNLOAD_TIMEOUT_S = 120.0
 
 
 def _pump(seconds):
@@ -285,7 +287,9 @@ def library_post(cam, description):
         inp = cam.ncPrograms.createInput()
         program = cam.ncPrograms.add(inp)
         program.postConfiguration = configuration
-        _pump(2.0)
+        deadline = time.time() + POST_DOWNLOAD_TIMEOUT_S
+        while not os.path.exists(path) and time.time() < deadline:
+            _pump(0.5)
         program.deleteMe()
     if not os.path.exists(path):
         raise RuntimeError(f"post {description!r} did not download to {path}")

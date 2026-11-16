@@ -9,13 +9,15 @@
 2. Sends ``_fusion_cam_runtime.py``, the recipe and that context to a running
    Autodesk Fusion through its local MCP server (``_fusion_mcp``). Fusion
    imports the STEP into a new, unsaved document, builds the setups and
-   toolpaths, posts one file per recipe program with the recipe's library post,
-   and closes the document without saving, on failure too.
+   toolpaths, posts one file per recipe program with the recipe's library post
+   into a fresh staging directory, and closes the document without saving, on
+   failure too.
 3. Checks every posted file against the recipe's ``expectations`` (``_gcode``):
-   depths, hole positions, slot cutter-centre bounds, pass positions and
-   directions, spindle speeds, and no rapid below the stock top.
-4. Writes ``manifest.json`` beside the programs: the SHA-256 of every input
-   and output, the Fusion version and the post used.
+   depths, hole positions, slot cutter-centre bounds, pass positions, steps
+   and directions, spindle speeds, and no rapid below the stock top.
+4. Moves the checked programs into ``cad/out/nc/<stem>/`` and writes
+   ``manifest.json`` beside them: the SHA-256 of every input and output, the
+   Fusion version and the post used.
 
 Exit 0 only when every program posted and every check passed. Any failure
 removes every output and exits 1, so a stale or unchecked program is never
@@ -29,7 +31,10 @@ import argparse
 import base64
 import hashlib
 import json
+import os
+import shutil
 import tomllib
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +52,7 @@ from export_features import bundle_paths
 MAX_SCRIPT_LINE = 4000
 _CHUNK = 76
 RESULT_MARKER = "FUSION_CAM_RESULT "
+STAGING_DIR = ".staging"
 _SCRIPT = '''
 import base64
 import json
@@ -156,9 +162,15 @@ def main(argv: list[str] | None = None) -> int:
         directory = _cam_programs.nc_dir(stem, args.out)
         for path in outputs:
             path.unlink(missing_ok=True)
-        directory.mkdir(parents=True, exist_ok=True)
+        # Fusion posts into a fresh staging directory; files reach ``directory``
+        # only after every check passed. A Fusion script still running after a
+        # client timeout can therefore never drop unchecked files beside the
+        # manifest, only into its own abandoned staging directory.
+        staging_root = directory / STAGING_DIR
+        shutil.rmtree(staging_root, ignore_errors=True)
+        staging = staging_root / uuid.uuid4().hex
+        staging.mkdir(parents=True)
         recipe_path = _cam_programs.recipe_path(stem)
-        recipe = _cam_programs.load_recipe(stem)
         features_path, step_path = bundle_paths(stem, args.out)
         plan_path = _process_plans.plan_path(stem)
         inputs = {
@@ -166,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             "shop": _process_plans.SHOP_PATH, "recipe": recipe_path, "runtime": _cam_programs.RUNTIME_PATH,
         }
         try:
+            recipe = _cam_programs.load_recipe(stem)
             missing = [str(p) for p in inputs.values() if not Path(p).is_file()]
             if missing:
                 raise FileNotFoundError(f"missing inputs {missing}; run package:features:{stem} first")
@@ -177,31 +190,35 @@ def main(argv: list[str] | None = None) -> int:
             with _telemetry.span("cam.fusion", stem=stem) as span:
                 session = FusionSession()
                 session.require_idle()
-                reply = session.run_script(compose_script(recipe_path, ctx, recipe.PROGRAMS, directory))
+                reply = session.run_script(compose_script(recipe_path, ctx, recipe.PROGRAMS, staging))
                 result = parse_result(reply)
                 span.set_attribute("fusion.version", result["fusion_version"])
             posted = {Path(f).resolve() for f in result["files"]}
-            expected = {p.resolve() for p in outputs[:-1]}
+            expected = {(staging / p.name).resolve() for p in outputs[:-1]}
             if posted != expected:
                 raise RuntimeError(f"Fusion posted {sorted(map(str, posted))}, expected {sorted(map(str, expected))}")
             with _telemetry.span("cam.verify", stem=stem) as span:
                 checks = recipe.expectations(ctx)
-                findings = verify(checks, directory)
+                findings = verify(checks, staging)
                 span.set_attribute("cam.checks", len(checks))
                 span.set_attribute("cam.findings", len(findings))
             if findings:
                 raise RuntimeError("posted G-code failed its checks:\n  " + "\n  ".join(map(str, findings)))
-        except (FusionError, OSError, ValueError, KeyError, RuntimeError) as exc:
+            for path in outputs[:-1]:
+                os.replace(staging / path.name, path)
+            manifest = {
+                "stem": stem,
+                "fusion_version": result["fusion_version"],
+                "post": {"file": Path(result["post"]).name, "sha256": sha256(Path(result["post"]))},
+                "inputs": {name: {"path": Path(p).name, "sha256": sha256(Path(p))} for name, p in inputs.items()},
+                "programs": {p.name: sha256(p) for p in outputs[:-1]},
+                "checks": len(checks),
+            }
+            outputs[-1].write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001 -- every failure must remove every output
             return _fail(root, stem, exc, outputs)
-        manifest = {
-            "stem": stem,
-            "fusion_version": result["fusion_version"],
-            "post": {"file": Path(result["post"]).name, "sha256": sha256(Path(result["post"]))},
-            "inputs": {name: {"path": Path(p).name, "sha256": sha256(Path(p))} for name, p in inputs.items()},
-            "programs": {p.name: sha256(p) for p in outputs[:-1]},
-            "checks": len(checks),
-        }
-        outputs[-1].write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        finally:
+            shutil.rmtree(staging_root, ignore_errors=True)
         _telemetry.info(f"{stem}: posted {len(outputs) - 1} programs, {len(checks)} checks passed (Fusion {result['fusion_version']})")
         return 0
 

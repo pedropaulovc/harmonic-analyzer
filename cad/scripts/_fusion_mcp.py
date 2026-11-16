@@ -27,6 +27,20 @@ class FusionError(RuntimeError):
     """Fusion was unreachable, busy, or a script it ran raised."""
 
 
+def _decode(body: str, content_type: str) -> dict[str, Any] | None:
+    """The JSON-RPC message in a reply: the body itself, or, for a Streamable HTTP
+    ``text/event-stream`` reply, the last ``data:`` event carrying a response."""
+    if not body.strip():
+        return None
+    if content_type != "text/event-stream":
+        return json.loads(body)
+    messages = [json.loads(line[5:]) for line in body.splitlines() if line.startswith("data:") and line[5:].strip()]
+    responses = [m for m in messages if "result" in m or "error" in m]
+    if not responses:
+        raise FusionError(f"event stream carried no JSON-RPC response: {body[:500]!r}")
+    return responses[-1]
+
+
 class FusionSession:
     def __init__(self, url: str | None = None, timeout_s: float = 900.0) -> None:
         self.url = url or os.environ.get(URL_ENV) or DEFAULT_URL
@@ -43,7 +57,11 @@ class FusionSession:
         try:
             with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
                 body = response.read().decode("utf-8")
-                return (json.loads(body) if body.strip() else None), dict(response.headers)
+                return _decode(body, response.headers.get_content_type()), dict(response.headers)
+        except urllib.error.HTTPError as exc:
+            # A running server answered with an error: not a reachability problem.
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            raise FusionError(f"Fusion MCP server at {self.url} returned HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise FusionError(
                 f"Fusion MCP server unreachable at {self.url} ({exc}). Start Fusion and enable "
@@ -69,7 +87,6 @@ class FusionSession:
         if reply is None or "result" not in reply or not session:
             raise FusionError(f"initialize failed: {reply}")
         self._session_id = session
-        self.server = reply["result"].get("serverInfo", {})
         self._post({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     def call(self, tool: str, arguments: dict[str, Any]) -> str:
@@ -107,9 +124,3 @@ class FusionSession:
         """
         reply = self.call_json("fusion_mcp_execute", {"featureType": "script", "object": {"script": script}})
         return str(reply.get("message", ""))
-
-    def close_active_document_without_saving(self) -> None:
-        self.call_json("fusion_mcp_execute", {
-            "featureType": "document",
-            "object": {"operation": "close", "userConfirmedCloseWithoutSave": True},
-        })

@@ -37,7 +37,6 @@ class Move:
     motion: Motion
     start: tuple[float, float, float]
     end: tuple[float, float, float]
-    feed: float | None
 
 
 @dataclass(frozen=True)
@@ -45,7 +44,6 @@ class Program:
     path: Path
     moves: tuple[Move, ...]
     spindle_rpm: frozenset[float]
-    feeds: frozenset[float]
 
     @property
     def cutting(self) -> tuple[Move, ...]:
@@ -53,35 +51,45 @@ class Program:
 
 
 def read_program(path: Path) -> Program:
-    """Parse one posted file. Machine-coordinate returns (G28/G53) and incremental
-    blocks are skipped: they move relative to home, not to the part's WCS."""
+    """Parse one posted file.
+
+    A machine-coordinate block (G28/G53) still applies its modal G words: the
+    motion, and the distance mode the Grbl post sets with ``G28 G91 Z0`` before
+    its ``G90``. Its axis words are skipped because they are not part
+    coordinates, and the axes it moves are unknown until a later block sets
+    them. A part move made in incremental mode (G91) is refused, not modelled.
+    """
     position: list[float | None] = [None, None, None]
     motion: Motion | None = None
-    feed: float | None = None
+    incremental = False
     moves: list[Move] = []
     spindle: set[float] = set()
-    feeds: set[float] = set()
-    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+    for number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         line = _COMMENT.sub("", raw).strip().upper()
-        if not line or any(code in line for code in ("G28", "G53", "G91")):
-            continue
         words = [(letter, float(value)) for letter, value in _WORD.findall(line)]
+        codes = {value for letter, value in words if letter == "G"}
         for letter, value in words:
             if letter == "G" and value in (0, 1, 2, 3):
                 motion = Motion(int(value))
+            elif letter == "G" and value in (90, 91):
+                incremental = value == 91
             elif letter == "S":
                 spindle.add(value)
-            elif letter == "F":
-                feed = value
-                feeds.add(value)
         axes = {letter: value for letter, value in words if letter in "XYZ"}
+        if codes & {28, 53}:
+            for i, axis in enumerate("XYZ"):
+                if axis in axes:
+                    position[i] = None
+            continue
         if not axes:
             continue
+        if incremental:
+            raise ValueError(f"{Path(path).name}:{number}: incremental (G91) part move is not supported: {raw.strip()}")
         target = [axes.get(axis, position[i]) for i, axis in enumerate("XYZ")]
         if None not in position and None not in target and motion is not None:
-            moves.append(Move(motion, tuple(position), tuple(target), feed))  # type: ignore[arg-type]
+            moves.append(Move(motion, tuple(position), tuple(target)))  # type: ignore[arg-type]
         position = target
-    return Program(Path(path), tuple(moves), frozenset(spindle), frozenset(feeds))
+    return Program(Path(path), tuple(moves), frozenset(spindle))
 
 
 @dataclass(frozen=True)
@@ -204,13 +212,15 @@ def check_side_passes(
     direction: float,
     span: float,
     below_z: float,
+    finish: float | None = None,
 ) -> list[Finding]:
     """Straight side-cut passes along the other axis, longer than ``span``, at
     constant ``axis`` coordinate and below ``below_z``: the last pass sits at
     ``final`` and runs in ``direction`` (+1/-1) along the other axis, and no pass
     removes more than ``max_step``. ``raw`` is the cutter-centre coordinate that
     just touches the raw face, so each step is the distance between consecutive
-    pass positions, starting from ``raw``."""
+    pass positions, starting from ``raw``. With ``finish``, the final pass
+    removes no more than that finishing step."""
     a = "XY".index(axis)
     b = 1 - a
     passes = [
@@ -227,10 +237,11 @@ def check_side_passes(
     if not _close(stations[-1], final):
         findings.append(Finding(program.path.name, "passes", f"final {axis} {stations[-1]:.3f}, expected {final:.3f}"))
     previous = raw
-    for station in stations:
+    for index, station in enumerate(stations):
         step = toward * (station - previous)
-        if step > max_step + _TOL_MM:
-            findings.append(Finding(program.path.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {max_step:.3f}"))
+        limit = finish if finish is not None and index == len(stations) - 1 else max_step
+        if step > limit + _TOL_MM:
+            findings.append(Finding(program.path.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {limit:.3f}"))
         previous = station
     last = [m for m in passes if _close(m.end[a], final)]
     if last and any((m.end[b] - m.start[b]) * direction <= 0 for m in last):

@@ -77,7 +77,7 @@ def _context() -> dict:
 
 
 def test_recipe_maps_features_into_the_drawing_frame():
-    # ZERO EDGE is WCS Y0 with +Y into the bar, and the C'BORE SIDE is up, so the
+    # S3/S4: ZERO EDGE is WCS Y0 at the back jaw and the bar lies at -Y, so the
     # drawing's bracket ordinates (54.909, 12.909 from ZERO EDGE) appear negated.
     ctx = _context()
     assert [c for xy in ctx["bracket"]["centres"] for c in xy] == pytest.approx([47.484, -54.909, 428.0, -12.909])
@@ -116,3 +116,35 @@ def test_side_step_over_the_plan_limit_is_caught(tmp_path):
     kwargs = {"axis": "Y", "raw": -12.7, "span": 200.0, "below_z": 0.0}
     findings = _gcode.check_side_passes(program, final=-6.35, max_step=2.0, direction=-1.0, **kwargs)
     assert any("removes" in f.detail for f in findings)
+
+
+def test_finish_pass_heavier_than_the_finish_step_is_caught(tmp_path):
+    # Roughing steps within 2.032, but the last pass takes 0.5 where 0.254 is planned.
+    program = _program(tmp_path, "G0 X0 Y-12.7 Z5\nG1 Z-14 F100\nG1 X400\nG1 Y-6.85\nG1 X0\nG1 Y-6.35\nG1 X400\nG0 Z5\n")
+    kwargs = {"axis": "Y", "raw": -12.7, "span": 200.0, "below_z": 0.0, "max_step": 6.0, "direction": 1.0}
+    assert _gcode.check_side_passes(program, final=-6.35, **kwargs) == []
+    findings = _gcode.check_side_passes(program, final=-6.35, finish=0.254, **kwargs)
+    assert [f.detail for f in findings] == ["Y -6.350 removes 0.500 > 0.254"]
+
+
+def test_rapid_after_a_machine_retract_keeps_its_motion(tmp_path):
+    # A G0 set on a machine-coordinate retract (G53) stays modal after a G1 cut,
+    # and the Grbl post's G28 G91 Z0 / G90 pair leaves absolute mode; the next
+    # unlabelled descent is therefore a rapid into the stock.
+    text = "G0 X10 Y5 Z5\nG1 Z-1 F100\nG90 G53 G0 Z0\nG28 G91 Z0\nG90\nX30 Y5\nZ5\nZ-2\n"
+    findings = _gcode.check_rapids_clear(_program(tmp_path, text), 0.0)
+    assert [f.check for f in findings] == ["rapid"]
+
+
+def test_incremental_part_moves_are_refused(tmp_path):
+    with pytest.raises(ValueError, match="G91"):
+        _program(tmp_path, "G0 X0 Y0 Z5\nG91\nG1 X10 F100\n")
+
+
+def test_event_stream_replies_decode_to_their_response():
+    from _fusion_mcp import _decode
+
+    body = 'event: message\ndata: {"jsonrpc": "2.0", "method": "notifications/progress"}\n\nevent: message\ndata: {"jsonrpc": "2.0", "id": 3, "result": {"ok": 1}}\n\n'
+    assert _decode(body, "text/event-stream") == {"jsonrpc": "2.0", "id": 3, "result": {"ok": 1}}
+    with pytest.raises(FusionError):
+        _decode("event: ping\n\n", "text/event-stream")

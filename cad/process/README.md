@@ -360,11 +360,15 @@ A recipe has four parts:
 - `PROGRAMS`: the file names, each listing its operations. Each program uses
   one tool, because GRBL has no tool changer and Fusion Personal refuses
   tool-change posts.
-- `context(features, plan, shop, step)`: a pure function that reads every
-  number from the part's `features.toml`, its `plan.toml` (`[parameters]`,
-  `milling_cuts`) and `shop.toml` (tools, settings). It also places the part
-  in the setup's work frame. A part dimension typed into the recipe would let
-  the NC drift from the CAD.
+- `context(features, plan, shop, step)`: a pure function. It reads every part
+  dimension from the part's `features.toml`. Blank size, cutter tip depths and
+  radial steps come from the part's `plan.toml` (`[parameters]`,
+  `milling_cuts`), and cutter diameters, speeds and feeds from `shop.toml`.
+  It also places the part in each setup's work frame. Values neither record
+  carries are recipe constants with a stated source: catalogue tool lengths
+  (Fusion's collision model only), the centre drill's geometry, the S2 strap
+  clearance and the facing plunge feed. A part dimension typed into the
+  recipe would let the NC drift from the CAD.
 - `build(ctx, rt)`: runs inside Fusion with the `_fusion_cam_runtime.py`
   helpers.
 - `expectations(ctx)`: the `_gcode` checks every posted file must pass, such
@@ -377,8 +381,10 @@ counterbore floor, a feed height below the stock top, a slot cut from the
 outside and an oversized radial step. A failed check removes every output.
 Fix the recipe, not the expectation.
 
-For the base bar, the WCS is ZERO END × ZERO EDGE at the top face, with +Y into
-the bar. Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the model's Z0 face, so
-one set of S3 and S4 programs serves both hands; `_bar1` programs are bar 1
-only. Posted NC is not machining approval: prove each program in air and check
-the setup against the traveler first.
+For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
+back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.
+Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the model's Z0 face, so one set
+of S3 and S4 programs serves both hands; `_bar1` programs are bar 1 only. S2
+is different: X0 is the blank's left end, Y0 the finished front edge with the
+bar at +Y, and Z0 the blank's top. Posted NC is not machining approval: prove
+each program in air and check the setup against the traveler first.

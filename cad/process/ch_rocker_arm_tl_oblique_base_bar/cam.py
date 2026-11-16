@@ -3,11 +3,15 @@
 ``fusion_cam.py`` loads this module on the host, calls :func:`context` with the
 part's exported ``features.toml`` and the plan/shop TOML, then sends
 :func:`build` to Fusion with that context and checks the posted G-code against
-:func:`expectations`. Nothing here types a part dimension: lengths, hole and
-slot positions come from the manifest; blank size, cutter tip depths and step
-sizes from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters,
-speeds and feeds from ``shop.toml``. A CAD change reaches the programs through
-the re-exported manifest.
+:func:`expectations`. No part dimension is typed here: lengths, hole and slot
+positions come from the manifest; blank size, cutter tip depths and radial
+steps from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
+diameters, speeds and feeds from ``shop.toml``. A CAD change reaches the
+programs through the re-exported manifest. Typed here, because neither record
+carries them: the #2 centre drill's catalogue geometry (it sets the spot
+depth), cutter flute and body lengths (used only by Fusion's holder and
+collision model, not the posted coordinates), the S2 strap clearance and the
+facing plunge feed.
 
 Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 face (two
 clampings), square the ends and mill the slots in the vise; S4 spot, drill and
@@ -48,9 +52,11 @@ CENTRE_DRILL = {"body_mm": 3 / 16 * IN, "pilot_mm": 5 / 64 * IN, "pilot_length_m
 # Strap studs and nuts stand above the bar in S2; their height is not recorded,
 # so moves between the two edges clear the stock top by this much.
 STRAP_CLEARANCE_MM = 60.0
-# Fusion spreads radial roughing steps unevenly (one 0.264 pass where 0.254 was
-# asked, 2026-11-16); the plan's steps are nominal hand-feed targets.
-STEP_TOLERANCE = 1.05
+# Fusion spreads end roughing over the pass count it is given: ceil(trim/step) + 1
+# left the right end's first step at 0.264 where the plan allows 0.254
+# (2026-11-16). One more pass keeps every step within the plan; a pass beyond
+# the raw face cuts air.
+EXTRA_ROUGHING_STEPS = 2
 
 
 def _feed_mm_min(text: str) -> float:
@@ -162,8 +168,8 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
                  "steps": math.ceil((y_trim - edge_finish) / edge_step) + 1, "tip": p["edge_cut_tip_z_mm"]},
         "face": {"rpm": face_rpm, "feed": face_feed, "stepover": face_stepover},
         "ends": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
-                 "left_step": left_step, "left_steps": math.ceil(x_trim / left_step) + 1,
-                 "right_step": right_step, "right_steps": math.ceil(x_trim / right_step) + 1},
+                 "left_step": left_step, "left_steps": math.ceil(x_trim / left_step) + EXTRA_ROUGHING_STEPS,
+                 "right_step": right_step, "right_steps": math.ceil(x_trim / right_step) + EXTRA_ROUGHING_STEPS},
         "slots": {"rpm": slot_rpm, "feed": slot_feed, "plunge": slot_plunge,
                   "step": p["slot_step_in"] * IN, "breakthrough": p["slot_breakthrough_in"] * IN,
                   "items": [slot_geometry(s) for s in slots]},
@@ -187,10 +193,10 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB01_S2_edges_T1", "rapids_clear", {"z_top": 0.0}),
         # Front edge becomes ZERO EDGE: conventional, cutter +X (plan S2).
         ("BB01_S2_edges_T1", "side_passes", {"axis": "Y", "final": -r, "raw": -ctx["y_trim"] - r,
-                                              "max_step": edge["step"] * STEP_TOLERANCE, "direction": 1.0,
+                                              "max_step": edge["step"], "finish": edge["finish"], "direction": 1.0,
                                               "span": L / 2, "below_z": 0.0}),
         ("BB01_S2_edges_T1", "side_passes", {"axis": "Y", "final": W + r, "raw": W + ctx["y_trim"] + r,
-                                              "max_step": edge["step"] * STEP_TOLERANCE, "direction": -1.0,
+                                              "max_step": edge["step"], "finish": edge["finish"], "direction": -1.0,
                                               "span": L / 2, "below_z": 0.0}),
         ("BB02_S3_face_side1_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB02_S3_face_side1_T2", "depth", {"z_min": ctx["side1"]}),
@@ -203,10 +209,10 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB04_S3_ends_slots_T1", "rapids_clear", {"z_top": 0.0}),
         # Left end becomes ZERO END, cutter -Y; right end to length, cutter +Y.
         ("BB04_S3_ends_slots_T1", "side_passes", {"axis": "X", "final": -r, "raw": -ctx["x_trim"] - r,
-                                                   "max_step": ends["left_step"] * STEP_TOLERANCE, "direction": -1.0,
+                                                   "max_step": ends["left_step"], "direction": -1.0,
                                                    "span": W / 2, "below_z": 0.0}),
         ("BB04_S3_ends_slots_T1", "side_passes", {"axis": "X", "final": L + r, "raw": L + ctx["x_trim"] + r,
-                                                   "max_step": ends["right_step"] * STEP_TOLERANCE, "direction": 1.0,
+                                                   "max_step": ends["right_step"], "direction": 1.0,
                                                    "span": W / 2, "below_z": 0.0}),
     ]
     for slot in slots["items"]:
@@ -236,7 +242,7 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
 def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     """Runs inside Fusion. Returns {operation key: operation}, plus the CAM object."""
     L, W, T = ctx["length"], ctx["width"], ctx["thick"]
-    bl, bw, bt = ctx["blank"]
+    bl, _width, bt = ctx["blank"]
     xt, yt, side1 = ctx["x_trim"], ctx["y_trim"], ctx["side1"]
     doc, design = rt.new_design()
     part = rt.import_step(design, ctx["step"])
@@ -289,6 +295,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
         ops[key] = op
     fc = ctx["face"]
     for key, setup_key, name in (("face_side1", "S3a", "Face side 1"), ("face_side2", "S3b", "Face side 2 to thickness")):
+        # Face plunge at half the cutting feed: a shop habit, not a plan or shop record.
         op = rt.operation(s[setup_key], "face", em_face, name, fc["rpm"], fc["feed"], fc["feed"] / 2)
         rt.set_params(op, {"stepover": f"{fc['stepover']} mm", "direction": "'conventional'", "passAngle": "0 deg"})
         ops[key] = op
