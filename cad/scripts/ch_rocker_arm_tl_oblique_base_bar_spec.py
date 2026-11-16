@@ -67,8 +67,8 @@ bar 9.35 mm.
 Rail fit stack (``RAIL_FIT_STACK``, radial at the worst hole, against the
 screw's float ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's hole at
 its receipt minimum ``RAIL_HOLE_DIA_MIN`` Ø4.50, which the kit drawing's
-receipt sheet requires (MHA-CH-06-TL-VN-83 sheet 2 note 2): the #8-32 basic
-major Ø4.166 is the largest a 3A screw reaches):
+receipt sheet requires (MHA-CH-06-TL-VN-83 sheet 2, its hole-pattern
+flag): the #8-32 basic major Ø4.166 is the largest a 3A screw reaches):
 
 - the rail's own pattern, 0.075: owner ruling 2026-11-16 assumes the
   purchased rail's R1-R8 span within ``RAIL_PATTERN_SPAN_ERROR`` 0.15 of the
@@ -78,7 +78,7 @@ major Ø4.166 is the largest a 3A screw reaches):
   every hole lies in the same 0.15. The untrimmed rail floats on its eight
   screws until they are tightened, so it centres on the bar's pattern and
   each end takes half;
-- thermal, 0.026: the CNC's leadscrews and the rail are both steel, so the
+- thermal, 0.026: the CNC's ballscrews and the rail are both steel, so the
   drilled pattern matches a steel rail at the drilling temperature; fitted
   ``FIT_TEMPERATURE_DIFFERENCE`` 10 °C away, the 6061 bar's 420 span moves
   0.053 against the rail (``ALUMINIUM_CTE`` 23.6 against ``RAIL_STEEL_CTE``
@@ -87,11 +87,20 @@ major Ø4.166 is the largest a 3A screw reaches):
 - the bar's hole, 0.050 along the rail: its station band (the stations
   print exact, so no rounding adds to it);
 - hole-to-hole scatter across the rail, ``RAIL_HOLE_ROW_SCATTER`` 0.02: all
-  eight come from one program at one Y, so only the CNC's repeatability and
-  drill wander move one hole off the row the others share.
+  eight come from one program at one Y, so only the CNC's positioning
+  repeatability moves one hole off the row the others share (±0.02 mm,
+  the owner's value in cad/config/shop-equipment.toml cnc.pm-30mv);
+- the tapped thread's tilt, ``RAIL_TAP_TILT_OFFSET`` 0.0085: owner ruling
+  2026-11-16, "Require a spring tap guide in the spindle (tap squared to the
+  quill), and add a squareness term to the stack": the guide's 0.05° (the
+  owner's value, shop-equipment.toml tools.spring-tap-guide) tilts the
+  screw by 9.7 x tan 0.05° at its seat. Its direction is free, so it adds
+  straight to the radial resultant. The thread's own pitch-diameter play is
+  not charged: until the head clamps it lets the screw move toward the
+  rail hole's centre, so it widens the float rather than eating it.
 
-hypot(0.075 + 0.026 + 0.050, 0.020) = 0.153 under the 0.167 float:
-``RAIL_FIT_MARGIN`` 0.014. The tap callout names the matched rail at the
+hypot(0.075 + 0.026 + 0.050, 0.020) + 0.0085 = 0.161 under the 0.167 float:
+``RAIL_FIT_MARGIN`` 0.006. The tap callout names the matched rail at the
 feature.
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
@@ -144,12 +153,14 @@ slip (``BRACKET_SCREW_FLOAT_MAX``; leadscrew LOAD_CASES, owner ruling Main
 from __future__ import annotations
 
 import math
+import tomllib
 
 import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import NUMBER_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
+from _paths import CAD_ROOT
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -216,13 +227,27 @@ RAIL_HOLE_POSITION_RADIUS = max(
     for x in RAIL_HOLE_X
 )
 # Across the rail: one program Y for all eight (BB05/BB07), so the row's .XX
-# band moves the whole row with the rail; only the CNC's repeatability and
-# drill wander scatter one hole off the row the others share.
-RAIL_HOLE_ROW_SCATTER = 0.02
+# band moves the whole row with the rail; only the CNC's positioning
+# repeatability scatters one hole off the row the others share. The PM-30MV
+# is CNC-converted (owner 2026-11-16): shop-equipment.toml cnc.pm-30mv.
+_SHOP_EQUIPMENT = tomllib.loads(
+    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+)
+RAIL_CNC = _SHOP_EQUIPMENT["cnc"]["pm-30mv"]
+RAIL_HOLE_ROW_SCATTER = RAIL_CNC["repeatability_mm"]  # 0.02
+# The rail taps are cut in the spring tap guide, squared to the quill (owner
+# ruling 2026-11-16, "Require a spring tap guide in the spindle (tap squared
+# to the quill), and add a squareness term to the stack"): its tilt moves the
+# screw at its seat on the rail, whichever way it leans.
+RAIL_TAP_GUIDE = _SHOP_EQUIPMENT["tools"]["spring-tap-guide"]
+RAIL_TAP_TILT_OFFSET = trammel.RAIL_SCREW_SEAT_ABOVE_BASE * math.tan(
+    math.radians(RAIL_TAP_GUIDE["squareness_deg"])
+)  # 9.7 x tan 0.05° = 0.0085
 # The rail's bolt hole at its receipt minimum, HIWIN catalogue G99TE23-2203 d
-# Ø4.5 (the kit rail copies the HGR15), which MHA-CH-06-TL-VN-83 sheet 2 note
-# 2 requires of every mounting hole, and the #8-32 screw's float in it at its
-# basic major, the largest a 3A screw reaches: 0.167 a side.
+# Ø4.5 (the kit rail copies the HGR15), which MHA-CH-06-TL-VN-83 sheet 2's
+# hole-pattern flag requires of every mounting hole, and the #8-32 screw's
+# float in it at its basic major, the largest a 3A screw reaches: 0.167 a
+# side.
 RAIL_HOLE_DIA_MIN = 4.5
 RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA_MIN - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0
 # The fit stack (module docstring), radial at the worst hole. Owner ruling
@@ -232,7 +257,7 @@ RAIL_PATTERN_SPAN_ERROR = 0.15
 RAIL_SPAN = RAIL_HOLE_X[-1] - RAIL_HOLE_X[0]  # 420.000
 # Linear expansion, 20-100 °C: 6061-T6 (ASM Handbook vol. 2) against the
 # low end of carbon and bearing steels, the larger difference. The CNC's
-# leadscrews are steel too, so only the drill-to-fit temperature
+# ballscrews are steel too, so only the drill-to-fit temperature
 # difference moves the bar's pattern against the rail.
 ALUMINIUM_CTE = 23.6e-6
 RAIL_STEEL_CTE = 11.0e-6
@@ -243,13 +268,17 @@ RAIL_THERMAL_SPAN_ERROR = (
 # Both span errors are linear along the rail, and the untrimmed rail floats
 # on its screws until they are tightened, so it centres on the bar's
 # pattern: each end hole takes half of them. The bar's own band does not
-# centre out: any hole may sit at either limit. The row scatter is across.
-RAIL_FIT_STACK = math.hypot(
-    (RAIL_PATTERN_SPAN_ERROR + RAIL_THERMAL_SPAN_ERROR) / 2.0
-    + RAIL_HOLE_POSITION_RADIUS,
-    RAIL_HOLE_ROW_SCATTER,
-)  # 0.153
-RAIL_FIT_MARGIN = RAIL_SCREW_CLEARANCE - RAIL_FIT_STACK  # 0.014
+# centre out: any hole may sit at either limit. The row scatter is across;
+# the tap's tilt leans any way, so it adds to the resultant.
+RAIL_FIT_STACK = (
+    math.hypot(
+        (RAIL_PATTERN_SPAN_ERROR + RAIL_THERMAL_SPAN_ERROR) / 2.0
+        + RAIL_HOLE_POSITION_RADIUS,
+        RAIL_HOLE_ROW_SCATTER,
+    )
+    + RAIL_TAP_TILT_OFFSET
+)  # 0.161
+RAIL_FIT_MARGIN = RAIL_SCREW_CLEARANCE - RAIL_FIT_STACK  # 0.006
 if RAIL_FIT_MARGIN <= 0.0:
     raise AssertionError("the rail screws bind: the fit stack exceeds their float")
 # The rail kit's Number: the rail is its Rail configuration.

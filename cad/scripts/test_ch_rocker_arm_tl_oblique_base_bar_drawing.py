@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -246,15 +247,27 @@ def test_walls_meet_rule_17() -> None:
 
 def test_rail_station_band_closes_the_rail_screws_fit() -> None:
     """Owner rulings 2026-11-16: the bar is drilled at its stations on the
-    CNC (±0.05 mm, RV-04) and the untrimmed rail fitted to it; the rail's
-    R1-R8 span is assumed within 0.15 of nominal. Half that span error (the
-    rail centres on its screws), the steel rail's differential expansion
-    against the aluminium bar over a 10 °C swing between drilling and
-    fitting and the station band along the rail, with the CNC's hole-to-hole
-    scatter across it, stay inside each screw's radial float in the rail's
-    hole at its Ø4.50 receipt minimum."""
+    CNC-converted PM-30MV (±0.05 mm, RV-04) and tapped in a spring tap guide,
+    and the untrimmed rail fitted to it; the rail's R1-R8 span is assumed
+    within 0.15 of nominal. Half that span error (the rail centres on its
+    screws), the steel rail's differential expansion against the aluminium
+    bar over a 10 °C swing between drilling and fitting and the station band
+    along the rail, with the CNC's ±0.02 mm repeatability across it, plus the
+    tap guide's 0.05° tilt at the screw's seat, stay inside each screw's
+    radial float in the rail's hole at its Ø4.50 receipt minimum."""
+    equipment = tomllib.loads(
+        (Path(spec.__file__).parents[1] / "config" / "shop-equipment.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    cnc = equipment["cnc"]["pm-30mv"]
+    guide = equipment["tools"]["spring-tap-guide"]
+    assert cnc["control"] == "GRBL" and "ballscrews" in cnc["drive"]
+    assert cnc["repeatability_mm"] == 0.02 and guide["squareness_deg"] == 0.05
+    assert any("Owner (Pedro) 2026-11-16" in cite for cite in cnc["cite"])
+    assert any("Owner ruling 2026-11-16" in cite for cite in guide["cite"])
     assert spec.RAIL_HOLE_BAND == 0.05
-    assert spec.RAIL_HOLE_ROW_SCATTER == 0.02
+    assert spec.RAIL_HOLE_ROW_SCATTER == cnc["repeatability_mm"]
     assert spec.RAIL_PATTERN_SPAN_ERROR == 0.15
     assert spec.RAIL_SPAN == pytest.approx(420.0)
     assert spec.RAIL_HOLE_DIA_MIN == 4.5
@@ -262,15 +275,26 @@ def test_rail_station_band_closes_the_rail_screws_fit() -> None:
     assert spec.RAIL_THERMAL_SPAN_ERROR == pytest.approx(
         420.0 * (23.6e-6 - 11.0e-6) * 10.0
     )
+    tilt = 9.7 * math.tan(math.radians(0.05))
+    assert spec.RAIL_TAP_TILT_OFFSET == pytest.approx(tilt)
+    assert spec.RAIL_TAP_TILT_OFFSET == pytest.approx(0.0085, abs=5e-5)
     along = (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.05
-    assert spec.RAIL_FIT_STACK == pytest.approx(math.hypot(along, 0.02))
-    assert spec.RAIL_FIT_STACK == pytest.approx(0.153, abs=5e-4)
+    assert spec.RAIL_FIT_STACK == pytest.approx(math.hypot(along, 0.02) + tilt)
+    assert spec.RAIL_FIT_STACK == pytest.approx(0.161, abs=5e-4)
     assert spec.RAIL_FIT_MARGIN == pytest.approx(
         spec.RAIL_SCREW_CLEARANCE - spec.RAIL_FIT_STACK
     )
-    assert spec.RAIL_FIT_MARGIN == pytest.approx(0.014, abs=5e-4)
+    assert spec.RAIL_FIT_MARGIN == pytest.approx(0.006, abs=5e-4)
     # The shop's ±.005 in drilled-hole location would not close the fit.
     assert (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.127 > spec.RAIL_SCREW_CLEARANCE
+    # The plan names the CNC route and the tap guide.
+    plan = (
+        Path(spec.__file__).parents[1]
+        / "process"
+        / "ch_rocker_arm_tl_oblique_base_bar"
+        / "plan.toml"
+    ).read_text(encoding="utf-8")
+    assert "cnc.pm-30mv" in plan and "spring tap guide" in plan
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:

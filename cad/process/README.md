@@ -221,8 +221,11 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   flush with both bar ends per TL-00 steps 1D–1F (`tools.rail-trim-grinder`,
   not owned yet). The owner assumes the purchased rail's hole span within
   0.15 mm of nominal; the base-bar spec's `RAIL_FIT_STACK` closes that, with
-  the CNC's hole-to-hole scatter and the rail holes' Ø4.50 receipt minimum
-  (TL-VN-83 sheet 2), under the screws' float. The
+  the CNC's hole-to-hole scatter (the converted PM-30MV's ±0.02 mm
+  repeatability, `cad/config/shop-equipment.toml` `cnc.pm-30mv`), the
+  spring tap guide's 0.05° squareness (`tools.spring-tap-guide`; owner ruling
+  2026-11-16) and the rail holes' Ø4.50 receipt minimum (TL-VN-83 sheet 2,
+  checked at TL-00 step 1J), under the screws' float. The
   1/2 in end mill alone cuts both slots, tracing a cutter-centre rectangle
   printed per slot, and `tool_sizing` checks it against the slot width band
   less the path offset (the 3/8 in slot

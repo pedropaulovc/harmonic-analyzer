@@ -272,7 +272,9 @@ rows = "{{cad.slot_rows}}"
 [[setups]]
 machine_kind = "other"
 title = "Drill / tap / counterbore"
-machine = "PM-30MV; inch DRO"
+# The PM-30MV is CNC-converted (GRBL, X/Y ballscrews, ±0.02 mm repeatability:
+# cad/config/shop-equipment.toml cnc.pm-30mv); its DRO still reads back.
+machine = "PM-30MV CNC (GRBL); inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 3 (re-clamp alike), jacks as set; bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up."
@@ -299,7 +301,7 @@ tool = "spot"
 sizing = "other"
 instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch_rocker_arm_tl_oblique_base_bar), rail X ±{{cad.rail_station_tol_in:.4f}} as posted; {{cad.bracket_range}} bar 1 only by DRO, X/Y ±{{cad.bracket_position_tol_in:.3f}}. Drill tips .125 past underside. Rail row ±{{cad.rail_row_tol_in:.2f}}."
 rpm = 3000
-feed = "hand"
+feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
 milling_cuts = [
   { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
@@ -316,7 +318,7 @@ tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; chip-break pecks after .27 deep (L/D 4)."
 rpm = 3000
-feed = "hand"
+feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964] },
@@ -328,7 +330,7 @@ tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R5–R8 in the same BB07 run, over the right jack."
 rpm = 3000
-feed = "hand"
+feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "R5–R8", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964] },
@@ -362,8 +364,8 @@ milling_cuts = [
 speed_kind = "other"
 tool = "tap"
 sizing = "other"
-instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}."
-instruction_detailed = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}: start each tap square from the spindle (tap in the drill chuck, spindle off), then finish by hand with tap fluid, backing off to clear chips."
+instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}, in the spring tap guide."
+instruction_detailed = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}: the tap in the spring tap guide held in the spindle, squared to the quill (owner ruling 2026-11-16; cad/config/shop-equipment.toml tools.spring-tap-guide), spindle off; turn it by hand with tap fluid, backing off to clear chips."
 feed = "hand"
 
 [[setups.operations]]
