@@ -77,8 +77,10 @@ def read_program(path: Path) -> Program:
                 spindle.add(value)
         axes = {letter: value for letter, value in words if letter in "XYZ"}
         if codes & {28, 53}:
+            # A bare G28 homes every axis; otherwise only the named axes move.
+            moved = "XYZ" if 28 in codes and not axes else axes
             for i, axis in enumerate("XYZ"):
-                if axis in axes:
+                if axis in moved:
                     position[i] = None
             continue
         if not axes:
@@ -86,8 +88,12 @@ def read_program(path: Path) -> Program:
         if incremental:
             raise ValueError(f"{Path(path).name}:{number}: incremental (G91) part move is not supported: {raw.strip()}")
         target = [axes.get(axis, position[i]) for i, axis in enumerate("XYZ")]
-        if None not in position and None not in target and motion is not None:
-            moves.append(Move(motion, tuple(position), tuple(target)))  # type: ignore[arg-type]
+        if None not in target and motion is not None:
+            # From an unknown start (program start, after a home) the path is
+            # unknown but the endpoint is not: record it as a zero-length move
+            # so endpoint checks (rapids into the stock, depth) still see it.
+            start = target if None in position else position
+            moves.append(Move(motion, tuple(start), tuple(target)))  # type: ignore[arg-type]
         position = target
     return Program(Path(path), tuple(moves), frozenset(spindle))
 

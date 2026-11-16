@@ -129,11 +129,20 @@ def test_finish_pass_heavier_than_the_finish_step_is_caught(tmp_path):
 
 def test_rapid_after_a_machine_retract_keeps_its_motion(tmp_path):
     # A G0 set on a machine-coordinate retract (G53) stays modal after a G1 cut,
-    # and the Grbl post's G28 G91 Z0 / G90 pair leaves absolute mode; the next
-    # unlabelled descent is therefore a rapid into the stock.
-    text = "G0 X10 Y5 Z5\nG1 Z-1 F100\nG90 G53 G0 Z0\nG28 G91 Z0\nG90\nX30 Y5\nZ5\nZ-2\n"
-    findings = _gcode.check_rapids_clear(_program(tmp_path, text), 0.0)
-    assert [f.check for f in findings] == ["rapid"]
+    # and the Grbl post's G28 G91 Z0 / G90 pair leaves absolute mode. A rapid
+    # straight into the stock from that unknown start, in one block or split
+    # over several, is still caught.
+    for descent in ("X30 Y5 Z-2", "X30 Y5\nZ5\nZ-2"):
+        text = f"G0 X10 Y5 Z5\nG1 Z-1 F100\nG90 G53 G0 Z0\nG28 G91 Z0\nG90\n{descent}\n"
+        findings = _gcode.check_rapids_clear(_program(tmp_path, text), 0.0)
+        assert [f.check for f in findings] == ["rapid"], descent
+
+
+def test_bare_home_forgets_every_axis(tmp_path):
+    # A bare G28 homes every axis, so the G0 X/Y move after it is not a rapid at
+    # the pre-home depth Z-3 (which the stale position would report).
+    program = _program(tmp_path, "G0 X10 Y5 Z5\nG1 Z-3 F100\nG28\nG0 X40 Y5\n")
+    assert _gcode.check_rapids_clear(program, 0.0, [(10.0, 5.0)]) == []
 
 
 def test_incremental_part_moves_are_refused(tmp_path):

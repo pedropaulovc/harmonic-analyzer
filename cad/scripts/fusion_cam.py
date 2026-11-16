@@ -141,9 +141,15 @@ def _load_toml(path: Path) -> dict[str, Any]:
         return tomllib.load(handle)
 
 
-def _fail(root, stem: str, exc: Exception, outputs: tuple[Path, ...]) -> int:
-    for path in outputs:
+def _remove_outputs(directory: Path) -> None:
+    """Every program and the manifest, whatever the recipe now declares: a
+    broken or renamed recipe must not leave a previous run's NC behind."""
+    for path in (*directory.glob("*.nc"), directory / _cam_programs.MANIFEST_NAME):
         path.unlink(missing_ok=True)
+
+
+def _fail(root, stem: str, exc: Exception, directory: Path) -> int:
+    _remove_outputs(directory)
     root.record_exception(exc)
     root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
     _telemetry.error(f"{stem}: {exc}")
@@ -158,10 +164,8 @@ def main(argv: list[str] | None = None) -> int:
     _telemetry.set_service("fusion-cam")
     stem = args.stem
     with _telemetry.run_pipeline_span("fusion_cam", stem=stem) as root:
-        outputs = _cam_programs.cam_outputs(stem, args.out)
         directory = _cam_programs.nc_dir(stem, args.out)
-        for path in outputs:
-            path.unlink(missing_ok=True)
+        _remove_outputs(directory)
         # Fusion posts into a fresh staging directory; files reach ``directory``
         # only after every check passed. A Fusion script still running after a
         # client timeout can therefore never drop unchecked files beside the
@@ -179,6 +183,10 @@ def main(argv: list[str] | None = None) -> int:
         }
         try:
             recipe = _cam_programs.load_recipe(stem)
+            outputs = (
+                *(directory / f"{name}.nc" for name, _ops in recipe.PROGRAMS),
+                directory / _cam_programs.MANIFEST_NAME,
+            )
             missing = [str(p) for p in inputs.values() if not Path(p).is_file()]
             if missing:
                 raise FileNotFoundError(f"missing inputs {missing}; run package:features:{stem} first")
@@ -216,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             outputs[-1].write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         except Exception as exc:  # noqa: BLE001 -- every failure must remove every output
-            return _fail(root, stem, exc, outputs)
+            return _fail(root, stem, exc, directory)
         finally:
             shutil.rmtree(staging_root, ignore_errors=True)
         _telemetry.info(f"{stem}: posted {len(outputs) - 1} programs, {len(checks)} checks passed (Fusion {result['fusion_version']})")
