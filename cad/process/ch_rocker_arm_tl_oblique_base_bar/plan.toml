@@ -282,7 +282,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaw
 # End mills lift: only the jaws hold them. Drills and the counterbore plunge
 # push down, so each end's jack carries that end's hole thrust (operation beams).
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-inspection = ["Before unclamping, DRO X from ZERO END: {{cad.rail_range}} at {{cad.rail_first_mm:.3f}} + n × {{cad.rail_pitch_mm:.3f}} mm ±{{cad.rail_station_tol_mm:.2f}} mm; bar 1 B1–B2 {{cad.bracket_x1_min_in:.4f}}–{{cad.bracket_x1_max_in:.4f}}, B3–B4 {{cad.bracket_x2_min_in:.4f}}–{{cad.bracket_x2_max_in:.4f}}."]
+inspection = ["Before unclamping, DRO X from ZERO END: {{cad.rail_range}} at the hole table's X ±{{cad.rail_station_tol_in:.4f}} ({{cad.rail_first_mm:.3f}} + n × {{cad.rail_pitch_mm:.3f}} mm ±{{cad.rail_station_tol_mm:.3f}} mm); bar 1 B1–B2 {{cad.bracket_x1_min_in:.4f}}–{{cad.bracket_x1_max_in:.4f}}, B3–B4 {{cad.bracket_x2_min_in:.4f}}–{{cad.bracket_x2_max_in:.4f}}."]
 gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.rail_first_band_mm}}" },
   { gauge = "mill-x-dro", band_mm = "{{cad.rail_last_band_mm}}" },
@@ -294,7 +294,7 @@ gauge_checks = [
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot all holes Ø.125; {{cad.bracket_range}} bar 1 only. Drill tips .125 past underside. Rail X ±{{cad.rail_station_tol_mm:.2f}} mm; bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}; rail row ±{{cad.rail_row_tol_in:.2f}}."
+instruction = "Spot all holes Ø.125; {{cad.bracket_range}} bar 1 only. Drill tips .125 past underside. Rail X ±{{cad.rail_station_tol_in:.4f}}; bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}; rail row ±{{cad.rail_row_tol_in:.2f}}."
 rpm = 3000
 feed = "hand"
 # Spotting cones are drilled away later; the jaws alone carry them.
