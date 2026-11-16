@@ -344,3 +344,41 @@ the check.
 A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
 [feature/traveler contract](../docs/pipeline/features-travelers.md).
+
+## NC programs (Fusion CAM)
+
+A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS` also has
+`<stem>/cam.py`, a Fusion CAM recipe that turns the plan's machining setups
+into G-code. `uv run --frozen python -m doit cam:<stem>` (opt-in; not in
+`build` or `release`) needs a running Autodesk Fusion with Preferences >
+General > API > Fusion MCP Server enabled and no command dialog open. It writes
+one `.nc` per recipe program and `manifest.json` (input, post and output
+SHA-256s, Fusion version) to `cad/out/nc/<stem>/`.
+
+A recipe has four parts:
+
+- `PROGRAMS`: the file names, each listing its operations. Each program uses
+  one tool, because GRBL has no tool changer and Fusion Personal refuses
+  tool-change posts.
+- `context(features, plan, shop, step)`: a pure function that reads every
+  number from the part's `features.toml`, its `plan.toml` (`[parameters]`,
+  `milling_cuts`) and `shop.toml` (tools, settings). It also places the part
+  in the setup's work frame. A part dimension typed into the recipe would let
+  the NC drift from the CAD.
+- `build(ctx, rt)`: runs inside Fusion with the `_fusion_cam_runtime.py`
+  helpers.
+- `expectations(ctx)`: the `_gcode` checks every posted file must pass, such
+  as depths, hole centres, slot cutter-centre bounds, pass positions and
+  directions, spindle speeds, and no rapid below the stock top.
+
+Fusion produced toolpaths that looked valid while the base-bar programs were
+being written, yet these checks caught a spot depth measured from the
+counterbore floor, a feed height below the stock top, a slot cut from the
+outside and an oversized radial step. A failed check removes every output.
+Fix the recipe, not the expectation.
+
+For the base bar, the WCS is ZERO END × ZERO EDGE at the top face, with +Y into
+the bar. Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the model's Z0 face, so
+one set of S3 and S4 programs serves both hands; `_bar1` programs are bar 1
+only. Posted NC is not machining approval: prove each program in air and check
+the setup against the traveler first.

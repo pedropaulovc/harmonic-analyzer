@@ -573,6 +573,30 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
 
 
+def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary):
+    import _cam_programs
+
+    stem = _cam_programs.CAM_STEMS[0]
+    normal = {task.name: task for task in generate_tasks("cam", dodo.task_cam(), dodo.task_cam.__doc__)}
+    selected = {task.name: task for task in dodo.canonical_tasks(["cam", f"cam:{stem}"])}
+    assert set(selected) == set(normal)
+    for name in selected:
+        assert _record(selected[name]) == _record(normal[name])
+    task = selected[f"cam:{stem}"]
+    assert task.task_dep == [f"package:features:{stem}"]
+    # The runtime is sent to Fusion as text, so no import closure can find it.
+    assert str(_cam_programs.RUNTIME_PATH.resolve()) in task.file_dep
+    assert str(_cam_programs.recipe_path(stem).resolve()) in task.file_dep
+    programs = [f"{name}.nc" for name, _ops in _cam_programs.load_recipe(stem).PROGRAMS]
+    assert [Path(target).name for target in task.targets] == [f"cam-{stem}.ok", *programs, "manifest.json"]
+    owners = dodo.canonical_target_owners()
+    for target in task.targets:
+        assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"cam:{stem}"
+    # Fusion is a local desktop seat: neither build nor release may require it.
+    for name in ("build", "release"):
+        assert not any(dep.startswith("cam") for dep in ordinary.tasks[name].task_dep), name
+
+
 def _case_requested_order_and_iterable_are_preserved_without_dependency_expansion(dodo, ordinary):
     part = next(name for name in ordinary.tasks if name.startswith("part:"))
     names = ["verify:kinematics", part, "package:features"]
@@ -665,7 +689,7 @@ def _case_queried_ownership_matches_complete_normal_oracle(dodo, ordinary, targe
     assert dodo.canonical_target_owners(queries) == target_owners
     for family in (
         "part", "assembly", "drawing", "verify_soundness", "verify", "check",
-        "package", "prechips", "export", "preflight", "gallery", "build", "release",
+        "package", "prechips", "cam", "export", "preflight", "gallery", "build", "release",
     ):
         selected_paths = {
             path
@@ -701,7 +725,7 @@ def _case_part_ownership_avoids_heavy_enrollment(dodo, ordinary, target_owners, 
     original_glob = Path.glob
 
     def clean_report_glob(path, pattern, *args, **kwargs):
-        if path == dodo.REPORTS and pattern == "prechips-*.ok":
+        if path == dodo.REPORTS and pattern in ("prechips-*.ok", "cam-*.ok"):
             return iter(())
         return original_glob(path, pattern, *args, **kwargs)
 
@@ -953,6 +977,7 @@ def test_selected_factories_portfolio(
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'check'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'package'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'prechips'}),
+        (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'cam'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'export'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'preflight'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'gallery'}),
@@ -968,6 +993,7 @@ def test_selected_factories_portfolio(
         (_case_groups_preserve_all_child_edges_without_building_children, {'family': 'check'}),
         (_case_groups_preserve_all_child_edges_without_building_children, {'family': 'package'}),
         (_case_groups_preserve_all_child_edges_without_building_children, {'family': 'prechips'}),
+        (_case_groups_preserve_all_child_edges_without_building_children, {'family': 'cam'}),
         (_case_only_requested_closure_constructs_tasks, {'family': 'part'}),
         (_case_only_requested_closure_constructs_tasks, {'family': 'assembly'}),
         (_case_only_requested_closure_constructs_tasks, {'family': 'drawing'}),
@@ -991,6 +1017,7 @@ def test_selected_factories_portfolio(
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['package:features:not-a-part']}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['package:not-a-package']}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['prechips:not-enrolled']}),
+        (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['cam:not-enrolled']}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['check:math', 'check:math']}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['check:math', 'not-a-task']}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['']}),
@@ -1006,6 +1033,7 @@ def test_selected_factories_portfolio(
         (_case_cache_access_mode_does_not_change_factory_records, {'mode': 'ro'}),
         (_case_cache_access_mode_does_not_change_factory_records, {'mode': 'rw'}),
         (_case_enrolled_traveler_keeps_normal_loader_conversion, {}),
+        (_case_enrolled_cam_keeps_normal_loader_conversion, {}),
         (_case_requested_order_and_iterable_are_preserved_without_dependency_expansion, {}),
         (_case_forced_refresh_preserves_other_freshness_trackers, {'family': 'part'}),
         (_case_forced_refresh_preserves_other_freshness_trackers, {'family': 'assembly'}),

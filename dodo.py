@@ -23,6 +23,7 @@ Task groups (the prefix says whether SolidWorks is required):
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
   prechips:<stem>    pro + hobby HTML travelers + hobby PDF, latest PyPI prechips (in build + release, not build_bare; NO SolidWorks)
+  cam:<stem>         NC programs posted by a running Autodesk Fusion via its MCP server (opt-in; NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -650,6 +651,8 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(":", 2)[1]
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
+    if label.startswith("cam:"):
+        return "fusion-cam"
     if label.startswith("prechips:"):
         return "prechips-traveler"
     if label.startswith(("check:machinist_review:", "review_sweep:")):
@@ -4499,6 +4502,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Shared native gear-gap authoring/status contracts use bounded fakes.
         SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_prechips_traveler.py",
+        # Fusion CAM: posted-G-code checks, recipe frame, Fusion script transport.
+        SCRIPTS_DIR / "test_fusion_cam.py",
         # The rocker's S7 op 97 profile windows: computed from the printed
         # zones and recorded gauge geometry, pinned into the plan's text.
         SCRIPTS_DIR / "test_ch_rocker_arm_profile_check.py",
@@ -5541,6 +5546,56 @@ def task_prechips():
         yield _prechips_task(stem)
 
 
+def _cam_task(stem: str) -> dict[str, Any]:
+    import _cam_programs
+    import _process_plans
+    from export_features import bundle_paths
+
+    label = f"cam:{stem}"
+    targets = _canonical_targets(label)
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "fusion_cam.py"),
+        stem, "--out", str(CAD_OUT),
+    ]
+    manifest, step = bundle_paths(stem, CAD_OUT)
+    return {
+        "name": stem,
+        # Freshness is content: a CAD change re-exports the feature bundle and
+        # re-posts every program. Fusion itself (and its library post) is not an
+        # input; its version and the post's hash are recorded in manifest.json.
+        "file_dep": sorted({
+            str(_cam_programs.recipe_path(stem).resolve()),
+            str(_cam_programs.RUNTIME_PATH.resolve()),
+            str(_process_plans.plan_path(stem).resolve()),
+            str(_process_plans.SHOP_PATH.resolve()),
+            str(manifest.resolve()),
+            str(step.resolve()),
+            *_executed_closure(cmd),
+        }),
+        "task_dep": [f"package:features:{stem}"],
+        "targets": targets,
+        # A failed post or check must not leave a previous success's stamp; the
+        # driver removes every program and the manifest itself.
+        "actions": [
+            (Path.unlink, [Path(targets[0])], {"missing_ok": True}),
+            (_run_stamped, [cmd, label, targets[0], label]),
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def task_cam():
+    """NC programs for enrolled parts, posted by a running Autodesk Fusion through
+    its local MCP server from ``cad/process/<stem>/cam.py`` and checked against
+    the part's feature bundle. Opt-in: neither ``build`` nor ``release`` runs it,
+    because no farm worker or CI runner has Fusion."""
+    import _cam_programs
+
+    for stem in _cam_programs.CAM_STEMS:
+        yield _cam_task(stem)
+
+
 def task_export():
     """Export neutral CAD: STEP / STL / assembly glTF / boxes scene + the
     release-neutral manifest, from every built model.
@@ -5856,7 +5911,7 @@ def task_build_bare():
 
 _CANONICAL_FAMILIES = (
     "part", "assembly", "drawing", "verify_soundness", "verify", "check",
-    "prechips", "package", "review_sweep",
+    "prechips", "cam", "package", "review_sweep",
 )
 
 
@@ -5879,6 +5934,10 @@ def _canonical_subtask_names(family: str) -> list[str]:
         import _process_plans
 
         return list(_process_plans.TRAVELER_STEMS)
+    if family == "cam":
+        import _cam_programs
+
+        return list(_cam_programs.CAM_STEMS)
     if family == "package":
         from export_features import SUPPORTED_PARTS
 
@@ -5931,6 +5990,13 @@ def _canonical_targets(name: str) -> list[str]:
             str(REPORTS / f"prechips-{subname}.ok"),
             *(str(path) for path in _process_plans.traveler_outputs(subname, CAD_OUT)),
         ]
+    if family == "cam":
+        import _cam_programs
+
+        return [
+            str(REPORTS / f"cam-{subname}.ok"),
+            *(str(path) for path in _cam_programs.cam_outputs(subname, CAD_OUT)),
+        ]
     if family == "package":
         if subname.startswith("features:"):
             # The feature factory already computes these outputs for its action;
@@ -5972,6 +6038,8 @@ def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
         return _check_task(subname)
     if family == "prechips":
         return _prechips_task(subname)
+    if family == "cam":
+        return _cam_task(subname)
     if family == "package":
         if subname.startswith("features:"):
             return _package_feature_task(subname.removeprefix("features:"))
@@ -6164,6 +6232,23 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
 
         for stem in _process_plans.TRAVELER_STEMS:
             include(f"prechips:{stem}")
+
+    nc_root = CAD_OUT / "nc"
+    cam_prefix = normalized(REPORTS) + "/cam-"
+    if (
+        queried_namespace(nc_root)
+        or requested is None
+        or any(path.startswith(cam_prefix) and path.endswith(".ok") for path in requested)
+        # Every cam target is a .nc or manifest.json file directly under its stem.
+        or _ownership_namespace_has_aliases(
+            nc_root, filenames=frozenset({"manifest.json"}), suffixes=frozenset({".nc"}),
+        )
+        or any(path.is_symlink() for path in REPORTS.glob("cam-*.ok"))
+    ):
+        import _cam_programs
+
+        for stem in _cam_programs.CAM_STEMS:
+            include(f"cam:{stem}")
     return owners
 
 
