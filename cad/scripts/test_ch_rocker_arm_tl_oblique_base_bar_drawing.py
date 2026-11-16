@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -244,27 +245,30 @@ def test_walls_meet_rule_17() -> None:
 
 
 def test_rail_station_band_closes_the_rail_screws_fit() -> None:
-    """Owner ruling 2026-11-16: the bar is drilled at its stations and the
-    untrimmed rail fitted to it; the rail's R1-R8 span is assumed within 0.15
-    of nominal. Half that span error (the rail centres on its screws), the
-    steel rail's differential expansion against the aluminium bar over a
-    10 °C swing between drilling and fitting, and the station band stay
-    inside each screw's radial float in the rail's Ø4.5 hole."""
+    """Owner rulings 2026-11-16: the bar is drilled at its stations on the
+    CNC (±0.05 mm, RV-04) and the untrimmed rail fitted to it; the rail's
+    R1-R8 span is assumed within 0.15 of nominal. Half that span error (the
+    rail centres on its screws), the steel rail's differential expansion
+    against the aluminium bar over a 10 °C swing between drilling and
+    fitting and the station band along the rail, with the CNC's hole-to-hole
+    scatter across it, stay inside each screw's radial float in the rail's
+    hole at its Ø4.50 receipt minimum."""
     assert spec.RAIL_HOLE_BAND == 0.05
+    assert spec.RAIL_HOLE_ROW_SCATTER == 0.02
     assert spec.RAIL_PATTERN_SPAN_ERROR == 0.15
     assert spec.RAIL_SPAN == pytest.approx(420.0)
+    assert spec.RAIL_HOLE_DIA_MIN == 4.5
     assert spec.RAIL_SCREW_CLEARANCE == pytest.approx((4.5 - 4.166) / 2.0)
     assert spec.RAIL_THERMAL_SPAN_ERROR == pytest.approx(
         420.0 * (23.6e-6 - 11.0e-6) * 10.0
     )
-    assert spec.RAIL_FIT_STACK == pytest.approx(
-        (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.05
-    )
-    assert spec.RAIL_FIT_STACK == pytest.approx(0.151, abs=5e-4)
+    along = (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.05
+    assert spec.RAIL_FIT_STACK == pytest.approx(math.hypot(along, 0.02))
+    assert spec.RAIL_FIT_STACK == pytest.approx(0.153, abs=5e-4)
     assert spec.RAIL_FIT_MARGIN == pytest.approx(
         spec.RAIL_SCREW_CLEARANCE - spec.RAIL_FIT_STACK
     )
-    assert spec.RAIL_FIT_MARGIN > 0.0
+    assert spec.RAIL_FIT_MARGIN == pytest.approx(0.014, abs=5e-4)
     # The shop's ±.005 in drilled-hole location would not close the fit.
     assert (0.15 + spec.RAIL_THERMAL_SPAN_ERROR) / 2.0 + 0.127 > spec.RAIL_SCREW_CLEARANCE
 
@@ -346,13 +350,17 @@ def test_rail_holes_print_as_one_banded_pattern_named_on_their_callout() -> None
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'presentation="reference"' not in build
     assert "references=" not in sheet
-    # The mate by the kit member and its full number (rule 4), with the
-    # matched pair's acceptance; two lines of words at most (rule 7), and no
-    # assembly instruction (rule 7's "ALL 8 SCREWS START BY HAND").
+    # Each station's band for the six between holes 1 and 8, from the same
+    # end (rule 10: baseline, never chained), then the mate by the kit
+    # member and its full number (rule 4); two lines of words at most (rule
+    # 7), and no assembly instruction (rule 7's "ALL 8 SCREWS START BY HAND").
     rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
     assert drawing.RAIL_TAP_CALLOUT_BELOW == (
+        "EACH <MOD-PM>0.05 mm FROM END AT EQ SP",
         f"MATCHES HGR15 RAIL OF {rail_number}",
-        "SCREWS ENTER FREE, NO FORCING",
+    )
+    assert features["rail_hole_1"]["note"] == (
+        f"EACH ±0.05 mm FROM END AT EQ SP; MATCHES HGR15 RAIL OF {rail_number}"
     )
     text = " ".join(drawing.RAIL_TAP_CALLOUT_BELOW)
     assert "START BY HAND" not in text and "RECEIVED" not in text
@@ -1318,7 +1326,15 @@ def test_each_seat_names_its_own_mate_on_each_member() -> None:
     declared = {
         entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, STEM, "part")
     }
-    assert set(declared) == {"RV-01", "RV-02", "RV-03"}
+    assert set(declared) == {"RV-01", "RV-02", "RV-03", "RV-04"}
+    # The rail stations' ±0.05 mm, tighter than the shop's drilled-hole row,
+    # is the owner's CNC ruling, quoted verbatim (rule 4 exception).
+    band = declared["RV-04"]
+    assert band.kind == "minor"
+    assert "'Rail holes CNC at ±0.05 mm OK.'" in band.reason
+    assert drawing.RAIL_TAP_CALLOUT_BELOW[0].replace("<MOD-PM>", "±") in band.where
+    # RV-01 accepts the unit only and points at RV-04 for the band.
+    assert "unit only" in declared["RV-01"].reason and "RV-04" in declared["RV-01"].reason
     shop = declared["RV-02"]
     assert shop.kind == "minor"
     assert table.removeprefix("SEATS ON ") in shop.where

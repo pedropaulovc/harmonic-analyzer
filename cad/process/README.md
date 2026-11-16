@@ -164,7 +164,11 @@ need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
 `cad.overhang_mm` (from the lever's one `overhang_in`), and the base-bar adapter
 refuses a Setup 4 jack centre off the bar or inside a rail-hole, counterbore or
-slot outline. The feed-lever plan needs 0.11.0, which binds the lever's
+slot outline. Since owner ruling 2026-11-16 the base-bar plan needs the first
+prechips release after 0.11.2, which carries pedropaulovc/prechips#427: 0.11.2
+refuses the manifest's banded rail stations, and the plan reads that release's
+`cad.rail_station_tol_in`, `cad.rail_station_tol_mm`, `cad.rail_first_band_mm`
+and `cad.rail_last_band_mm`. The feed-lever plan needs 0.11.0, which binds the lever's
 grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
@@ -208,13 +212,17 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. Setups
   2–3 run in the low belt range and Setup 4 in the high range, so both bars
   take one belt change. The rail
-  holes are drilled at their printed stations, ±0.05 mm from ZERO END on the
-  X DRO (owner ruling 2026-11-16, superseding the R4 transfer from the
-  trimmed rail): each bar's untrimmed rail is then fitted with its eight
-  screws entering free and only then cut and ground flush with both bar ends
-  per TL-00 steps 1D–1F (`tools.rail-trim-grinder`, not owned yet). The owner
-  assumes the purchased rail's hole span within 0.15 mm of nominal; the
-  base-bar spec's `RAIL_FIT_STACK` closes that under the screws' float. The
+  holes are drilled at their printed stations, ±0.05 mm from ZERO END, on
+  the CNC by programs BB05 (spot) and BB07 (#29 drill) of
+  `cam:ch_rocker_arm_tl_oblique_base_bar` (owner rulings 2026-11-16,
+  superseding the R4 transfer from the trimmed rail; "Rail holes CNC at
+  ±0.05 mm OK" is the part yaml's RV-04): each bar's untrimmed rail is then
+  fitted with its eight screws entering free and only then cut and ground
+  flush with both bar ends per TL-00 steps 1D–1F (`tools.rail-trim-grinder`,
+  not owned yet). The owner assumes the purchased rail's hole span within
+  0.15 mm of nominal; the base-bar spec's `RAIL_FIT_STACK` closes that, with
+  the CNC's hole-to-hole scatter and the rail holes' Ø4.50 receipt minimum
+  (TL-VN-83 sheet 2), under the screws' float. The
   1/2 in end mill alone cuts both slots, tracing a cutter-centre rectangle
   printed per slot, and `tool_sizing` checks it against the slot width band
   less the path offset (the 3/8 in slot

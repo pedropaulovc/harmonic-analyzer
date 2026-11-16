@@ -480,19 +480,22 @@ def seat_label_xy(key: str, text: str) -> tuple[float, float]:
 
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The rail taps' one callout carries the pattern and its mate (rule 10: one
-# regular pattern; rule 7: a location dimension carries no words, the mate
-# sits once on the size callout). Holes 1 and 8 carry the banded stations,
-# so the count row says the eight are equally spaced (EQ SP), the pitch
-# after it REF in millimetres like the stations (RV-01). The bar is drilled
-# at its stations and the untrimmed rail fitted to it (owner ruling
-# 2026-11-16), so the callout names the kit's rail by its full number and
-# states the pair's acceptance (rule 4: the ±0.05 mm stations' fit route);
-# the old "ALL 8 SCREWS START BY HAND" read as an assembly instruction (rule 7).
+# The rail taps' one callout carries the pattern, its band and its mate
+# (rule 10: one regular pattern; rule 7: a location dimension carries no
+# words, the mate sits once on the size callout). Holes 1 and 8 carry the
+# banded stations, so the count row says the eight are equally spaced (EQ
+# SP), the pitch after it REF in millimetres like the stations (RV-01), and
+# the line under the thread gives the six between the same band at their
+# equally spaced stations, measured from the same end (rule 10: baseline,
+# never chained; Codjiflo #2833 round 1). The CNC holds that band (owner
+# ruling 2026-11-16, RV-04) and the untrimmed rail is fitted to the bar, so
+# the callout names the kit's rail by its full number; the old "ALL 8
+# SCREWS START BY HAND" read as an assembly instruction (rule 7), and the
+# screws' free entry is TL-00's step, not the bar's requirement.
 RAIL_PITCH_TEXT = f" EQ SP ({RAIL_PITCH:.{part_spec.RAIL_HOLE_PLACES}f} mm)"
 RAIL_TAP_CALLOUT_BELOW = (
+    f"EACH <MOD-PM>{part_spec.RAIL_HOLE_BAND:.2f} mm FROM END AT EQ SP",
     f"MATCHES HGR15 RAIL OF {part_spec.RAIL_NUMBER}",
-    "SCREWS ENTER FREE, NO FORCING",
 )
 # The bracket holes' one callout: size, then process, then depth (rule 26:
 # the drill word after the size, the far-side counterbore by its symbol),
@@ -756,12 +759,12 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             "nominal_dia": (_TAP_DRILL_PRINTED, ("TAP_DRILL",)),
             "thru": (True, ("TAP_SPEC",)),
             **_station,
-            # The pattern's callout names the matched rail and its acceptance.
+            # The pattern's callout: every station's band and the matched rail.
             "note": (
-                "; ".join(RAIL_TAP_CALLOUT_BELOW),
+                "; ".join(RAIL_TAP_CALLOUT_BELOW).replace("<MOD-PM>", "±"),
                 (
                     "RAIL_NUMBER",
-                    "RAIL_FIT_STACK",
+                    "RAIL_HOLE_BAND",
                     ("draw_ch_rocker_arm_tl_oblique_base_bar", "RAIL_TAP_CALLOUT_BELOW"),
                 ),
             ),

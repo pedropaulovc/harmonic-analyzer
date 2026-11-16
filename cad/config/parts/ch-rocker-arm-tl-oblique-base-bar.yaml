@@ -23,13 +23,13 @@ ch-rocker-arm-tl-oblique-base-bar:
     Bar1: 1
     Bar2: 1
   tolerance_class: machined_block
-  process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); drill and tap the eight #8-32 rail holes through; bar 1 only: drill the four #12 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); spot and drill the eight #8-32 rail holes through on the CNC (programs BB05 and BB07) and tap them by hand; bar 1 only: drill the four #12 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
       where: "front view: RailHoles hole 1 and hole 8 station dimensions and BracketHoles vendor-mating station dimensions"
       finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
-      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: controlled interfaces to the metric-only KP08, HGR15 and Tr8 vendor lines retain exact millimetres, the mm unit label and their applicable explicit mm bands rather than rounded inch conversions (drawing-simplicity-policy.md, supplier-unit exception). Owner ruling 2026-11-16 (Pedro) supersedes #2144 item 13.1's transfer from the trimmed rail: 'change plan to trim rail after fit; rail programs stay normal' and 'assume it will always be within .15; no transfer needed'. The eight rail holes are drilled and tapped at their printed stations (±0.05 mm from the end face, the rail screws' fit stack), the untrimmed rail is fitted with free screw insertion and only then are its ends ground flush with the base-bar ends. This records the existing rulings, not a new waiver."
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: controlled interfaces to the metric-only KP08, HGR15 and Tr8 vendor lines retain exact millimetres, the mm unit label and their applicable explicit mm bands rather than rounded inch conversions (drawing-simplicity-policy.md, supplier-unit exception). This accepts the unit only; the rail stations' ±0.05 mm band is RV-04's ruling."
     - id: "RV-02"
       kind: "minor"
       where: "end view: the Ra 125 seat label SEATS ON PM-30MV MILL TABLE (SHOP EQUIPMENT) (sheet 1 underside, sheet 2 top face)"
@@ -40,4 +40,9 @@ ch-rocker-arm-tl-oblique-base-bar:
       where: "sheets 1 and 2: title blocks (one DWG. NO. MHA-CH-06-TL-20 on both sheets), the isometric captions BASE BAR 1, END BRACKET HOLES and BASE BAR 2, NO BRACKET HOLES, and the sheet 1 bracket-hole callout line BAR 1 ONLY"
       finding: "bar 1 (bracket holes, rail seat on the front face) and bar 2 (no bracket holes, seat faces swapped) print one drawing number, so a callout that uses only the number cannot say which bar it means"
       reason: "Coordinator decision (Main) under the owner's jig-simplicity ruling 2026-11-13. The owner was asked whether to use dash numbers, and the question timed out 2026-11-14, so the default was taken; the owner may revert to dash numbers (TL-20-1 / TL-20-2). This is a shop fixture: one native model, one number by design, with Bar1 and Bar2 configurations, QTY 1 each. The sheets tell the two bars apart by the captions BASE BAR 1 / BASE BAR 2 and the BAR 1 ONLY bracket-hole line. This accepts no other identity, mate or package departure."
+    - id: "RV-04"
+      kind: "minor"
+      where: "front view: the RailHoles hole 1 and hole 8 stations (9.964 and 429.964 mm, each ±.05 mm) and the rail tap callout line EACH ±0.05 mm FROM END AT EQ SP"
+      finding: "the eight #8-32 rail-tap stations carry ±0.05 mm from the end face, tighter than drawing-guidelines' ±.005 in drilled-hole row (rules 4 and 19: a band tightened to close a stack)"
+      reason: "Owner ruling 2026-11-16 (Pedro), relayed by Main, verbatim: 'Rail holes CNC at ±0.05 mm OK.' With the owner's same-day rulings 'change plan to trim rail after fit; rail programs stay normal' and 'assume it will always be within .15; no transfer needed', the band closes the rail screws' fit: half the purchased rail's assumed 0.15 R1-R8 span error, half a 10 °C aluminium-against-steel expansion and the ±0.05 mm station along the rail, with 0.02 CNC hole-to-hole scatter across it, give 0.153 under the #8 screw's 0.167 float in the rail's Ø4.50 minimum hole (MHA-CH-06-TL-VN-83 sheet 2). The plan spots and drills R1-R8 on the CNC from programs BB05 and BB07 of cam:ch_rocker_arm_tl_oblique_base_bar, which post the stations exactly; the untrimmed rail is fitted and only then ground flush with the bar's ends. This accepts no other band, mate or process departure."
   drawing_unit: in

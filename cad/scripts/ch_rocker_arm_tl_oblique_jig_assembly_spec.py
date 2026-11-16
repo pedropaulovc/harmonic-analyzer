@@ -2108,8 +2108,9 @@ GENERAL_TORQUE_NOTE = (
     "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
 # Documents are cited by Number (TL-00 review 62753c5e): step 1 cites the
-# rail kit's receipt sheet, whose NOTE 1 states the counterbore-to-end wall
-# each trimmed rail keeps, and the BOM note the base bar's two sheets.
+# rail kit's receipt sheet, whose hole flag states the mounting holes' Ø4.50
+# minimum and whose NOTE 1 the counterbore-to-end wall each trimmed rail
+# keeps, and the BOM note the base bar's two sheets.
 # A literal row (base_bar_spec's convention): drawing closures track this
 # concrete registry row, not a dynamic read of another part's.
 BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
@@ -2322,11 +2323,11 @@ ASSEMBLY_STEPS = (
     f"{RAIL_CUT_OFF_ALLOWANCE_IN} LONG OF EACH BAR END.",
     "1F. GRIND EACH CUT END SQUARE WITH THE GRINDER'S GRINDING WHEEL UNTIL "
     "FLUSH WITH ITS BAR'S END.",
-    "1G. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
-    f"{RAIL_RECEIPT_REFERENCE} NOTE 1.",
-    f"1H. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS OF EACH RAIL LOOSEN AND "
+    f"1G. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS OF EACH RAIL LOOSEN AND "
     "RETIGHTEN FREELY BY HAND WITHOUT MOVING THE RAIL.",
-    "1J. REMOVE EACH RAIL FROM ITS MARKED BAR.",
+    "1H. REMOVE EACH RAIL FROM ITS MARKED BAR.",
+    "1J. CHECK THE HOLE SIZES AND END COUNTERBORE WALLS OF EACH REMOVED RAIL TO "
+    f"{RAIL_RECEIPT_REFERENCE}.",
     "1K. CLEAN ALL CUTTING AND GRINDING GRIT FROM THE RAILS AND BARS.",
     "1L. SLIDE EACH RAIL'S KEPT CARRIAGE FROM ITS ARBOR ONTO THAT RAIL, THE "
     "SAME WAY ROUND AS SUPPLIED.",

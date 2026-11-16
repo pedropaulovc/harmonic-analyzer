@@ -12,8 +12,9 @@ drilled at its own banded stations (MHA-CH-06-TL-20); the untrimmed rail is
 fitted to it, then trimmed flush with the bar's ends (owner ruling
 2026-11-16). The first hole's station and the length are model-linked,
 parenthesised and untoleranced; the flag under them gives the rest as one
-REF pattern (``8X HOLES ON (60.000) PITCH``, rule 10) with the bar whose taps
-it fits. The end wall is the model's ``EndWall`` reference, far end face to
+REF pattern with the holes' receipt minimum (``8X Ø4.50 MIN HOLES ON
+(60.000) PITCH``, rule 10) and the bar whose taps it fits. The end wall is
+the model's ``EndWall`` reference, far end face to
 far counterbore edge, its callout ``2X, SEE NOTE 1``. No supplier pitch
 accuracy is claimed. Free screw insertion, retained actual walls and full
 travel accept the pair (the jig's steps).

@@ -453,14 +453,18 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     )
     assert rail.WALL_ACCEPTANCE_MM == 2.0
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
-    # The flag gives the hole pattern as one REF pattern (rule 10), then the
-    # base bar whose taps it fits (owner ruling 2026-11-16: no transfer).
+    # The flag gives the hole pattern as one REF pattern (rule 10) with the
+    # holes' Ø4.50 receipt minimum (the base bar's fit stack assumes it),
+    # then the base bar whose taps it fits (owner ruling 2026-11-16: no
+    # transfer).
     assert rail.RECEIPT_FLAG.splitlines() == [
-        f"{rail.HOLE_COUNT}X HOLES ON ({rail.HOLE_PITCH:.3f}) PITCH",
+        f"{rail.HOLE_COUNT}X Ø{base_bar.RAIL_HOLE_DIA_MIN:.2f} MIN HOLES ON "
+        f"({rail.HOLE_PITCH:.3f}) PITCH",
         f"FITS TAPS OF BASE BAR {bar['number']}",
     ]
     assert "TRANSFER" not in rail.RECEIPT_FLAG
-    assert rail.RECEIPT_FLAG.splitlines()[0] == "8X HOLES ON (60.000) PITCH"
+    assert rail.RECEIPT_FLAG.splitlines()[0] == "8X Ø4.50 MIN HOLES ON (60.000) PITCH"
+    assert base_bar.RAIL_HOLE_DIA_MIN == rail.HOLE_DIA
     assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS"
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM

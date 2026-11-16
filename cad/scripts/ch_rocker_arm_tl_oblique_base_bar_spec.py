@@ -48,23 +48,27 @@ operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
 Rail holes: 8 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
 ``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (9.964 .. 429.964 mm), each
-station ± ``RAIL_HOLE_BAND`` 0.05 mm from the spindle-end face (ZERO END),
-drilled and tapped at those stations by DRO or CNC. Owner ruling 2026-11-16
-(Pedro): "change plan to trim rail after fit; rail programs stay normal", so
-nothing transfers from the rail. The sheet prints holes 1 and 8 with that
-band and the eight as one equally spaced pattern; the row prints from the
-faced -Y edge at the title block's .XX (all eight at one DRO Y setting, so
-the row's band moves the whole row and the rail with it). The untrimmed
-rail is then fitted with its eight screws and only then are both its ends
-ground flush with the bar's ends; the pair is accepted when all eight
-screws enter freely by hand without forcing the rail. The rail's Ø4.5 mm
-holes take #8 socket screws
+station ± ``RAIL_HOLE_BAND`` 0.05 mm from the spindle-end face (ZERO END).
+Owner rulings 2026-11-16 (Pedro): "change plan to trim rail after fit; rail
+programs stay normal", so nothing transfers from the rail, and "Rail holes
+CNC at ±0.05 mm OK": the band is tighter than drawing-guidelines' drilled-
+hole row, so it is held on the CNC by the base bar's NC programs BB05 (spot)
+and BB07 (#29 drill) from ``cam:ch_rocker_arm_tl_oblique_base_bar``, and the
+yaml's RV-04 records the rule 4 exception. The sheet prints holes 1 and 8
+with that band, the eight as one equally spaced pattern and, on the tap
+callout, the same band for each station; the row prints from the faced -Y
+edge at the title block's .XX (one program Y for all eight, so the row's
+band moves the whole row and the rail with it). The untrimmed rail is then
+fitted with its eight screws and only then are both its ends ground flush
+with the bar's ends. The rail's mounting holes take #8 socket screws
 (``RAIL_SCREW``); a 3/4 in screw seats 9.7 mm above the base and engages the
 bar 9.35 mm.
 
 Rail fit stack (``RAIL_FIT_STACK``, radial at the worst hole, against the
-screw's float ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's catalogue
-Ø4.5 hole: the #8-32 basic major Ø4.166 is the largest a 3A screw reaches):
+screw's float ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's hole at
+its receipt minimum ``RAIL_HOLE_DIA_MIN`` Ø4.50, which the kit drawing's
+receipt sheet requires (MHA-CH-06-TL-VN-83 sheet 2 note 2): the #8-32 basic
+major Ø4.166 is the largest a 3A screw reaches):
 
 - the rail's own pattern, 0.075: owner ruling 2026-11-16 assumes the
   purchased rail's R1-R8 span within ``RAIL_PATTERN_SPAN_ERROR`` 0.15 of the
@@ -74,20 +78,21 @@ screw's float ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's catalogue
   every hole lies in the same 0.15. The untrimmed rail floats on its eight
   screws until they are tightened, so it centres on the bar's pattern and
   each end takes half;
-- thermal, 0.026: the DRO's magnetic scale and the rail are both steel, so
-  the drilled pattern matches a steel rail at the drilling temperature;
-  fitted ``FIT_TEMPERATURE_DIFFERENCE`` 10 °C away, the 6061 bar's 420 span
-  moves 0.053 against the rail (``ALUMINIUM_CTE`` 23.6 against
-  ``RAIL_STEEL_CTE`` 11.0 µm/m·°C, the low end of carbon and bearing steels,
-  so the larger difference), centred like the pattern error;
-- the bar's hole, 0.050: its station band (the stations print exact, so no
-  rounding adds to it). All eight holes share one Y setting, so the row adds
-  no hole-to-hole scatter.
+- thermal, 0.026: the CNC's leadscrews and the rail are both steel, so the
+  drilled pattern matches a steel rail at the drilling temperature; fitted
+  ``FIT_TEMPERATURE_DIFFERENCE`` 10 °C away, the 6061 bar's 420 span moves
+  0.053 against the rail (``ALUMINIUM_CTE`` 23.6 against ``RAIL_STEEL_CTE``
+  11.0 µm/m·°C, the low end of carbon and bearing steels, so the larger
+  difference), centred like the pattern error;
+- the bar's hole, 0.050 along the rail: its station band (the stations
+  print exact, so no rounding adds to it);
+- hole-to-hole scatter across the rail, ``RAIL_HOLE_ROW_SCATTER`` 0.02: all
+  eight come from one program at one Y, so only the CNC's repeatability and
+  drill wander move one hole off the row the others share.
 
-0.075 + 0.026 + 0.050 = 0.151 under the 0.167 float: ``RAIL_FIT_MARGIN``
-0.016. The ±0.05 mm stations are a CNC-typical position band, narrower than
-drawing-guidelines' DRO-drilled row; the tap callout names the matched rail
-and the pair's free-screw acceptance at the feature.
+hypot(0.075 + 0.026 + 0.050, 0.020) = 0.153 under the 0.167 float:
+``RAIL_FIT_MARGIN`` 0.014. The tap callout names the matched rail at the
+feature.
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
 along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` .08 (.69 overall). Near slot
@@ -197,30 +202,37 @@ if len(RAIL_HOLE_X) != 8:
     raise AssertionError("the kit rail's base bar carries eight rail holes")
 RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
 # The stations print exact three-place millimetres with their own band (owner
-# ruling 4): DRO or CNC positions from ZERO END (owner ruling 2026-11-16).
+# ruling 4), CNC positions from ZERO END (owner ruling 2026-11-16, "Rail holes
+# CNC at ±0.05 mm OK"; the yaml's RV-04).
 RAIL_HOLE_PLACES = 3
 RAIL_HOLE_BAND = 0.05
 RAIL_ROW_PLACES = 2
-# The first and last stations print; the six between are equally spaced.
+# The first and last stations print; the six between are equally spaced and
+# the tap callout gives each station the same band.
 RAIL_PRINTED_HOLES = (1, len(RAIL_HOLE_X))
-# One Y setting for the row: only the station band scatters hole from hole.
+# Along the rail: the station band.
 RAIL_HOLE_POSITION_RADIUS = max(
     _deviation(x, RAIL_HOLE_PLACES, RAIL_HOLE_BAND, unit=METRIC_UNIT)
     for x in RAIL_HOLE_X
 )
-# The rail's bolt hole, HIWIN catalogue G99TE23-2203 d (the kit rail copies
-# the HGR15), and the #8-32 screw's float in it at its basic major, the
-# largest a 3A screw reaches: 0.167 a side.
-RAIL_HOLE_DIA = 4.5
-RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0
+# Across the rail: one program Y for all eight (BB05/BB07), so the row's .XX
+# band moves the whole row with the rail; only the CNC's repeatability and
+# drill wander scatter one hole off the row the others share.
+RAIL_HOLE_ROW_SCATTER = 0.02
+# The rail's bolt hole at its receipt minimum, HIWIN catalogue G99TE23-2203 d
+# Ø4.5 (the kit rail copies the HGR15), which MHA-CH-06-TL-VN-83 sheet 2 note
+# 2 requires of every mounting hole, and the #8-32 screw's float in it at its
+# basic major, the largest a 3A screw reaches: 0.167 a side.
+RAIL_HOLE_DIA_MIN = 4.5
+RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA_MIN - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0
 # The fit stack (module docstring), radial at the worst hole. Owner ruling
 # 2026-11-16: the purchased rail's R1-R8 span is assumed within 0.15 of the
 # nominal 420.000, no receipt gate and no transfer fallback.
 RAIL_PATTERN_SPAN_ERROR = 0.15
 RAIL_SPAN = RAIL_HOLE_X[-1] - RAIL_HOLE_X[0]  # 420.000
 # Linear expansion, 20-100 °C: 6061-T6 (ASM Handbook vol. 2) against the
-# low end of carbon and bearing steels, the larger difference. The DRO's
-# magnetic scale is steel too, so only the drill-to-fit temperature
+# low end of carbon and bearing steels, the larger difference. The CNC's
+# leadscrews are steel too, so only the drill-to-fit temperature
 # difference moves the bar's pattern against the rail.
 ALUMINIUM_CTE = 23.6e-6
 RAIL_STEEL_CTE = 11.0e-6
@@ -231,11 +243,13 @@ RAIL_THERMAL_SPAN_ERROR = (
 # Both span errors are linear along the rail, and the untrimmed rail floats
 # on its screws until they are tightened, so it centres on the bar's
 # pattern: each end hole takes half of them. The bar's own band does not
-# centre out: any hole may sit at either limit.
-RAIL_FIT_STACK = (
-    RAIL_PATTERN_SPAN_ERROR + RAIL_THERMAL_SPAN_ERROR
-) / 2.0 + RAIL_HOLE_POSITION_RADIUS  # 0.151
-RAIL_FIT_MARGIN = RAIL_SCREW_CLEARANCE - RAIL_FIT_STACK  # 0.016
+# centre out: any hole may sit at either limit. The row scatter is across.
+RAIL_FIT_STACK = math.hypot(
+    (RAIL_PATTERN_SPAN_ERROR + RAIL_THERMAL_SPAN_ERROR) / 2.0
+    + RAIL_HOLE_POSITION_RADIUS,
+    RAIL_HOLE_ROW_SCATTER,
+)  # 0.153
+RAIL_FIT_MARGIN = RAIL_SCREW_CLEARANCE - RAIL_FIT_STACK  # 0.014
 if RAIL_FIT_MARGIN <= 0.0:
     raise AssertionError("the rail screws bind: the fit stack exceeds their float")
 # The rail kit's Number: the rail is its Rail configuration.

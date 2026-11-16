@@ -321,9 +321,12 @@ RECEIPT_SHEET = 2
 # The flag, a note of its own under the station dimension, gives the hole
 # pattern as one REF pattern callout (rule 10: a regular pattern counts as
 # one axis): the first station is dimensioned from the end, the rest step
-# off at the pitch; the pattern's mate, whose taps it fits, follows it.
+# off at the pitch; the pattern's mate, whose taps it fits, follows it. The
+# holes' receipt minimum is the base bar's fit stack's Ø4.50 (the screw's
+# float; Codjiflo #2833 round 1): MHA-CH-06-TL-00 step 1J checks it.
 RECEIPT_FLAG = (
-    f"{HOLE_COUNT}X HOLES ON ({HOLE_PITCH:.{base_bar.RAIL_HOLE_PLACES}f}) PITCH\n"
+    f"{HOLE_COUNT}X Ø{base_bar.RAIL_HOLE_DIA_MIN:.2f} MIN HOLES ON "
+    f"({HOLE_PITCH:.{base_bar.RAIL_HOLE_PLACES}f}) PITCH\n"
     "FITS TAPS OF BASE BAR MHA-CH-06-TL-20"
 )
 END_FIT_CALLOUT = (
@@ -342,8 +345,8 @@ WALL_ACCEPTANCE_MM = 2.0
 # location; run 20261108T060418489Z, 3 of 3, note 1 unlinked from the
 # dimension; before them, run 20261108T031012373Z, a worded "END WALL"
 # leader did not say what the 2.0 runs between). The trim is MHA-CH-06-TL-00
-# step 1's ("TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS"). The note is
-# the member's one manufacturing note, on one line. The pairing of each rail
+# steps 1E-1F: each rail, fitted to its drilled bar, is cut and ground flush.
+# The note is the member's one manufacturing note, on one line. The pairing of each rail
 # with its bar and the free screw entry stay the jig's steps (rule 7).
 END_WALL_CALLOUT = "2X, SEE NOTE 1"
 TRIM_STEP = "MHA-CH-06-TL-00 STEP 1"

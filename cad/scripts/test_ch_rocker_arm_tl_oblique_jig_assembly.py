@@ -2542,7 +2542,10 @@ def test_rail_preparation_cites_numbered_documents_and_the_stated_wall() -> None
     # Owner ruling 2026-11-16: the bars are drilled at their stations, so
     # step 1 no longer picks the holes up from the rail.
     assert "PROCESS PLAN" not in preparation and "TRANSFER" not in preparation
-    assert f"{spec.RAIL_RECEIPT_REFERENCE} NOTE 1" in preparation
+    # The removed rail is checked to the receipt sheet: its holes' Ø4.50
+    # minimum (the base bar's fit stack) and NOTE 1's end walls.
+    assert f"TO {spec.RAIL_RECEIPT_REFERENCE}." in preparation
+    assert f"Ø{base_bar.RAIL_HOLE_DIA_MIN:.2f} MIN" in guide_rail.RECEIPT_FLAG
     assert f"{guide_rail.WALL_ACCEPTANCE_MM:.1f} MIN" in guide_rail.DRAWING_NOTES
     assert " MM MIN" not in preparation
 
@@ -2565,7 +2568,9 @@ def test_each_rail_is_fitted_to_its_drilled_bar_before_it_is_trimmed() -> None:
     assert spec.RAIL_CUT_OFF_ALLOWANCE_IN.startswith(".") and spec.RAIL_CUT_OFF_ALLOWANCE_IN in steps["1E"]
     assert "TRIM EACH RAIL ON ITS BAR" in steps["1E"]
     assert "FLUSH WITH ITS BAR'S END" in steps["1F"]
-    assert "FREELY BY HAND" in steps["1H"]
+    assert "FREELY BY HAND" in steps["1G"]
+    assert "REMOVE EACH RAIL" in steps["1H"]
+    assert "HOLE SIZES AND END COUNTERBORE WALLS" in steps["1J"]
     assert "BOTH ENDS FLUSH" in steps["2A"] and "MARKED BAR" in steps["2A"]
     order = list(steps)
     assert (
