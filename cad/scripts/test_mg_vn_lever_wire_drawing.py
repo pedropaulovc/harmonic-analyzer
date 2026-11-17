@@ -92,8 +92,8 @@ def _cited_groups(line: str, number: str) -> dict[int, set[str]]:
 
 
 def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_member():
-    import draw_mg_magnifier_assembly as magnifier
     import draw_pn_pen_assembly as pen
+    import ha_assembly_package
     import mg_magnifier_assembly_sheet as magnifier_sheet
     import pn_pen_assembly_sheet as pen_sheet
 
@@ -107,33 +107,33 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         "mg-magnifier": drawing.magnifier_steps.DRAWING_NUMBER,
         "pn-pen": drawing.PEN_DRAWING_NUMBER,
     }
-    # The lever wire's steps are the keyed sequence's hook and tie steps.
+    lines = drawing.ASSEMBLY_NOTE.splitlines()
+    # The lever wire's steps are the keyed sequence's hook and tie steps,
+    # which the release's ASSEMBLY.md prints (#2889): the pointer cites the
+    # range, no sheet.
     wire_keys = (
         drawing.magnifier_steps.WIRE_HOOKED_KEY,
         drawing.magnifier_steps.WIRE_TIED_KEY,
     )
     assert all("WIRE" in magnifier_sheet.STEP_TEXT[key] for key in wire_keys)
-    lever_steps = {drawing.magnifier_steps.step_number(key) for key in wire_keys}
+    assert "mg-magnifier" in ha_assembly_package.STEPS_IN_DOCUMENT
+    first, last = (drawing.magnifier_steps.step_number(key) for key in wire_keys)
+    [line] = [line for line in lines if numbers["mg-magnifier"] in line]
+    assert line == f"LEVER WIRE: {numbers['mg-magnifier']} STEPS {first}-{last}"
     # The pen sheet has no keyed sequence: its numbered steps naming the pen
-    # wire are the ones the pointer must cite.
+    # wire are the ones the pointer must cite, on the sheets that print them.
     pen_steps = {
         text.split(".", 1)[0]
         for text in pen_sheet.ASSEMBLY_STEPS
         if text[:1].isdigit() and "PEN WIRE" in text
     }
     assert pen_steps == {str(step) for _sheet, step in drawing.PEN_WIRE_CITATIONS}
-    printed = {
-        "mg-magnifier": _printed_step_sheets(magnifier),
-        "pn-pen": _printed_step_sheets(pen),
-    }
-    cited = {"mg-magnifier": lever_steps, "pn-pen": pen_steps}
-    lines = drawing.ASSEMBLY_NOTE.splitlines()
-    for stem, number in numbers.items():
-        expected: dict[int, set[str]] = {}
-        for step in cited[stem]:
-            expected.setdefault(printed[stem][step], set()).add(step)
-        [line] = [line for line in lines if number in line]
-        assert _cited_groups(line, number) == expected, (stem, line)
+    printed = _printed_step_sheets(pen)
+    expected: dict[int, set[str]] = {}
+    for step in pen_steps:
+        expected.setdefault(printed[step], set()).add(step)
+    [line] = [line for line in lines if numbers["pn-pen"] in line]
+    assert _cited_groups(line, numbers["pn-pen"]) == expected, line
 
 
 def test_end_view_and_isometric_labels_sit_inside_their_fields() -> None:

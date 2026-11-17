@@ -27,14 +27,13 @@ Sheet 2, WHEEL GROUP + BOM: the builder-owned MG_MAGNIFIER_EXPLODED
 presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
 BOM (part number, description, vendor SKU, quantity) and one balloon per
 family. Sheet 3, LEVER GROUP: the same explode with only the lever group
-shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
-assembly with the lever wire ballooned, beside the wheel group's numbered
-steps (mg_magnifier_assembly_steps). The instruction column uses the left
-190 mm; the finished view is centred in the remaining right field. Sheet 5,
-LEVER + WIRE STEPS: the lever group's and the lever wire's steps under
-ASSEMBLY SEQUENCE (CONT.), then the checks, beside VIEW D.
-Steps name parts by BOM item and settings by their view, and never value
-them. This recipe never edits the source assembly or its explodes.
+shown, ballooned from the same BOM. Sheet 4, FINISHED ASSEMBLY: the finished
+assembly with the lever wire ballooned, centred above the title block.
+Sheet 5, WHEEL AT REST: VIEW D alone. The numbered fit-up steps and checks
+print in the release's ASSEMBLY.md (mg_magnifier_assembly_sheet.STEP_SECTIONS,
+ha_assembly_package, #2889), never on these sheets; they name parts by BOM
+item and settings by their view, and never value them. This recipe never
+edits the source assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -44,9 +43,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
-import re
 import sys
-import textwrap
 from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array, null_callout
@@ -61,7 +58,6 @@ import _config
 import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
-import mg_magnifier_assembly_steps as steps
 import mg_magnifier_explode_spec as explode
 import sh_vn_music_wire_lever_geom
 import sh_vn_music_wire_lever_spec
@@ -154,10 +150,10 @@ SHEET_NAMES = (
     "ASSEMBLED + SETTINGS",
     "WHEEL GROUP + BOM",
     "LEVER GROUP",
-    "ASSEMBLY STEPS",
-    "LEVER + WIRE STEPS",
+    "FINISHED ASSEMBLY",
+    "WHEEL AT REST",
 )
-if SHEET_NAMES.index("LEVER + WIRE STEPS") + 1 != notes.WHEEL_REST_VIEW_SHEET:
+if SHEET_NAMES.index("WHEEL AT REST") + 1 != notes.WHEEL_REST_VIEW_SHEET:
     raise AssertionError("VIEW D's sheet number must match its arrow's reference")
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the magnifier sheet coordinates are landscape")
@@ -304,16 +300,9 @@ if any(
     raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
 LEVER_LABEL = "lever group exploded"
-# Sheet 4: the wheel group's steps down a 190 mm left column, the finished
-# assembly centred in the remaining field above the title block, its caption
-# centred over it. The column is narrow enough to run down beside the title
-# block (BESIDE_TITLE_BLOCK below): one step per action needs the rows.
-# The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
-STEPS_XY = (0.018, 0.2605)
-STEPS_LINE_WIDTH = 72  # characters; default-format note text (as MHA-MS-00)
-# Sheet 5: the lever group's and the wire's steps, then the checks, down a
-# 237 mm column (one step per action needs the rows), VIEW D right of it.
-CONTINUED_LINE_WIDTH = 100
+# Sheet 4: the finished assembly centred in the field above the title block,
+# its caption centred over it. The lever wire's balloon stands right of the
+# view (FINISHED_WIRE_BALLOON_*).
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
 # Machinist review r2: the caption at the field's left corner sat ~40 mm left
@@ -321,29 +310,20 @@ NOTE_LINE_PITCH = 0.0046
 # has settled. Its width is the character count at the r6 PDF's measured
 # pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
 CAPTION_CHAR_WIDTH = 0.00237
-# The note columns' widths are the native note's measured pitch: the
-# 80-character sequence of run 20261024T041027643Z spanned x 17.6-227.8 mm.
-NOTE_CHAR_WIDTH = (0.2278 - 0.0176) / 80
-STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
 CAPTION_GAP = 0.004
 FINISHED_FIELD = (
-    STEPS_RIGHT + _PAD,
+    INNER_BORDER[0] + _PAD,
     TITLE_BLOCK[3] + _PAD,
     INNER_BORDER[2] - _PAD,
     INNER_BORDER[3] - _PAD - 0.008,
-)
-FINISHED_CENTER = (
-    (FINISHED_FIELD[0] + FINISHED_FIELD[2]) / 2.0,
-    (FINISHED_FIELD[1] + FINISHED_FIELD[3]) / 2.0,
 )
 # 1:4 prints the simplified configuration like every rung below it.
 FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
-# Sheet 5's VIEW D field, right of the continued column, above the title block.
-CONTINUED_RIGHT = STEPS_XY[0] + CONTINUED_LINE_WIDTH * NOTE_CHAR_WIDTH
+# Sheet 5's VIEW D field: the whole width above the title block.
 WHEEL_REST_FIELD = (
-    CONTINUED_RIGHT + _PAD,
+    INNER_BORDER[0] + _PAD,
     TITLE_BLOCK[3] + _PAD,
     INNER_BORDER[2] - _PAD,
     INNER_BORDER[3] - _PAD,
@@ -540,104 +520,6 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the magnifier explode is authored in Default")
 
 
-def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
-    """Wrap each line, a numbered step under its own head (``12.`` or
-    ``12A.``); rows stay tight."""
-    out: list[str] = []
-    for line in lines:
-        number, sep, rest = line.partition(". ")
-        if sep and re.fullmatch(r"\d+[A-Z]?", number):
-            out += textwrap.wrap(
-                rest,
-                width=width,
-                initial_indent=f"{number}. ",
-                subsequent_indent=" " * (len(number) + 2),
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
-        else:
-            out += textwrap.wrap(
-                line,
-                width=width,
-                subsequent_indent="   ",
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
-    return "\n".join(out)
-
-
-def _sequence(
-    heading: str, groups: tuple[tuple[str, tuple[str, ...]], ...], *, width: int
-) -> str:
-    """One note: ``heading``, then each titled step group, a blank line
-    between groups. One step per action leaves no room for a blank line
-    between steps; the group titles carry the structure instead."""
-    out = [heading]
-    for index, (title, lines) in enumerate(groups):
-        if index:
-            out.append("")
-        out.append(_wrapped((title,), width=width))
-        out.append(_wrapped(lines, width=width))
-    return "\n".join(out)
-
-
-_GROUP_STARTS = (
-    *(steps.SEQUENCE.index(key) for _title, key in notes.STEP_GROUPS),
-    len(notes.ASSEMBLY_STEPS),
-)
-STEP_GROUP_LINES = tuple(
-    (title, notes.ASSEMBLY_STEPS[start:end])
-    for (title, _key), start, end in zip(
-        notes.STEP_GROUPS, _GROUP_STARTS, _GROUP_STARTS[1:], strict=False
-    )
-)
-# The sequence's native box runs 2.63 mm a character from x 17.6 mm (run
-# 20261024T041027643Z: 80 characters spanned x 17.6-227.8 mm). A block whose
-# box ends a pad short of the title block's left edge may run down beside it
-# to the bottom border; a wider one must end above the title block. Sheet 4
-# takes the wheel group; sheet 5 continues with the lever group and the lever
-# wire (MHA-HA-00 and MHA-SH-VN-56 cite the wire steps there), followed by the
-# checks.
-if notes.STEP_GROUPS[1][1] != steps.LEVER_THREADED_KEY:
-    raise AssertionError("sheet 5 continues the sequence at the lever group")
-STEPS_SPLIT = _GROUP_STARTS[1]
-CONTINUED_HEADING = "ASSEMBLY SEQUENCE (CONT.)"
-ASSEMBLY_STEPS = _sequence(
-    "ASSEMBLY SEQUENCE", STEP_GROUP_LINES[:1], width=STEPS_LINE_WIDTH
-)
-ASSEMBLY_STEPS_CONTINUED = _sequence(
-    CONTINUED_HEADING, STEP_GROUP_LINES[1:], width=CONTINUED_LINE_WIDTH
-)
-ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=CONTINUED_LINE_WIDTH)
-CHECKS_XY = (
-    STEPS_XY[0],
-    STEPS_XY[1]
-    - (ASSEMBLY_STEPS_CONTINUED.count("\n") + 1) * NOTE_LINE_PITCH
-    - 2 * _PAD,
-)
-
-
-def _note_floor(width: int) -> float:
-    """The lowest y a note block ``width`` characters wide may reach."""
-    right = STEPS_XY[0] + width * NOTE_CHAR_WIDTH
-    if right + _PAD < TITLE_BLOCK[0]:
-        return INNER_BORDER[1] + _PAD
-    return TITLE_BLOCK[3] + _PAD
-
-
-BESIDE_TITLE_BLOCK = _note_floor(STEPS_LINE_WIDTH) < TITLE_BLOCK[3]
-if not BESIDE_TITLE_BLOCK:
-    raise AssertionError("the sheet 4 column no longer clears the title block")
-if any(
-    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < _note_floor(width)
-    for block, top, width in (
-        (ASSEMBLY_STEPS, STEPS_XY[1], STEPS_LINE_WIDTH),
-        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1], CONTINUED_LINE_WIDTH),
-        (ASSEMBLY_CHECKS, CHECKS_XY[1], CONTINUED_LINE_WIDTH),
-    )
-):
-    raise AssertionError("an assembly instruction note runs past its floor")
-
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 # A detail's label note: its top-left corner this far under the detail's
@@ -811,9 +693,9 @@ class WheelRestView:
     title: str = notes.WHEEL_REST_VIEW_TITLE
     orientation: str = "*Front"
     scale: tuple[int, int] = (2, 1)
-    # Right-aligned in its field: the column's long rows get the slack.
+    # Centred in its field, the sheet's only view.
     centre: tuple[float, float] = (
-        WHEEL_REST_FIELD[2] - WHEEL_REST_CROP_MM * WHEEL_REST_SCALE[0] / 1000.0,
+        (WHEEL_REST_FIELD[0] + WHEEL_REST_FIELD[2]) / 2.0,
         0.170,
     )
     stems: frozenset[str] = frozenset(
@@ -2038,69 +1920,6 @@ def _grown(box: Box, by: float) -> Box:
     return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
 
 
-def _assert_instruction_clearance(
-    adapter: Any, sequence: Any, continued: Any, checks: Any
-) -> None:
-    """Read the settled native note boxes, not character-count width estimates:
-    the wheel group on sheet 4; the lever group, the wire and the checks on
-    sheet 5, left of VIEW D's field."""
-    bounds: dict[str, Box] = {}
-    for label, sheet_name, note in (
-        ("assembly sequence", SHEET_NAMES[3], sequence),
-        ("assembly sequence, continued", SHEET_NAMES[4], continued),
-        ("assembly checks", SHEET_NAMES[4], checks),
-    ):
-        _activate_sheet(adapter, sheet_name)
-        adapter.currentModel.GraphicsRedraw2()
-        extent = tuple(
-            float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
-        )
-        if (
-            len(extent) != 6
-            or not all(math.isfinite(value) for value in extent)
-            or extent[3] <= extent[0]
-            or extent[4] <= extent[1]
-        ):
-            raise RuntimeError(f"magnifier {label}: invalid native note extent {extent!r}")
-        box = (extent[0], extent[1], extent[3], extent[4])
-        padded = _grown(box, _PAD)
-        if (
-            padded[0] < INNER_BORDER[0]
-            or padded[1] < INNER_BORDER[1]
-            or padded[2] > INNER_BORDER[2]
-            or padded[3] > INNER_BORDER[3]
-        ):
-            raise RuntimeError(
-                f"magnifier {label}: native note box {box!r} lacks "
-                f"{_PAD * 1000:.1f} mm border clearance"
-            )
-        if padded[2] > TITLE_BLOCK[0] and padded[1] < TITLE_BLOCK[3]:
-            raise RuntimeError(
-                f"magnifier {label}: native note box {box!r} lacks "
-                f"{_PAD * 1000:.1f} mm title-block clearance"
-            )
-        if sheet_name == SHEET_NAMES[4] and padded[2] > REST_INK_LEFT:
-            raise RuntimeError(
-                f"magnifier {label}: native note box {box!r} runs into "
-                f"{WHEEL_REST.title}, whose ink starts at x {REST_INK_LEFT!r}"
-            )
-        bounds[label] = box
-    gap = bounds["assembly sequence, continued"][1] - bounds["assembly checks"][3]
-    if gap < _PAD:
-        raise RuntimeError(
-            f"magnifier assembly checks: native gap below the continued sequence is "
-            f"{gap * 1000:.3f} mm, under {_PAD * 1000:.1f} mm"
-        )
-    _telemetry.info(
-        f"magnifier instruction native note boxes={bounds!r}, "
-        f"continued-sequence-to-checks gap_mm={gap * 1000:.3f}, title-block air mm="
-        + ", ".join(
-            f"{label}: {(box[1] - TITLE_BLOCK[3]) * 1000:.3f}"
-            for label, box in bounds.items()
-        )
-    )
-
-
 def ring_fit_shift(outline: Box, field: Box, *, name: str) -> tuple[float, float]:
     """Shift that centres a view's balloon ring (its outline grown by
     BALLOON_RING_REACH) in ``field``; raises naming each axis on which the
@@ -3094,22 +2913,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"{FINISHED_LABEL} caption",
     )
     source_step(f"{FINISHED_LABEL} caption")
-    sequence_note = _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    source_step("assembly sequence")
-    continued_note = _add_note_block(
-        adapter,
-        SHEET_NAMES[4],
-        ASSEMBLY_STEPS_CONTINUED,
-        STEPS_XY,
-        label="assembly sequence, continued",
-    )
-    source_step("assembly sequence, continued")
-    checks_note = _add_note_block(
-        adapter, SHEET_NAMES[4], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-    )
-    source_step("assembly checks")
     _activate_sheet(adapter, SHEET_NAMES[1])
     source_step("BOM sheet activation before reference hide")
     _hide_bom_reference(adapter, reference, table, items)
@@ -3152,9 +2955,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 wheel_rest_settled,
                 bom_settled,
                 lambda: assert_balloon_landings(adapter, landings),
-                lambda: _assert_instruction_clearance(
-                    adapter, sequence_note, continued_note, checks_note
-                ),
                 lambda: _assert_source_identity(
                     source_model,
                     source_sha256,

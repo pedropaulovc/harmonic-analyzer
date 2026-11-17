@@ -1,11 +1,13 @@
 """Drawing-only data of the magnifier fitter package (MHA-MG-00).
 
 The BOM rows (families, quantities, descriptions), the axle-stack dimensions
-the sheet imports, the exploded-view caption, the fit-up steps and the checks
-the sheets print. Native setting callouts belong to the model spec, not here.
-Only draw_mg_magnifier_assembly (and its tests) import this module; no assembly
-builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit here
-does not rebuild the magnifier assembly. No SolidWorks.
+the sheet imports and the exploded-view caption the sheets print, and the
+fit-up steps and checks the release's ASSEMBLY.md prints for the package
+(ha_assembly_package, #2889). Native setting callouts belong to the model
+spec, not here. Only draw_mg_magnifier_assembly, ha_assembly_package (and
+their tests) import this module; no assembly builder may
+(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
+rebuild the magnifier assembly. No SolidWorks.
 """
 
 from __future__ import annotations
@@ -57,7 +59,8 @@ PRESS_DETAIL_TITLE = f"DETAIL {PRESS_DETAIL_LETTER}"
 ENDSHAKE_DETAIL_TITLE = f"DETAIL {ENDSHAKE_DETAIL_LETTER}"
 THREAD_PROJECTION_DETAIL_TITLE = f"VIEW {LEVER_TIP_VIEW_LETTER}"
 WHEEL_REST_VIEW_TITLE = f"VIEW {WHEEL_REST_VIEW_LETTER}"
-# VIEW D prints on the last sheet, beside the wire steps that turn the wheel.
+# VIEW D prints on the last sheet, its own; the wire steps that turn the wheel
+# cite it.
 WHEEL_REST_VIEW_SHEET = 5
 
 # TIE 1's rest position: the wheel sits at its part frame in the assembly, so
@@ -186,7 +189,7 @@ BOM_DESCRIPTIONS = {
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 4-5"
+EXPLODED_CAPTION = "EXPLODED VIEW"
 
 # The BOM's item numbers, as the native table numbers the families (component
 # order in the source assembly); the drawing proves the inserted table prints
@@ -242,11 +245,11 @@ _STACK = (
 # #2523, amending the 2026-11-07 "a slip axle is remade": a remade axle cut
 # from the same as-supplied rod comes out the same size). Its degrease,
 # coated length, squeeze-out, cure and acceptance rules print once, as a
-# general note with the checks on sheet 5. The axle's coat stays on the
+# general note with the checks in ASSEMBLY.md. The axle's coat stays on the
 # length inside the bar and its squeeze-out is wiped off at once, since the
 # spacer and the wheel slide and run on the same shank just outside it.
 BOND_GRADE = "LOCTITE 638"
-BOND_NOTE_REF = "NOTE 1 (SHEET 5)"
+BOND_NOTE_REF = "NOTE 1"
 BOND_NOTE = (
     f"NOTE 1, {BOND_GRADE} BOND: DEGREASE; COAT THE SPIGOT OR THE AXLE END IN "
     f"{_BAR} ONLY; WIPE OFF THE EXCESS; CURE 24 H AT ROOM TEMPERATURE BEFORE "
@@ -538,7 +541,7 @@ ASSEMBLY_STEPS = tuple(
 )
 # The sequence prints in three titled groups, each opening at a numbered
 # step; the wire group's title states when its steps run, so no step carries
-# a precondition clause.
+# a precondition clause. Steps cite the drawing's sheets, views and BOM items.
 STEP_GROUPS = (
     ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_PRESSED_KEY),
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
@@ -555,6 +558,15 @@ if (
     or not all(_steps.step_number(key).isdigit() for _title, key in STEP_GROUPS)
 ):
     raise AssertionError("the step groups must open numbered steps in order")
+_GROUP_STARTS = (*_GROUP_INDICES, len(ASSEMBLY_STEPS))
+# Each group's title (its colon dropped) and numbered steps, as ASSEMBLY.md
+# prints them.
+STEP_SECTIONS = tuple(
+    (title.rstrip(":"), ASSEMBLY_STEPS[start:end])
+    for (title, _key), start, end in zip(
+        STEP_GROUPS, _GROUP_STARTS, _GROUP_STARTS[1:], strict=False
+    )
+)
 ASSEMBLY_CHECKS = (
     f"CHECK: WITH BOTH {_NUT} NUTS SET, {_WHEEL} TURNS FREE, NO RATTLE.",
     f"CHECK: {_CLAMP} AND {_FIXTURE} HOLD THEIR SETTINGS WHEN {_LEVER} IS "

@@ -56,7 +56,7 @@ DOCUMENT_NAME = "ASSEMBLY.md"
 PACKAGES: tuple[str, ...] = (*BOM_ORDER, ASM_NAME)
 # The packages whose fit-up steps and checks print in this document, not on
 # their sheets (#2889).
-STEPS_IN_DOCUMENT: tuple[str, ...] = ()
+STEPS_IN_DOCUMENT: tuple[str, ...] = ("mg-magnifier",)
 _TEXT_MODULE_SUFFIXES = ("_assembly_sheet", "_steps", "_fitup")
 _PACKAGE_PREFIXES = tuple(sorted({f"{stem.split('-')[0]}_" for stem in PACKAGES}))
 
@@ -547,7 +547,7 @@ def markdown() -> str:
         i for i, phase in enumerate(build.PHASES, start=1) if phase.frame == "APART"
     ]
     lines = [
-        "# MHA-HA-00 build sequence and assembly tools",
+        "# MHA-HA-00 build sequence, fit-up steps and assembly tools",
         "",
         "Generated from the assembly packages' own steps and the shop files at "
         "this release (cad/scripts/ha_assembly_package.py); a change to a sheet "
