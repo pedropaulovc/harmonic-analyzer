@@ -423,6 +423,25 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Medium-Strength Zinc-Plated Steel Hex Nut",
         "95462A505",
     ),
+    # MHA-CH-13-TL-VN-50 (owner, 2026-11-17): the Pitbull edge clamp with the
+    # #4-40 x 3/8 SHCS it is supplied with, one part of two bodies; four hold
+    # the strap blank on MHA-CH-13-TL-01. Its catalogue says tool steel; the
+    # library material is the nearest SOLIDWORKS steel for mass and render.
+    "ch-rocker-strap-tl-vn-edge-clamp": _stock(
+        "ch-rocker-strap-tl-vn-edge-clamp",
+        "Pitbull Clamp 26000, #4-40",
+        "26000",
+        material="Alloy Steel",
+        supplier="Mitee-Bite Products",
+    ),
+    # MHA-CH-13-TL-VN-51 (owner ruling 2026-11-17): the 1/4-20 x 5/8 button
+    # head that snugs the strap blank's hub on MHA-CH-13-TL-01.
+    "ch-rocker-strap-tl-vn-hub-screw": _stock(
+        "ch-rocker-strap-tl-vn-hub-screw",
+        "Black-Oxide Button Head Hex-Drive Screw",
+        "91255A539",
+        material="Alloy Steel",
+    ),
 }
 
 
