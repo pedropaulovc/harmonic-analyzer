@@ -112,12 +112,11 @@ def test_sheet_text_stays_out_of_the_assembly_recipe() -> None:
     assert not hasattr(explode, "exploded_point")
 
 
-def test_pen_package_is_four_landscape_sheets_at_half_scale() -> None:
+def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
     assert drawing.SHEET_NAMES == (
         "ASSEMBLED VIEWS + SETTINGS",
         "EXPLODED VIEW + BOM",
-        "ASSEMBLY STEPS",
-        "ASSEMBLY STEPS CONTINUED",
+        "FINISHED ASSEMBLY",
     )
     assert set(drawing.SHEET_LAYOUTS.values()) == {
         DRAWINGS_BY_NAME["pn_pen_assembly"].layout
@@ -491,11 +490,5 @@ def test_stirrup_detail_shows_the_window_and_the_thumb_screw_tap_off_the_title_b
     assert detail.label_xy[0] > x + r
 
 
-def test_text_blocks_respect_the_measured_note_width() -> None:
-    for block, width in (
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
-        (drawing.SETTINGS_NOTE, drawing.SETTINGS_NOTE_WIDTH),
-    ):
-        assert max(len(line) for line in block.splitlines()) <= width
+def test_settings_note_respects_the_measured_note_width() -> None:
+    assert max(map(len, drawing.SETTINGS_NOTE.splitlines())) <= drawing.SETTINGS_NOTE_WIDTH

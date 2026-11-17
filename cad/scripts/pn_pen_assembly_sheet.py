@@ -3,10 +3,12 @@
 The BOM item numbers and descriptions, the settings' display on the sheet
 (which is a reference, the nominals and bands it reads back, tolerance
 places), setting callouts and their text points, the explode trails, the
-detail regions and titles, the as-shipped note, the assembly steps and checks
-the sheets print. Only draw_pn_pen_assembly (and its tests) import this
-module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
-so a wording edit here does not rebuild the pen assembly. No SolidWorks.
+detail regions and titles and the as-shipped note the sheets print, and the
+assembly steps and checks the release's ASSEMBLY.md prints
+(ha_assembly_package, #2889). Only draw_pn_pen_assembly, ha_assembly_package
+(and their tests) import this module; no assembly builder may
+(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
+rebuild the pen assembly. No SolidWorks.
 Printed lengths are decimal inch, the assembly contract's ``drawing_unit``.
 """
 
@@ -211,7 +213,7 @@ EXPLODE_TRAILS = {
     "stirrup": STIRRUP_TRAIL,
 }
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 3-4"
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 
 # The nib preset's text point, sketch mm: on the side of the marker-axis arm
 # away from the yaw wedge, and beyond the nib tip along the axis, so the
@@ -356,8 +358,7 @@ SETTINGS_NOTE = (
 # (MHA-PN-VN-57's steps 2 and 8, MHA-HA-00's hanger screw lock) stay put.
 _HA_WIRE_TIED = ha_steps.step_number("pen-wire-tied")
 _HA_NIB = (ha_steps.step_number("nib-set"), ha_steps.step_number("nib-on-paper"))
-ASSEMBLY_STEPS = (
-    "AT THE BENCH:",
+_BENCH_STEPS = (
     f"1. STUD HEIGHT: MEASURE THE OVERALL LENGTH OF THE STUD (ITEM {ITEM[STUD]}), "
     "THREAD END TO HEAD END.",
     f"1A. RUN THE JAM NUT (ITEM {ITEM[STUD_NUT]}) ONTO THE STUD UP TO THE HEAD.",
@@ -393,7 +394,8 @@ ASSEMBLY_STEPS = (
     f"6. INTO THE GUIDES: ENTER THE SQUARE OF THE ROD (ITEM {ITEM[ROD]}) INTO BOTH U GUIDES OF THE "
     f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, THE {_BELOW_GUIDE} "
     "BELOW THE LOWER GUIDE.",
-    "AT MHA-HA-00:",
+)
+_MACHINE_STEPS = (
     f"7. HANGER SCREW LOCK: PASS THE HANGER SCREW (ITEM {ITEM[HANGER_SCREW]}) "
     "THROUGH THE MHA-MG-08 WHEEL BAR AND THE STRAP HOLE, HEAD ON THE WHEEL-BAR "
     "SIDE (DETAIL B).",
@@ -416,14 +418,15 @@ ASSEMBLY_STEPS = (
     "8D. FIT THE NEW MARKER PER STEPS 5-5B.",
     "8E. SET ITS NIB TO PAPER PER STEP 8A.",
 )
+STEP_SECTIONS = (("AT THE BENCH", _BENCH_STEPS), ("AT MHA-HA-00", _MACHINE_STEPS))
+ASSEMBLY_STEPS = (*_BENCH_STEPS, *_MACHINE_STEPS)
 ASSEMBLY_CHECKS = (
-    "CHECKS:",
-    f"- THE ROD SLIDES FREELY THROUGH BOTH GUIDES OVER ITS {_TRAVEL} TRAVEL "
+    f"THE ROD SLIDES FREELY THROUGH BOTH GUIDES OVER ITS {_TRAVEL} TRAVEL "
     f"AND FALLS UNDER THE WEIGHT OF ITEMS {_CARRIAGE_ITEMS[0]}-"
     f"{_CARRIAGE_ITEMS[-1]} WHEN LIFTED AND RELEASED.",
-    "- THE V-BLOCK DOES NOT TURN ON THE PIVOT BY HAND, AND THE YAW STILL "
+    "THE V-BLOCK DOES NOT TURN ON THE PIVOT BY HAND, AND THE YAW STILL "
     f"READS {_YAW_SETTING} (VIEW C) AFTER TRYING IT.",
-    f"- BOTH JAM NUTS (ITEMS {ITEM[STUD_NUT]}, {ITEM[HANGER_JAM_NUT]}) TIGHT; "
+    f"BOTH JAM NUTS (ITEMS {ITEM[STUD_NUT]}, {ITEM[HANGER_JAM_NUT]}) TIGHT; "
     "THE STUD AND THE HANGER SCREW DO NOT TURN BY HAND.",
-    "- A SQUARE ON THE BAR TOP STILL READS THE ROD SQUARE TO IT.",
+    "A SQUARE ON THE BAR TOP STILL READS THE ROD SQUARE TO IT.",
 )
