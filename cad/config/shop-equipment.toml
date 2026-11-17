@@ -356,10 +356,9 @@ homing = "switches on all three axes"
 probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
 toolsetter_pin = "gpio.21:low:pu, the tool setter"
 sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
-pendant = "WHB04B via cncjs-whb04b6-el400-integration 48f0c378e44341870a60914181237382efb158b8 (its Probe-Z reads CNCjs Touch Plate Height)"
 note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1."
 cite = [
-  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5, WHB04B pendant.",
+  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5.",
   "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
 ]
 
@@ -1045,3 +1044,360 @@ kind = "countersink"
 present = false
 status = "not owned"
 use = "Leadscrew kit (MHA-CH-06-TL-VN-84) feed nut: the four countersinks beside the body, at the cutter size the sheet allows"
+
+# --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
+
+# Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's
+# McMaster-Carr packing list for PO 0803PCAMPOS (McMaster-Carr number
+# 1616317-01, 08/04/2025), all shipped; owner (Pedro) 2026-11-17: "add to
+# inventory ... already owned". Names, sizes and quantities are the packing
+# list's descriptions; nothing it does not state is recorded (the McMaster
+# product pages returned no product text, read 2026-11-17). Its fasteners,
+# wire, brass and 12L14 stock and brass balls are consumable stock, not
+# recorded here. Where an older record may be the same object (noted at the
+# record), neither is merged: the packing list does not say.
+
+[gauges.telescoping-gauges-starrett-s579gz]
+name = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
+kind = "telescoping_gauge_set"
+make = "Starrett"
+sku = "2081A8"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 1: \"Starrett Telescoping Bore Gauge, 4-Piece Set, Model S579Gz\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Range and resolution: cad/process/shop.toml gauges.height-gauge (its 0-12 in
+# range agrees with this gauge; its .001 in resolution is not on the list).
+[gauges.height-gauge]
+name = "Dial height gauge, 0-12 in"
+kind = "height_gauge"
+sku = "19765A72"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 9: \"Dial Height Gauge with 0 to 12\" Measuring Range\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[gauges.lathe-alignment-bar]
+name = "Precision lathe alignment bar"
+kind = "alignment_bar"
+sku = "9244N111"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Carbide 3-flute square end mills. The 1/8, 1/4, 3/8 and 1/2 in share their
+# keys with cad/process/shop.toml, which holds their diameters and their
+# cutting settings on 1018.
+[tools.endmill-carbide-3fl-1-8]
+name = "Uncoated carbide square 3-flute end mill, 1/8 in, 1-1/2 in OAL"
+kind = "endmill"
+sku = "88815A18"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 1.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 10: \"Uncoated Carbide Square 3-Flute End Mill, 1/8\" Mill Diameter, 1-1/2\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-3-16]
+name = "Uncoated carbide square 3-flute end mill, 3/16 in, 2 in OAL"
+kind = "endmill"
+sku = "88815A23"
+present = true
+pieces = 2
+flutes = 3
+dia_in = 0.1875
+oal_in = 2.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 11: \"Uncoated Carbide Square 3-Flute End Mill, 3/16\" Mill Diameter, 2\" Overall Length\", 2 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-1-4]
+name = "Uncoated carbide square 3-flute end mill, 1/4 in, 3 in OAL"
+kind = "endmill"
+sku = "88815A43"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 14: \"Uncoated Carbide Square 3-Flute End Mill, 1/4\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-3-8]
+name = "Uncoated carbide square 3-flute end mill, 3/8 in, 4 in OAL"
+kind = "endmill"
+sku = "88815A56"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 4.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 12: \"Uncoated Carbide Square 3-Flute End Mill, 3/8\" Mill Diameter, 4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-1-2]
+name = "Uncoated carbide square 3-flute end mill, 1/2 in, 3 in OAL"
+kind = "endmill"
+sku = "88815A45"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.roughing-endmill-carbide-4fl-3-8]
+name = "Roughing carbide square end mill, TiN coated, 4-flute, 3/8 in, 1/2 in length of cut"
+kind = "roughing_endmill"
+sku = "87825A13"
+present = true
+pieces = 1
+flutes = 4
+dia_in = 0.375
+loc_in = 0.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 35: \"Roughing Carbide Square End Mill, TiN Coated, 4 Flute, 3/8\" Mill Diameter, 1/2\" Long Cut\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.ball-endmill-carbide-2fl-1-4]
+name = "Uncoated carbide ball end mill, 2-flute, 1/4 in, 2-1/2 in OAL"
+kind = "ball_endmill"
+sku = "8878A17"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+oal_in = 2.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 32: \"Uncoated Carbide Ball End Mill, 2 Flute, 1/4\" Mill Diameter, 2-1/2\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.chamfer-mill-carbide-1-4-30]
+name = "Carbide chamfering end mill, uncoated, 2-flute, 30 deg cut, 1/4 in"
+kind = "chamfer_mill"
+sku = "3073A533"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+cut_angle_deg = 30
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 33: \"Carbide Chamfering End Mill, Uncoated, 2 Flute, 30 Degree Cut, 1/4\" Mill Diameter\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Possibly the same cutter as tools.chamfer-mill-330ch-1-4-90 (owner
+# inventory 2026-11-13: 1/4 in 90 deg 2-flute chamfer mill); not reconciled.
+[tools.chamfer-mill-carbide-1-4-90]
+name = "Carbide chamfering end mill, uncoated, 2-flute, 90 deg cut, 1/4 in"
+kind = "chamfer_mill"
+sku = "3073A46"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+cut_angle_deg = 90
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 52: \"Carbide Chamfering End Mill, Uncoated, 2 Flute, 90 Degree Cut, 1/4\" Mill Diameter\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# HSS 2-flute square end mills. The 1/2 in ones have the 1 in of flute that
+# tools.endmill-half-long-flute (owner 2026-11-13) records; that record may be
+# one of them.
+[tools.endmill-hss-2fl-1-2-oal-3]
+name = "Uncoated HSS square end mill, 2-flute, 1/2 in, 1 in length of cut, 3 in OAL"
+kind = "endmill"
+sku = "3051A18"
+present = true
+pieces = 3
+flutes = 2
+dia_in = 0.5
+loc_in = 1.0
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 27: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/2\" Mill Diameter, 1\" Long Cut, 3\" Overall Length\", 3 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-1-2-oal-4]
+name = "Uncoated HSS square end mill, 2-flute, 1/2 in, 1 in length of cut, 4 in OAL"
+kind = "endmill"
+sku = "3051A67"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.5
+loc_in = 1.0
+oal_in = 4.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 31: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/2\" Mill Diameter, 1\" Long Cut, 4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-3-8]
+name = "Uncoated HSS square end mill, 2-flute, 3/8 in, 1-1/2 in length of cut, 3-1/4 in OAL"
+kind = "endmill"
+sku = "3051A61"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.375
+loc_in = 1.5
+oal_in = 3.25
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 30: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 3/8\" Mill Diameter, 1-1/2\" Long Cut, 3-1/4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-1-4]
+name = "Uncoated HSS square end mill, 2-flute, 1/4 in, 5/8 in length of cut, 3-1/16 in OAL"
+kind = "endmill"
+sku = "3051A51"
+present = true
+pieces = 2
+flutes = 2
+dia_in = 0.25
+loc_in = 0.625
+oal_in = 3.0625
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 29: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/4\" Mill Diameter, 5/8\" Long Cut, 3-1/16\" Overall Length\", 2 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-tin-2fl-3-16]
+name = "TiN-coated HSS square end mill, 2-flute, 3/16 in, 2-5/16 in OAL"
+kind = "endmill"
+sku = "8949A16"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.1875
+oal_in = 2.3125
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 28: \"TiN-Coated High-Speed Steel Square End Mill, 2 Flute, 3/16\" Mill Diameter, 2-5/16\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.centre-drills-carbide-60]
+name = "Carbide 60 deg centre drills, trade sizes 1, 3 and 6"
+kind = "centre_drill_set"
+present = true
+pieces = 3
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 43-45: \"Center Drill, Carbide, 60 Degree, Trade Size 1, for 3/64\" Drill Bit\", \"... Trade Size 3, for 7/64\" Drill Bit\", \"... Trade Size 6, for 7/32\" Drill Bit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.centre-drills-carbide-60.members]
+1 = { sku = "2925A11", for_drill_in = 0.046875 }
+3 = { sku = "2925A13", for_drill_in = 0.109375 }
+6 = { sku = "2925A16", for_drill_in = 0.21875 }
+
+[tools.slitting-saw-1-032]
+name = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole"
+kind = "slitting_saw"
+sku = "3044A23"
+present = true
+pieces = 1
+dia_in = 1.0
+thickness_in = 0.032
+bore_in = 0.375
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Arbor hole not on the packing list.
+[tools.slitting-saw-2-75-064]
+name = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth"
+kind = "slitting_saw"
+sku = "3062A21"
+present = true
+pieces = 1
+dia_in = 2.75
+thickness_in = 0.064
+teeth = 72
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 16: \"High-Speed Steel Slitting Saw, 0.064\" Thick, 2-3/4\" Mill Diameter, 72 Teeth\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
+# the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.
+[tools.lathe-inserts-ccmt-32-51]
+name = "CCMT-32.51 carbide lathe tool inserts, seven grades"
+kind = "lathe_insert_set"
+present = true
+pieces = 7
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 2-8, 1 each (descriptions in members)", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.lathe-inserts-ccmt-32-51.members]
+3867N133 = { use = "multiple materials, semi-interrupted cutting, finishing" }
+3867N136 = { use = "multiple materials, semi-interrupted cutting, medium" }
+1691N15 = { use = "economy carbide, aluminum, brass and bronze" }
+1691N16 = { use = "economy carbide, steel and stainless steel" }
+6110N142 = { use = "carbide, steel, semi-interrupted cutting, finishing" }
+3244A574 = { use = "carbide, steel, semi-interrupted cutting, medium" }
+6110N147 = { use = "carbide, steel, semi-interrupted cutting, roughing" }
+
+[tools.cutoff-blade-holder]
+name = "Blade-style holder for cutoff and grooving carbide inserts, 4-5/16 in long x 1/8 in wide"
+kind = "cutoff_holder"
+sku = "3212A119"
+present = true
+pieces = 1
+length_in = 4.3125
+width_in = 0.125
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 41: \"Blade-Style Holder, 4-5/16\" Long x 1/8\" Wide for Cutoff and Grooving Carbide Lathe Tool Insert\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.cutoff-inserts]
+name = "Cutoff and grooving carbide lathe inserts, neutral, .252 in thick, uncoated C2 and C5"
+kind = "cutoff_insert_set"
+present = true
+pieces = 2
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 42 and 40: \"Cutoff and Grooving Carbide Lathe Tool Insert, Neutral, 0.252\" Thick, Uncoated C2 Carbide\" and \"... Uncoated C5 Carbide\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.cutoff-inserts.members]
+C2 = { sku = "3212A75" }
+C5 = { sku = "3212A76" }
+
+[tools.centre-punch-spring-impact]
+name = "Spring-impact centre punch, aluminum handle, 1/16 in point"
+kind = "centre_punch"
+sku = "34895A65"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 46: \"Spring-Impact Center Punch with Aluminum Handle, 1/16\" Diameter Point\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.deburring-set]
+name = "7-piece deburring scraper and countersink set"
+kind = "deburring_set"
+sku = "4289A78"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 34: \"7 Piece Deburring Scraper and Countersink Set\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.sharpening-stone-two-grit]
+name = "Aluminum oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 x 320 grit"
+kind = "sharpening_stone"
+sku = "4506A2"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 50: \"Aluminum Oxide Two Grit Sharpening Stone, 6\" Long x 2\" Wide x 1\" Thick, 100 Grit x 320 Grit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.oil-dispenser]
+name = "Hand-held oil dispenser, 16 fl oz, flexible nozzle"
+kind = "oil_can"
+sku = "10085K36"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 25: \"Hand-Held Oil Dispenser, 16 FL oz Capacity with Flexible Nozzle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.tapmatic-gold]
+name = "LPS Tapmatic #1 Gold milling, turning and sawing lubricant, 16 fl oz"
+kind = "cutting_fluid"
+make = "LPS"
+sku = "2008K13"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 17: \"Milling, Turning, and Sawing Lubricant, LPS Tapmatic #1 Gold, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.anchorlube]
+name = "Anchorlube milling, drilling and turning coolant, 16 fl oz"
+kind = "cutting_fluid"
+make = "Anchorlube"
+sku = "10705K49"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 26: \"Milling, Drilling, and Turning Coolant, Anchorlube, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.marking-fluid-blue]
+name = "Scribe-enhancing marking fluid, blue, 2 fl oz felt-tip bottle"
+kind = "layout_fluid"
+sku = "2131A74"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 24: \"Marking Fluid, Scribe-Enhancing, 2 FL. oz Felt-Tip Bottle, Blue\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.stone-lubricant]
+name = "Lubricant for polishing and sharpening stones, 4.5 fl oz"
+kind = "honing_oil"
+sku = "1386K41"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 47: \"Lubricant for Polishing and Sharpening Stones, 4.5 FL. oz. Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-soft-metals-220]
+name = "Clog- and water-resistant sanding roll for aluminum, soft metals and nonmetals, 2 in wide, 220 grit"
+kind = "abrasive_roll"
+sku = "8230A32"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 48: \"Clog- and Water-Resistant Sanding Roll for Aluminum, Soft Metals and Nonmetals, 2\" Wide, 220 Grit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-220]
+name = "Sanding roll for smooth finish, 2 in wide, 220 grit, 30 ft"
+kind = "abrasive_roll"
+sku = "4687A223"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 49: \"Sanding Roll for Smooth Finish, 2\" Wide, 220 Grit, 30 Feet Long\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]

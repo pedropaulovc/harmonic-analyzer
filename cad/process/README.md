@@ -1,13 +1,21 @@
 # Process plans and travelers
 
-This directory holds the inputs to the `prechips:<stem>` travelers:
+This directory holds the inputs to the `prechips:<stem>` travelers and the
+`cam:<stem>` NC programs:
 
 ```text
 cad/process/
   shop.toml                 prechips shop file, shared by every plan
   <stem>/plan.toml          one prechips plan per part
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
+  <stem>/cam.py             CAM recipe of a part milled on the CNC mill
 ```
+
+The machine premise is a CNC mill and a manual lathe (owner ruling
+2026-11-17): milled work runs on the CNC-converted PM-30MV (FluidNC
+controller, CNCjs sender, electronic tool setter and 3D touch probe) from the
+part's posted NC programs, with speed of manufacture the priority, and turned
+work runs on the manual PM-1127VF-LB lathe.
 
 [prechips](https://github.com/pedropaulovc/prechips) is a stdlib-only PyPI
 package. It is not an HA dependency while it stabilises (owner ruling
@@ -39,9 +47,9 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-No part has a plan since the oblique trammel jig, whose eight parts were the
-only enrolled ones, was deleted (owner ruling 2026-11-17, #2885); their plans,
-diagrams and the base bar's CAM recipe are at
+Parts are enrolled by the CNC migration. The oblique trammel jig's eight parts,
+enrolled before it was deleted (owner ruling 2026-11-17, #2885), left their
+plans, diagrams and the base bar's CAM recipe at
 `ebd3bf3b44:cad/process/ch_rocker_arm_tl_oblique_*/` and
 `ebd3bf3b44:cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/`. Each
 plan's `adapter` is a prechips adapter written against that part's manifest
@@ -67,7 +75,10 @@ tests read; the rocker profile cutter (`tools.rocker-profile-cutter`) with its
 HSS cutting setting (`settings.rocker-profile-hss-low-carbon-steel`); and the
 PM 6-in vise (`workholding.vise-pm-6`: jaw width, opening, jaw height and bed
 height). The opening is the owner-reported fit with the stock hard jaws
-(2026-10-30), not the bare 6.135 in jaw-to-jaw reading.
+(2026-10-30), not the bare 6.135 in jaw-to-jaw reading. The owned 1/8, 1/4,
+3/8 and 1/2 in 3-flute uncoated carbide end mills (`tools.endmill-carbide-3fl-*`)
+carry cutting settings on 1018 within the PM-30MV's 2800 rpm ceiling
+(`settings.endmill-carbide-3fl-*-1018-cf`), each number cited beside it.
 
 The `[limits]` table carries the three `vise_holding` limits: grip at least
 `vise_grip_min_mm` 6 mm (Pedro's house choice) and `vise_grip_fraction_min`
@@ -108,6 +119,9 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   shop-made bend form it is
   bent on (`fixtures.sm-gooseneck-bend-form`, no toleranced size: the radius
   is a reference);
+- the owned tools, gauges, cutters, inserts, holders, saws and shop fluids of
+  McMaster-Carr PO 0803PCAMPOS (packing list 1616317-01, 08/04/2025; owner
+  2026-11-17), each with its SKU, quantity and packing-list line;
 
 One fact lives in one file. The same object may appear in both files with
 disjoint fields (the DTI, for example), but no field is duplicated. Together
@@ -146,14 +160,16 @@ Owner rulings (Pedro), recorded for the cutover:
 ## Travelers
 
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task; none is enrolled since 2026-11-17. `build` runs
+`prechips:<stem>` task, enrolled by the CNC migration. `build` runs
 every one beside the drawing PDFs (`build_bare` runs none); `release` runs
 every one and ships each hobby sheet as
 `travelers/<slug>-traveler.pdf` (owner ruling 2026-11-14). Each run renders two
 travelers from the same plan: `traveler.html` (`pro`, concise) and
 `traveler-hobby.html` (`hobby`, with the setup pictures in `<stem>/diagrams/`),
 then prints the hobby sheet to `<slug>-traveler.pdf` with a headless Edge or
-Chrome. A plan that prechips refuses therefore blocks the release. The
+Chrome. For a milled part the hobby sheet is the CNC setup sheet: the setups,
+workholding and work zeros the part's NC programs run in. A plan that prechips
+refuses therefore blocks the release. The
 wrapper's `prechips@latest` runs the latest PyPI release.
 
 ```text
@@ -197,10 +213,13 @@ physical setup verification and machining approval are still required. See the
 
 ## NC programs (FreeCAD CAM)
 
-A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS` also has
-`<stem>/cam.py`, a CAM recipe that turns the plan's machining setups into
-G-code with FreeCAD's CAM workbench, run headless. `uv run --frozen python -m
-doit cam:<stem>` (opt-in; not in `build` or `release`) needs FreeCAD 1.1 or
+A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS`, enrolled by the CNC
+migration, also has `<stem>/cam.py`, a CAM recipe that turns the plan's
+machining setups into G-code with FreeCAD's CAM workbench, run headless.
+`build` and `release` run every enrolled part's `cam:<stem>` task
+(`build_bare` runs none); `uv run --frozen python -m doit cam:<stem>` runs
+one. It runs on the submitter, like the travelers, even under the farm
+executor (no farm worker has FreeCAD), and needs FreeCAD 1.1 or
 later: `$HARMONIC_FREECAD` names `freecadcmd`, otherwise the newest
 `FreeCAD <version>` install under the Windows program directories is used, and
 the task fails when there is none (or when it is older than 1.1). It writes
@@ -208,6 +227,10 @@ one `.nc` per recipe program, `cycle_times.json` and `manifest.json` (input,
 post and output SHA-256s, FreeCAD version, the post file FreeCAD loaded) to
 `cad/out/nc/<stem>/`, logs each program's cutting, air-at-feed and rapid
 minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
+Its only task dependency is its own `package:features:<stem>` leaf. A release
+ships the programs, `cycle_times.json` and `manifest.json` (not the log) under
+the bundle's `nc/<stem>/`; a missing output, a program that differs from the
+manifest, or a manifest recording another `features.toml` fails the cut.
 
 A recipe has four parts:
 
