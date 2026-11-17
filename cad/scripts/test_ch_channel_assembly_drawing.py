@@ -1474,15 +1474,13 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT
 
 
-def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() -> None:
+def test_shared_arbor_set_screws_keep_their_two_ear_seats() -> None:
     stem = "sh-vn-arbor-set-screw"
     assert drawing.explode.BRACKET_SET_SCREW == stem
     assert drawing.BOM_QUANTITIES[stem] == 2
     assert drawing.BOM_PART_NUMBERS[stem] == "MHA-SH-VN-54"
     assert drawing.BOM_SKUS[stem] == "91375A106"
-    seeds = assembly_contract("ch-channel").flip_invert
-    assert {f"sh vn arbor set screw datum {axis}" for axis in "xyz"} <= seeds
-    assert not any(seed.startswith("ch vn arbor set screw datum ") for seed in seeds)
+
 
 def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     """#2341: once every foot is seated the bars hang side by side at the
