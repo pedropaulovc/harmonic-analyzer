@@ -1983,10 +1983,9 @@ requires exactly one declared material field, never an alias or optional note.
 
 The COM-free `test_purchased_title_fit.py`, `test_supplier_native_contracts.py`,
 `test_supplier_native_repair.py` and `test_supplier_top_text_shelves.py` suites
-are enrolled in `check:recipe`. That gate also tracks their runtime-read washer
-paint and R44 shelf JSON fixtures, so changing recorded ink invalidates its
-offline stamp. The enrollment guard requires both the test modules and those
-fixture inputs; no exemption replaces their actual execution. These checks do
+run in `check:recipe` like every collected test. That gate also tracks their
+runtime-read washer paint and R44 shelf JSON fixtures in `_check_recipe_spec`,
+so changing recorded ink invalidates its offline stamp. These checks do
 not qualify a native export.
 
 Washer ownership failures collect bounded, independent read-only context only

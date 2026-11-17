@@ -462,16 +462,18 @@ cache invalidation or replace the applicable native gate.
 
 ### Recipe gate scheduling
 
-`check:recipe` alone runs its complete explicit test inventory with
+`check:recipe` runs every `test_*.py` a bare `pytest` collects from pyproject's
+`testpaths` (honouring `norecursedirs`), except the files a dedicated gate owns
+(`dodo._GATE_TESTS`) and the files in `dodo._UNGATED`, with
 `pytest -q -p no:cacheprovider --collect-in-virtualenv -n 8 --dist worksteal`.
-`--collect-in-virtualenv` is safe here only because the gate supplies an explicit
-file list: it avoids repeated parent-directory virtualenv-marker probes without
-expanding that inventory. Do not apply it to normal recursive pytest discovery.
-
-Enroll new SolidWorks-free test files in `dodo.task_check`;
-`test_check_gate_enrollment.py` rejects uncollected files. Release packaging's
-fake-seat cleanup and error-preservation contracts
-(`test_package_native_cleanup.py`) run in `check:recipe` beside failure forensics.
+A new test file needs no enrollment; a test file that must not run in a gate
+goes in `dodo._UNGATED` with its reason. dodo hands
+pytest the collected file list, so `--collect-in-virtualenv` only skips repeated
+parent-directory virtualenv-marker probes. Do not apply it to normal recursive
+pytest discovery. The gate's `file_dep` is each collected test plus its
+`module_deps_of` closure, plus the runtime-read inputs listed in
+`_check_recipe_spec`; the collected inventory is also an `uptodate` value, so a
+deleted test file re-runs the gate.
 
 In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
 collection took **75.1735279 s** versus **38.6164179 s** with the flag; the

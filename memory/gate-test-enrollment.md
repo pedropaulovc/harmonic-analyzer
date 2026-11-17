@@ -1,34 +1,23 @@
 ---
 name: gate-test-enrollment
-description: A new cad/scripts/test_*.py runs in NO gate unless enrolled in dodo.py's recipe_tests allowlist — check:recipe stays GREEN over a test nothing executes
+description: check:recipe runs every test file a bare pytest collects, minus dedicated-gate files and dodo._UNGATED; there is no enrollment step
 metadata:
   type: project
 ---
 
-`check:recipe` runs an **explicit allowlist**, not pytest discovery:
-`recipe_tests` in `dodo.py` (~line 1714) lists files by hand plus ONE glob,
-`SCRIPTS_DIR.glob("test_*_drawing.py")`. A new `cad/scripts/test_*.py` whose
-name misses that glob is executed by **no gate at all** — and the gate still
-reports green, so "check:recipe passed" is not evidence your new test ran.
+`check:recipe` selects its tests by collection (`dodo._collected_tests`):
+every `test_*.py` under pyproject's `testpaths`, honouring `norecursedirs`,
+except the files a dedicated `check:*` gate owns (`dodo._GATE_TESTS`) and the
+files listed in `dodo._UNGATED` with a reason. A new test file is gated by
+existing; there is nothing to enroll.
 
-Why this bites rather than merely annoys: the failure is invisible from where
-you are working. You add a test, run `check:recipe`, see green, and conclude it
-is covered. Discovered 2026-07-25 (PR #416, found by Codex, not by the build):
-`test_assembly_drawing_batch_contract.py` had never been enrolled while its two
-siblings `test_cone_drawing_batch_contract.py` and
-`test_pen_summing_drawing_batch_contract.py` were. Reducing the channel assembly
-drawing to a three-view diagram left it reading `ASSEMBLY_NOTES` /
-`BOM_COMPONENTS` / `BOM_PART_NUMBERS` that the sheet no longer defined — an
-`AttributeError` at import, i.e. it would have failed on collection — and every
-`check:*` gate passed anyway. Enrolling it took the suite 898 → 912 tests, so
-14 assertions had been dead for as long as the file existed.
+Why it changed (#2884): until 2026-11 the gate ran a hand-kept allowlist plus a
+`test_*_drawing.py` glob, and a file missing from both ran in NO gate while
+check:recipe stayed green (PR #416: 14 assertions dead since the file was
+written). `test_check_gate_enrollment.py` policed the allowlist; collection
+removes the failure mode instead.
 
-**How to apply:** after adding a test file under `cad/scripts/`, confirm it is
-either named `test_<stem>_drawing.py` (auto-enrolled by the glob) or added to
-`recipe_tests` explicitly. Verify by the TEST COUNT moving, not by the gate
-being green — run `uv run python -m doit check:recipe` before and after and
-check the `N passed` number changed. Do not trust a green gate as proof of
-coverage.
-
-Related: [[no-untested-failure-assumptions]],
-[[load-bearing-claims-need-repro]].
+**How to apply:** to keep a test file out of every gate (it needs a local
+tool no build dependency tracks, say), add it to `dodo._UNGATED` with a
+one-line reason. To move a file into a dedicated gate, add it to
+`_GATE_TESTS`; check:recipe drops it automatically.
