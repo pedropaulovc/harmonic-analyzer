@@ -1433,7 +1433,6 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify: tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
-BANK_RETENTION_PY = (SCRIPTS_DIR / "_native_bank_retention.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # COM half of a release: SolidWorks Pack-and-Go of the top assembly and of every
@@ -2192,23 +2191,9 @@ def _cad_identity_deps() -> list[str]:
     return deps
 
 
-def _bank_retention_file_deps() -> list[str]:
-    """The imported native gate's complete source and config closure.
-
-    verify.py imports this gate even for other suites; its module-level shared
-    spec guards execute on import, independently of any assembly recipe digest.
-    """
-    return sorted({
-        str(BANK_RETENTION_PY),
-        *_helper_deps(BANK_RETENTION_PY),
-        *_config_deps(BANK_RETENTION_PY),
-    })
-
-
 def _soundness_file_deps(stem: str) -> list[str]:
     """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
-    outside every build closure, the native retention gate's source/config
-    closure, the assembly's OWN contract (its free-DOF sets decide the verdict,
+    outside every build closure, the assembly's OWN contract (its free-DOF sets decide the verdict,
     and verify.py is not run through ``_config_deps``), the assembly's OWN
     allowed-interference table with its import closure (verify.py resolves it
     by name at run time, so no import edge exposes it; it decides gate
@@ -2223,7 +2208,6 @@ def _soundness_file_deps(stem: str) -> list[str]:
         str(POSTBUILD_PY),
         interference,
         *_helper_deps(interference),
-        *_bank_retention_file_deps(),
         assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
@@ -2266,7 +2250,6 @@ def _kinematics_file_deps() -> list[str]:
     return [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
-        *_bank_retention_file_deps(),
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
         _sldasm("mg_magnifier"),
@@ -3399,7 +3382,6 @@ def _verify_task(name: str) -> dict[str, Any]:
             "file_dep": [
                 str(VERIFY_PY),
                 str(POSTBUILD_PY),
-                *_bank_retention_file_deps(),
                 *child_stamps,
             ],
             "targets": _canonical_targets(f"verify:{name}"),
@@ -4294,7 +4276,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
         # Source-only adapter member/signature census; no SDK or native import.
         SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
-        SCRIPTS_DIR / "test_native_bank_retention_contract.py",
         # Finite purchased-rack ends and the complete recording-paper sweep.
         SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
         SCRIPTS_DIR / "test_pd_platen_refit.py",

@@ -38,6 +38,76 @@ import fr_tube_frame_spec
 from _inch_wall_limits import WALL_TARGET_MM
 from _paths import CAD_ROOT
 from machinist_exceptions import load_exceptions
+from test_pd_transgear_adapter_contract import SDK, _signature, _tree
+
+GENERATED = SDK / "adapters" / "_generated" / "sldworks_2026.py"
+
+
+@functools.cache
+def _interfaces() -> dict[str, ast.ClassDef]:
+    return {
+        node.name: node for node in _tree(GENERATED).body
+        if isinstance(node, ast.ClassDef)
+    }
+
+
+def _property_map(cls: ast.ClassDef, name: str) -> dict[str, ast.expr]:
+    assignments = [
+        node for node in cls.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+    ]
+    assert len(assignments) == 1, f"{cls.name}: missing/ambiguous {name}"
+    value = assignments[0].value
+    assert isinstance(value, ast.Dict)
+    return {ast.literal_eval(key): entry for key, entry in zip(value.keys, value.values, strict=True)}
+
+
+@functools.cache
+def _members(interface: str):
+    """(methods, getters, setters) of a generated SolidWorks interface."""
+    cls = _interfaces()[interface]
+    methods = {node.name: node for node in cls.body if isinstance(node, ast.FunctionDef)}
+    return methods, _property_map(cls, "_prop_map_get_"), _property_map(cls, "_prop_map_put_")
+
+
+def _dispatch(method: ast.FunctionDef) -> tuple[tuple[int, int], tuple]:
+    """Read the actual makepy invocation, never execute generated definitions."""
+    calls = [
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"InvokeTypes", "_ApplyTypes_"}
+    ]
+    assert len(calls) == 1, f"{method.name}: unsupported generated invocation"
+    call = calls[0]
+    index = 3 if call.func.attr == "InvokeTypes" else 2
+    return ast.literal_eval(call.args[index]), ast.literal_eval(call.args[index + 1])
+
+
+def _native_signature(method: ast.FunctionDef) -> inspect.Signature:
+    signature = _signature(method)
+    # makepy's not-optional sentinel is a Python default, but omitting an input
+    # sends DISP_E_PARAMNOTFOUND to COM. Out params default to Missing instead.
+    return signature.replace(parameters=[
+        parameter.replace(default=inspect.Parameter.empty)
+        if isinstance(parameter.default, ast.Name)
+        and parameter.default.id == "defaultNamedNotOptArg" else parameter
+        for parameter in signature.parameters.values()
+    ])
+
+
+def _bind(method: ast.FunctionDef, call: ast.Call, *, native: bool) -> None:
+    assert not any(isinstance(arg, ast.Starred) for arg in call.args), "unresolved positional splat"
+    assert all(keyword.arg is not None for keyword in call.keywords), "unresolved keyword splat"
+    static = any(isinstance(item, ast.Name) and item.id == "staticmethod" for item in method.decorator_list)
+    signature = _native_signature(method) if native else _signature(method)
+    try:
+        signature.bind(
+            *([] if static else [call.func.value]), *call.args,
+            **{keyword.arg: keyword.value for keyword in call.keywords},
+        )
+    except TypeError as error:
+        raise AssertionError(f"{method.name}: signature mismatch: {error}") from error
 
 
 def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> None:
@@ -3068,7 +3138,6 @@ def test_datum_target_leaders_are_solid_for_points_their_view_shows(monkeypatch,
     from types import SimpleNamespace
 
     import _drawing_datum_target as datum_target
-    from test_native_bank_retention_contract import _members
 
     target_xy, symbol_xy = (0.100, 0.050), (0.080, 0.040)
     inserted = []
@@ -3233,7 +3302,6 @@ def test_rail_webs_hold_position_to_the_underside_and_the_socket_pattern(monkeyp
     the web's drafted cut face (SolidWorks would not hang it on the
     dimension), its leader is then taken off and the frame moved to its
     place; the width's 2X counts the webs."""
-    from test_native_bank_retention_contract import _members
 
     assert spec.GEOMETRIC_TOLERANCES_IN["rail web position"] == ".06"
     assert spec.RAIL_WEB_POSITION_ZONE == pytest.approx(0.06 * 25.4)
@@ -8086,7 +8154,6 @@ def test_precise_curves_are_configured_immediately_after_new_drawing() -> None:
 
 def test_precise_curve_native_members_match_generated_extension_contract() -> None:
     import ast
-    from test_native_bank_retention_contract import _bind, _dispatch, _members
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     helper = next(
