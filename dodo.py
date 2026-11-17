@@ -3469,6 +3469,15 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
         if path.is_file() and path.name not in excluded_prompts
     ]
+    fitup: tuple[str, ...] = ()
+    if spec.source_kind == "assembly":
+        # A package whose steps print in ASSEMBLY.md is reviewed with that
+        # section (rule 22), which its sources key; its sheets no longer print it.
+        import ha_assembly_package
+
+        fitup = ha_assembly_package.fitup_sources(
+            dashed.removesuffix("-assembly")
+        )
     return sorted({
         str(path.resolve())
         for path in (
@@ -3484,6 +3493,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),
+            *map(Path, fitup),
         )
     })
 

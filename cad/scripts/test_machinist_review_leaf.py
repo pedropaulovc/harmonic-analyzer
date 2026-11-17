@@ -135,8 +135,10 @@ def _local_import_closure(entry: Path) -> set[str]:
             for name in names:
                 local = scripts / f"{name}.py"
                 # Registry is only used by interactive name/--all selectors;
-                # the leaf supplies PDF, kind and name.
-                if local.is_file() and name != "_drawing_registry":
+                # the leaf supplies PDF, kind and name. The ASSEMBLY.md
+                # generator is keyed per package instead, by
+                # ha_assembly_package.fitup_sources (rule 22).
+                if local.is_file() and name not in {"_drawing_registry", "ha_assembly_package"}:
                     pending.append(local)
     return found
 
