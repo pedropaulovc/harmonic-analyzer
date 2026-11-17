@@ -1,4 +1,4 @@
-import { MECHANISM_DATA } from './current-mechanics-data'
+import { MECHANISM_DATA } from './mechanics-data'
 
 /**
  * Taut, inextensible, non-slipping output wires, on the installed branch.
@@ -11,8 +11,8 @@ import { MECHANISM_DATA } from './current-mechanics-data'
  * rim wires. The 100/20 mm diameters give the nominal unsigned thin-wire gain;
  * source-video handedness must be checked against the released routing below.
  *
- * Geometry is the released CAD's lever_wire_geom.py, pen_wire_geom.py and
- * magnifying_wheel_geom.py at MECHANISM_DATA.provenance.sourceCommit. Its
+ * Geometry comes from cad/scripts mg_lever_wire_geom.py, pn_pen_wire_geom.py and
+ * the magnifying wheel geometry, via web/scripts/export-mechanism.py. Its
  * exaggerated 0.8 mm wire is retained, including its finite pitch radius;
  * the 0.25 mm interference-check stand-off is VISUAL ONLY, never extra gain.
  * The source CAD's point/plane yokes are rest-linearized motion-study aids,
@@ -55,8 +55,7 @@ const REST_AZIMUTH = Math.atan2(REST_HOOK_Y - CY, REST_HOOK_X - CX)
 const REST_LENGTH = Math.sqrt(REST_D2 - HUB_RADIUS ** 2 + (REST_HOOK_Z - CONTACT_Z) ** 2)
 const REST_PEN_WIRE_Y = M.penWireBottomMm[1] / 1000
 
-// The marker's local origin is the nib, not the rod's wire anchor. The exporter
-// checks this raw world datum against the exact released pen-assembly recipe.
+// The marker's local origin is the nib, not the rod's wire anchor.
 const PEN_X = M.penRestMm[0] / 1000
 const PEN_Y = M.penRestMm[1] / 1000
 const PEN_Z = M.penRestMm[2] / 1000
