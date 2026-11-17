@@ -219,7 +219,8 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
 
 def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
     # Rule 22 (machinist review of R5 and of farm run
-    # 20261117T143446475Z-fdea6028; MainBuild ruling 2026-11-17): the bracket
+    # 20261117T143446475Z-fdea6028; delegated ruling 2026-11-17 (MainBuild),
+    # no precedent; owner review #2144): the bracket
     # station band, the hanger bolt's cut-to-fit length, the top-seat feeler
     # and the free-rock travel print in the sheet 1 setting table, and the
     # steps and checks cite the row that carries their value.
@@ -256,9 +257,9 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
     assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in step("4A. ")
     check = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("1. "))
     assert feeler in check and notes.setting_row(notes.SEAT_ROW) in check
-    # The steps that draw each top seat flat send the fitter to check 1.
-    for label in ("5C. ", "6H. "):
-        assert "(CHECK 1" in step(label)
+    # Check 1 tries EACH mount's seat, so it runs once both bolts are
+    # tightened (6H), not at 5C while the rear mount is finger-tight.
+    assert "(CHECK 1" in step("6H. ") and "CHECK 1" not in step("5C. ")
     assert notes.setting_row(notes.ROCK_ROW) in step("6G. ")
     rock = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("2. "))
     assert notes.ROCK_TRAVEL_MIN in rock and notes.setting_row(notes.ROCK_ROW) in rock

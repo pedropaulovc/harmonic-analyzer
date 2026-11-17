@@ -139,7 +139,11 @@ DIMENSION_CALLOUTS = {
 # the reach ran to the hidden tip inside MHA-SM-02), the top-seat feeler, and
 # the free-rock travel read at the boss (a travel, not a feature: on DETAIL
 # A its upper end landed on nothing). Machinist review of farm run
-# 20261117T143446475Z-fdea6028; MainBuild ruling 2026-11-17.
+# 20261117T143446475Z-fdea6028. Delegated ruling 2026-11-17 (MainBuild), no
+# precedent; owner review #2144: a value no visible single model dimension
+# carries prints as a setting-table row built from the spec/sheet symbols.
+# Check 1 runs once both mounts are tightened (6H), not at 5C, while the
+# rear mount is still finger-tight.
 SETTING_TABLE_TITLE = "SETTING TABLE - ASSEMBLY.MD STEPS CITE EACH ROW"
 SETTING_TABLE_HEADER = (
     "ROW",
@@ -174,7 +178,7 @@ SETTING_TABLE_ROWS = (
     ),
     (
         SEAT_ROW,
-        "5C, 6H (CHECK 1)",
+        "6H (CHECK 1)",
         "MHA-SM-02 TOP SEAT ON MHA-FR-02",
         "-",
         f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE",
@@ -286,7 +290,7 @@ ASSEMBLY_STEPS = (
     f"5B. SLIDE A {KNIFE_GAUGE_BAR}, MADE TO THE MHA-SM-02 BORES, THROUGH "
     f"BOTH MOUNTS: {KNIFE_GAUGE_BAR_FEEL}.",
     "5C. TIGHTEN THE FRONT MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT "
-    "TO THE CROSSBAR UNDERSIDE (CHECK 1; THE REAR MOUNT IS SET AT 6G).",
+    "TO THE CROSSBAR UNDERSIDE (THE REAR MOUNT IS SET AT 6G).",
     "5D. WITHDRAW THE BAR (CHECK 5).",
     "6. REMOVE THE REAR MOUNT'S BOLT.",
     "6A. LIFT THE REAR MOUNT OFF ITS DOWEL.",

@@ -6,7 +6,7 @@ detail showing the knife contact and the boss the free rock is read at, the
 setting table (the settings and acceptances no visible model dimension
 carries) and the notes. Sheet 2 is the builder-owned SM_EXPLODED isometric
 with its BOM (vendor SKU added) and one balloon per BOM row. Sheet 3 is the
-finished isometric at 1:3. The numbered fit-up steps and checks print in the
+finished isometric at 1:4. The numbered fit-up steps and checks print in the
 release's ASSEMBLY.md (#2889). The setting is the assembly's own sketch
 dimension (``build_sm_summing_assembly._author_settings``), imported here; the explode
 comes from ``sm_summing_explode_spec`` and every printed text comes from
