@@ -12,15 +12,20 @@
  * buffer. Renderer-owned wheel/pen closure consumes magnifierHookM; this module
  * does not substitute the CAD's rest-linearized yoke for an actual wire law.
  */
-import { MECHANISM_DATA } from './current-mechanics-data'
+import { MECHANISM_DATA } from './mechanics-data'
 import {
   CHANNELS, physicalChannelAngle, coneShaftAngle, paperTravelM,
-  MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_BUILT, MAGNIFIER_RATIO_MAX,
   type Gearing,
 } from './kinematics'
 import { createMagnifierPose, solveMagnifier, type MagnifierPose } from './magnifier'
 
-export { MECHANISM_DATA } from './current-mechanics-data'
+export { MECHANISM_DATA }
+
+/** Magnifying clamp radius (CAD clamp_radius_band: min, built, max) over the spring-anchor arm. */
+const [CLAMP_MIN_MM, CLAMP_BUILT_MM, CLAMP_MAX_MM] = MECHANISM_DATA.magnifier.clampRadiusBandMm
+export const MAGNIFIER_RATIO_MIN = CLAMP_MIN_MM / MECHANISM_DATA.summing.anchorArmMm
+export const MAGNIFIER_RATIO_BUILT = CLAMP_BUILT_MM / MECHANISM_DATA.summing.anchorArmMm
+export const MAGNIFIER_RATIO_MAX = CLAMP_MAX_MM / MECHANISM_DATA.summing.anchorArmMm
 
 const C = MECHANISM_DATA.channel
 const S = MECHANISM_DATA.spring

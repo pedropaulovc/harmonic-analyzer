@@ -22,9 +22,8 @@
         <div class="model-view">
           <canvas id="stage" aria-label="Interactive CAD model of the harmonic analyzer" tabindex="0"></canvas>
           <div id="loading">
-            <p id="model-status" role="status">Loading the released CAD model…</p>
+            <p id="model-status" role="status">Loading the CAD model…</p>
             <progress id="model-progress" aria-label="CAD model download"></progress>
-            <span id="model-progress-percentage" class="hint" aria-hidden="true">0%</span>
             <button id="retry-model" type="button" hidden>Retry model</button>
           </div>
           <section id="video-dock" data-size="expanded" aria-label="Source video">
@@ -33,22 +32,6 @@
               <button id="minimize-player" type="button" aria-controls="video-player" aria-expanded="true">Compact player</button>
             </div>
             <div id="video-player"></div>
-            <div id="source-controls" hidden>
-              <div class="source-audio">
-                <button id="source-play" type="button">Play video</button>
-                <button id="source-mute" type="button" aria-pressed="false">Mute</button>
-                <label for="source-volume">Volume</label>
-                <input id="source-volume" type="range" min="0" max="100" step="1" value="100" />
-              </div>
-              <label for="source-scrub">Original video time <output id="source-scrub-time">0.000 s</output></label>
-              <input id="source-scrub" type="range" min="0" max="1" step="any" value="0" disabled aria-describedby="source-seek-status" />
-              <div class="source-audio">
-                <label for="source-seek-time">Exact time (s)</label>
-                <input id="source-seek-time" type="number" min="0" max="1" step="any" value="0" disabled />
-                <button id="source-seek" type="button" disabled>Seek</button>
-              </div>
-              <p id="source-seek-status" role="status">Pause to choose an original exposure.</p>
-            </div>
             <p id="video-error" class="notice" role="alert" hidden></p>
             <a id="watch-on-youtube" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
           </section>
@@ -60,17 +43,15 @@
           <p id="status"><span id="playback-status" role="status">Loading video…</span><span id="playback-clock"> · 0.0 s</span></p>
           <div class="playback-actions">
             <button id="pause-video" type="button" disabled>Play video</button>
-            <button id="follow-video" type="button" disabled>Restore video pose</button>
-            <button id="fit-view" type="button" disabled>See whole machine</button>
+            <button id="follow-video" type="button" disabled>Follow the video</button>
+            <button id="fit-view" type="button">See whole machine</button>
           </div>
-          <p class="interaction-hint">Pause to orbit, pan, zoom, and change the mechanism. Play follows approximate source tracks with chosen feasible inputs, not recovered history; unavailable intervals and unmeasured fidelity remain explicit.</p>
-          <p id="source-error" class="notice" role="status" hidden></p>
+          <p class="interaction-hint">Drag, scroll or change a control to explore the mechanism; Follow the video returns to the video's view. Shots are approximate, chosen to match each scene, not measured from the footage.</p>
           <p id="model-error" class="notice" role="alert" hidden></p>
-          <p id="physics-error" class="notice" role="alert" hidden></p>
 
           <details id="manual-controls">
             <summary>Mechanism controls</summary>
-            <fieldset id="drive-controls" disabled>
+            <fieldset id="drive-controls">
               <legend>Drive and setup</legend>
               <label for="crank">Crank position <output id="crank-value"></output></label>
               <input id="crank" type="range" min="-5" max="160" step="0.001" value="0" />
@@ -96,7 +77,7 @@
               <label for="platen-offset">Platen datum <output id="platen-value"></output></label>
               <input id="platen-offset" type="range" min="-0.1" max="0.1" step="0.0001" />
             </fieldset>
-            <fieldset id="channel-fieldset" disabled>
+            <fieldset id="channel-fieldset">
               <legend>Twenty physical channels</legend>
               <p class="hint">Normalized slide position. The configured CAD station is shown in millimetres; engraved measuring-stick calibration is not established. Phase rotates that channel's cam.</p>
               <div class="coefficient-presets">

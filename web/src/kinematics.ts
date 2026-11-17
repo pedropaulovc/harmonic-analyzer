@@ -85,15 +85,6 @@ export function coneShaftAngle(turns: number): number {
 }
 
 /**
- * The real magnifying clamp radius divided by the 39.85 mm spring-anchor arm.
- * Source: magnifying_lever_geom.clamp_radius_band(12): 66/165/209 mm.
- * These geometric limits supersede a nominal "up to four" animation scale.
- */
-export const MAGNIFIER_RATIO_MIN = 66 / 39.85
-export const MAGNIFIER_RATIO_BUILT = 165 / 39.85
-export const MAGNIFIER_RATIO_MAX = 209 / 39.85
-
-/**
  * Sample a coefficient set from a function, the way an operator does it:
  * the function is sampled at twenty discrete points and each sample becomes
  * one amplitude-bar position.

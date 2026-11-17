@@ -13,8 +13,9 @@ it is.
 2. **Kinematics stays free of three.js.** `src/kinematics.ts` imports nothing
    and is the only place the machine's ratios live. Motion derived from the
    1898 paper and `cad/config/machine/gear_train.yaml` — cite the source in a
-   comment when you add a ratio. If you need a number, read it out of the
-   config; do not eyeball it from the model.
+   comment when you add a ratio. Dimensions come from `src/mechanics-data.ts`,
+   generated from `cad/` by `scripts/export-mechanism.py`; regenerate it, never
+   hand-edit it or eyeball a number from the model.
 3. **Joints bind by name.** Add a joint by adding a `Binding` in
    `src/bindings.ts`, never by indexing into the glTF node array. An unresolved
    binding must warn and degrade, never throw.
@@ -23,9 +24,11 @@ it is.
 5. **`npm run build` runs `tsc --noEmit` first.** Keep it green — strict mode
    with `noUncheckedIndexedAccess` is on deliberately, because the code is full
    of `arrays[i]` over twenty channels.
-6. **Narration copy comes from the transcripts.** `references/engineerguy-youtube/*.vtt`
-   for pacing and beat order — paraphrase, never paste. The videos are
-   copyrighted; the structure is not.
+6. **Shot tables are data.** Change what the view shows during a video in
+   `content/tracks/<slug>.json` (author rows with `?edit=1`), not in code.
+   Mark a row you have not checked against the footage `"review": "unverified"`.
+   Narration and beat order follow `references/engineerguy-youtube/*.vtt` —
+   paraphrase, never paste. The videos are copyrighted; the structure is not.
 
 ## What this is for
 
