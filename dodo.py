@@ -3844,7 +3844,10 @@ def _machinist_review_task(
     deps = _machinist_review_file_deps(stem)
     return {
         "name": f"machinist_review:{stem}",
-        "file_dep": deps,
+        # The key folds the review code by bytes (_machinist_review_digest),
+        # doit by syntax tree: the text sidecar, one for every sheet since they
+        # share the code, keeps doit's freshness agreeing with the key.
+        "file_dep": [*deps, _source_text_dep("check:machinist_review", deps)],
         # The real producer edge is the PDF file_dep. Repeating it in the
         # packaged task closure keeps a selected review's drawing admitted.
         "task_dep": [f"drawing:{stem}"],

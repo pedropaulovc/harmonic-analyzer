@@ -431,8 +431,8 @@ def _exporter_digest() -> str:
 
     Produced feature bundle bytes enter the outer cache key and are validated
     and copied on every full run. They do not invalidate the native STL/scene
-    freshness ledger. Text uses Git-canonical bytes across LF/CRLF checkouts;
-    YAML uses the shared parsed-content digest.
+    freshness ledger. Each file is digested as the outer cache key digests it
+    (``ContentChecker._digest``), so the ledger and the key move together.
 
     Best-effort: if dependency discovery fails, fall back to this module alone;
     if even that cannot be read, return a stable empty digest.
@@ -440,15 +440,11 @@ def _exporter_digest() -> str:
     self_path = Path(__file__).resolve()
     try:
         dodo = _import_dodo()
-        canon = dodo._canonical_file_bytes
         files = sorted({self_path, *(Path(p).resolve()
                                      for p in dodo._export_requirement_deps())})
         h = hashlib.md5()
         for f in files:
-            h.update(
-                dodo.ContentChecker._digest(str(f)).encode("ascii")
-                if f.suffix.lower() in {".yaml", ".yml"} else canon(str(f))
-            )
+            h.update(dodo.ContentChecker._digest(str(f)).encode("ascii"))
         return h.hexdigest()
     except Exception:
         try:
