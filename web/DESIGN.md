@@ -88,8 +88,8 @@ rectangle, and tiles that showed a photograph of loose gears are left empty.
 Setup states that are not the operating machine (bars lifted, the measuring
 stick, a gear change, the pen being installed) are not modelled; the Operation
 rows that showed them render the operating machine and are marked
-`"review": "unverified"`. A setting past a v49 end stop (cone swing, pinion
-cam, wire fixture) clamps to that stop. The cameras were fitted on the v39
+`"review": "unverified"`. A setting past a v49 end stop (magnifying clamp,
+cone swing, pinion cam, wire fixture) clamps to that stop. The cameras were fitted on the v39
 model; v49 moved some parts (notably the magnifier and pen), so a camera aimed
 at them may need re-framing in the editor.
 

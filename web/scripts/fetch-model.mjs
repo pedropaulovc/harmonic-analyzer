@@ -13,7 +13,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inflateRawSync } from 'node:zlib'
+import { crc32, inflateRawSync } from 'node:zlib'
 import { optimizeModel } from './optimize-model.mjs'
 
 export const MODEL_RELEASE = 'v49'
@@ -46,6 +46,7 @@ export async function downloadReleaseGlb() {
     const name = directory.toString('utf8', at + 46, at + 46 + nameLength)
     if (name === MEMBER) {
       const method = directory.readUInt16LE(at + 10)
+      const crc = directory.readUInt32LE(at + 16)
       const sizes = [directory.readUInt32LE(at + 24), directory.readUInt32LE(at + 20), directory.readUInt32LE(at + 42)]
       // Zip64 extra field: 64-bit values for whichever of size/compressed/offset overflowed, in that order.
       for (let extra = at + 46 + nameLength; extra < at + 46 + nameLength + extraLength; extra += 4 + directory.readUInt16LE(extra + 2)) {
@@ -59,7 +60,7 @@ export async function downloadReleaseGlb() {
       console.log(`Downloading ${MEMBER} from ${MODEL_RELEASE} (${(compressedSize / 1e6).toFixed(0)} MB of a ${(total / 1e9).toFixed(1)} GB zip)…`)
       const { bytes: data } = await range(`${start}-${start + compressedSize - 1}`)
       const glb = method === 0 ? data : method === 8 ? inflateRawSync(data) : null
-      if (!glb || glb.length !== size) throw new Error(`Unsupported or corrupt zip member ${MEMBER} (method ${method})`)
+      if (!glb || glb.length !== size || crc32(glb) !== crc) throw new Error(`Unsupported or corrupt zip member ${MEMBER} (method ${method})`)
       return glb
     }
     at += 46 + nameLength + extraLength + directory.readUInt16LE(at + 32)

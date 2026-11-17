@@ -1,6 +1,6 @@
 import { createViewer, loadMachine, type Machine } from './scene'
-import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
-import { MAGNIFIER_RATIO_MAX, MAGNIFIER_RATIO_MIN, squareWave } from './kinematics'
+import { createMechanismInput, MAGNIFIER_RATIO_MAX, MAGNIFIER_RATIO_MIN, MECHANISM_DATA, type MechanismInput } from './mechanics'
+import { squareWave } from './kinematics'
 import { loadTrack, type Track, type TrackView } from './track'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
@@ -67,6 +67,8 @@ let mode: 'following-video' | 'exploring' = 'following-video'
 let dirty = true
 let turning = false
 let views: readonly TrackView[] = []
+/** Video time of the last following-mode draw. */
+let drawnTime = Number.NaN
 /** ?t= deep link: the time shown before the player reports one. */
 let linkedTime = Number(new URLSearchParams(location.search).get('t')) || 0
 let lastTick = performance.now()
@@ -235,7 +237,9 @@ async function selectVideo(next: Video): Promise<void> {
     track = loaded
     if (!loaded) explore()
     dirty = true
-  }).catch((error: unknown) => notice(videoError, `Shot table failed to load: ${error instanceof Error ? error.message : String(error)}`))
+  }).catch((error: unknown) => {
+    if (!current.signal.aborted) notice(videoError, `Shot table failed to load: ${error instanceof Error ? error.message : String(error)}`)
+  })
   try {
     const created = await createVideoPlayer(videoContainer, next.id, state => {
       if (current.signal.aborted) return
@@ -297,9 +301,15 @@ function tick(now: number): void {
   const elapsed = Math.min((now - lastTick) / 1000, 0.25)
   lastTick = now
   if (mode === 'following-video' && track) {
-    views = track.evaluate(videoTime())
-    if (views.length) viewer.renderViews(views, view => updatePose(view.input))
-    else viewer.render()
+    // A paused, cued or ended video keeps its time: draw only when it moves or something else changed.
+    const time = videoTime()
+    if (time !== drawnTime || dirty) {
+      views = track.evaluate(time)
+      if (views.length) viewer.renderViews(views, view => updatePose(view.input))
+      else viewer.render()
+      drawnTime = time
+      dirty = false
+    }
   } else {
     if (turning) { input.crankTurns += elapsed * Number(speed.value); dirty = true }
     if (dirty) {

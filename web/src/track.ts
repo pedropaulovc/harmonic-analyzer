@@ -12,8 +12,8 @@
  */
 import * as THREE from 'three'
 import cameras from '../content/cameras.json'
-import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
-import { MAGNIFIER_RATIO_BUILT, MAGNIFIER_RATIO_MAX, MAGNIFIER_RATIO_MIN, type Gearing } from './kinematics'
+import { createMechanismInput, MAGNIFIER_RATIO_BUILT, MAGNIFIER_RATIO_MAX, MAGNIFIER_RATIO_MIN, MECHANISM_DATA, type MechanismInput } from './mechanics'
+import type { Gearing } from './kinematics'
 
 export type Vec3 = [number, number, number]
 export type Rect = [number, number, number, number]
@@ -96,6 +96,9 @@ function phaseDelta(a: number, b: number): number {
   return d
 }
 
+/** Every bar at zero; rows without a preset use it, so a track need not define it. */
+const ZERO_PRESET: Preset = { amplitudes: new Array(20).fill(0), phases: new Array(20).fill(0) }
+
 export class Track {
   readonly shots: CompiledShot[]
   private readonly views: TrackView[] = []
@@ -103,7 +106,7 @@ export class Track {
 
   constructor(readonly spec: TrackSpec) {
     const preset = (name: string | undefined, where: string): Preset => {
-      const found = name === undefined ? undefined : spec.presets[name]
+      const found = name === undefined ? undefined : spec.presets[name] ?? (name === 'zero' ? ZERO_PRESET : undefined)
       if (!found) throw new Error(`${where}: unknown preset ${JSON.stringify(name)}`)
       return found
     }

@@ -11,8 +11,9 @@ import { MECHANISM_DATA } from './mechanics-data'
  * rim wires. The 100/20 mm diameters give the nominal unsigned thin-wire gain;
  * source-video handedness must be checked against the released routing below.
  *
- * Geometry comes from cad/scripts mg_lever_wire_geom.py, pn_pen_wire_geom.py and
- * the magnifying wheel geometry, via web/scripts/export-mechanism.py. Its
+ * Geometry comes from cad/scripts/sh_vn_music_wire_lever_geom.py,
+ * sh_vn_music_wire_pen_geom.py and the magnifying wheel geometry, via
+ * web/scripts/export-mechanism.py. Its
  * exaggerated 0.8 mm wire is retained, including its finite pitch radius;
  * the 0.25 mm interference-check stand-off is VISUAL ONLY, never extra gain.
  * The source CAD's point/plane yokes are rest-linearized motion-study aids,

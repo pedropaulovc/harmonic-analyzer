@@ -4,8 +4,7 @@
  * paste into content/tracks/<slug>.json. Loaded only on ?edit=1.
  */
 import type { Viewer } from './scene'
-import type { MechanismInput } from './mechanics'
-import { MAGNIFIER_RATIO_BUILT } from './kinematics'
+import { MAGNIFIER_RATIO_BUILT, type MechanismInput } from './mechanics'
 import { NAMED_CAMERAS, cameraPose, type CameraSpec, type SetupSpec, type Shot, type Track } from './track'
 import type { VideoPlayer } from './youtube-player'
 import type { Video } from './video-catalog'
@@ -54,8 +53,8 @@ export function startEditor(context: EditorContext): void {
     <label>Video time <output data-id="time">0.000 s</output></label>
     <input data-id="scrub" type="range" min="0" step="0.001" value="0" />
     <div class="row">
-      <button data-step="-1">−1 s</button><button data-step="-0.1">−0.1 s</button><button data-step="-0.04">−1 frame</button>
-      <button data-step="0.04">+1 frame</button><button data-step="0.1">+0.1 s</button><button data-step="1">+1 s</button>
+      <button data-step="-1">−1 s</button><button data-step="-0.1">−0.1 s</button><button data-frames="-1">−1 frame</button>
+      <button data-frames="1">+1 frame</button><button data-step="0.1">+0.1 s</button><button data-step="1">+1 s</button>
     </div>
     <div class="row"><button data-id="mark-start">Start ⟵ now</button><output data-id="start">0.000</output>
       <button data-id="mark-end">End ⟵ now</button><output data-id="end">0.000</output></div>
@@ -98,6 +97,9 @@ export function startEditor(context: EditorContext): void {
   scrub.addEventListener('input', () => seek(Number(scrub.value)))
   for (const button of panel.querySelectorAll<HTMLButtonElement>('[data-step]')) {
     button.addEventListener('click', () => seek(context.time() + Number(button.dataset.step)))
+  }
+  for (const button of panel.querySelectorAll<HTMLButtonElement>('[data-frames]')) {
+    button.addEventListener('click', () => seek(context.time() + Number(button.dataset.frames) / (context.video?.fps ?? 30)))
   }
   get('mark-start').addEventListener('click', () => { start = round(context.time(), 4); startOut.value = start.toFixed(3) })
   get('mark-end').addEventListener('click', () => { end = round(context.time(), 4); endOut.value = end.toFixed(3) })
