@@ -220,9 +220,8 @@ reviews that read it. This policy file is not a review input.
   for axial-only pins and rods (supersedes the 2026-10-15 thread-or-press
   ruling). Red threadlocker (262/263) is a lock on seated threads #10 and
   larger, never on adjusters or joints that must open; 222/243 are optional
-  consumables. `cad/scripts/joint_retention.py` lists every threaded joint
-  and audits it (`check:joint_retention`); smooth fixed joints are not yet
-  in its inventory.
+  consumables. `cad/docs/threaded-joint-retention.md` lists every threaded
+  joint, its lock and the open items; smooth fixed joints are not yet in it.
 - **Legacy assembly sheets.** Three-view sheets from
   `drawing_recipe_assembly.md` are orientation placeholders and are expected
   to fail review until they are built out to rule 22.

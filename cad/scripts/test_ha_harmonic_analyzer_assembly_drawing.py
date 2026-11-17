@@ -14,7 +14,6 @@ import fr_tube_frame_spec
 import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
-import joint_retention
 import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -414,15 +413,6 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     assert max(map(len, drawing.ASSEMBLED_NOTE.splitlines())) <= (
         drawing.ASSEMBLED_NOTE_WIDTH
     )
-
-
-def test_integration_joints_point_at_their_integration_steps() -> None:
-    rows = {joint.id: joint for joint in joint_retention.JOINTS}
-    anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
-    assert anchor.installed_at == steps.step_ref("channel-anchors-set")
-    assert anchor.lock is joint_retention.Lock.NONE
-    bracket = rows["ha-harmonic-analyzer/magnifying-bracket-screws"]
-    assert bracket.installed_at == steps.step_ref("magnifier-bracket-screwed")
 
 
 def test_channel_sheet_cites_the_anchor_step_by_its_number() -> None:

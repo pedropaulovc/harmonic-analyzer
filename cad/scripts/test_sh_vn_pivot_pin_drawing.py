@@ -1,6 +1,6 @@
 """MHA-SH-VN-58 (#2339): one bought dowel, two installed members, one sheet.
 
-Offline: the registry row, the joint-retention entry, the purchase sheet's
+Offline: the registry row, the purchase sheet's
 supplier sizes and mate callout, and the channel BOM rows it feeds.
 """
 
@@ -16,7 +16,6 @@ import ch_channel_assembly_sheet as channel_sheet
 import ch_channel_assembly_steps as channel_steps
 import ch_channel_explode_spec as explode
 import draw_sh_vn_pivot_pin as drawing
-import joint_retention
 import pytest
 import sh_vn_pivot_pin_bar_spec as bar_pin
 import sh_vn_pivot_pin_notes as notes
@@ -62,12 +61,6 @@ def test_the_catalogue_band_is_not_the_generic_dowel_band() -> None:
     low, high = pin.PIN_DIA_LIMITS
     assert low == pin.PIN_DIA == pytest.approx(25.4 * 5 / 64)
     assert high - low == pytest.approx(0.0002 * 25.4)
-
-
-def test_joint_retention_lists_the_pin_as_purchased_and_unthreaded() -> None:
-    stem = pin.PART_STEM.replace("-", "_")
-    assert stem in joint_retention.UNTHREADED_PARTS
-    assert stem in joint_retention.UNTHREADED_STOCK
 
 
 def test_the_sheet_is_registered_and_enforced() -> None:

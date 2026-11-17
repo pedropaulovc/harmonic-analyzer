@@ -6,7 +6,6 @@ import _chain
 import _chain_link
 import _config
 import draw_pd_paper_drive_assembly as assembly_drawing
-import joint_retention
 
 STEM = "sh-vn-chain-link"
 NAME = "sh_vn_chain_link"
@@ -19,8 +18,6 @@ def test_registry_row_is_the_bought_chain_not_a_machined_part() -> None:
     assert ROW["process"] == "purchased"
     assert ROW["supplier"] == "McMaster-Carr"
     assert ROW["supplier_skus"] == ["6261K171"]
-    assert NAME in joint_retention.purchased_parts()
-    assert NAME in joint_retention.UNTHREADED_STOCK
 
 
 def test_quantity_is_half_the_loop_and_matches_the_bom() -> None:

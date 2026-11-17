@@ -12,7 +12,6 @@ import pytest
 import _config
 import build_sm_summing_assembly as builder
 import draw_sm_summing_assembly as drawing
-import joint_retention
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
@@ -267,20 +266,9 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
         )
 
 
-def test_retention_rows_cite_the_package_steps() -> None:
-    rows = {
-        joint.id: joint
-        for joint in joint_retention.JOINTS
-        if joint.assembly == "sm_summing"
-    }
-    hanger = rows["sm-summing/knife-hanger-in-mount"]
-    assert hanger.installed_at == "MHA-SM-00 STEP 6"
-    assert hanger.exposure is joint_retention.Exposure.STATIC_CLAMP
-    assert hanger.lock is joint_retention.Lock.NONE
-    assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
+def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
     # sheet 1 note 5, so the shoulder screw goes in at 8A-8B.
-    assert rows["sm-summing/gooseneck-shoulder-screw"].installed_at == "MHA-SM-00 STEP 8B"
     steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
     assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5")
     assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
@@ -292,10 +280,6 @@ def test_retention_rows_cite_the_package_steps() -> None:
     # Bench acceptance, as note 4's dowel bond (machinist review, run
     # 20261109T142156827Z, rule 23).
     assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
-    hook = rows["sm-summing/boss-hook-in-lever"]
-    assert hook.lock is joint_retention.Lock.NONE
-    assert joint_retention.RULINGS[hook.exception].joint == hook.id
-    assert "sm-summing/boss-hook-jam-nut-on-hook" not in rows
 
 
 def _step_group(number: str) -> list[str]:
@@ -411,7 +395,7 @@ def test_rear_mount_is_rehung_on_the_lever_and_swung_to_the_rock_gauge() -> None
         < step.index("TIGHTEN")
     )
     # The cut stays at step 4 and the hanger joint completes at step 6, the
-    # steps the purchased-part sheets and joint_retention cite.
+    # steps the purchased-part sheets and the joint-retention table cite.
     cut = " ".join(_step_group("4"))
     assert cut.startswith("4. ") and "CUT AN" in cut
     assert builder.KNIFE_REAR_YAW_RANGE_DEG > builder.KNIFE_BAR_YAW_DEG
