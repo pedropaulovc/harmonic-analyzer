@@ -5,8 +5,7 @@ objects whose every COM call ``time.sleep``s for a duration *calibrated from the
 v0.10.0 release logs* (``harmonic-analyzer-v0.10.0-logs.zip`` ->
 ``verify-soundness.log``). The telemetry gates above that seam stay production
 code: ``verify._verify_static_one`` opens the doc, activates the pose, and runs
-them through the real ``_telemetry`` spine. Native bank-retention metrology is
-isolated separately in ``_patch_com_seam``; saved-solid validation belongs to the
+them through the real ``_telemetry`` spine; saved-solid validation belongs to the
 native farm gate, not these telemetry tests. Wall-clock timing is scaled
 (``HARMONIC_MOCK_SCALE``, default 0.01 = 1/100th real time).
 Shared vendor occurrences carry native file/member identities and semantic
@@ -366,14 +365,6 @@ def _patch_com_seam(monkeypatch, gear_owner: str = "dt-drive-train") -> None:
 
     monkeypatch.setattr(_assembly, "whats_wrong", clean_whats_wrong)
     monkeypatch.setattr(verify, "_gear_mate_links", _fake_gear_links(gear_owner))
-    # Like test_verify_auto_repair, this fixture tests another contract, not
-    # native component metrology. Keep the collaborator's assembly routing
-    # checked without inventing saved-solid geometry for the telemetry tests.
-    def bank_retention(_adapter: Any, *, assembly_kind: str) -> None:
-        assert assembly_kind == "drive_train"
-        assert _adapter.currentModel._name == "dt-drive-train"
-
-    monkeypatch.setattr(verify, "measure_bank_retention", bank_retention)
 
 
 # --------------------------------------------------------------------------- #

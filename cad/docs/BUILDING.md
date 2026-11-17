@@ -67,28 +67,16 @@ These examples run on a **local seat**. For the farm, replace
 (see [farm builds](../../DEVELOPING.md#farm-builds-farm_buildpy)) —
 the same task names select the same closure.
 
-The `verify_soundness:dt_drive_train` and
-`verify_soundness:ha_harmonic_analyzer` leaves also read the saved cylinder-bank
-retention stack: one south brass disc (no north disc), the north spring,
-pedestal/arbor bearing stations and end seats, and actual configured disc
-size/material. Checked temporary solid copies certify positive disc air to
-the 64T and alignment pinion at the shared **ENGAGED** pose; no production
-component, mate, configuration or saved file is changed. The top leaf additionally
-checks the saved rods' complete finite ring bores against native eccentric
-cam cylinders and their axial slots. Aggregate metrology is emitted under
-`verify.bank_retention`. The continuous printed-tolerance clearance/retaining-land
-proof remains authoritative for all phases and tolerance extremes: this native
-home/engaged witness is not a motion simulation. The spring solid is its
-specified installed envelope, not a measured wave form or load certificate.
-Reduced `active_count` debug banks retain applicable readbacks but report
-`coverage=partial-bank` and the absent stations; they do not certify contact
-between a missing final gear and the north spring. Production retention evidence
-requires `coverage=full-bank`.
+Cylinder-bank retention (south disc air to the 64T and alignment pinion,
+retaining lands, rod ring bores against the eccentric cams) is proved by the
+continuous printed-tolerance clearance in `cylinder_bank_layout`
+(`SOUTH_DISC_CLEARANCE`) over all phases and tolerance extremes; the saved
+bodies are covered by the `interference-free` soundness gate.
 
 Drive-train drawing acceptance also inspects sheet 3 for separate arbor/spring
 balloon landings, and sheet 8 step 9C against sheet 13 Detail A for the same
 back MHA-DT-02 (north pedestal) blade-setting face. Explode offsets affect
-presentation only; the installed retention geometry above is unchanged.
+presentation only; the installed geometry is unchanged.
 
 ```powershell
 # The one fully-safe build: every part + assembly + every gate (= default task)

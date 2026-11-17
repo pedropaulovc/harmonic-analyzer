@@ -497,7 +497,7 @@ def _case_target_ownership_never_builds_tasks_or_dependency_closures(dodo, monke
     for helper in (
         "_canonical_subtask_definition", "_part_file_deps", "_assembly_file_deps",
         "_drawing_file_deps", "_soundness_file_deps", "_kinematics_file_deps",
-        "_bank_retention_file_deps", "_feature_export_file_deps", "_export_file_deps",
+        "_feature_export_file_deps", "_export_file_deps",
         "_package_file_deps", "_check_spec", "_recipe_files",
         "_executed_closure",
     ):
