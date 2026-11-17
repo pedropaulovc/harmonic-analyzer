@@ -19,6 +19,7 @@ stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fra
 note = "Inches. Only the ends, two holes and two grip-end corners are machined; 1/2 and 1 in faces as bought. All spindle work on the low belt, 100–2800 rpm; no belt change."
 shop = "../shop.toml"
 material_key = "6061-t6511"
+milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_feed_lever/features.toml"
@@ -117,7 +118,7 @@ envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_s
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{cad.overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 # From ZERO END: the jaws hold the lever from its left jaw side to the right
 # one; ZERO END and H1 sit on the short left overhang.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{cad.overhang_mm}}", "{{cad.jaw_right_x_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.blank_thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{cad.overhang_mm}}", "{{cad.jaw_right_x_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.blank_thickness_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -128,7 +129,7 @@ instruction = "Cutter .04 below bar. Left end, conventional (table moves away fr
 instruction_detailed = "Touch the cutter on the top, then down .54 (cutter .04 below the bar). Left end, conventional: the table moves away from you (cutter toward you). Skim .02–.04 in .02 X steps until clean all over. Mark ZERO END and ZERO EDGE."
 settings = "jig-em-half-6061-t6511"
 milling_cuts = [
-  { name = "ZERO END clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
+  { name = "ZERO END clean-up", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
 ]
 
 [[setups.operations]]
@@ -141,7 +142,7 @@ rpm = 2800
 feed = "hand"
 # H1 (.28) sits just outside the left jaw side, H2 (.91) inside the jaws.
 milling_cuts = [
-  { name = "spot H1–H2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.hole_x_mm}}" },
+  { name = "spot H1–H2", kind = "drill", phase = "rough", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.hole_x_mm}}" },
 ]
 
 [setups.operations.table]
@@ -161,7 +162,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.hole_dia_band_mm}}" }, 
 hole_depth_mm = "{{cad.thickness_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.hole_x_mm}}" },
+  { name = "H1–H2", kind = "drill", phase = "finish", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.hole_x_mm}}" },
 ]
 
 [[setups]]
@@ -178,7 +179,7 @@ envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.cutter_dia_mm}}"], y_s
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{cad.overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 # From ZERO END: the jaws hold the lever from their left side to the right
 # one, the grip end on the short right overhang; ZERO END ~5 in out left.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{cad.grip_jaw_left_x_mm}}", "{{cad.grip_jaw_right_x_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.blank_thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{cad.grip_jaw_left_x_mm}}", "{{cad.grip_jaw_right_x_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.blank_thickness_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -191,7 +192,7 @@ settings = "jig-em-half-6061-t6511"
 inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}} on the DRO from ZERO END: edge finder on the grip end at Y {{process.square_probe_near_y_in:.1dot}} and {{process.square_probe_far_y_in:.1dot}}, the two X readings within {{cad.end_square_in:.3dot}} (square ±{{cad.angular_tol_deg:g}}°)."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "grip end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "grip end to length", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
 [[setups]]

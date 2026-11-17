@@ -212,6 +212,22 @@ them from the carrier and drills each at its own mark, so its table gives the
 REF X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
 recorded as not owned in `cad/config/shop-equipment.toml`.
 
+Every plan needs the first prechips release after 0.11.3 (pedropaulovc/prechips#437,
+owner rulings 2026-11-16 on #407–#410, #429 and #430). Each vise setup's
+cantilever `beam` declares `vise_left` (`"start"`/`"end"`: the beam end at
+the hold's left overhang; the grip is measured from the end whose overhang
+the hold declares, so a finished-length beam such as the riser's ends links
+to its blank-length hold; `"other"` for an upright part or a beam across the
+jaws), with `vise_hold = N` where the setup
+re-grips. Single-material plans set `milling_material` once instead of a
+`material` per cut (the leadscrew kit keeps per-cut keys). The base-bar edge
+roughs name their finish pass (`finish_cut`) and its stock per loaded axis
+(`finish_stock_mm = { y = 0.254, z = "through" }`: the cutter tip runs
+below the underside), so they rough at dechatter's 4.1 mm width again (owner
+ruling 2026-11-16). No shop tool states `helix_deg` or `axial_ratio`: no
+vendor page for the owned cutters (the LMS 6784 set) publishes a helix, so the
+configured 1.0 applies.
+
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
 hold is checked against `workholding.vise-pm-6` and the three vise limits
