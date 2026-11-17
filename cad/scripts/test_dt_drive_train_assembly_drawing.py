@@ -688,9 +688,8 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     import dt_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    printed = re.search(
-        r"VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT (\.\d{3}) MIN", check
-    )
+    # Attempt 1 review (rule 22): the minimum prints as check 4Y's sheet 16 row.
+    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("stop-screw-engagement"))
     assert printed is not None
     # The inch minimum is the 1.5D rule rounded up, never over the guarantee.
     minimum = float(printed.group(1)) * 25.4
@@ -699,25 +698,34 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
     _assert_engagement_cites_its_records(
-        check, "SWING STOP FULL-FORM", "THE STOP SEAT'S", "MHA-SH-VN-52'S THREAD LENGTH"
+        check,
+        "SWING STOP FULL-FORM",
+        "THE STOP SEAT'S",
+        "MHA-SH-VN-52'S THREAD LENGTH",
+        "stop-screw-engagement",
     )
 
 
 def _assert_engagement_cites_its_records(
-    check: str, joint: str, seat: str, screw: str
+    check: str, joint: str, seat: str, screw: str, row: str
 ) -> None:
     """PR 2 machinist review round 6: a seated screw's engagement cannot be
     read, so the check takes the lesser of the seat's full-thread depth and
-    the screw's thread length, both recorded in step 23 before it goes in."""
+    the screw's thread length, both recorded in step 23 before it goes in;
+    its sheet 16 row names the same two records."""
     import dt_drive_train_steps as steps
 
     cited = re.search(
-        rf"{joint} THREAD ENGAGEMENT \.\d{{3}} MIN: THE LESSER READING OF STEPS (\d+\w)-(\d+\w)\.",
+        rf"{joint} THREAD ENGAGEMENT, THE LESSER READING OF STEPS (\d+\w)-(\d+\w) "
+        rf"\({re.escape(drawing.acceptance_ref(row))}\)\.",
         check,
     )
     assert cited is not None
     number = steps.step_number("other-base-mounting")
     assert all(ref.startswith(str(number)) for ref in cited.groups())
+    number_text = str(drawing.ACCEPTANCE_ROW_NUMBERS[row])
+    (printed,) = (cells for cells in drawing.ACCEPTANCE_TABLE_ROWS if cells[0] == number_text)
+    assert printed[-1] == "LESSER OF {}, {}".format(*cited.groups())
     body = _rig_step_body("other-base-mounting")
     seat_line, screw_line = (
         re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
@@ -732,7 +740,8 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     import dt_vn_cone_pivot_screw_spec as pivot_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    printed = re.search(r"VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT (\.\d{3}) MIN", check)
+    # Attempt 1 review (rule 22): the minimum prints as check 4W's sheet 16 row.
+    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("pivot-screw-engagement"))
     assert printed is not None
     # The inch minimum is the 1D floor rounded up, never over the guarantee.
     minimum = float(printed.group(1)) * 25.4
@@ -744,6 +753,7 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
         "MHA-DT-VN-52 FULL-FORM",
         "THE TAPPED HOLE'S",
         "MHA-DT-VN-52'S THREAD LENGTH",
+        "pivot-screw-engagement",
     )
 
 
@@ -1028,9 +1038,11 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
         cite = f"({drawing.acceptance_ref(key)}"
         assert printed.count(cite) == (2 if key == "tip-gap" else 1), key
         (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
-        # The STEP cell names the sub-step whose text carries the cite.
+        # The STEP cell names the sub-step (or check) whose text carries the cite.
         first = row[1].split(",")[0]
-        head = re.search(rf"\b{re.escape(first)}\. ((?:(?!\b\d+[A-Z]?\. ).)*)", printed)
+        text = _flat(drawing.CHECKS) if first.startswith("CHECK ") else printed
+        first = first.removeprefix("CHECK ")
+        head = re.search(rf"\b{re.escape(first)}\. ((?:(?!\b\d+[A-Z]?\. ).)*)", text)
         assert head is not None and cite in head.group(1), (key, first)
     assert drawing.acceptance_ref("tip-gap") in _flat(drawing.CHECKS)
     # No cited value prints in its step any more.

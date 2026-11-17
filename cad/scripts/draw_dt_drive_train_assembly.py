@@ -1485,6 +1485,26 @@ _ACCEPTANCES = (
         f"FLUSH {FLUSH_SET_TEXT}",
         "DEPTH MICROMETER",
     ),
+    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4W and 4Y
+    # printed their engagement minimums only in check text.  Each is the lesser
+    # of two recorded readings (step 23's depth gauge and calipers), never one
+    # model dimension.
+    (
+        "pivot-screw-engagement",
+        "CHECK 4W",
+        "MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT",
+        pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT,
+        f"LESSER OF {_step_ref('other-base-mounting', 'H')}, "
+        f"{_step_ref('other-base-mounting', 'J')}",
+    ),
+    (
+        "stop-screw-engagement",
+        "CHECK 4Y",
+        "MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT",
+        stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT,
+        f"LESSER OF {_step_ref('other-base-mounting', 'M')}, "
+        f"{_step_ref('other-base-mounting', 'N')}",
+    ),
 )
 ACCEPTANCE_ROW_NUMBERS = {
     key: len(SETTING_TABLE_ROWS) + index for index, (key, *_cells) in enumerate(_ACCEPTANCES, 1)
@@ -1498,6 +1518,14 @@ def acceptance_ref(key: str) -> str:
     """A step's citation of its sheet 16 setting-table row."""
     return f"SHEET {ACCEPTANCE_SHEET} ROW {ACCEPTANCE_ROW_NUMBERS[key]}"
 
+
+# Attempt 1 review (clarity, rule 26): 4L's bare .320 MIN named no dimension;
+# it limits MHA-DT-10's printed shoulder length.
+_T120_SHOULDER_REMEDY = T120_FITUP_SHOULDER_REMEDY.replace(
+    "FACE THE SHOULDER BACK, ", "FACE THE SHOULDER BACK: MHA-DT-10 SHOULDER LENGTH "
+)
+if _T120_SHOULDER_REMEDY == T120_FITUP_SHOULDER_REMEDY:
+    raise AssertionError("T120_FITUP_SHOULDER_REMEDY no longer prints 'FACE THE SHOULDER BACK, '")
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
 # is a slip fit, so each pressed pin's check is followed by this one remedy,
@@ -1681,7 +1709,9 @@ CONE_CRANK_STEPS = _note_text(
         "3C. INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
-        "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
+        # Attempt 1 review (clarity, rule 22): the redo says which way the
+        # back-off moves; the end play grows with it from 3's zero.
+        "3E. IF IT READ OVER, REDO 3-3C WITH LESS BACK-OFF, IF UNDER WITH MORE.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
@@ -1715,7 +1745,8 @@ CONE_CRANK_STEPS = _note_text(
         "4H. " + T120_FITUP_BAND_CHECK,
         "4J. " + T120_FITUP_SHOULDER_CHECK,
         "4K. " + T120_FITUP_BAND_REMEDY,
-        "4L. " + T120_FITUP_SHOULDER_REMEDY,
+        # Attempt 1 review (clarity, rule 26): the limit names its dimension.
+        "4L. " + _T120_SHOULDER_REMEDY,
         "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
         "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
         # Rubric sample round 4: the bind remedy names what to check and how;
@@ -2322,13 +2353,13 @@ CHECKS = _note_text(
         "4T. REDO 4N-4R.",
         "4U. LEAVE MHA-DT-02 AS THEY ARE FROM HERE ON.",
         "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
-        "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
-        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')}.",
+        "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT, THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')} "
+        f"({acceptance_ref('pivot-screw-engagement')}).",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
-        "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'M')}-{_step_ref('other-base-mounting', 'N')}.",
+        "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT, THE LESSER "
+        f"READING OF STEPS {_step_ref('other-base-mounting', 'M')}-"
+        f"{_step_ref('other-base-mounting', 'N')} ({acceptance_ref('stop-screw-engagement')}).",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
