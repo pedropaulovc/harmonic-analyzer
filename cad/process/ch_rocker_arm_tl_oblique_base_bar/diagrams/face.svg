@@ -1,75 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Styles: prechips.palette roles (class); the traveler prints the legend once. Arrows show the cutter's path over the bar. -->
 <svg xmlns="http://www.w3.org/2000/svg" data-cad-template="face" viewBox="0 0 720 360" width="720" height="360" font-family="Arial, Helvetica, sans-serif" font-size="15">
-  <defs>
-    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0L10 5L0 10z" fill="#111"/>
-    </marker>
-  </defs>
-  <rect width="720" height="360" fill="#fff"/>
+  <rect class="paper" width="720" height="360"/>
 
   <!-- Front view (from operator side) -->
-  <text x="10" y="22" fill="#555" font-style="italic">Front view</text>
-  <rect x="20" y="200" width="680" height="16" fill="#6b7178"/>
-  <text x="30" y="213" fill="#fff" font-size="14">mill table</text>
-  <rect x="239" y="172" width="188" height="28" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
+  <text class="title" x="10" y="22">Front view</text>
+  <rect class="fixture-table" x="20" y="200" width="680" height="16"/>
+  <text x="30" y="213" font-size="14">mill table</text>
+  <rect class="fixture-vise" x="239" y="172" width="188" height="28"/>
 
   <!-- Arriving sawn blank at authored blank thickness; finished ends dashed -->
-  <rect id="bar" x="{{view.fx0}}" y="120" width="{{view.flen}}" height="{{view.fthick}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
-  <g stroke="#a33" stroke-width="1.5" stroke-dasharray="3 2">
+  <rect id="bar" class="part-kept" x="{{view.fx0}}" y="120" width="{{view.flen}}" height="{{view.fthick}}" stroke-width="1.5"/>
+  <g class="active-face" stroke-width="1.5" stroke-dasharray="3 2">
     <line x1="{{view.fzero}}" y1="112" x2="{{view.fzero}}" y2="{{view.fbottom}}"/>
     <line x1="{{view.fend}}" y1="112" x2="{{view.fend}}" y2="{{view.fbottom}}"/>
   </g>
   <text x="{{view.fx0}}" y="106" font-size="13">sawn {{process.blank_length_in:fraction}}; ends squared to {{cad.length_in:.2f}} (dashed)</text>
   <!-- front jaw with parallels hidden behind -->
-  <rect x="249" y="{{view.jaw_top}}" width="168" height="{{view.jaw_h}}" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
-  <rect x="255" y="{{view.fbottom}}" width="156" height="{{view.parallel_h}}" fill="none" stroke="#333" stroke-width="1.2" stroke-dasharray="4 3"/>
-  <text x="333" y="148" text-anchor="middle">front jaw</text>
-  <text x="333" y="165" text-anchor="middle" font-size="14">1-3/8 parallels behind</text>
+  <rect class="clamp" x="249" y="{{view.jaw_top}}" width="168" height="{{view.jaw_h}}"/>
+  <rect class="fixture-support" x="255" y="{{view.fbottom}}" width="156" height="{{view.parallel_h}}" fill="none"/>
+  <text class="label-on-clamp" x="333" y="148" text-anchor="middle">front jaw</text>
+  <text class="label-on-clamp" x="333" y="165" text-anchor="middle" font-size="14">1-3/8 parallels behind</text>
 
   <!-- screw jacks at their authored X from ZERO END -->
   <g transform="translate({{view.jack1_x}} 0)">
-    <g fill="#8a9099" stroke="#111" stroke-width="1.2">
+    <g class="fixture-support">
       <rect x="-3" y="{{view.fbottom}}" width="6" height="{{view.jack_shaft_h}}"/>
       <rect x="-12" y="158" width="24" height="42"/>
     </g>
     <text x="8" y="153" font-size="13">jack: touch only</text>
   </g>
   <g transform="translate({{view.jack2_x}} 0)">
-    <g fill="#8a9099" stroke="#111" stroke-width="1.2">
+    <g class="fixture-support">
       <rect x="-3" y="{{view.fbottom}}" width="6" height="{{view.jack_shaft_h}}"/>
       <rect x="-12" y="158" width="24" height="42"/>
     </g>
     <text x="-8" y="153" text-anchor="end" font-size="13">jack: touch only</text>
   </g>
 
-  <!-- 3/4 end mill facing the top (shown dashed) -->
-  <rect x="345" y="34" width="31" height="26" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
-  <rect x="350" y="60" width="21" height="28" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <!-- 3/4 end mill facing the top; its path over the bar -->
+  <rect class="cutter" x="345" y="34" width="31" height="26"/>
+  <rect class="cutter" x="350" y="60" width="21" height="28"/>
   <text x="384" y="56">3/4 in end mill faces full length</text>
-  <line x1="384" y1="74" x2="472" y2="74" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="478" y="79">+X</text>
+  <line class="arrow" x1="384" y1="74" x2="472" y2="74"/>
+  <text x="478" y="79">cutter path +X</text>
 
   <!-- Top view: final orientation for marking; blank length, finished width -->
-  <text x="10" y="240" fill="#555" font-style="italic">Top view</text>
-  <rect x="159.5" y="240" width="84" height="10" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
-  <rect x="{{view.tx0}}" y="250" width="{{view.tlen}}" height="{{view.twidth}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
-  <line x1="{{view.tx0}}" y1="251" x2="{{view.tx1}}" y2="251" stroke="#a33" stroke-width="3"/>
-  <line x1="{{view.tzero}}" y1="250" x2="{{view.tzero}}" y2="{{view.tbottom}}" stroke="#a33" stroke-width="3"/>
-  <line x1="{{view.tend}}" y1="250" x2="{{view.tend}}" y2="{{view.tbottom}}" stroke="#a33" stroke-width="1.5" stroke-dasharray="3 2"/>
-  <!-- slots S1-S2 cut here, and the jacks under the bar (dashed) -->
-  <g id="slots" data-cad-group="slots" fill="#fff" stroke="#111" stroke-width="1.2"/>
+  <text class="title" x="10" y="240">Top view</text>
+  <rect class="clamp" x="159.5" y="240" width="84" height="10"/>
+  <rect class="part-kept" x="{{view.tx0}}" y="250" width="{{view.tlen}}" height="{{view.twidth}}" stroke-width="1.5"/>
+  <line class="datum" x1="{{view.tx0}}" y1="251" x2="{{view.tx1}}" y2="251" stroke-width="3"/>
+  <line class="datum" x1="{{view.tzero}}" y1="250" x2="{{view.tzero}}" y2="{{view.tbottom}}" stroke-width="3"/>
+  <line class="active-face" x1="{{view.tend}}" y1="250" x2="{{view.tend}}" y2="{{view.tbottom}}" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <!-- slots S1-S2 cut here, and the jacks under the bar -->
+  <g id="slots" data-cad-group="slots" class="holes"/>
   <g id="slot-labels" data-cad-group="slot-labels" font-size="13"/>
-  <g id="jacks" data-cad-group="jacks" fill="none" stroke="#333" stroke-width="1.2" stroke-dasharray="3 2"/>
-  <rect x="159.5" y="{{view.tbottom}}" width="84" height="10" fill="#b5b9bf" stroke="#111" stroke-width="1.2"/>
+  <g id="jacks" data-cad-group="jacks" class="fixture-support" fill="none"/>
+  <rect class="clamp" x="159.5" y="{{view.tbottom}}" width="84" height="10"/>
   <text x="201.5" y="{{view.mark1_y}}" text-anchor="middle" font-size="13">mark top: bar 1 C'BORE SIDE,</text>
   <text x="201.5" y="{{view.mark2_y}}" text-anchor="middle" font-size="13">bar 2 RAIL SIDE</text>
   <text x="{{view.zero_end_label_x}}" y="{{view.zero_end_y}}" text-anchor="end" font-size="13">ZERO END</text>
 
   <text x="340" y="250">fixed jaw: ZERO EDGE against it</text>
-  <line x1="336" y1="246" x2="245" y2="245" stroke="#111" stroke-width="1"/>
+  <line class="leader" x1="336" y1="246" x2="245" y2="245"/>
   <text x="340" y="276">side 2: flip end-for-end, ZERO EDGE stays at</text>
   <text x="340" y="294">fixed jaw. Then, without unclamping: square left</text>
   <text x="340" y="312">end (ZERO END), right end to length, mark top;</text>
   <text x="340" y="330">slots S1–S2; spot, drill, tap, counterbore.</text>
-  <text x="340" y="348">Dashed circles: jacks, clear of the slots.</text>
+  <text x="340" y="348">Dotted circles: jacks, clear of the slots.</text>
 </svg>
