@@ -261,7 +261,7 @@ vise_hold = [
 ]
 # On edge the bar bends across its .24 thickness (y) as well as down its
 # width (z); the jaws are the only clamp.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = "{{cad.edges_jaw_mm}}", section_mm = { y = "{{cad.thickness_mm}}", z = "{{cad.blank_width_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = "{{cad.edges_jaw_mm}}", section_mm = { y = "{{cad.thickness_mm}}", z = "{{cad.blank_width_mm}}" }, vise_left = "start", vise_hold = 1 }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -282,7 +282,7 @@ sizing = "other"
 instruction = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure width w; .010 passes to .005 over, then .005 to {{cad.width_in:.3f}}."
 instruction_detailed = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure the width w, touch the cutter on the top edge and set Z = w. Cutter centred on the edge, take .010 passes to Z .005 over {{cad.width_in:.3f}}, then a .005 pass to Z {{cad.width_in:.3f}}."
 settings = "riser-em-half-6061-t6511"
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = "{{cad.edges_jaw_mm}}", section_mm = { y = "{{cad.thickness_mm}}", z = "{{cad.width_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = "{{cad.edges_jaw_mm}}", section_mm = { y = "{{cad.thickness_mm}}", z = "{{cad.width_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [
   { name = "width rough", kind = "end", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.254, radial_woc_mm = "{{cad.thickness_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
   { name = "width finish", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.127, radial_woc_mm = "{{cad.thickness_mm}}", rpm = 1800, feed_mm_min = 203.2, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -307,8 +307,9 @@ vise_hold = [
   { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{cad.overhang_max_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" },
 ]
 # X from ZERO END; hold 1 jaws (hold 2 is an operation beam). Drills
-# in the overhang bend it as a cantilever off the jaw side.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold1_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+# in the overhang bend it as a cantilever off the jaw side. vise_left
+# "other": the beam is the finished length, the holds the blank's.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold1_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
 speed_kind = "spindle"

@@ -184,7 +184,7 @@ vise_hold = [
   { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.spacer_height_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{process.spacer_centred_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
 ]
 # The whole blank lies inside the jaw span: no station bends.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = [0, "{{cad.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = [0, "{{cad.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start", vise_hold = 1 }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -220,7 +220,7 @@ milling_cuts = [
 ]
 settings = "block-em-half-6061-t6511"
 # The spacer stands in the vise alone: its own section and grip.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.spacer_height_mm}}"], clamp_mm = [0, "{{process.spacer_height_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.spacer_height_mm}}"], clamp_mm = [0, "{{process.spacer_height_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start", vise_hold = 2 }
 inspection = "Spacer within .001 of the block's height, both in {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.height_band_mm}}" }]
 
@@ -235,7 +235,7 @@ diagram = { file = "diagrams/feed-block/width.svg", alt = "Blank on edge: clean 
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_width_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_blank_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # Standing on edge: a cantilever up from the jaw tops, bent across the jaws.
-beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_width_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.blank_length_mm}}", y = "{{cad.height_mm}}" } }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_width_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.blank_length_mm}}", y = "{{cad.height_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -270,7 +270,7 @@ diagram = { file = "diagrams/feed-block/ends.svg", alt = "Blank on end: clean on
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.blank_length_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.edge_parallel_height_mm}}", "{{cad.y_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.blank_length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_x_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # Standing on a sawn end: a cantilever up from the jaw tops.
-beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.length_mm}}", y = "{{cad.height_mm}}" } }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.length_mm}}", y = "{{cad.height_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -308,7 +308,7 @@ diagram = { file = "diagrams/feed-block/holes.svg", alt = "Block SEAT down, SPIN
 envelope = { x_span_mm = "{{cad.y_length_mm}}", y_span_mm = "{{cad.length_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{cad.height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.face_parallel_height_mm}}", "{{process.tap_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.length_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.height_mm}}", parallel_height_mm = "{{process.face_parallel_height_mm}}", overhang_mm = ["{{cad.centred_overhang_y_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # Stations from ROW SIDE. Before the notch the jaws grip the whole length.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.y_length_mm}}"], clamp_mm = [0, "{{cad.y_length_mm}}"], section_mm = { y = "{{cad.length_mm}}", z = "{{cad.height_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.y_length_mm}}"], clamp_mm = [0, "{{cad.y_length_mm}}"], section_mm = { y = "{{cad.length_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -397,7 +397,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_ja
 # Standing on all of SPINDLE END (the notch comes later), drilled down from
 # OUTER END: thrust along the upright block compresses it, so these cuts
 # bend nothing.
-beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.overall_y_mm}}", y = "{{cad.height_mm}}" } }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = [0, "{{process.jaw_grip_mm}}"], section_mm = { x = "{{cad.overall_y_mm}}", y = "{{cad.height_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -448,7 +448,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_ja
 # Stations from LUG END. The lug hangs out past the jaw side, a cantilever
 # from it at the 2.15 worst case; the finished lug section (.96 across the
 # jaws, .77 high) is taken for every pass, the weakest.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.overall_y_mm}}"], clamp_mm = ["{{process.notch_overhang_mm}}", "{{cad.overall_y_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{process.lug_width_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.overall_y_mm}}"], clamp_mm = ["{{process.notch_overhang_mm}}", "{{cad.overall_y_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{process.lug_width_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
 speed_kind = "spindle"
