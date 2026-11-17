@@ -514,9 +514,14 @@ EXPLODED_VIEW_NAMES = {
 if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the pen explode is authored in Default")
 
-# --- sheet 3: the finished isometric, centred above the title block; the fit-up
-# steps and checks print in the release's ASSEMBLY.md (#2889) ---------------------
-ASSEMBLY_ISO_CENTER = ((SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0, 0.145)
+# --- sheet 3: the finished isometric, centred in the field between the title
+# block's top and the top border (the outline stands ~26 mm under the ink, so
+# the sheet's mid-height would crowd the title block); the fit-up steps and
+# checks print in the release's ASSEMBLY.md (#2889) -------------------------------
+ASSEMBLY_ISO_CENTER = (
+    (SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0,
+    (TITLE_BLOCK[3] + SHEET_INNER_BORDER[3]) / 2.0,
+)
 # GetOutline frames the finished iso's projected bounding box, not its ink: on
 # the c03368c sheets 3 and 4 the pen's ink spanned x 0.0304..0.0950, y
 # 0.0955..0.1952 about ASSEMBLY_ISO_CENTER while the outline's bottom stood
