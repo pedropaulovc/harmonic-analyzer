@@ -49,6 +49,7 @@ from sm_vn_knife_hanger_stud_spec import (
     HEAD_TOP_Y,
     LENGTH,
     SHANK_DIA,
+    THREAD,
     THREAD_LENGTH_MIN,
     UNIT,
 )
@@ -100,7 +101,7 @@ CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
 DIMENSION_CALLOUTS = {
     "CutLength": "UNDER HEAD TO TIP\nCUT AT MHA-SM-00 STEP 4",
     "ChamferWidth": "CUT END",
-    "ThreadLengthMin": "FULL THREAD FROM TIP\nEXCEPT 1 PITCH MAX AT CUT END",
+    "ThreadLengthMin": f"{THREAD} UNC FULL THREAD FROM TIP\nEXCEPT 1 PITCH MAX AT CUT END",
 }
 # The purchased-screw note lands on the unaltered head's top edge and stands
 # up and right in the open field.
