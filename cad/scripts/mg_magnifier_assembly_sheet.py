@@ -23,13 +23,14 @@ from _inch_fraction import inch_fraction
 from sh_vn_thumb_screw_spec import SHANK_LEN as _THUMB_SHANK_LEN
 from sh_vn_thumb_screw_spec import THREAD as _THUMB_THREAD
 from mg_magnifier_assembly_spec import (
+    BACK_END_SUNK_DIMENSION,
+    DRUM_RECESS_DIMENSION,
     ENDSHAKE,
     ENDSHAKE_DIMENSION,
     ENDSHAKE_TOL,
     FEATURE,
     PRESS_GAUGE_DIMENSION,
-    THREAD_PAST_LOCKNUT_MIN_TEXT,
-    THREAD_PAST_LOCKNUT_TEXT,
+    THREAD_PAST_LOCKNUT_DIMENSION,
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
@@ -40,14 +41,20 @@ from _printed_tolerance import (
 )
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 from sh_vn_music_wire_lever_geom import TOGGLE_LENGTH as _TOGGLE_LENGTH
-from mg_magnifying_wheel_geom import DRUM_RECESS as _DRUM_RECESS
 from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
 from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
 from mg_magnifying_wheel_geom import TIE1_Y as _TIE1_Y
 
 # The axle-stack dimensions DETAIL A and DETAIL B import (the builder marks
-# the banded ones, DIMENSION_TOLERANCES).
-DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
+# the banded and limit ones, DIMENSION_TOLERANCES and LIMIT_DIMENSIONS).
+# DETAIL A: the press gauge and the plain end below the bar's far face;
+# DETAIL B: the drum face below the spigot end, the endshake and the thread
+# end past the second nut.
+PRESS_DETAIL_DIMENSIONS = frozenset({PRESS_GAUGE_DIMENSION, BACK_END_SUNK_DIMENSION})
+ENDSHAKE_DETAIL_DIMENSIONS = frozenset(
+    {DRUM_RECESS_DIMENSION, ENDSHAKE_DIMENSION, THREAD_PAST_LOCKNUT_DIMENSION}
+)
+DRAWING_DIMENSIONS = {FEATURE: set(PRESS_DETAIL_DIMENSIONS | ENDSHAKE_DETAIL_DIMENSIONS)}
 
 # Every view other than the three principal ones carries a letter (rule 9,
 # rule 26), its boundary or viewing arrow on the right side view (MG LEFT).
@@ -80,22 +87,6 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
-# The pressed axle's plain end below the bar's far face: the window the axle
-# spec proves from the printed shank, gauge and bar depth (mg_wheel_axle_spec;
-# the bar sheet names the stack, MHA-MG-00's press step accepts it).
-BACK_END_SUNK_TEXT = (
-    f"{render_number(_axle.BACK_END_SUNK_MIN / _INCH, UNIT, 3)}-"
-    f"{render_number(_axle.BACK_END_SUNK_MAX / _INCH, UNIT, 3)}"
-)
-# The pressed drum's front face below the wheel's spigot face, hard against
-# the boss: the window the printed spigot and drum lengths prove
-# (mg_magnifying_wheel_geom.DRUM_RECESS). Delegated ruling (assembly-step
-# moves): MHA-MG-00's press step accepts it.
-# The geom asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0)
-# drops float residue that render_number would reject as a negative magnitude.
-DRUM_RECESS_TEXT = "-".join(
-    render_number(round(limit / _INCH, 6) + 0.0, UNIT, 3) for limit in _DRUM_RECESS
-)
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
@@ -330,8 +321,8 @@ _TIE_HOLE = f"THE {WIRE_TIE_HOLE}"
 STEP_TEXT = {
     _steps.DRUM_PRESSED_KEY: (
         f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
-        f"BOSS, ITS OUTER FACE {DRUM_RECESS_TEXT} BELOW THE END OF THE SPIGOT "
-        "(CALIPER DEPTH ROD)."
+        f"BOSS, ITS OUTER FACE BELOW THE END OF THE SPIGOT AS {ENDSHAKE_DETAIL_TITLE} "
+        "SETS IT (CALIPER DEPTH ROD)."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
     # A press that goes on by hand is a slip fit (rule 23). Owner ruling
@@ -341,19 +332,18 @@ STEP_TEXT = {
     "drum-bonded": f"IF IT CAME OFF, BOND IT ON WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
     # The press goes to a first setting: the plain end's window below the
     # bar's far face (the bar's depth stack, which MHA-MG-08 names; the spec
-    # proves the window), read with a depth rod. The only acceptance of the
-    # axle's position is the thread end past the second nut: the number pair
-    # a depth rod reads there (owner ruling 2026-11-06 Q1), printed in the
-    # check from the spec's constants and read where DETAIL B draws the nuts.
-    # Farm rounds 1-3 gated it as a callout on DETAIL A, which draws no nut,
-    # and r3 read two acceptances; Main chose option A on 2026-11-08. The
-    # press goes in oiled and pushes only on the shank step, through
-    # PRESS_SLEEVE (#2399).
+    # proves the window), read with a depth rod where DETAIL A dimensions it.
+    # The only acceptance of the axle's position is the thread end past the
+    # second nut: the limits a depth rod reads there (owner ruling 2026-11-06
+    # Q1), dimensioned on DETAIL B, which draws the nuts. Farm rounds 1-3
+    # gated it as a callout on DETAIL A, which draws no nut, and r3 read two
+    # acceptances; Main chose option A on 2026-11-08. The press goes in oiled
+    # and pushes only on the shank step, through PRESS_SLEEVE (#2399).
     _steps.AXLE_PRESSED_KEY: (
         f"PRESS {_AXLE} INTO {_BAR} WITH LIGHT MACHINE OIL ON ITS PLAIN END, "
         "THREADED END OUT, ON ITS SHOULDER ONLY, "
-        f"THROUGH {PRESS_SLEEVE}, TO A FIRST SETTING: ITS PLAIN END "
-        f"{BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
+        f"THROUGH {PRESS_SLEEVE}, TO A FIRST SETTING: ITS PLAIN END BELOW THE "
+        f"FAR FACE OF {_BAR} AS {PRESS_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
@@ -380,9 +370,8 @@ STEP_TEXT = {
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
-        f"CHECK THE THREAD END IN {ENDSHAKE_DETAIL_TITLE} STANDS "
-        f"{THREAD_PAST_LOCKNUT_MIN_TEXT}-{THREAD_PAST_LOCKNUT_TEXT} PAST THE "
-        "SECOND NUT (CALIPER DEPTH ROD)."
+        f"CHECK THE THREAD END STANDS PAST THE SECOND NUT AS "
+        f"{ENDSHAKE_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
     "trial-parts-removed-to-press": (
         f"IF IT FAILS, REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}."

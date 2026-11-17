@@ -1,12 +1,15 @@
 """The MHA-MG-00 magnifier assembly settings: the builder's and the sheet's.
 
-Two settings belong to no single part: the press gauge the wheel axle is pressed
-to in the bar, and the endshake the first nut sets. Each one is printed as a
-native model dimension on the MHA-MG-00 sheet. A construction chain in the
-assembly carries both (the ms-measuring-stick ClampedSetting pattern). It runs
-along the axle centreline on the Right plane, through four stations: the bar
-front face, the shank step, the wheel's spigot face and the front washer. The
-chain is blanked, so it prints only in the drawing view that dimensions it.
+Five settings belong to no single part: the press gauge the wheel axle is
+pressed to in the bar, the axle's plain end below the bar's far face (the
+press's first setting), the drum's outer face below the wheel's spigot end,
+the endshake the first nut sets, and the axle's thread end past the second
+nut (the press's acceptance). Each one is printed as a native model dimension
+on the MHA-MG-00 sheet. A construction chain in the assembly carries them all
+(the ms-measuring-stick ClampedSetting pattern). It runs along the axle
+centreline on the Right plane, through nine stations (CHAIN_D), from the bar's
+far face to the axle's thread end. The chain is blanked, so it prints only in
+the drawing views that dimension it.
 
 Two more are the lever group's operator settings: the clamp station on the
 lever and the output fixture's drop below the lever axis. A second blanked
@@ -30,11 +33,11 @@ import mg_magnifying_lever_geom as _lever
 import mg_output_fixture_geom as _fixture
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
+import mg_magnifying_wheel_geom as _wheel
 import mg_wheel_group as _group
 from sh_vn_music_wire_lever_geom import WHEEL_X
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from _assembly_contract import assembly_contract
-from _title_block_units import LENGTH_UNITS, render_number
 
 ASM_NAME = "mg-magnifier"
 # A literal stem: the build graph narrows this drawing's assemblies/*
@@ -103,30 +106,103 @@ ENDSHAKE_TOL = _group.ENDSHAKE_MAX - _group.ENDSHAKE
 if abs((_group.ENDSHAKE - _group.ENDSHAKE_MIN) - ENDSHAKE_TOL) > 1e-9:
     raise AssertionError("the endshake band is not symmetric about its model value")
 
-# Chain stations d (from the bar front face) along the axle centreline.
+# The press and thread-end settings the MHA-MG-00 steps read with a caliper
+# depth rod, each a model length on the same chain (rule 22: a measurable
+# setting prints on a view even though the steps print in ASSEMBLY.md).
+# Each prints as its two limits; the model's own pose sits inside them.
+# The axle's plain end below the bar's far face: the press's first setting,
+# the window the axle spec proves from the printed shank, gauge and bar depth.
+BAR_FAR_D = -_pin.BAR_DEPTH
+BACK_END_D = _pin.BACK_Y
+BACK_END_SUNK_LIMITS = (_pin.BACK_END_SUNK_MIN, _pin.BACK_END_SUNK_MAX)
+# The pressed drum's outer face below the spigot end (the wheel hub's front
+# face): the window the printed spigot and drum lengths prove. The geom
+# asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0) drops
+# the float residue the limits' places check would reject.
+DRUM_RECESS = _wheel.SPIGOT_LEN - _wheel.DRUM_LEN
+DRUM_RECESS_LIMITS = tuple(round(limit, 6) + 0.0 for limit in _wheel.DRUM_RECESS)
+# The axle's thread end (the dome's tangent) past the second nut's outer face:
+# the press's one acceptance (owner ruling 2026-11-06, Q1), read on the stack.
+# High: the axle's limit. Low: the locknut on full thread, i.e. at least the
+# dome's incomplete pitch past it (mg_wheel_group.LOCKNUT_THREAD_MARGIN).
+LOCKNUT_FACE_D = _group.LOCKNUT_FACE_D
+THREAD_END_D = _pin.THREAD_END_Y
+THREAD_PAST_LOCKNUT_LIMITS = (_pin.TIP_INCOMPLETE, _pin.THREAD_PAST_LOCKNUT_LIMIT)
+
+# Chain stations d (from the bar front face) along the axle centreline: the
+# bar's far face, the axle's plain end, the bar front face, the shank step,
+# the drum's outer face, the wheel's spigot face, the front washer, the
+# second nut's outer face and the axle's thread end.
 STEP_D = PRESS_GAUGE
 HUB_FRONT_D = _group.HUB_FRONT_D
 WASHER_D = _group.FRONT_WASHER_D
+DRUM_FACE_D = HUB_FRONT_D - DRUM_RECESS
 if abs((WASHER_D - HUB_FRONT_D) - ENDSHAKE) > 1e-9:
     raise AssertionError("the front washer no longer sits one endshake off the hub")
 if not 0.0 < HUB_FRONT_D - STEP_D:
     raise AssertionError("the shank step must stand inside the wheel hub")
-CHAIN_D = (0.0, STEP_D, HUB_FRONT_D, WASHER_D)
+CHAIN_D = (
+    BAR_FAR_D,
+    BACK_END_D,
+    0.0,
+    STEP_D,
+    DRUM_FACE_D,
+    HUB_FRONT_D,
+    WASHER_D,
+    LOCKNUT_FACE_D,
+    THREAD_END_D,
+)
+if any(near >= far for near, far in zip(CHAIN_D, CHAIN_D[1:])):
+    raise AssertionError(f"the axle stack stations are out of order: {CHAIN_D}")
+# The chain's anchor station, the bar front face (d = 0).
+CHAIN_ORIGIN_INDEX = CHAIN_D.index(0.0)
 
 FEATURE = "AxleStackReference"
 PRESS_GAUGE_DIMENSION = "PressGauge"
 ENDSHAKE_DIMENSION = "Endshake"
+BACK_END_SUNK_DIMENSION = "BackEndSunk"
+DRUM_RECESS_DIMENSION = "DrumRecess"
+THREAD_PAST_LOCKNUT_DIMENSION = "ThreadPastLocknut"
+# Each leg's dimension name, in chain order; the printed ones are named above.
+CHAIN_LEG_DIMENSIONS = (
+    BACK_END_SUNK_DIMENSION,
+    "PlainEndToFrontFace",
+    PRESS_GAUGE_DIMENSION,
+    "StepToDrumFace",
+    DRUM_RECESS_DIMENSION,
+    ENDSHAKE_DIMENSION,
+    "WasherToLocknutFace",
+    THREAD_PAST_LOCKNUT_DIMENSION,
+)
+if len(CHAIN_LEG_DIMENSIONS) != len(CHAIN_D) - 1:
+    raise AssertionError("every axle stack leg needs one dimension name")
+LIMIT_DIMENSIONS = {
+    BACK_END_SUNK_DIMENSION: BACK_END_SUNK_LIMITS,
+    DRUM_RECESS_DIMENSION: DRUM_RECESS_LIMITS,
+    THREAD_PAST_LOCKNUT_DIMENSION: THREAD_PAST_LOCKNUT_LIMITS,
+}
+_legs = dict(zip(CHAIN_LEG_DIMENSIONS, zip(CHAIN_D, CHAIN_D[1:])))
+for _name, (_low, _high) in LIMIT_DIMENSIONS.items():
+    _length = _legs[_name][1] - _legs[_name][0]
+    if not _low < _length < _high:
+        raise AssertionError(f"{_name}: the model's {_length:.4f} mm is outside {_low}-{_high}")
+LIMIT_PRECISION = 3
 DRAWING_PRECISION = {
-    FEATURE: {PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES, ENDSHAKE_DIMENSION: 3}
+    FEATURE: {
+        PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES,
+        ENDSHAKE_DIMENSION: 3,
+        **{name: LIMIT_PRECISION for name in LIMIT_DIMENSIONS},
+    }
 }
 TOLERANCE_PRECISION = 3
 DIMENSION_TOLERANCES = {ENDSHAKE_DIMENSION: ENDSHAKE_TOL}
 # Printed as (value) through the native prefix/suffix channel, no band.
 REFERENCE_DIMENSIONS = frozenset({PRESS_GAUGE_DIMENSION})
-if REFERENCE_DIMENSIONS | set(DIMENSION_TOLERANCES) != set(
+_forms = (REFERENCE_DIMENSIONS, set(DIMENSION_TOLERANCES), set(LIMIT_DIMENSIONS))
+if set().union(*_forms) != set(DRAWING_PRECISION[FEATURE]) or sum(map(len, _forms)) != len(
     DRAWING_PRECISION[FEATURE]
-) or REFERENCE_DIMENSIONS & set(DIMENSION_TOLERANCES):
-    raise AssertionError("each stack setting is either banded or a reference")
+):
+    raise AssertionError("each stack setting is exactly one of banded, limits or a reference")
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
@@ -164,16 +240,6 @@ THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
 assert _lever.LEVER_UNIT == UNIT, "the lever charges this sheet's projection band in its unit"
 INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 
-# The thread-past-locknut window that the step 3B check prints. High: the
-# axle's limit. Low: the locknut on full thread, i.e. at least the dome's
-# incomplete pitch past it (mg_wheel_group.LOCKNUT_THREAD_MARGIN).
-THREAD_PAST_LOCKNUT_TEXT = render_number(
-    _pin.THREAD_PAST_LOCKNUT_LIMIT / LENGTH_UNITS[UNIT], UNIT, 3
-)
-THREAD_PAST_LOCKNUT_MIN_TEXT = render_number(
-    _pin.TIP_INCOMPLETE / LENGTH_UNITS[UNIT], UNIT, 3
-)
-
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
 # 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are
 # model annotations, not sheet prose: imported SetText writes through to the
@@ -184,13 +250,19 @@ SETTING_CALLOUTS = {
     FEATURE: {
         # The press gauge prints as a bare reference. Its acceptance, the
         # number pair a depth rod reads at the second nut (owner ruling
-        # 2026-11-06, Q1), is printed in the MHA-MG-00 thread-end check,
-        # which points to DETAIL B, the view that draws the nuts. Farm rounds
-        # 1-3 of #2286 gated the pair as a callout on DETAIL A, which draws
-        # no nut; Main chose option A on 2026-11-08.
+        # 2026-11-06, Q1), is ThreadPastLocknut on DETAIL B, the view that
+        # draws the nuts. Farm rounds 1-3 of #2286 gated the pair as a
+        # callout on DETAIL A, which draws no nut; Main chose option A on
+        # 2026-11-08.
         # One reason line; the steps carry how the nuts set and lock it
         # (owner ruling 2026-11-06, Q2).
         ENDSHAKE_DIMENSION: (4, "WHEEL FREE, NO RATTLE"),
+        # Each limit pair names the two faces it reads between; the press's
+        # first setting and its one acceptance say which they are (r3 of
+        # #2286 read two acceptances). The steps name the caliper depth rod.
+        BACK_END_SUNK_DIMENSION: (4, "FIRST SETTING:\nPLAIN END BELOW\nFAR FACE"),
+        DRUM_RECESS_DIMENSION: (4, "DRUM FACE BELOW\nSPIGOT END"),
+        THREAD_PAST_LOCKNUT_DIMENSION: (4, "ACCEPTANCE:\nTHREAD END PAST\nSECOND NUT"),
     },
     LEVER_FEATURE: {
         CLAMP_STATION_DIMENSION: (3, "CLAMP STATION: SETS MAGNIFICATION"),
