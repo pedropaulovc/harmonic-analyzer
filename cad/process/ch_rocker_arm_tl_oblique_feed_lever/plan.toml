@@ -132,6 +132,8 @@ instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~3/16 across. X ±{{cad.sta
 rpm = 2800
 feed = "hand"
 # H1 (.28) sits just outside the left jaw side, H2 (.91) inside the jaws.
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "spot H1–H2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
 ]
@@ -144,11 +146,13 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "drill"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
-instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.2 below the bottom face; no peck (L/D 1.5). H1 leaves a ~.11 web to the end."
+instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.2 below the bottom face; no peck. H1 leaves a ~.11 web to the end."
 rpm = 2000
 feed = "hand"
 inspection = "Ø{{cad.hole_dia_min_in:.4dot}}–{{cad.hole_dia_max_in:.4dot}}; stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
 ]

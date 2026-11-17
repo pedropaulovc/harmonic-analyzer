@@ -45,6 +45,9 @@ file = "../../out/features/ch_rocker_arm_tl_oblique_carrier/features.toml"
 adapter = "harmonic_carrier"
 
 [parameters]
+# drill_pecking steps, one drill Ø each: #43 (.089 in), #29 (.136 in).
+riser_peck_mm = 2.2606
+clamp_peck_mm = 3.4544
 blank_length_in = 21.3           # Registry process note: a 21.3 in length.
 blank_min_length_in = 20.8       # Author's choice: ≥.15 to clean up each sawn end.
 blank_width_in = 6.0
@@ -317,6 +320,8 @@ rpm = 2800
 feed = "hand"
 # The #2 centre drill's Ø3/16 body cone, .001 in/rev.
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "A1, A2, B1, B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.pin_x_mm}}" },
   { name = "CL, CR", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.clamp_x_mm}}" },
@@ -333,6 +338,8 @@ sizing = "other"
 instruction = "Spot R1–R4 (cone just under .089) and L1, L2 (full Ø.19 cone) the same way, from the same zero."
 rpm = 2800
 feed = "hand"
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" },
   { name = "L1, L2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.lever_x_mm}}" },
@@ -351,19 +358,23 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "drill-43"
 sizing = { kind = "band", band_mm = "{{cad.riser_drill_band_mm}}" }
-instruction = "R1–R4 through; full-retract peck every .09 (5D deep)."
+instruction = "R1–R4 through; full-retract pecks every {{process.riser_peck_mm:in.3dot}}."
 rpm = 2800
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = { step_mm = "{{process.riser_peck_mm}}", retract = "full" }
 milling_cuts = [{ name = "R1–R4 at .001 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 2.2606, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-29"
 sizing = { kind = "band", band_mm = "{{cad.clamp_drill_band_mm}}" }
-instruction = "CL, CR through; one chip-break peck at about .27 deep."
+instruction = "CL, CR through; chip-break pecks every {{process.clamp_peck_mm:in.3dot}}."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = { step_mm = "{{process.clamp_peck_mm}}", retract = "chip_break" }
 milling_cuts = [{ name = "CL, CR at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.clamp_x_mm}}" }]
 
 [[setups.operations]]
@@ -374,6 +385,8 @@ instruction = "L1, L2 through; no peck."
 instruction_detailed = "L1 and L2 straight through, no peck (the plate is under 2 drill diameters thick): light feed for the first .05 so the drill follows the spot, then a steady feed."
 rpm = 2800
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [{ name = "L1, L2 at .002 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 6.5278, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.lever_x_mm}}" }]
 
 [[setups.operations]]
@@ -385,6 +398,8 @@ instruction_detailed = "Chuck the 23/64 short, no more than 1-1/4 in out of the 
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [{ name = "A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 9.128125, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 
 [[setups.operations]]
@@ -400,6 +415,8 @@ feed = "hand"
 # No reamer kind: its thrust is declared as a twist drill's at the reamer Ø
 # (the larger, chisel-edge figure), .004 in/rev.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+peck = "other"
+peck_reason = "reamer through the 23/64 holes"
 milling_cuts = [{ name = "ream A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 9.5504, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 inspection = "Ø{{cad.pin_dia_min_in:.4dot}}–{{cad.pin_dia_max_in:.4dot}}: the .376 GO pin enters full depth, the .377 NO-GO does not start, each hole."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_dia_band_mm}}" }]

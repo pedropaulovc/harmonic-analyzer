@@ -327,6 +327,8 @@ sizing = "other"
 instruction = "Spot P1, cone ~.10 across. X ±{{cad.stop_station_tol_in:.2dot}}; Y {{cad.stop_row_min_in:.2dot}}–{{cad.stop_row_max_in:.2dot}}."
 rpm = 2800
 feed = "hand"
+peck = "other"
+peck_reason = "centre-drill spot"
 milling_cuts = [
   { name = "P1 spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.p1_x_mm}}" },
 ]
@@ -342,6 +344,8 @@ sizing = { kind = "band", band_mm = "{{cad.stop_dia_band_mm}}" }
 instruction = "P1 through, beyond the left jaw side."
 rpm = 2800
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "P1", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.2639, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.p1_x_mm}}" },
 ]
@@ -368,6 +372,8 @@ instruction = "Spot P2 as P1."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+peck = "other"
+peck_reason = "centre-drill spot"
 milling_cuts = [
   { name = "P2 spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.p2_x_mm}}" },
 ]
@@ -380,6 +386,8 @@ instruction = "P2 through, beyond the right jaw side."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "P2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.2639, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.p2_x_mm}}" },
 ]
@@ -430,6 +438,8 @@ instruction = "Pick up each mark on the centre-drill point, lock X/Y, spot ~.10 
 instruction_detailed = "Pick up each mark: spindle stopped, bring the centre-drill point down into the mark and move X/Y until the point seats at the bottom without pushing the bar sideways; lock both axes. Spot ~.10 across (HUB: the full centre-drill cone, ~.18), then drill that hole with the drills below at the same setting before moving to the next mark. In hold C drill R1 and R2 before HUB, so the HUB drills come last."
 rpm = 2800
 feed = "hand"
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "spots", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.spot_y_mm}}" },
   { name = "HUB spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.572, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.hub_y_mm}}" },
@@ -442,6 +452,8 @@ sizing = { kind = "band", band_mm = "{{cad.screw_dia_band_mm}}" }
 instruction = "R1–R4 through."
 rpm = 2800
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "R1-R4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.2639, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.screw_y_mm}}" },
 ]
@@ -453,6 +465,8 @@ sizing = { kind = "band", band_mm = "{{cad.clamp_dia_band_mm}}" }
 instruction = "CL, CR through."
 rpm = 2800
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "CL, CR", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.9784, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.clamp_y_mm}}" },
 ]
@@ -464,6 +478,8 @@ sizing = "other"
 instruction = "HUB pilot through."
 rpm = 2500
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "HUB pilot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 6.35, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.hub_y_mm}}" },
 ]
@@ -476,6 +492,8 @@ instruction = "HUB through."
 instruction_detailed = "HUB through. A large drill grabs in thin plate and can leave a lobed hole: steady light feed, ease off as the point breaks through."
 rpm = 1400
 feed = "hand"
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "HUB", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 12.0, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.hub_y_mm}}" },
 ]
@@ -488,6 +506,8 @@ instruction = "Turn over, marked face down, ZERO EDGE now at the moving jaw; sam
 instruction_detailed = "Turn the riser over, marked face down, ZERO EDGE now at the moving jaw; same holds. Move the belt to the low range: a countersink chatters at drilling speed. Centre the countersink in each R hole, spindle stopped, then sink until the mouth calipers Ø{{cad.csk_dia_min_in:.2dot}}–{{cad.csk_dia_max_in:.2dot}}; a #4-40 flat head then sits just below the face."
 rpm = 600
 feed = "hand"
+peck = "other"
+peck_reason = "countersinks"
 milling_cuts = [
   { name = "R1-R4 countersinks", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 6.35, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.screw_y_mm}}" },
 ]

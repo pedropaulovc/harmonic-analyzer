@@ -29,6 +29,9 @@ file = "../../out/features/ch_rocker_arm_tl_oblique_pivot_block/features.toml"
 adapter = "harmonic_pivot_block"
 
 [parameters]
+# drill_pecking steps, one drill Ø each: #15 (.180 in), F (.257 in).
+hole_peck_mm = 4.572
+tap_drill_peck_mm = 6.5278
 bar_width_in = 3.0               # 1187 bar width.
 blank_length_in = 1.70           # Along the bar: Y 1.58 + two clean-ups + saw allowance.
 blank_min_length_in = 1.66
@@ -258,6 +261,8 @@ sizing = "other"
 instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_tol_in:.3dot}}; B ±.01."
 instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
 # Stations: X from ROW SIDE. The #2 centre drill at its 3/16 in body Ø (largest cone).
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2800
 feed = "hand"
@@ -270,7 +275,9 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "drill-15"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
-instruction = "H1–H4 through, full-retract pecks every .18."
+instruction = "H1–H4 through, full-retract pecks every {{process.hole_peck_mm:in.3dot}}."
+hole_depth_mm = "{{cad.height_mm}}"
+peck = { step_mm = "{{process.hole_peck_mm}}", retract = "full" }
 milling_cuts = [{ name = "H1–H4", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.572, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2800
 feed = "hand"
@@ -293,7 +300,9 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cbore_floor_band_mm}}" }]
 speed_kind = "spindle"
 tool = "drill-f"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
-instruction = "B through (tap drill); chip-break pecks after the first .5."
+instruction = "B through (tap drill); chip-break pecks every {{process.tap_drill_peck_mm:in.3dot}}."
+hole_depth_mm = "{{cad.height_mm}}"
+peck = { step_mm = "{{process.tap_drill_peck_mm}}", retract = "chip_break" }
 milling_cuts = [{ name = "B tap drill", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 6.5278, stations_mm = "{{cad.bore_y_mm}}" }]
 rpm = 2450
 feed = "hand"

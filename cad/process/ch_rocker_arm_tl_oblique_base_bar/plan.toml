@@ -31,6 +31,8 @@ file = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
 adapter = "harmonic_base_bar"
 
 [parameters]
+# drill_pecking: BB07 posts G83 full-retract pecks of one #29 Ø (.136 in).
+rail_peck_mm = 3.4544
 blank_length_in = 17.4375
 blank_width_in = 6.0
 blank_thickness_in = 0.5
@@ -314,6 +316,8 @@ instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch
 rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
+peck = "other"
+peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
   { name = "spot R5–R8, B3–B4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964, 428.0] },
@@ -327,10 +331,13 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
-instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; full-retract pecks of one drill diameter (L/D 4)."
+instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; full-retract pecks every {{process.rail_peck_mm:in.3dot}}."
 rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+# BB07 posts G83 full-retract pecks of one drill Ø (cam.py drill_rail).
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = { step_mm = "{{process.rail_peck_mm}}", retract = "full" }
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964] },
 ]
@@ -343,6 +350,8 @@ instruction = "R5–R8 in the same BB07 run, over the right jack."
 rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = { step_mm = "{{process.rail_peck_mm}}", retract = "full" }
 milling_cuts = [
   { name = "R5–R8", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964] },
 ]
@@ -351,10 +360,12 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
-instruction = "Bar 1 only: B1–B2 through over the left jack; chip-break pecks after .38 deep (L/D 3)."
+instruction = "Bar 1 only: B1–B2 through over the left jack; no peck."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "B1–B2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
 ]
@@ -367,6 +378,8 @@ instruction = "Bar 1 only: B3–B4 over the right jack, as above."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "B3–B4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
 ]
