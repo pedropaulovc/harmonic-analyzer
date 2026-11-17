@@ -356,6 +356,22 @@ def _cache_refresh_isolated(monkeypatch):
     monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _farm_run_isolated(monkeypatch):
+    """A farm build's identity must not reach the tests its check:* gates run.
+
+    ``farm_build.py _build`` exports the run's executor, commit, display name,
+    leaf timeout, run id and run directory, and the producer adds the build id
+    and admitted leaves; every check:* subprocess inherits them. A test that
+    dispatches a fake leaf would then use the real budget in its workflow ID and
+    record that fake leaf in the real run's directory, where ``farm_build.py
+    cancel`` can never close it. Tests of these variables set them explicitly.
+    """
+    for name in list(os.environ):
+        if name == "HARMONIC_EXECUTOR" or name.startswith("HARMONIC_FARM_"):
+            monkeypatch.delenv(name)
+
+
 @pytest.fixture
 def saved_native_bytes():
     """Build the observed native DisplayLists envelope for parser-backed tests."""
