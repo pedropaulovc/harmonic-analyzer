@@ -734,16 +734,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     ]
     accuracy = stated * 25.4
     # Centring is a null reading against the step's stated acceptance, not a
-    # measured size: under one division of sweep (the TIR) puts each centre
-    # within half a division of the spindle (owner ruling 2026-11-08 (Pedro),
-    # #2144 item 5.3). The indicator's unknown accuracy over its range scales
-    # that reading only; the bound holds while the indicator repeats to its
-    # stated sweep at null.
-    division_in = shop["gauges"]["dti"]["resolution_mm"] / 25.4
-    # The printed sweep is a value on the shop's own test indicator.
-    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == pytest.approx(division_in)
-    division = division_in * 25.4
-    centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
+    # measured size: a sweep (the TIR) under the printed value puts each
+    # centre within half of it of the spindle (owner ruling 2026-11-08
+    # (Pedro), #2144 item 5.3). The bound holds while the indicator repeats
+    # to its stated sweep at null; the shop's test indicator must read it.
+    sweep = drawing.KNOB_SETTING_SWEEP_IN * 25.4
+    assert shop["gauges"]["dti"]["resolution_mm"] < sweep
+    centring = sweep / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
     # on S, so its two axes' errors enter once, on the S-to-K move, both
     # along any direction; the indicator centres S and K; the pivot-and-pin
@@ -752,7 +749,7 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     radial_err = dro + 2.0 * centring
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
-    assert centring == pytest.approx(division / 2.0)
+    assert centring == pytest.approx(0.0005 * 25.4 / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
@@ -2799,7 +2796,7 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
         for tip in tips
     ]
     low, high = drawing.REDUCER_BACKLASH_DIAL_MM
-    division = drawing.KNOB_SETTING_INDICATOR_DIVISION_IN * 25.4
+    division = drawing.REDUCER_DIAL_STEP_MM
     assert low <= min(readings) < low + division
     assert high - division < max(readings) <= high
     for bound in (low, high):

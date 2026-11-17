@@ -18,9 +18,10 @@
 # --- gauges ---------------------------------------------------------------
 
 # Kind only; its range and resolution are cad/process/shop.toml gauges.dti.
+# Make unrecorded: the archived LittleMachineShop entry was a .0005 in DTI,
+# not the owner's 1 um lever indicator (2026-11-17).
 [gauges.dti]
 kind = "dial_test_indicator"
-make = "LittleMachineShop"
 
 # Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
 [gauges.pin-gauges]
@@ -36,53 +37,6 @@ kind = "gauge_block_set"
 make = "Mitutoyo"
 present = true
 note = "owner-confirmed 2026-11-08: 81-piece inch set, shop grade; largest block 4 in; model number to be recorded"
-
-# The gauge geometry the rocker's profile check reads (edge, pivot pin and rod-slot
-# registration) is owned by cad/scripts/ch_rocker_arm_profile_check.py, and the solids
-# below are the plate's outline envelope with the pivot hole and the rod slot's pin seat
-# as voids, in that module's frame (origin on the pivot-hole axis in the face laid on the
-# arm, +Y toward the arcs' centre, +X toward the rod end, plate Z0..3.175). Physical
-# features: 1/8 in O1 ground flat (3.175 as supplied); pivot hole reamed H7 6.500-6.515
-# for the 0.2558 in Class X minus pin (gauges.vermont-class-x-2558-minus); rod slot 1.983
-# +0.010/0 wide (0.001-0.017 diametral clearance on the 0.0780 in Class ZZ minus pin),
-# radial to the pivot at the arm's rod-pin hole station (133.067, 8.456 BASIC), 0.75 run.
-# Accepted on PROFILE (Pedro 2026-10-11): DTI stations within +/-0.03 of the nominal arcs
-# about the pivot; the trammel setting is the proof of R. The same acceptance is taken
-# with pins in both the pivot hole and the rod slot (#1545): the slot's 0.0780 in pin is
-# one of gauges.pin-gauges and clocks the template on the arm. verify = false is an
-# ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11).
-[gauges.arm-outline-template]
-name = "arm outline template (MHA-CH-06), shop-made"
-kind = "profile_gauge"
-# The plate's x envelope follows the tip stations re-aimed at the arm's mid-zone nominal
-# (owner ruling 2026-11-08, #2144 item 10.3). at_mm/axis are design coordinates, not
-# surveyed measurements.
-solids = [
-  { name = "plate", supply = "made", shape = "box", at_mm = [-145.978, -7.746, 0.0], size_mm = [291.956, 29.240, 3.175], note = "outline envelope; the arcs, tip lands and tapered ends are inside it", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-  { name = "pivot-hole", shape = "cylinder", void = true, at_mm = [0.0, 0.0, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 6.5024, length_mm = 3.175, locates = "pin gauge in the rocker's pivot bore", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-  { name = "rod-slot", shape = "cylinder", void = true, at_mm = [133.067, 8.456, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 1.9812, length_mm = 3.175, locates = "pin gauge in the rocker's rod-pin hole (datum C); the radial slot's run is not modelled", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-]
-range_mm = [8.0, 817.0]
-resolution_mm = { value = 0.05, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "gauge dial or digital display, smallest marked increment" } }
-shop_made = true
-verify = false
-note = "Shop-made template (retired TL CAD part MHA-CH-06-TL-13; inspection geometry in ch_rocker_arm_profile_check; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot and rod slot (pins in both; the slot's pin is the 0.0780 in from gauges.pin-gauges) at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
-
-# Bought gauge pin that locates the arm outline template (gauges.arm-outline-template) in the
-# rocker's pivot bore (ch_rocker_arm_profile_check PIN_GAUGE_*): the 0.2550 Class
-# ZZ pin from gauges.pin-gauges left 0.0505 of registration play across both bores.
-# Auto-selected 2026-10-15 after review timeout (Codex 4280365386); Pedro may revisit.
-[gauges.vermont-class-x-2558-minus]
-name = "Class X gauge pin 0.2558 in minus (Vermont Gage)"
-kind = "pin_gauge"
-make = "Vermont Gage"
-sku = "141225580"
-source = "https://www.mscdirect.com/product/details/85912335"
-purchase = "Vermont Gage 141225580 Class X minus plug gage 0.2558 in x 2 in, MSC 85912335, $20.30 (MSC listing read live 2026-10-15; auto-selected 2026-10-15 after review timeout, Pedro may revisit)"
-note = "illustrative example item: one Vermont Gage Class X minus pin, 0.2558 in, tolerance -0.000040 in (0.25576-0.25580 in = 6.4963-6.4973 mm), tool steel, 2 in long, with certificate. Locates the arm outline template's reamed 6.500-6.515 hole in the rocker's 6.500-6.530 pivot bore: worst-case registration 0.0262 (0.0094 template + 0.0169 rocker)."
-pieces = 1
-dia_in = { value = 0.2558, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
-length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "calipers" } }
 
 # MHA-SM-00 step 5B / check 5 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
 # #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
