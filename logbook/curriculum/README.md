@@ -29,7 +29,7 @@ conventional, the order of faces) still decide whether a program cuts well.
 The lathe stays manual.
 
 **The mill track's first part is the rocker strap.** `ch-rocker-strap`
-(MHA-CH-13) is the first part trialled end to end on the CNC mill. The
+(MHA-CH-13) is the first part routed for the CNC mill. The
 program interpolates its R800/R816 arcs, which on a manual mill needed the
 oblique trammel jig (deleted 2026-11-17).
 
@@ -102,8 +102,8 @@ competency check (with a number) · notes · sessions.
 Total `[EST]` ≈ **256 h**, and M10 is certainly underestimated.
 
 Module numbers are identifiers, not sequence. M08 comes before M07, because
-the rocker strap carries a reamed hub hole and a drilled rod-pin hole besides
-its profile. The numbers stay as they are so entry and book links keep working.
+the rocker strap carries a reamed hub hole besides its profile. The numbers
+stay as they are so entry and book links keep working.
 
 ## Dependency order
 

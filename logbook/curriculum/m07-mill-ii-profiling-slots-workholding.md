@@ -19,7 +19,7 @@ hours_actual: 5
 ## Prerequisites
 
 - m06
-- m08 — drilling and reaming, which the rocker strap's hub and rod-pin holes need
+- m08 — drilling and reaming, which the rocker strap's reamed hub hole needs
 
 ## References
 
@@ -70,7 +70,7 @@ compare.
 ## Now make — the real part this unlocks
 
 **`ch-rocker-strap`** (MHA-CH-13) ×20 from its CNC programs, the first part
-trialled end to end on the CNC mill: 1018 flat with an R800 concave top edge
+routed for the CNC mill: 1018 flat with an R800 concave top edge
 that is the **outline** of the strap, not a pocket. Each strap takes a hub
 turned on the lathe to make a **`ch-rocker-arm`**.
 
