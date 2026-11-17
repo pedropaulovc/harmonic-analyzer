@@ -309,11 +309,9 @@ def _changes(
     return before, after, removed, added, text_changed, changed
 
 
-def _overlay(
-    old: _Raster | None, new: _Raster | None, *, include_unchanged: bool = False
-) -> tuple[bytes | None, bool, bool]:
+def _overlay(old: _Raster | None, new: _Raster | None) -> tuple[bytes | None, bool, bool]:
     before, after, removed, added, text_changed, changed = _changes(old, new)
-    if not changed and not include_unchanged:
+    if not changed:
         return None, False, False
 
     # White paper; shared ink fades to light gray; changed ink retains its
@@ -465,11 +463,6 @@ def _index(summary: dict[str, Any]) -> bytes:
             f'alt="{escape(title, quote=True)}"></a></article>'
         )
     content = "\n".join(articles) or "<p>No effective drawing changes.</p>"
-    unchanged_note = (
-        "included"
-        if any(page["status"] == "unchanged" and page["image"] for page in summary["pages"])
-        else "omitted"
-    )
     return (
         "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -483,7 +476,7 @@ def _index(summary: dict[str, Any]) -> bytes:
         '<strong class="removed">Red: removed ink</strong> · '
         '<span class="shared">Light gray: shared ink</span></p>'
         f"<p>Pages: {counts['changed']} changed, {counts['added']} added, "
-        f"{counts['removed']} removed, {counts['unchanged']} unchanged ({unchanged_note}).</p>"
+        f"{counts['removed']} removed, {counts['unchanged']} unchanged (omitted).</p>"
         "<p>Only geometrically identified title-block BUILD/REV values are masked. "
         f"At {summary['dpi']} dpi, ink is matched in both directions within "
         f"{summary['spatial_tolerance_pixels']} pixel along each axis "
@@ -509,7 +502,6 @@ def create_drawing_diff(
     *,
     old_label: str,
     new_label: str,
-    include_unchanged: bool = False,
 ) -> dict[str, Any]:
     """Write an overlay ZIP, including index/summary even when nothing changed.
 
@@ -520,8 +512,7 @@ def create_drawing_diff(
     is compared, with pages paired by ordinal, never by extracted text.
     ``asset_path`` is a string so returned facts are JSON serializable.
     Corrupt/unrenderable inputs raise, without replacing a previous output ZIP.
-    With ``include_unchanged``, every page has an RGB overlay, including shared
-    gray ink on unchanged pages. Image presence does not affect classifications.
+    Unchanged pages have no overlay image.
     """
     old_files = {} if old_pdf_dir is None else _pdfs(old_pdf_dir)
     new_files = _pdfs(new_pdf_dir)
@@ -574,9 +565,7 @@ def create_drawing_diff(
                     for index in range(max(old_count, new_count)):
                         old = _raster(old_doc, index, old_path) if index < old_count else None
                         new = _raster(new_doc, index, new_path) if index < new_count else None
-                        png, text_changed, changed = _overlay(
-                            old, new, include_unchanged=include_unchanged
-                        )
+                        png, text_changed, changed = _overlay(old, new)
                         if old is None:
                             status = "added"
                         elif new is None:

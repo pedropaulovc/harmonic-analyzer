@@ -23,7 +23,7 @@ import uuid
 
 import _telemetry
 from filelock import FileLock, Timeout as LockTimeout
-from machinist_review_credentials import CredentialPool, CredentialUnavailable, _directory
+from machinist_review_credentials import CredentialPool, _directory
 
 TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
 OMP_TOOLS = {"mcp__sheets_view_sheet", "mcp__sheets_crop"}
@@ -135,7 +135,10 @@ def cleanup_state(provenance) -> None:
 
 @contextmanager
 def session_lifecycle():
-    """Own precheck state through judging, including skip/error early returns."""
+    """Own every registered reviewer state home until the aggregate completes.
+
+    Each attempt removes its own state; this retries any incomplete removal.
+    """
     states: set[Path] = set()
     token = _SESSION_STATES.set(states)
     try:
@@ -227,19 +230,6 @@ def environment(key=None, *, mode="sdk_overlay"):
     return env
 
 
-def resume_inputs(previous):
-    """Copy only conversation inputs, never prior turn's completion evidence."""
-    return {
-        name: deepcopy(previous[name])
-        for name in (
-            "transport", "private_home", "session_id", "credential_id",
-            "credential_fingerprint", "sdk_session_dir", "sdk_redacted_files",
-            "sdk_redacted_fingerprint", "session_file",
-        )
-        if name in previous
-    }
-
-
 def sdk_event(message, value):
     """Convert SDK public dataclasses without losing image/result/error data."""
     from claude_agent_sdk import AssistantMessage, UserMessage, SystemMessage, ResultMessage
@@ -318,18 +308,12 @@ def _cleanup_error(phase, exc, emit, diagnostics):
     _telemetry.error("machinist_review.cleanup_failed", phase=phase, error_category=category)
 
 
-async def _sdk(*, key, config, schema, model, effort, session_id, continuation, cwd, remaining, startup, settings, emit, diagnostics, provenance):
+async def _sdk(*, key, config, schema, model, effort, session_id, cwd, remaining, startup, settings, emit, diagnostics, provenance):
     from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
     env = environment(key.api_key)
     home = Path(provenance["private_home"])
-    session_dir = Path(provenance.get("sdk_session_dir") or home / "sdk")
+    session_dir = home / "sdk"
     session_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    # Skip only files successfully sanitized by an earlier pass. New or changed
-    # native files (including metadata) always receive the complete secret scan.
-    previous_files = (
-        deepcopy(provenance.get("sdk_redacted_files", {}))
-        if provenance.get("sdk_redacted_fingerprint") == key.fingerprint else {}
-    )
     env.update(HOME=str(home), USERPROFILE=str(home))
     provenance["sdk_session_dir"] = str(session_dir)
     env["CLAUDE_CONFIG_DIR"] = str(session_dir)
@@ -340,8 +324,7 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
         permission_mode="dontAsk", setting_sources=[], settings=json.dumps(settings),
         output_format={"type": "json_schema", "schema": schema},
         max_buffer_size=MAX_EVENT_BUFFER_BYTES,
-        resume=session_id if continuation == "sdk_resume" else None,
-        session_id=None if continuation == "sdk_resume" else session_id,
+        session_id=session_id,
         extra_args={"bare": None, "disable-slash-commands": None, "no-chrome": None},
         stderr=lambda line: diagnostics.append(line + "\n"),
     )
@@ -407,24 +390,16 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
             disconnect_error = exc
             _cleanup_error("sdk_disconnect", exc, emit, diagnostics)
         try:
-            # SDK transcripts are resumable state, not an unredacted back door
+            # SDK transcripts are native state, not an unredacted back door
             # around the retained-stream redactor.
             for path in session_dir.rglob("*"):
                 if path.is_file() and path.suffix in {".json", ".jsonl", ".txt", ".log"}:
-                    stat = path.stat()
-                    signature = (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
-                    if previous_files.get(str(path)) == list(signature):
-                        continue
                     text = path.read_text(encoding="utf-8", errors="replace")
                     sanitized = text.replace(key.api_key, "[REDACTED]").replace(
                         json.dumps(key.api_key, ensure_ascii=True)[1:-1], "[REDACTED]",
                     )
                     if sanitized != text:
                         path.write_text(sanitized, encoding="utf-8")
-                    stat = path.stat()
-                    previous_files[str(path)] = [stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
-            provenance["sdk_redacted_files"] = previous_files
-            provenance["sdk_redacted_fingerprint"] = key.fingerprint
         except Exception as exc:
             _cleanup_error("sdk_redaction", exc, emit, diagnostics)
             if primary is None and disconnect_error is None:
@@ -653,9 +628,9 @@ def _omp_blobs(provenance):
             with path.open("rb") as stream:
                 actual = hashlib.file_digest(stream, "sha256").hexdigest()
         except OSError:
-            raise RuntimeError("OMP continuation image blob is unavailable") from None
+            raise RuntimeError("OMP image blob is unavailable") from None
         if actual != digest:
-            raise RuntimeError("OMP continuation image blob is corrupt")
+            raise RuntimeError("OMP image blob is corrupt")
     return sorted(hashes)
 
 
@@ -676,7 +651,7 @@ def omp_native_event(event):
     return retained
 
 
-async def _omp_session(*, executable, broker_env, config, schema, model, effort, cwd, remaining, startup, emit, diagnostics, provenance, continuation):
+async def _omp_session(*, executable, broker_env, config, schema, model, effort, cwd, remaining, startup, emit, diagnostics, provenance):
     home = Path(provenance["private_home"])
     if not home.is_dir() or not Path(cwd).resolve().is_relative_to(home.resolve()):
         raise RuntimeError("OMP cwd must remain inside its lifecycle-owned private HOME")
@@ -694,8 +669,6 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
     sessions = home / "sessions"
     sessions.mkdir(mode=0o700, exist_ok=True)
     provenance["session_dir"] = str(sessions)
-    if continuation == "omp_resume":
-        _omp_blobs(provenance)
     env = environment(mode="subprocess")
     for name in tuple(env):
         if name.startswith(("PI_", "OMP_", "XDG_")):
@@ -714,8 +687,6 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--auto-approve",
                "--system-prompt", OMP_SYSTEM_PROMPT,
                "--model", "anthropic/" + model_id, "--thinking", effort, "--session-dir", str(sessions)]
-    if continuation == "omp_resume":
-        command += ["--resume", provenance["session_file"]]
     provenance["omp_command"] = command
     proc = await asyncio.create_subprocess_exec(*command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=MAX_EVENT_BUFFER_BYTES)
     async def errors():
@@ -788,8 +759,8 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
             except ValueError as exc:
                 raise RuntimeError(str(exc)) from None
             actual = state.get("sessionId")
-            if not actual or continuation == "omp_resume" and actual != provenance.get("session_id"):
-                raise RuntimeError("OMP continuation/session mismatch")
+            if not actual:
+                raise RuntimeError("OMP lacks its session id")
             if not isinstance(state.get("sessionFile"), str) or not state["sessionFile"]:
                 raise RuntimeError("OMP lacks its persisted session file")
             resolved = state.get("model") or {}
@@ -888,15 +859,11 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     provenance["operation_id"] = str(uuid.uuid4())
     provenance["routes"] = []
     common = {name: provenance.get(name) for name in ("operation_id", "package", "phase", "attempt")}
-    continuation = ("omp_resume" if provenance.get("transport") == "omp" else "sdk_resume") if "--resume" in command else "fresh"
-    resume = continuation != "fresh"
-    pinned_omp = continuation == "omp_resume"
-    session_id = command[command.index("--resume" if resume else "--session-id") + 1]
+    session_id = command[command.index("--session-id") + 1]
     provenance["requested_session_id"] = session_id
-    if not resume:
-        provenance.update(transport="routing", session_id=None)
+    provenance.update(transport="routing", session_id=None)
     try:
-        pool = CredentialPool(load_mode="skip" if pinned_omp else "configured")
+        pool = CredentialPool()
     except Exception:
         _telemetry.error("machinist_review.credentials", reason="invalid_configuration", configured_count=None, selected_id=None, **common)
         _telemetry.error("machinist_review.transport_failed", error_category="credential_configuration", timed_out=False, **common)
@@ -985,11 +952,10 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     schema = json.loads(input_path("--schema", "schema.json").read_text())
     model = command[command.index("--model") + 1]
     effort = command[command.index("--effort") + 1]
-    prior_transport = provenance.get("transport") if resume else None
     def clear_route_evidence():
-        # Retain only owned run metadata and explicitly resumable inputs.
-        # Unknown completion fields must never certify a later route.
-        preserved = resume_inputs(provenance) if resume else {"private_home": provenance["private_home"]}
+        # Retain only owned run metadata. Unknown completion fields must never
+        # certify a later route.
+        preserved = {"private_home": provenance["private_home"]}
         preserved.update({
             name: provenance[name] for name in (
                 "operation_id", "package", "phase", "attempt", "requested_session_id", "routes",
@@ -1001,18 +967,8 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     async def execute():
         nonlocal session_id, route_index
         attempted = []
-        while prior_transport != "omp":
-            try:
-                credential = await credential_operation(
-                    pool, pool.claim, remaining, attempted,
-                    required_id=provenance.get("credential_id") if resume else None,
-                    required_fingerprint=provenance.get("credential_fingerprint") if resume else None,
-                )
-            except CredentialUnavailable:
-                # Conversation history is local, not owned by the API key.
-                # Rebind before submitting this one resumed turn, never replay
-                # a turn already submitted with an exhausted credential.
-                credential = await credential_operation(pool, pool.claim, remaining, attempted)
+        while True:
+            credential = await credential_operation(pool, pool.claim, remaining, attempted)
             remaining()
             _telemetry.info("machinist_review.credentials", configured_count=len(pool.credentials), selected_id=credential.id if credential else None, reason="selected" if credential else "no_eligible_keys", **common)
             _telemetry.event("machinist_review.credentials", configured_count=len(pool.credentials), selected_id=credential.id if credential else None, reason="selected" if credential else "no_eligible_keys", **common)
@@ -1022,14 +978,14 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             route_index += 1
             clear_route_evidence()
             provenance.update(transport="claude_agent_sdk", credential_id=credential.id, credential_fingerprint=credential.fingerprint,
-                              session_id=session_id if resume else None)
+                              session_id=None)
             route = {"transport": "claude_agent_sdk", "credential_id": credential.id, "outcome": "started",
                      "session_id": session_id, "route_index": route_index, "event_start": len(events)}
             provenance.setdefault("routes", []).append(route)
             _telemetry.info("machinist_review.sdk_attempt", model=model, effort=effort, credential_id=credential.id, route_index=route_index, **common)
             _telemetry.event("machinist_review.sdk_attempt", model=model, effort=effort, credential_id=credential.id, route_index=route_index, **common)
             async with operation("machinist_review.sdk", credential_id=credential.id, model=model, effort=effort):
-                quota = await _sdk(key=credential, config=config, schema=schema, model=model, effort=effort, session_id=session_id, continuation=continuation, cwd=cwd, remaining=remaining, startup=startup, settings=settings, emit=emit, diagnostics=diagnostics, provenance=provenance)
+                quota = await _sdk(key=credential, config=config, schema=schema, model=model, effort=effort, session_id=session_id, cwd=cwd, remaining=remaining, startup=startup, settings=settings, emit=emit, diagnostics=diagnostics, provenance=provenance)
             finish_usage()
             route["event_end"] = len(events)
             if quota is None:
@@ -1052,27 +1008,20 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             _telemetry.event("machinist_review.credential_unavailable", credential_id=credential.id,
                              reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"],
                              quota_state_write=write_outcome, **common)
-            if resume:
-                raise RuntimeError("SDK continuation credential exhausted; refusing transport switch")
             # Session history may contain the API error: start a new session for
             # the next route, and scope tool IDs to its own routed attempt.
             session_id = str(uuid.uuid4())
-        if resume and prior_transport != "omp":
-            raise RuntimeError("SDK continuation cannot switch transport")
         clear_route_evidence()
-        provenance.update(transport="omp", credential_id=None, credential_fingerprint=None,
-                          session_id=provenance.get("session_id") if resume else None)
+        provenance.update(transport="omp", credential_id=None, credential_fingerprint=None, session_id=None)
         route_index += 1
         route = {"transport": "omp", "outcome": "started", "route_index": route_index, "event_start": len(events)}
         provenance["routes"].append(route)
-        _telemetry.info("machinist_review.omp_attempt" if pinned_omp else "machinist_review.fallback",
-                        source_transport="omp" if pinned_omp else "claude_agent_sdk", destination_transport="omp",
-                        reason="continuation" if pinned_omp else "no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
-        _telemetry.event("machinist_review.omp_attempt" if pinned_omp else "machinist_review.fallback",
-                         source_transport="omp" if pinned_omp else "claude_agent_sdk", destination_transport="omp",
-                         reason="continuation" if pinned_omp else "no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
+        _telemetry.info("machinist_review.fallback", source_transport="claude_agent_sdk", destination_transport="omp",
+                        reason="no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
+        _telemetry.event("machinist_review.fallback", source_transport="claude_agent_sdk", destination_transport="omp",
+                         reason="no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
         async with operation("machinist_review.omp", model=model, effort=effort):
-            await _omp(config=config, schema=schema, model=model, effort=effort, cwd=cwd, remaining=remaining, startup=startup, emit=emit, diagnostics=diagnostics, provenance=provenance, continuation=continuation, register_secret=pool.secrets.add)
+            await _omp(config=config, schema=schema, model=model, effort=effort, cwd=cwd, remaining=remaining, startup=startup, emit=emit, diagnostics=diagnostics, provenance=provenance, register_secret=pool.secrets.add)
         finish_usage()
         route.update(outcome="succeeded", event_end=len(events), session_id=provenance.get("session_id"))
     try:

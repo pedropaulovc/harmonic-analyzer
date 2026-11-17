@@ -132,21 +132,17 @@ refresh that produces no cacheable verdict fails even in LEARN mode, without
 caching the error. Review keys hash the PDF's ink, package exceptions, review code/import
 closure, the selected kind's reviewer/severity prompts, shared reviewer/judge
 prompts/schemas, shared drawing guidelines and the effective reviewer and judge
-selections below, not the registry, enforcement declaration, or recipe-skipped
-infrastructure such as telemetry. Build leaves always pass `--force`, so bypassed
-PDF-diff implementation, identity-pairing inputs, and the precheck prompt/schema
-do not invalidate their review cache.
+selections below, not the registry, enforcement declaration, recipe-skipped
+infrastructure such as telemetry, or `pyproject.toml`/`uv.lock`: a dependency
+release changes transport, not the verdict's inputs (#2882).
 
 The PDF's ink is `_pdf_ink_digest.pdf_ink_digest`: every page's size, printed
 characters and 144 dpi grayscale PDFium raster, with no tolerance. Two exports
 of an unchanged drawing differ in export time, document `/ID` and font-subset
 tags only, so a rebuild that prints the same sheet keeps its verdict, `SHIP`
-or `FIX`, and one changed pixel or character misses the key (#2714). On an
-ink-key miss the leaf first adopts a verdict published under the earlier
-byte-digest key for the same PDF bytes (`review_adopted_byte_key` in
-`cache.jsonl`; removed under #2811), so the change itself rolls no reviewer.
+or `FIX`, and one changed pixel or character misses the key (#2714).
 
-Then it tries to carry a verdict (`_review_carry`, #2714): it compares the PDF
+On a key miss the leaf tries to carry a verdict (`_review_carry`, #2714): it compares the PDF
 with the newest eight PDFs reviewed for that drawing under the same non-PDF
 review inputs (`_machinist_review_context`, the review key without the PDF)
 using the release drawing diff's page rule, `_drawing_diff.compare_drawings`:
@@ -288,21 +284,18 @@ finding, change the sheet: the new ink is reviewed by the next build.
 
 ## Holistic review telemetry
 
-Each aggregate emits one completed `machinist_review.precheck` child span before
-any independent reviewer starts, including when `--force` bypasses precheck.
-This is separate from `layout.audit`. Attributes are:
+Each aggregate emits one `machinist_review.aggregate` span, with a
+`machinist_review.run` child per blind run and a `machinist_review.judge` child
+when findings are judged. This is separate from `layout.audit`. On completion
+the aggregate span carries `verdict` (`SHIP`, `FIX`, `ERROR`); requested
+`run_count`, `completed_run_count`, `valid_run_count`, run `error_count`,
+`input_finding_count`, `confirmed_count`, `rejected_count`, `gating_count`,
+`judge_executed`, aggregate `error`, package `name`/`kind`, reviewer/model and
+judge reviewer/model.
 
-| Signal | Attributes |
-| --- | --- |
-| Precheck | `name`, `kind`, `judge_reviewer`, `judge_model`, `forced`; `outcome` is `skip`, `review`, `bypass`, or `error`; `skip_kind` is `rendering_noise`, `assembly_single_part`, or `none`; `reason` and `error` are forwarded unchanged (empty when absent), subject to the backend's 8192-character attribute limit. Bypass has the reason `Precheck bypassed by --force.` |
-| Aggregate completion | `verdict` (`SHIP`, `FIX`, `ERROR`); `decision_basis` (`precheck_skip`, `full_review`, `error`); all precheck classification/text fields prefixed `precheck_`; requested `run_count`, `completed_run_count`, `valid_run_count`, existing run `error_count`, `judge_executed`, aggregate `error`, package `name`/`kind`, reviewer/model and judge reviewer/model. |
-
-`precheck_skip` plus `SHIP` means change triage **without full reviewers**, not
-baseline approval. `full_review` can have partial run errors; use the counts,
-not the basis alone, to assess completeness. A valid zero-finding review does
-not execute the findings judge. `--force` is `bypass`, not a clean precheck;
-precheck failures are `error`, not `review`. Caught failures are represented by
-these outcome/error attributes, not necessarily the SDK span status. These
+A `SHIP` can have partial run errors; use the counts to assess completeness. A
+valid zero-finding review does not execute the findings judge. Caught failures
+are represented by these attributes, not necessarily the SDK span status. These
 signals do not alter the approval JSON or acceptance rules.
 
 In Application Insights, these internal spans are in `dependencies`, with
@@ -311,34 +304,7 @@ attempts**, not unique packages; ingestion can lag and sampling/retention can
 limit observed totals. With Azure CLI, use `--offset 2h` (or a wider explicit
 window) as well as the KQL time filter.
 
-Completed prechecks in the last two hours, including aggregates still running:
-
-```kusto
-let attempts = dependencies
-| where timestamp > ago(2h) and name == "machinist_review.precheck"
-| extend outcome=tostring(customDimensions.outcome),
-         skip_kind=tostring(customDimensions.skip_kind),
-         reason=tostring(customDimensions.reason),
-         error=tostring(customDimensions.error);
-attempts
-| summarize attempts=count(), skips=countif(outcome == "skip"),
-            reviews=countif(outcome == "review"),
-            bypasses=countif(outcome == "bypass"), errors=countif(outcome == "error")
-| extend eligible_prechecks=skips + reviews
-| extend skip_percent=iff(eligible_prechecks == 0, real(null),
-                         100.0 * skips / eligible_prechecks)
-```
-
-The skip-rate denominator excludes bypasses and failed prechecks. To inspect
-skip kinds and verbatim reasons, replace the final summary above with:
-
-```kusto
-attempts
-| summarize attempts=count() by outcome, skip_kind, reason, error
-| order by attempts desc
-```
-
-Completed aggregate SHIP provenance (including raw bypass/error counts):
+Completed aggregates in the last two hours:
 
 ```kusto
 let completed = dependencies
@@ -346,35 +312,23 @@ let completed = dependencies
 | extend package=tostring(customDimensions.name),
          package_kind=tostring(customDimensions.kind),
          verdict=tostring(customDimensions.verdict),
-         basis=tostring(customDimensions.decision_basis),
-         outcome=tostring(customDimensions.precheck_outcome),
-         skip_kind=tostring(customDimensions.precheck_skip_kind),
-         reason=tostring(customDimensions.precheck_reason),
          error=tostring(customDimensions.error),
          completed_runs=toint(customDimensions.completed_run_count),
          valid_runs=toint(customDimensions.valid_run_count);
 completed
-| summarize attempts=count(),
-            skip_ship=countif(verdict == "SHIP" and basis == "precheck_skip"),
-            full_review_ship=countif(verdict == "SHIP" and basis == "full_review"),
-            eligible_prechecks=countif(outcome in ("skip", "review")),
-            bypasses=countif(outcome == "bypass"),
-            precheck_errors=countif(outcome == "error"),
-            aggregate_errors=countif(verdict == "ERROR")
-| extend skip_ship_percent=iff(eligible_prechecks == 0, real(null),
-                              100.0 * skip_ship / eligible_prechecks)
+| summarize attempts=count(), ship=countif(verdict == "SHIP"),
+            fix=countif(verdict == "FIX"), errors=countif(verdict == "ERROR")
 ```
 
 For the latest completed result per package **within this two-hour window**,
 replace the final summary with the following. This is not an all-time package
-approval inventory, and does not include a newer in-flight aggregate; use the
-precheck query for prompt in-flight decisions.
+approval inventory, and does not include a newer in-flight aggregate.
 
 ```kusto
 completed
 | summarize arg_max(timestamp, *) by package, package_kind
-| project timestamp, package, package_kind, verdict, basis, outcome, skip_kind,
-          reason, error, completed_runs, valid_runs, operation_Id
+| project timestamp, package, package_kind, verdict, error, completed_runs,
+          valid_runs, operation_Id
 | order by timestamp desc
 ```
 

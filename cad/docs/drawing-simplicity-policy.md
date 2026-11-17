@@ -373,41 +373,15 @@ remain deferred; this P1 correction does not change those sections.
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`
-compares baseline PDFs with the current registered PDFs (`--pdf-dir <after>`
-selects another output directory). For an explicit package, use `--name <stem>`
-with `--before-pdf` and `--pdf`; repeat each PDF option in matching
-sheet-document order. PNG CLI input is not supported. Both PDF versions are
-required unless `--force` requests an
-unconditional review of the after PDFs.
+`uv run cad/scripts/machinist_review.py <name>...` reviews the current
+registered PDFs (`--pdf-dir <dir>` selects another output directory). For an
+explicit package, use `--name <stem>` with `--pdf`, repeated in sheet-document
+order. PNG CLI input is not supported. Every review is unconditional.
 
-Before starting independent reviews, the findings judge inspects the repository
-PDF diff tool's **overlaid** before/after pictures: shared ink is gray, removed
-ink red, and added ink blue. It may skip a package only when the differences are
-rendering noise, or an assembly drawing changes only one part's geometry without
-affecting mating shown on the drawings. SolidWorks balloon placement is unstable:
-movement of a balloon or leader is noise when both its number and referenced
-part/region remain unchanged. That noise may coexist with a skippable single-part
-geometry change. A different number or target requires review, as does uncertainty
-about either. This allowance does not extend to dimension changes or other
-annotation edits. Proximity of a changed feature to a joint alone does not prove
-a mating effect; the judge compares the depicted connections and relative
-placement. A hypothetical hidden effect of a small local feature is not a
-depicted mating change. Uncertainty grounded in the visible assembly evidence
-still requires a full review.
-An unchanged overlay is inspected too; an image-generation or precheck failure
-is not permission to skip. The report retains the before/after identities,
-overlay evidence and decision. A skip returns `SHIP` with an explicit warning
-that the machinist review was skipped due to minimal changes, not a claim that
-a full review ran. The precheck does not establish that the baseline was
-approved, and PDF overlays cannot reveal changes to review rules or owner
-exceptions. Use `--force` when those require reassessment. It bypasses the
-precheck; build gates and prompt benchmarks use it for unconditional reviews.
-
-Packages selected for review run three independent blind senior-machinist
-reviews (`--runs N` changes the count). The same judge session that inspected
-the overlays later merges their findings; independent reviewers do not receive
-the baseline or precheck context. Each run receives `drawing-guidelines.md`
+Each package runs three independent blind senior-machinist
+reviews (`--runs N` changes the count). An isolated judge session then merges
+their findings; independent reviewers never receive another session's context.
+Each run receives `drawing-guidelines.md`
 followed by the reviewer
 instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
 or `machinist_review_assembly.md`), with its classification slot expanded from
@@ -494,7 +468,7 @@ both verdicts and the finding diff.
   corresponding quota signal; normal assistant text never authorizes rotation.
   Transient SDK
   `system/api_retry` notices are retained as evidence while the in-flight turn
-  continues, including a resumed judge; they do not trigger credential cooldown,
+  continues; they do not trigger credential cooldown,
   rotation or transport switching. A terminal quota route records
   `quota_state_write` as pending, then persisted, stale_credential or failed.
   A concurrent credential replacement returns `stale_credential`, does not block
@@ -597,31 +571,15 @@ both verdicts and the finding diff.
   failure. SDK disconnect and transcript-redaction failures follow the same
   primary-error rule; redaction failure alone is fatal, never permission to
   return a successful verdict with unsanitized native state.
-  Valid findings are never retried. A successful precheck pins its actual transport and session for
-  judging. SDK continuation prefers the original credential, but may select
-  another eligible key **before** submitting its single resumed turn: the local
-  conversation and cwd remain unchanged. Once submitted, a failed resumed turn
-  is never retried or switched to another transport.
-  Resume inputs are explicitly allowlisted: `transport`, `private_home`,
-  `session_id`, `credential_id`, `credential_fingerprint`, `sdk_session_dir`,
-  `sdk_redacted_files`, `sdk_redacted_fingerprint`, and `session_file`. Mutable
-  allowlisted values are deep-copied. Completion evidence (resolved model,
-  effective options, exact prompt/hash, image digests and shutdown outcome) must
-  be newly observed for the resumed turn, never inherited from the precheck.
-  Judge provenance is a separate object; judging must not mutate the retained
-  precheck report.
-  The same boundary applies when quota rotation starts a new SDK route or
-  falls back to OMP: route entry rebuilds provenance from explicitly owned run
-  metadata and conversation inputs, not a completion-field denylist. Unknown
-  completion fields cannot leak into a successor; prior route outcomes remain.
-  Resumed conversations retain their explicit session/redaction inputs, while
-  fresh routes retain only their lifecycle-owned private HOME and run metadata.
-  Private SDK transcripts and OMP agent/blob state survive the precheck so
-  persisted images hydrate correctly in the judge's history. Independent runs,
-  failed attempts and completed judges delete native state after retaining
-  redacted event/image evidence. The aggregate also cleans an unused precheck
-  when judging is skipped or an error returns early. Native session IDs remain
-  historical provenance, not standalone CLI resume recipes after cleanup.
+  Valid findings are never retried.
+  When quota rotation starts a new SDK route or falls back to OMP, route entry
+  rebuilds provenance from explicitly owned run metadata, not a completion-field
+  denylist. Unknown completion fields cannot leak into a successor; prior route
+  outcomes remain. Each route retains only its lifecycle-owned private HOME and
+  run metadata. Every attempt deletes its private SDK transcripts and OMP
+  agent/blob state after retaining redacted event/image evidence; the aggregate
+  retries any incomplete removal. Native session IDs remain historical
+  provenance, not standalone CLI resume recipes after cleanup.
 - Structured operation logs and span events record credential decisions (safe
   IDs/counts), SDK route starts, quota unavailability and OMP fallback reasons.
   Logs also record broker readiness and terminal outcome or original failure
@@ -674,12 +632,8 @@ both verdicts and the finding diff.
   quota-dependent route selected in advance. The canonical cached result records
   the route actually used and its per-attempt provenance, which adopters retain;
   it does not claim SDK and OMP are identical inference harnesses.
-  Review-verdict inputs include repository-root `pyproject.toml` and `uv.lock`,
-  so pinned SDK/runtime dependency changes invalidate cached verdicts.
-  Whole-manifest hashing conservatively invalidates reviews for unrelated
-  manifest edits too; dependency versions remain authoritative in manifests,
-  not duplicated in cache code. These review-only inputs do not change CAD
-  part/drawing geometry recipe keys.
+  Review-verdict inputs exclude repository-root `pyproject.toml` and `uv.lock`:
+  a dependency release changes the transport, not the verdict's inputs (#2882).
   SDK-only run identity excludes optional OMP version probes; diagnostics remain
   in aggregate `runtime_probes`. An actual OMP route's recorded version must
   match a successful current probe before reuse. An unavailable cached OMP probe
@@ -695,7 +649,7 @@ both verdicts and the finding diff.
   partial-failure policy, without claiming a warmed cache. Each run keeps its
   own neutral cwd and fresh session UUID, the same frozen sheets, rubric, model
   and effort, and no shared history. Codex runs remain fully parallel. Single-run
-  reviews, the precheck/judge lifecycle and the two-run support rule are unchanged.
+  reviews, the judge and the two-run support rule are unchanged.
 - The authoritative result is `<name>.aggregate.json` and its companion
   `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
   **confirmed** blocker, over-specification or clarity finding raised by two or

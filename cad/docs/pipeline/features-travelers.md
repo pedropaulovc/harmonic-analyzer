@@ -278,8 +278,8 @@ on exactly the records it reads (AGENTS.md, "Fine-grained config deps"). See
 
 prechips is not an HA dependency while it stabilises
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
-locked prechips made every prechips release change `uv.lock`, which re-keys every
-`check:machinist_review:*`, so prechips stays out of the lock. `build` runs every
+locked prechips made every prechips release change `uv.lock`, which until #2882
+re-keyed every `check:machinist_review:*`, so prechips stays out of the lock. `build` runs every
 enrolled traveler beside the drawing PDFs and `build_bare` runs none; `release`
 runs every one and ships its hobby sheet as a PDF (owner rulings 2026-11-14,
 superseding the 2026-11-11 ruling that travelers stay out of `build` and

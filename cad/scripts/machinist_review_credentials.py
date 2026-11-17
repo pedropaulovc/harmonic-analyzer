@@ -143,19 +143,13 @@ def _directory(path: Path) -> None:
             raise ValueError("Claude credentials: storage parent must be a directory")
 
 
-class CredentialUnavailable(ValueError):
-    """A requested key cannot currently serve a locally persisted conversation."""
-
-
 class CredentialPool:
-    def __init__(self, env=None, *, load_mode="configured"):
+    def __init__(self, env=None):
         env = os.environ if env is None else env
         home = Path(env.get("HOME", str(Path.home())))
         self.keys_file = Path(env.get("CODJIFLO_ANTHROPIC_KEYS_FILE", home / ".config/codjiflo/anthropic-keys.json"))
         self.state_file = Path(env.get("CODJIFLO_CLAUDE_STATE_FILE", home / ".local/state/codjiflo/claude-routing.json"))
-        if load_mode not in {"configured", "skip"}:
-            raise ValueError("unknown credential load mode")
-        self.credentials = _credentials(_private_json(self.keys_file)) if load_mode == "configured" else []
+        self.credentials = _credentials(_private_json(self.keys_file))
         self.secrets = {key.api_key for key in self.credentials}
 
     def redact(self, text: str) -> str:
@@ -262,8 +256,8 @@ class CredentialPool:
                     or entry["status"] == "cooldown" and entry["retryAt"] is None):
                 raise ValueError("Claude credentials: corrupt routing state")
 
-    def claim(self, excluded=(), *, required_id=None, required_fingerprint=None):
-        if not self.credentials and required_id is None:
+    def claim(self, excluded=()):
+        if not self.credentials:
             return None
         with self._state() as state:
             now = int(time.time() * 1000)
@@ -273,13 +267,9 @@ class CredentialPool:
                 entry = state["keys"][key.id]
                 if entry["retryAt"] is not None and entry["retryAt"] <= now:
                     entry.update(self._fresh(key))
-                if required_id is not None and (key.id != required_id or key.fingerprint != required_fingerprint):
-                    continue
                 if key.id not in excluded and entry["status"] == "ready":
                     state["cursor"] = (index + 1) % len(self.credentials)
                     return key
-        if required_id is not None:
-            raise CredentialUnavailable("Claude continuation credential is unavailable or rotated")
         return None
 
     def unavailable(self, key: Credential, quota: dict):

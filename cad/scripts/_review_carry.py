@@ -22,7 +22,7 @@ The index is one create-only sidecar per freshly reviewed PDF::
     machinist-review/epoch-<epoch>/<stem>/<context>/<review key>.pdf
 
 ``context`` is the cache key of every review input but the PDF, so a prompt,
-review-code, ``uv.lock`` or exception-file change finds no entry and the sheet
+review-code or exception-file change finds no entry and the sheet
 is reviewed again. The blob holds the reviewed PDF's bytes; its name is the
 key its verdict is stored under. Writers never update a blob, so concurrent
 builds cannot corrupt an entry, and a reader lists one drawing's prefix,

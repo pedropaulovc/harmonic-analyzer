@@ -757,7 +757,6 @@ def test_review_main_uses_registry_pdf_basename(
                 case["package"],
                 "--pdf-dir",
                 str(pdf_dir),
-                "--force",
                 "--report-dir",
                 str(report_dir),
                 "--reviewer",
@@ -775,8 +774,6 @@ def test_review_main_uses_registry_pdf_basename(
     assert package.sources == (
         pdf_dir / mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name,
     )
-    assert package.before_sources == ()
-    assert controls["force"] is True
     assert controls["report_dir"] == report_dir
     assert controls["reviewer"] == "claude"
     assert controls["runs"] == 3
@@ -1034,9 +1031,6 @@ def test_run_without_baseline_never_loads_or_reviews_old_skill(
     assert composed == [(case["kind"], None)]
     assert len(reviewed) == 1
     command = reviewed[0]
-    assert command.count("--force") == 1
-    assert "--before-pdf" not in command
-    assert "--before-pdf-dir" not in command
     assert "--png" not in command
     assert command[:4] == [
         evaluation.sys.executable,
@@ -1088,9 +1082,6 @@ def test_release_pdf_override_reads_the_renamed_release_pdf(
     staged = []
 
     def review(command, **kwargs):
-        assert command.count("--force") == 1
-        assert "--before-pdf" not in command
-        assert "--before-pdf-dir" not in command
         pdf_dir = Path(command[command.index("--pdf-dir") + 1])
         staged.append((pdf_dir / registry_pdf).read_bytes())
         _report(Path(command[command.index("--report-dir") + 1]), case)
