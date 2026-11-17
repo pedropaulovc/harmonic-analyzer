@@ -65,7 +65,7 @@ NOTES_XY = (0.020, 0.075)
 # sheets, so its citation is (sheet, step) per printed group (test-pinned to
 # where the pen drawing places its sequence blocks). MHA-MG-00's steps print
 # in the release's ASSEMBLY.md, not on its sheets (#2889), so its citation is
-# the step range alone.
+# the step range there.
 PEN_DRAWING_NUMBER = "MHA-PN-00"
 PEN_WIRE_CITATIONS = ((3, 2), (4, 8))
 ASSEMBLY_NOTE = "\n".join(
@@ -73,7 +73,7 @@ ASSEMBLY_NOTE = "\n".join(
         "CUT TO LENGTH AND FORM AT ASSEMBLY:",
         f"LEVER WIRE: {magnifier_steps.DRAWING_NUMBER} "
         f"STEPS {magnifier_steps.step_number(magnifier_steps.WIRE_HOOKED_KEY)}-"
-        f"{magnifier_steps.step_number(magnifier_steps.WIRE_TIED_KEY)}",
+        f"{magnifier_steps.step_number(magnifier_steps.WIRE_TIED_KEY)} (ASSEMBLY.MD)",
         f"PEN WIRE: {PEN_DRAWING_NUMBER} "
         + "; ".join(
             f"SHEET {sheet}, STEP {step}" for sheet, step in PEN_WIRE_CITATIONS

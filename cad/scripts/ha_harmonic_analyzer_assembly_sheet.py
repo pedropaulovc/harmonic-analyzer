@@ -281,11 +281,11 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"{_n('magnifier-bracket-screwed')}C-{_n('magnifier-bracket-screwed')}D.",
     ),
     # MHA-MG-00's fit-up steps print in the release's ASSEMBLY.md, not on its
-    # sheets (#2889): cite them by number.
+    # sheets (#2889): cite them by number there.
     "lever-wire-fitted": (
         f"LEVER WIRE: FIT IT PER {mg_steps.DRAWING_NUMBER} STEPS "
         f"{mg_steps.step_number(mg_steps.WIRE_HOOKED_KEY)}-"
-        f"{mg_steps.step_number(mg_steps.WIRE_TIED_KEY)}.",
+        f"{mg_steps.step_number(mg_steps.WIRE_TIED_KEY)} (ASSEMBLY.MD).",
     ),
     "pen-hung": (
         "PEN: HANG MHA-PN-00 FROM THE MHA-MG-08 BAR.",
