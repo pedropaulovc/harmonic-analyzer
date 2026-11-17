@@ -798,6 +798,11 @@ on_hand = false
 cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
 
 # Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
+# Owner (Pedro) 2026-11-17: the jig is no longer made, so its stock, less the
+# two base-bar lengths already cut, is free for fixture plates. The allocation
+# text in the rows below records what each piece was bought for, not a
+# current claim. First reuse: fixtures.strap-sub-plate, one 13 in length of
+# the 1/2 x 6 in 1173 bar. Lengths left on hand are not measured.
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
@@ -1408,11 +1413,11 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 # The plan's [parameters] carry the sizes prechips reads (plate_*, fence_*,
 # clamp_height_mm, hub_relief_dia_mm); they are not repeated here.
 [fixtures.strap-sub-plate]
-name = "Rocker-strap sub-plate with fence, 6061, about 13 x 3 x 1/2 in"
+name = "Rocker-strap sub-plate with fence, 6061, 13 x 3 x 1/2 in"
 kind = "fixture_plate"
 present = false
-status = "not made: shop-made"
-purchase = "Make from 1/2 x 3 in 6061 flat, 13 in long: mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; a through relief hole under the hub hole; four mounting holes for the edge clamps along the front at the plan's clamp stations."
+status = "not made: shop-made from owned stock"
+purchase = "Make from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). Mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; a through relief hole under the hub hole; four Pitbull clamp slots and 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
 use = "MHA-CH-13 Setups 2-4: seats the 1/8 x 1-1/2 in blank for facing, the hub hole and the outline"
 
 # Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
