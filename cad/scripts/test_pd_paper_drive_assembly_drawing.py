@@ -1733,8 +1733,9 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
     assert f"RING GAP READS {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
-    # Rule 4: each press step prints its setting detail's plain band, which
-    # lies inside the part specs' window.
+    # Each press step prints its setting detail's limits: the part specs'
+    # window rounded inward to the .001 grid and no narrower, so no
+    # conforming press-to-floor build is refused (Codjiflo, PR #3029).
     for key, band, bounds in (
         (
             "collar-pins-pressed",
@@ -1748,6 +1749,7 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         ),
     ):
         assert bounds[0] - 1e-9 <= band[0] < band[1] <= bounds[1] + 1e-9
+        assert band[0] - bounds[0] < 0.0254 and bounds[1] - band[1] < 0.0254
         assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 

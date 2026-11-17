@@ -1,4 +1,4 @@
-"""MHA-PD-00's geometric assembly settings as model dimensions (DETAILS F-L).
+"""MHA-PD-00's geometric assembly settings as model dimensions (DETAILS F, H, J, L).
 
 Rule 22 (R5 machinist review of MHA-PD-00): every measurable setting prints
 on a view, setting diagram or setting table.  Owner policy (via MainBuild,
@@ -24,7 +24,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pd_rack_pinion_spec import MM_PER_IN, inch_text
+from pd_latch_hook_geometry import on_arm
+from pd_rack_pinion_spec import MM_PER_IN, inch_ceil_mm, inch_floor_mm
 
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from _column_clamp_interface import ARC_DEPTH, BAR_DEPTH
@@ -84,15 +85,10 @@ class SettingLine:
         return abs(low + high) < 1e-9
 
     @property
-    def printed(self) -> str:
-        """The dimension as the sheet prints it, in inches."""
-        nominal = inch_text(self.length_mm, PLACES)
-        if self.band_mm is None:
-            return nominal
-        low, high = self.deviations_mm
-        if self.symmetric:
-            return f"{nominal} \u00b1{inch_text(high, PLACES)}"
-        return f"{nominal} +{inch_text(high, PLACES)}/-{inch_text(-low, PLACES)}"
+    def limits(self) -> bool:
+        """A band that is not symmetric about the grid nominal prints as its
+        two limits (rule 4: no converted +a/-b deviations)."""
+        return self.band_mm is not None and not self.symmetric
 
 
 @dataclass(frozen=True)
@@ -141,14 +137,6 @@ DRIVE_PIN_Y = KNOB_AXIS_XY[1] + collar.PIN_CIRCLE_RADIUS
 ARM_REAR_Z = arm.FRONT_FACE_MACHINE_Z + arm.THICKNESS
 
 
-def on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
-    """Machine xy of the hanger-frame point ``P + station*U + offset*N``."""
-    return (
-        placement.PIVOT_XY[0] + station * arm.ARM_U[0] + offset * arm.ARM_N[0],
-        placement.PIVOT_XY[1] + station * arm.ARM_U[1] + offset * arm.ARM_N[1],
-    )
-
-
 LOCATOR_XY = on_arm(*arm.LOCATOR_SITES_MM[0])
 # The latch dowel: pressed along U to the floor of the arm tip's hole, its
 # proud end past the square tip face at TIP_STATION.
@@ -158,32 +146,21 @@ LATCH_PROUD_MODEL = latch_pin.PROUD
 
 
 # --- the bands the details and steps print ----------------------------------
-# Rule 4 (review of run 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca):
-# an explicit band is a plain inch step, and converted limits such as
-# .094 +.004/-.003 read as nobody's choice. A press window prints the widest
-# plain symmetric band about its grid nominal that lies inside the part
-# specs' window, and the step prints that band's limits.
-PLAIN_STEPS_IN = (0.030, 0.025, 0.020, 0.015, 0.010, 0.005, 0.003, 0.002, 0.001)
-
-
-def plain_band(
-    nominal_mm: float, window_mm: tuple[float, float]
-) -> tuple[float, float]:
-    """``nominal_mm`` +/- the widest plain inch step inside ``window_mm``."""
-    for step_in in PLAIN_STEPS_IN:
-        half = step_in * 25.4
-        if (
-            window_mm[0] - 1e-9 <= nominal_mm - half
-            and nominal_mm + half <= window_mm[1] + 1e-9
-        ):
-            return (nominal_mm - half, nominal_mm + half)
-    raise AssertionError(f"no plain band about {nominal_mm} fits {window_mm}")
+# A press-to-stop or press-to-floor window is the part specs' own window,
+# rounded inward to the .001 grid (pd_paper_drive_assembly_steps.inch_window),
+# so the step and the detail read alike and no conforming build is refused
+# (Codjiflo, PR #3029). The proud is not adjustable, so the window is not
+# narrowed to reach a plain step; it prints as its two limits (the review of
+# run 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca found the
+# converted +.004/-.003 form unreadable, rule 4).
+def _inward(limits_mm: tuple[float, float]) -> tuple[float, float]:
+    return (inch_ceil_mm(limits_mm[0], PLACES), inch_floor_mm(limits_mm[1], PLACES))
 
 
 DRIVE_PIN_PROUD_NOMINAL = _grid_in(collar.DRIVE_PIN_PROUD)
-DRIVE_PIN_PROUD_BAND = plain_band(DRIVE_PIN_PROUD_NOMINAL, drive_pin.PROUD_RANGE)
-LATCH_PROUD_NOMINAL = _grid_in(latch_pin.PROUD)
-LATCH_PROUD_BAND = plain_band(LATCH_PROUD_NOMINAL, joints.LATCH_PIN_PROUD_RANGE)
+DRIVE_PIN_PROUD_BAND = _inward(drive_pin.PROUD_RANGE)
+LATCH_PROUD_NOMINAL = _grid_in(LATCH_PROUD_MODEL)
+LATCH_PROUD_BAND = _inward(joints.LATCH_PIN_PROUD_RANGE)
 RACK_FRONT_BAND = (
     feed_rack.FRONT_BEHIND_PLATEN - feed_rack.FRONT_SET_BAND,
     feed_rack.FRONT_BEHIND_PLATEN + feed_rack.FRONT_SET_BAND,
@@ -219,9 +196,9 @@ COLLAR_DOWELS = SettingDetail(
             end=(
                 KNOB_AXIS_XY[0],
                 DRIVE_PIN_Y,
-                COLLAR_FRONT_Z - _grid_in(collar.DRIVE_PIN_PROUD),
+                COLLAR_FRONT_Z - DRIVE_PIN_PROUD_NOMINAL,
             ),
-            length_mm=_grid_in(collar.DRIVE_PIN_PROUD),
+            length_mm=DRIVE_PIN_PROUD_NOMINAL,
             band_mm=DRIVE_PIN_PROUD_BAND,
             # Above the dowel, in front of the collar's face.
             text=(KNOB_AXIS_XY[0], DRIVE_PIN_Y + 3.2, COLLAR_FRONT_Z - 1.2),
@@ -266,10 +243,10 @@ LOCATING_DOWELS = SettingDetail(
     title="DOWELS PROUD OF THE ARM REAR FACE",
 )
 
-# J: both lines start on the rack's front face.  The crest drop runs up it
-# from the crest's front corner to the platen's bottom edge level (its upper
-# extension line runs along that edge); the front set runs across the rack's
-# flat top from the guide's front face to the rack's.
+# J: the crest drop runs up the rack's front face from the crest's front
+# corner to the platen's bottom edge level (its upper extension line runs
+# along that edge); the front set runs across the rack's flat top from the
+# guide's front face to the rack's.
 _RACK_SIDE_X = 0.0
 RACK_SETTINGS = SettingDetail(
     letter="J",
@@ -309,7 +286,7 @@ RACK_SETTINGS = SettingDetail(
     title="RACK CRESTS BELOW THE PLATEN, RACK BEHIND THE GUIDE",
 )
 
-_LATCH_LENGTH = _grid_in(LATCH_PROUD_MODEL)
+_LATCH_LENGTH = LATCH_PROUD_NOMINAL
 _LATCH_END_XY = on_arm(arm.TIP_STATION + _LATCH_LENGTH)
 _LATCH_MID_XY = on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 3.0)
 LATCH_DOWEL = SettingDetail(

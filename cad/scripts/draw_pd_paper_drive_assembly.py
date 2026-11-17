@@ -2065,8 +2065,8 @@ def _step_text(
 ) -> dict[str, tuple[str, ...]]:
     """Each step's sub-steps, one action or one check each."""
     n = _N
-    # The windows DETAILS L and F dimension (rule 4's plain bands, inside
-    # the part specs' press windows), so step and detail read alike.
+    # The windows DETAILS L and F print as limits: the part specs' press
+    # windows on the .001 grid, so step and detail read alike.
     pin_window = steps.inch_window(setting_details.LATCH_PROUD_BAND, 3, " TO ")
     drive_window = steps.inch_window(setting_details.DRIVE_PIN_PROUD_BAND, 3, " TO ")
     knob_window = KNOB_END_FLOAT_WINDOW
@@ -3091,7 +3091,7 @@ def _step_text(
 # or hides inside a part (the pivot screw's tip in the bar's tap, the cup
 # pin's hole).  Cells are the steps' own values.
 SETTING_TABLE_TITLE = (
-    "SETTING TABLE: SETTINGS AND CHECKS NOT DIMENSIONED ON DETAILS F-L "
+    "SETTING TABLE: SETTINGS AND CHECKS NOT DIMENSIONED ON DETAILS F, H, J, L "
     f"(SHEET {SHEET_NAMES.index(SETTING_DETAIL_SHEET) + 1})"
 )
 SETTING_TABLE_HEADER = ("ROW", "STEP", "SETTING OR CHECK", "SET TO / ACCEPT", "CHECK WITH")

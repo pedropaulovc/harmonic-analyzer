@@ -118,6 +118,7 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _limit_tolerance import set_limits
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -2447,14 +2448,15 @@ def _author_setting_details(adapter) -> None:
             deviations = line_spec.deviations_mm
             if deviations is None:
                 continue
-            if line_spec.symmetric:
-                set_dimension_symmetric_tolerance(
-                    adapter, detail.feature, line_spec.dimension, deviations[1],
+            if line_spec.limits:
+                set_limits(
+                    adapter, detail.feature, line_spec.dimension,
+                    limits=line_spec.band_mm,
                     places=SETTING_DETAILS.PLACES, display_unit=unit,
                 )
             else:
-                set_dimension_bilateral_tolerance(
-                    adapter, detail.feature, line_spec.dimension, *deviations,
+                set_dimension_symmetric_tolerance(
+                    adapter, detail.feature, line_spec.dimension, deviations[1],
                     places=SETTING_DETAILS.PLACES, display_unit=unit,
                 )
         apply_drawing_precision(
