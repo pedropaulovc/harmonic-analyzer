@@ -559,7 +559,7 @@ headless FreeCAD (`freecadcmd` 1.1+, from `$HARMONIC_FREECAD` or the newest
 discovered `FreeCAD <version>` install; it fails loud when there is none) on
 `_freecad_cam_runtime.py`, which builds one CAM Job per program section and
 posts with FreeCAD's `grbl` post, joining a program's sections into one file:
-`M5`, a comment and `M6 T<n>` at a new tool (CNCjs's Manual Tool Change,
+`M5`, a `%msg` and `M6 T<n>` at a new tool (CNCjs's Manual Tool Change,
 Custom Probing, expands it into the tool change and tool-setter probe), a
 `%msg` and `M0` at a hand-set speed change, and the recipe's own manual
 sections (operator stops, the base bar's touch-probe X0). The driver then

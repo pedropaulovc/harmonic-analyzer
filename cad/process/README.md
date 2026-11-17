@@ -389,12 +389,12 @@ A recipe has four parts:
   Job, posted as it is) or in sections (one Job per tool and spindle speed,
   or a manual section: G-code the recipe writes itself, such as an operator
   stop or a probing cycle). Sections join into one file. A new tool starts at
-  `M5`, a comment naming it and the speed to set, and `M6 T<n>`, which CNCjs
+  `M5`, a `%msg` naming it and the speed to set, and `M6 T<n>`, which CNCjs
   (Manual Tool Change, Custom Probing) expands into its tool change and
   tool-setter probe; FluidNC 3.7.8 has no tool change of its own. The
   PM-30MV's speed is set by hand on the knob, so the same tool at a new speed
-  starts at `%msg` and `M0` (CNCjs strips comments before sending and shows
-  the `%msg` text at the stop). The base bar's BB02 (bar 1) runs the Tri Fly,
+  starts at `%msg` and `M0`. CNCjs strips comments before sending and shows
+  the pending `%msg` text at the next M0 or M6 pause. The base bar's BB02 (bar 1) runs the Tri Fly,
   the flip stop, the probe, the end mill at 2250 then 1250, the drills, the
   tap stops and the counterbore. `_gcode` splits a file at its `M6`s into
   tool sections, named `FILE@k` in expectations, and checks the tools called,
@@ -456,7 +456,8 @@ block, once per vise setup), so every top-face operation is posted from
 Z = finished thickness, which the side-2 face makes true; Y0 is ZERO EDGE
 against the back jaw; after the flip the file's touch probe sets X0 at ZERO
 END. The bar lies at −Y, so drawing Y becomes −Y. Bar 1's C'BORE SIDE and
-bar 2's RAIL SIDE are the model's top face, so both files share one frame;
+bar 2's RAIL SIDE are the model's underside, face up at Z = T (the model's
+top seat lies on the parallels), so both files share one frame;
 bar 2's has no bracket holes. S2 is different: X0 is the blank's left end,
 Y0 the finished front edge with the bar at +Y, and Z0 the blank's top.
 Posted NC is not machining approval: prove each program in air and check the

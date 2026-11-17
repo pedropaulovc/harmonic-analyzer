@@ -396,10 +396,10 @@ def post(sections, path, name, comment):
                 # a manual section's own setting (spindle off).
                 speed = next((t[2] for t in tools[index:] if t[0] == number and t[2] is not None), None)
                 setting = f"SET SPINDLE TO {speed:g} RPM" if speed else manual
-                # No ";" in the comment: a sender stripping ";" comments first
-                # would leave its "(" unclosed. CNCjs shows its own message at the
-                # tool change's stop, so this one is for the file view.
-                out += ["M5", f"(TOOL CHANGE: T{number} {label}, {setting})", f"M6 T{number}"]
+                # CNCjs strips comments before sending and shows the pending
+                # %msg at the M6's pause (GrblController, Manual Tool Change),
+                # so the speed to set, or spindle off, reaches the operator.
+                out += ["M5", f"%msg TOOL CHANGE: T{number} {label}, {setting}", f"M6 T{number}"]
             elif previous is not None and rpm is not None and previous[1] is not None:
                 if rpm != previous[1]:
                     # CNCjs shows a %msg line when the M0 pauses it; it strips

@@ -103,6 +103,6 @@ def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path)
     assert _gcode.check_tool_changes(three, 10.0, [8, 1]) == []
     assert _gcode.check_spindle(three, [850, [], 2250]) == []
     text = (tmp_path / "P4_three_tools.nc").read_text(encoding="utf-8")
-    assert "(TOOL CHANGE: T1 1/2 in endmill, SET SPINDLE TO 2250 RPM)" in text
-    assert "(TOOL CHANGE: T8 probe, SPINDLE OFF - PROBE IN)" in text
-    assert not any(line.startswith("(TOOL CHANGE:") and "001" in line for line in text.splitlines())
+    assert "%msg TOOL CHANGE: T1 1/2 in endmill, SET SPINDLE TO 2250 RPM" in text
+    assert "%msg TOOL CHANGE: T8 probe, SPINDLE OFF - PROBE IN" in text
+    assert not any(line.startswith("%msg TOOL CHANGE:") and "001" in line for line in text.splitlines())
