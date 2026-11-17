@@ -210,6 +210,7 @@ AXIS_OVERRUN = 0.003
 # family's layout).
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+_TOL_NONE = 0  # swTolType_e.swTolNONE
 
 
 def floor_dia_y() -> float:
@@ -653,6 +654,25 @@ def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+def _pivot_reference(adapter: Any, side_annotations: list[Any]) -> None:
+    """Parenthesize the pivot's diameter as REF: the part leaves it unbanded,
+    and note 1's two ranges, on the measured mates, are its requirement."""
+    found = [a for a in side_annotations if dimension_name(adapter, a) == "PivotDia"]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one PivotDia on the sheet, found {len(found)}")
+    display = _early_bound(
+        set_reference_dimension(adapter, found[0], label="pivot", diameter=True),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != _TOL_NONE:
+        raise RuntimeError(f"REF pivot reads tolerance type {int(tolerance.Type)}")
+    measured = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured - STEM_DIA_MM) > 1e-4:
+        raise RuntimeError(f"REF pivot reads {measured:.4f} mm, expected {STEM_DIA_MM}")
+
+
 # The thickness callout's printed rows other than the value, top down.
 TOOTH_THICKNESS_ROWS = (
     CALLOUTS_ABOVE["ToothThickness"],
@@ -1016,6 +1036,7 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _pivot_reference(adapter, side_annotations)
     printed = {dimension_name(adapter, annotation) for annotation in annotations}
     if printed != sheet_dimension_names():
         raise RuntimeError(

@@ -99,8 +99,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # The cone tip gear's loop over its own module-level bands.
     ("build_dt_cone_tip_gear", "band"): (
-        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND,"
-        " PIVOT_DIA_BAND)",
+        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND)",
         "each",
     ),
     # _apply_neck_and_flat_limits passes each native LIMIT band in turn.

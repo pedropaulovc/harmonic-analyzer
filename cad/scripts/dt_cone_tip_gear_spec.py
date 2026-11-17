@@ -14,9 +14,9 @@ the tooth phase. The leaves span z 0..FACE_WIDTH, the spigot
 ``PATTERN_AXIS`` is the gear axis the assembly mates, ``LEAVES_NORTH_PLANE``
 the leaves' north face the MHA-DT-38 bushing seats on.
 
-Both stems sit under the leaves' root at every printed limit, so the fly
-cutter runs off over them (``CUTTER_RUNOFF_MM``). Lengths in mm; bands are
-(upper, lower).
+Both stems sit under the leaves' root at every limit they can be made to, so
+the fly cutter runs off over them (``CUTTER_RUNOFF_MM``). Lengths in mm;
+bands are (upper, lower).
 """
 
 from __future__ import annotations
@@ -78,7 +78,26 @@ PATTERN_AXIS = "Axis1"
 # --- The stems ----------------------------------------------------------------
 STEM_DIA_MM = cluster.STEM_DIA_MM
 SPIGOT_DIA_BAND = cluster.SPIGOT_DIA_BAND
-PIVOT_DIA_BAND = cluster.PIVOT_DIA_BAND
+# The pivot prints its Ø.0625 as REF and is turned to its two measured mates
+# (rule 4, matched pair): note 1's interference in the MHA-DT-38 bore and
+# running clearance in the MHA-DT-39 hole are the requirement, each the range
+# the cluster's design window (cluster.PIVOT_DIA_BAND, .0003 wide, under any
+# plain inch step, so never printed) gives on its mate's printed limits.
+_BUSHING_BORE_MM = cluster.limits(*cluster.BUSHING_BORE)
+_END_HOLE_MM = cluster.limits(*cluster.END_HOLE)
+_PRESS = cluster.BUSHING_PRESS_INTERFERENCE_MM
+_RUN = cluster.PIVOT_RUNNING_CLEARANCE_MM
+# Every in-limit bore and hole leave a pivot size that meets both ranges.
+if not (
+    _END_HOLE_MM[0] - _BUSHING_BORE_MM[1] >= _PRESS[0] + _RUN[0] - 1e-9
+    and _END_HOLE_MM[1] - _BUSHING_BORE_MM[0] <= _PRESS[1] + _RUN[1] + 1e-9
+):
+    raise AssertionError("some in-limit MHA-DT-38/MHA-DT-39 pair admits no pivot")
+# (minimum, maximum) of every pivot so matched.
+PIVOT_MATCHED_LIMITS_MM = (
+    max(_BUSHING_BORE_MM[0] + _PRESS[0], _END_HOLE_MM[0] - _RUN[1]),
+    min(_BUSHING_BORE_MM[1] + _PRESS[1], _END_HOLE_MM[1] - _RUN[0]),
+)
 SPIGOT_LENGTH_MM = cluster.SPIGOT_LENGTH_MM
 PIVOT_LENGTH_MM = cluster.PIVOT_LENGTH_MM
 STEM_PLACES = cluster.STEM_PLACES
@@ -91,10 +110,10 @@ PIVOT_END_Z_MM = FACE_WIDTH + PIVOT_LENGTH_MM
 OVERALL_LENGTH_MM = SPIGOT_LENGTH_MM + FACE_WIDTH + PIVOT_LENGTH_MM
 LEAVES_NORTH_PLANE = "LeavesNorthPlane"
 
-# The fly cutter runs off over both stems: the largest stem stands under the
-# smallest printed root envelope at every limit (research: (.0840 - .0625)/2
-# = .0108 in radial).
-STEM_MAX_DIA_MM = STEM_DIA_MM + max(SPIGOT_DIA_BAND[0], PIVOT_DIA_BAND[0])
+# The fly cutter runs off over both stems: the largest stem (a pivot matched
+# to the largest mates) stands under the smallest printed root envelope
+# (research: (.0840 - .0630)/2 = .0105 in radial).
+STEM_MAX_DIA_MM = max(STEM_DIA_MM + SPIGOT_DIA_BAND[0], PIVOT_MATCHED_LIMITS_MM[1])
 CUTTER_RUNOFF_MM = (FLOOR_LIMITS_MM[0] - STEM_MAX_DIA_MM) / 2.0
 if CUTTER_RUNOFF_MM <= 0.0:
     raise AssertionError(
