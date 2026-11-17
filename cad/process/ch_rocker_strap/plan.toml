@@ -385,8 +385,8 @@ sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
 instruction = "Same file, M6 T5: ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Then unclamp and lift the blank out."
 rpm = 400
 feed = "{{process.hub_ream_feed_per_min_mm:in.1f}} in/min, in and out"
-inspection = "Hub hole Ø{{cad.hub_dia_min_in:.4dot}}–{{cad.hub_dia_max_in:.4dot}}, telescoping gauge read on the micrometer; both edges sharp, no burr."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_dia_band_mm}}" }]
+inspection = "Hub hole Ø{{cad.hub_dia_min_in:.4dot}}–{{cad.hub_dia_max_in:.4dot}} by the .4000 GO / .4005 NO-GO plug gauges, before unclamping: the GO enters, the NO-GO does not. Gauge the first blank's hole before reaming any other (NO-GO enters or GO will not: stop, the reamer is out of band), then every hole. Both edges sharp, no burr."
+gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = "{{cad.hub_dia_band_mm}}" }]
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
 # No reamer kind: its thrust is analysed as a two-lip twist drill's at the
 # reamer Ø and the same feed (flutes = 2 is that model's, not the reamer's),
