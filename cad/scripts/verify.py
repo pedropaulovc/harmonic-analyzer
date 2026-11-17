@@ -1087,7 +1087,7 @@ def _verify_motion_one(adapter: Any, report: Report) -> None:
     Setting CrankDeg and rebuilding must displace the pen-marker tip by exactly
     ``pen_driver.expected_tip_disp_mm(theta)`` from the rest pose -- the computed
     (not force-simulated) summation, mapped onto the physical half-stroke. The
-    async sweep runs first (collecting the worst deviation + any stroke-extreme
+    sweep runs first (collecting the worst deviation + any stroke-extreme
     interference); the sync gates then assert on what it collected.
     """
     name = MOTION_OWNER

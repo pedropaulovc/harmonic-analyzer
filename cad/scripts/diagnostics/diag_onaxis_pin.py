@@ -32,8 +32,7 @@ BORE_R = 6.0
 RESULTS: list[tuple[str, bool, str]] = []
 
 
-def _try(label: str, coro) -> bool:
-    res = coro
+def _try(label: str, res) -> bool:
     ok = bool(res.is_success)
     RESULTS.append((label, ok, "" if ok else str(res.error)))
     if ok:
@@ -60,15 +59,15 @@ def _scenario(adapter: Any, name: str, with_bore: bool, direct_db: bool,
     if direct_db:
         set_sketch_direct_db(adapter, False)
     steps = [
-        ("hdist", adapter.add_sketch_dimension(
+        ("hdist", lambda: adapter.add_sketch_dimension(
             f"{pin}.center", "origin", "horizontal_distance", PIN_X)),
-        ("horizontal_points", adapter.add_sketch_constraint(
+        ("horizontal_points", lambda: adapter.add_sketch_constraint(
             f"{pin}.center", "origin", "horizontal_points")),
     ]
     if not dim_first:
         steps.reverse()
-    for step_label, coro in steps:
-        _try(f"{name}: {step_label}", coro)
+    for step_label, step in steps:
+        _try(f"{name}: {step_label}", step())
     _try(f"{name}: pin diameter",
                adapter.add_sketch_dimension(pin, None, "diameter", 2 * PIN_R))
     res = adapter.check_sketch_fully_defined()

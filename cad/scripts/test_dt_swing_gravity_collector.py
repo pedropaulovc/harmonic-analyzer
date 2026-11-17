@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import sys
+from pathlib import Path
 from types import ModuleType
 
 import numpy as np
@@ -193,6 +194,15 @@ def test_export_units_refuse_scaling_or_origin_guessing(tmp_path, units, origin)
     )
     with pytest.raises(RuntimeError, match="swMM|part-local origin"):
         collector.SourceSlices(tmp_path).export_units()
+
+
+def test_export_units_accept_the_repository_stl_exporter():
+    # The real _preferences/_part_save pair: a change to the exporter's shape
+    # (e.g. its async -> sync conversion) must not make the collector refuse it.
+    source_root = Path(__file__).resolve().parents[2]
+    units = collector.SourceSlices(source_root).export_units()
+    assert units["coordinate_unit"] == "mm"
+    assert units["scale_to_mm"] == 1.0
 
 
 def test_report_cannot_write_inside_source_tree(tmp_path):

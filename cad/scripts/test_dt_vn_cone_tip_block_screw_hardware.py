@@ -148,7 +148,7 @@ def _record(monkeypatch, author) -> list[tuple]:
 
         return call
 
-    def async_logger(name):
+    def call_logger(name):
         def call(*args, **kwargs):
             adapter.log(name, args, kwargs)
 
@@ -171,9 +171,9 @@ def _record(monkeypatch, author) -> list[tuple]:
     monkeypatch.setattr(socket_head, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(socket_head, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(socket_head, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_sketch, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(_sketch, "add_line_chain", call_logger("add_line_chain"))
     monkeypatch.setattr(
-        _sketch_rectangle, "add_line_chain", async_logger("add_line_chain")
+        _sketch_rectangle, "add_line_chain", call_logger("add_line_chain")
     )
     monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
