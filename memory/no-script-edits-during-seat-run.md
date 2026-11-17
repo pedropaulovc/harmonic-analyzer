@@ -17,9 +17,8 @@ distinct failure shapes:
    the script says otherwise -- drive-train's "flip-seed MISS ... off by 9.00 mm" was
    exactly the arm-length delta, not a flip bug. `_FLIP_INVERT` toggling would have been
    the wrong fix.
-2. The verify gates' fresh-inputs guard reads script digests at gate time, so every
-   assembly carrying the edited part fails "STALE artefact, NOT verified" even though
-   the geometry is fine.
+2. A verify gate run through doit after the edit re-runs on the changed inputs and
+   reopens assemblies whose parts the in-flight run built from the OLD scripts.
 
 **How to apply:** batch script/spec edits; when the seat is busy, commit them and wait for
 the run to finish, then run `uv run python -m doit -n 4 --continue build` once. Also

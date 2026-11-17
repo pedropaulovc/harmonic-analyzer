@@ -516,7 +516,6 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
 
-    monkeypatch.setattr(verify, "_assert_fresh", lambda *_args: True)
     monkeypatch.setattr(verify, "save_assembly_in_place", _assembly.save_assembly_in_place)
     monkeypatch.setattr(
         verify, "reconcile_saved_rebuild_state", _assembly.reconcile_saved_rebuild_state

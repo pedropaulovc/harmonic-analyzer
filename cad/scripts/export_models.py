@@ -501,7 +501,7 @@ def _import_dodo() -> Any:
     """dodo.py (repo root, off cad/scripts' path) is doit's build graph plus the
     exact recipe digest its ContentChecker + remote-cache key use. Reusing it makes
     export's staleness immune to SolidWorks' save-metadata byte churn and cache-restore
-    mtime churn -- the same reason verify.py's freshness guard imports dodo -- so a
+    mtime churn -- so a
     part/assembly re-exports iff doit itself would consider it rebuilt. export_models.py
     always runs as its own process, so this never races the orchestrator."""
     repo_root = str(CAD_ROOT.parent)
