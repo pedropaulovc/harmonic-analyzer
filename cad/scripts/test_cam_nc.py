@@ -12,17 +12,12 @@ edge passes with full-length returns, one-way facing.
 from __future__ import annotations
 
 import math
-import tomllib
 from pathlib import Path
 
 import pytest
 
-import _cam_programs
 import _gcode
-import _process_plans
 import cam_nc
-
-STEM = "ch_rocker_arm_tl_oblique_base_bar"
 
 
 def _program(tmp_path: Path, text: str) -> _gcode.Program:
@@ -38,135 +33,6 @@ def test_silent_freecad_output_is_a_failure():
     with pytest.raises(cam_nc.FreeCadError, match="boom"):
         cam_nc.parse_result(f"{cam_nc.RESULT_MARKER}{{\"error\": \"Traceback: boom\"}}\n")
     assert cam_nc.parse_result(f"noise\n{cam_nc.RESULT_MARKER}{{\"files\": []}}\n") == {"files": []}
-
-
-def _features(rail_requirements=("thread", "dia", "station", "height", "thru")) -> dict:
-    """The base bar's exported features, reduced to what the recipe reads. Rail
-    holes carry the drawing's export requirements, "station" included since the
-    stations are held at ±0.05 mm; ``rail_requirements`` without it is the REF
-    shape the recipe refuses."""
-    def plane(value):
-        return {"kind": "plane", "plane": {"value": value}}
-
-    f = {
-        "bar_spindle_end": plane(0.0), "bar_far_end": plane(439.928),
-        "bar_low_side": plane(-88.9), "bar_high_side": plane(50.8),
-        "underside_seat": plane(0.0), "top_seat": plane(11.938),
-        "near_slot": {"kind": "slot", "at": [22.084, -39.624, 11.938], "separation": [3.81, 4.318], "width_nominal": 13.462},
-        "far_slot": {"kind": "slot", "at": [389.89, 35.56, 11.938], "separation": [3.81, 4.318], "width_nominal": 13.462},
-    }
-    for i in range(4):
-        f[f"rail_{i}"] = {"kind": "threaded_hole", "at": [9.964 + 60 * i, 0.0, 11.938], "nominal_dia": 3.4544,
-                          "requirements": list(rail_requirements)}
-    for name, x, y in (("b1", 47.484, -33.991), ("b2", 428.0, -75.991)):
-        f[name] = {"kind": "hole", "at": [x, y, 11.938], "dia_nominal": 4.8006}
-        f[f"{name}_cbore"] = {"kind": "counterbore", "parent": name, "dia_nominal": 7.9502, "depth_ref": 5.08}
-    return {"features": f}
-
-
-def _context() -> dict:
-    recipe = _cam_programs.load_recipe(STEM)
-    with _process_plans.plan_path(STEM).open("rb") as plan, _process_plans.SHOP_PATH.open("rb") as shop:
-        return recipe.context(_features(), tomllib.load(plan), tomllib.load(shop), "bar.STEP")
-
-
-def test_rail_programs_refuse_ref_stations():
-    # A REF rail station is transferred from each bar's own rail; drilling the
-    # nominal would miss the real rail holes (Codjiflo P1 on #2832).
-    recipe = _cam_programs.load_recipe(STEM)
-    with _process_plans.plan_path(STEM).open("rb") as plan, _process_plans.SHOP_PATH.open("rb") as shop:
-        with pytest.raises(ValueError, match="REF"):
-            recipe.context(_features(("thread", "dia", "height", "thru")), tomllib.load(plan), tomllib.load(shop), "bar.STEP")
-
-
-def test_recipe_maps_features_into_the_drawing_frame():
-    # S3: ZERO EDGE is WCS Y0 at the back jaw and the bar lies at -Y, so the
-    # drawing's bracket ordinates (54.909, 12.909 from ZERO EDGE) appear negated.
-    ctx = _context()
-    assert [c for xy in ctx["bracket"]["centres"] for c in xy] == pytest.approx([47.484, -54.909, 428.0, -12.909])
-    assert [y for _x, y in ctx["rail"]["centres"]] == pytest.approx([-88.9] * 4)
-    recipe = _cam_programs.load_recipe(STEM)
-    slots = [kw for program, check, kw in recipe.expectations(ctx) if check == "bounds" and program == "BB02_S3_bar1@2"]
-    assert [s["x"] for s in slots] == [pytest.approx((21.703, 22.465)), pytest.approx((389.509, 390.271))]
-    # The envelope's ends are the cutter-centre arcs' apexes, e = 0.381 past the arc centres.
-    assert slots[0]["y"] == pytest.approx((-53.721, -48.895))
-    # Z0 is the parallels' top, so the slots cut through to the breakthrough
-    # below Z0 and their stock top is the faced top, Z = finished thickness.
-    assert slots[0]["z_top"] == pytest.approx(11.938)
-
-
-def test_slots_plunge_at_the_corner_nearest_their_jack():
-    # Plan S3: largest X (S1 .885 in, S2 15.365 in), and the Y end nearer the
-    # slot's jack (left jack Y -4.4 in, right jack Y -1.8 in).
-    items = _context()["slots"]["items"]
-    assert [s["plunge"] for s in items] == [pytest.approx([22.465, -53.34]), pytest.approx([390.271, -124.46])]
-
-
-def test_side_passes_step_evenly_without_air_passes():
-    ctx = _context()
-    edge, ends = ctx["edge"], ctx["ends"]
-    # Edges: equal roughing steps within .100 in down to the .010 finish, then
-    # the finish pass; the first step starts at the raw face, so none cuts air.
-    offsets = edge["offsets"]
-    steps = [a - b for a, b in zip([ctx["y_trim"], *offsets], offsets)]
-    assert offsets[-2:] == pytest.approx([edge["finish"], 0.0])
-    assert max(steps[:-1]) <= edge["step"] + 1e-9 and steps[-1] == pytest.approx(edge["finish"])
-    assert min(steps) > 0
-    # Two equal depth levels no deeper than 7.62 (plan): edges 7.366, ends 6.477.
-    assert edge["levels"] == pytest.approx([-7.366, -14.732])
-    assert ends["levels"] == pytest.approx([-6.477, -12.954])
-    for side, step in (("left", ends["left_step"]), ("right", ends["right_step"])):
-        stations = ends[side]
-        assert stations[-1] == 0.0 and stations[0] < ctx["x_trim"]
-        assert max(a - b for a, b in zip([ctx["x_trim"], *stations], stations)) <= step + 1e-9
-
-
-def test_every_program_names_its_stock_top_for_the_air_check():
-    # A one-tool file names its stock top once; a file with M6 tool changes
-    # names it for every tool section (the top drops at the side-2 face).
-    ctx = _context()
-    recipe = _cam_programs.load_recipe(STEM)
-    tops = [program for program, check, _kw in recipe.expectations(ctx) if check == "air_feed"]
-    expected = []
-    for name, _ops in recipe.PROGRAMS:
-        changes = ctx["tool_changes"].get(name)
-        expected += [name] if changes is None else [f"{name}@{k}" for k in range(len(changes) + 1)]
-    assert sorted(tops) == sorted(expected)
-
-
-def test_one_file_per_bar_with_its_tools_speeds_and_stops():
-    # Main relaying the owner, 2026-11-16: one file per bar, M6 tool changes;
-    # bar 2 has no bracket holes. The Tri Fly faces at 2500 (both sides, the
-    # flip stop between), the probe and the tap run with the spindle off, the
-    # ends take the measured 2250 and the slots 1250, an M0 between them.
-    ctx = _context()
-    recipe = _cam_programs.load_recipe(STEM)
-    expected = {(program, check): kw for program, check, kw in recipe.expectations(ctx)}
-    assert expected[("BB02_S3_bar1", "tool_changes")]["tools"] == [8, 1, 3, 4, 5, 6, 7]
-    assert expected[("BB03_S3_bar2", "tool_changes")]["tools"] == [8, 1, 3, 4, 6]
-    assert expected[("BB02_S3_bar1", "spindle")]["rpm"] == [[2500], [], [2250, 1250], [2800], [2800], [2800], [], [2000]]
-    assert expected[("BB03_S3_bar2", "spindle")]["rpm"] == [[2500], [], [2250, 1250], [2800], [2800], []]
-    # The flip, the ends-to-slots speed change and one stop per rail hole tapped.
-    assert expected[("BB02_S3_bar1", "pauses")]["count"] == 2 + len(ctx["rail"]["centres"])
-    assert expected[("BB02_S3_bar1@0", "pauses")] == {"z_top": pytest.approx(ctx["blank_max"]), "count": 1, "spindle_off": True}
-    assert expected[("BB02_S3_bar1@1", "probe_zero")]["value"] == pytest.approx(-(ctx["x_trim"] + 1.0))
-    assert ctx["ends"]["feed"] == pytest.approx(400.05)
-
-
-def test_side_1_faces_where_the_whole_blank_band_cleans_up():
-    # Side 1 faces at a fixed Z, half the nominal allowance off; a band whose
-    # thin end would not clean up there, or whose thick end cuts past the
-    # planned depth of cut, is refused before anything is posted.
-    ctx = _context()
-    assert ctx["side1"] == pytest.approx((11.938 + 12.7) / 2)
-    recipe = _cam_programs.load_recipe(STEM)
-    for key, value, match in (("blank_thickness_min_in", 0.488, "may not clean up"),
-                              ("blank_thickness_max_in", 0.510, "past the 'side 1 face'")):
-        with _process_plans.plan_path(STEM).open("rb") as plan, _process_plans.SHOP_PATH.open("rb") as shop:
-            data, shop_data = tomllib.load(plan), tomllib.load(shop)
-        data["parameters"][key] = value
-        with pytest.raises(ValueError, match=match):
-            recipe.context(_features(), data, shop_data, "bar.STEP")
 
 
 def test_m0_stops_need_a_retract_and_an_operator_comment(tmp_path):
@@ -239,32 +105,6 @@ def test_probe_sets_one_work_zero_after_a_touch_along_its_axis(tmp_path):
     assert any(f.detail.startswith("G0 to X-22.000") for f in _gcode.check_probe_zero(low, "X", -2.5, 12.0))
     with pytest.raises(ValueError, match="G10 L20 P1"):
         _program(tmp_path, "G10 L2 P1 X0\n")
-
-
-def _equipment() -> dict:
-    with (Path(__file__).resolve().parents[1] / "config" / "shop-equipment.toml").open("rb") as handle:
-        return tomllib.load(handle)
-
-
-def test_setup_3_tools_fit_the_tool_setter_and_the_probe_has_a_holder():
-    # CNCjs probes every M6 tool on the tool setter's 20 mm plate: each must
-    # land on it; the 2 in Tri Fly cannot and is touched off by hand (it is
-    # loaded before the file runs, never called by an M6). The probe's 6 mm
-    # shank has no collet in the owned inch set: its holder is still to buy.
-    equipment = _equipment()
-    plate = equipment["fixtures"]["tool-setter-ets"]["plate_dia_mm"]
-    ctx = _context()
-    called = {n for tools in ctx["tool_changes"].values() for n in tools}
-    n, t = ctx["numbers"], ctx["tools"]
-    # What lands on the plate: the cutter, the tap's 8-32 major, the probe's 2 mm ball.
-    tips = {n["em-half"]: t["em_half"], n["spot"]: t["centre_drill"]["body_mm"], n["rail-drill"]: t["rail_drill"],
-            n["bracket-drill"]: t["bracket_drill"], n["tap"]: 0.164 * 25.4, n["counterbore"]: t["cbore"], n["probe"]: 2.0}
-    assert called <= tips.keys() and max(tips[k] for k in called) <= plate
-    assert ctx["face"]["dia"] > plate and ctx["numbers"]["face-mill"] not in called
-    probe = equipment["gauges"]["touch-probe-diy0-tp05"]
-    collets = equipment["holders"]["r8-collets-south-bend-sb1280"]
-    assert probe["present"] and probe["shank_mm"] == 6.0 and "to buy" in probe["holder"]
-    assert all(not size.endswith("mm") for size in collets["sizes_in"])
 
 
 def test_spot_depth_measured_from_the_counterbore_floor_is_caught(tmp_path):

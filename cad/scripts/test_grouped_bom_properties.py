@@ -110,9 +110,8 @@ def test_bom_aliases_preserve_distinct_current_stock_identities():
     families = (
         "sh-vn-brass-fillister-screw",
         "dt-vn-cone-lock-knob",
-        "ch-rocker-arm-tl-vn-oblique-rail-kit",
     )
-    numbers = ("MHA-SH-VN-51", "MHA-DT-VN-51", "MHA-CH-06-TL-VN-83")
+    numbers = ("MHA-SH-VN-51", "MHA-DT-VN-51")
     aliases = dict(zip(numbers, families, strict=True))
     identities = _bom_identity_map(families, aliases)
     assert len(identities) == 2 * len(families)
@@ -146,10 +145,6 @@ def test_shared_purchase_number_alone_cannot_disambiguate_configured_rows():
         (
             "sh-vn-music-wire", "MHA-SH-VN-56",
             (("LeverWire", 1), ("PenWire", 1)),
-        ),
-        (
-            "sh-vn-clamping-kit-hardware", "MHA-SH-VN-57",
-            (("HoldDownStud", 4), ("TNut", 4), ("FlangeNut", 4)),
         ),
     ],
 )

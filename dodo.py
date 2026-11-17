@@ -1878,10 +1878,6 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     outs += _assembly_discovered_on_disk(stem)
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
-    if stem == "ch_rocker_arm_tl_oblique_jig":
-        # The jig's pass-sweep sidecar: verify_soundness walks both passes from
-        # it, so a cache consumer needs it beside the .SLDASM.
-        outs.append(Path(_sweep_json(stem)))
     return outs
 
 
@@ -2186,13 +2182,6 @@ def _dof_json(stem: str) -> str:
     return str(sldasm.parent / f".{sldasm.stem}.dof.json")
 
 
-def _sweep_json(stem: str) -> str:
-    """The jig's pass-sweep sidecar beside its DOF manifest (gate input, written
-    by the build from the jig spec's sweep poses)."""
-    sldasm = Path(_sldasm(stem))
-    return str(sldasm.parent / f".{sldasm.stem}.sweep.json")
-
-
 def _cad_identity_deps() -> list[str]:
     """Every built model plus its execution token -- the exact CAD identity the
     fleet-wide stages (neutral export, release packaging) consume. The token is
@@ -2244,10 +2233,6 @@ def _soundness_file_deps(stem: str) -> list[str]:
     ]
     if stem == "pd_paper_drive":
         deps.append(_dof_json(stem))
-    if stem == "ch_rocker_arm_tl_oblique_jig":
-        # The pass sweep replays the recorded slide from the DOF manifest and
-        # walks the sweep sidecar's poses.
-        deps += [_dof_json(stem), _sweep_json(stem)]
     assembly = f"assembly:{stem}"
     if assembly not in _SHOP_RECORD_READS:
         _recipe_files(stem)
@@ -4146,9 +4131,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # CAM: posted-G-code checks and cycle times, recipe frame, and one
         # end-to-end freecadcmd post (skipped where FreeCAD is not installed).
         SCRIPTS_DIR / "test_cam_nc.py",
-        # The rocker's oblique-trammel jig numbers: derived from the strap's
-        # radii, the cutters and the rail angle, pinned against the plan.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_trammel_spec.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
@@ -4275,9 +4257,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Source-only adapter member/signature census; no SDK or native import.
         SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
         SCRIPTS_DIR / "test_native_bank_retention_contract.py",
-        # Captured-pivot tooling recipes: the source-only adapter census
-        # checks the real native builders without importing or connecting them.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_adapter_contract.py",
         # Finite purchased-rack ends and the complete recording-paper sweep.
         SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
         SCRIPTS_DIR / "test_pd_platen_refit.py",
@@ -4323,18 +4302,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
         # ride module_deps_of.
         SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
-        # The TL-00 oblique-trammel jig (a shop fixture outside the machine
-        # tree): poses closing on the calculator, the shop-fixture rule, and
-        # the pinned sweep clearances of both passes.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_jig_assembly.py",
-        # The R3 hold-down's clamp heights, cutter-flank gaps and flange
-        # clearances (ch_rocker_arm_tl_oblique_holding_spec).
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_holding_spec.py",
-        # The held bandsaw blank's clipped stock, radial allowance and entry
-        # engagement before the oblique-trammel jig passes.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_blank_spec.py",
-        # Native carrier-table identity and correlated pin/HUB tolerance budget.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_carrier_table.py",
         # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
         # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
         SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",

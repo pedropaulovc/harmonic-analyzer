@@ -25,7 +25,6 @@ import dt_pinion_spring_spec
 import dt_vn_post_mount_screw_spec
 import dt_vn_slotted_screw_spec
 import _ch_channel_interference
-import _ch_rocker_arm_tl_oblique_jig_interference
 from _buildgraph import ASSEMBLY_ORDER, interference_module, module_deps_of
 from test_assembly_chain_mesh import (
     _Adapter as InterferenceAdapter,
@@ -1022,20 +1021,3 @@ def test_converged_stock_uses_distinct_semantic_base_joint_pairs() -> None:
         for pair in allowed
         for name in pair
     )
-
-
-def test_kit_fit_pairs_keep_member_roles_and_four_physical_instances() -> None:
-    allowed = _allowed("ch-rocker-arm-tl-oblique-jig")
-    kit = {
-        pair: limit
-        for pair, limit in allowed.items()
-        if any(name.startswith("@HoldDownStud:") for name in pair)
-    }
-    assert len(kit) == 8
-    for number in range(1, 5):
-        for role, triple in (
-            ("TNut", _ch_rocker_arm_tl_oblique_jig_interference.JIG_T_NUT_THREAD),
-            ("FlangeNut", _ch_rocker_arm_tl_oblique_jig_interference.JIG_FLANGE_NUT_THREAD),
-        ):
-            pair = frozenset((f"@HoldDownStud:{number}", f"@{role}:{number}"))
-            assert kit[pair] == pytest.approx(_annulus_limit(*triple))

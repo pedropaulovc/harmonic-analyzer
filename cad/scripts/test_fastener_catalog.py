@@ -64,30 +64,11 @@ _STOCK_REQUIREMENTS = {
     "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),
     "ch-vn-spring-hook": (("9489T111",), "MHA-CH-VN-51", 20),
     "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
-    "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 19),
-    "ch-rocker-arm-tl-vn-oblique-bracket-screw": (("91251A196",), "MHA-CH-06-TL-VN-62", 8),
-    "ch-rocker-arm-tl-vn-oblique-carriage-screw": (("91290A168",), "MHA-CH-06-TL-VN-64", 8),
-    "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 8),
-    "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
-    "ch-rocker-arm-tl-vn-oblique-lever-washer": (
-        ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
-    ),
-    "ch-rocker-arm-tl-vn-oblique-hub-washer": (
-        ("90231A116",), "MHA-CH-06-TL-VN-85", 1,
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-screw": (
-        ("BLTS40-0375-1500188P",), "MHA-CH-06-TL-VN-77", 2,
-    ),
-    "ch-rocker-arm-tl-vn-oblique-pivot-spacer": (("AS62-18-40",), "MHA-CH-06-TL-VN-78", 2),
-    "ch-rocker-arm-tl-vn-oblique-pivot-shim": (("SHIM-0375-008",), "MHA-CH-06-TL-VN-79", 10),
     "dt-cone-gear-tl-vn-arbor-nut": (("95462A505",), "MHA-DT-03-TL-VN-50", 1),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {
     "dt-vn-post-mount-screw": "MSC Industrial Supply",
-    "ch-rocker-arm-tl-vn-oblique-pivot-screw": "Huyett",
-    "ch-rocker-arm-tl-vn-oblique-pivot-spacer": "AluminumSpacers.com",
-    "ch-rocker-arm-tl-vn-oblique-pivot-shim": "Huyett",
 }
 
 
@@ -112,10 +93,6 @@ _SHARED_MEMBERS = {
     "sh-vn-music-wire": (
         "McMaster-Carr", "9666K142", "MHA-SH-VN-56",
         {"LeverWire": 1, "PenWire": 1},
-    ),
-    "sh-vn-clamping-kit-hardware": (
-        "Precision Matthews", "52PCCK-9/16-14mm", "MHA-SH-VN-57",
-        {"HoldDownStud": 4, "TNut": 4, "FlangeNut": 4},
     ),
     "sh-vn-pivot-pin": (
         "McMaster-Carr", "90145A299", "MHA-SH-VN-58",
@@ -156,10 +133,6 @@ _SHARED_PROPERTIES = {
     "sh-vn-music-wire": (
         "ASTM A228 music wire",
         "phosphate coated, as supplied", "machined_block", None,
-    ),
-    "sh-vn-clamping-kit-hardware": (
-        "Plain Carbon Steel",
-        "BLACK OXIDE AS SUPPLIED", "visual_noncritical", None,
     ),
     "sh-vn-pivot-pin": (
         "18-8 Stainless Steel",

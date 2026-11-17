@@ -15,11 +15,10 @@ import _part_configuration_exports as exports
 import _preferences
 
 
-# These are the eleven physical members of the five heterogeneous shared SKUs,
-# not eleven separate native parts. Keep the registry real throughout these tests.
+# These are the eight physical members of the four heterogeneous shared SKUs,
+# not eight separate native parts. Keep the registry real throughout these tests.
 _MEMBERS = {
     "sh-vn-chain-link": ("InnerLink", "OuterLink"),
-    "sh-vn-clamping-kit-hardware": ("HoldDownStud", "TNut", "FlangeNut"),
     "sh-vn-music-wire": ("LeverWire", "PenWire"),
     "sh-vn-pivot-pin": ("RodPin", "BarPin"),
     "sh-vn-fillister-screw-91794a055": ("RackScrew", "DiscScrew"),
@@ -168,7 +167,7 @@ def native_export(tmp_path, monkeypatch):
     # configuration activation, rebuild, STEP writer, view helper and result check.
     monkeypatch.setattr(_preferences, "enforce_preferences", lambda *_args: {})
 
-    def create(stem="sh-vn-clamping-kit-hardware"):
+    def create(stem="sh-vn-chain-link"):
         members = exports.member_configurations(stem)
         native = tmp_path / "sldprt" / f"{stem}.SLDPRT"
         native.parent.mkdir(exist_ok=True)

@@ -20,41 +20,11 @@ from _shop_records import shop_record
 
 SCRIPTS = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS.parents[1]
-GAUGE_HEADER = "[gauges.gauge-blocks-mitutoyo]\n"
-# COM leaves around the jig; part:dt_cone_gear reads no shop record.
+# part:dt_cone_gear reads no shop record.
 _LEAVES = {
-    "part:ch_rocker_arm_tl_oblique_base_bar": lambda d: d._part_file_deps(
-        d.SCRIPTS_DIR / "build_ch_rocker_arm_tl_oblique_base_bar.py",
-        "ch_rocker_arm_tl_oblique_base_bar",
-    ),
-    "part:ch_rocker_arm_tl_oblique_end_bracket": lambda d: d._part_file_deps(
-        d.SCRIPTS_DIR / "build_ch_rocker_arm_tl_oblique_end_bracket.py",
-        "ch_rocker_arm_tl_oblique_end_bracket",
-    ),
-    "drawing:ch_rocker_arm_tl_oblique_base_bar": lambda d: d._drawing_file_deps(
-        "ch_rocker_arm_tl_oblique_base_bar"
-    ),
-    "assembly:ch_rocker_arm_tl_oblique_jig": lambda d: d._recipe_files(
-        "ch_rocker_arm_tl_oblique_jig"
-    ),
-    "drawing:ch_rocker_arm_tl_oblique_jig_assembly": lambda d: d._drawing_file_deps(
-        "ch_rocker_arm_tl_oblique_jig_assembly"
-    ),
-    "verify_soundness:ch_rocker_arm_tl_oblique_jig": lambda d: d._soundness_file_deps(
-        "ch_rocker_arm_tl_oblique_jig"
-    ),
-    "package:features:ch_rocker_arm_tl_oblique_base_bar": lambda d: (
-        d._feature_export_file_deps("ch_rocker_arm_tl_oblique_base_bar")
-    ),
     "part:dt_cone_gear": lambda d: d._part_file_deps(
         d.SCRIPTS_DIR / "build_dt_cone_gear.py", "dt_cone_gear"
     ),
-}
-_BASE_BAR_CONSUMERS = set(_LEAVES) - {"part:dt_cone_gear"}
-_JIG_CONSUMERS = {
-    "assembly:ch_rocker_arm_tl_oblique_jig",
-    "drawing:ch_rocker_arm_tl_oblique_jig_assembly",
-    "verify_soundness:ch_rocker_arm_tl_oblique_jig",
 }
 
 
@@ -100,20 +70,6 @@ def _moved(before: dict[str, str], after: dict[str, str]) -> set[str]:
     return {label for label in before if before[label] != after[label]}
 
 
-def test_a_record_edit_rekeys_exactly_its_consumers(dodo, shop_copy, tmp_path, monkeypatch):
-    monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
-    equipment = shop_copy["shop-equipment.toml"]
-    base = _keys(dodo)
-    _edit(equipment, "repeatability_mm = 0.02\n", "repeatability_mm = 0.03\n")
-    cnc = _keys(dodo)
-    assert _moved(base, cnc) == _BASE_BAR_CONSUMERS
-    _edit(equipment, GAUGE_HEADER, GAUGE_HEADER + 'probe = "edited"\n')
-    gauges = _keys(dodo)
-    assert _moved(cnc, gauges) == _JIG_CONSUMERS
-    _edit(shop_copy["shop.toml"], "[machines.pm-30mv]\n", "[machines.pm-30mv]\nprobe = 1\n")
-    assert _moved(gauges, _keys(dodo)) == _JIG_CONSUMERS
-
-
 def test_unrelated_records_and_new_tables_rekey_nothing(dodo, shop_copy, tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "out")
     equipment = shop_copy["shop-equipment.toml"]
@@ -127,14 +83,6 @@ def test_unrelated_records_and_new_tables_rekey_nothing(dodo, shop_copy, tmp_pat
 
 
 def test_the_guard_carries_the_folded_records(dodo):
-    guard = json.loads(dodo._shop_records_env("part:ch_rocker_arm_tl_oblique_base_bar"))
-    assert guard == {
-        "files": [],
-        "records": [
-            ["shop-equipment.toml", "cnc", "pm-30mv"],
-            ["shop-equipment.toml", "tools", "spring-tap-guide"],
-        ],
-    }
     assert json.loads(dodo._shop_records_env("part:dt_cone_gear")) == {
         "files": [], "records": [],
     }
@@ -158,7 +106,6 @@ def test_a_read_outside_the_key_fails_the_build(dodo, monkeypatch):
 
     monkeypatch.setenv(_shop_records.ENV, "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
-    assert dodo._run_subprocess(["x"], "part:ch_rocker_arm_tl_oblique_end_bracket") == 0
     with pytest.raises(KeyError, match="is outside this build"):
         dodo._run_subprocess(["x"], "part:dt_cone_gear")
     seen.clear()

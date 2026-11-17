@@ -269,16 +269,14 @@ material = "6061-t6511"
 rpm = 1800
 feed = "7 in/min"
 
-# HA: the rocker arm's strap profile cutter on its low-carbon steel (the oblique
-# trammel jig's normal cutting force reads this chip load:
-# ch_rocker_arm_tl_oblique_jig_assembly_spec.NORMAL_FEED_CHIP_LOAD_MM). Source:
+# HA: the rocker arm's strap profile cutter on its low-carbon steel. Source:
 # HA cutting-data row low_carbon_steel / HSS / profile, 3-12.7 mm cutters:
 # LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min, low end used;
 # UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth, stated
 # for 1/2 to 1-1/2 in cutters; AUTHOR'S CHOICE below 1/2 in, half the UF low
 # end, 0.001 in = 0.0254 mm/tooth.
 [tools.rocker-profile-cutter]
-description = "HSS 4-flute end mill from the LMS 6784 set (ch_rocker_arm_tl_oblique_trammel_spec PART_CUTTER)"
+description = "HSS 4-flute end mill from the LMS 6784 set"
 
 [settings.rocker-profile-hss-low-carbon-steel]
 tool = "rocker-profile-cutter"

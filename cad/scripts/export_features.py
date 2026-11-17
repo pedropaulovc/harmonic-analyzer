@@ -69,37 +69,8 @@ def _drawing_module(stem: str) -> ModuleType:
     return importlib.import_module(f"draw_{stem}")
 
 
-def _spec_module_name(stem: str, scripts: Path) -> str:
-    """Read a literal member-spec owner; ordinary drawings keep <stem>_spec.
-
-    A configured shared producer need not invent a monolithic spec or re-export
-    the saved/default member's facts. This lookup never imports a drawing.
-    """
-    drawing = _source_module_path(f"draw_{stem}", scripts)
-    owners = [
-        node.value for node in source_tree(drawing).body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "FEATURE_SPEC_MODULE" for target in node.targets)
-    ]
-    if not owners:
-        return f"{stem}_spec"
-    if len(owners) != 1 or not isinstance(owners[0], ast.Constant) or not isinstance(owners[0].value, str):
-        raise ValueError(f"draw_{stem}: FEATURE_SPEC_MODULE must be one literal module name")
-    name = owners[0].value
-    _source_module_path(name, scripts)
-    return name
-
-
 def _spec_module(stem: str) -> ModuleType:
-    name = _spec_module_name(stem, Path(__file__).resolve().parent)
-    module = importlib.import_module(name)
-    if name != f"{stem}_spec":
-        # A feature bundle uses the producer's bare/default STEP, not another
-        # member that merely lives in the same native file.
-        default = _config.parts(stem.replace("_", "-")).get("default_configuration")
-        if not default or getattr(module, "CONFIGURATION", None) != default:
-            raise ValueError(f"{stem}: feature spec must own the saved default configuration")
-    return module
+    return importlib.import_module(f"{stem}_spec")
 
 
 def _notes_module(stem: str) -> ModuleType:
@@ -252,7 +223,7 @@ def source_paths(stem: str) -> tuple[Path, ...]:
     stem = _stem(stem)
     scripts = Path(__file__).resolve().parent
     drawing = _source_module_path(f"draw_{stem}", scripts)
-    spec = _source_module_path(_spec_module_name(stem, scripts), scripts)
+    spec = _source_module_path(f"{stem}_spec", scripts)
     notes = scripts / f"{stem}_notes.py"
     roots = {Path(__file__).resolve(), drawing, spec}
     if notes.is_file():

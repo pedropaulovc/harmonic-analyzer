@@ -65,23 +65,14 @@ Shared-helper sources name their defining module, such as
 `("_drawing_hole_callout", "add_native_hole_callout")`; the lifecycle-only
 `_drawing_common` module is not the authority for helpers extracted from it.
 
-A configured shared producer may declare one literal `FEATURE_SPEC_MODULE` in
-its drawing to name the actual saved/default member's spec instead. For example,
-`sh_vn_clamping_kit_hardware` names `sh_vn_clamping_kit_hold_down_stud_spec`,
-whose `CONFIGURATION` must match the registry's `default_configuration`
-(`HoldDownStud`). Do not invent an aggregate spec or re-export member facts to
-match the producer stem. The feature source closure includes the drawing, the
-selected spec and both transitive Python dependency closures without importing
-them; config reads from those sources remain feature-leaf inputs.
-
 When a configured producer's rework spans members, a requirement for a
 non-default member names it with a literal `configuration="<Member>"` keyword
-(for example the `FeedNut` of `ch_rocker_arm_tl_vn_oblique_leadscrew_kit`,
-whose default member is `LeadScrew`). `export_models --features` shows that
+(no current part declares one; the oblique jig's leadscrew kit `FeedNut` did until
+2026-11-17). `export_models --features` shows that
 member after the default export, names only its requirements' faces and saves
 `<part>--<mesh key>.STEP` beside the bundle STEP (the member's
-`_part_configuration_exports.mesh_key`, lowercased: `FeedNut` saves
-`ch-rocker-arm-tl-vn-oblique-leadscrew-kit--feednut.STEP`), the same name as the full
+`_part_configuration_exports.mesh_key`, lowercased: a `FeedNut` member saves
+`<part>--feednut.STEP`), the same name as the full
 export's neutral member STEP, which `features_bound` then requires to be that
 exact copy. The manifest marks each such feature with `configuration` and
 records the member STEP and its digest under `member_steps.<Member>`; the
@@ -269,12 +260,9 @@ on exactly the records it reads (AGENTS.md, "Fine-grained config deps"). See
 ## Travelers
 
 `_process_plans.TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task: `ch_rocker_arm_tl_oblique_base_bar`,
-`ch_rocker_arm_tl_oblique_end_bracket`,
-`ch_rocker_arm_tl_oblique_feed_lever`, `ch_rocker_arm_tl_oblique_riser`,
-`ch_rocker_arm_tl_oblique_pivot_block`, `ch_rocker_arm_tl_oblique_feed_block` and
-`ch_rocker_arm_tl_vn_oblique_leadscrew_kit` and
-`ch_rocker_arm_tl_oblique_carrier`.
+`prechips:<stem>` task. None is enrolled since the oblique trammel jig, whose
+eight parts were the only ones, was deleted (owner ruling 2026-11-17, #2885);
+the machinery stays for the CNC migration.
 
 prechips is not an HA dependency while it stabilises
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
@@ -317,7 +305,7 @@ uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan
 msedge --headless --no-pdf-header-footer --user-data-dir=<temp> --print-to-pdf=cad/out/travelers/<stem>/<slug>-traveler.pdf file:///…/traveler-hobby.html
 ```
 
-`<slug>` is the dashed stem (`ch-rocker-arm-tl-oblique-base-bar`). The browser
+`<slug>` is the dashed stem (`ch-rocker-arm`). The browser
 is `HARMONIC_PDF_BROWSER` when set, else the first of `msedge`, `chrome`,
 `chromium` or `google-chrome` on `PATH`, else Edge or Chrome at its default
 Windows install location. The print keeps the sheet's own `@page` (Letter,
@@ -374,17 +362,8 @@ pipeline and per-profile spans carry the resolved `prechips.version`.
 A missing plan, an unresolved version, a nonzero exit or a failed print marks the pipeline span
 as failed.
 
-Current state: under prechips 0.11.4 (released) all eight enrolled plans pass
-both profiles with every check enforced: the base bar, carrier, feed lever and
-leadscrew kit on their v50 manifests, the pivot and feed blocks on theirs, and
-the end bracket and riser on their v49 release manifests. The v49 release
-manifests of the base bar, feed lever and carrier predate their v50 drawings
-and are refused (the rail-hole stations, grip-corner fillets and the
-carrier's pin-gauge band). Each plan's `[cad]` table names a neutral adapter
-(`base_bar`, `end_bracket`, `feed_lever`, `riser`, `carrier`, `pivot_block`,
-`feed_block`, `leadscrew_kit`) and the manifest's `part` id;
-`cad/process/README.md` lists which release brought each binding.
-prechips adapters are tied to the
+Each plan's `[cad]` table names a neutral prechips adapter and the manifest's
+`part` id. prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.
 
