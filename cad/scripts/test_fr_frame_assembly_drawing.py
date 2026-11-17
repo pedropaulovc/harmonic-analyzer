@@ -238,10 +238,11 @@ def test_no_view_label_repeats_its_sheet_scale() -> None:
     assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
 
 
-def test_every_numeric_step_value_prints_in_the_sheet_1_setting_table() -> None:
+def test_setting_rows_are_cited_by_their_steps_and_clear_the_title_block() -> None:
     # R5 machinist review (rule 22): the rough-cut length and the cross
-    # screws' full-thread acceptance print on sheet 1; their steps cite the
-    # row, carry no number of their own, and every row is cited.
+    # screws' full-thread acceptance print in sheet 1's setting table; each
+    # row's step cites it without repeating its value, every row is cited,
+    # and the columns' budget clears the title block.
     from _general_table import table_column_widths
     from _drawing_types import DRAWING_TEMPLATES
 

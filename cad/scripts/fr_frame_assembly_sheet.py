@@ -243,9 +243,11 @@ STEP_TEXT = {
         f"CHECK ONE {_CROSS} PASSES BOTH TUBE HOLES OF EACH SEATED COLUMN AND "
         "STARTS BY HAND IN THE TAPPED SOCKET WALL."
     ),
+    # No casting named: upper-holes-reworked repeats this step with the
+    # columns in the top frame (codjiflo review of PR #3024).
     "lower-holes-reworked": (
-        f"IF IT DOES NOT START, TAKE THAT {_COLUMN} OUT OF {_BASE} AND ROUND-FILE "
-        f"THE TUBE HOLE THE {_CROSS} THREAD MARKED, UNTIL "
+        f"IF IT DOES NOT START, TAKE THAT {_COLUMN} OUT AND ROUND-FILE THE TUBE "
+        f"HOLE THE {_CROSS} THREAD MARKED, UNTIL "
         f"{_step(steps.LOWER_HOLES_CHECKED_KEY)} PASSES."
     ),
     "lower-tap-chased": (
