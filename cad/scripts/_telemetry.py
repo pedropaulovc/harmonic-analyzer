@@ -437,6 +437,9 @@ _depth: contextvars.ContextVar[int] = contextvars.ContextVar(
 )
 
 _configured = False
+# True while this process's configure runs; a same-thread re-entry (a log record
+# routed during configure) returns instead of configuring twice.
+_configuring = False
 # The processors of the CURRENT configuration: ONE set per process, which every
 # provider below emits through (:class:`_SharedSpanProcessors` /
 # :class:`_SharedLogProcessors`), so every resource lands on the same console
@@ -1007,14 +1010,21 @@ def _new_logger_provider(service: str) -> LoggerProvider:
 
 
 def configure(*, console: bool = True, force: bool = False) -> None:
-    """Configure once, under a lock: a second thread's first telemetry call
-    waits until processors and handlers are installed (see :func:`_configure`)."""
+    """Configure once, under a lock: ``_configured`` turns True only after
+    processors and handlers are installed, so another thread's first telemetry
+    call waits on the lock rather than running against a half-built state."""
+    global _configured, _configuring
     if _configured and not force:
         return
     with _CONFIGURE_LOCK:
-        if _configured and not force:
+        if _configuring or (_configured and not force):
             return
-        _configure(console=console)
+        _configuring = True
+        try:
+            _configure(console=console)
+        finally:
+            _configuring = False
+            _configured = True
 
 
 # Reentrant: the first configure logs, and a log record may route to a provider
@@ -1032,9 +1042,8 @@ def _configure(*, console: bool) -> None:
     and replaces the shared processors, shutting the previous ones down; the
     installed providers, and their resources, stay.
     """
-    global _configured, _span_processors, _log_processors
+    global _span_processors, _log_processors
     global _tracer_provider, _logger_provider
-    _configured = True
 
     want_console = console
     console_level = _console_level()
