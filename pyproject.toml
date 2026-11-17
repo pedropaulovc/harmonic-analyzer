@@ -77,13 +77,6 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-xdist>=3.8",
     "ruff>=0.15.20",
-    # Pull the submodule's `ui` extra (fastapi + prefab-ui) transitively through
-    # the editable path source, so its UI modules import from this one venv.
-    # Its test suite is NOT collected from this root (see
-    # [tool.pytest.ini_options]) and must not run on amet. Single source of
-    # truth — the versions stay pinned in the submodule's own pyproject, not
-    # duplicated here.
-    "solidworks-mcp-python[ui]",
 ]
 # Exact original-source native Y/PTS decoding for the web pixel observer.
 web = [
