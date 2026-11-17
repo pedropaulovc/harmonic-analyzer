@@ -10,10 +10,12 @@ exploded side view (rule 22), one view per item
 (draw_dt_cone_tip_gear_tl_cutter_assembly's ``_item_view``): items 1 and 5
 seated together, the blank's phantom, item 2 and item 6 drawn off the thread
 end in fitting order on the arbor's axis, items 3 and 4 under item 2, whose
-place either takes; the fitting steps. The spare collars stand off the
-arbor's end in the model, so every sheet-1 view shows only the working
-pose's parts. Poses, items and the sheet words come from the spec; this
-recipe only lays the sheets out and never edits the source assembly.
+place either takes; the key-clock setting note. The fitting steps print in
+the release's ASSEMBLY.md (``dt_cone_gear_tl_arbor_assembly_sheet``, #2889).
+The spare collars stand off the arbor's end in the model, so every sheet-1
+view shows only the working pose's parts. Poses, items and the sheet words
+come from the spec and the sheet module; this recipe only lays the sheets out
+and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from collections.abc import Callable
 from typing import Any
 
 import _telemetry
+import dt_cone_gear_tl_arbor_assembly_sheet as notes
 import dt_cone_gear_tl_arbor_assembly_spec as spec
 import dt_cone_gear_tl_arbor_collar_spec as collar
 import dt_cone_gear_tl_arbor_key_spec as key
@@ -317,7 +320,7 @@ EXPLODED_CAPTION = "\n".join(
     )
 )
 CAPTION_XY = (0.020, 0.090)
-STEPS_XY = (0.219, 0.262)
+STEPS_XY = (0.219, 0.262)  # the key-clock note, where the steps stood
 
 Box = tuple[float, float, float, float]
 
@@ -717,7 +720,7 @@ def _place_exploded_sheet(
     _activate_sheet(adapter, SHEET_NAMES[1])
     for text, xy, note_label in (
         (EXPLODED_CAPTION, CAPTION_XY, "exploded view caption"),
-        (spec.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
+        (notes.KEY_CLOCK_NOTE, STEPS_XY, "key clock setting"),
     ):
         _add_note(adapter, text, xy, label=note_label)
 

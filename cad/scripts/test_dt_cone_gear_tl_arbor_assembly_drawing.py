@@ -6,6 +6,7 @@ import ast
 import inspect
 import math
 import re
+import textwrap
 from dataclasses import replace
 
 import pytest
@@ -16,6 +17,7 @@ import _dt_cone_gear_tl_arbor_interference as interference
 import build_dt_cone_gear_tl_arbor_assembly as build
 import draw_dt_cone_gear_tl_arbor_assembly as drawing
 import dt_cone_gear_spec as cone
+import dt_cone_gear_tl_arbor_assembly_sheet as notes
 import dt_cone_gear_tl_arbor_assembly_spec as spec
 import dt_cone_gear_tl_arbor_collar_spec as collar
 import dt_cone_gear_tl_arbor_key_spec as key
@@ -113,15 +115,9 @@ def test_each_collar_row_names_its_own_sheet_of_the_collar_drawing() -> None:
 
 
 def _steps() -> list[str]:
-    """Each numbered step with its continuation lines, as printed."""
-    steps: list[str] = []
-    for line in spec.ASSEMBLY_STEPS.splitlines()[1:]:
-        if line[:1].isdigit():
-            steps.append(line)
-        else:
-            assert line.startswith("   "), line
-            steps[-1] += "\n" + line
-    return steps
+    """Each numbered step as ASSEMBLY.md prints it."""
+    ((_title, steps),) = notes.STEP_SECTIONS
+    return list(steps)
 
 
 def _flat(step: str) -> str:
@@ -147,14 +143,13 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
     assert [step.split(".", 1)[0] for step in steps] == [
         str(number) for number in range(1, len(steps) + 1)
     ]
-    assert all(len(step.splitlines()) <= 6 for step in steps)
     assert all(
-        len(line) <= spec.STEP_WIDTH for line in spec.ASSEMBLY_STEPS.splitlines()
+        len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6 for step in steps
     )
     for step in steps:
         body = _flat(step).split(". ", 1)[1]
         assert body.count(". ") == 0 and "; " not in body and " THEN " not in body
-    cited = set(re.findall(r"ITEM (\d+)", spec.ASSEMBLY_STEPS))
+    cited = set(re.findall(r"ITEM (\d+)", " ".join(steps)))
     assert cited <= set(spec.BOM_ITEMS.values())
     k, a, n = (spec.BOM_ITEMS[s] for s in (spec.KEY, spec.ARBOR, spec.NUT))
     flat = [_flat(step) for step in steps]
@@ -174,7 +169,7 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         f"CARRY THE INDICATOR OVER ITEM {a}",
         f"CHECK: THE INDICATOR READS ZERO WITHIN "
         f"{arbor.inch_text(spec.KEY_SIDE_READING, 3)}",
-        f"IF STEP {spec.CHECK_STEP} FAILS",
+        f"IF STEP {notes.CHECK_STEP} FAILS",
         f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°",
         "LOCK THE HEAD'S SPINDLE",
         "SLIDE THE BLANK ONTO",
@@ -190,20 +185,26 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
     ]
     assert positions == sorted(positions)
     assert flat[-1].endswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
-    assert len(steps) == spec.INDEX_STEP
+    assert len(steps) == notes.INDEX_STEP
     # The step numbers the steps cite are the zeroing, the DRO and the check.
-    assert "ZERO A TEST INDICATOR" in flat[spec.ZERO_STEP - 1]
-    assert flat[spec.DRO_STEP - 1] == f"{spec.DRO_STEP}. NOTE THE Z DRO READING."
+    assert "ZERO A TEST INDICATOR" in flat[notes.ZERO_STEP - 1]
+    assert flat[notes.DRO_STEP - 1] == f"{notes.DRO_STEP}. NOTE THE Z DRO READING."
     assert (
-        f"BACK AT THE STEP {spec.DRO_STEP} Z DRO READING" in flat[spec.CHECK_STEP - 2]
+        f"BACK AT THE STEP {notes.DRO_STEP} Z DRO READING" in flat[notes.CHECK_STEP - 2]
     )
-    assert flat[spec.CHECK_STEP - 1].startswith(f"{spec.CHECK_STEP}. CHECK:")
-    assert flat[spec.CHECK_STEP].endswith(f"REPEAT FROM STEP {spec.ZERO_STEP}.")
-    assert "CENTRE PLANE" not in spec.ASSEMBLY_STEPS
-    assert "90°" not in spec.ASSEMBLY_STEPS
+    assert flat[notes.CHECK_STEP - 1].startswith(f"{notes.CHECK_STEP}. CHECK:")
+    assert flat[notes.CHECK_STEP].endswith(f"REPEAT FROM STEP {notes.ZERO_STEP}.")
+    text = " ".join(steps)
+    assert "CENTRE PLANE" not in text
+    assert "90°" not in text
     private = ("TO SUIT", "ON SEAM", "IN PHASE", "MIRRORS", "SAME X AS", "BY EYE")
     for words in (*private, " AIR", "TRUE D", " YOU", "BETWEEN CENTRES", "BACK OUT"):
-        assert words not in spec.ASSEMBLY_STEPS, words
+        assert words not in text, words
+    # The key clock's measurable acceptance stays on sheet 2 (rule 22).
+    assert f"WITHIN {arbor.inch_text(spec.KEY_SIDE_READING, 3)}" in _flat(
+        notes.KEY_CLOCK_NOTE
+    )
+    assert f"STEPS {notes.ZERO_STEP}-{notes.CHECK_STEP}" in notes.KEY_CLOCK_NOTE
     # The tailstock centre comes in only once item 6 is tight, and only for a
     # cone blank: the chuck alone holds item 1 from the clock to the nut.
     tail = next(i for i, s in enumerate(flat) if "TAILSTOCK" in s)
@@ -270,9 +271,9 @@ def _run_clock_steps(start_error_deg: float) -> float:
             reading = _upper_face_height(key_deg, station) - zero
         elif step.startswith("CHECK: THE INDICATOR READS ZERO"):
             passed = abs(reading) <= spec.KEY_SIDE_READING
-        elif step.startswith(f"IF STEP {spec.CHECK_STEP} FAILS") and not passed:
+        elif step.startswith(f"IF STEP {notes.CHECK_STEP} FAILS") and not passed:
             key_deg = _turn_until(zero + reading / 2.0, key_deg, station)
-            index = spec.ZERO_STEP - 1
+            index = notes.ZERO_STEP - 1
         elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°.":
             assert not locked
             away = spec.POINTING_DEG["AWAY FROM THE CUTTER"]
@@ -311,7 +312,7 @@ def test_the_printed_steps_leave_the_key_on_the_cutters_radius() -> None:
     # and covers it from then on.
     flat = [_flat(step) for step in _steps()]
     blank = next(i for i, s in enumerate(flat) if "SLIDE THE BLANK ONTO" in s)
-    assert blank > spec.CHECK_STEP
+    assert blank > notes.CHECK_STEP
     assert key.END_Z_MM + key.LENGTH < spec.BLANK_FACE_Z
 
 
@@ -716,7 +717,7 @@ def test_the_exploded_labels_and_balloons_stand_clear_of_the_ink() -> None:
         spec.SHOWN_BLANK_LABEL, drawing.blank_label_position("sheet 2", blank_tip)
     )
     assert boxes["blank label"][0] >= blank_tip[0] + drawing.LABEL_RUN - 1e-9
-    boxes["steps"] = drawing.label_box(spec.ASSEMBLY_STEPS, drawing.STEPS_XY)
+    boxes["key clock"] = drawing.label_box(notes.KEY_CLOCK_NOTE, drawing.STEPS_XY)
     for stem in drawing.SPARES:
         boxes[f"ring {stem}"] = _grown(parts[stem], BALLOON_REACH)
     names = list(boxes)

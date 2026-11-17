@@ -17,7 +17,6 @@ beyond the arbor's end. Every part is fixed (0 DOF).
 from __future__ import annotations
 
 import math
-import textwrap
 
 import _config
 import dt_cone_gear_tl_arbor_collar_spec as collar
@@ -267,9 +266,6 @@ CHAMFERED_FACE_TOWARD = (
 SHOWN_BLANK_LABEL = "\n".join(
     (f"{SHOWN_BLANK.number} {crank.TEETH}T BLANK, NOT IN KIT", CHAMFERED_FACE_TOWARD)
 )
-_SEAT_TEXT = "Ø" + arbor.inch_text(
-    arbor.SEAT_DIA, arbor.DRAWING_PRECISION_BY_NAME["SeatDia"]
-)
 
 # --- Sheet words ------------------------------------------------------------------
 # The setup table (sheet 1, under the parts list): a ruled table, a row per
@@ -307,81 +303,4 @@ SETUP_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
         *_first_index(_blank.tag),
     )
     for _blank in arbor.KEYED_GEARS
-)
-
-# Fitting steps (sheet 2, beside the exploded view): one action each, each
-# retention or setting followed by its check (rules 22, 23). LOCTITE 638 is
-# a consumable: degrease, coat the key (never the keyseat), keep it off the
-# seat the blanks slide on, cure before the first cut. Ends and surfaces are
-# named by the features the views show, not by a view the package does not
-# label (machinist review of farm 20261113T171903293Z).
-_K, _A, _N = (BOM_ITEMS[s] for s in (KEY, ARBOR, NUT))
-_READING = arbor.inch_text(KEY_SIDE_READING, 3)
-_AWAY = "AWAY FROM THE CUTTER"
-if _AWAY not in POINTING_DEG:
-    raise AssertionError("the steps' pointing words are not a declared direction")
-# The key's clock (above): set on its own two side faces before the blank
-# goes on, touched in turn by one test indicator at one height, the head
-# turned half a turn between them (the cutter's centre plane is nothing a
-# builder can touch; machinist review of farm 20261113T204539922Z); then a
-# half turn, only if it points away, brings it to the cutter. Rule 26's
-# private phrases (BY EYE among them) appear in no step.
-_FITTING: tuple[str, ...] = (
-    f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
-    f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
-    f"PUSH ITEM {_K} INTO ITEM {_A}'S KEYSEAT AGAINST THE KEYSEAT'S END NEAREST "
-    f"ITEM {_A}'S SHOULDER.",
-    f"WIPE ALL {arbor.KEY_BOND} OFF ITEM {_A}'S {_SEAT_TEXT} SEAT, LEAVING THE "
-    "KEYSEAT FILLED.",
-    "LET THE BOND CURE 24 H.",
-    f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
-    f"GRIP ITEM {_A}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP, "
-    f"ONLY ITEM {_K} ON IT.",
-    f"TURN THE HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
-    f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {_K}'S UPPER SIDE FACE.",
-)
-ZERO_STEP = len(_FITTING)
-DRO_STEP = ZERO_STEP + 1
-_SETTING: tuple[str, ...] = (
-    "NOTE THE Z DRO READING.",
-    "TURN THE HEAD 180°.",
-    f"CARRY THE INDICATOR OVER ITEM {_A} TO ITEM {_K}'S UPPER SIDE FACE BY Y AND "
-    f"Z ONLY, BACK AT THE STEP {DRO_STEP} Z DRO READING.",
-    f"CHECK: THE INDICATOR READS ZERO WITHIN {_READING}.",
-)
-CHECK_STEP = ZERO_STEP + len(_SETTING)
-_SETTING += (
-    f"IF STEP {CHECK_STEP} FAILS, TURN THE HEAD UNTIL THE INDICATOR READS HALF "
-    f"ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
-    f"IF ITEM {_K} POINTS {_AWAY}, TURN THE HEAD 180°.",
-    "LOCK THE HEAD'S SPINDLE.",
-    f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",
-    f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
-    f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
-    f"FOR AN {CONE_NUMBER} BLANK, RUN THE TAILSTOCK CENTRE INTO ITEM {_A}'S "
-    "THREADED-END CENTRE HOLE.",
-    "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
-    "UNLOCK THE HEAD'S SPINDLE.",
-    "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
-)
-_STEPS: tuple[str, ...] = (*_FITTING, *_SETTING)
-INDEX_STEP = len(_STEPS)
-STEP_WIDTH = 66  # characters a printed line, inside the sheet's right border
-
-
-def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
-    lines: list[str] = []
-    for number, step in enumerate(steps, start=1):
-        head = f"{number}. "
-        lines += textwrap.wrap(
-            step,
-            STEP_WIDTH,
-            initial_indent=head,
-            subsequent_indent=" " * len(head),
-        )
-    return tuple(lines)
-
-
-ASSEMBLY_STEPS = "\n".join(
-    ("FITTING STEPS (PARTS LIST AND SETUP TABLE ON SHEET 1)", *_numbered(_STEPS))
 )
