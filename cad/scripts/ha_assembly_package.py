@@ -56,7 +56,10 @@ DOCUMENT_NAME = "ASSEMBLY.md"
 PACKAGES: tuple[str, ...] = (*BOM_ORDER, ASM_NAME)
 # The packages whose fit-up steps and checks print in this document, not on
 # their sheets (#2889).
-STEPS_IN_DOCUMENT: tuple[str, ...] = ("mg-magnifier",)
+STEPS_IN_DOCUMENT: tuple[str, ...] = (
+    "mg-magnifier",
+    "ms-measuring-stick",
+)
 _TEXT_MODULE_SUFFIXES = ("_assembly_sheet", "_steps", "_fitup")
 _PACKAGE_PREFIXES = tuple(sorted({f"{stem.split('-')[0]}_" for stem in PACKAGES}))
 
