@@ -172,9 +172,18 @@ and `cad.rail_last_band_mm`. The feed-lever plan needs 0.11.0, which binds the l
 grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
-the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
-(its `harmonic_riser` adapter).
+the end-bracket plan's tap flags need the 0.11.0 jig pictures. The riser plan
+needs 0.11.0 too (its `harmonic_riser` adapter). The base-bar, end-bracket and
+feed-lever plans need the first prechips release after 0.11.3, which carries
+pedropaulovc/prechips#436: they read that release's adapter-bound
+milling-deflection stations (base bar `cad.jack_*_x_mm`, `cad.strap_*_x_mm`
+from `strap_inset_mm`, `cad.blank_centred_*`, `cad.vise_centred_jaw_right_mm`,
+`cad.rail_left_x_mm`/`rail_right_x_mm`, `cad.bracket_x1_mm`/`bracket_x2_mm`,
+`cad.slot_x_mm`, `cad.slot_entry_x_mm`; lever `cad.hole_x_mm`,
+`cad.jaw_right_x_mm`, `cad.grip_jaw_*_x_mm`, `cad.end_square_in`,
+`cad.angular_tol_deg`; bracket `cad.row_mm`, `cad.parallel_near_mm`/
+`parallel_far_mm`), its tap-flag refusal (`tap_flag_tol_in`) and the restored
+`jig-lever-hold` grip-end picture.
 
 The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
 adapter and the `milling_deflection` check. It passes both profiles, with every
@@ -245,8 +254,12 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE.
   The #29 drill runs to 1.06 below BAR SIDE so the KP08-side exit is full
   size; each face's plug and bottoming taps carry one flag (BAR .45, KP08 .51
-  from the tip, in the low half of the drawing's tip windows) so the two
-  bottoming taps never meet; Setup 4 lines up on the drilled holes instead of
+  from the physical tip, as the drawing measures the tip marks, in the low
+  half of the tip windows) so the two bottoming taps never meet: prechips
+  refuses a flag that, ± `tap_flag_tol_in`, leaves its window, or a pair whose
+  deepest tips reach the minimum width. The end mill runs at the hand sheets'
+  shared setting (`jig-em-half-6061-t6511`, low belt range), and the final
+  inspection calipers the as-bought section; Setup 4 lines up on the drilled holes instead of
   re-finding datums. The final screw check runs a flagged screw only to its
   own face's full-thread depth, never on into the opposite face's thread.
 - Feed lever: the 2X bolt holes are the 11/32 drill, `2X Ø.3438 11/32 DRILL
@@ -254,9 +267,13 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   post-v49 drawing; the former 5/16 normal-fit clearance, Ø.344, put the
   plan's 11/32 drill under its minimum), inspected with pin gauges. The grip
   corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
-  fillet, not an authored radius. The saw cut at 11.85 is the finished grip
-  end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
-  has no second vise setup.
+  fillet, not an authored radius. Both ends are milled, as the manifest's
+  process note says ("saw and face to length"): ZERO END in the hole setup,
+  then the grip end to length in the hand sheet's slid-left hold, with its
+  length and ±1° squareness (two edge-finder X readings at the two edges)
+  read on the DRO. The end mill runs at the shared hand-sheet setting; the
+  final inspection calipers the as-bought section and runs two 5/16-18
+  screws through both holes at once.
 
 The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
 is enrolled. It needs prechips 0.11.1 (the `harmonic_carrier` adapter with
