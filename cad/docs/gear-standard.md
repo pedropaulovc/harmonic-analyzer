@@ -178,14 +178,16 @@ the runout extreme at the nominal end, 1.214 and 1.123 at the far end, 43.844
 MHA-PD-00's arm-plate-located step jig-bores it on the mill DRO after the
 MHA-PD-23 pin is pressed: the arm trammed front up on its pivot bore and the
 pin's shank in bore S, at the height the disc runs (the mesh's own plane), K set at mid-band
-coordinates from S, each indicated true to under one division of sweep. With
+coordinates from S, each indicated true to a sweep under .0005. With
 the plate still only clamped, the cluster and the knob shaft are slipped on and
-the mesh is tried on an indicator (#2417): the knob shaft and the disc pressed
-lightly together, the disc rocked, the stylus on the disc tooth next to the
-15T. The window, .0005 to .0075 in, covers every reading the band, the gears'
-runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_BACKLASH_DIAL_MM`; #2510):
-the band's backlash at the tightest centre the two running fits allow, read
-at the tip and rounded outward to the indicator's division. The trial only
+the mesh is tried on a .001 in dial indicator (#2417): the knob shaft and the disc pressed
+lightly together, the disc rocked, the plunger on the disc tooth next to the
+15T. The acceptance, a visible shake of at most .008 in, covers every reading the band, the gears'
+runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM`; #2510):
+the band's backlash at the loosest centre the two running fits allow, read
+at the tip and rounded up to the indicator's division (the tightest still
+moves it about 0.9 division). The 1 um lever indicator's 0.14 mm range is too
+short for it (#2888). The trial only
 reads the setting; it never moves K, so the band stays the limit. The pilots
 are drilled after it passes, and the doweled plate is read the same way again
 before anything on the arm is made permanent. The band and the coordinates are

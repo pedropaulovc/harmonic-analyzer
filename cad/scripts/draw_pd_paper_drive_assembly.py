@@ -2395,7 +2395,7 @@ def _step_text(
             f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 11)} WITH "
             "THE ARM CLAMPED FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE.",
             f"CHECK: AS {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)}, "
-            "THE TEST INDICATOR ON A MAGNETIC BASE.",
+            "A DIAL INDICATOR ON A MAGNETIC BASE.",
             # A chip from the drilling just done reads as a tight spot or an
             # off reading, so the doweled set is cleaned and read once more
             # before it is scrapped (codjiflo P2 on ab2fdaf, as 28A/28B).
