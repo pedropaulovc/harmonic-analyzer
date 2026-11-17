@@ -984,7 +984,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_ha_harmonic_analyzer_assembly.py",
         source_kind="assembly",
         layout=DrawingLayout.PORTRAIT,
-        additional_layouts=(DrawingLayout.LANDSCAPE,),
     ),
 )
 

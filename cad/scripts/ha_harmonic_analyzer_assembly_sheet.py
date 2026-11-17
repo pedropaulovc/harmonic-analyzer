@@ -1,10 +1,11 @@
 """Drawing-only text of the complete-machine fitter package (MHA-HA-00).
 
-The BOM descriptions, balloon targets, setting callouts, integration steps
-and checks the sheets print. Only draw_ha_harmonic_analyzer_assembly (and its
-tests) import this module; no assembly builder may
-(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
-rebuild the complete-machine assembly. No SolidWorks.
+The BOM descriptions, balloon targets and setting callouts the sheets print,
+and the integration steps and checks the release's ASSEMBLY.md prints
+(ha_assembly_package, #2889). Only draw_ha_harmonic_analyzer_assembly,
+ha_assembly_package (and their tests) import this module; no assembly
+builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit
+here does not rebuild the complete-machine assembly. No SolidWorks.
 """
 
 from __future__ import annotations
@@ -365,7 +366,11 @@ def step_lines(key: str) -> tuple[str, ...]:
     return _printed(key)
 
 
-# Sheet 5's checks before running: one acceptance each.
+# The section ASSEMBLY.md prints (ha_assembly_package, #2889).
+STEP_SECTIONS = (("INTEGRATION SEQUENCE", ASSEMBLY_STEPS),)
+
+
+# The checks before running: one acceptance each.
 ASSEMBLY_CHECKS: tuple[str, ...] = (
     "1. THE MHA-MG-08 BAR TOP READS ITS SHEET 1 HEIGHT.",
     "2. THE MHA-PN-07 STUD DROP READS AS SHEET 1.",
@@ -379,7 +384,7 @@ ASSEMBLY_CHECKS: tuple[str, ...] = (
     "8. THROUGH TWO CRANK TURNS BOTH WIRES STAY IN THEIR GROOVES.",
 )
 
-EXPLODED_CAPTION = "EXPLODED VIEW - INTEGRATION STEPS ON SHEETS 4 AND 5"
+EXPLODED_CAPTION = "EXPLODED VIEW - INTEGRATION STEPS IN ASSEMBLY.MD"
 ORIENTATION_NOTE = "FRONT VIEW: THE PAPER SIDE. THE CRANK IS AT THE RIGHT."
 # The model holds the pen parked (step "nib-set"); running needs it on the
 # paper (step "nib-on-paper").
