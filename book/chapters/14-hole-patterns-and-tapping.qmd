@@ -11,7 +11,7 @@ Position matters more than size for most of the holes in this machine.
 **TODO** — stub. Nothing here has been written yet.
 :::
 
-## Laying out a pattern, and the DRO alternative
+## Hole patterns from the program, zeroed with the touch probe
 
 TODO
 

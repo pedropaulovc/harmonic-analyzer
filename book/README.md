@@ -2,7 +2,8 @@
 
 **_Albert Michelson's Harmonic Analyzer: A Project for Hobby Machinists_**.
 Step-by-step machining instructions for building a working 20-element harmonic
-analyzer on a manual mill and lathe.
+analyzer on a CNC mill and a manual lathe: the milled parts run from G-code
+posted with open-source CAM (FreeCAD) and shipped with each release.
 
 The book is the main machining and publication deliverable. The
 [CAD model](../cad) supplies the geometry, the

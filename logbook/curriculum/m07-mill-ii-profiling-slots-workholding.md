@@ -12,38 +12,38 @@ hours_actual: 5
 
 - Cut a slot to width
 - Hold thin and flexible stock flat without crushing it
-- Assemble a jig and fit a running gap to a measured number
-- Mill a 2D profile to a line
+- Prove a profile program in air, then run it on stock
+- Mill a 2D profile from a program to its drawing limits
 - Hold twenty identical parts identically
 
 ## Prerequisites
 
 - m06
-- m08 — the jig's holes, so it can be assembled and cut rocker arms
+- m08 — drilling and reaming, which the rocker strap's hub and rod-pin holes need
 
 ## References
 
 - `references/machining-for-hobbyists-getting-started/09_chapter-7-milling-machines.pdf`
-- [`ch-rocker-arm-tl-oblique-base-bar`](../../cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml) and
-  [`ch-rocker-arm-tl-oblique-riser`](../../cad/config/parts/ch-rocker-arm-tl-oblique-riser.yaml) registry rows
-- `cad/scripts/ch_rocker_arm_tl_oblique_jig_assembly_spec.py` and the
-  `ch-rocker-arm-tl-oblique-jig` assembly drawing (fit-up, travel, BOM)
-- [Oblique jig plain-pivot tooling](../../cad/docs/subsystem-identities.md#oblique-jig-plain-pivot-tooling)
-  (shimming the carrier's running gap)
+- [`ch-rocker-strap`](../../cad/config/parts/ch-rocker-strap.yaml) registry row
+- `cad/process/ch_rocker_strap/`: the strap's process plan and CAM recipe; its
+  NC programs are posted to `cad/out/nc/ch_rocker_strap/` and ship with each
+  release under `nc/ch_rocker_strap/`
 - `cad/docs/machining-dfm.md` (`ch-rocker-arm`, `ch-connecting-rod` rows)
-- `cad/scripts/build_ch_rocker_arm.py`
+- `cad/scripts/build_ch_rocker_strap.py`, `cad/scripts/build_ch_rocker_arm.py`
 
 ## Practice
 
 - Slots: width, and why a slot is never the cutter diameter
 - Speed, depth and chip clearing in an aluminium slot
-- Thin stock: holding 6 mm acetal flat, and tape or double-sided workholding
-- Fit-up: shims, feeler gauges, and measuring a running gap
-- Profile milling: cutter comp by hand, leaving a finishing pass
-- Arcs on a manual machine: rotary table, template, file-to-line, or a jig
-  that generates them
+- Thin stock: holding the 1/8 in strap flat, and tape or double-sided workholding
+- Proving a program: tool lengths on the tool setter, work zero from the touch
+  probe, a run in air above the stock, then the first part checked before the
+  rest
+- Profile milling from a program: cutter compensation in the CAM, leaving a
+  finishing pass
+- Arcs: the controller interpolates them, so the R800/R816 edges need no jig
 - Simple fixtures, stops, and soft jaws
-- Twenty identical profiles without CNC
+- Twenty identical profiles: one program, one stop, one work zero
 
 ## Controlled mistakes
 
@@ -69,18 +69,10 @@ compare.
 
 ## Now make — the real part this unlocks
 
-**Finish the oblique jig, then cut rocker arms on it:**
-
-1. The two hold-down slots through each **`ch-rocker-arm-tl-oblique-base-bar`**.
-2. **`ch-rocker-arm-tl-oblique-riser`** (TL-24): 1/4 in acetal faced to 6.0 and
-   milled to a 40 × 340 blank. At assembly, spot its holes from the carrier,
-   drill #4 clearance and countersink 82°; drill the HUB, CL and CR clearance
-   holes.
-3. **Assemble `ch-rocker-arm-tl-oblique-jig`** (TL-00) on the table to its
-   drawing. Fit each measured carrier running gap to 0.05–0.25 mm with the
-   purchased shims.
-4. Use the jig to cut **`ch-rocker-arm`** ×20: 2.5 mm steel, with an R800
-   concave top edge that is the **outline** of the plate, not a pocket.
+**`ch-rocker-strap`** (MHA-CH-13) ×20 from its CNC programs, the first part
+trialled end to end on the CNC mill: 1018 flat with an R800 concave top edge
+that is the **outline** of the strap, not a pocket. Each strap takes a hub
+turned on the lathe to make a **`ch-rocker-arm`**.
 
 Then **`ch-connecting-rod`** ×20: a flat 2D profile, with the rough finish the
 book shows.
@@ -92,8 +84,8 @@ Twenty rocker arms whose pivot-to-pin distance varies by less than 0.05 mm acros
 ## Notes
 
 The R800 arc is what the amplitude bar rides on. Its consistency across twenty
-parts is a functional requirement, not cosmetic. That is why the jig is worth
-building before the first arm.
+parts is a functional requirement, not cosmetic. That is why all twenty come
+from one program and one work zero.
 
 The 2026-10-30 session is logged here, but what it actually did was face to
 length, which is M06 work. It stays where it was logged.

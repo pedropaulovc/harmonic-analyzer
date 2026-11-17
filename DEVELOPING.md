@@ -333,8 +333,8 @@ completed
 
 `build` and `release` run every enrolled `prechips:<stem>` task, so a build
 that produces the drawing PDFs also produces the traveler PDFs; `build_bare`
-runs none. `release` ships each part's hobby sheet as
-`travelers/<slug>-traveler.pdf` in the
+runs none. `release` ships each part's hobby sheet, which is the part's CNC
+setup sheet, as `travelers/<slug>-traveler.pdf` in the
 bundle (owner ruling 2026-11-14). prechips is not in `uv.lock`
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)); the
 wrapper runs the latest PyPI release with `uv tool run` outside the project
@@ -362,6 +362,30 @@ traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool
 run` error before prechips ran) or the browser was missing or failed to print.
 Plan authoring and the shop files are described in
 [`cad/process/README.md`](cad/process/README.md).
+
+## NC programs
+
+Milled parts are made on the CNC-converted PM-30MV (owner ruling
+2026-11-17; the lathe stays manual). `build` and `release` run every enrolled
+`cam:<stem>` task (`_cam_programs.CAM_STEMS`; the rocker strap is the first),
+and `build_bare` runs none. Each one runs the part's
+`cad/process/<stem>/cam.py` recipe in headless FreeCAD and writes one G-code
+file per program, `cycle_times.json` and `manifest.json` to
+`cad/out/nc/<stem>/`; `release` ships them under `nc/<stem>/` and the cut
+fails if any is missing or stale. The tasks run on the submitter (no farm
+worker has FreeCAD), so the submitter needs FreeCAD 1.1 or later:
+`$HARMONIC_FREECAD` names `freecadcmd`, otherwise the newest `FreeCAD
+<version>` install is used, and the task fails when there is none. To post one
+part's programs after its scoped feature bundle exists:
+
+```text
+uv run --frozen python -m doit cam:<stem>
+```
+
+Recipes and their checks are described in
+[`cad/process/README.md`](cad/process/README.md).
+Posted NC is not machining approval: prove each program in air and check the
+setup against the traveler first.
 
 ## Local pytest timing
 
@@ -1053,9 +1077,11 @@ complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
 Then run `uv run --frozen python -m doit -s gallery`,
 `uv run --frozen python -m doit -s prechips` (every enrolled traveler, rendered
 from the restored feature bundles) and
-`uv run --frozen python -m doit -s release -- vNN` there. This keeps the
+`uv run --frozen python -m doit -s release -- vNN` there. The NC programs
+arrive with the restored `out/`: the run's `build` posts them on the submitter,
+which therefore needs FreeCAD 1.1+. This keeps the
 gallery, travelers and publish in the owning worktree without local COM
-redispatch; the cut fails if any traveler PDF is missing.
+redispatch; the cut fails if any traveler PDF or NC program is missing.
 
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,

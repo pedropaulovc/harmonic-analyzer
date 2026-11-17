@@ -27,7 +27,11 @@ TODO
 
 TODO
 
-## The DRO question
+## The CNC conversion: controller, sender, tool setter and touch probe
+
+TODO
+
+## CAM: the G-code each release ships, and proving a program in air
 
 TODO
 

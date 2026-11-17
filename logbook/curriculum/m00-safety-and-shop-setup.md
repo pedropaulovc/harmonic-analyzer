@@ -50,8 +50,8 @@ Make each on scrap first, under the
 compare.
 
 - **The e-stop out of reach.** Stand where you actually work on the next job
-  and time how long it takes to hit the stop. Move the stop or the pendant
-  until it is under your hand, then time it again.
+  and time how long it takes to hit the stop. Move the stop until it is under
+  your hand, then time it again.
 - **Chips left to pile.** Run one job without clearing chips and see where
   they go: the ways, the vise, the floor, your shoes. Then set up chip control
   and run the same job again.
