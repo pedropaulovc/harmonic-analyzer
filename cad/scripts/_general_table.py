@@ -7,6 +7,11 @@ The free-note helpers it needs (``add_note_block``, ``note_extent``,
 ``anchor_note``) are public too.  Extracted from
 ``draw_dt_drive_train_assembly`` (sheet 15's setting tables); the import
 closure stays narrow so a consumer's cache key pulls in only this module.
+
+The calibration is that package's: 2.8 mm a character and a one-line title.
+A title must be one line, and a cell whose glyphs print wider (the
+dt_cone_gear_tl_arbor setup table measured 3.2 mm a character and keeps its
+own placer) wraps without raising, so a consumer checks its print.
 """
 
 from __future__ import annotations
@@ -117,6 +122,7 @@ def table_column_widths(
     )
 
 
+@_telemetry.traced("drawing.insert_general_table", label_param="label")
 def insert_general_table(
     adapter: Any,
     *,
