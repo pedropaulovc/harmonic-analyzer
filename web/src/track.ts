@@ -99,6 +99,7 @@ function phaseDelta(a: number, b: number): number {
 export class Track {
   readonly shots: CompiledShot[]
   private readonly views: TrackView[] = []
+  private readonly active: TrackView[] = []
 
   constructor(readonly spec: TrackSpec) {
     const preset = (name: string | undefined, where: string): Preset => {
@@ -153,8 +154,9 @@ export class Track {
 
   /** Views at a time. The returned array and its objects are reused by the next call. */
   evaluate(time: number): readonly TrackView[] {
+    this.active.length = 0
     let index = this.shotAt(time)
-    if (index < 0) return []
+    if (index < 0) return this.active
     let shot = this.shots[index]!
     let fraction = (time - shot.start) / (shot.end - shot.start)
     if (shot.holdOf) {
@@ -163,9 +165,12 @@ export class Track {
       shot = this.shots[index]!
     }
     const tiles = shot.tiles
-    if (!tiles) return []
-    for (let i = 0; i < tiles.length; i++) evaluateTile(tiles[i]!, fraction, this.views[i]!)
-    return this.views.slice(0, tiles.length)
+    if (!tiles) return this.active
+    for (let i = 0; i < tiles.length; i++) {
+      evaluateTile(tiles[i]!, fraction, this.views[i]!)
+      this.active.push(this.views[i]!)
+    }
+    return this.active
   }
 }
 

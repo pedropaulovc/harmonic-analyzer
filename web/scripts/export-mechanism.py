@@ -64,7 +64,11 @@ OUTPUT = ROOT / "web/src/mechanics-data.ts"
 # The 15:150 knob-shaft/disc reducer is an external spur mesh, which reverses
 # rotation (the -1 build_kinematic_probe.GEAR_SENSE pins on the live model).
 EXTERNAL_MESH_SENSE = -1.0
-GEARINGS = (("small-large", "T24", "T12"), ("medium-medium", "T18", "T18"), ("large-small", "T12", "T24"))
+GEARINGS = (
+    ("small-large", "T24", "T12"),
+    ("medium-medium", "T18", "T18"),
+    ("large-small", "T12", "T24"),
+)
 
 
 def chain_paths() -> dict:
@@ -85,8 +89,10 @@ def chain_paths() -> dict:
                     [c.BX, c.BY, c.WRAP_R_B, c._ANG_GB, c.SPAN_B],
                 ],
                 "tautMm": [
-                    c.BX + c.WRAP_R_B * c.TNX, c.BY + c.WRAP_R_B * c.TNY,
-                    c.WRAP_R_A * c.TNX, c.WRAP_R_A * c.TNY,
+                    c.BX + c.WRAP_R_B * c.TNX,
+                    c.BY + c.WRAP_R_B * c.TNY,
+                    c.WRAP_R_A * c.TNX,
+                    c.WRAP_R_A * c.TNY,
                 ],
                 "tautLengthMm": c.TAUT_LEN,
                 "sagMm": c.SAG,
@@ -110,7 +116,10 @@ def pinion_setup() -> dict:
     c, s = math.cos(swing), math.sin(swing)
     dx, dy = park.FPIN_C[0] - park.PIVOT_X, park.FPIN_C[1] - park.PIVOT_Y
     follower = (park.PIVOT_X + dx * c - dy * s, park.PIVOT_Y + dx * s + dy * c)
-    normal = (park.SPR_N[0] * c - park.SPR_N[1] * s, park.SPR_N[0] * s + park.SPR_N[1] * c)
+    normal = (
+        park.SPR_N[0] * c - park.SPR_N[1] * s,
+        park.SPR_N[0] * s + park.SPR_N[1] * c,
+    )
     radii = (cam.CAM_OD + cam_pin.PIN_DIA) / 2
     lo, hi = -math.pi, 0.0
     for _ in range(60):
@@ -124,7 +133,9 @@ def pinion_setup() -> dict:
     cone_pivot = list(cone_line.cone_station(platform.PIVOT_STATION))
     cone_pivot[1] = cone_line.Y_BASE_TOP
     hardware = platform.swing_hardware_geometry(
-        (cone_pivot[0], cone_pivot[2]), lock_head_dia=lock_knob.HEAD_DIA, stop_contact_dia=stop_screw.CONTACT_DIA
+        (cone_pivot[0], cone_pivot[2]),
+        lock_head_dia=lock_knob.HEAD_DIA,
+        stop_contact_dia=stop_screw.CONTACT_DIA,
     )
     return {
         "conePivotMm": cone_pivot,
@@ -150,7 +161,10 @@ def build() -> tuple[dict, list]:
     pitch = config.machine("channels", "station_pitch_mm")
     mid_dz = rocker_bank_layout.ARM_MID_DZ
     native_counter, native_goose_y = settled.counter_seat()
-    lever_rod_y, lever_rod_z = mg_bracket.BRACKET_ORIGIN[1], mg_bracket.BRACKET_ORIGIN[2]
+    lever_rod_y, lever_rod_z = (
+        mg_bracket.BRACKET_ORIGIN[1],
+        mg_bracket.BRACKET_ORIGIN[2],
+    )
     clamp_x = lever_wire.CLAMP_X
     fixture_y = fixture_geom.FIXTURE_AXIS_Y
     vrod_top_y = lever_rod_y - mg_clamp.LEVER_BORE_Y + vrod_geom.SHOULDER_X
@@ -173,7 +187,8 @@ def build() -> tuple[dict, list]:
             "barWidthMm": bar.BAR_WIDTH,
             "contactOffsetMm": [
                 bar.BAR_WIDTH / 2.0,
-                bar.BOTTOM_NOTCH_HEIGHT - config.fit("cam_follower_contact", "contact_gap_mm"),
+                bar.BOTTOM_NOTCH_HEIGHT
+                - config.fit("cam_follower_contact", "contact_gap_mm"),
             ],
             "leverBarArmMm": lever.BAR_PIN_X,
             "leverSpringArmMm": lever.LEVER_SPRING_X,
@@ -227,8 +242,21 @@ def build() -> tuple[dict, list]:
             "clampRestMm": [clamp_x, lever_rod_y, lever_rod_z],
             "fixtureRestMm": [clamp_x, fixture_y, fixture_geom.VROD_Z],
             "fixtureOffsetRangeM": [  # whole cross bore on the straight rod, below the clamp
-                (vrod_top_y - vrod_geom.ROD_LENGTH + vrod_geom.DOME_R + fixture_geom.HEX_CORNER_RADIUS - fixture_y) / 1000,
-                (lever_rod_y - mg_clamp.LEVER_BORE_Y - fixture_geom.HEX_CORNER_RADIUS - fixture_y) / 1000,
+                (
+                    vrod_top_y
+                    - vrod_geom.ROD_LENGTH
+                    + vrod_geom.DOME_R
+                    + fixture_geom.HEX_CORNER_RADIUS
+                    - fixture_y
+                )
+                / 1000,
+                (
+                    lever_rod_y
+                    - mg_clamp.LEVER_BORE_Y
+                    - fixture_geom.HEX_CORNER_RADIUS
+                    - fixture_y
+                )
+                / 1000,
             ],
             "hubPitchRadiusMm": lever_wire.YOKE_PITCH_R,
             "rimPitchRadiusMm": pen_wire.RIM_WIRE_R,
@@ -257,21 +285,57 @@ def build() -> tuple[dict, list]:
         spring = settled.channel_seat(amplitudes[index]).pose
         data["restChannels"].append({"nativeSpring": {"length_mm": spring.length_mm}})
         checks += [
-            (f"{ch}ch-rocker-arm-{n}", [0, arm.PIVOT_MID_Y, 0], [*frame.ROCKER_PIVOT_XY, mid]),
+            (
+                f"{ch}ch-rocker-arm-{n}",
+                [0, arm.PIVOT_MID_Y, 0],
+                [*frame.ROCKER_PIVOT_XY, mid],
+            ),
             (f"{ch}ch-channel-lever-{n}", [0, 0, 0], [*frame.LEVER_FULCRUM_XY, mid]),
-            (f"{ch}ch-amplitude-bar-{n}", [0, 0, 0],
-             [state["bar_origin_x"], state["bar_origin_y"], mid - bar.BAR_WIDTH / 2.0]),
-            (f"{ch}ch-connecting-rod-{n}", [0, 0, 0],
-             [*ck._RING_CENTER, station - (cyl.FACE_WIDTH + cyl.CAM_THICKNESS) / 2.0]),
-            (f"{ch}ch-vn-channel-spring-installed-*-{n}", [0, 0, 0], [*spring.centre_xy, mid]),
-            (f"{dt}dt-cylinder-gear-{n}", [0, 0, 0], [*frame.CAM_SHAFT_XY, station + cyl.FACE_WIDTH / 2.0]),
+            (
+                f"{ch}ch-amplitude-bar-{n}",
+                [0, 0, 0],
+                [
+                    state["bar_origin_x"],
+                    state["bar_origin_y"],
+                    mid - bar.BAR_WIDTH / 2.0,
+                ],
+            ),
+            (
+                f"{ch}ch-connecting-rod-{n}",
+                [0, 0, 0],
+                [
+                    *ck._RING_CENTER,
+                    station - (cyl.FACE_WIDTH + cyl.CAM_THICKNESS) / 2.0,
+                ],
+            ),
+            (
+                f"{ch}ch-vn-channel-spring-installed-*-{n}",
+                [0, 0, 0],
+                [*spring.centre_xy, mid],
+            ),
+            (
+                f"{dt}dt-cylinder-gear-{n}",
+                [0, 0, 0],
+                [*frame.CAM_SHAFT_XY, station + cyl.FACE_WIDTH / 2.0],
+            ),
         ]
     checks += [
         ("sm-summing/sm-summing-lever-1", [0, 0, 0], [*mount.KNIFE, SUMMING_Z]),
-        ("sm-summing/sm-vn-counter-spring-1", [0, 0, 0], [*native_counter.pose.centre_xy, SUMMING_Z]),
-        ("sm-summing/sm-gooseneck-1", [0, 0, 0], [mount.COLUMN_X, native_goose_y, SUMMING_Z]),
-        ("mg-magnifier/mg-magnifying-lever-1", [mg_lever.KNIFE_LOCAL_X, mg_lever.KNIFE_LOCAL_Y, 0],
-         [knife[0], knife[1], lever_rod_z]),
+        (
+            "sm-summing/sm-vn-counter-spring-1",
+            [0, 0, 0],
+            [*native_counter.pose.centre_xy, SUMMING_Z],
+        ),
+        (
+            "sm-summing/sm-gooseneck-1",
+            [0, 0, 0],
+            [mount.COLUMN_X, native_goose_y, SUMMING_Z],
+        ),
+        (
+            "mg-magnifier/mg-magnifying-lever-1",
+            [mg_lever.KNIFE_LOCAL_X, mg_lever.KNIFE_LOCAL_Y, 0],
+            [knife[0], knife[1], lever_rod_z],
+        ),
         ("mg-magnifier/mg-magnifying-wheel-1", [0, 0, 0], wheel),
         ("pn-pen/pn-vn-pen-marker-1", [0, 0, 0], list(pen.MARKER_POS)),
         (f"{dt}dt-cone-swing-platform-1", [0, 0, 0], setup["conePivotMm"]),
@@ -296,16 +360,34 @@ def glb_world_matrices(path: Path) -> dict[str, list[float]]:
         x, y, z, w = node.get("rotation", [0, 0, 0, 1])
         sx, sy, sz = node.get("scale", [1, 1, 1])
         return [
-            (1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
-            2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
-            2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0,
-            *node.get("translation", [0, 0, 0]), 1,
+            (1 - 2 * (y * y + z * z)) * sx,
+            2 * (x * y + z * w) * sx,
+            2 * (x * z - y * w) * sx,
+            0,
+            2 * (x * y - z * w) * sy,
+            (1 - 2 * (x * x + z * z)) * sy,
+            2 * (y * z + x * w) * sy,
+            0,
+            2 * (x * z + y * w) * sz,
+            2 * (y * z - x * w) * sz,
+            (1 - 2 * (x * x + y * y)) * sz,
+            0,
+            *node.get("translation", [0, 0, 0]),
+            1,
         ]
 
     def visit(index: int, parent: list[float], prefix: str) -> None:
         node, m = nodes[index], local(nodes[index])
-        world = [sum(parent[k * 4 + r] * m[c * 4 + k] for k in range(4)) for c in range(4) for r in range(4)]
-        name = f"{prefix}/{node.get('name', index)}" if prefix else node.get("name", str(index))
+        world = [
+            sum(parent[k * 4 + r] * m[c * 4 + k] for k in range(4))
+            for c in range(4)
+            for r in range(4)
+        ]
+        name = (
+            f"{prefix}/{node.get('name', index)}"
+            if prefix
+            else node.get("name", str(index))
+        )
         result[name] = world
         for child in node.get("children", []):
             visit(child, world, name)
@@ -330,27 +412,50 @@ def report_rest_residuals(glb: Path, checks: list) -> None:
             print(f"{suffix}: {len(found)} matching nodes")
             continue
         m = nodes[found[0]]
-        actual = [m[12 + r] * 1000 + sum(m[c * 4 + r] * point[c] for c in range(3)) for r in range(3)]
+        actual = [
+            m[12 + r] * 1000 + sum(m[c * 4 + r] * point[c] for c in range(3))
+            for r in range(3)
+        ]
         family = re.sub(r"-\d+$", "-N", suffix)
         error, seen = worst.get(family, (0.0, 0))
         worst[family] = (max(error, math.dist(actual, expected)), seen + 1)
-    links = [m for path, m in nodes.items() if re.search(r"/(sh-vn-chain-link|pd-vn-chain-connecting-link)-\d+$", path)]
-    worst["pd-paper-drive/chain link pin0 to mounted loop"] = (max(
-        _chain.centreline_distance(m[12] * 1000, m[13] * 1000, *_chain.KNOB_CENTRE, mirror_x=True) for m in links
-    ), len(links))
+    links = [
+        m
+        for path, m in nodes.items()
+        if re.search(r"/(sh-vn-chain-link|pd-vn-chain-connecting-link)-\d+$", path)
+    ]
+    worst["pd-paper-drive/chain link pin0 to mounted loop"] = (
+        max(
+            _chain.centreline_distance(
+                m[12] * 1000, m[13] * 1000, *_chain.KNOB_CENTRE, mirror_x=True
+            )
+            for m in links
+        ),
+        len(links),
+    )
     print(f"{'datum family':56} {'nodes':>5} {'max |d| mm':>11}")
     for family, (error, seen) in worst.items():
         print(f"{family:56} {seen:5d} {error:11.6f}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--glb", type=Path, help="raw GLB whose rest node transforms to compare (report only)")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--glb",
+        type=Path,
+        help="raw GLB whose rest node transforms to compare (report only)",
+    )
     args = parser.parse_args()
     data, checks = build()
     text = json.dumps(data, indent=2, allow_nan=False)
     header = "// Generated by web/scripts/export-mechanism.py from cad/; do not edit.\n"
-    OUTPUT.write_text(f"{header}export const MECHANISM_DATA = {text} as const\n", encoding="utf-8", newline="\n")
+    OUTPUT.write_text(
+        f"{header}export const MECHANISM_DATA = {text} as const\n",
+        encoding="utf-8",
+        newline="\n",
+    )
     print(f"wrote {OUTPUT.relative_to(ROOT).as_posix()}")
     if args.glb:
         report_rest_residuals(args.glb, checks)
