@@ -5360,6 +5360,109 @@ def test_hash_invalid_canonical_adoption_is_fatal(canonical_publication, monkeyp
         )
 
 
+@pytest.mark.parametrize("initially_present", [False, True])
+@pytest.mark.parametrize("conflict", [False, True])
+def test_forced_root_cas_snapshot_before_seat_and_work(
+    canonical_publication, monkeypatch, initially_present, conflict
+):
+    import json
+    from test_artifact_cache import _get_bytes, _put_bytes
+
+    f = canonical_publication
+    with f.at("A"):
+        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        if initially_present:
+            f.emit("assembly", b"old-A")
+            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Refresh root",
+    }))
+    initial_etags = dict(f.service.etags)
+    seat = f.dodo._com_seat
+    snapshots = []
+
+    @contextlib.contextmanager
+    def before_seat(label):
+        heads = [call[1] for call in f.service.calls if call[0] == "etag"]
+        assert heads == [f.backend._name(root_key)]
+        snapshots.extend(heads)
+        if conflict:
+            _put_bytes(
+                f.backend, root_key, b"concurrent canonical",
+                replace_etag=initial_etags.get(f.backend._name(root_key)),
+            )
+        with seat(label) as waited:
+            yield waited
+
+    def execute(*_args, **_kwargs):
+        assert len(snapshots) == 1
+        f.emit("assembly", b"refresh-B")
+
+    monkeypatch.setattr(f.dodo, "_com_seat", before_seat)
+    monkeypatch.setattr(f.dodo, "_exec_com", execute)
+    with f.at("B"):
+        if conflict:
+            with pytest.raises(RuntimeError, match="did not store outputs \\(lost\\)"):
+                f.run("assembly")
+        else:
+            f.run("assembly")
+    heads = [call[1] for call in f.service.calls if call[0] == "etag"]
+    assert heads == snapshots  # no under-seat or pre-upload recapture
+    if conflict:
+        assert _get_bytes(f.backend, root_key) == b"concurrent canonical"
+
+
+def test_refresh_snapshot_head_error_is_fatal_before_work(canonical_publication, monkeypatch):
+    import json
+
+    f = canonical_publication
+
+    def fail(_key):
+        raise OSError("HEAD unavailable, not absence")
+
+    monkeypatch.setattr(f.backend, "etag", fail)
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Snapshot failure",
+    }))
+    monkeypatch.setattr(f.dodo, "_com_seat", lambda *_a: pytest.fail("waited for seat after failed HEAD"))
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("built after failed HEAD"))
+    with f.at("B"), pytest.raises(OSError, match="HEAD unavailable"):
+        f.run("assembly")
+    assert not f.publications
+
+
+@pytest.mark.parametrize("initially_present", [False, True])
+def test_root_refresh_upload_failure_is_fatal(
+    canonical_publication, monkeypatch, initially_present
+):
+    import json
+
+    f = canonical_publication
+    with f.at("A"):
+        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        if initially_present:
+            f.emit("assembly", b"old-A")
+            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+            with f.cache._pack(f.outputs("assembly")) as archive:
+                f.backend.put(root_key, archive)
+    initial_etags = dict(f.service.etags)
+
+    def upload(_key, _blob, *, replace_etag=None):
+        raise OSError("upload unavailable")
+
+    monkeypatch.setattr(f.backend, "put", upload)
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"refresh-B"))
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Publish failure",
+    }))
+    outcome = "lost" if initially_present else "error"
+    with f.at("B"), pytest.raises(RuntimeError, match=f"did not store outputs \\({outcome}\\)"):
+        f.run("assembly")
+    assert f.service.etags == initial_etags
+
+
 def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
     import json
     import _artifact_cache
