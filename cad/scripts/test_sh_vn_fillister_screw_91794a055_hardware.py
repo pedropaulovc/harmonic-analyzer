@@ -1,0 +1,490 @@
+"""Offline part, recipe and fit contracts for sh-vn-fillister-screw-91794a055.
+
+Its purchase sheet retired for a HARDWARE.md row (#2886); these checks pin
+the part the assemblies still build.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import json
+import math
+import re
+from pathlib import Path
+
+import pytest
+
+import _config
+import _telemetry
+import build_sh_vn_fillister_screw_91794a055 as part
+import pd_feed_rack_screw_spec as rack
+import pd_transgear_disc_screw_spec as screw
+import sh_vn_fillister_screw_91794a055_spec as shared
+from _fastener_catalog import FASTENERS
+from _test_stock_recipes import discovered_recipes
+from diagnostics import diag_build_91794A055 as entry
+from _mcmaster_91794a055 import FILLISTER_SIZE
+
+IN = 25.4
+
+
+def test_spec_is_the_catalogue_screw() -> None:
+    """91794A055 per mcmaster.com (2026-09-30): #0-80 x 1/4 under the head,
+    fillister head Ø0.096 x 0.055, fully threaded."""
+    assert screw.SKU == "91794A055"
+    assert screw.THREAD == "#0-80"
+    assert screw.SHANK_DIA == pytest.approx(0.060 * IN)
+    assert screw.PITCH == pytest.approx(IN / 80.0)
+    assert screw.SHANK_LEN == pytest.approx(0.25 * IN)
+    assert screw.HEAD_DIA == pytest.approx(0.096 * IN)
+    assert screw.HEAD_H == pytest.approx(0.055 * IN)
+    # The hub spec reads the same screw's pure per-SKU fillister dimensions.
+    assert FILLISTER_SIZE == pytest.approx(
+        (screw.SHANK_DIA, screw.SHANK_LEN, screw.HEAD_H, screw.HEAD_DIA, screw.PITCH)
+    )
+
+
+_DUMP = (
+    Path(__file__).resolve().parents[1]
+    / "out"
+    / "reports"
+    / f"mcmaster-{screw.SKU}-dump.json"
+)
+
+
+def _truth() -> dict:
+    if not _DUMP.exists():
+        pytest.skip(f"no local vendor harvest at {_DUMP}")
+    return json.loads(_DUMP.read_text(encoding="utf-8"))
+
+
+def _feature(truth: dict, name: str) -> dict:
+    (feature,) = [f for f in truth["features"] if f["name"] == name]
+    return feature
+
+
+def test_spec_laws_are_the_vendor_model() -> None:
+    """Every head, slot, fillet, chamfer, thread and runout law reproduces the
+    harvest's own number (the dump wins over the 90280A family's fractions)."""
+    truth = _truth()
+    dims = {
+        d["full_name"].split("@")[0] + "@" + d["owner"]: d.get(
+            "value_mm", d.get("value_deg")
+        )
+        for f in truth["features"]
+        for d in f["dimensions"]
+    }
+    assert dims["Head Diameter@Sketch1"] == pytest.approx(screw.HEAD_DIA)
+    assert dims["Head Height@Sketch1"] == pytest.approx(screw.HEAD_H)
+    assert dims["Length@Sketch1"] == pytest.approx(screw.SHANK_LEN)
+    assert dims["Screw Size Decimal Equivalent@Sketch1"] == pytest.approx(
+        screw.SHANK_DIA
+    )
+    assert dims["Pitch@Sketch1"] == pytest.approx(screw.PITCH)
+    assert dims["Approx Head Edge Flat@Sketch1"] == pytest.approx(screw.HEAD_BAND)
+    assert dims["D5@Sketch2"] == pytest.approx(screw.HEAD_SIDE_DRAFT_DEG)
+    assert dims["D3@Sketch2"] == pytest.approx(screw.NECK_DIA / 2.0)
+    assert dims["D4@Sketch2"] == pytest.approx(screw.NECK_LEN)
+    assert dims["D1@Sketch2"] == pytest.approx(screw.TIP_CHAMFER)
+    assert dims["D2@Sketch2"] == pytest.approx(45.0)
+    assert dims["D1@Sketch9"] == pytest.approx(screw.SLOT_WIDTH)
+    assert dims["D1@Fillet1"] == pytest.approx(screw.SLOT_FILLET_R, abs=1e-6)
+    assert dims["D1@Fillet2"] == pytest.approx(screw.HEAD_FILLET_R)
+    assert dims["D3@Helix/Spiral1"] == pytest.approx(screw.HELIX_HEIGHT)
+    assert dims["D3@Boss-Extrude1"] == pytest.approx(screw.RUNOUT_DRAFT_DEG)
+
+    profile = {s["name"]: s for s in _feature(truth, "Sketch2")["sketch"]["segments"]}
+    assert profile["Arc4"]["radius_mm"] == pytest.approx(screw.DOME_R, abs=1e-5)
+    # Line2: the drafted side, rim radius to the under-head radius.
+    side = profile["Line2"]
+    assert side["start"]["y"] == pytest.approx(screw.HEAD_DIA / 2.0)
+    assert side["end"]["y"] == pytest.approx(screw.UNDER_HEAD_DIA / 2.0, abs=1e-5)
+
+    slot = [
+        s
+        for s in _feature(truth, "Sketch9")["sketch"]["segments"]
+        if not s["construction"]
+    ]
+    xs = [p["x"] for s in slot for p in (s["start"], s["end"])]
+    assert max(xs) - min(xs) == pytest.approx(screw.SLOT_DEPTH, abs=1e-5)
+
+    cutter = _feature(truth, "Sketch7")["sketch"]["segments"]
+    ys = sorted({round(p["y"], 6) for s in cutter for p in (s["start"], s["end"])})
+    assert ys == pytest.approx([screw.ROOT_DIA / 2.0, screw.SHANK_DIA / 2.0], abs=1e-5)
+    (top,) = [s for s in cutter if s["start"]["y"] == s["end"]["y"] == ys[1]]
+    (root,) = [s for s in cutter if s["start"]["y"] == s["end"]["y"] == ys[0]]
+    assert top["length_mm"] == pytest.approx(screw.CUTTER_TOP_W, abs=1e-5)
+    assert root["length_mm"] == pytest.approx(screw.ROOT_FLAT, abs=1e-5)
+
+    helix = _feature(truth, "Helix/Spiral1")["data"]
+    assert helix["revolutions"] == pytest.approx(screw.HELIX_REVS)
+    assert helix["pitch_mm"] == pytest.approx(screw.PITCH)
+
+    (runout,) = [
+        s
+        for s in _feature(truth, "Sketch8")["sketch"]["segments"]
+        if s["kind"] == "arc"
+    ]
+    assert runout["radius_mm"] == pytest.approx(screw.RUNOUT_DIA / 2.0)
+
+
+class _Recorder:
+    """A fake SolidWorks that records every call a recipe makes."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple] = []
+        recorder = self
+
+        class _Obj:
+            def __init__(self, name: str) -> None:
+                self._name = name
+
+            def __getattr__(self, attr: str):
+                if attr.startswith("_"):
+                    raise AttributeError(attr)
+
+                def call(*args, **kwargs):
+                    recorder.log(f"{self._name}.{attr}", args, kwargs)
+                    return _Obj(f"{self._name}.{attr}()")
+
+                return call
+
+        self.currentSketchManager = _Obj("sketch")
+        self.currentModel = _Obj("model")
+
+    def log(self, name: str, args=(), kwargs=None) -> None:
+        self.events.append((name, tuple(args), dict(kwargs or {})))
+
+    async def _async(self, name: str, *args, **kwargs):
+        self.log(name, args, kwargs)
+        return "ok"
+
+    async def create_sketch(self, *args):
+        return await self._async("create_sketch", *args)
+
+    async def exit_sketch(self, *args):
+        return await self._async("exit_sketch", *args)
+
+    async def create_revolve(self, *args):
+        return await self._async("create_revolve", *args)
+
+    async def create_cut_extrude(self, *args):
+        return await self._async("create_cut_extrude", *args)
+
+    async def add_fillet(self, *args):
+        return await self._async("add_fillet", *args)
+
+
+def _record(monkeypatch, author=None, **cut) -> tuple[_Recorder, list[tuple]]:
+    adapter = _Recorder()
+
+    def logger(name, result=None):
+        def call(*args, **kwargs):
+            adapter.log(name, args, kwargs)
+            return result
+
+        return call
+
+    async def add_line_chain(_adapter, points, **kwargs):
+        adapter.log("add_line_chain", (tuple(points),), kwargs)
+
+    async def volume_check(_adapter, label, expected, tol):
+        adapter.log("volume_check", (label, expected, tol))
+        return expected
+
+    @contextlib.contextmanager
+    def no_inference(_adapter):
+        yield
+
+    monkeypatch.setattr(entry, "check", logger("check", True))
+    monkeypatch.setattr(entry, "name_last_feature", logger("name_last_feature"))
+    monkeypatch.setattr(entry, "volume_check", volume_check)
+    monkeypatch.setattr(entry, "insert_helix", logger("insert_helix"))
+    monkeypatch.setattr(entry, "thread_sweep_cut", logger("thread_sweep_cut"))
+    monkeypatch.setattr(entry, "offset_plane", logger("offset_plane"))
+    monkeypatch.setattr(entry, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(entry, "no_sketch_inference", no_inference)
+    monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
+    if author is None:
+        asyncio.run(entry.build_91794A055(adapter, **cut))
+    else:
+        monkeypatch.setattr(part, "check", logger("check", True))
+        monkeypatch.setattr(part, "name_last_feature", logger("name_last_feature"))
+        monkeypatch.setattr(part, "add_line_chain", add_line_chain)
+        monkeypatch.setattr(part, "no_sketch_inference", no_inference)
+
+        async def force_rebuild(_adapter):
+            adapter.log("force_rebuild")
+
+        monkeypatch.setattr(part, "force_rebuild", force_rebuild)
+        monkeypatch.setattr(part, "_require_tip", logger("require_tip"))
+        asyncio.run(author(adapter))
+    return adapter, adapter.events
+
+
+def _chains(calls) -> list[tuple]:
+    return [c[1][0] for c in calls if c[0] == "add_line_chain"]
+
+
+def test_recipe_builds_the_vendor_head_on_the_under_head_face(monkeypatch) -> None:
+    _adapter, calls = _record(monkeypatch)
+    (arc,) = [c for c in calls if c[0] == "sketch.Create3PointArc"]
+    apex, rim, mid = arc[1][0:3], arc[1][3:6], arc[1][6:9]
+    assert apex[:2] == pytest.approx((0.0, screw.HEAD_H / 1000.0))
+    assert rim[:2] == pytest.approx((screw.HEAD_DIA / 2000.0, screw.HEAD_BAND / 1000.0))
+    # The mid point lies on the vendor's dome sphere, centred on the axis.
+    centre_y = (screw.HEAD_H - screw.DOME_R) / 1000.0
+    assert math.hypot(mid[0], mid[1] - centre_y) == pytest.approx(screw.DOME_R / 1000.0)
+
+    profile, slot, cutter, runout = _chains(calls)
+    # Drafted side from the rim down to the bearing face, then the neck, the
+    # major and a flat tip one full length under the head.
+    assert [v for point in profile[0:3] for v in point] == pytest.approx(
+        [
+            screw.HEAD_DIA / 2.0,
+            screw.HEAD_BAND,
+            screw.UNDER_HEAD_DIA / 2.0,
+            0.0,
+            screw.NECK_DIA / 2.0,
+            0.0,
+        ]
+    )
+    assert min(y for _x, y in profile) == pytest.approx(-screw.SHANK_LEN)
+    # The slot is the vendor width and stops 1.5 dome heights under the apex.
+    assert max(x for x, _y in slot) - min(x for x, _y in slot) == pytest.approx(
+        screw.SLOT_WIDTH
+    )
+    assert min(y for _x, y in slot) == pytest.approx(screw.HEAD_H - screw.SLOT_DEPTH)
+    (revolve_check,) = [c for c in calls if c[0] == "volume_check"]
+    assert revolve_check[1][1] == pytest.approx(entry.revolved_volume())
+
+    fillets = [c[1] for c in calls if c[0] == "add_fillet"]
+    assert [f[0] for f in fillets] == pytest.approx(
+        [screw.SLOT_FILLET_R, screw.HEAD_FILLET_R]
+    )
+    assert len(fillets[0][1]) == 2 and len(fillets[1][1]) == 3
+
+
+def test_recipe_threads_tip_seeded_one_pitch_into_the_head(monkeypatch) -> None:
+    _adapter, calls = _record(monkeypatch)
+    assert ("offset_plane", (_adapter, "TipPlane", -screw.SHANK_LEN), {}) in calls
+    (helix,) = [c for c in calls if c[0] == "insert_helix"]
+    pitch, revs = helix[1][1:3]
+    assert pitch == pytest.approx(screw.PITCH)
+    assert revs * pitch == pytest.approx(screw.SHANK_LEN + screw.PITCH)
+    assert helix[2]["clockwise"] is False and helix[2]["reversed_dir"] is False
+    # The cutter's top rides ON the major; its root flat is P/8 at the root.
+    _profile, _slot, cutter, _runout = _chains(calls)
+    radii = sorted({x for x, _y in cutter})
+    assert radii == pytest.approx([screw.ROOT_DIA / 2.0, screw.SHANK_DIA / 2.0])
+    assert max(y for _x, y in cutter) == pytest.approx(-screw.SHANK_LEN)
+    (sweep,) = [c for c in calls if c[0] == "thread_sweep_cut"]
+    # Unscoped: the vendor's one-body sweep leaves its last turn as a void in
+    # the head, and the harvest's face multiset carries that void.
+    assert sweep[1][1:5] == ("ThreadCutter", "ThreadHelix", None, "ThreadGroove")
+    assert not [c for c in calls if c[0] == "split_at_plane"]
+
+
+def test_runout_swallows_the_neck_under_the_bearing_face(monkeypatch) -> None:
+    _adapter, calls = _record(monkeypatch)
+    *_rest, runout = _chains(calls)
+    assert (screw.RUNOUT_DIA / 2.0, 0.0) in runout
+    assert (screw.RUNOUT_DIA / 2.0, -screw.NECK_LEN) in runout
+    (x0, y0), (x1, y1) = runout[2], runout[3]
+    # 60 deg from the axis: radius falls tan(60) per unit of depth.
+    assert (x0 - x1) / (y0 - y1) == pytest.approx(math.tan(math.radians(60.0)))
+    assert x1 == pytest.approx(screw.ROOT_DIA / 2.0)
+
+
+def test_recipe_draws_the_screw_cut_to_fit_as_installed(monkeypatch) -> None:
+    """R9-47: the part is modelled cut, its end broken in place of the factory
+    tip chamfer; the thread stays the vendor's, seeded on the factory tip."""
+    cut = {"cut_length": screw.CUT_LENGTH, "cut_end_break": screw.CUT_END_BREAK_MAX}
+    _adapter, calls = _record(monkeypatch, **cut)
+    profile, *_rest = _chains(calls)
+    length, brk = screw.CUT_LENGTH, screw.CUT_END_BREAK_MAX
+    major_r = screw.SHANK_DIA / 2.0
+    assert [v for point in profile[5:8] for v in point] == pytest.approx(
+        [major_r, -(length - brk), major_r - brk, -length, 0.0, -length]
+    )
+    (revolve_check,) = [c for c in calls if c[0] == "volume_check"]
+    assert revolve_check[1][1] == pytest.approx(entry.revolved_volume(**cut))
+    assert entry.revolved_volume(**cut) < entry.revolved_volume()
+    assert ("offset_plane", (_adapter, "TipPlane", -screw.SHANK_LEN), {}) in calls
+
+
+@pytest.mark.parametrize(
+    ("cut_length", "cut_end_break"),
+    [
+        (screw.CUT_LENGTH, None),  # half a cut
+        (None, screw.CUT_END_BREAK_MAX),
+        (screw.SHANK_LEN, screw.CUT_END_BREAK_MAX),  # not short of the stock tip
+        (screw.CUT_LENGTH, 0.0),  # an unbroken end
+        (screw.NECK_LEN, screw.CUT_END_BREAK_MAX),  # no shank left
+    ],
+)
+def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
+    with pytest.raises(ValueError):
+        entry.revolved_volume(cut_length, cut_end_break)
+
+
+def test_one_part_two_members_in_registry_order() -> None:
+    """One SKU in two modelled forms is Shared (subsystem-identities.md): the
+    default RackScrew is the stock screw, DiscScrew the cut disc screw."""
+    metadata = discovered_recipes()[screw.SKU]
+    assert metadata.module == entry.__name__
+    assert metadata.callable_name == entry.build_91794A055.__name__
+    assert metadata.threaded
+    assert FASTENERS[part.PART_NAME] is part.SPEC
+    assert part.SPEC.skus == (screw.SKU,)
+    assert part.SPEC.material == "AISI 304"
+    row = _config.parts(part.PART_NAME)
+    assert part.PART_NAME == shared.PART_STEM == "sh-vn-fillister-screw-91794a055"
+    assert row["number"] == "MHA-SH-VN-59"
+    assert row["supplier_skus"] == [screw.SKU]
+    assert row["stock_name"] == part.SPEC.stock_name
+    assert row["default_configuration"] == "RackScrew"
+    assert row["configuration_quantities"] == {"RackScrew": 4, "DiscScrew": 3}
+    assert int(row["quantity"]) == 7
+    assert shared.CONFIGURATIONS == ("RackScrew", "DiscScrew")
+    assert (screw.STEM, screw.CONFIGURATION) == (shared.PART_STEM, "DiscScrew")
+    assert (rack.STEM, rack.CONFIGURATION) == (shared.PART_STEM, "RackScrew")
+    assert screw.UNIT == shared.UNIT == "in"
+
+
+def test_each_member_is_modelled_at_its_installed_length() -> None:
+    """DiscScrew is the cut screw (R9-47); RackScrew the stock 1/4 untrimmed,
+    the length the strip's engagement stack reads."""
+    import pd_feed_rack_spec as feed_rack
+
+    assert screw.LENGTH == screw.CUT_LENGTH < screw.SHANK_LEN
+    assert rack.LENGTH == feed_rack.SCREW_LENGTH == pytest.approx(0.25 * IN)
+    assert (rack.UNDER_HEAD_Y, rack.TIP_Y) == pytest.approx((0.0, -0.25 * IN))
+    assert rack.AXIS == (0.0, 1.0, 0.0)
+    assert part.LENGTHS == {"DiscScrew": screw.CUT_LENGTH, "RackScrew": rack.LENGTH}
+    # Only DiscScrew owns a feature: the cut; RackScrew is the supplied screw.
+    assert part.MEMBER_FEATURES == {
+        "DiscScrew": part.DISC_CUT_FEATURES,
+        "RackScrew": (),
+    }
+
+
+def test_stock_build_cuts_the_disc_member_from_the_supplied_screw(monkeypatch) -> None:
+    seen: dict = {}
+
+    async def fake_build(adapter, **kwargs):
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
+    asyncio.run(part.build(None))
+    (component,) = seen["components"]
+    assert component.sku == screw.SKU
+    # The registered recipe, wrapped: the stock build validates its identity.
+    assert component.author.__wrapped__ is entry.build_91794A055
+    assert component.parameters is None
+    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
+    assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
+    assert seen["material"] == part.SPEC.material
+    assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
+    assert seen["save_threaded_part"] is part._save_members
+
+
+def test_disc_cut_leaves_the_replicas_cut_profile(monkeypatch) -> None:
+    """The supplied replica, then one revolve cut whose break corner is the
+    replica's own cut-to-fit end: above the cut the two profiles agree."""
+    _adapter, calls = _record(monkeypatch, author=part._supplied_with_disc_cut)
+    profile, _slot, _cutter, _runout, disc_cut = _chains(calls)
+    assert min(y for _x, y in profile) == pytest.approx(-screw.SHANK_LEN)
+    length, brk = screw.CUT_LENGTH, screw.CUT_END_BREAK_MAX
+    major_r = screw.SHANK_DIA / 2.0
+    assert [v for point in disc_cut[:3] for v in point] == pytest.approx(
+        [0.0, -length, major_r - brk, -length, major_r, -(length - brk)]
+    )
+    # It reaches past the factory tip and outside the major, from the axis.
+    assert min(y for _x, y in disc_cut) < -screw.SHANK_LEN
+    assert max(x for x, _y in disc_cut) > major_r
+    assert {x for x, _y in disc_cut[-1:] + disc_cut[:1]} == {0.0}
+    revolves = [c for c in calls if c[0] == "create_revolve"]
+    assert [r[1][0].is_cut for r in revolves] == [False, False, True]
+    named = [c[1][1] for c in calls if c[0] == "name_last_feature"]
+    assert named[-2:] == list(part.DISC_CUT_FEATURES)
+    assert ("require_tip", (_adapter, "DiscScrew"), {}) in calls
+
+
+def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -> None:
+    events: list[tuple] = []
+
+    def sync(name):
+        return lambda *args, **kwargs: events.append((name, *args[1:]))
+
+    def coro(name, result=None):
+        async def call(*args, **kwargs):
+            events.append((name, *args[1:], *sorted(kwargs.items())))
+            return result
+
+        return call
+
+    for name in (
+        "create_member_configurations",
+        "select_member_features",
+        "force_rebuild",
+        "apply_material",
+        "report_mass_properties",
+        "activate_member",
+        "add_supplier_reference_sketch",
+        "export_member_configurations",
+    ):
+        monkeypatch.setattr(part, name, coro(name))
+    monkeypatch.setattr(
+        part, "save_simplified_part", coro("save_simplified_part", {"part": "p"})
+    )
+    for name in (
+        "require_member_configurations",
+        "_require_tip",
+        "apply_member_properties",
+        "require_material_in_every_configuration",
+    ):
+        monkeypatch.setattr(part, name, sync(name))
+    artefacts = asyncio.run(part._save_members(None, part.PART_NAME, ("ThreadGroove",)))
+    assert artefacts == {"part": "p"}
+    kinds = [event[0] for event in events]
+    assert events[kinds.index("create_member_configurations")][1:] == (
+        part.PART_NAME,
+        ("RackScrew", "DiscScrew"),
+    )
+    selected = [e[1:] for e in events if e[0] == "select_member_features"]
+    assert selected == [
+        ("RackScrew", part.MEMBER_FEATURES),
+        ("DiscScrew", part.MEMBER_FEATURES),
+    ]
+    assert [e[1] for e in events if e[0] == "_require_tip"] == [
+        "RackScrew",
+        "DiscScrew",
+    ]
+    assert [e[1:3] for e in events if e[0] == "apply_member_properties"] == [
+        (part.PART_NAME, "RackScrew"),
+        (part.PART_NAME, "DiscScrew"),
+    ]
+    assert [e[1:] for e in events if e[0] == "apply_member_properties"][1][2] == (
+        screw.BOM_DESCRIPTION
+    )
+    # Every catalogue reference, the stock length included, rides the part.
+    (reference,) = [e for e in events if e[0] == "add_supplier_reference_sketch"]
+    assert reference[1] == supplier_module().SUPPLIER_REFERENCE_DIMENSIONS
+    # The default member, the drawing's, is active for the save; the member
+    # exports follow it.
+    assert kinds.index("activate_member") < kinds.index("save_simplified_part")
+    assert events[kinds.index("activate_member")][1] == shared.DRAWING_CONFIGURATION
+    assert kinds[-2:] == ["save_simplified_part", "export_member_configurations"]
+    assert events[-1][1:] == (part.PART_NAME, ("RackScrew", "DiscScrew"))
+
+
+def supplier_module():
+    import _mcmaster_91794a055 as supplier
+
+    return supplier
+
+
+_DIMENSION = re.compile(r"\d")

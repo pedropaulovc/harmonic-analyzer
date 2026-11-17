@@ -4058,6 +4058,9 @@ def _check_graph_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "test_package_unit_declarations.py").resolve()),
             *parts_registry_files(),
             *assembly_contract_files(),
+            # test_part_coverage counts a tier-1 hardware.yaml row as the
+            # part's deliverable (#2886).
+            str((CONFIG_DIR / "hardware.yaml").resolve()),
         ],
         "cmd": [*pytest_cmd, *_gate_tests("graph")],
     }

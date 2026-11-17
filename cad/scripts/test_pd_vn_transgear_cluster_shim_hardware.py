@@ -1,0 +1,75 @@
+"""Offline part, recipe and fit contracts for pd-vn-transgear-cluster-shim.
+
+Its purchase sheet retired for a HARDWARE.md row (#2886); these checks pin
+the part the assemblies still build.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+import _config
+import build_pd_vn_transgear_cluster_shim as part
+import pd_transgear_rear_bushing_spec as rear_bushing
+import pd_vn_transgear_cluster_shim_spec as spec
+import transgear_cluster_fit as fit
+from _fastener_catalog import FASTENERS
+from _test_stock_recipes import discovered_recipes
+from diagnostics import diag_build_94773A606 as recipe
+
+STEM = "pd-vn-transgear-cluster-shim"
+IN = 25.4
+
+
+def test_catalogue_row_is_the_registered_mcmaster_shim() -> None:
+    row = _config.parts(STEM)
+    stock = FASTENERS[STEM]
+    assert part.SPEC is stock
+    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("94773A606",)
+    assert stock.supplier == row["supplier"] == "McMaster-Carr"
+    assert stock.stock_name == row["stock_name"]
+    assert row["number"] == "MHA-PD-VN-68"
+    assert row["drawing_unit"] == "in"
+    # The kit: the stack's nominal shims and the spares in the spare T18's bore.
+    assert int(row["quantity"]) == fit.SHIM_COUNT_MAX
+    metadata = discovered_recipes()[spec.SKU]
+    assert metadata.module == recipe.__name__
+    assert getattr(recipe, metadata.callable_name) is recipe.build_94773A606
+    assert metadata.threaded is False
+
+
+def test_spec_carries_the_catalogue_bands() -> None:
+    """94773A606: .005 +/-.0005 thick; ID 1/8 0/+.012; OD 1/4 -.005/+.002."""
+    assert spec.THICKNESS == pytest.approx(0.005 * IN)
+    assert (spec.THICKNESS_MIN, spec.THICKNESS_MAX) == pytest.approx(
+        (0.0045 * IN, 0.0055 * IN)
+    )
+    assert (spec.ID_MIN, spec.ID_MAX) == pytest.approx((0.125 * IN, 0.137 * IN))
+    assert (spec.OD_MIN, spec.OD_MAX) == pytest.approx((0.245 * IN, 0.252 * IN))
+    # The model and its supplier REF carry the catalogue's nominal 1/8.
+    assert spec.ID == spec.ID_MIN == pytest.approx(0.125 * IN)
+    assert spec.TOP_Y - spec.BOTTOM_Y == pytest.approx(spec.THICKNESS)
+    assert spec.shim_volume() == pytest.approx(
+        math.pi / 4 * (spec.OD**2 - spec.ID**2) * spec.THICKNESS
+    )
+
+
+def test_the_shim_sits_inside_the_rear_bushing_face() -> None:
+    """The largest shim stays inside the smallest rear bushing's face."""
+    assert spec.OD_MAX < rear_bushing.OD - 0.254  # the .35 O.D. at .XX
+
+
+def test_the_smallest_shim_bore_never_binds_on_the_largest_pin(monkeypatch) -> None:
+    """Codjiflo P2 on #2124: the stack check refuses a pin band whose top
+    passes the shim's catalogue minimum bore (the former +.0001 does)."""
+    import runpy
+
+    import pd_transgear_pin_spec as pin
+
+    assert spec.ID_MIN >= pin.DIA_MAX
+    assert spec.ID_MIN - pin.DIA_MAX == pytest.approx(0.0)  # line-on-line
+    monkeypatch.setattr(pin, "DIA_MAX", pin.DIA + 0.0001 * IN)
+    with pytest.raises(AssertionError, match="shim's smallest bore"):
+        runpy.run_path(fit.__file__)
