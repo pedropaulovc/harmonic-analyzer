@@ -806,31 +806,30 @@ def test_the_north_keeper_balloons_on_detail_c_right_of_its_lifted_screws() -> N
     assert ring_top + 0.004 < bracket_label_bottom
 
 
-def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
-    """#1895 machinist review (r2, r3): leader 1 climbed through the black
-    rocker-arm fan to a landing it hid. It lands on the south flat's
-    eye-side edge, on the stub between hub 0 and the exploded south ear,
-    whose line of sight (eye on +x +y +z) clears hub 0 and arm 0's top edge,
-    and its balloon stands off the ring, above and east of that landing."""
+def test_the_pivot_shaft_is_drawn_north_and_ballooned_on_its_bare_run() -> None:
+    """#1895, R5 and farm run 20261117T130021685Z machinist reviews: left in
+    the hubs, only a stub of the shaft showed and balloon 1 landed on that
+    sliver. The explode draws it north, the way the fit-up pushes it in,
+    wholly out of the hubs and short of the pulled channel's hub; balloon 1
+    lands on its north flat's eye-side edge and stands straight above it."""
     import ch_pivot_shaft_spec as shaft
-    import ch_rocker_arm_spec as arm
 
+    explode = drawing.explode
+    offset = drawing.exploded_offset(explode.PIVOT_SHAFT, "north")
+    assert offset == drawing.exploded_offset(explode.PIVOT_SHAFT, "south")
+    assert offset[:2] == (0.0, 0.0) and offset[2] > 0.0
+    south_end = bank.PIVOT_SHAFT_SOUTH_Z + offset[2]
+    north_tip = bank.PIVOT_SHAFT_NORTH_Z + shaft.DOME_HEIGHT + offset[2]
+    assert south_end > bank.HUB19_NORTH_FACE_Z + 20.0
+    pulled = drawing.exploded_offset(explode.ARM, "north-most")[2]
+    assert north_tip + 50.0 < bank.HUB19_NORTH_FACE_Z - HUB_LENGTH + pulled
     x, y, z = drawing.BALLOON_POINTS_MM[drawing.PIVOT_SHAFT_STEM]
     radius = shaft.SHAFT_DIA / 2.0
     assert y == pytest.approx(radius - shaft.FLAT_DEPTH)
     assert x > 0.0 and math.hypot(x, y) == pytest.approx(radius)
-    point_z = bank.PIVOT_SHAFT_NORTH_Z + z
-    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0] + bank.SOUTH_END_INSET)
-    assert bank.SOUTH_EAR_OUTER_Z < point_z < bank.HUB0_SOUTH_FACE_Z
-    assert drawing.exploded_offset(drawing.explode.BRACKET, "south")[2] < 0.0
-    hub_t = bank.HUB0_SOUTH_FACE_Z - point_z
-    assert math.hypot(x + hub_t, y + hub_t) > arm.HUB_DIA / 2.0 + 5.0
-    arm_t = bank.hub_mid_z(0) - arm.ARM_THICKNESS / 2.0 - point_z
-    reach = x + arm_t
-    top_edge = arm.TOP_EDGE_ABOVE_PIVOT + arm.R_TOP - math.sqrt(arm.R_TOP**2 - reach**2)
-    assert y + arm_t - top_edge > 1.5
+    assert z == pytest.approx(-bank.PIVOT_SHAFT_FLAT_STATIONS[1])
     dx, dy = drawing.PIVOT_SHAFT_BALLOON_OFFSET
-    assert dy > 0.04 and 0.0 < dx < dy / 3.0
+    assert dx == 0.0 and dy > drawing.BALLOON_MAX_RADIUS + 0.008
 
 
 def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper() -> None:
@@ -963,7 +962,8 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
     assert spring == (0.0, 0.0, 300.0)
     assert drawing.exploded_offset(explode.ARM, "north") == (0.0, 0.0, 0.0)
-    assert {"ch-pivot-shaft", explode.ARM, explode.LEVER}.isdisjoint(explode.FULLY_EXPLODED_STEMS)
+    assert {explode.ARM, explode.LEVER}.isdisjoint(explode.FULLY_EXPLODED_STEMS)
+    assert explode.PIVOT_SHAFT in explode.FULLY_EXPLODED_STEMS
     assert explode.FULCRUM_SHAFT in explode.EXPLODED_STEMS
 
 
@@ -1162,9 +1162,14 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
     assert f"{drawing.ROCKER_BANK.title} TIP PROUD DIMENSION" in body
     assert drawing.notes.DIMENSION_CALLOUTS[asm.TIP_PROUD_DIMENSION] == "TIP PROUD"
     assert low not in body and high not in body
-    # The callout clears the left border and stands above the stack's.
+    # The text stands wholly right of the ear-face extension line (centred on
+    # the 1.5 mm gap both lines struck its digits, rule 14), inside the
+    # border, and over the stack's callout line.
     ((x, y),) = drawing.TIP_KEEP.values()
-    half = len("TIP PROUD") * NOTE_CHAR_WIDTH / 2.0
+    half = len(".060 ±.010") * NOTE_CHAR_WIDTH / 2.0
+    ear_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[4], 0.0)
+    tip_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[5], 0.0)
+    assert tip_x < ear_x < x - half - 0.003
     assert x - half > drawing.BORDER + 0.003
     ((_, stack_y),) = drawing.STACK_KEEP.values()
     assert y > stack_y + 3 * NOTE_LINE_PITCH

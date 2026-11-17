@@ -262,29 +262,27 @@ BRACKET_BALLOON_POINT_MM = (
     BRACKET_FOOT_H / 2.0,
     BRACKET_FOOT_Z1,
 )
-# Balloon 1 (the rocker pivot shaft) walked to the stub of shaft south of hub
-# 0, the only part of it the 1:7 view shows, but its ring slot is below the
-# view, so its leader climbed through the black rocker-arm fan and read as
-# naming the arms (#1895 machinist review, r2 and r3). Its landing is now the
-# south flat's edge on the eye's side, at the flat's middle (the south ear's
-# mid-plane): the flat faces +y, so both faces at that edge face the eye, and
-# in the isometric the edge clears arm 0's top edge (8 over the pivot) by
-# about 1.8. Part frame (ch_pivot_shaft_spec): axis along z from the north
-# cylinder end, unturned in the assembly.
-PIVOT_SHAFT_STEM = "ch-pivot-shaft"
+# Balloon 1 (the rocker pivot shaft): left in the hubs only a stub of it
+# showed and the balloon landed on that sliver beside the washers (#1895 and
+# R5 machinist reviews). The shaft is drawn north out of the bank
+# (ch_channel_explode_spec), its north half past the hanging rods onto open
+# paper; the landing is the north flat's edge on the eye's side, at the
+# flat's middle (half an ear from the north end): the flat faces +y, so both
+# faces at that edge face the eye. Part frame (ch_pivot_shaft_spec): axis
+# along z from the north cylinder end, unturned in the assembly.
+PIVOT_SHAFT_STEM = explode.PIVOT_SHAFT
 _PIVOT_FLAT_Y = PIVOT_SHAFT_DIA / 2.0 - PIVOT_FLAT_DEPTH
 PIVOT_SHAFT_BALLOON_POINT_MM = (
     math.sqrt((PIVOT_SHAFT_DIA / 2.0) ** 2 - _PIVOT_FLAT_Y**2),
     _PIVOT_FLAT_Y,
-    -PIVOT_SHAFT_FLAT_STATIONS[0],
+    -PIVOT_SHAFT_FLAT_STATIONS[1],
 )
-# Off the ring, its circle stands this far (sheet m) from that landing: up
-# the open strip between the east edge of the bank's vertical column and the
-# exploded south washer, spring and bracket, which the stub points at. The
-# leader then reaches the stub over paper, about 1.3 mm east of the column's
-# corner and clear of the washer ring beside the stub's tip (measured on the
-# sheet of run 20261023T234951749Z).
-PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
+# Off the ring, its circle stands this far (sheet m) straight above that
+# landing: in the open strip between the pulled channel's bar and the bank's
+# hanging rods, left of the north bracket's trail (an ink scan of the farm
+# run 20261117T130021685Z sheet found no ink in a 6.8 mm disc there or on the
+# leader's path).
+PIVOT_SHAFT_BALLOON_OFFSET = (0.0, 0.017)
 # Balloon 2 (the lever fulcrum shaft) walked to a body extreme among the
 # stacked lever hubs, where the shaft shows only as slivers, and read as
 # naming the levers (machinist review on PR #2702, three runs of three). Its
@@ -903,10 +901,13 @@ STACK_KEEP = {
 # The left tip's set proud of the left ear's outer face (R5 machinist review,
 # rule 22: printed in the shaft-set step only). Its two extension lines stand
 # 1.5 mm apart left of the stack's, so its text rides above the stack
-# callout, 5 mm right of the tip so the callout clears the left border.
+# callout. Not between them: centred on the gap, both lines ran up into the
+# '6' and '0' of .060 (farm run 20261117T130021685Z machinist review, rule
+# 14); 19 mm right of the gap the text stands wholly right of the ear-face
+# line, as detail A's spring set does, its dimension line carried to it.
 _TIP_MID = (asm.PIVOT_CHAIN_Z[4] + asm.PIVOT_CHAIN_Z[5]) / 2.0
 TIP_KEEP = {
-    asm.TIP_PROUD_DIMENSION: ROCKER_BANK.sheet_xy(_TIP_MID - 5.0, _PIVOT_Y + 62.0)
+    asm.TIP_PROUD_DIMENSION: ROCKER_BANK.sheet_xy(_TIP_MID - 19.0, _PIVOT_Y + 62.0)
 }
 ROCKER_KEEP = {**STACK_KEEP, **TIP_KEEP}
 # Above the 8 mm crop circle: at +6 the circle's arc crossed the callout
