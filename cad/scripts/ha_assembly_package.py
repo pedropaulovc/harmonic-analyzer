@@ -153,9 +153,10 @@ class Text:
 
 @cache
 def package_texts() -> dict[str, tuple[Text, ...]]:
-    """Each package's printable strings, whitespace collapsed, by stem."""
+    """Each package's printable strings, whitespace collapsed, by stem: the
+    machine's packages and any shop kit whose steps print here."""
     texts: dict[str, tuple[Text, ...]] = {}
-    for stem in PACKAGES:
+    for stem in dict.fromkeys((*PACKAGES, *STEPS_IN_DOCUMENT)):
         found: dict[str, bool] = {}
         for path in text_modules(stem):
             for text, piece in (
