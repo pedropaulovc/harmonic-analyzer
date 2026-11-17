@@ -129,7 +129,7 @@ DIMENSION_CALLOUTS = {
 }
 
 # --- Fitter package text ----------------------------------------------------------
-EXPLODED_CAPTION = "EXPLODED VIEW"
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 ASSEMBLED_NOTES = (
     "NOTES:",
     "1. NOT SHOWN: TOP FRAME MHA-FR-02. EACH KNIFE-MOUNT TOP SEAT CLAMPS TO "
