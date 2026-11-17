@@ -285,11 +285,18 @@ TOOLS: tuple[Tool, ...] = (
             "shop.toml:gauges.dial-indicators",
             "shop-equipment.toml:gauges.digital-indicator",
             "shop.toml:gauges.digital-indicator",
-            "shop-equipment.toml:gauges.mag-bases-extra",
+            "shop-equipment.toml:gauges.mag-base",
         ),
     ),
+    # MHA-DT-00's metric leaf stacks (#3042): ahead of the inch row so the
+    # 66MA wording lists the unowned metric set.
     Tool(
-        "Feeler gauge leaves",
+        "Feeler gauge, metric (Starrett 66MA)",
+        r"STARRETT 66MA(?: METRIC THICKNESS GAGE| LEAF STACKS| LEAVES)?",
+        ("shop-equipment.toml:gauges.feeler-gauges-metric",),
+    ),
+    Tool(
+        "Feeler gauge leaves, inch",
         r"(?:\.\d+ )?FEELERS?(?: GAUGES?| GAUGE LEAF| LEAVES| STACKS?)?\b|THICKNESS GAGE",
         ("shop-equipment.toml:gauges.feeler-gauges",),
     ),
