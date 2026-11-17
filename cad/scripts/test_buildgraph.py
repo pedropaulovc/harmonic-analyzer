@@ -34,7 +34,6 @@ from _buildgraph import (  # noqa: E402
     references_of,
     script_for,
     stamps_part_properties,
-    stamps_title_block_properties,
 )
 from _assembly import assembly_title_properties  # noqa: E402
 from _part_properties import part_properties  # noqa: E402
@@ -2023,9 +2022,9 @@ def test_config_files_track_real_reads():
 
 def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
-    the machine/* | tolerances/* | parts/* | title_block | ** dynamic tokens). The set can only
+    the machine/* | tolerances/* | parts/* | ** dynamic tokens). The set can only
     NARROW the old whole-config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    globs = {"machine/*", "tolerances/*", "parts/*", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
     scripts = [
         *bg.part_scripts(),
         *(script_for(stem) for stem in ASSEMBLY_ORDER),
@@ -2267,54 +2266,13 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
         assert (scripts / other / "helper.py").resolve() not in closures[package]
 
 
-def test_stamping_classification_rereads_sources_between_contracts(
-    tmp_path, monkeypatch
-):
-    """Each stamping CONTRACT classifies against the sources as they are NOW.
-
-    Part and title-block classification share one whole-program scan, but they
-    are separate cache entries: the second contract to be asked is a miss, and a
-    miss has always re-read the tree.  A source rewritten in-process between the
-    two -- a generated module, a test fixture, an edit during a long ``doit``
-    session -- must therefore be visible to the second, or a module that started
-    stamping would be classified from the first contract's stale reading and its
-    registry dependency would go missing.
-    """
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    module = scripts / "widget.py"
-    module.write_text("def go():\n    pass\n", encoding="utf-8")
-
-    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
-    bg._local_modules.cache_clear()
-    bg._module_by_path.cache_clear()
-    bg._stamping_modules.cache_clear()
-    try:
-        assert bg._stamping_modules(bg._PART_STAMP_PRIMITIVES) == frozenset()
-        module.write_text("def go():\n    part_properties()\n", encoding="utf-8")
-        assert "widget" in bg._stamping_modules(bg._TITLE_BLOCK_STAMP_PRIMITIVES)
-    finally:
-        bg._stamping_modules.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
-
-
-def test_part_and_title_property_stampers_are_distinct():
+def test_only_channel_generates_parts_in_script():
     """Assembly identity must not masquerade as in-script part generation."""
-    title_stampers = {
-        stem
-        for stem in ASSEMBLY_ORDER
-        if stamps_title_block_properties(script_for(stem))
-    }
     part_stampers = {
         stem for stem in ASSEMBLY_ORDER if stamps_part_properties(script_for(stem))
     }
-    assert title_stampers == set(ASSEMBLY_ORDER)
     assert part_stampers == {"ch_channel"}
-
-    leaf = SCRIPTS_DIR / "build_sh_vn_brass_fillister_screw.py"
-    assert stamps_part_properties(leaf)
-    assert stamps_title_block_properties(leaf)
+    assert stamps_part_properties(SCRIPTS_DIR / "build_sh_vn_brass_fillister_screw.py")
 
 
 def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
@@ -2988,27 +2946,6 @@ def test_magnifier_interference_does_not_depend_on_magnifier_fit_or_pose(
     assert "mg_output_fixture_geom" not in closure
 
 
-@pytest.mark.parametrize(
-    ("script", "expected"),
-    [
-        # Listed themselves: the root script is not in its own import closure
-        # (Codex #1035, PRRT_kwDOPHDy386mV11b).
-        ("build_mg_wheel_bar.py", True),
-        # Canonical stock does not own the stop application's printed fit.
-        ("build_sh_vn_fillister_screw_90280a108.py", False),
-        # Reads through an imported listed module.
-        ("build_sm_vn_boss_hook.py", True),
-        ("build_ch_vn_spring_hook.py", True),
-        # R9-48: judges its lock taps at the printed worst case.
-        ("build_pd_platen_guide.py", True),
-        # Stock limits do not read a manufactured receiver's platform allowance.
-        ("dt_swing_stop_screw_spec.py", False),
-    ],
-)
-def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
-    assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected
-
-
 def test_feature_declarations_stay_out_of_all_native_build_closures():
     """Manifest-only edits must never cascade through native part/assembly recipes."""
     forbidden = {"_feature_requirements", "_printed_limits", "export_features"}
@@ -3032,7 +2969,7 @@ def test_generic_feature_driver_closure_contains_no_discovered_part_draw_or_spec
 def test_features_source_closures_preserve_draw_and_spec_config_reads():
     import export_features
 
-    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    globs = {"machine/*", "tolerances/*", "parts/*", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
     # Every features part cites its own <stem>_spec.
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
@@ -3052,31 +2989,20 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
                     assert token in globs or (bg.CONFIG_DIR / token).is_file(), (stem, source, token)
 
 
-def test_requirement_declarations_do_not_read_title_block_geometry():
-    script = SCRIPTS_DIR / "_feature_requirements.py"
-    assert script.stem not in bg.TITLE_BLOCK_GEOMETRY_MODULES
-    assert not bg.reads_title_block_geometry(script)
-    assert "title_block" not in config_files_of(script)
-
-
-@pytest.mark.parametrize("module", ["_printed_tolerance"])
-def test_numeric_tolerance_title_block_readers_are_classified(module):
-    script = SCRIPTS_DIR / f"{module}.py"
-    assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES
-    assert bg.reads_title_block_geometry(script)
-    assert "title_block" in config_files_of(script)
-
-
 @pytest.mark.parametrize(
-    "module", ["dt_vn_cone_lock_knob_spec", "dt_cone_tip_block_spec", "_printed_limits"]
+    ("module", "expected"),
+    [
+        ("_feature_requirements", False),
+        ("_printed_tolerance", True),
+        # Read the printed rows only via _printed_tolerance.
+        ("dt_vn_cone_lock_knob_spec", True),
+        ("dt_cone_tip_block_spec", True),
+        ("_printed_limits", True),
+    ],
 )
-def test_printed_band_readers_are_classified_through_the_reader(module):
-    # Reads the printed rows only via _printed_tolerance, so its import closure,
-    # not its own stem, keeps title_block.yaml on its recipes.
-    script = SCRIPTS_DIR / f"{module}.py"
-    assert script.stem not in bg.TITLE_BLOCK_GEOMETRY_MODULES
-    assert bg.reads_title_block_geometry(script)
-    assert "title_block" in config_files_of(script)
+def test_title_block_readers_keep_the_title_block(module, expected):
+    tokens = config_files_of(SCRIPTS_DIR / f"{module}.py")
+    assert ("title_block.yaml" in tokens) is expected
 
 
 def test_feature_exporter_revision_call_keeps_config_analysis_classifiable():

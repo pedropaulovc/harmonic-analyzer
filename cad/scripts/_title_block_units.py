@@ -13,9 +13,7 @@ unit is part of its key (``band_mm`` or ``band_in``, ``plus_mm``,
   Each takes the sheet's ``unit`` (``_config.title_block``'s row selection).
 
 The TOL_* stamping (``_part_properties``) imports only this module.  Geometry
-that sizes from the printed rows reads them through ``_printed_tolerance``,
-which ``_buildgraph.TITLE_BLOCK_GEOMETRY_MODULES`` lists; keeping the two apart
-keeps every stamping script out of that geometry classification.
+that sizes from the printed rows reads them through ``_printed_tolerance``.
 
 Pure data; no SolidWorks, no drawing imports.
 """

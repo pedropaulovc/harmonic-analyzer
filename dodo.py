@@ -141,13 +141,11 @@ from _buildgraph import (  # noqa: E402
     part_stems,
     parts_registry_files,
     read_source,
-    reads_title_block_geometry,
     references_of,
     script_for,
     ShopRecordReads,
     shop_records_selected,
     stamps_part_properties,
-    stamps_title_block_properties,
     source_text_digest,
     syntax_digest,
 )
@@ -1156,23 +1154,6 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
-def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
-    """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
-    ``_part_properties.part_properties`` or ``_assembly.assembly_title_properties``):
-    every part and every drawing-owning assembly stamps these values. An
-    assembly whose closure sizes geometry from the printed rows
-    (``reads_title_block_geometry``) keeps it too, stamping or not. Other
-    assemblies drop the token. Any other caller keeps the dependency
-    conservatively."""
-    if (
-        kind == "assembly"
-        and not stamps_title_block_properties(script)
-        and not reads_title_block_geometry(script)
-    ):
-        return []
-    return [str(_resolved(CONFIG_DIR / "title_block.yaml"))]
-
-
 def _expand_assembly_contracts_token(
     stem: str | None, kind: str | None, script: Path
 ) -> list[str]:
@@ -1198,9 +1179,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
     conservative whole-config fallback on any unclassifiable ``_config`` use).
 
     Expands the tokens from ``config_files_of`` to concrete paths, narrowing the
-    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token)
-    and the ``"title_block"`` token to stamping tasks only
-    (_expand_title_block_token).
+    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token).
     """
     script = script if isinstance(script, Path) else Path(script)
     tokens = config_files_of(script)
@@ -1214,8 +1193,6 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(tolerance_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
-        elif tok == "title_block":
-            out.update(_expand_title_block_token(kind, script))
         elif tok == ASSEMBLY_CONTRACTS_TOKEN:
             out.update(_expand_assembly_contracts_token(stem, kind, script))
         else:
