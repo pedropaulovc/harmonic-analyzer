@@ -569,7 +569,7 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
 def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, monkeypatch, tmp_path):
     import _cam_programs
 
-    # No part is enrolled since 2026-11-17; enrol a synthetic recipe.
+    # A synthetic stem isolates the test from the real recipe and its features bundle.
     stem = "ch_rocker_arm"
     recipe = tmp_path / stem / "cam.py"
     recipe.parent.mkdir()
