@@ -465,7 +465,7 @@ for _name, _window in WINDOWS.items():
     if max(map(abs, _window["accept"])) > DTI_TRAVEL_IN * INCH / 2.0:
         raise AssertionError(f"{_name}: the accept window leaves the DTI's half travel")
 
-# Read heights above the granite: the template's mid-thickness, then the
+# Read heights above the surface plate: the template's mid-thickness, then the
 # strap's mid-plane, which is the hub's, so half the hub length above the
 # template the arm's +Z hub face rests on.
 TEMPLATE_READ_MM = round(THICK / 2.0, 1)  # 1.6
@@ -490,21 +490,21 @@ def method_steps() -> list[str]:
         f"pinned in datums A and C: the top edge ({ZONE_MM:g}, equal-bilateral about the R{rocker.R_TOP:g} BASIC arc) and "
         f"the lower outline J to K ({ZONE_MM:g}, equal-bilateral about the BASIC outline: the R{rocker_interface.R_BOTTOM:g} arc, both "
         f"tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on "
-        f"the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
-        "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",
-        "Lay the template flat on the granite, the face that is laid on the arm up.",
+        f"the surface plate (gauges.surface-plate), off the rest plate.",
+        "Clean the arm, the template and both pins and leave them on the surface plate for 30 min to reach its temperature.",
+        "Lay the template flat on the surface plate, the face that is laid on the arm up.",
         "Seating: lower the arm onto it with strap datum B (the +Z strap face) down, so its +Z hub face rests on the "
         "template and the rod-pin hole sits over the rod slot. Datum A: push the 0.2558 in Class X pin "
         "(gauges.vermont-class-x-2558-minus) down through the pivot bore and the template's pivot hole to the "
-        "granite. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot "
-        "to the granite. Press on the hub: the arm must not rock; if it does, clean and reseat.",
+        "surface plate. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot "
+        "to the surface plate. Press on the hub: the arm must not rock; if it does, clean and reseat.",
         f"Gauge: the DTI (gauges.dti) on the height gauge's scriber (gauges.height-gauge), stylus horizontal, "
         f"its ball approaching each edge square to it from outside the part. A higher reading is an edge standing "
         f"farther out. The DTI reads inches: o (mm) = reading x {INCH:g}.",
         f"Stations (20; each at least {INSET_MM:g} mm from a corner, placed by eye): each arc on the mirror line, "
         f"halfway out and 2 mm short of each end (5 per arc); each tip land a third and two thirds along (2 per "
         f"land); each tapered end 2 mm from each corner and halfway (3 per taper).",
-        f"At each station, zero: set the slider so the ball is {TEMPLATE_READ_MM:g} mm above the granite (the "
+        f"At each station, zero: set the slider so the ball is {TEMPLATE_READ_MM:g} mm above the surface plate (the "
         f"template's mid-thickness), slide the gauge base in until the dial has turned half its travel "
         f"({half_travel:g} in) and set the bezel to zero. Read: without moving the base, raise only the slider "
         f"to {ARM_READ_MM:g} mm (the strap's mid-plane), letting the ball ride onto the arm's edge, and copy "
