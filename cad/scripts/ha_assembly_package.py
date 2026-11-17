@@ -56,7 +56,7 @@ DOCUMENT_NAME = "ASSEMBLY.md"
 PACKAGES: tuple[str, ...] = (*BOM_ORDER, ASM_NAME)
 # The packages whose fit-up steps and checks print in this document, not on
 # their sheets (#2889).
-STEPS_IN_DOCUMENT: tuple[str, ...] = ()
+STEPS_IN_DOCUMENT: tuple[str, ...] = ("mg-magnifier",)
 _TEXT_MODULE_SUFFIXES = ("_assembly_sheet", "_steps", "_fitup")
 _PACKAGE_PREFIXES = tuple(sorted({f"{stem.split('-')[0]}_" for stem in PACKAGES}))
 
@@ -550,7 +550,7 @@ def markdown() -> str:
         i for i, phase in enumerate(build.PHASES, start=1) if phase.frame == "APART"
     ]
     lines = [
-        "# MHA-HA-00 build sequence and assembly tools",
+        "# MHA-HA-00 build sequence, fit-up steps and assembly tools",
         "",
         "Generated from the assembly packages' own steps and the shop files at "
         "this release (cad/scripts/ha_assembly_package.py); a change to a sheet "
@@ -585,7 +585,8 @@ def markdown() -> str:
     lines += [
         "## Assembly tools, gauges and consumables",
         "",
-        "Every tool the assembly sheets name, reconciled with cad/process/shop.toml "
+        "Every tool the assembly sheets or the fit-up steps above name (Named on: "
+        "the package whose sheets or steps name it), reconciled with cad/process/shop.toml "
         "and cad/config/shop-equipment.toml. OWNED: its shop record says so. "
         "TO BUY: its record has `present = false`. TO MAKE: a drawn shop tool, "
         "made in the step that names it, or its record says `shop_made`. Drills, "
