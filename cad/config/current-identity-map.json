@@ -2204,6 +2204,75 @@
       "kind": "assembly"
     },
     {
+      "old_stem": "ch-rocker-strap-tl-sub-plate",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap-tl-sub-plate",
+          "number": "MHA-CH-13-TL-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap-tl-hub-plug",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap-tl-hub-plug",
+          "number": "MHA-CH-13-TL-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap-tl-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap-tl-hub-washer",
+          "number": "MHA-CH-13-TL-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap-tl-vn-edge-clamp",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-strap-tl-fixture",
+          "stem": "ch-rocker-strap-tl-vn-edge-clamp",
+          "number": "MHA-CH-13-TL-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap-tl-vn-hub-screw",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-strap-tl-fixture",
+          "stem": "ch-rocker-strap-tl-vn-hub-screw",
+          "number": "MHA-CH-13-TL-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap-tl-fixture",
+      "old_number": null,
+      "introduced": "2026-11-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap-tl-fixture",
+          "number": "MHA-CH-13-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",

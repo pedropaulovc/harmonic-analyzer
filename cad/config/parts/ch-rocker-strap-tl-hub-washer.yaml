@@ -1,0 +1,14 @@
+ch-rocker-strap-tl-hub-washer:
+  title: Rocker Strap Hub Washer
+  # Shop tooling: the parent MHA-CH-13 Number plus -TL-nn (subsystem-identities.md).
+  # 2026-11-17: the flat washer under the hub screw's head, sized to stay
+  # inside the strap programs' hub keep-out (plan bushing_flange_dia_mm and
+  # bushing_stack_height_mm).
+  number: MHA-CH-13-TL-03
+  material: LOW-CARBON STEEL OR 6061 ALUMINUM
+  material_specification: low-carbon steel or 6061 aluminum round, 9/16 in or over, as on hand
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "manual lathe: from round bar on hand, turn the outside diameter, drill the bore through, part off and face to thickness; break edges"
