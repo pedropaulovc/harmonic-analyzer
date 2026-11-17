@@ -137,11 +137,13 @@ _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 _ANCHOR = str(_config.parts("ch-vn-spring-hook")["number"])
 _SUMMING_PLATE = str(_config.parts("sm-summing-lever")["number"])
 
-# Rule 22: the plate's level is a measurable acceptance, so it prints on
-# sheet 1 though its step and check print in ASSEMBLY.md (machinist review of
-# main 67ba11bf1a, R5). An angle-gauge reading is no model dimension, so it
-# prints as a row of a native setting table (_general_table), from the
-# constants step 6D and check 4 print, and both cite the table.
+# Rule 22: the plate's level and the parked nib's feeler gap are measurable
+# settings, so they print on sheet 1 though their steps and check print in
+# ASSEMBLY.md (machinist review of main 67ba11bf1a, R5, and of the first
+# proof of this table, which found the .010 in a prose note only). An
+# angle-gauge reading and a feeler leaf are no model dimension, so each prints
+# as a row of a native setting table (_general_table), from the constants its
+# step prints, and the step (and check 4) cites the table.
 SETTING_TABLE_TITLE = "SETTING TABLE"
 SETTING_TABLE_REF = "SETTING TABLE, SHEET 1"
 SETTING_TABLE_HEADER = ("STEP", "SETTING", "CONDITION", "ACCEPT", "CHECK WITH")
@@ -327,7 +329,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "NIB PARKED, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-PN-VN-51 "
         "THUMB SCREW.",
         f"SLIDE THE MHA-PN-VN-56 MARKER UNTIL A {NIB_CLEARANCE_TEXT} FEELER JUST "
-        "DRAGS BETWEEN NIB AND PAPER.",
+        f"DRAGS BETWEEN NIB AND PAPER ({SETTING_TABLE_REF}).",
         "TIGHTEN THE THUMB SCREW FINGER-TIGHT.",
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
     ),
@@ -360,20 +362,31 @@ if set(_STEP_TEXT) != set(steps.SEQUENCE):
 if max(map(len, _STEP_TEXT.values())) > len(SUB_STEP_LETTERS):
     raise AssertionError("a step outgrows its sub-step letters")
 
-# The setting table's one row: the level step (6D) and its acceptance, from
-# the constants the step prints.
-_LEVEL_SUB_STEP = next(
-    index
-    for index, text in enumerate(_STEP_TEXT["summing-levelled"])
-    if SETTING_TABLE_REF in text
-)
+
+def _table_sub_step(key: str) -> str:
+    """The one sub-step of ``key`` that cites the setting table."""
+    (index,) = (
+        index for index, text in enumerate(_STEP_TEXT[key]) if SETTING_TABLE_REF in text
+    )
+    return sub_step(key, index)
+
+
+# The setting table's rows: the level step (6D) and the parked nib's feeler
+# step (13B), each from the constants its step prints.
 SETTING_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
     (
-        sub_step("summing-levelled", _LEVEL_SUB_STEP),
+        _table_sub_step("summing-levelled"),
         f"{_SUMMING_PLATE} PLATE TOP",
         f"EVERY {_AMPLITUDE_BAR} BAR AT 0",
         f"LEVEL \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0",
         "DIGITAL ANGLE GAUGE",
+    ),
+    (
+        _table_sub_step("nib-set"),
+        "NIB TO PAPER",
+        "PARKED, PAPER ON PLATEN",
+        NIB_CLEARANCE_TEXT,
+        "FEELER JUST DRAGS",
     ),
 )
 
@@ -417,10 +430,10 @@ ASSEMBLY_CHECKS: tuple[str, ...] = (
 EXPLODED_CAPTION = "EXPLODED VIEW - INTEGRATION STEPS IN ASSEMBLY.MD"
 ORIENTATION_NOTE = "FRONT VIEW: THE PAPER SIDE. THE CRANK IS AT THE RIGHT."
 # The model holds the pen parked (step "nib-set"); running needs it on the
-# paper (step "nib-on-paper").
+# paper (step "nib-on-paper"). The parked gap prints in the setting table.
 NIB_PARKED_NOTE = (
-    f"VIEWS SHOW THE NIB PARKED {NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP "
-    f"{_n('nib-set')}); STEP {_n('nib-on-paper')} SETS IT ON."
+    f"VIEWS SHOW THE NIB PARKED OFF THE PAPER (STEP {_n('nib-set')}); "
+    f"STEP {_n('nib-on-paper')} SETS IT ON."
 )
 # Sheet 3's label on the spare, beside item 7's group (its leader ends on the
 # spare's plate face).

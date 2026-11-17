@@ -163,15 +163,17 @@ BAR_COLUMN_PICK_M = (
 )
 ASSEMBLED_NOTE_XY = (0.020, 0.100)
 ASSEMBLED_NOTE_WIDTH = 84  # characters; default-format note text
-# Sheet 1's setting table (notes.SETTING_TABLE_*): its title and one-row
-# native general table (_general_table) in the band over the views. R5 of
-# main 67ba11bf1a printed the views' ink no higher than 387.6 mm (the
-# gooseneck and the crank-side rod), the inner border at 419.1 mm. Rows print
-# 5.5 mm apart (MHA-DT-00 v48 sheet 13, the same helper's default rows); the
-# read-back box must stay inside the border and above SETTING_TABLE_FLOOR.
-SETTING_TABLE_XY = (0.020, 0.416)
+# Sheet 1's setting table (notes.SETTING_TABLE_*): its title and native
+# general table (_general_table) in the band over the views. R5 of main
+# 67ba11bf1a printed the views' ink no higher than 387.6 mm (the gooseneck and
+# the crank-side rod), the inner border at 419.1 mm. Rows print 5.5 mm apart
+# (the one-row proof, run 20261117T133205408Z: title text 411.7-415.3 mm under
+# a 416 mm top, header text from 408.5 mm, row text from 403.0 mm); the
+# read-back box must stay inside the border and above SETTING_TABLE_FLOOR,
+# 2.4 mm over that ink.
+SETTING_TABLE_XY = (0.020, 0.4175)
 SETTING_TABLE_ROW_PITCH = 0.0055
-SETTING_TABLE_FLOOR = 0.392
+SETTING_TABLE_FLOOR = 0.390
 
 # Sheet 2: the finished machine, full detail, centred in the usable area.
 FINISHED_CENTER = (_PORTRAIT.width_m / 2.0, sum(_PORTRAIT_USABLE_Y) / 2.0)
