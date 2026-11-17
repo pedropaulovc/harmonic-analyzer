@@ -35,10 +35,10 @@ async def define_circle(
     diameter doubles the feature on the sheet's rebuild (v37 arbor-pedestal
     printed an R22 crown on its R11 part).
 
-    The raw ``add_circle`` runs with sketch inference SUPPRESSED (restored
-    afterwards): with it on, a second concentric/near circle snaps to the first
-    and the call fails (proven live on the coefficients-plate hole column).
-    Same rationale as :func:`add_line_chain` -- the centre/diameter are pinned
+    The ``add_circle`` runs direct-to-DB (the adapter does this itself; the
+    wrap below is redundant, #3001): with inference on, a second
+    concentric/near circle snaps to the first and the call fails (proven live
+    on the coefficients-plate hole column). The centre/diameter are pinned
     explicitly below, so inference during the draw only ever hurts.
 
     Self-naming: pass ``dims`` (a per-sketch :class:`SketchDims`) plus ``names`` /

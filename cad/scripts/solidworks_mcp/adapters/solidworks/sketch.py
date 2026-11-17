@@ -609,8 +609,39 @@ def _add_line_impl(
             raise Exception("Failed to create line")
         return cast(AdapterResult[str], adapter._register_sketch_entity("Line", line))
 
+    return _create_direct_to_db(adapter, "add_line", _line_operation)
+
+
+def _create_direct_to_db(
+    adapter: Any, operation_name: str, operation: Any
+) -> AdapterResult[str]:
+    """Run one entity-creating closure with ``SketchManager.AddToDB`` on.
+
+    With ``AddToDB`` off, SolidWorks places each new entity through the
+    interactive inference engine: an endpoint within the on-screen snap
+    radius of another entity, grid point or the origin moves onto it and an
+    automatic relation is added. The radius is in screen pixels, so whether a
+    point snaps depends on the seat's window size and zoom, and the same
+    recipe authored different geometry on different seats. ``AddToDB`` writes
+    the entity at its exact coordinates instead; exactly coincident endpoints
+    still merge in the sketch database. Relations a profile needs must be
+    added explicitly. The previous value is restored, so a caller that turned
+    it on around several entities keeps its own setting.
+    ``DisplayWhenAdded`` is left alone: it only defers drawing the entity on
+    screen and SolidWorks' default (``True``) is not changed anywhere.
+    """
+
+    def direct() -> str:
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            return cast(str, operation())
+        finally:
+            manager.AddToDB = previous
+
     return cast(
-        AdapterResult[str], adapter._handle_com_operation("add_line", _line_operation)
+        AdapterResult[str], adapter._handle_com_operation(operation_name, direct)
     )
 
 
@@ -661,10 +692,7 @@ def _add_circle_impl(
             AdapterResult[str], adapter._register_sketch_entity("Circle", circle)
         )
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_circle", _circle_operation),
-    )
+    return _create_direct_to_db(adapter, "add_circle", _circle_operation)
 
 
 def _add_rectangle_impl(
@@ -723,10 +751,7 @@ def _add_rectangle_impl(
         )
         return entity_id
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_rectangle", _rectangle_operation),
-    )
+    return _create_direct_to_db(adapter, "add_rectangle", _rectangle_operation)
 
 
 def _add_arc_impl(
@@ -799,9 +824,7 @@ def _add_arc_impl(
             raise Exception("Failed to create arc")
         return cast(AdapterResult[str], adapter._register_sketch_entity("Arc", arc))
 
-    return cast(
-        AdapterResult[str], adapter._handle_com_operation("add_arc", _arc_operation)
-    )
+    return _create_direct_to_db(adapter, "add_arc", _arc_operation)
 
 
 def _add_spline_impl(
@@ -873,10 +896,7 @@ def _add_spline_impl(
             raise Exception("Failed to create spline")
         return cast(str, adapter._register_sketch_entity("Spline", spline))
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_spline", _spline_operation),
-    )
+    return _create_direct_to_db(adapter, "add_spline", _spline_operation)
 
 
 def _add_centerline_impl(
@@ -932,10 +952,7 @@ def _add_centerline_impl(
             raise Exception("Failed to create centerline")
         return cast(str, adapter._register_sketch_entity("Centerline", centerline))
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_centerline", _centerline_operation),
-    )
+    return _create_direct_to_db(adapter, "add_centerline", _centerline_operation)
 
 
 def _add_polygon_impl(
@@ -1018,10 +1035,7 @@ def _add_polygon_impl(
         adapter._sketch_entity_centers[entity_id] = (center_x, center_y)
         return entity_id
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_polygon", _polygon_operation),
-    )
+    return _create_direct_to_db(adapter, "add_polygon", _polygon_operation)
 
 
 def _add_ellipse_impl(
@@ -1094,10 +1108,7 @@ def _add_ellipse_impl(
             raise Exception("Failed to create ellipse")
         return cast(str, adapter._register_sketch_entity("Ellipse", ellipse))
 
-    return cast(
-        AdapterResult[str],
-        adapter._handle_com_operation("add_ellipse", _ellipse_operation),
-    )
+    return _create_direct_to_db(adapter, "add_ellipse", _ellipse_operation)
 
 
 def _add_sketch_constraint_impl(

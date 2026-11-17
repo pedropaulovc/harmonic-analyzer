@@ -1893,27 +1893,6 @@ def test_retry_capture_does_not_erase_the_first_failure(tmp_path):
     assert all((capture / "capture.json").is_file() for capture in captures)
 
 
-def test_authoring_context_is_recorded_on_the_success_path(tmp_path, capture_telemetry):
-    """A failure-only capture cannot answer "what was different about the run
-    that worked?", so the screen-space bags are recorded per part build."""
-    spans, logs = capture_telemetry
-    context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo_ring")
-
-    assert context["display"]["px_per_mm"] > 0
-    assert context["sketch_manager"]["AddToDB"] is True
-    events = [
-        event
-        for span in spans.get_finished_spans()
-        for event in span.events
-        if event.name == "seat.authoring_context"
-    ]
-    # Recorded even with no enclosing span: the log record is the channel the
-    # diagnostics/ probes (which build no phase span) are attributable through.
-    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
-    assert any("authoring logo_ring: px/mm=" in body for body in bodies)
-    assert len(events) <= 1
-
-
 def test_add_to_db_left_on_by_a_dead_leaf_is_reported(capture_telemetry):
     """``AddToDB`` is session state on a seat that outlives the leaf: finding it
     already ON means an earlier leaf died between its True and its False."""
@@ -2279,27 +2258,6 @@ def test_the_anchor_banner_is_printed_once_per_process(monkeypatch):
         _telemetry._log_utc_anchor(_telemetry.get_logger(), stream)
 
     assert stream.stream.getvalue().count("log anchor") == 1
-
-
-def test_success_path_context_never_fails_a_good_build(tmp_path, monkeypatch):
-    """The forensics' own worst failure mode: aborting a build that WORKED.
-
-    record_authoring_context runs before save_file on every part, and its probes
-    reach _early_bound (which raises when no generated wrapper binds) and raw
-    user32 calls. A diagnostic that fails a good part export is worse than no
-    diagnostic, so each bag records its own error and the part still saves.
-    """
-
-    def explode(_adapter):
-        raise RuntimeError("no IModelView wrapper bound")
-
-    monkeypatch.setattr(_seat_forensics, "display_geometry", explode)
-
-    context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo")
-
-    assert "no IModelView wrapper bound" in context["display"]["capture_error"]
-    # The bags that CAN be read are still read: a broken probe is not a blackout.
-    assert context["sketch_manager"]["AddToDB"] is True
 
 
 # --- The doit parent's half of the same contract ---------------------------

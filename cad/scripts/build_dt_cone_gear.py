@@ -644,8 +644,8 @@ async def build(adapter) -> dict[str, str]:
         await set_global(adapter, global_name, f"{value:.17g}", value)
 
     # ------------------------------------------------------------------
-    # Blank: disc at tip radius Ra -- an origin-snapped circle with a
-    # DRIVING diameter dimension, extruded. NOT a revolve: a dimension-
+    # Blank: disc at tip radius Ra -- a circle made coincident with the origin,
+    # with a DRIVING diameter dimension, extruded. NOT a revolve: a dimension-
     # driven cut through a revolved body freezes at its creation-time
     # profile size on SW 2026 (any later change of the cut's dimension --
     # equation, configured value or plain SystemValue -- makes the cut
@@ -655,27 +655,25 @@ async def build(adapter) -> dict[str, str]:
     ra_default_mm = profile.blank_radius_mm
     blank = SketchDims()
     check("create_sketch blank", await adapter.create_sketch("Front"))
-    blank_circle = check(
-        "add_circle blank", await adapter.add_circle(0.0, 0.0, ra_default_mm)
+    # The adapter authors direct-to-DB, so no inference relation ties the
+    # centre to the origin; define_circle adds that coincidence explicitly and
+    # records the driving diameter as "BlankDia" = 2*Ra for ``drive_jobs``.
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        ra_default_mm,
+        "blank",
+        dims=blank,
+        names=(None, None, "BlankDia"),
+        drives=(None, None, '2 * "Ra"'),
     )
-    check(
-        "blank diameter dim (driving, D1)",
-        await adapter.add_sketch_dimension(
-            blank_circle, None, "diameter", 2.0 * ra_default_mm
-        ),
-    )
-    # Record the manual driving dim into the per-sketch SketchDims (crank-pin
-    # pattern): one display dim, driven by 2*Ra. This is the SAME link the
-    # blank previously got via an inline ``create_equation`` -- now it is named
-    # ("BlankDia") and deferred into ``drive_jobs`` instead, so the equation
-    # target is the friendly name and resolves after the final rebuild.
-    blank.record("BlankDia", '2 * "Ra"')
     status = await adapter.check_sketch_fully_defined()
     state = status.data.get("definition_state") if status.is_success else None
     if state != "fully_defined":
         raise RuntimeError(
-            f"blank sketch is {state!r} -- origin snap missing; a fix would "
-            "break the Ra configuration link, aborting"
+            f"blank sketch is {state!r} -- centre-to-origin coincidence missing; "
+            "a fix would break the Ra configuration link, aborting"
         )
     _telemetry.success("blank sketch fully defined (driving dim, no fix)")
     check("exit_sketch blank", await adapter.exit_sketch())

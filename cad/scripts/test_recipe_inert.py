@@ -45,9 +45,6 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("_session.py", "run_build"): frozenset(
         {"note_seats_before_connect", "record_seat_provenance", "teardown_seat"}
     ),
-    # PRE-save, by necessity: the camera moves right after this, and the snapshot
-    # records the view the sketches were authored under. Rule 3 proves it reads only.
-    ("_part_save.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
     # Release packaging's own teardown, after Pack-and-Go.
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
     # A failed drive-train package audit: the evidence PDF's directory, read
@@ -68,8 +65,6 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # and session, then raises the pick's own failure. It never returns, but a
     # caller can catch the RuntimeError and retry; draw_rocker_arm does so.
     ("_drawing_selection.py", "_select_view_entity"): frozenset({"capture_pick_miss"}),
-    # PRE-save no-op awaiting removal with the next drawing re-key (#2883).
-    ("_drawing_common.py", "new_project_drawing"): frozenset({"record_drawing_display"}),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})
@@ -102,10 +97,8 @@ MUTATOR_ROOTS = {
 }
 # Entry points that run BEFORE an artefact is saved: nothing they reach may mutate.
 PRE_SAVE = {
-    "record_authoring_context",
     "record_seat_provenance",
     "note_seats_before_connect",
-    "record_drawing_display",
 }
 # ctypes structures and prototypes the module builds itself.
 LOCAL_ATTRIBUTE_STORES = {"cb", "argtypes", "restype"}

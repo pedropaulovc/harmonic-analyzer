@@ -469,9 +469,10 @@ async def add_line_chain(
     vertex onto a neighbour/axis -- the documented cause of vanished hex
     vertices (a 2/3-volume head) and intermittent "failed to create line" when a
     segment runs near existing geometry. Exact-coordinate endpoints still merge
-    in the sketch DB, so the loop closes regardless. The prior ``AddToDB`` state
-    is restored, so the manual :func:`set_sketch_direct_db` wraps some callers
-    still use nest harmlessly (they are no longer required)."""
+    in the sketch DB, so the loop closes regardless. The adapter's ``add_line``
+    already authors direct-to-DB and restores ``AddToDB``; this wrap and the
+    :func:`set_sketch_direct_db` wraps some callers use are redundant and nest
+    harmlessly (retirement tracked in #3001)."""
     vertices = list(points) + ([points[0]] if close else [])
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
