@@ -15,8 +15,8 @@ import mg_magnifier_assembly_spec as installed
 import mg_magnifying_clamp_geom as clamp
 import mg_magnifying_lever_geom as geom
 import mg_magnifying_lever_spec as spec
-import _drawing_leader_notes as leader_notes
 import _drawing_dimension_import as dimension_import
+from _gtol_face_read import face_geometry
 from _drawing_types import DRAWING_TEMPLATES
 from _layout_audit import (
     find_leader_across_lines,
@@ -180,7 +180,7 @@ def test_small_thread_requirements_have_a_legible_enlarged_native_home() -> None
 
 
 class _LeverFace:
-    """Native face/selection boundary; the real geometry matcher reads this."""
+    """Native face geometry; the real surface matcher reads this."""
 
     def __init__(self, *, center_mm=None, diameter_mm=joint.ROD_DIA, identity=4004):
         self.center_mm = (joint.ROD_DIA / 2.0, 0.0, 0.0) if center_mm is None else center_mm
@@ -194,8 +194,6 @@ class _LeverFace:
         self.box = (*tuple(value - radius for value in center), *tuple(value + radius for value in center))
         if identity == 4002:
             self.box = (radius, -radius, -radius, joint.THREAD_ROOT_X / 1000.0, radius, radius)
-        self.document = None
-        self.selection_attempts = 0
 
     def GetSurface(self):
         return self.surface
@@ -203,86 +201,26 @@ class _LeverFace:
     def GetBox(self):
         return self.box
 
-    def Select4(self, append, data):
-        assert append is False
-        assert data.View is self.document.active_view
-        self.selection_attempts += 1
-        if self.document.fault == "selection_rejected":
-            return False
-        self.document.selected = self
-        return True
 
-
-class _LeverVisibleView:
-    def __init__(self, name, faces=(), *, direct_faces=()):
+class _LeverView:
+    def __init__(self, name, faces=()):
         self.name = name
         self.faces = faces
-        self.direct_faces = direct_faces
-        self.entity_kinds = []
-        self.component = object()
 
     def GetName2(self):
         return self.name
 
-    def GetVisibleComponents(self):
-        return (self.component,)
 
-    def GetVisibleEntities2(self, component, kind):
-        assert component is self.component
-        self.entity_kinds.append(kind)
-        if kind == 3:
-            return self.direct_faces
-        assert kind == 4
-        return tuple(SimpleNamespace(GetFace=lambda face=face: face) for face in self.faces)
-
-
-class _LeverNoteAnnotation:
-    def __init__(self, face, fault):
-        self.face = _LeverFace() if fault == "wrong_attachment" else face
-        self.fault = fault
-        self.leaders = 0
-        self.position = None
-
-    def GetAttachedEntityCount3(self):
-        return 1
-
-    def GetAttachedEntities3(self):
-        return (self.face,)
-
-    def GetAttachedEntityTypes(self):
-        return (2,)  # swSelFACES, not swSelEDGES or swSelSILHOUETTES
-
-    def GetLeaderCount(self):
-        return self.leaders
-
-    def IsDangling(self):
-        return self.fault == "dangling"
-
-    def SetLeader3(self, *_args):
-        self.leaders = 1
-        return 0
-
-    def SetPosition2(self, x, y, z):
-        self.position = (x, y, z)
-        return True
-
-
-class _LeverNoteDocument:
-    def __init__(self, views, fault):
+class _LeverDocument:
+    def __init__(self, views):
         self.views = {view.name: view for view in views}
-        self.fault = fault
         self.active_view = None
         self.selected = None
-        self.notes = []
         self.SelectionManager = SimpleNamespace(
             CreateSelectData=lambda: SimpleNamespace(View=None),
             GetSelectedObjectCount2=lambda _mark: int(self.selected is not None),
             GetSelectedObject6=lambda _index, _mark: self.selected,
         )
-        self.Extension = SimpleNamespace(SelectByID2=self._reject_hit_test)
-
-    def _reject_hit_test(self, *_args):
-        raise AssertionError("the hemisphere note must select the identified face, not hit-test an EDGE at its silhouette")
 
     def ActivateView(self, name):
         self.active_view = self.views[name]
@@ -292,23 +230,17 @@ class _LeverNoteDocument:
         self.selected = None
 
     def InsertNote(self, text):
-        assert text == spec.FREE_END_CALLOUT
-        assert self.active_view.name == "front" and self.selected is not None
-        annotation = _LeverNoteAnnotation(self.selected, self.fault)
-        note = SimpleNamespace(GetAnnotation=lambda: annotation)
-        self.notes.append(note)
-        return note
+        raise AssertionError(f"the lever sheet prints no free-text note through InsertNote: {text!r}")
 
 
-@pytest.mark.parametrize("fault", (None, "selection_rejected", "wrong_attachment", "dangling", "shared_native_note"))
-def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monkeypatch, tmp_path, fault) -> None:
-    """Run real detail/callout ordering, FACE attachment and drawing-thread rewrite."""
+@pytest.mark.parametrize("fault", (None, "shared_native_note"))
+def test_real_recipe_prints_the_free_hemisphere_as_its_native_spherical_radius(monkeypatch, tmp_path, fault) -> None:
+    """Run real detail/callout ordering, native SR import and drawing-thread rewrite."""
     hemisphere = _LeverFace()
-    front = _LeverVisibleView("front", (_LeverFace(identity=4002), hemisphere))
-    iso, detail = _LeverVisibleView("iso"), _LeverVisibleView("detail")
-    document = _LeverNoteDocument((front, iso, detail), fault)
+    front = _LeverView("front", (_LeverFace(identity=4002), hemisphere))
+    iso, detail = _LeverView("iso"), _LeverView("detail")
+    document = _LeverDocument((front, iso, detail))
     document.EditRebuild3 = lambda: True
-    hemisphere.document = document
     _thread_adapter, _thread_view, native_thread = _native_thread_note_adapter(view=detail, sheet_owned=fault == "shared_native_note")
     other_threads = [_native_thread_note_adapter(view=view)[2] for view in (front, iso)]
     if fault == "shared_native_note":
@@ -316,13 +248,13 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
             state.thread.ThreadCallout = native_thread.note
     trace, qualifiers, captured = [], {}, {}
     values = {
-        "OverallLength": joint.ROD_LENGTH, "RodDia": joint.ROD_DIA,
+        "OverallLength": joint.ROD_LENGTH, "RodDia": joint.ROD_DIA, "DomeR": joint.ROD_DIA / 2.0,
         "TipChamfer": joint.TIP_CHAMFER, "ThreadLength": joint.THREAD_LENGTH,
         "IncompleteLength": joint.INCOMPLETE_THREAD_MAX,
     }
     dimensions, annotations = {}, {}
     for name, value in values.items():
-        feature = "RodProfile" if name in ("OverallLength", "RodDia", "TipChamfer") else "ThreadExtent"
+        feature = "RodProfile" if name in ("OverallLength", "RodDia", "DomeR", "TipChamfer") else "ThreadExtent"
         dimension = SimpleNamespace(Name=name, FullName=f"{name}@{feature}@mg-magnifying-lever.SLDPRT", SystemValue=value / 1000.0)
         dimensions[name] = dimension
 
@@ -440,7 +372,6 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "assert_imported_precision", "add_property_linked_note", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
-    monkeypatch.setattr(leader_notes, "rebuild_drawing", lambda *_a, **_kw: None)
     monkeypatch.setattr(drawing, "_circle", lambda *_a, mark=False: None if mark else trace.append("crop boundary"))
     monkeypatch.setattr(drawing, "_note", lambda _a, view, text, xy: captured.setdefault("notes", []).append((view, text, xy)))
     monkeypatch.setattr(drawing, "add_surface_finish", lambda _a, view, **kwargs: captured.update(finish=(view, kwargs)))
@@ -451,24 +382,14 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
 
     monkeypatch.setattr(drawing, "supplier_reference_dimension", stock_reference)
 
-    def attach(_adapter, view, **kwargs):
-        assert kwargs["text"] == spec.FREE_END_CALLOUT and view is front
-        return leader_notes.add_attached_note(_adapter, view, **kwargs)
-
-    monkeypatch.setattr(drawing, "add_attached_note", attach)
     if fault is not None:
-        message = ("native detail authority" if fault == "shared_native_note" else
-                   "failed to select free end hemisphere face by entity" if fault == "selection_rejected" else "lost its face attachment")
-        with pytest.raises(RuntimeError, match=message):
+        with pytest.raises(RuntimeError, match="native detail authority"):
             drawing.build(adapter)
     else:
         assert drawing.build(adapter) == {"slddrw": "lever.SLDDRW"}
-        assert len(document.notes) == 1
-        annotation = document.notes[0].GetAnnotation()
-        assert annotation.GetAttachedEntities3() == (hemisphere,)
-        assert annotation.GetAttachedEntityTypes() == (2,)
-        assert annotation.position == (0.030, 0.185, 0.0)
-        assert annotation.GetLeaderCount() == 1 and not annotation.IsDangling()
+        # The free end prints as its native SR model dimension, not prose.
+        assert annotations["DomeR"].GetPosition() == (*drawing.FRONT_KEEP["DomeR"], 0.0)
+        assert "DomeR" not in deleted and "DomeR" not in qualifiers
         assert trace.index("detail import") < trace.index("crop boundary") < trace.index("crop") < trace.index("front import")
         assert trace.index("crop") < trace.index("callout:IncompleteLength")
         assert trace.index("front import") < trace.index("delete:TipChamfer") < trace.index("callout:RodDia")
@@ -486,9 +407,9 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         finish = captured["finish"][1]
         assert finish["entity_type"] == "FACE" and finish["char_height"] == 0.0025
         assert finish["edge_xy"] == finish["leader_attach_xy"]
-        controlled = drawing.face_geometry(front.faces[0])
+        controlled = face_geometry(front.faces[0])
         assert finish["control"].face.matches(controlled)
-        assert not finish["control"].face.matches(drawing.face_geometry(hemisphere))
+        assert not finish["control"].face.matches(face_geometry(hemisphere))
         left = project(None, front, (controlled.box[0], 0.0, 0.0))[0]
         right = project(None, front, (controlled.box[3], 0.0, 0.0))[0]
         assert left < finish["edge_xy"][0] < right
@@ -512,8 +433,6 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert incomplete_xy[0] - max(map(len, rows)) * 0.0035 / 2.0 > tip_x
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
         assert captured["thread_lines"] == [(detail, "Detail A"), (front, "front")]
-    assert hemisphere.selection_attempts == 1
-    assert front.entity_kinds == [3, 4]
 
 def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
     """R10 measured glyph/witness replay, not proof of a new native font/leader.
@@ -688,12 +607,32 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
         label="parent A", kind="note", owner="front",
         text_boxes=(Box(0.203362, 0.1324876, 0.2065895, 0.1358896),), exact=True,
     )
-    free_end = AnnotationGeometry(
-        label="free hemisphere", kind="note", owner="front",
-        text_boxes=(Box(0.030406, 0.1814082, 0.1025834, 0.1849736),),
-        segments=(Segment(0.0291609, 0.183542, 0.0335495, 0.1169481, "leader"),),
-        exact=True,
+    # The free-end SR, from its first native ink (run 20261117T122606274Z,
+    # "SR.125" at text centre (0.021, 0.134)): 3.44 mm glyphs, 13.9 mm for six
+    # of them; the shelf sits 2.6 mm under the text centre, runs 1 mm past
+    # its left end and bends 3 mm past its right; the radial leader runs from
+    # that bend toward the sphere centre and its arrow stops on the dome.
+    sx, sy, _z = annotations["DomeR"].GetPosition()
+    width, half_height = 0.0139 * len("SR.13") / len("SR.125"), 0.00172
+    shelf_y, shelf_left, bend_x = sy - 0.0026, sx - width / 2.0 - 0.001, sx + width / 2.0 + 0.003
+    sphere_x, sphere_y = project(None, front, (diameter / 2.0, 0.0, 0.0))
+    reach = math.hypot(bend_x - sphere_x, shelf_y - sphere_y)
+    arrow = (
+        sphere_x + (bend_x - sphere_x) * diameter / 2.0 / reach,
+        sphere_y + (shelf_y - sphere_y) * diameter / 2.0 / reach,
     )
+    free_end = AnnotationGeometry(
+        label="free hemisphere SR", kind="dim", owner="front",
+        text_boxes=(Box(sx - width / 2.0, sy - half_height, sx + width / 2.0, sy + half_height),),
+        segments=(
+            Segment(*arrow, bend_x, shelf_y, "leader"),
+            Segment(bend_x, shelf_y, shelf_left, shelf_y, "leader"),
+        ),
+    )
+    # That run's shelf ended on the border (clarity); now it stands clear.
+    assert shelf_left - region.xmin > 0.002
+    # The arrow lands on the sphere, clear of its tangent junction with the rod.
+    assert arrow[0] < sphere_x - 0.001 and arrow[1] > sphere_y
     after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
     assert find_text_on_line(after) == []
@@ -709,7 +648,8 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     # The seat label stands 5 mm clear of the callout's underline, not a third row.
     assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.005
     assert rod_dia.text_boxes[0].ymin - seat_label.text_boxes[0].ymax > 0.0038
-    assert free_end.text_boxes[0].ymin - rod_dia.text_boxes[0].ymax > 0.0053
+    assert free_end.text_boxes[0].xmax < seat_label.text_boxes[0].xmin
+    assert free_end.text_boxes[0].ymax < rod_dia.text_boxes[0].ymin
 
 
 def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, nullable_empty_arrays=False, fault=None, null_entity_index=0, missing_callout=False):

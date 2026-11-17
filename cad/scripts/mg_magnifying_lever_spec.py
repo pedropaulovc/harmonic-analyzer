@@ -15,13 +15,14 @@ from mg_lever_thread_joint import (
 )
 
 DRAWING_DIMENSIONS = {
-    "RodProfile": {"OverallLength", "RodDia"},
+    "RodProfile": {"OverallLength", "RodDia", "DomeR"},
     "ThreadExtent": {"ThreadLength", "IncompleteLength"},
 }
 # Inch places; the rod diameter prints as its stock fraction (REF), so its
-# places only govern the model before the sheet dresses it.
+# places only govern the model before the sheet dresses it. The free-end SR
+# (half the stock) is a plain dome: the profile's .XX grade, as on MHA-MG-04.
 DRAWING_PRECISION = {
-    "RodProfile": {"OverallLength": ROD_LENGTH_PLACES, "RodDia": 2},
+    "RodProfile": {"OverallLength": ROD_LENGTH_PLACES, "RodDia": 2, "DomeR": 2},
     "ThreadExtent": {"ThreadLength": THREAD_LENGTH_PLACES, "IncompleteLength": 3},
 }
 SINGLE_LIMITS = {("ThreadExtent", "IncompleteLength"): (INCOMPLETE_THREAD_MAX, 6)}
@@ -52,7 +53,6 @@ PRINT_THREAD_CALLOUT = f"{THREAD} UNC\nMATES MHA-MG-01\nBRACKET"
 # from those two native sizes, so the sheet prints no derived minimum (the
 # simplicity policy: a value the sheet prints is a model dimension).
 LEAD_CALLOUT = "INCOMPLETE THREAD,\nEACH END OF THREAD"
-FREE_END_CALLOUT = "FREE END: TANGENT HEMISPHERE"
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "clamp_screw_seat", SEAT_UM, CylinderFace(ROD_DIA, contains_x_mm=50.0), display_unit=UNIT,

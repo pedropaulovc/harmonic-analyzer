@@ -4,9 +4,8 @@ The sheet prints decimal inch; the as-bought rod's diameter is its REF stock
 fraction. The independent model detail imports its dimensions before its
 circular crop, as on MHA-MG-04. Native diameters/lengths/limits remain
 associative. The model retains UNC-2A metadata; drawing instances defer the
-default class to the title. Only the free end domes; its note attaches to the
-identified spherical face, including actual visible-silhouette faces when face
-enumeration omits them.
+default class to the title. Only the free end domes; its native SR model
+dimension sizes it.
 """
 
 from __future__ import annotations
@@ -18,33 +17,29 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array, null_callout
-from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_full_name, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary, view_name
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
-from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_properties import part_drawing_unit
 from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
-from _gtol_face_read import face_geometry
-from _gtol_sphere import SphereFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from _transgear_zone_line import require_placed, sketch_lines
-from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, PITCH, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_BORE_CLEARANCE, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
+from mg_lever_thread_joint import PITCH, ROD_DIA, ROD_LENGTH, THREAD_ROOT_X
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_BORE_CLEARANCE, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -68,8 +63,11 @@ DETAIL_RADIUS_MM = 12.5
 # The .71 sits just above the rod's threaded end, short witnesses.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.381, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
-# keep the qualifier above the screw-seat note and below the free-end note.
-FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
+# keep the qualifier above the screw-seat note. The free-end SR's position is
+# its text centre; native ink (run 20261117T122606274Z) runs its shelf 1 mm past the text's left
+# end and bends 3 mm past its right, so the text sits low and right enough to
+# keep the shelf 2.5 mm inside the border and land the radial arrow on the dome.
+FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166), "DomeR": (0.022, 0.130)}
 DETAIL_THREAD_NOTE_XY = (0.2760, 0.172)
 # ASME Y14.6 simplified external thread, sketched in the view: a thin
 # thread-limit line across the major diameter where ThreadLength's root
@@ -212,112 +210,6 @@ def _detail(adapter: Any) -> tuple[Any, list[Any]]:
     if not set(DETAIL_KEEP) <= names:
         raise RuntimeError(f"lever thread detail crop lost dimensions: {set(DETAIL_KEEP) - names}")
     return view, annotations
-
-
-def _free_end_face(adapter: Any, view: Any, annotations: list[Any]) -> Any:
-    """Read visible face provenance and require the known rod as a positive control."""
-    hemisphere = SphereFace(ROD_DIA, center_mm=(ROD_DIA / 2.0, 0.0, 0.0))
-    body = surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat").face
-    direct = visible_view_entities(view, 3, label="lever visible faces")  # swViewEntityType_Face
-    silhouettes = visible_view_entities(view, 4, label="lever visible silhouette faces")
-    candidates = list(direct)
-    null_faces = 0
-    for silhouette in silhouettes:
-        face = _early_bound(silhouette, "ISilhouetteEdge").GetFace()
-        if face is None:
-            null_faces += 1
-        else:
-            candidates.append(face)
-    faces, records, matches, body_matches = [], [], [], []
-    for face in candidates:
-        if any(int(adapter.swApp.IsSame(face, seen)) == 1 for seen in faces):
-            continue
-        faces.append(face)
-        geometry = face_geometry(face)
-        box = geometry.box if geometry is not None else ()
-        if not box:
-            # Unknown surface identities still need actual model-space bounds
-            # for diagnosis; GetBox is approximate, never a sphere selector.
-            box = tuple(_early_bound(face, "IFace2").GetBox() or ())
-        record = {"identity": None, "parameters": (), "box": box}
-        if geometry is not None:
-            record.update(
-                identity=geometry.identity,
-                surface_type={4001: "plane", 4002: "cylinder", 4003: "cone", 4004: "sphere", 4005: "torus"}.get(geometry.identity, "unhandled native surface identity"),
-                parameters=geometry.parameters,
-            )
-            if geometry.identity == 4004:
-                record.update(
-                    sphere_center_m=geometry.parameters[:3],
-                    sphere_radius_m=geometry.parameters[3],
-                    sphere_center_mm=tuple(value * 1000.0 for value in geometry.parameters[:3]),
-                    sphere_diameter_mm=geometry.parameters[3] * 2000.0,
-                )
-            if hemisphere.matches(geometry):
-                matches.append(face)
-            if body.matches(geometry):
-                body_matches.append(face)
-        records.append(record)
-    expected_dimensions = {
-        "OverallLength@RodProfile": ROD_LENGTH, "RodDia@RodProfile": ROD_DIA,
-        "TipChamfer@RodProfile": TIP_CHAMFER, "ThreadLength@ThreadExtent": THREAD_LENGTH,
-        "IncompleteLength@ThreadExtent": INCOMPLETE_THREAD_MAX,
-    }
-    source = {"requested_path": str(SOURCE), "dimensions": []}
-    referenced = None
-    try:
-        referenced = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-        source["actual_path"] = str(referenced.GetPathName())
-        source["path_matches"] = source["actual_path"].replace("\\", "/").casefold() == str(SOURCE).replace("\\", "/").casefold()
-    except Exception as exc:  # Diagnostics must not replace the strict face failure.
-        source["read_error"] = f"{type(exc).__name__}: {exc}"
-    for name, expected_mm in expected_dimensions.items():
-        row = {"requested_name": name, "expected_mm": expected_mm, "matches_source": False}
-        try:
-            parameter = referenced.Parameter(name) if referenced is not None else None
-            if parameter is None:
-                row["read_error"] = "native source dimension unavailable"
-            else:
-                parameter = _early_bound(parameter, "IDimension")
-                row["full_name"] = str(parameter.FullName)
-                row["actual_m"] = float(parameter.SystemValue)
-                row["actual_mm"] = row["actual_m"] * 1000.0
-                row["matches_source"] = math.isclose(row["actual_mm"], expected_mm, rel_tol=0.0, abs_tol=1e-6)
-        except Exception as exc:
-            row["read_error"] = f"{type(exc).__name__}: {exc}"
-        source["dimensions"].append(row)
-    source["all_dimensions_match"] = all(row["matches_source"] for row in source["dimensions"])
-    projection = {}
-    try:
-        bound_view = _early_bound(view, "IView")
-        matrix = tuple(float(value) for value in _early_bound(bound_view.ModelToViewTransform, "IMathTransform").ArrayData)
-        projection = {
-            "model_to_view": matrix, "rotation": matrix[:9], "translation_m": matrix[9:12],
-            "scale": matrix[12], "orientation": str(bound_view.GetOrientationName()),
-        }
-    except Exception as exc:
-        projection["read_error"] = f"{type(exc).__name__}: {exc}"
-    imported = []
-    for annotation in annotations:
-        full_name = dimension_full_name(adapter, _early_bound(annotation, "IAnnotation"))
-        parts = full_name.split("@")
-        imported.append({"full_name": full_name, "source_feature": parts[1] if len(parts) > 1 else ""})
-    census = {
-        "direct_faces": len(direct), "silhouettes": len(silhouettes),
-        "null_silhouette_faces": null_faces, "unique_faces": len(faces),
-        "plain_body_matches": len(body_matches), "hemisphere_matches": len(matches),
-        "faces": records,
-        "coordinate_frame": "referenced part model", "length_units": "metres",
-        "expected_sphere_center_mm": (ROD_DIA / 2.0, 0.0, 0.0), "expected_sphere_diameter_mm": ROD_DIA,
-        "source": source, "view": projection, "imported_dimensions": imported,
-    }
-    diagnostic = json.dumps(census, sort_keys=True)
-    _telemetry.info(f"lever visible-face census: {diagnostic}")
-    if len(body_matches) != 1:
-        raise RuntimeError(f"lever visible-face census failed its plain-body positive control: {diagnostic}")
-    if len(matches) != 1:
-        raise RuntimeError(f"lever free hemisphere: expected one visible spherical face, got {len(matches)}; census={diagnostic}")
-    return matches[0]
 
 
 def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
@@ -648,8 +540,6 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("native lever thread-detail callout is not visible")
     _sketch_thread_lines(adapter, detail, label="Detail A")
     _sketch_thread_lines(adapter, front, label="front")
-    free_end = _free_end_face(adapter, front, annotations)
-    add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
     # Clear of the diameter callout's last row, so it does not read as a third.
     symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.0175)

@@ -19,6 +19,7 @@ from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
@@ -149,7 +150,6 @@ def build(adapter) -> dict[str, str]:
     for first, second in ((f"{lines[2]}.end", f"{dome}.start"), (f"{dome}.end", f"{closure}.start"), (f"{closure}.end", f"{lines[0]}.start"), (f"{axis}.start", f"{closure}.start"), (f"{axis}.end", f"{closure}.end")):
         check("rod profile coincidence", adapter.add_sketch_constraint(first, second, "coincident"))
     check("free tip origin", adapter.add_sketch_constraint(f"{closure}.start", "origin", "coincident"))
-    check("dome centre on rod axis", adapter.add_sketch_constraint(f"{dome}.center", "origin", "horizontal_points"))
     check("tangent free dome", adapter.add_sketch_constraint(lines[2], dome, "tangent"))
     for line, relation in ((axis, "horizontal"), (closure, "horizontal"), (lines[0], "vertical"), (lines[2], "horizontal")):
         check("rod profile alignment", adapter.add_sketch_constraint(line, None, relation))
@@ -160,6 +160,10 @@ def build(adapter) -> dict[str, str]:
         dims.record(name, '"TipChamfer"')
     add_diametric_linear_dimension(adapter, axis, lines[2], (70.0, R + 4.0), "RodDia")
     dims.record("RodDia", '"RodDia"')
+    # The tangent dome's own radius closes the profile: a hemisphere of the
+    # rod's radius ends on the axis at the tip, centred on it.
+    check("free dome radius", adapter.add_sketch_dimension(dome, None, "radial", R))
+    dims.record("DomeR", '"RodDia" / 2')
     ensure_fully_defined(adapter, "full-body threaded lever profile")
     check("exit rod profile", adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
@@ -183,6 +187,7 @@ def build(adapter) -> dict[str, str]:
     name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X, "Top Plane", KNIFE_LOCAL_Y, "knife axis")
     # The rod diameter is as-bought stock: untoleranced, the sheet prints it REF.
     set_dimension_bilateral_tolerance(adapter, "RodProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND), display_unit=UNIT)
+    set_dimension_prefix(adapter, "RodProfile", "DomeR", "SR")
     # The hidden native distance owns the footer ceiling without changing the
     # nominal profile. The joint separately charges the ordinary angle band.
     _, chamfer_dimension = _named_dimension(adapter, "RodProfile", "TipChamfer")
