@@ -363,6 +363,20 @@ def _text_layers(package: ReviewPackage) -> str:
     return "\n\n".join(documents)
 
 
+def _fitup_section(package: ReviewPackage) -> str:
+    """The package's ASSEMBLY.md fit-up section when its steps print there
+    (rule 22); empty for a part or a package whose sheets print its steps."""
+    if package.kind != "assembly":
+        return ""
+    # Imported here: only an assembly review reads the generator.
+    import ha_assembly_package
+
+    stem = package.name.removesuffix("_assembly").replace("_", "-")
+    if stem not in ha_assembly_package.STEPS_IN_DOCUMENT:
+        return ""
+    return "\n".join(ha_assembly_package.fitup_lines(stem)).strip()
+
+
 def _review_prompt(
     package: ReviewPackage,
     sheet_count: int,
@@ -395,6 +409,15 @@ def _review_prompt(
             "section here have no extractable text and must be read from the "
             "images.\n"
             f"{layers}\n"
+        )
+    fitup = _fitup_section(package)
+    if fitup:
+        prompt += (
+            "\nASSEMBLY.MD FIT-UP STEPS\n"
+            "This package's steps, checks and procedures print in the release's "
+            "ASSEMBLY.md, not on its sheets (rule 22). This is that section as "
+            "printed; judge it as you would steps printed on a sheet.\n"
+            f"{fitup}\n"
         )
     if package.sources:
         exceptions = _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
@@ -2126,6 +2149,7 @@ def aggregate_package(
             snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
         snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
         source_sha = [_sha256(source) for source in sources]
+
 
         def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id

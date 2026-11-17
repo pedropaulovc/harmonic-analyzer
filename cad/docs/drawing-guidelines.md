@@ -645,40 +645,44 @@ sub-assembly, never on part fabrication.
   which face mates to which. Every part the view balloons is visible in it,
   and its balloon lands on a visible face of that part; a part left hidden
   behind its mate, ballooned on a sliver or a hidden face, does not show its
-  order or face. Parts may stay seated together where the steps make the
-  order plain; exploding every stepwise part is not required.
+  order or face. Parts may stay seated together where the order is plain;
+  exploding every stepwise part is not required.
 - A parts list with item number, part number, description and quantity, and
   balloons tying every visible part to it. Every row is ballooned somewhere;
   every balloon has a row.
-- Ordered assembly steps, each a short instruction the fitter can act on:
-  press this bushing to this depth, set this mesh with this backlash, torque
-  this screw, align this axis to that face within so much. A step does one
-  thing and is at most six printed lines. A check and its remedy (`IF THE
-  FEELER STOPS, …`) are separate steps; a sequence that needs more is more
-  steps, not a longer one. A setting table gives the reference, target,
-  range and check in columns; a check with three or more measured variables
-  uses a labelled sketch and a table, not equations in prose. Steps name
-  parts by item number (with the BOM supplying the full drawing number) and
-  directions by view names (rule 26), never a compass or a code the package
-  does not define in a labelled table (`HD1`, `F1A`, `P1–P3`). One labelled
-  code key may serve the whole package when it sits on a named sheet and
-  every sheet that uses its codes points to it by sheet number
-  (`CODES: SHEET 14 KEY`); a code with no key on its sheet and no pointer
-  to one is undefined. A setting finer than `.XXX` names the indicator or
-  gauge that reads it. A fit made at
-  assembly (match-drill, ream in place, shim, adjust) names the mating parts
-  as rule 4 requires; an item reference is enough when the BOM supplies the
-  item's name and number unambiguously.
-- The few assembly-level dimensions and checks that exist only once the parts
-  are together (positions, gaps, clearances, travels, alignments, preloads),
-  each with an unambiguous acceptance criterion and a way to check it.
-- Setup and adjustment: anything with parked and engaged states, an adjusting
-  screw, a zero or a spring tension states its as-shipped state and its
-  setting procedure without ambiguity.
-- Consumables and loose items: lubricant, thread locker, loose pins, shims,
-  all named.
+- The few assembly-level dimensions and settings that exist only once the
+  parts are together (positions, gaps, clearances, endshake, travels,
+  alignments, preloads, press depths and stops), each printed on a view as
+  its native dimension, with a setting diagram or setting table (reference,
+  target, range and check in columns) where a view alone cannot carry it.
+  A retention or fit acceptance that is a measurable value (a check with a
+  number) is such a setting and prints here. A setting finer than `.XXX`
+  names the indicator or gauge that reads it. A fit made at assembly
+  (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
+  requires; an item reference is enough when the BOM supplies the item's name
+  and number unambiguously.
 
-A three-view orientation sheet without these is a placeholder, not a package.
+**Steps may print in ASSEMBLY.md instead of on the sheets.** A package may print
+its ordered assembly steps, the wording of their non-numeric checks and
+remedies, setup and adjustment procedures, and the consumables and loose
+items in the release's generated `ASSEMBLY.md` instead of on its sheets, from
+the same sources as the sheets, under its drawing number. They cite the
+sheets' item numbers, view and detail letters, sheet numbers and settings.
+Its machinist review receives that section as text with the sheets and
+judges it as it would printed steps. Wherever the steps print, they carry
+every step, grade, cure, bench acceptance and step that makes a retention
+that rules 23 and 25 ask for; anything with parked and engaged states, an
+adjusting screw, a zero or a spring tension states its as-shipped state and
+its setting procedure without ambiguity; and every consumable and loose item
+(lubricant, thread locker, loose pins, shims) is named. A measurable setting
+or acceptance still prints on the sheets. Each step does one thing in at most
+six printed lines, a check and its remedy are separate steps, parts are named
+by item number and directions by view names (rule 26), and a code is defined
+in a labelled key on the step's own sheet or on a sheet the step points to
+by sheet number.
+
+A three-view orientation sheet without the views, parts list and balloons
+above is a placeholder, not a package.
 
 ### Rule 23 — Retain every fixed joint, and print how
 

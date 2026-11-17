@@ -69,6 +69,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import datetime
 import functools
@@ -3449,6 +3450,38 @@ _MACHINIST_REVIEW_MODULES = (
 )
 
 
+_ASSEMBLY_DOCUMENT = SCRIPTS_DIR / "ha_assembly_package.py"
+
+
+def _steps_in_document() -> tuple[str, ...]:
+    """``ha_assembly_package.STEPS_IN_DOCUMENT``, read statically: graph load
+    imports no step or geometry module."""
+    for node in ast.parse(read_source(_ASSEMBLY_DOCUMENT)).body:
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "STEPS_IN_DOCUMENT"
+        ):
+            return tuple(ast.literal_eval(node.value))
+    raise AssertionError("ha_assembly_package declares no STEPS_IN_DOCUMENT")
+
+
+def _machinist_review_fitup_deps(stem: str) -> list[Path]:
+    """A package whose steps print in ASSEMBLY.md is reviewed with that
+    section (rule 22), and its sheets no longer print it: the generator, the
+    package's sheet module, that module's imports and the config they read
+    key the review."""
+    if stem.removesuffix("_assembly").replace("_", "-") not in _steps_in_document():
+        return []
+    sheet = SCRIPTS_DIR / f"{stem}_sheet.py"
+    return [
+        _ASSEMBLY_DOCUMENT,
+        sheet,
+        *map(Path, module_deps_of(sheet)),
+        *map(Path, _config_deps(sheet)),
+    ]
+
+
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     dashed = stem.replace("_", "-")
@@ -3469,6 +3502,9 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
         if path.is_file() and path.name not in excluded_prompts
     ]
+    fitup = (
+        _machinist_review_fitup_deps(stem) if spec.source_kind == "assembly" else []
+    )
     return sorted({
         str(path.resolve())
         for path in (
@@ -3484,6 +3520,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),
+            *fitup,
         )
     })
 

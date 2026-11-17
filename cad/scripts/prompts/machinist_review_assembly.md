@@ -37,20 +37,27 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
 4. Census every fixed joint the package shows or depends on, threaded or
    not (pressed, bonded, pinned, set-screwed, staked), including screws a
    part pivots, swings or turns on and joints the package lists as external
-   interfaces or leaves to final assembly. From the exploded view, sections
-   and steps, classify each nested or seated pair as runs, adjusts or fixed;
+   interfaces or leaves to final assembly. From the exploded view and
+   sections, classify each nested or seated pair as runs, adjusts or fixed;
    for each fixed pair find its load class, its fit or feature on the part
-   sheet, the step that makes it and its bench acceptance, and check the
-   method against rule 23's table. A pair you cannot classify from the
-   package is a candidate. Never compute a capacity or invent a load.
+   sheet and any lock part or retaining feature the views and BOM show, and
+   check the method against rule 23's table. The step that makes a joint, its
+   grade, cure and bench acceptance are in the package's steps: on the sheets
+   or, where the package input carries one, in its ASSEMBLY.MD FIT-UP STEPS
+   section (rule 22); a measurable acceptance (a gap, press depth, stop or a
+   check with a number) is a setting the sheets print. A pair you cannot
+   classify from the package is a candidate. Never compute a capacity or
+   invent a load.
 5. Walk rule 22 item by item and record each gap: assembled views where every
    part is identifiable; an exploded view that reads; a parts list with
-   balloons for every visible part; steps that fit every part the package
-   shows and install no part it does not contain; every check with an
-   acceptance criterion the step can meet; setup states; every consumable
-   named (lubricant, locker, solder). Count each step's printed lines and
-   actions; check that every code and direction it uses is defined on the
-   sheet and every setting finer than .XXX names its instrument.
+   balloons for every visible part; every assembly-level dimension, setting
+   and measurable acceptance as a view dimension, setting diagram or setting
+   table, every setting finer than .XXX naming its instrument; steps that fit
+   every part in order, every check with an acceptance criterion. Read the
+   steps where they print, on the sheets or in the ASSEMBLY.MD FIT-UP STEPS
+   section, and judge both alike: count each step's printed lines and
+   actions and check that every code and direction it uses is defined on a
+   sheet.
 6. Read the package as the first-time builder of the guidelines would: every
    part named by item number with its full drawing number in the BOM (rule
    4); every section, detail and enlarged view lettered with its boundary on

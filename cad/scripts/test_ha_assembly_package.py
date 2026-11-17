@@ -52,6 +52,39 @@ def test_release_ships_the_sequence_and_tool_list(tmp_path, monkeypatch):
         assert use.tool.name in text
 
 
+def test_numbered_steps_and_checks_keep_their_printed_heads():
+    """A numbered step or check prints its head in bold (never a nested
+    ordered list); an unnumbered check is a plain row."""
+    assert package._list_item("12A. TIGHTEN IT.") == "- **12A.** TIGHTEN IT."
+    assert package._list_item("1. THE BAR IS LEVEL.") == "- **1.** THE BAR IS LEVEL."
+    assert package._list_item("CHECK: IT TURNS.") == "- CHECK: IT TURNS."
+
+
+def test_a_listed_package_prints_its_section_and_its_review_reads_it(monkeypatch):
+    """Rule 22, end to end without mocking the generator: a package listed in
+    STEPS_IN_DOCUMENT whose sheet module exposes STEP_SECTIONS and
+    ASSEMBLY_CHECKS prints them in ASSEMBLY.md, and its review prompt carries
+    the same section."""
+    import machinist_review as mr
+    import mg_magnifier_assembly_sheet as sheet
+
+    monkeypatch.setattr(package, "STEPS_IN_DOCUMENT", ("mg-magnifier",))
+    sections = (("FIT-UP", ("1. PRESS ITEM 2 HOME.", "1A. CHECK: ITEM 2 DOES NOT TURN.")),)
+    monkeypatch.setattr(sheet, "STEP_SECTIONS", sections, raising=False)
+    monkeypatch.setattr(sheet, "ASSEMBLY_CHECKS", ("2. ITEM 3 TURNS FREELY.",), raising=False)
+    expected = (
+        "## MHA-MG-00 fit-up steps",
+        "### FIT-UP",
+        "- **1A.** CHECK: ITEM 2 DOES NOT TURN.",
+        "### Checks and notes",
+        "- **2.** ITEM 3 TURNS FREELY.",
+    )
+    text = package.markdown()
+    prompt = mr._review_prompt(mr.ReviewPackage("mg_magnifier_assembly", "assembly", ()), 1)
+    for line in expected:
+        assert f"{line}\n" in text and f"{line}\n" in prompt, line
+
+
 def test_summing_lever_step_stops_before_its_final_assembly_step():
     import ha_harmonic_analyzer_assembly_sheet as ha_sheet
     import sm_summing_assembly_sheet as sm_sheet
