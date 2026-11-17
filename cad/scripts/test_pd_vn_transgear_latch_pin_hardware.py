@@ -6,6 +6,7 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from fractions import Fraction
 from pathlib import Path
@@ -35,6 +36,25 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A474
     assert metadata.threaded is False
+
+
+def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
+    """R9-50: the 7/8 length has no vendor model yet, so the standalone run
+    builds and saves the catalog recipe and never enters the replica path,
+    which demands a vendor SLDPRT and its harvest."""
+    from diagnostics.diag_build_mcmaster import REGISTRY
+
+    assert spec.SKU not in REGISTRY
+    assert not hasattr(recipe, "replica_main")
+    seen: list = []
+
+    async def fake_catalog(adapter, part_no, size, ends):
+        seen.append((part_no, size, ends))
+        return {}
+
+    monkeypatch.setattr(recipe, "build_catalog", fake_catalog)
+    asyncio.run(recipe._catalog(None))
+    assert seen == [(spec.SKU, (spec.DIA, spec.LENGTH), spec.ENDS)]
 
 
 def test_no_vendor_model_of_the_new_pin_is_tracked() -> None:
