@@ -238,6 +238,50 @@ def test_no_view_label_repeats_its_sheet_scale() -> None:
     assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
 
 
+def test_setting_rows_are_cited_by_their_steps_and_clear_the_title_block() -> None:
+    # R5 machinist review (rule 22): the rough-cut length and the cross
+    # screws' full-thread acceptance print in sheet 1's setting table; each
+    # row's step cites it without repeating its value, every row is cited,
+    # and the columns' budget clears the title block.
+    from _general_table import table_column_widths
+    from _drawing_types import DRAWING_TEMPLATES
+
+    steps = notes.steps
+    assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[0]
+    assert notes.SETTING_TABLE_ROWS == (
+        (
+            "1",
+            str(steps.step_number(steps.COLUMNS_ROUGH_CUT_KEY)),
+            "ITEM 2 ROUGH-CUT LENGTH",
+            notes.COLUMN_ROUGH_CUT_LENGTH_TEXT,
+            "STEEL RULE",
+        ),
+        (
+            "2",
+            str(steps.step_number("cross-screws-measured")),
+            "ITEM 9 FULL THREAD UNDER HEAD",
+            notes.CROSS_SCREW_FULL_THREAD_LIMIT_TEXT,
+            "CALIPER",
+        ),
+    )
+    for row in notes.SETTING_TABLE_ROWS:
+        key = steps.SEQUENCE[int(row[1]) - 1]
+        text = notes.STEP_TEXT[key]
+        assert f"SETTING TABLE ROW {row[0]} (SHEET 1)" in text, key
+        assert row[3] not in text, key
+    cited = re.findall(r"SETTING TABLE ROW (\d+)", " ".join(notes.STEP_TEXT.values()))
+    assert sorted(cited) == [row[0] for row in notes.SETTING_TABLE_ROWS]
+    # The columns' budget stays left of the title block.
+    width = sum(
+        table_column_widths(notes.SETTING_TABLE_HEADER, notes.SETTING_TABLE_ROWS)
+    )
+    template = DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SETTING_TABLE_SHEET]]
+    assert (
+        drawing.SETTING_TABLE_XY[0] + width
+        <= template.title_block_left_m - drawing.SETTING_TABLE_CLEARANCE_M
+    )
+
+
 def test_steps_name_parts_by_item_and_use_no_private_vocabulary() -> None:
     steps = " ".join(notes.STEP_TEXT.values())
     for word in (

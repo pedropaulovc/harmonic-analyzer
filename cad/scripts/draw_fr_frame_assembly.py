@@ -72,7 +72,7 @@ from _drawing_ray_pick import (
     _to_part,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
 from _drawing_sections import create_section_view
@@ -88,12 +88,20 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
+from _general_table import insert_general_table
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
 from _assembly_contract import assembly_contract
-from fr_frame_assembly_sheet import EXPLODED_CAPTION, ITEM_NUMBERS
+from fr_frame_assembly_sheet import (
+    EXPLODED_CAPTION,
+    ITEM_NUMBERS,
+    SETTING_TABLE_HEADER,
+    SETTING_TABLE_ROWS,
+    SETTING_TABLE_SHEET_NUMBER,
+    SETTING_TABLE_TITLE,
+)
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
@@ -225,6 +233,14 @@ SHEET_SCALES = {
     SHEET_NAMES[1]: EXPLODED_ISO_SCALE,
     SHEET_NAMES[2]: ASSEMBLY_ISO_SCALE,
 }
+# Sheet 1's setting table (fr_frame_assembly_sheet: the values no model
+# dimension carries) sits under the working front view, left of the title
+# block. R5's lower cutting letters A end 82.8 mm above the sheet's bottom
+# edge, so the title's top stands 7.8 mm under them; the five columns run
+# about 191 mm from x 17 mm, clear of the title block's left edge (216 mm).
+SETTING_TABLE_SHEET = SHEET_NAMES[SETTING_TABLE_SHEET_NUMBER - 1]
+SETTING_TABLE_XY = (0.017, 0.075)
+SETTING_TABLE_CLEARANCE_M = 0.003
 BOM_ANCHOR = (0.018, 0.414)
 # Keep the complete set-screw balloon below the measured BOM, not its nominal
 # row heights: shared-SKU descriptions can wrap and lower the bottom rule.
@@ -2239,6 +2255,39 @@ def _place_deck_detail(
     return view
 
 
+@_telemetry.traced("drawing.frame_setting_table")
+def _place_setting_table(adapter: Any) -> None:
+    """Sheet 1's native setting table: the rows its fit-up steps cite
+    (fr_frame_assembly_sheet.SETTING_TABLE_ROWS), inside the border and left
+    of the title block."""
+    _activate_sheet(adapter, SETTING_TABLE_SHEET)
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    properties = tuple(sheet.GetProperties2())
+    region = sheet_drawable_region(
+        adapter, sheet, width=float(properties[5]), height=float(properties[6])
+    )
+    box = insert_general_table(
+        adapter,
+        title=SETTING_TABLE_TITLE,
+        header=SETTING_TABLE_HEADER,
+        rows=SETTING_TABLE_ROWS,
+        top_left=SETTING_TABLE_XY,
+        label="frame setting table",
+    )
+    template = DRAWING_TEMPLATES[SHEET_LAYOUTS[SETTING_TABLE_SHEET]]
+    if (
+        box[0] < region.xmin + SETTING_TABLE_CLEARANCE_M
+        or box[1] < region.ymin + SETTING_TABLE_CLEARANCE_M
+        or box[2] > template.title_block_left_m - SETTING_TABLE_CLEARANCE_M
+    ):
+        raise RuntimeError(
+            f"the frame setting table {box!r} leaves its field on {SETTING_TABLE_SHEET} "
+            f"({region!r}, title block left {template.title_block_left_m:.4f})"
+        )
+
+
 def _place_package(adapter: Any) -> Callable[[], None]:
     """Place every sheet; return the check that proves every balloon again
     after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
@@ -2270,6 +2319,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_frame_height_dimensions(adapter, front)
     _, top_section = _create_joint_sections(adapter, front)
     inset = _add_nameplate_inset_dimension(adapter, top_section)
+    _place_setting_table(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
