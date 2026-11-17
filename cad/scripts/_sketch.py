@@ -5,10 +5,8 @@ Separate module so edits affect only recipes that use this scope.
 Shared infrastructure for the part reproduction scripts.
 
 Every part/assembly in ``cad/out`` is built by a ``build_<part>.py`` script in
-this directory that drives SolidWorks through the ``PyWin32Adapter`` from the
-``solidworks-mcp-python`` package — vendored as the ``SolidworksMCP-python``
-git submodule and installed editable by ``uv sync`` (``[tool.uv.sources]``), so
-``import solidworks_mcp`` resolves to the submodule with no path juggling.
+this directory that drives SolidWorks through the ``PyWin32Adapter`` of the
+vendored ``solidworks_mcp`` package in this directory.
 
 Conventions (see cad/DIMENSIONS.md for the dimension source of truth):
 

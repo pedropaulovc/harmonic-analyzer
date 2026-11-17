@@ -1474,10 +1474,12 @@ def _assert_source_import_contract(sources):
 
 def test_assembly_source_sinks_have_enforced_import_and_passthrough_contracts():
     paths = {script_for(stem) for stem in ASSEMBLY_ORDER}
+    # The vendored adapter implements placement; it is not a source provider.
     paths.update(
         Path(path)
         for stem in ASSEMBLY_ORDER
         for path in module_deps_of(script_for(stem))
+        if "solidworks_mcp" not in Path(path).parts
     )
     _assert_source_import_contract(
         {path.stem: path.read_text(encoding="utf-8") for path in paths}

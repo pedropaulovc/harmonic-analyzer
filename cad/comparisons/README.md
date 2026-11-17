@@ -134,7 +134,7 @@ uv run cad/comparisons/tools/seed_manifest.py
 
 # 2. render offline (no SolidWorks): refresh the STL cache once after
 #     any rebuild, then Blender replays the same manifest cameras
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
+uv run python cad\scripts\export_models.py
 uv run cad/comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 #    parts render from their own STL; assemblies instance per-part STLs
 #    (metres, untranslated) through the scene graph in cad/out/boxes/*.json,
@@ -148,7 +148,7 @@ uv run cad/comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 uv run cad/comparisons/tools/composite.py [--only id1,id2]
 
 # 4. selective model rebuild after fixing a part script (dependent assemblies refresh)
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:dt_cone_gear
+uv run python -m doit part:dt_cone_gear
 ```
 
 ## Interactive posing — Blender pose studio
@@ -160,7 +160,7 @@ just `uv` + Blender.
 
 ```powershell
 # export the STL cache once after any rebuild (same prerequisite as render_offline)
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
+uv run python cad\scripts\export_models.py
 # launch — the script relaunches itself inside Blender's GUI
 uv run cad/comparisons/tools/pose_studio.py --pair ch30-p003
 ```

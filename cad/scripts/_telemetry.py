@@ -1755,9 +1755,9 @@ def instrument_adapter(cls: type) -> int:
     """Wrap ``cls``'s :data:`ADAPTER_TRACED_METHODS` in ``adapter.<method>`` spans.
 
     The OpenTelemetry instrumentation-library pattern (``RequestsInstrumentor``):
-    the adapter lives in the vendored ``SolidworksMCP-python`` submodule, whose
-    content is folded into EVERY COM task's cache key, and a span there would
-    re-key all ~227 leaves. Wrapping from here re-keys none -- this module is
+    the adapter is vendored in ``cad/scripts/solidworks_mcp``, in the import
+    closure (and so the cache key) of every COM task, and a span there would
+    re-key them all. Wrapping from here re-keys none -- this module is
     recipe-inert -- and a wrapper only times the call: same arguments, same
     result, same exception. Idempotent; returns how many methods it wrapped."""
     wrapped = 0

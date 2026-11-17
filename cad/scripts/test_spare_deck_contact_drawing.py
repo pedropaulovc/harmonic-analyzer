@@ -533,7 +533,9 @@ async def test_outer_timing_checkpoint_cannot_replace_measure_failure(
     monkeypatch.setattr(probe, "ROOT", tmp_path)
     monkeypatch.setattr(probe.sys, "prefix", str(tmp_path / ".venv"))
     monkeypatch.setattr(
-        pywin32_adapter, "__file__", str(tmp_path / "SolidworksMCP-python/adapter.py")
+        pywin32_adapter,
+        "__file__",
+        str(tmp_path / "cad/scripts/solidworks_mcp/adapter.py"),
     )
     monkeypatch.setattr(probe.subprocess, "check_output", lambda *a, **kw: "f" * 40)
     monkeypatch.setattr(probe, "digest", lambda _: "e" * 64)

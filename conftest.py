@@ -117,10 +117,18 @@ def _install_activation_guard():
     a Dispatch starts SolidWorks without any Popen. Collection is covered too.
     """
     class_ids = _guard.launcher_class_ids()
+    # The vendored adapter imports only from cad/scripts; append it so its
+    # launch entry points are bound here, before any test imports them. A
+    # private nested project (a copy of this conftest) has no adapter to guard.
+    scripts = Path(__file__).resolve().parent / "cad" / "scripts"
+    if scripts.is_dir() and str(scripts) not in sys.path:
+        sys.path.append(str(scripts))
     for module_name in _guard.GUARDED_MODULES:
         try:
             module = importlib.import_module(module_name)
         except ImportError:
+            if module_name.startswith("solidworks_mcp.") and scripts.is_dir():
+                raise
             continue
         _guard.guard_module(module_name, module, _refuse, class_ids)
 

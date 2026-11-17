@@ -19,8 +19,8 @@ self-checks) used to re-export ALL ~119 parts on every release. Two causes:
   mtimes, so on cache-restore releases every part looked stale.
 
 **Fix:** export staleness now keys on the SAME churn-immune recipe digest the rest
-of the pipeline uses — `dodo._stable_artefact_digest` (see [[two-tier-submodule-digest]]),
-imported from dodo. Per-output source
+of the pipeline uses — `dodo._stable_artefact_digest`,
+imported the way `verify.py`'s freshness guard imports dodo. Per-output source
 digests are recorded in `cad/out/stl/export-src.json`; a re-export fires iff an
 output is missing/colour-uncached OR the source's recipe digest changed.
 `manifest_part_stale` keeps the STEP requirement only for real manifest parts.

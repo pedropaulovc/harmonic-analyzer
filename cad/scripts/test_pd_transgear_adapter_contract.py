@@ -19,7 +19,7 @@ import pytest
 
 
 SCRIPTS = Path(__file__).resolve().parent
-SDK = SCRIPTS.parents[1] / "SolidworksMCP-python" / "src" / "solidworks_mcp"
+SDK = SCRIPTS / "solidworks_mcp"
 ADAPTER = SDK / "adapters" / "pywin32_adapter.py"
 RECIPES = (
     "build_pd_transgear_knob_shaft.py",
