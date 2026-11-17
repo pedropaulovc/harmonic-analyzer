@@ -42,14 +42,17 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    for each fixed pair find its load class, its fit or feature on the part
    sheet and any lock part or retaining feature the views and BOM show, and
    check the method against rule 23's table. The step that makes a joint and
-   its bench acceptance live in ASSEMBLY.md (rule 22), not on the sheets. A
-   pair you cannot classify from the package is a candidate. Never compute a
-   capacity or invent a load.
+   the wording of a non-numeric bench acceptance live in ASSEMBLY.md (rule
+   22), not on the sheets; a measurable acceptance (a gap, press depth, stop
+   or a check with a number) is a setting the sheets print. A pair you cannot
+   classify from the package is a candidate. Never compute a capacity or
+   invent a load.
 5. Walk rule 22 item by item and record each gap: assembled views where every
    part is identifiable; an exploded view that reads; a parts list with
-   balloons for every visible part; the assembly-level dimensions and
-   settings as views or setting tables, every setting finer than .XXX naming
-   its instrument. Steps, checks, setup procedures and consumables print in
+   balloons for every visible part; every assembly-level dimension, setting
+   and measurable acceptance as a view dimension, setting diagram or setting
+   table, every setting finer than .XXX naming its instrument. Steps, the
+   wording of non-numeric checks, setup procedures and consumables print in
    ASSEMBLY.md, not on the sheets: never report them missing. Where a sheet
    still prints steps, count each step's printed lines and actions and check
    that every code and direction it uses is defined on the sheet.
