@@ -1139,8 +1139,10 @@ clone the vendor B-rep through the `diag_mcmaster_lib` replica gate. Existing
 threaded SKUs keep their grooves, because assembly `ALLOWED_PAIRS` overlap
 budgets and `_stock_fastener`'s declared-thread check are calibrated against
 them. Give every new purchased part its COTS tier in `cad/config/hardware.yaml`;
-a tier-1 (standard) part also takes its designation, standard and envelope
-sources there, which `hardware_schedule.py` prints as the release's `HARDWARE.md`.
+a tier-1 (standard) part also takes its designation and standard there, plus
+envelope sources when a head, nut, washer or wire must clear its seat (fits such
+as pins, chain, set-screw lengths and retaining rings print `per <standard>`).
+`hardware_schedule.py` prints these rows as the release's `HARDWARE.md`.
 
 Simplified configuration helpers are separated by their real consumers:
 `_simplified_names` is naming only, `_simplified_identity` fingerprints assembly

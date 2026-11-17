@@ -7,13 +7,14 @@
 # sheet (MAKE FROM blank + the shop's cuts). The oblique trammel jig's vendor
 # parts are not listed: that family is retiring.
 #
-# Tier-1 rows also carry `designation`, `standard` and, where a head, nut or
-# washer must clear its seat, an `envelope`. Each envelope value is
+# Tier-1 rows also carry `designation`, `standard` and, where a head, nut,
+# washer or wire must clear its seat, an `envelope`. Each envelope value is
 # "<pure provider module> [factor*]<attribute path>": an attribute such as
 # HEAD_DIA or DIMS.od_max, or a Supplier* reference dimension; millimetres.
-# Heads and nuts print across corners (factor 1/cos(pi/n)). Pins and chain
-# carry none: their sizes are fits fixed by the designation and standard,
-# and their catalogue tolerances lie above the modelled nominal.
+# Heads and nuts print across corners (factor 1/cos(pi/n)). Pins, chain,
+# set screws and retaining rings carry none: their sizes are fits fixed by
+# the designation and standard, and their catalogue tolerances lie above the
+# modelled nominal.
 ch-vn-bracket-hold-down-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -35,8 +36,6 @@ ch-vn-fulcrum-set-screw:
   why: "ASME B18.3 socket set screw, used as supplied"
   designation: "#1-72 UNF-3A x 5/32 hex socket set screw, cup point, alloy steel"
   standard: "ASME B18.3"
-  envelope:
-    "L": "_mcmaster_91375a942 SupplierLength"
 ch-vn-rocker-thrust-washer:
   tier: 1
   why: "commodity ring shim defined by ID, OD and thickness"
@@ -244,9 +243,6 @@ pd-vn-transgear-retaining-ring:
   why: "commodity E-style external ring sized by its shaft"
   designation: "E-style external retaining ring for Ø1/8 shaft, spring steel"
   standard: "—"
-  envelope:
-    "OD": "pd_vn_transgear_retaining_ring_spec OD"
-    "T": "pd_vn_transgear_retaining_ring_spec THICKNESS"
 pn-vn-hanger-screw:
   tier: 1
   why: "ASME B18.6.3 hex head machine screw, used as supplied"
@@ -284,8 +280,6 @@ sh-vn-arbor-set-screw:
   why: "ASME B18.3 socket set screw, used as supplied"
   designation: "#4-40 UNC-3A x 1/4 hex socket set screw, cup point, alloy steel"
   standard: "ASME B18.3"
-  envelope:
-    "L": "sh_vn_arbor_set_screw_spec LENGTH"
 sh-vn-brass-fillister-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
