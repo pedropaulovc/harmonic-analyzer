@@ -168,8 +168,11 @@ def harness(tmp_path, monkeypatch):
         helper_paths[name] = path
     recipe_path = scripts / "draw_dt_pinion_lift_rod.py"
     recipe_path.write_text("import _drawing_gdt\n", encoding="utf-8")
-    local_modules = {path.stem: path for path in (*helper_paths.values(), recipe_path)}
-    monkeypatch.setattr(_buildgraph, "_local_modules", lambda: local_modules)
+    # Point the real module map at this tree and drop every per-process import
+    # fact on both sides: a cached map left behind would drop relative imports
+    # from later closures in the same worker (#3030).
+    monkeypatch.setattr(_buildgraph, "SCRIPTS_DIR", scripts)
+    _buildgraph.clear_import_caches()
     recipe = SimpleNamespace(SOURCE=source, ROD_DIA=6.35, __file__=str(recipe_path))
     recipe.add_datum_feature = lambda *_args, **_kwargs: None
 
@@ -213,7 +216,8 @@ def harness(tmp_path, monkeypatch):
         monkeypatch.setattr(sys, "argv", [module.__file__, *(str(arg) for arg in arguments), "--worker"])
         return module.main()
 
-    return SimpleNamespace(**locals())
+    yield SimpleNamespace(**locals())
+    _buildgraph.clear_import_caches()
 
 
 def ownership_witnesses(h):
