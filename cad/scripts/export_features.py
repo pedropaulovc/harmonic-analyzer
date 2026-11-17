@@ -33,7 +33,6 @@ import _part_configuration_exports
 import _part_properties
 import _surface_finish
 from _feature_requirements import (
-    declaration_calls,
     discover_parts,
     member_configurations,
     metadata_for,
@@ -81,7 +80,7 @@ def _notes_module(stem: str) -> ModuleType:
 
 
 def _declarations(module: ModuleType) -> dict[str, str]:
-    """Resolve cached, current AST declarations rather than hand-entered spans."""
+    """Resolve cached, current top-level declarations to ``<file>.py#<symbol>`` cites."""
     path = Path(module.__file__).resolve()
     return _source_declarations(path, source_tree(path))
 
@@ -99,7 +98,7 @@ def _source_declarations(path: Path, tree: ast.Module) -> dict[str, str]:
     relative = path.relative_to(REPO).as_posix()
     result = {}
     if tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str):
-        result["__frame__"] = f"harmonic-analyzer/{relative}:{tree.body[0].lineno}-{tree.body[0].end_lineno}"
+        result["__frame__"] = f"harmonic-analyzer/{relative}#__doc__"
     for node in tree.body:
         if isinstance(node, ast.Assign):
             names = [name for target in node.targets for name in _target_names(target)]
@@ -110,7 +109,7 @@ def _source_declarations(path: Path, tree: ast.Module) -> dict[str, str]:
         else:
             continue
         for name in names:
-            result[name] = f"harmonic-analyzer/{relative}:{node.lineno}-{node.end_lineno}"
+            result[name] = f"harmonic-analyzer/{relative}#{name}"
     return result
 
 
@@ -128,22 +127,6 @@ def _spec_cite(module: ModuleType, sources: tuple[str | tuple[str, str], ...]) -
         owner, name = (importlib.import_module(source[0]), source[1]) if isinstance(source, tuple) else (module, source)
         citations.extend(_cite(owner, name))
     return list(dict.fromkeys(citations))
-
-
-@lru_cache(maxsize=256)
-def _call_spans(tree: ast.Module) -> frozenset[tuple[int, int]]:
-    return frozenset(
-        (call.lineno, call.end_lineno)
-        for api in ("requirement", "part_metadata")
-        for call in declaration_calls(tree, api)
-    )
-
-
-def _call_cite(path: Path, span: tuple[int, int]) -> list[str]:
-    tree = source_tree(path)
-    if span not in _call_spans(tree):
-        raise ValueError(f"missing declaration call at {path}:{span[0]}-{span[1]}")
-    return [f"harmonic-analyzer/{path.relative_to(REPO).as_posix()}:{span[0]}-{span[1]}"]
 
 
 def _title_cite(*keys: str, unit: str = "mm") -> list[str]:
@@ -301,16 +284,12 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     module = _spec_module(stem)
     drawing = _drawing_module(stem)
     declarations = requirements_for(drawing)
-    call_cites = {}
-
-    def call_cite(declared: Any) -> list[str]:
-        site = declared.path, declared.call_span
-        if site not in call_cites:
-            call_cites[site] = _call_cite(*site)
-        return call_cites[site]
-
-    calls = {name: call_cite(declared) for name, declared in declarations.items()}
-    metadata = [(declared, call_cite(declared)) for declared in metadata_for(drawing)]
+    relative = Path(drawing.__file__).resolve().relative_to(REPO).as_posix()
+    calls = {name: [f"harmonic-analyzer/{relative}#requirement:{name}"] for name in declarations}
+    metadata = [
+        (declared, [f"harmonic-analyzer/{relative}#part_metadata:{ordinal}"])
+        for ordinal, declared in enumerate(metadata_for(drawing), 1)
+    ]
     facts = {}
     fact_citations = {}
     precision_cite = []

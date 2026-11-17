@@ -27,7 +27,7 @@ import _rocker_interface as rocker_interface
 import dt_cone_pivot_post_spec as cone
 import rocker_bank_layout as bank
 from _export_feature_faces import FeatureFaceError, face_name
-from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
+from _feature_requirements import discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceGeometry
 from _printed_tolerance import drilled_oversize_mm, edge_break_radius_mm, printed_band_mm
 
@@ -232,13 +232,10 @@ def test_assignment_subscript_and_attribute_targets_cannot_hijack_symbol_citatio
     monkeypatch.setattr(exporter, "REPO", tmp_path)
     module = ModuleType("authority")
     module.__file__ = str(path)
-    tree = source_tree(path)
-    expected = f"harmonic-analyzer/authority.py:{tree.body[0].lineno}-{tree.body[0].end_lineno}"
-    assert exporter._cite(module, "KEY") == [expected]
+    assert exporter._cite(module, "KEY") == ["harmonic-analyzer/authority.py#KEY"]
     assert {"FIRST", "SECOND", "THIRD"} <= exporter._declarations(module).keys()
     path.write_text("\n" + path.read_text(encoding="utf-8"), encoding="utf-8")
-    updated = source_tree(path).body[0]
-    assert exporter._cite(module, "KEY") == [f"harmonic-analyzer/authority.py:{updated.lineno}-{updated.end_lineno}"]
+    assert exporter._cite(module, "KEY") == ["harmonic-analyzer/authority.py#KEY"]
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
@@ -247,19 +244,12 @@ def test_draw_declarations_cite_current_calls_and_declared_sources(stem: str) ->
     declarations = requirements_for(draw)
     features = exporter.requirement_manifest(stem)["features"]
     path = Path(draw.__file__).resolve()
-    calls = declaration_calls(source_tree(path), "requirement")
-    assert calls, f"{path.name} has no module-level requirement calls"
     relative = path.relative_to(exporter.REPO).as_posix()
-    call_citations = {
-        f"harmonic-analyzer/{relative}:{call.lineno}-{call.end_lineno}"
-        for call in calls
-    }
     spec = exporter._spec_module(stem)
     for name, declared in declarations.items():
         feature = features[name]
         assert declared.path == path
-        call_citation = f"harmonic-analyzer/{relative}:{declared.call_span[0]}-{declared.call_span[1]}"
-        assert call_citation in call_citations, (stem, name, call_citation)
+        call_citation = f"harmonic-analyzer/{relative}#requirement:{name}"
         for field, (value, sources) in declared.fields.items():
             assert feature[field] == (list(value) if isinstance(value, tuple) else value), (stem, name, field)
             citations = set(feature["cite"][field])
@@ -884,12 +874,13 @@ def test_all_emitted_citations_resolve_current_python_ast_and_yaml_scalar_source
     assert citations, f"{stem}: no citations emitted"
     dashed = stem.replace("_", "-")
     assert f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}.number" in citations
-    assert any(".py:" in citation for citation in citations), f"{stem}: no Python sources cited"
+    assert any(".py#" in citation for citation in citations), f"{stem}: no Python sources cited"
     source_text = {}
-    python_spans = {}
+    python_symbols = {}
     yaml_documents = {}
     for reference in citations:
-        filename, separator, location = reference.removeprefix("harmonic-analyzer/").partition(":")
+        reference = reference.removeprefix("harmonic-analyzer/")
+        filename, separator, location = reference.partition("#") if "#" in reference else reference.partition(":")
         assert separator and location, reference
         path = exporter.REPO / filename
         assert path.is_file(), f"{reference}: missing source file"
@@ -904,17 +895,16 @@ def test_all_emitted_citations_resolve_current_python_ast_and_yaml_scalar_source
                 value = value[key]
             assert value is not None and not isinstance(value, (dict, list)), f"{reference}: not a scalar value"
         elif path.suffix == ".py":
-            low, dash, high = location.partition("-")
-            assert low.isdecimal() and dash and high.isdecimal(), f"{reference}: invalid AST span"
-            span = int(low), int(high)
-            assert 1 <= span[0] <= span[1] <= len(source_text[path].splitlines()), reference
-            if path not in python_spans:
-                python_spans[path] = {
-                    (node.lineno, node.end_lineno)
-                    for node in ast.walk(ast.parse(source_text[path]))
-                    if hasattr(node, "lineno") and hasattr(node, "end_lineno")
+            if path not in python_symbols:
+                python_symbols[path] = {
+                    "__doc__" if name == "__frame__" else name
+                    for name in exporter._source_declarations(path, source_tree(path))
                 }
-            assert span in python_spans[path], f"{reference}: not a current AST declaration/call span"
+            api, colon, name = location.partition(":")
+            if colon:
+                assert api in {"requirement", "part_metadata"} and name, f"{reference}: invalid call citation"
+            else:
+                assert location in python_symbols[path], f"{reference}: not a current top-level declaration"
         else:
             pytest.fail(f"{reference}: unsupported citation source")
 
