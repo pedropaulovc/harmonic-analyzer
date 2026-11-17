@@ -38,7 +38,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_feed_block/features.toml"
-adapter = "harmonic_feed_block"
+adapter = "feed_block"
+part = "ch-rocker-arm-tl-oblique-feed-block"
 
 [parameters]
 # drill_pecking steps, one drill Ø each: #15 (.180 in), F (.257 in).

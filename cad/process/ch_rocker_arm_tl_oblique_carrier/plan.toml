@@ -43,7 +43,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_carrier/features.toml"
-adapter = "harmonic_carrier"
+adapter = "carrier"
+part = "ch-rocker-arm-tl-oblique-carrier"
 
 [parameters]
 # drill_pecking steps, one drill Ø each: #43 (.089 in), #29 (.136 in).

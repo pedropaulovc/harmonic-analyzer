@@ -24,7 +24,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_feed_lever/features.toml"
-adapter = "harmonic_feed_lever"
+adapter = "feed_lever"
+part = "ch-rocker-arm-tl-oblique-feed-lever"
 
 [parameters]
 # Hand sheet: saw 11.9, at least 11.85; both ends are then milled to length.

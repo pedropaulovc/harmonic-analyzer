@@ -1,5 +1,5 @@
 # Prechips plan for MHA-CH-06-TL-24 (oblique trammel riser). Needs prechips
-# 0.11.4 (the harmonic_riser adapter's blank_max_length_in and
+# 0.11.4 (the riser adapter's blank_max_length_in and
 # edge_finder_dia_in guards, its Setup 2 face_* stations, thickness_min_mm and
 # blank_max_length_mm, the plan-level milling_material and beam vise links,
 # and vise_holding's full-height grip ruling); prechips examples/riser.toml
@@ -27,7 +27,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_riser/features.toml"
-adapter = "harmonic_riser"
+adapter = "riser"
+part = "ch-rocker-arm-tl-oblique-riser"
 
 [parameters]
 blank_length_in = 14.0

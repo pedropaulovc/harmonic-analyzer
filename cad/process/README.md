@@ -173,7 +173,7 @@ grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags need the 0.11.0 jig pictures. The riser plan needs 0.11.4
-(its `harmonic_riser` adapter's Setup 2 stations and Setup 4 guards). The base-bar, end-bracket and
+(its `riser` adapter's Setup 2 stations and Setup 4 guards). The base-bar, end-bracket and
 feed-lever plans need the first prechips release after 0.11.3, which carries
 pedropaulovc/prechips#436: they read that release's adapter-bound
 milling-deflection stations (base bar `cad.jack_*_x_mm`, `cad.strap_*_x_mm`
@@ -194,7 +194,7 @@ drill Ø) bound into both `step_mm` and the instruction
 parameter `lug_bore_depth_mm`, printed the same way; earlier releases refuse
 those fields and bindings.
 
-The riser plan (TL-24) needs prechips 0.11.4: 0.11.0 added its `harmonic_riser`
+The riser plan (TL-24) needs prechips 0.11.4: 0.11.0 added its riser
 adapter and the `milling_deflection` check; 0.11.4 derives the Setup 2 strap
 stations and faced spans from the authored strap layout (refusing a strap off
 faced metal or in a cut), binds the .230 minimum thickness the Setup 3–5 beams
@@ -227,7 +227,11 @@ ruling 2026-11-16). No shop tool states `helix_deg` or `axial_ratio`: no
 vendor page for the owned cutters (the LMS 6784 set) publishes a helix, so the
 configured 1.0 applies.
 
-prechips 0.11.4 also needs these plan and template changes. The base bar's
+prechips 0.11.4 also needs these plan and template changes. Each plan's
+`[cad]` table names a neutral adapter (`base_bar`, `end_bracket`,
+`feed_lever`, `riser`, `carrier`, `pivot_block`, `feed_block`,
+`leadscrew_kit`) and the manifest's `part` id, which the adapter checks
+(pedropaulovc/prechips#452). The base bar's
 Setup 3 slot and spot cantilevers declare `vise_left = "start"` and clamp at
 the blank-centred grip (`cad.blank_centred_overhang_mm`..
 `cad.blank_centred_jaw_right_mm`; pedropaulovc/prechips#446). The carrier's
@@ -334,7 +338,7 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   screws through both holes at once.
 
 The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
-is enrolled. It needs prechips 0.11.1 (the `harmonic_carrier` adapter with
+is enrolled. It needs prechips 0.11.1 (the carrier adapter with
 its `block_tolerance_in` refusal, and the `jig-carrier-*` pictures), and passes
 both profiles under `@latest` with every check enforced. The 20.5 in plate is made flat on the table, vise off,
 on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
@@ -365,13 +369,13 @@ lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
 piloted and plunged in .25 full-retract pecks with the same 3/8 end mill with
 the block standing on SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
 and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
-(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
+(`pivot_block`, `feed_block`) ship in prechips 0.11.0 (released). No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 The leadscrew kit's plan (`ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml`,
 MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.4 (its saw lay binds the adapter's rounded-up 1/16 in step): its
-`harmonic_leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
+`leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
 cut end and five flats, the FeedNut member's faced seat, countersinks and
 receipt limits), and its `kit-*` setup pictures are prechips layouts. The route
 is authored (no hand traveler): receive and check the kit, hacksaw the screw

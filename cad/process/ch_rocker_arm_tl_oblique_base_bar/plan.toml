@@ -31,7 +31,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
-adapter = "harmonic_base_bar"
+adapter = "base_bar"
+part = "ch-rocker-arm-tl-oblique-base-bar"
 
 [parameters]
 # drill_pecking: BB07 posts G83 full-retract pecks of one #29 Ø (.136 in).

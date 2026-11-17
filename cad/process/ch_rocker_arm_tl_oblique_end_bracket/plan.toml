@@ -27,7 +27,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_end_bracket/features.toml"
-adapter = "harmonic_end_bracket"
+adapter = "end_bracket"
+part = "ch-rocker-arm-tl-oblique-end-bracket"
 
 [parameters]
 # drill_pecking: full-retract pecks of one #29 Ø (.136 in).

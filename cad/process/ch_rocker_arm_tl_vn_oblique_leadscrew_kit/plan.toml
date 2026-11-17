@@ -22,7 +22,8 @@ material_key = "sus304"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/features.toml"
-adapter = "harmonic_leadscrew_kit"
+adapter = "leadscrew_kit"
+part = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
 
 [parameters]
 screw_stock_length_mm = 600.0

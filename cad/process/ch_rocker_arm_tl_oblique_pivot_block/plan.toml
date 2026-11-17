@@ -27,7 +27,8 @@ milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_pivot_block/features.toml"
-adapter = "harmonic_pivot_block"
+adapter = "pivot_block"
+part = "ch-rocker-arm-tl-oblique-pivot-block"
 
 [parameters]
 # drill_pecking steps, one drill Ø each: #15 (.180 in), F (.257 in).
