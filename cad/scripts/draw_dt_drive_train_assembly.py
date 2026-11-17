@@ -30,7 +30,6 @@ from typing import Any, Callable, Iterator, Literal, NamedTuple, Sequence
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -82,6 +81,16 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
+from _general_table import (
+    NOTE_ANCHOR_PASSES,
+    NOTE_ANCHOR_SETTLE,
+    NOTE_FIELD_INSET,
+    NOTE_LINE_PITCH,
+    add_note_block,
+    anchor_note,
+    insert_general_table,
+    note_extent,
+)
 from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 from _machinist_review_mode import MachinistReviewMode
 import _seat_forensics
@@ -620,9 +629,6 @@ NOTE_FIELD_RIGHT = (
     0.415,
     DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + BOM_SHEET_CLEARANCE,
 )
-NOTE_FIELD_INSET = 0.0005
-NOTE_ANCHOR_PASSES = 3
-NOTE_ANCHOR_SETTLE = 0.00005
 NOTE_BLOCK_GAP = 0.006
 # A note's anchor is its top edge: y=0.268 crossed the top zone border by
 # 1.5 mm on every sheet; summing's headings at 0.263 pass.
@@ -635,9 +641,6 @@ BOM_REFERENCE_VIEW_BOTTOM = 0.025
 # caption still prints ~3 mm over the title block (rubric sample round 4: the
 # one-thing sub-steps outgrew the fields).
 REFERENCE_ISO_CENTER = (0.380, 0.103)
-# Notes print at 4.525 mm a line (summing-assembly.pdf; this package's telemetry:
-# 47 lines measure 212.33 mm).
-NOTE_LINE_PITCH = 0.004525
 # ~47 lines fit the full left column, ~26 the right one above the 1:8 reference
 # view that every sheet needs for its title-block property links
 # (finalize_drawing refuses a sheet without a view: r8, leaf
@@ -690,22 +693,6 @@ STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
 # R16 print's pitch) take the table bottom from ~120 to ~109 mm.
 INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.101, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
-# A general table's cell text runs ~2.8 mm a character at the 3.5 mm note
-# font (47 note lines measured 212.33 mm; 70 characters ~194 mm); each column
-# is cut to its longest cell plus 2 mm a side.
-TABLE_CHAR_WIDTH = 0.0028
-TABLE_CELL_PAD = 0.004
-TABLE_TITLE_GAP = 0.0015
-# A sheet 15 table hangs a fixed drop under its title's requested top: the
-# inset, the title's one line and the gap.  It used to hang off the title's
-# INote.GetExtent bottom, which reads to the seat window's pixel, and each
-# table carried the error down the stack: the same sheet put the pedestal
-# recheck table's bottom at 172.53 mm on a 1010x598 px window (leaf
-# 20261112T161937Z, 2.098 px/mm) and at 171.63 mm, inside the station table
-# field, on a 1010x678 px one (leaf 20261113T025825Z, 2.325 px/mm; release
-# v49 r2).  Only the table's own position and row heights, which SolidWorks
-# holds in sheet metres, set the next table's top.
-TABLE_TITLE_DROP = NOTE_FIELD_INSET + NOTE_LINE_PITCH + TABLE_TITLE_GAP
 # Between one table's last row and the next table's title
 # (draw_ch_rocker_arm_tl_oblique_jig_assembly.TABLE_GAP).  At NOTE_BLOCK_GAP
 # the pedestal recheck table, four rows since PR #2640, ended 0.2 mm over the
@@ -2409,7 +2396,7 @@ def bank_setting_caption_violations(
 ) -> list[str]:
     """Actual caption ink must retain at least 4 mm below its view.
 
-    ``_anchor_note`` steers toward a point; its bounded moves do not promise
+    ``anchor_note`` steers toward a point; its bounded moves do not promise
     that point. The functional postcondition is measured air, not target error.
     """
     if not all(map(math.isfinite, (*extent, *outline))):
@@ -3276,62 +3263,6 @@ def _activate_sheet(adapter: Any, name: str) -> None:
         raise RuntimeError(f"active drawing sheet is {actual!r}, expected {name!r}")
 
 
-def _add_note_block(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> Any:
-    note = add_note(adapter, text, *xy)
-    if note is None:
-        raise RuntimeError(f"failed to add {label}")
-    note = _early_bound(note, "INote")
-    actual = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
-    expected = text.replace("\r\n", "\n").replace("\r", "\n")
-    if actual != expected:
-        raise RuntimeError(
-            f"{label} text did not persist "
-            f"(actual_length={len(actual)}, expected_length={len(expected)})"
-        )
-    return note
-
-
-def _note_extent(adapter: Any, note: Any, *, label: str) -> tuple[float, ...]:
-    """The rendered sheet-space box (x0, y0, x1, y1) of a free note."""
-    adapter.currentModel.GraphicsRedraw2()
-    extent = tuple(float(value) for value in (_early_bound(note, "INote").GetExtent() or ()))
-    if len(extent) != 6 or extent[3] <= extent[0] or extent[4] <= extent[1]:
-        raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
-    return (extent[0], extent[1], extent[3], extent[4])
-
-
-def _anchor_note(
-    adapter: Any, note: Any, corner: tuple[float, float], *, label: str
-) -> tuple[float, ...]:
-    """Steer a note's RENDERED top-left corner toward ``corner`` (summing r10/r11:
-    the text box neither sits on nor tracks the insertion point 1:1)."""
-    target_x, target_y = corner
-    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
-    if annotation is None:
-        raise RuntimeError(f"{label}: note has no annotation to move")
-    extent = _note_extent(adapter, note, label=label)
-    moves = 0
-    for _pass in range(NOTE_ANCHOR_PASSES):
-        shift = (target_x - extent[0], target_y - extent[3])
-        if max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE:
-            break
-        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-        if len(position) != 3:
-            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
-        if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
-            raise RuntimeError(f"{label}: note SetPosition failed")
-        extent = _note_extent(adapter, note, label=label)
-        moves += 1
-    _telemetry.event(
-        "drawing.note_anchor",
-        block=label,
-        moves=moves,
-        target_mm=(target_x * 1000.0, target_y * 1000.0),
-        extent_mm=tuple(value * 1000.0 for value in extent),
-    )
-    return extent
-
-
 def _stack_note_field(
     adapter: Any,
     blocks: tuple[tuple[str, str], ...],
@@ -3344,8 +3275,8 @@ def _stack_note_field(
     y = top
     findings = []
     for block_label, text in blocks:
-        note = _add_note_block(adapter, text, (left, y), label=block_label)
-        extent = _anchor_note(
+        note = add_note_block(adapter, text, (left, y), label=block_label)
+        extent = anchor_note(
             adapter, note, (left + NOTE_FIELD_INSET, y - NOTE_FIELD_INSET), label=block_label
         )
         violations = note_field_violations(extent, field)
@@ -3373,16 +3304,6 @@ def _stack_sheet_note_fields(adapter: Any, facts: SourceFacts, sheet: int) -> li
     return findings
 
 
-def table_column_widths(
-    header: Sequence[str], rows: Sequence[Sequence[str]]
-) -> tuple[float, ...]:
-    """Each general-table column cut to its longest cell (metres)."""
-    return tuple(
-        max(len(text) for text in column) * TABLE_CHAR_WIDTH + TABLE_CELL_PAD
-        for column in zip(header, *rows, strict=True)
-    )
-
-
 def table_box_violations(
     box: tuple[float, float, float, float], *, label: str
 ) -> list[str]:
@@ -3400,65 +3321,6 @@ def table_box_violations(
             f"{label} runs {(INTERFACE_FIELD[1] - y0) * 1000.0:.1f} mm into the interface notes field"
         )
     return findings
-
-
-def _place_general_table(
-    adapter: Any,
-    *,
-    title: str,
-    header: Sequence[str],
-    rows: Sequence[Sequence[str]],
-    top_left: tuple[float, float],
-    label: str,
-) -> tuple[float, float, float, float]:
-    """A titled native general table, every cell read back; returns its box.
-
-    The table's top is :data:`TABLE_TITLE_DROP` under ``top``, whatever the
-    title's rendered box reads on this seat's window."""
-    x, top = top_left
-    title_note = _add_note_block(adapter, title, (x, top), label=f"{label} title")
-    _anchor_note(
-        adapter, title_note, (x + NOTE_FIELD_INSET, top - NOTE_FIELD_INSET), label=f"{label} title"
-    )
-    table_top = top - TABLE_TITLE_DROP
-    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
-    # swBOMConfigurationAnchor_TopLeft = 1; no template: a plain general table.
-    raw = ddoc.InsertTableAnnotation2(False, x, table_top, 1, "", len(rows) + 1, len(header))
-    if raw is None:
-        raise RuntimeError(f"{label}: InsertTableAnnotation2 returned no table")
-    table = _early_bound(raw, "ITableAnnotation")
-    if (int(table.RowCount), int(table.ColumnCount)) != (len(rows) + 1, len(header)):
-        raise RuntimeError(
-            f"{label}: table is {table.RowCount}x{table.ColumnCount}, "
-            f"expected {len(rows) + 1}x{len(header)}"
-        )
-    for column, width in enumerate(table_column_widths(header, rows)):
-        # swTableRowColChange_TableSizeCanChange = 0
-        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
-            raise RuntimeError(f"{label}: column {column} width did not persist")
-    for row, cells in enumerate((header, *rows)):
-        for column, text in enumerate(cells):
-            table.SetText2(row, column, True, text)
-            applied = str(table.DisplayedText2(row, column, True) or "")
-            if applied != text:
-                raise RuntimeError(
-                    f"{label}: cell ({row}, {column}) did not persist: {applied!r} != {text!r}"
-                )
-    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
-    widths = tuple(float(table.GetColumnWidth(column)) for column in range(int(table.ColumnCount)))
-    if len(position) != 3 or not all(map(math.isfinite, (*position, *heights, *widths))):
-        raise RuntimeError(f"{label}: table geometry is unreadable")
-    box = (position[0], position[1] - sum(heights), position[0] + sum(widths), position[1])
-    _telemetry.event(
-        "drawing.general_table",
-        table=label,
-        box_mm=tuple(value * 1000.0 for value in box),
-        row_heights_mm=tuple(value * 1000.0 for value in heights),
-        column_widths_mm=tuple(value * 1000.0 for value in widths),
-    )
-    return box
 
 
 def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -3479,7 +3341,7 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         ),
         (FEELER_STACK_TITLE, FEELER_STACK_HEADER, FEELER_STACK_ROWS, "feeler stack table"),
     ):
-        box = _place_general_table(
+        box = insert_general_table(
             adapter,
             title=title,
             header=header,
@@ -3528,10 +3390,10 @@ def _shift_view(adapter: Any, view: Any, delta: tuple[float, float], *, label: s
 def _caption_under(adapter: Any, view: Any, text: str, *, label: str) -> None:
     """A caption centred under a view's outline."""
     outline = _view_outline(view)
-    note = _add_note_block(adapter, text, (outline[0], outline[1]), label=label)
-    extent = _note_extent(adapter, note, label=label)
+    note = add_note_block(adapter, text, (outline[0], outline[1]), label=label)
+    extent = note_extent(adapter, note, label=label)
     width = extent[2] - extent[0]
-    _anchor_note(
+    anchor_note(
         adapter,
         note,
         ((outline[0] + outline[2]) / 2.0 - width / 2.0, outline[1] - VIEW_CAPTION_GAP),
@@ -4269,7 +4131,7 @@ def _create_package_sheets(adapter: Any) -> None:
 def _heading(
     adapter: Any, sheet_number: int, text: str = "", *, xy: tuple[float, float] = HEADING_XY
 ) -> Any:
-    return _add_note_block(
+    return add_note_block(
         adapter,
         heading_text(sheet_number, text),
         xy,
@@ -4410,7 +4272,7 @@ def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     # The general notes fill the slot between the measured heading and the
     # measured isometric: an isometric grown upward fails the gate, not overlaps.
     (notes,) = (field for field in package_note_fields(facts) if field.sheet == 1)
-    heading_box = _note_extent(adapter, heading, label="sheet 1 heading")
+    heading_box = note_extent(adapter, heading, label="sheet 1 heading")
     iso_box = _view_outline(iso)
     bounds = general_notes_field(heading_box[1], iso_box[3])
     _telemetry.event(
@@ -4765,12 +4627,12 @@ def _balloon_cone_tip_detail(
         view_name(adapter, parent)
     ):
         raise RuntimeError(f"cannot activate the cone set view for the {label} letter")
-    letter = _add_note_block(adapter, CONE_TIP_DETAIL_LETTER, centre, label=f"{label} letter")
-    letter_extent = _note_extent(adapter, letter, label=f"{label} letter")
+    letter = add_note_block(adapter, CONE_TIP_DETAIL_LETTER, centre, label=f"{label} letter")
+    letter_extent = note_extent(adapter, letter, label=f"{label} letter")
     # The final uncross only swaps balloons between ring slots, so the slots
     # read here are the ones the audit reads.
     parent_leaders = _placed_balloon_leaders(adapter, parent_balloons)
-    _anchor_note(
+    anchor_note(
         adapter,
         letter,
         cone_tip_letter_corner(
@@ -4817,14 +4679,14 @@ def _balloon_cone_tip_detail(
     _activate_sheet(adapter, sheet_name)
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     placed = _view_outline(detail)
-    caption = _add_note_block(
+    caption = add_note_block(
         adapter,
         cone_tip_detail_caption(scale, parent_scale),
         (placed[0], placed[1]),
         label=f"{label} caption",
     )
-    extent = _note_extent(adapter, caption, label=f"{label} caption")
-    _anchor_note(
+    extent = note_extent(adapter, caption, label=f"{label} caption")
+    anchor_note(
         adapter,
         caption,
         (
@@ -5110,14 +4972,14 @@ def _place_bank_setting_sheet(
         outline = _view_outline(view)
         _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
         step(f"{label}: activate sheet")
-        note = _add_note_block(adapter, text, (outline[0], outline[1]), label=label)
+        note = add_note_block(adapter, text, (outline[0], outline[1]), label=label)
         step(f"{label}: add note")
-        extent = _note_extent(adapter, note, label=label)
+        extent = note_extent(adapter, note, label=label)
         step(f"{label}: note extent redraw")
         width = extent[2] - extent[0]
         left = outline[2] - width if right_aligned else (outline[0] + outline[2] - width) / 2.0
         corner = (left, outline[1] - placement_gap)
-        _anchor_note(adapter, note, corner, label=label)
+        anchor_note(adapter, note, corner, label=label)
         step(f"{label}: anchor note")
         captions.append((note, view, label))
 
@@ -5129,9 +4991,9 @@ def _place_bank_setting_sheet(
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(overall_name):
         raise RuntimeError("cannot activate bank setting view for its detail identifier")
     step("spring detail letter: ActivateView")
-    letter = _add_note_block(adapter, "A", parent_centre, label="spring detail letter")
+    letter = add_note_block(adapter, "A", parent_centre, label="spring detail letter")
     step("spring detail letter: add note")
-    letter_extent = _note_extent(adapter, letter, label="spring detail letter")
+    letter_extent = note_extent(adapter, letter, label="spring detail letter")
     step("spring detail letter: note extent redraw")
     # Seed inside the clear region, not on its minimum-air boundary: the
     # bounded anchor helper does not guarantee its requested text-box corner.
@@ -5139,7 +5001,7 @@ def _place_bank_setting_sheet(
         parent_centre[0] - radius - placement_gap - (letter_extent[2] - letter_extent[0]),
         parent_centre[1] + radius + placement_gap + (letter_extent[3] - letter_extent[1]),
     )
-    _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
+    anchor_note(adapter, letter, letter_corner, label="spring detail letter")
     step("spring detail letter: anchor note")
     # The labelled sketch the setting table's rows name: each leader tip on
     # the model point it labels, the note owned by its view.
@@ -5183,7 +5045,7 @@ def _place_bank_setting_sheet(
         for note, view, label in captions:
             view.UpdateViewDisplayGeometry()
             step(f"{label} settled: UpdateViewDisplayGeometry")
-            extent = _note_extent(adapter, note, label=label)
+            extent = note_extent(adapter, note, label=label)
             step(f"{label} settled: note extent redraw")
             violations = bank_setting_caption_violations(extent, _view_outline(view))
             if violations:
@@ -5191,7 +5053,7 @@ def _place_bank_setting_sheet(
         owner = _early_bound(letter_annotation.Owner, "IView")
         if view_name(adapter, owner) != overall_name:
             raise RuntimeError("spring detail letter is not owned by the bank setting view")
-        extent = _note_extent(adapter, letter, label="spring detail letter")
+        extent = note_extent(adapter, letter, label="spring detail letter")
         violations = bank_setting_letter_violations(extent, parent_centre, radius)
         if violations:
             raise RuntimeError(f"{'; '.join(violations)}; actual extent {extent!r}")
@@ -5313,7 +5175,7 @@ def _note_handle_stake(adapter: Any, view: Any, *, label: str) -> None:
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     points = list(annotation.GetLeaderPointsAtIndex(0) or ())
     shift = 0.0
-    # The text does not track its insertion point 1:1 (_anchor_note), so the
+    # The text does not track its insertion point 1:1 (anchor_note), so the
     # slide is repeated until the leader start settles.
     for _pass in range(NOTE_ANCHOR_PASSES):
         if len(points) < 6:
@@ -5329,7 +5191,7 @@ def _note_handle_stake(adapter: Any, view: Any, *, label: str) -> None:
         rebuild_drawing(adapter, label=f"{label} slid")
         points = list(annotation.GetLeaderPointsAtIndex(0) or ())
         shift += step_x
-    extent = _note_extent(adapter, note, label=label)
+    extent = note_extent(adapter, note, label=label)
     _telemetry.event(
         "drawing.handle_stake_note",
         tip_mm=tuple(round(value * 1000.0, 2) for value in tip),
@@ -5383,7 +5245,7 @@ def _note_cam_stake(adapter: Any, view: Any, *, label: str) -> None:
         "drawing.cam_stake_note",
         tips_mm=tuple(tuple(round(value * 1000.0, 2) for value in t) for t in tips),
         extent_mm=tuple(
-            round(value * 1000.0, 2) for value in _note_extent(adapter, note, label=label)
+            round(value * 1000.0, 2) for value in note_extent(adapter, note, label=label)
         ),
         leader_mm=tuple(round(float(value) * 1000.0, 2) for value in points),
     )
@@ -5423,7 +5285,7 @@ def _note_lever_pin_peen(adapter: Any, view: Any, *, label: str) -> None:
         "drawing.lever_pin_peen_note",
         tip_mm=tuple(round(value * 1000.0, 2) for value in tip),
         extent_mm=tuple(
-            round(value * 1000.0, 2) for value in _note_extent(adapter, note, label=label)
+            round(value * 1000.0, 2) for value in note_extent(adapter, note, label=label)
         ),
         leader_mm=tuple(round(float(value) * 1000.0, 2) for value in points),
     )
