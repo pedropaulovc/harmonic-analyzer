@@ -117,8 +117,8 @@ def test_references_and_the_governing_end_sizes() -> None:
     assert spec.OVERALL_HEIGHT_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
     assert _config.parts("sm-vn-counter-spring")["number"] == spec.COUNTER_SPRING_NUMBER
     reach_callout = spec.DIMENSION_CALLOUTS_BY_NAME["OverallReach"]
-    assert reach_callout.startswith(spec.COUNTER_SPRING_NUMBER)
-    assert "PLUMB" in reach_callout and "\n" not in reach_callout
+    # One row naming the mate by Number with what the tip does for it.
+    assert reach_callout == f"TIP HANGS {spec.COUNTER_SPRING_NUMBER} PLUMB"
     assert spec.callout_slot("OverallReach") == 3
     assert {spec.callout_slot(name) for name in ("BendRadius", "TubeOdRef")} == {4}
     # The tube Ø's reference line runs on the leg, below the bend tangent.
@@ -230,6 +230,15 @@ def test_sheet_is_the_elevation_and_isometric_only() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert drawing.ISO_SCALE == (1, 4)
+    # The pictorial looks into the faced arm end (part -X), so its open bore
+    # shows the tube the (.065) WALL STOCK callout names.
+    assert spec.ISOMETRIC_OCTANT == (-1, 1, 1)
+    for module in (part, drawing):
+        names = {
+            node.id for node in ast.walk(_tree(module)) if isinstance(node, ast.Name)
+        }
+        assert "ISOMETRIC_OCTANT" in names, module.__name__
+    assert '"*Isometric"' not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() -> None:
@@ -242,8 +251,9 @@ def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() ->
     assert height_x <= drawing.ISO_CENTER[0] - 0.030
     assert abs(height_y - keep["LegLength"][1]) >= 0.015
     assert drawing.FOOT_Y < height_y < drawing._front_y(geom.ARM_Y + geom.TUBE_DIA / 2)
-    # Over the arm straight, inside the sheet's top border.
-    assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258
+    # Over the arm straight, a clear row above its (.47) text (machinist
+    # review of a611188e85), inside the sheet's top border.
+    assert keep["ArmStraight"][1] + 0.009 <= reach_y <= 0.258
     assert drawing.ARM_END_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
     # The arm straight's text (~12 mm wide at (.47)) ends one text clearance
     # (1.78 mm) left of the faced arm end's shared extension line.

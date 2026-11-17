@@ -85,12 +85,13 @@ BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
 TUBE_OD_CALLOUT = f"({_inch(geom.WALL_T, 3)}) WALL STOCK"
 # The reach's .XX holds the counter spring plumb (below): its callout names
 # that spring by its frozen Number (cad/docs/subsystem-identities.md; the
-# drawing test checks it against the registry row) and the reason, in one
-# row ABOVE the value, clear of the arm straight's (.47) row under the
-# reach's dimension line (machinist review of main 67ba11bf1a: an unmated
-# .XX reach on a bend).
+# drawing test checks it against the registry row) and says what the tip
+# does for it, in one row ABOVE the value, clear of the arm straight's (.47)
+# row under the reach's dimension line (machinist review of main
+# 67ba11bf1a: an unmated .XX reach on a bend; of a611188e85: the bare
+# "MHA-SM-VN-51 SPRING PLUMB" carried no relationship word).
 COUNTER_SPRING_NUMBER = "MHA-SM-VN-51"
-OVERALL_REACH_CALLOUT = f"{COUNTER_SPRING_NUMBER} SPRING PLUMB"
+OVERALL_REACH_CALLOUT = f"TIP HANGS {COUNTER_SPRING_NUMBER} PLUMB"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "TubeOdReference": {"TubeOdRef": TUBE_OD_CALLOUT},
@@ -200,3 +201,9 @@ if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
 # the original's smooth bend does not have.  It is seen by eye, not measured.
 DRAWING_NOTES = "1. BEND: NO KINKS"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# The pictorial's viewer octant (_named_views signs: x, y, z).  The faced arm
+# end looks along part -X, so the built-in *Isometric (+X+Y+Z) saw only its
+# back and the tip read as solid rod against the (.065) WALL STOCK callout
+# (machinist review of a611188e85, blocker): FRONT-TOP-LEFT looks into the
+# open bore.
+ISOMETRIC_OCTANT = (-1, 1, 1)
