@@ -69,7 +69,9 @@ def dodo():
 
 @pytest.fixture
 def shop_copy(tmp_path, monkeypatch):
-    """Temporary copies of both shop files that every reader (and dodo) uses."""
+    """Temporary copies of both shop files that every reader (and dodo) uses.
+    Key computations below never clear a cache: dodo re-parses a file whose
+    stat moved, as a long-lived doit process must."""
     copies = {}
     for name, path in _shop_records.SHOP_FILES.items():
         copy = tmp_path / name
@@ -85,7 +87,6 @@ def _edit(path: Path, old: str, new: str) -> None:
     text = path.read_text(encoding="utf-8")
     assert text.count(old) == 1, old
     path.write_text(text.replace(old, new), encoding="utf-8")
-    _shop_records._document.cache_clear()
 
 
 def _keys(dodo) -> dict[str, str]:
@@ -122,7 +123,6 @@ def test_unrelated_records_and_new_tables_rekey_nothing(dodo, shop_copy, tmp_pat
         handle.write('\n# a comment\n[tools.probe-new-table]\nkind = "probe"\n')
     with shop_copy["shop.toml"].open("a", encoding="utf-8") as handle:
         handle.write('\n[probe-new-family.probe]\nkind = "probe"\n')
-    _shop_records._document.cache_clear()
     assert _moved(base, _keys(dodo)) == set()
 
 
@@ -201,6 +201,22 @@ def test_an_absent_selected_record_is_keyed_as_absent(shop_copy):
         handle.write('\n[tools.probe-later]\nkind = "probe"\n')
     _shop_records._document.cache_clear()
     assert _shop_records.records_recipe(record) != before
+
+
+def test_dodo_reparses_a_shop_file_whose_stat_moved(dodo, shop_copy):
+    """The accessor memoizes per process; dodo is long-lived, so an edit after
+    its first parse must still move the digest, even a same-size one."""
+    import os
+
+    equipment = shop_copy["shop-equipment.toml"]
+    record = frozenset({("shop-equipment.toml", "cnc", "pm-30mv")})
+    for path in shop_copy.values():
+        os.utime(path, ns=(10**18, 10**18))  # long settled: not racy
+    before = dodo._shop_records_recipe(record)
+    assert dodo._shop_records_recipe(record) == before
+    _edit(equipment, "repeatability_mm = 0.02\n", "repeatability_mm = 0.03\n")
+    os.utime(equipment, ns=(10**18 + 100, 10**18 + 100))  # same size, next tick
+    assert dodo._shop_records_recipe(record) != before
 
 
 # The modules allowed to name the shop files directly: the accessor itself and

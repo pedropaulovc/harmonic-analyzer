@@ -3058,8 +3058,15 @@ def test_shop_record_reads_see_the_literal_records(source, records, files):
         "import importlib\nm = importlib.import_module('_shop_records')\n",
         _SHOP + "lookup = shop_record\n",
         _SHOP + "R = shop_record('shop.toml', 'gauges', key='dti')\n",
+        _SHOP + "read = globals()['shop_record']\nR = read('shop.toml', 'gauges', 'dti')\n",
+        _SHOP + "import sys\nR = sys.modules['x'].f()\n",
+        _SHOP + "from importlib import import_module\n",
+        _SHOP + "R = eval('1')\n",
     ],
-    ids=["module-import", "alias", "other-name", "string-alias", "passed-around", "keyword"],
+    ids=[
+        "module-import", "alias", "other-name", "string-alias", "passed-around", "keyword",
+        "globals", "sys-modules", "import-module", "eval",
+    ],
 )
 def test_unclassified_shop_record_use_keeps_every_file(source):
     assert bg.shop_record_reads(source).files == {bg.ALL_SHOP_FILES}

@@ -2037,6 +2037,30 @@ def _fit_groups_env(task: str) -> str | None:
 _SHOP_RECORDS_PY = (SCRIPTS_DIR / "_shop_records.py").resolve()
 # label -> the shop records/whole files its cache key folds (see _fold_shop_records).
 _SHOP_RECORD_READS: dict[str, ShopRecordReads] = {}
+# The shop files' (path, mtime_ns, size) when ``_shop_records`` last parsed them.
+_SHOP_FILE_STATS: tuple[tuple[str, int, int], ...] | None = None
+
+
+def _shop_records_recipe(records: frozenset[tuple[str, str, str]]) -> str:
+    """``_shop_records.records_recipe`` from the files as they are now.
+
+    The accessor memoizes each parse for its process, which suits a build
+    subprocess but not dodo: a long ``doit`` run that re-folds a task after a
+    shop edit must digest the new values. Drop the memo whenever a shop file's
+    stat moved, or is too recent to identify its content (as ``read_source``
+    does)."""
+    global _SHOP_FILE_STATS
+    stats = []
+    for path in _shop_records.SHOP_FILES.values():
+        stat = path.stat()
+        stats.append((str(path), stat.st_mtime_ns, stat.st_size))
+    current = tuple(stats)
+    if current != _SHOP_FILE_STATS or any(
+        is_racy_mtime(mtime_ns / 1e9) for _, mtime_ns, _ in current
+    ):
+        _shop_records._document.cache_clear()
+        _SHOP_FILE_STATS = current
+    return _shop_records.records_recipe(records)
 
 
 def _fold_shop_records(
@@ -2081,7 +2105,7 @@ def _fold_shop_records(
             _write_digest_sidecar(
                 CAD_OUT / ".shop-records" / f"{label.replace(':', '-')}.digest",
                 hashlib.md5(
-                    _shop_records.records_recipe(records).encode("utf-8")
+                    _shop_records_recipe(records).encode("utf-8")
                 ).hexdigest(),
             )
         )

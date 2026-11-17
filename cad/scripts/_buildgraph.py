@@ -1815,6 +1815,24 @@ class TableReads(NamedTuple):
     dynamic: bool  # it also calls the accessor with a runtime value
 
 
+_ESCAPE_NAMES = frozenset({"eval", "exec", "globals", "vars", "__import__"})
+_ESCAPE_ATTRIBUTES = frozenset({"import_module", "modules"})
+
+
+def _escapes_static_reads(node: ast.AST, module: str) -> bool:
+    """Whether ``node`` can reach an accessor without a visible call to it:
+    ``eval``/``exec``/``globals``/``vars``/``__import__``, an ``import_module``
+    or ``sys.modules`` lookup, or a star/``import_module`` import from another
+    module. Shared by the accessor classifiers so both stay conservative alike."""
+    if isinstance(node, ast.ImportFrom):
+        return (
+            node.module is None or node.module.rsplit(".", 1)[-1] != module
+        ) and any(alias.name in {"*", "import_module"} for alias in node.names)
+    if isinstance(node, ast.Attribute):
+        return node.attr in _ESCAPE_ATTRIBUTES
+    return isinstance(node, ast.Name) and node.id in _ESCAPE_NAMES
+
+
 @functools.lru_cache(maxsize=512)
 @_persisted_facts(
     "table_reads",
@@ -1862,7 +1880,7 @@ def table_reads(
                 return None
         elif isinstance(node, ast.ImportFrom):
             if node.module is None or node.module.rsplit(".", 1)[-1] != module:
-                if any(alias.name in {"*", "import_module"} for alias in node.names):
+                if _escapes_static_reads(node, module):
                     return None
                 continue
             for alias in node.names:
@@ -1872,16 +1890,11 @@ def table_reads(
                     accessor_names.add(alias.name)
                 elif alias.name not in exports:
                     return None
-        elif isinstance(node, ast.Attribute) and node.attr in {table, "import_module", "modules"}:
+        elif isinstance(node, ast.Attribute) and node.attr == table:
             return None
-        elif isinstance(node, ast.Name) and node.id in {
-            table,
-            "eval",
-            "exec",
-            "globals",
-            "vars",
-            "__import__",
-        }:
+        elif isinstance(node, ast.Name) and node.id == table:
+            return None
+        elif _escapes_static_reads(node, module):
             return None
 
     keys: set[str] = set()
@@ -1968,8 +1981,9 @@ def shop_record_reads(text: str) -> ShopRecordReads:
     key name one record. A runtime table or key keeps that file whole; a
     runtime file, or a use this cannot classify (a module import or alias of
     ``_shop_records``, the module named in a string, the accessor rebound or
-    passed around), keeps every file whole. Reads outside the static import
-    graph are caught at run time by ``HARMONIC_SHOP_RECORDS``.
+    passed around, or an escape :func:`_escapes_static_reads` names), keeps
+    every file whole. Reads outside the static import graph are caught at run
+    time by ``HARMONIC_SHOP_RECORDS``.
     """
     if SHOP_RECORDS_MODULE not in text:
         return NO_SHOP_RECORDS
@@ -1990,7 +2004,7 @@ def shop_record_reads(text: str) -> ShopRecordReads:
         and isinstance(node.value, ast.Constant)
         and isinstance(node.value.value, str)
     }
-    imported = False
+    imported = escaped = False
     for node in nodes:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             if node.value.rsplit(".", 1)[-1] == SHOP_RECORDS_MODULE:
@@ -2006,8 +2020,12 @@ def shop_record_reads(text: str) -> ShopRecordReads:
                 if alias.name != SHOP_RECORD_ACCESSOR or alias.asname is not None:
                     return everything
             imported = True
+        elif _escapes_static_reads(node, SHOP_RECORDS_MODULE):
+            escaped = True
     if not imported:
         return NO_SHOP_RECORDS
+    if escaped:
+        return everything
 
     def literal(argument: ast.expr) -> str | None:
         if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
