@@ -499,16 +499,17 @@ SECTION_CALLOUTS = {
     "BottomEdgeChamfer": "X 45<MOD-DEG>\nUNDERSIDE",
 }
 # One spotface callout in symbol form (rule 26): sheet 5's diameter carries
-# count, symbol, size and the depth as REF beside the seat it makes, and
-# section A-A's banded depth is the control that REF points at (the rule's
-# own `<HOLE-DEPTH> (.235)` form). The depth control keeps its count and
-# symbols only, so the cross screw is named once, on sheet 5. Its count and
-# spotface symbol ride the lane above the value: on one row the block ran
-# 49 mm from x 385 mm, its stacked +.020/.000 through the right border (run
-# 20261107T121814924Z, 3/3); the value row alone is 29 mm.
+# count, symbol, size, the depth as REF and the mate beside the seat it
+# makes, and section A-A's banded depth is the plain dimension that locates
+# the floor the REF points at (the rule's own `<HOLE-DEPTH> (.235)` form).
+# The depth keeps its count but no spotface or depth symbol: dressed as
+# '4X <spot> <depth> .169 +.020/.000' it read as a second spotface callout
+# missing its diameter (machinist review run
+# 20261117T111407559Z, 2/3, rule 26). The count rides the lane above the
+# value: the value row alone is 29 mm from x 385 mm, and a longer row runs its
+# stacked +.020/.000 through the right border (run 20261107T121814924Z, 3/3).
 SPOTFACE_DEPTH_REF = f"({BASE_SPOTFACE_DEPTH / 25.4:.3f})".replace("(0.", "(.")
-SECTION_AFFIXES = {"SpotFaceDepth": ("<HOLE-DEPTH> ", "")}
-SECTION_ABOVE_CALLOUTS = {"SpotFaceDepth": "4X <HOLE-SPOT>"}
+SECTION_ABOVE_CALLOUTS = {"SpotFaceDepth": "4X"}
 HOLE_SIDE_AFFIXES = {
     "SpotFaceDia": ("4X <HOLE-SPOT> <MOD-DIAM>", f" <HOLE-DEPTH> {SPOTFACE_DEPTH_REF}"),
 }
@@ -2123,7 +2124,6 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, section_dimensions, SECTION_ABOVE_CALLOUTS, location="above"
     )
-    _set_dimension_affixes(adapter, section_dimensions, SECTION_AFFIXES)
     # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09

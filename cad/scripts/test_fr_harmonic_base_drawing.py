@@ -691,7 +691,7 @@ def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
         for node in ast.walk(module)
         if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_set_dimension_affixes"
     }
-    assert callers == {"SECTION_AFFIXES", "UNDERSIDE_SECTION_AFFIXES", "HOLE_SIDE_AFFIXES"}
+    assert callers == {"UNDERSIDE_SECTION_AFFIXES", "HOLE_SIDE_AFFIXES"}
 
 
 def test_cross_tap_callout_carries_hole_facts_only() -> None:
@@ -1678,11 +1678,17 @@ def test_shifted_cross_rib_volume_and_all_eighteen_skin_only_cut_footprints() ->
     assert cross_volume == pytest.approx(83003.1666)
 
 
-def test_spotface_depth_count_and_symbol_ride_above_the_banded_value() -> None:
-    # Run 20261107T121814924Z (3/3): on one row '4X <spot> <depth> .169
-    # +.020/.000' ran through sheet 2's right border from the 382-418 mm column.
+def test_spotface_depth_is_a_plain_counted_control_under_one_callout() -> None:
+    # Run 20261117T111407559Z (2/3): '4X <spot> <depth> .169 +.020/.000' in
+    # section A-A read as a second spotface callout without its diameter.
+    # Sheet 5 holds the one callout (size, REF depth, mate); A-A keeps only
+    # the banded depth and its count, the count above the value so the row
+    # stays inside the right border (run 20261107T121814924Z, 3/3).
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.SECTION_AFFIXES == {"SpotFaceDepth": ("<HOLE-DEPTH> ", "")}
-    assert sheet.SECTION_ABOVE_CALLOUTS == {"SpotFaceDepth": "4X <HOLE-SPOT>"}
+    assert sheet.SECTION_ABOVE_CALLOUTS == {"SpotFaceDepth": "4X"}
+    prefix, suffix = sheet.HOLE_SIDE_AFFIXES["SpotFaceDia"]
+    assert prefix == "4X <HOLE-SPOT> <MOD-DIAM>"
+    assert suffix == f" <HOLE-DEPTH> {sheet.SPOTFACE_DEPTH_REF}"
+    assert sheet.HOLE_SIDE_CALLOUTS == {"SpotFaceDia": "SEATS MHA-FR-VN-53"}
     assert sheet.SECTION_KEEP["SpotFaceDepth"][0] <= 0.3845
