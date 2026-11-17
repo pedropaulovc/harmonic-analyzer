@@ -8,8 +8,7 @@
 #
 # TOML, deliberately not YAML: a *.yaml file in cad/config joins
 # _buildgraph.all_config_files() and would re-key every whole-config consumer.
-# Build closures read it only through _shop_records.shop_record(file, table,
-# key), which keys each COM leaf on exactly the records it reads (#2852).
+# No COM build closure reads it: it is in no leaf's cache key.
 #
 # Records moved verbatim from cad/process/shop/inventory.toml (last at
 # 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
