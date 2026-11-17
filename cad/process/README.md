@@ -356,10 +356,11 @@ G-code with FreeCAD's CAM workbench, run headless. `uv run --frozen python -m
 doit cam:<stem>` (opt-in; not in `build` or `release`) needs FreeCAD 1.1 or
 later: `$HARMONIC_FREECAD` names `freecadcmd`, otherwise the newest
 `FreeCAD <version>` install under the Windows program directories is used, and
-the task fails when there is none. It writes one `.nc` per recipe program,
-`cycle_times.json` and `manifest.json` (input, post and output SHA-256s,
-FreeCAD version) to `cad/out/nc/<stem>/`, and prints each program's cutting,
-air-at-feed and rapid minutes.
+the task fails when there is none (or when it is older than 1.1). It writes
+one `.nc` per recipe program, `cycle_times.json` and `manifest.json` (input,
+post and output SHA-256s, FreeCAD version, the post file FreeCAD loaded) to
+`cad/out/nc/<stem>/`, logs each program's cutting, air-at-feed and rapid
+minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
 
 A recipe has four parts:
 
@@ -372,7 +373,8 @@ A recipe has four parts:
   `shop.toml`. It also places the part in each setup's work frame and lays out
   the pass stations and depth levels. Values neither record carries are
   recipe constants with a stated source: the centre drill's geometry, the S2
-  strap clearance, the approach clearance, the safe height above the stock
+  strap clearance, the approach clearance, the saw allowance past the blank
+  end, the face overhang past the bar edges, the safe height above the stock
   and the facing plunge feed. A part dimension typed into the recipe would let
   the NC drift from the CAD.
 - `build(ctx, rt)`: runs inside `freecadcmd` with the
@@ -400,14 +402,16 @@ conversion has ball screws, so faces zigzag (climb on alternate passes).
 "Cut edge 1 in +X and edge 2 in −X": both edges stay conventional (the
 dechatter edge settings were measured conventional) and BB01 alternates
 between them, so no pass returns through the air. Ends, slots and holes keep
-the plan's strategy. With the rapid rate assumed at 100 in/min
+the plan's strategy. Edge and end passes plunge beside the stock, so they
+plunge at their cutting feed; only the slot corners plunge into metal at the
+plan's slow feed. With the rapid rate assumed at 100 in/min
 (`_gcode.RAPID_MM_MIN`, until the controller's `$110`/`$111` are read), one
 bar's nine programs fell from about 207 to 96 minutes.
 
 FreeCAD's `grbl` post expands G81/G82/G83 into G0/G1 but not G73, so the
-drilled holes peck with full retracts (G83) where the plan's text says
-chip-break pecks; FreeCAD measures each peck from the R plane, which is why
-the R plane sits just above the stock.
+drilled holes peck with full retracts (G83), one drill diameter each, as the
+traveler says; FreeCAD measures each peck from the R plane, which is why the
+R plane sits just above the stock.
 
 For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
 back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.

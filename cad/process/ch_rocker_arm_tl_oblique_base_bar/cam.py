@@ -67,10 +67,20 @@ CENTRE_DRILL = {"body_mm": 3 / 16 * IN, "pilot_mm": 5 / 64 * IN, "pilot_length_m
 # so moves between the two edges clear the stock top by this much.
 STRAP_CLEARANCE_MM = 60.0
 # Side and face passes start and finish with the cutter this far clear of the
-# stock, so every plunge enters air beside it, never the material.
+# stock, so every plunge enters air beside it, never the material. Edge and
+# end plunges therefore run at the pass's cutting feed; only the slots plunge
+# into metal, at the plan's slow corner-plunge feed.
 APPROACH_MM = 2.54
+# S2's right-hand plunges sit past the sawn blank end, whose length is only as
+# good as the saw: they clear a blank up to this much over the plan's length.
+SAW_ALLOWANCE_MM = 3.81
+# Faces overhang the bar's front and back edges by this much, so a bar at the
+# top of its width band or a ZERO EDGE edge-find error leaves no lip. The
+# cutter then passes over the vise jaws, which stand below the faced top (the
+# context checks it); 0.5 keeps the base bar at nine passes.
+FACE_OVERHANG_MM = 0.5
 # Plunges and drill pecks start this far above the stock top: real G0 brings
-# the tool down to it, so only this much of each plunge feeds through air.
+# the tool down to it, so only this much of each plunge is above the stock.
 # FreeCAD measures each G83 peck from this R plane, so a higher one would
 # also make the first peck feed through air.
 SAFE_MM = 1.0
@@ -146,6 +156,11 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     side1 = thick + (blank[2] - thick) / 2  # side 1 takes half the facing allowance
     x_trim = (blank[0] - length) / 2  # blank centred: equal trim at each end
     y_trim = (blank[1] - width) / 2
+    # The faces overhang the bar's edges (FACE_OVERHANG_MM), over the vise jaws:
+    # the lower faced top (side 2, on the parallels) must stand above them.
+    if p["parallel_height_mm"] + thick <= p["vise_jaw_height_mm"]:
+        raise ValueError(f"faced top {p['parallel_height_mm'] + thick:.3f} mm above the vise bed is not above the "
+                         f"{p['vise_jaw_height_mm']:.3f} mm jaws; the face overhang would cut them")
 
     def frame(point):  # model mm -> S3c/S4 WCS mm
         return (point[0] - x0, -(point[1] - y_low), -(point[2] - z_under))
@@ -221,12 +236,12 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             "em_half": em_half, "em_face": em_face, "cbore": cbore_em,
             "rail_drill": rail_drill, "bracket_drill": bracket_drill, "centre_drill": CENTRE_DRILL,
         },
-        "edge": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "step": edge_step, "finish": edge_finish,
+        "edge": {"rpm": edge_rpm, "feed": edge_feed, "step": edge_step, "finish": edge_finish,
                  "tip": p["edge_cut_tip_z_mm"], "stepdown": p["side_max_stepdown_mm"],
                  "offsets": _stations(y_trim, edge_step, edge_finish),
                  "levels": _levels(blank[2] - p["edge_cut_tip_z_mm"], p["side_max_stepdown_mm"])},
         "face": {"rpm": face_rpm, "feed": face_feed, "stepover": face_stepover},
-        "ends": {"rpm": end_rpm, "feed": end_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
+        "ends": {"rpm": end_rpm, "feed": end_feed, "tip": p["end_cut_tip_z_mm"],
                  "stepdown": p["side_max_stepdown_mm"], "left_step": left_step, "right_step": right_step,
                  "left": _stations(x_trim, left_step), "right": _stations(x_trim, right_step),
                  "levels": _levels(thick - p["end_cut_tip_z_mm"], p["side_max_stepdown_mm"])},
@@ -265,13 +280,13 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB02_S3_face_side1_T2", "depth", {"z_min": ctx["side1"]}),
         ("BB02_S3_face_side1_T2", "rapids_clear", {"z_top": bt}),
         ("BB02_S3_face_side1_T2", "air_feed", {"z_top": bt}),
-        ("BB02_S3_face_side1_T2", "face_passes", {"z": ctx["side1"], "y": (-W, 0.0), "max_stepover": ctx["face"]["stepover"],
+        ("BB02_S3_face_side1_T2", "face_passes", {"z": ctx["side1"], "y": (-W - FACE_OVERHANG_MM, FACE_OVERHANG_MM), "max_stepover": ctx["face"]["stepover"],
                                                    "radius": ctx["tools"]["em_face"] / 2, "span": L / 2}),
         ("BB03_S3_face_side2_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB03_S3_face_side2_T2", "depth", {"z_min": T}),
         ("BB03_S3_face_side2_T2", "rapids_clear", {"z_top": ctx["side1"]}),
         ("BB03_S3_face_side2_T2", "air_feed", {"z_top": ctx["side1"]}),
-        ("BB03_S3_face_side2_T2", "face_passes", {"z": T, "y": (-W, 0.0), "max_stepover": ctx["face"]["stepover"],
+        ("BB03_S3_face_side2_T2", "face_passes", {"z": T, "y": (-W - FACE_OVERHANG_MM, FACE_OVERHANG_MM), "max_stepover": ctx["face"]["stepover"],
                                                    "radius": ctx["tools"]["em_face"] / 2, "span": L / 2}),
         # One hand-set spindle speed per program: the ends and slots share it.
         ("BB04_S3_ends_slots_T1", "spindle", {"rpm": ends["rpm"]}),
@@ -324,11 +339,12 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     cd = tl["centre_drill"]
     r = tl["em_half"] / 2
     clear = r + APPROACH_MM  # side passes run this far past the stock's ends
+    s2_right = clear + SAW_ALLOWANCE_MM
     doc = rt.document()
     bar = rt.import_step(doc, "Bar", ctx["step"], ctx["model"]["origin"], ctx["model"]["axes"])
 
-    def half_inch(cut):
-        return rt.tool_controller(doc, "1/2 in 2FL flat end mill", 1, "endmill", tl["em_half"], cut["rpm"], cut["feed"], cut["plunge"], flutes=2)
+    def half_inch(cut, plunge):
+        return rt.tool_controller(doc, "1/2 in 2FL flat end mill", 1, "endmill", tl["em_half"], cut["rpm"], cut["feed"], plunge, flutes=2)
 
     ops: dict[str, Any] = {}
     # S2 (X0 blank left end, Y0 finished front edge, bar at +Y, Z0 blank top).
@@ -337,9 +353,9 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     # station, the front edge runs +X (Direction CCW round the model) and the
     # back edge -X: both conventional, each pass starting where the last ended.
     e = ctx["edge"]
-    s2 = rt.job(doc, "BB01 S2 edges, 1-2-3 blocks + straps", [rt.box(doc, "S2_model", (-clear, bl + clear), (0, W), (-bt, 0))],
+    s2 = rt.job(doc, "BB01 S2 edges, 1-2-3 blocks + straps", [rt.box(doc, "S2_model", (-clear, bl + s2_right), (0, W), (-bt, 0))],
                 ((0, bl), (-yt, W + yt), (-bt, 0)))
-    em = half_inch(e)
+    em = half_inch(e, e["feed"])
     m2 = rt.model(s2)
     edges = (("front", rt.straight_edge(m2, y=0, z=0)), ("back", rt.straight_edge(m2, y=W, z=0)))
     passes, top = [], 0.0
@@ -356,7 +372,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     fc = ctx["face"]
     run = tl["em_face"] + APPROACH_MM
     for key, label, height, stock_top in (("face_side1", "BB02 S3 face side 1", side1, bt), ("face_side2", "BB03 S3 face side 2", T, side1)):
-        target = rt.job(doc, label, [rt.box(doc, f"{key}_model", (-xt - run, L + xt + run), (-W, 0), (0, height))],
+        target = rt.job(doc, label, [rt.box(doc, f"{key}_model", (-xt - run, L + xt + run), (-W - FACE_OVERHANG_MM, FACE_OVERHANG_MM), (0, height))],
                         ((-xt, L + xt), (-W, 0), (0, stock_top)))
         # Face plunge at half the cutting feed: a shop habit, not a plan or shop record.
         tc = rt.tool_controller(doc, "3/4 in 4FL flat end mill", 2, "endmill", tl["em_face"], fc["rpm"], fc["feed"], fc["feed"] / 2, flutes=4)
@@ -368,7 +384,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     en, sl = ctx["ends"], ctx["slots"]
     s3c = rt.job(doc, "BB04 S3 ends and slots, vise", [bar, rt.box(doc, "S3c_ends", (0, L), (-W - clear, clear), (-T, 0))],
                  ((-xt, L + xt), (-W, 0), (-T, 0)))
-    ends_tc = half_inch(en)
+    ends_tc = half_inch(en, en["feed"])
     helper = rt.model(s3c, 1)
     for key, x, stations in (("left_end", 0.0, en["left"]), ("right_end", L, en["right"])):
         edge = rt.straight_edge(helper, x=x, z=0)
@@ -379,7 +395,7 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
                                     safe=SAFE_MM, passes=len(stations), stepover=stepover))
             top = level
         ops[key] = group
-    slot_tc = half_inch(sl)
+    slot_tc = half_inch(sl, sl["plunge"])
     for key, slot in zip(("slot_near", "slot_far"), sl["items"]):
         loop = rt.inner_loop(rt.model(s3c, 0), 0.0, slot["x"], sum(slot["y"]) / 2)
         # Inside the slot, clockwise: conventional with a clockwise spindle.

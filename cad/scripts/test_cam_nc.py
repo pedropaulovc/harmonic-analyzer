@@ -1,6 +1,5 @@
-"""CAM driver, recipe frame, posted-G-code checks and cycle times, without FreeCAD,
-plus one end-to-end post through headless FreeCAD (skipped only when no
-FreeCAD is installed).
+"""CAM driver, recipe frame, posted-G-code checks and cycle times, without
+FreeCAD (the end-to-end post through FreeCAD is ``test_cam_nc_freecad.py``).
 
 The G-code cases are the errors CAM produced with valid-looking toolpaths
 while the base-bar programs were first written (2026-11-16): a spot drill
@@ -284,45 +283,13 @@ def test_face_passes_must_zigzag_within_the_stepover_and_cover_the_face(tmp_path
     assert any(f.detail.startswith("stepover 20.500") for f in _gcode.check_face_passes(_program(tmp_path, wide), **kwargs))
 
 
-_MINI_RECIPE = '''
-STEM = "mini"
-PROGRAMS = (("P1_face", ("face",)), ("P2_edges", ("edges",)))
+def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):
+    exe = tmp_path / "freecadcmd.exe"
+    exe.write_text("", encoding="utf-8")
+    monkeypatch.setenv(cam_nc.FREECAD_ENV, str(exe))
+    monkeypatch.setattr(cam_nc, "freecad_version", lambda _path: (1, 0))
+    with pytest.raises(cam_nc.FreeCadError, match="needs 1.1"):
+        cam_nc.resolve_freecadcmd()
+    monkeypatch.setattr(cam_nc, "freecad_version", lambda _path: (1, 1))
+    assert cam_nc.resolve_freecadcmd() == exe
 
-
-def build(ctx, rt):
-    doc = rt.document()
-    face_job = rt.job(doc, "face", [rt.box(doc, "face_model", (-25, 125), (0, 50), (0, 9))], ((0, 100), (0, 50), (0, 10)))
-    tc = rt.tool_controller(doc, "3/4 in endmill", 2, "endmill", 19.05, 850, 172.7, 86.35, flutes=4)
-    face = rt.face(face_job, tc, "face", rt.top_face(rt.model(face_job), 9), 10, 9, 15.24)
-    edge_job = rt.job(doc, "edges", [rt.box(doc, "edge_model", (-10, 110), (0, 50), (-10, 0))], ((0, 100), (-3, 53), (-10, 0)))
-    em = rt.tool_controller(doc, "1/2 in endmill", 1, "endmill", 12.7, 2250, 400, 63.5, flutes=2)
-    edges = [
-        rt.profile(edge_job, em, name, rt.straight_edge(rt.model(edge_job), y=y, z=0), "Outside", "CCW", 0, -5, 5, clearance=60)
-        for name, y in (("front", 0), ("back", 50))
-    ]
-    rt.generate(doc)
-    return {"ops": {"face": face, "edges": edges}}
-'''
-
-
-def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path):
-    """Positive control through freecadcmd: a 100 x 50 x 10 box faced with a
-    19.05 mm end mill, and two opposite edges profiled."""
-    try:
-        freecadcmd = cam_nc.resolve_freecadcmd()
-    except cam_nc.FreeCadError:
-        pytest.skip("FreeCAD is not installed")
-    recipe = tmp_path / "cam.py"
-    recipe.write_text(_MINI_RECIPE, encoding="utf-8")
-    programs = (("P1_face", ("face",)), ("P2_edges", ("edges",)))
-    result = cam_nc.run_freecad(recipe, {"comment": "positive control"}, programs, tmp_path, freecadcmd)
-    assert sorted(Path(f).name for f in result["files"]) == ["P1_face.nc", "P2_edges.nc"]
-    face = _gcode.read_program(tmp_path / "P1_face.nc")
-    assert any(m.motion is _gcode.Motion.RAPID and m.length > 0 for m in face.moves)
-    assert face.spindle_rpm == {850.0}
-    assert _gcode.check_face_passes(face, z=9.0, y=(0.0, 50.0), max_stepover=15.24, radius=9.525, span=50.0) == []
-    assert _gcode.check_air_feed(face, 10.0) == []
-    edges = _gcode.read_program(tmp_path / "P2_edges.nc")
-    assert _gcode.check_air_feed(edges, 0.0) == []
-    for final, raw, direction in ((-6.35, -9.35, 1.0), (56.35, 59.35, -1.0)):
-        assert _gcode.check_side_passes(edges, "Y", final, raw, 3.0, direction, 50.0, 0.0) == [], final

@@ -36,6 +36,7 @@ programming the oblique base bar (2026-11-16):
 """
 
 import importlib.util
+import inspect
 import json
 import os
 import traceback
@@ -43,12 +44,12 @@ import types
 
 import FreeCAD
 import Part
+import Path
 import Path.Main.Job as PathJob
 import Path.Main.Stock as PathStock
 import Path.Op.Drilling as PathDrilling
 import Path.Op.MillFace as PathMillFace
 import Path.Op.Profile as PathProfile
-import Path.Post
 import Path.Tool.Controller as PathToolController
 from Path.Post.Processor import PostProcessorFactory
 from PathScripts import PathUtils
@@ -56,7 +57,6 @@ from Path.Tool.toolbit import ToolBit
 
 SPEC_ENV = "HARMONIC_CAM_SPEC"  # _cam_programs.SPEC_ENV
 POST = "grbl"
-POST_SCRIPT = os.path.join(os.path.dirname(Path.Post.__file__), "scripts", f"{POST}_post.py")
 # No header: its output timestamp would make every post of the same toolpath differ.
 POST_ARGS = "--no-header --no-show-editor --precision 3"
 _TOL = 1e-3
@@ -309,21 +309,25 @@ def _flatten(items):
 
 def post(ops, path, name, comment):
     """Post ``ops`` (one Job's operations, all of them, in order) to ``path`` with
-    a header naming the program and its tools; return the path."""
+    a header naming the program and its tools. Returns the path and the file of
+    the post the factory loaded: FreeCAD searches user post directories before
+    its own, so the name alone does not say which file posted."""
     jobs = {PathUtils.findParentJob(op).Name: PathUtils.findParentJob(op) for op in ops}
     if len(jobs) != 1:
         raise RuntimeError(f"{name}: operations from jobs {sorted(jobs)}; a program is one job")
     (target_job,) = jobs.values()
     if [op.Name for op in target_job.Operations.Group] != [op.Name for op in ops]:
         raise RuntimeError(f"{name}: job {target_job.Label} holds operations the program does not list")
-    sections = PostProcessorFactory.get_post_processor(target_job, POST).export()
+    processor = PostProcessorFactory.get_post_processor(target_job, POST)
+    source = getattr(processor, "script_path", None) or inspect.getfile(type(processor))
+    sections = processor.export()
     if len(sections) != 1:
         raise RuntimeError(f"{name}: post returned {len(sections)} sections")
     tools = sorted({(tc.ToolNumber, float(tc.Tool.Diameter), tc.Tool.Label) for tc in target_job.Tools.Group})
     header = [f"({name})", f"({comment})"] + [f"(T{n} D={d:.3f} {label})" for n, d, label in tools]
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(header) + "\n" + sections[0][1])
-    return path
+    return path, os.path.abspath(source)
 
 
 def _load_recipe(path):
@@ -340,11 +344,14 @@ def main():
         rt = types.ModuleType("_freecad_cam_runtime")
         rt.__dict__.update({k: v for k, v in globals().items() if not k.startswith("__")})
         built = _load_recipe(spec["recipe"]).build(spec["ctx"], rt)
-        files = [
+        posted = [
             post(list(_flatten(built["ops"][key] for key in keys)), os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"])
             for name, keys in spec["programs"]
         ]
-        result = {"freecad_version": ".".join(FreeCAD.Version()[:3]), "post": POST_SCRIPT, "files": files}
+        sources = sorted({source for _path, source in posted})
+        if len(sources) != 1:
+            raise RuntimeError(f"programs posted by several post files: {sources}")
+        result = {"freecad_version": ".".join(FreeCAD.Version()[:3]), "post": sources[0], "files": [p for p, _s in posted]}
     except Exception:  # noqa: BLE001 -- the traceback is the host's error report
         result = {"error": traceback.format_exc()}
     print(spec["marker"] + json.dumps(result), flush=True)

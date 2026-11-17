@@ -555,16 +555,20 @@ opt-in `cam:<stem>` task, run by `cad/scripts/cam_nc.py`. Its recipe,
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 `cad/process/shop.toml`; constants that neither record carries are named in
 the recipe. The driver writes the recipe's context to a JSON job spec and runs
-headless FreeCAD (`freecadcmd`, from `$HARMONIC_FREECAD` or the newest
+headless FreeCAD (`freecadcmd` 1.1+, from `$HARMONIC_FREECAD` or the newest
 discovered `FreeCAD <version>` install; it fails loud when there is none) on
 `_freecad_cam_runtime.py`, which builds one CAM Job per program and posts it
 with FreeCAD's `grbl` post. The driver then checks every file against the
-recipe's `expectations` (`_gcode`), prints each program's cutting /
+recipe's `expectations` (`_gcode`), logs each program's cutting /
 air-at-feed / rapid minutes, and writes `cad/out/nc/<stem>/cycle_times.json`
-and `manifest.json`. Any failed check removes every output. The task's file
-deps include the feature bundle, so a CAD change re-posts the programs; the
-FreeCAD version and post hash are recorded, not keyed. The generated NC is
-never committed. Like a traveler, it is not machining approval.
+and `manifest.json` (freecadcmd's console output stays in `freecadcmd.log`
+there). Any failed check removes every output. The task's file deps include
+the feature bundle, so a CAD change re-posts the programs; the FreeCAD
+version and the post file FreeCAD loaded are recorded, not keyed. The
+FreeCAD positive control, `test_cam_nc_freecad.py`, is in no `check:*` gate:
+run it by hand after changing the driver, the runtime or FreeCAD. The
+generated NC is never committed. Like a traveler, it is not machining
+approval.
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the

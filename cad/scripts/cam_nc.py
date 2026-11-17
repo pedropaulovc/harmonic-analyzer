@@ -15,10 +15,11 @@
    depths, hole positions, slot cutter-centre bounds, pass positions, steps
    and directions, spindle speeds, no rapid below the stock top and no feed
    move above it.
-4. Moves the checked programs into ``cad/out/nc/<stem>/``, prints each
+4. Moves the checked programs into ``cad/out/nc/<stem>/``, logs each
    program's cutting / air-at-feed / rapid minutes and writes them to
    ``cycle_times.json``, then writes ``manifest.json``: the SHA-256 of every
-   input and output, the FreeCAD version and the post used.
+   input and output, the FreeCAD version and the post file FreeCAD loaded.
+   freecadcmd's console output stays in ``freecadcmd.log`` beside them.
 
 Exit 0 only when every program posted and every check passed. Any failure
 removes every output and exits 1, so a stale or unchecked program is never
@@ -53,6 +54,10 @@ STAGING_DIR = ".staging"
 # The base bar's nine programs build and post in about 20 s; a hung FreeCAD
 # must not hold the task forever.
 FREECAD_TIMEOUT_S = 900
+# The runtime uses FreeCAD 1.1's CAM API (Path.Tool.toolbit, Path.Post.Processor).
+MIN_FREECAD = (1, 1)
+# freecadcmd's console output, rewritten every run and kept after a failure.
+LOG_NAME = "freecadcmd.log"
 
 
 class FreeCadError(RuntimeError):
@@ -63,33 +68,53 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _version(path: str) -> tuple[int, ...]:
+def _path_version(path: str) -> tuple[int, ...]:
     match = re.search(r"FreeCAD (\d+)\.(\d+)", path)
     return (int(match.group(1)), int(match.group(2))) if match else (-1,)
+
+
+def freecad_version(freecadcmd: Path) -> tuple[int, int]:
+    """(major, minor) that ``freecadcmd --version`` reports ("FreeCAD 1.1.4 ...")."""
+    try:
+        out = subprocess.run([str(freecadcmd), "--version"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=120, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise FreeCadError(f"{freecadcmd} --version failed: {exc}") from exc
+    match = re.search(r"FreeCAD (\d+)\.(\d+)", out.stdout + out.stderr)
+    if not match:
+        raise FreeCadError(f"{freecadcmd} --version printed no FreeCAD version")
+    return int(match.group(1)), int(match.group(2))
 
 
 def resolve_freecadcmd() -> Path:
     """``$HARMONIC_FREECAD`` (the ``freecadcmd`` executable) wins; otherwise the
     newest ``FreeCAD <version>`` install under the per-user or machine-wide
-    Windows program directories, then ``freecadcmd`` on PATH."""
+    Windows program directories, then ``freecadcmd`` on PATH. The one chosen
+    must report FreeCAD 1.1 or later: the runtime uses 1.1's CAM API."""
     override = os.environ.get(FREECAD_ENV)
     if override:
         if not Path(override).is_file():
             raise FreeCadError(f"freecadcmd not found at {override} (${FREECAD_ENV})")
-        return Path(override)
-    roots = [os.environ.get("LOCALAPPDATA", ""), os.environ.get("ProgramFiles", "")]
-    found = [
-        exe
-        for root in roots if root
-        for exe in glob.glob(os.path.join(root, "Programs", "FreeCAD *", "bin", "freecadcmd.exe"))
-        + glob.glob(os.path.join(root, "FreeCAD *", "bin", "freecadcmd.exe"))
-    ]
-    if found:
-        return Path(max(found, key=_version))
-    which = shutil.which("freecadcmd")
-    if which:
-        return Path(which)
-    raise FreeCadError(f"no FreeCAD found; install FreeCAD 1.1 or set ${FREECAD_ENV} to freecadcmd")
+        chosen = Path(override)
+    else:
+        roots = [os.environ.get("LOCALAPPDATA", ""), os.environ.get("ProgramFiles", "")]
+        found = [
+            exe
+            for root in roots if root
+            for exe in glob.glob(os.path.join(root, "Programs", "FreeCAD *", "bin", "freecadcmd.exe"))
+            + glob.glob(os.path.join(root, "FreeCAD *", "bin", "freecadcmd.exe"))
+        ]
+        which = shutil.which("freecadcmd")
+        if found:
+            chosen = Path(max(found, key=_path_version))
+        elif which:
+            chosen = Path(which)
+        else:
+            raise FreeCadError(f"no FreeCAD found; install FreeCAD 1.1 or set ${FREECAD_ENV} to freecadcmd")
+    version = freecad_version(chosen)
+    if version < MIN_FREECAD:
+        raise FreeCadError(f"{chosen} is FreeCAD {version[0]}.{version[1]}; the CAM runtime needs {MIN_FREECAD[0]}.{MIN_FREECAD[1]}+")
+    return chosen
 
 
 def parse_result(output: str) -> dict[str, Any]:
@@ -104,10 +129,10 @@ def parse_result(output: str) -> dict[str, Any]:
     return result
 
 
-def run_freecad(recipe: Path, ctx: dict[str, Any], programs, staging: Path, freecadcmd: Path) -> dict[str, Any]:
+def run_freecad(recipe: Path, ctx: dict[str, Any], programs, staging: Path, freecadcmd: Path, log: Path) -> dict[str, Any]:
     """Build and post ``programs`` in freecadcmd into ``staging``; return the
     runtime's result (posted files, FreeCAD version, post script). The full
-    console output is kept in ``staging/freecadcmd.log``."""
+    console output goes to ``log``, which outlives the staging directory."""
     spec = staging / "spec.json"
     spec.write_text(json.dumps({
         "recipe": str(Path(recipe).resolve()),
@@ -123,8 +148,11 @@ def run_freecad(recipe: Path, ctx: dict[str, Any], programs, staging: Path, free
         timeout=FREECAD_TIMEOUT_S, check=False,
     )
     output = completed.stdout + completed.stderr
-    (staging / "freecadcmd.log").write_text(output, encoding="utf-8")
-    return parse_result(output)
+    log.write_text(output, encoding="utf-8")
+    try:
+        return parse_result(output)
+    except FreeCadError as exc:
+        raise FreeCadError(f"{exc}\n(full freecadcmd output: {log})") from exc
 
 
 def verify(expectations, directory: Path) -> list[_gcode.Finding]:
@@ -222,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
                 ctx = recipe.context(features, _load_toml(plan_path), _load_toml(_process_plans.SHOP_PATH), str(step_path.resolve()))
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
-                result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd)
+                result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)
                 span.set_attribute("freecad.version", result["freecad_version"])
             posted = {Path(f).resolve() for f in result["files"]}
             expected = {(staging / p.name).resolve() for p in programs}
@@ -247,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             manifest = {
                 "stem": stem,
                 "freecad_version": result["freecad_version"],
-                "post": {"file": Path(result["post"]).name, "sha256": sha256(Path(result["post"]))},
+                "post": {"file": result["post"], "sha256": sha256(Path(result["post"]))},
                 "inputs": {name: {"path": Path(p).name, "sha256": sha256(Path(p))} for name, p in inputs.items()},
                 "programs": {p.name: sha256(p) for p in programs},
                 "cycle_times": sha256(times_path),
@@ -258,7 +286,8 @@ def main(argv: list[str] | None = None) -> int:
             return _fail(root, stem, exc, directory)
         finally:
             shutil.rmtree(staging_root, ignore_errors=True)
-        print(time_table(times), flush=True)
+        for line in time_table(times).splitlines():
+            _telemetry.info(line)
         _telemetry.info(f"{stem}: posted {len(programs)} programs, {len(checks)} checks passed (FreeCAD {result['freecad_version']})")
         return 0
 
