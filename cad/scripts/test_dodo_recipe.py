@@ -2207,7 +2207,8 @@ def test_artefact_digest_is_recipe_not_bytes():
 
 def test_shop_file_readers_stay_outside_every_com_leaf():
     """Neither shop TOML is in a COM leaf's key, so the modules that read them
-    may never join a part, assembly, drawing, soundness or feature closure."""
+    may never join a part, assembly, drawing, soundness, feature or export
+    closure."""
     dodo = _load_dodo()
     readers = {
         str((dodo.SCRIPTS_DIR / name).resolve())
@@ -2217,8 +2218,12 @@ def test_shop_file_readers_stay_outside_every_com_leaf():
         *dodo.part_scripts(),
         *(dodo.script_for(stem) for stem in dodo.ASSEMBLY_ORDER),
         *(spec.script for spec in dodo.DRAWINGS_BY_NAME.values()),
+        # Soundness: verify.py loads each assembly's interference table by name.
         dodo.VERIFY_PY,
-        dodo.SCRIPTS_DIR / "export_features.py",
+        dodo.POSTBUILD_PY,
+        *(dodo.interference_contract_file(stem) for stem in dodo.ASSEMBLY_ORDER),
+        # Feature bundles and the neutral export both run export_models.py.
+        dodo.EXPORT_PY,
     ]
     reached = {
         str(root): sorted(

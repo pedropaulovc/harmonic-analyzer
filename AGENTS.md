@@ -1243,7 +1243,7 @@ come from the model/spec, not separate text renderers.
 `cad/process/shop.toml` are in no COM leaf's cache key, so no part, assembly or
 drawing closure may read them. Their readers (`ha_assembly_package.py`,
 `_process_plans.py`, `cam_nc.py`) run outside every COM leaf, and `check:recipe`
-fails if one joins a part, assembly, drawing, soundness or feature closure
+fails if one joins a part, assembly, drawing, soundness, feature or export closure
 (`test_shop_file_readers_stay_outside_every_com_leaf`). A read by path from any
 other module is not caught: add the file to that leaf's deps.
 
